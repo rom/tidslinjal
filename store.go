@@ -598,6 +598,9 @@ func (s *Store) GetEvents(from, to time.Time, layerIDs []int64) []Event {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	// If no specific layers requested, return all (master + all layers).
+	// Layer visibility filtering is done client-side.
+	filterLayers := len(layerIDs) > 0
 	layerSet := make(map[int64]bool)
 	for _, id := range layerIDs {
 		layerSet[id] = true
@@ -605,8 +608,8 @@ func (s *Store) GetEvents(from, to time.Time, layerIDs []int64) []Event {
 
 	var result []Event
 	for _, e := range s.events {
-		// Layer filter: include master (no layer) + requested layers
-		if e.LayerID != nil {
+		// Layer filter: only restrict when caller explicitly asks for specific layers
+		if filterLayers && e.LayerID != nil {
 			if !layerSet[*e.LayerID] {
 				continue
 			}
@@ -683,6 +686,17 @@ func (s *Store) GetAttachmentsByEvent(eventID int64) []Attachment {
 		}
 	}
 	return result
+}
+
+// attachmentCountsLocked returns a map[eventID]count. Caller must hold at least RLock.
+func (s *Store) attachmentCounts() map[int64]int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	m := make(map[int64]int)
+	for _, a := range s.attachments {
+		m[a.EventID]++
+	}
+	return m
 }
 
 func (s *Store) GetAttachmentByID(id int64) (*Attachment, bool) {

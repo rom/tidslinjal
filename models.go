@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "2.3.0"
+const AppVersion = "2.4.0"
 
 // Role defines user access levels
 type Role string
@@ -148,13 +148,15 @@ type Event struct {
 	StartTime         time.Time   `json:"start_time"`
 	EndTime           *time.Time  `json:"end_time,omitempty"`
 	IsRecurring       bool        `json:"is_recurring"`
-	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // daily | weekly | monthly
+	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
 	LayerID           *int64      `json:"layer_id,omitempty"`
 	CreatedBy         int64       `json:"created_by"`
 	CreatedByName     string      `json:"created_by_name"`
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
+	// Derived (not stored)
+	AttachmentCount int `json:"attachment_count,omitempty"`
 	// Verification
 	VerifiedBy      int64      `json:"verified_by,omitempty"`
 	VerifiedByName  string     `json:"verified_by_name,omitempty"`
