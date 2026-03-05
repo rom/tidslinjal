@@ -3,13 +3,14 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "2.4.0"
+const AppVersion = "3.0.0"
 
 // Role defines user access levels
 type Role string
 
 const (
 	RoleRead      Role = "read"
+	RoleReporter  Role = "reporter"  // can comment + set responded/completed, needs approval
 	RoleReadWrite Role = "readwrite"
 	RoleTeamLead  Role = "teamlead" // can create groups/layers, verify/reject events
 	RoleOpLead    Role = "oplead"   // operations lead: master timeline + teamlead rights
@@ -20,13 +21,14 @@ const (
 type EventStatus string
 
 const (
-	StatusPlanned   EventStatus = "planned"
-	StatusActive    EventStatus = "active"
-	StatusCompleted EventStatus = "completed"
-	StatusSubmitted EventStatus = "submitted"
-	StatusVerified  EventStatus = "verified"
-	StatusRejected  EventStatus = "rejected"
-	StatusCancelled EventStatus = "cancelled"
+	StatusPlanned     EventStatus = "planned"
+	StatusActive      EventStatus = "active"
+	StatusRespondedTo EventStatus = "responded_to"
+	StatusCompleted   EventStatus = "completed"
+	StatusSubmitted   EventStatus = "submitted"
+	StatusVerified    EventStatus = "verified"
+	StatusRejected    EventStatus = "rejected"
+	StatusCancelled   EventStatus = "cancelled"
 )
 
 // EventType is a string key referencing a dynamic EventTypeDef
@@ -95,16 +97,23 @@ func (u *User) Public() UserPublic {
 
 // UserPreferences stores per-user UI settings
 type UserPreferences struct {
-	UserID       int64    `json:"user_id"`
-	Theme        string   `json:"theme"`          // dark | light
-	Size         string   `json:"size"`           // small | normal | large | huge
-	Language     string   `json:"language"`       // en | sv | fr
-	DayStartHour int      `json:"day_start_hour"` // 0-23
-	DayEndHour   int      `json:"day_end_hour"`   // 1-24  (exclusive)
-	HiddenTypes  []string `json:"hidden_types"`   // event type keys to hide
-	ActiveLayers []int64  `json:"active_layers"`  // layer IDs currently visible
-	WebhookURL   string   `json:"webhook_url,omitempty"`
-	WebhookType  string   `json:"webhook_type,omitempty"` // mattermost | slack | generic
+	UserID          int64    `json:"user_id"`
+	Theme           string   `json:"theme"`           // dark | light
+	Size            string   `json:"size"`            // small | normal | large | huge
+	Language        string   `json:"language"`        // en | sv | fr
+	DayStartHour    int      `json:"day_start_hour"`  // 0-23
+	DayEndHour      int      `json:"day_end_hour"`    // 1-24  (exclusive)
+	HiddenTypes     []string `json:"hidden_types"`    // event type keys to hide
+	ActiveLayers    []int64  `json:"active_layers"`   // layer IDs currently visible
+	WebhookURL      string   `json:"webhook_url,omitempty"`
+	WebhookType     string   `json:"webhook_type,omitempty"` // mattermost | slack | generic
+	DefaultView     string   `json:"default_view,omitempty"` // day|2days|3days|4days|week
+	ShowOutOfHours  bool     `json:"show_out_of_hours"`      // show ghosted time outside day hours
+	RedLineEnabled  bool     `json:"red_line_enabled"`       // show current-time red line
+	RedLineColor    string   `json:"red_line_color,omitempty"`
+	RedLineWidth    int      `json:"red_line_width,omitempty"`
+	RedLineStyle    string   `json:"red_line_style,omitempty"` // solid | dashed | dotted
+	SynthLabel      bool     `json:"synth_label"`              // show H+N label on red line
 }
 
 // Group is a named set of users used for layer sharing
@@ -147,6 +156,7 @@ type Event struct {
 	Status            EventStatus `json:"status"`
 	StartTime         time.Time   `json:"start_time"`
 	EndTime           *time.Time  `json:"end_time,omitempty"`
+	AllDay            bool        `json:"all_day"`              // day-only activity (no specific time)
 	IsRecurring       bool        `json:"is_recurring"`
 	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
@@ -157,11 +167,39 @@ type Event struct {
 	UpdatedAt         time.Time   `json:"updated_at"`
 	// Derived (not stored)
 	AttachmentCount int `json:"attachment_count,omitempty"`
+	CommentCount    int `json:"comment_count,omitempty"`
 	// Verification
 	VerifiedBy      int64      `json:"verified_by,omitempty"`
 	VerifiedByName  string     `json:"verified_by_name,omitempty"`
 	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
 	RejectionReason string     `json:"rejection_reason,omitempty"`
+}
+
+// EventComment is a comment on an event
+type EventComment struct {
+	ID          int64     `json:"id"`
+	EventID     int64     `json:"event_id"`
+	AuthorID    int64     `json:"author_id"`
+	AuthorName  string    `json:"author_name"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	// PendingApproval: for reporter role comments that change status
+	PendingApproval bool        `json:"pending_approval,omitempty"`
+	ApprovedBy      int64       `json:"approved_by,omitempty"`
+	ApprovedAt      *time.Time  `json:"approved_at,omitempty"`
+	StatusChange    EventStatus `json:"status_change,omitempty"`
+}
+
+// ExercisePhase is a visually distinct phase block on the timeline
+type ExercisePhase struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	Order     int       `json:"order"` // 0-9
+	CreatedBy int64     `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Attachment is a file attached to an event
@@ -236,4 +274,6 @@ type ExerciseSettings struct {
 	Enabled bool   `json:"enabled"`
 	Epoch   string `json:"epoch"` // ISO8601: real datetime = Day 1 T+0
 	Label   string `json:"label"` // exercise name shown in header
+	Paused  bool   `json:"paused"`  // freeze timeline progression
+	PausedAt string `json:"paused_at,omitempty"` // ISO8601: when it was paused
 }

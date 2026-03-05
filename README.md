@@ -1,8 +1,33 @@
-# Tidslinjal v2.4.0
+# Tidslinjal v3.0.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
 
 ---
+
+## What's New in v3.0.0
+
+- **Reporter role** — new `reporter` role between Read and Read/Write: reporters can comment on events and set statuses to `responded_to` or `completed`; status-changing comments require Team Lead approval
+- **Event comments** — threaded comments on every event with author, timestamp, and pending-approval workflow for reporters
+- **`responded_to` status** — new event lifecycle step between `active` and `completed`
+- **Exercise phases** — up to 10 visually distinct overlaid blocks on the timeline (name, color, start/end); managed in the new **Phases** sidebar tab (Team Lead+)
+- **All-day / day-only events** — events with no specific time display in the ghosted area; create with the "All-day" checkbox
+- **Recurring event occurrences** — recurring events now expand and render all occurrences in the current view; clicking any instance opens the master event
+- **Current-time red line options** — configurable on/off, color, width, and style (solid/dashed/dotted) from Settings
+- **H+N synthetic labels** — toggleable H+N hour labels on the red line and on the time column for exercise contexts
+- **Timeline freeze / pause** — pause progression of synthetic time for exercise review; "Freeze" button in Settings
+- **Admin sees all layers** — admins now see all users' layers in the Layers sidebar
+- **Horizontal drag-to-pan** — drag the timeline horizontally to scroll; drag >40% of visible width to navigate to the adjacent date range
+- **Keyboard shortcuts** — `←` / `→` navigate dates, `T` go today, `N` scroll to now, `E` add event, `?` help, `Esc` close modal, `+` / `-` zoom
+- **User creation with group assignment** — user create/edit dialog includes group multi-select
+- **Group member list in sidebar** — groups tab shows members; 👥 button opens member management
+- **Password change** — 🔑 key button in header opens self-service password change dialog
+- **Full data export** — admin-only JSON export of all data (events, users, groups, layers, settings, alarms) via ⬇ Export Data button
+- **Printable / exportable reports** — 📄 Report button generates AAR, per-layer, or timeline snapshot HTML reports (download or print to PDF)
+- **Configurable default view** — save your preferred date range (day / 2-day / 3-day / 4-day / week) as default in Settings
+- **Out-of-hours toggle** — toggle visibility of ghosted time slots outside configured day hours
+- **"Last updated" timestamp** — shown in event detail when the event was modified after creation
+- **Sidebar toggle glitch fixed** — event blocks correctly reposition when the sidebar opens or closes
+- **Version bump to 3.0.0**
 
 ## What's New in v2.4.0
 

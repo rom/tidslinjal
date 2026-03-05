@@ -58,6 +58,8 @@
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
       <button class="btn btn-secondary btn-sm" id="btnExportICS">📅 Export ICS</button>
+      <button class="btn btn-secondary btn-sm admin-only" id="btnExportData" style="display:none">⬇ Export Data</button>
+      <button class="btn btn-secondary btn-sm" id="btnReport">📄 Report</button>
 
       <div class="toolbar-sep"></div>
       <div class="lang-flags" id="langFlags">
@@ -79,6 +81,7 @@
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help" onclick="openModal('helpModal')">?</button>
+        <button class="btn btn-secondary btn-icon btn-sm" id="btnChangePassword" title="Change password">🔑</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnSidebar" title="Toggle panel">☰</button>
         <button class="btn btn-secondary btn-sm" id="btnLogout">Logout</button>
       </div>
@@ -103,6 +106,7 @@
         <button class="sidebar-tab admin-only" data-tab="users" style="display:none">Users</button>
         <button class="sidebar-tab admin-only" data-tab="groups" style="display:none">Groups</button>
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none">Audit</button>
+        <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none">Phases</button>
         <button class="sidebar-tab" data-tab="settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
@@ -165,6 +169,7 @@
           <select id="eventStatus">
             <option value="planned">Planned</option>
             <option value="active">Active</option>
+            <option value="responded_to">Responded To</option>
             <option value="completed">Completed</option>
             <option value="submitted">Submitted</option>
             <option value="verified">Verified</option>
@@ -178,6 +183,12 @@
         <textarea id="eventDescription" rows="3"></textarea>
       </div>
       <div class="form-row">
+        <div class="form-group">
+          <div class="form-check">
+            <input type="checkbox" id="eventAllDay">
+            <label for="eventAllDay" id="lbl-ev-allday">Day-only (no specific time)</label>
+          </div>
+        </div>
         <div class="form-group">
           <div class="form-check">
             <input type="checkbox" id="eventRecurring">
@@ -323,6 +334,7 @@
           <label>Role</label>
           <select id="uRole">
             <option value="read">Read</option>
+            <option value="reporter">Reporter</option>
             <option value="readwrite">Read/Write</option>
             <option value="teamlead">Team Lead</option>
             <option value="oplead">Operations Lead</option>
@@ -336,11 +348,137 @@
           <label for="uCanLock">Can lock time slots</label>
         </div>
       </div>
+      <div class="form-group" id="uGroupsGroup">
+        <label>Groups</label>
+        <div id="uGroupPicker" class="group-picker"></div>
+      </div>
+      <div class="form-group" id="uPasswordGroup" style="display:none">
+        <label>Change Password</label>
+        <div class="password-form">
+          <input type="password" id="uNewPassword" placeholder="New password">
+          <input type="password" id="uConfirmPassword" placeholder="Confirm new password">
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
       <button class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" id="btnSaveUser">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Change Modal (self-service) -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Change Password</h2>
+      <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="password-form">
+        <div class="form-group">
+          <label>Current password</label>
+          <input type="password" id="pwdCurrent">
+        </div>
+        <div class="form-group">
+          <label>New password</label>
+          <input type="password" id="pwdNew">
+        </div>
+        <div class="form-group">
+          <label>Confirm new password</label>
+          <input type="password" id="pwdConfirm">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('passwordModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSavePassword">Change Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phase Modal -->
+<div class="modal-overlay" id="phaseModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="phaseModalTitle">New Phase</h2>
+      <button class="modal-close" onclick="closeModal('phaseModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="phaseId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Name *</label>
+          <input type="text" id="phaseName">
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="phaseColor" value="#E67E22">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start *</label>
+          <input type="datetime-local" id="phaseStart">
+        </div>
+        <div class="form-group">
+          <label>End *</label>
+          <input type="datetime-local" id="phaseEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Order (0-9)</label>
+        <input type="number" id="phaseOrder" min="0" max="9" value="0" style="width:70px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeletePhase" style="display:none">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal('phaseModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSavePhase">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal-overlay" id="reportModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>📄 Generate Report</h2>
+      <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Report type</label>
+          <select id="reportType">
+            <option value="aar">After Action Report (AAR)</option>
+            <option value="timeline">Timeline Snapshot</option>
+            <option value="per_layer">Per-Layer Activity</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Format</label>
+          <select id="reportFormat">
+            <option value="html">HTML (view)</option>
+            <option value="print">Print / PDF</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>From</label>
+          <input type="datetime-local" id="reportFrom">
+        </div>
+        <div class="form-group">
+          <label>To</label>
+          <input type="datetime-local" id="reportTo">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('reportModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="generateReport()">Generate</button>
     </div>
   </div>
 </div>
@@ -540,11 +678,12 @@
         <h3 id="h-roles">User Roles</h3>
         <table class="help-table">
           <tr><th>Role</th><th>Capabilities</th></tr>
-          <tr><td><b>Read</b></td><td>View timeline; set personal alarms</td></tr>
+          <tr><td><b>Read</b></td><td>View timeline; set personal alarms; add comments</td></tr>
+          <tr><td><b>Reporter</b></td><td>+ Set event status to "Responded To" or "Completed" (requires team lead approval); add comments</td></tr>
           <tr><td><b>Read/Write</b></td><td>+ Create/edit own events on accessible layers; create event types and layers</td></tr>
-          <tr><td><b>Team Lead</b></td><td>+ Create groups; verify/reject submitted events; view audit log</td></tr>
+          <tr><td><b>Team Lead</b></td><td>+ Create groups; verify/reject events; approve reporter status changes; manage exercise phases; view audit log</td></tr>
           <tr><td><b>Operations Lead</b></td><td>+ Create/edit/delete master timeline events</td></tr>
-          <tr><td><b>Admin</b></td><td>Full access — manage users, roles, locks, exercise settings</td></tr>
+          <tr><td><b>Admin</b></td><td>Full access — manage users, roles, locks, exercise settings; see all layers; export all data</td></tr>
         </table>
 
         <h3 id="h-alarms">Alarms</h3>
@@ -558,13 +697,14 @@
         <h3 id="h-status">Event Status Workflow</h3>
         <table class="help-table">
           <tr><th>Status</th><th>Meaning</th><th>Who can set</th></tr>
-          <tr><td>Planned</td><td>Default — not yet active</td><td>Creator / Team Lead+</td></tr>
-          <tr><td>Active</td><td>Currently in progress</td><td>Creator / Team Lead+</td></tr>
-          <tr><td>Completed</td><td>Finished</td><td>Creator / Team Lead+</td></tr>
-          <tr><td>Submitted</td><td>Ready for review</td><td>Creator / Team Lead+</td></tr>
+          <tr><td>Planned</td><td>Default — not yet active</td><td>Creator / Read/Write+</td></tr>
+          <tr><td>Active</td><td>Currently in progress</td><td>Creator / Read/Write+</td></tr>
+          <tr><td>Responded To</td><td>Event has been acknowledged/responded to</td><td>Reporter+ (Reporter requires approval)</td></tr>
+          <tr><td>Completed</td><td>Finished</td><td>Reporter+ (Reporter requires approval)</td></tr>
+          <tr><td>Submitted</td><td>Ready for review</td><td>Creator / Read/Write+</td></tr>
           <tr><td>Verified ✓</td><td>Approved by Team Lead+; records who/when</td><td>Team Lead+</td></tr>
           <tr><td>Rejected ✗</td><td>Returned with mandatory reason</td><td>Team Lead+</td></tr>
-          <tr><td>Cancelled</td><td>Will not happen; shown dimmed</td><td>Creator / Team Lead+</td></tr>
+          <tr><td>Cancelled</td><td>Will not happen; shown dimmed</td><td>Creator / Read/Write+</td></tr>
         </table>
 
         <h3 id="h-recur">Recurrence Patterns</h3>
@@ -577,6 +717,8 @@
 
         <h3 id="h-exercise">Synthetic Exercise Time</h3>
         <p>Admins can define an <b>Exercise Epoch</b> — the real datetime that maps to <em>Day 1 T+0</em>. Once enabled, users click the <b>🕐 T+</b> button in the toolbar to toggle exercise day headers (Day -1, Day 0, Day 1 …).</p>
+        <p>In synthetic time mode, the current-time red line shows an <b>H+N</b> label indicating hours since the exercise epoch. The timeline can also be <b>frozen/paused</b> to stop progression for planning.</p>
+        <p><b>Exercise Phases</b> (Team Lead+) appear as color-coded semi-transparent overlays on the timeline. Up to 10 phases can be defined under the Phases sidebar tab.</p>
         <p>Configure under <b>Settings → Exercise Settings</b> (Admin only).</p>
 
         <h3 id="h-webhooks">Webhook Notifications</h3>
@@ -594,8 +736,20 @@
           <tr><td><b>Drag event block</b></td><td>Reschedule to target slot</td></tr>
           <tr><td><b>Drag time column</b></td><td>Zoom slot height</td></tr>
           <tr><td><b>Double-click time column</b></td><td>Reset zoom to 1×</td></tr>
+          <tr><td><b>Drag timeline horizontally</b></td><td>Pan to adjacent dates (middle-drag on timeline area)</td></tr>
           <tr><td><b>🗂 button</b></td><td>Layer quick-toggle popover</td></tr>
           <tr><td><b>? button</b></td><td>Open this help</td></tr>
+        </table>
+        <h3>Keyboard Shortcuts</h3>
+        <table class="help-table">
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Navigate back / forward one range</td></tr>
+          <tr><td><kbd>T</kbd></td><td>Jump to today</td></tr>
+          <tr><td><kbd>N</kbd></td><td>Scroll to current time (Now)</td></tr>
+          <tr><td><kbd>E</kbd></td><td>Open Add Event dialog</td></tr>
+          <tr><td><kbd>?</kbd> / <kbd>H</kbd></td><td>Open this help</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close current modal</td></tr>
+          <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out (increase / decrease slot height)</td></tr>
+          <tr><td><kbd>F</kbd></td><td>Freeze / resume synthetic time</td></tr>
         </table>
 
       </div><!-- .help-content -->
