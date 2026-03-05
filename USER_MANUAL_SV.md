@@ -1,0 +1,556 @@
+# Tidslinjal Användarmanual
+
+**Version 3.2.0**
+
+---
+
+## Innehållsförteckning
+
+1. [Översikt](#1-översikt)
+2. [Komma igång](#2-komma-igång)
+3. [Gränssnittet](#3-gränssnittet)
+4. [Navigera tidslinjen](#4-navigera-tidslinjen)
+5. [Händelser](#5-händelser)
+6. [Händelsestatus-arbetsflöde](#6-händelsestatus-arbetsflöde)
+7. [Kommentarer](#7-kommentarer)
+8. [Lager](#8-lager)
+9. [Larm och notifieringar](#9-larm-och-notifieringar)
+10. [Övning och syntetisk tid](#10-övning-och-syntetisk-tid)
+11. [Övningsfaser](#11-övningsfaser)
+12. [Tidsluckslåsning](#12-tidsluckslåsning)
+13. [Roller och behörigheter](#13-roller-och-behörigheter)
+14. [Inställningar](#14-inställningar)
+15. [Export och rapporter](#15-export-och-rapporter)
+16. [Adminvy](#16-adminvy)
+17. [Tangentbords- och musgenvägar](#17-tangentbords--och-musgenvägar)
+18. [Felsökning](#18-felsökning)
+
+---
+
+## 1. Översikt
+
+**Tidslinjal** är ett samarbetsbaserat, webbaserat operativt tidslinje-verktyg för geografiskt utspridda team. Det ger en delad, visuell kronologi av händelser för operationsplanering, koordinering och lägesuppfattning — inklusive stöd för militära och nödlägesövningar med syntetisk tid.
+
+Nyckelfunktioner:
+- Delad tidslinje med flera användare och rollbaserad åtkomst
+- Händelselivscykelhantering med godkännandearbetsflöde
+- Namngivna lager för att separera aktivitetsströmmar
+- Övningsstöd med STARTEX/ENDEX och syntetisk "Dag N / T+T" tid
+- Larmeddelanden i realtid via Server-Sent Events
+- Export till ICS, JSON och CSV
+
+---
+
+## 2. Komma igång
+
+### Logga in
+
+Gå till `http://<server>:<port>` (standard: `http://localhost:8080`).
+
+```
+┌─────────────────────────────────┐
+│          TIDSLINJAL             │
+│                                 │
+│  Användarnamn: [admin         ] │
+│  Lösenord:     [••••••••••••••] │
+│                                 │
+│         [ Logga in ]            │
+└─────────────────────────────────┘
+```
+
+Standarduppgifter: `admin` / `admin`
+
+> **Säkerhetsnotering:** Byt adminlösenordet omedelbart efter första inloggning med 🔑-knappen i övre högra hörnet.
+
+### Byta lösenord
+
+Klicka på **🔑**-knappen i sidhuvudet. Ange ditt nuvarande lösenord och sedan ditt nya lösenord två gånger.
+
+---
+
+## 3. Gränssnittet
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Tids│linjal  [‹] [Idag] [›] [⏱]  Visa: [Vecka▼]  Upl.: [Timme▼]   │
+│             [🔍 Sök…] [🗂 Lager] [⬇ Exportera] [📄 Rapport]          │
+│                          [👤 Namn  roll] [?][🔑][☰] [Logga ut]       │
+├────────────────────────────────────────────────────┬─────────────────┤
+│                                                    │  SIDOPANEL      │
+│                  TIDSLINJEGRID                     │                 │
+│  Tid  │  Mån 01  │  Tis 02  │  Ons 03  │  ...     │  [Förklaring]   │
+│ ──────┼──────────┼──────────┼──────────┤          │  [Larm]         │
+│ 08:00 │          │ ▓▓▓▓▓▓▓▓ │          │          │  [Lager]        │
+│ 09:00 │          │ Genomg.  │          │          │  [Inställningar]│
+│ 10:00 │ ████████ │          │          │          │                 │
+│       │ Stand-up │          │          │          │                 │
+│ 11:00 │          │          │ ████████ │          │                 │
+│       │          │          │ ENDEX    │          │                 │
+└────────────────────────────────────────────────────┴─────────────────┘
+```
+
+**Sidhuvud** — navigering, vyval, sökning och användarkontroller.
+
+**Tidslinjegrid** — dagar från vänster till höger, tid uppifrån och ner. Händelser visas som färgade block.
+
+**Sidopanel** — flikarna Förklaring, Larm, Lager, Användare (admin), Grupper (admin), Granskningslogg (Gruppledare+), Faser (Gruppledare+), Inställningar. Växla med ☰-knappen.
+
+---
+
+## 4. Navigera tidslinjen
+
+### Datumnavigering
+
+| Kontroll | Åtgärd |
+|---|---|
+| **‹** / **›**-knappar | Stega bakåt / framåt ett visningsintervall |
+| **Idag**-knapp | Hoppa till idag |
+| **⏱**-knapp | Scrolla griden till aktuell tid |
+
+### Visningsintervall
+
+Använd **Visa**-rullgardinsmenyn i verktygsfältet:
+
+```
+Visa: [Dag ▼]
+       Dag
+       2 Dagar
+       3 Dagar
+       4 Dagar
+     ▶ Vecka
+       Månad
+       2 Månader
+       3 Månader
+```
+
+### Upplösning (slothöjd)
+
+Använd **Upplösning**-rullgardinsmenyn:
+
+```
+Upplösning: [Timme ▼]
+             10 min
+             15 min
+           ▶ Timme
+             Dag
+```
+
+### Zoom
+
+**Dra för att zooma** — klicka och dra uppåt/nedåt på tidskolumnen (vänster kant) för att öka eller minska slothöjden. Dra **uppåt** för att zooma in, **nedåt** för att zooma ut.
+
+**Dubbelklicka** på tidskolumnen för att återställa zoom till 1×.
+
+Tangentbord: **+** / **-** för att zooma in/ut i steg.
+
+### Horisontell panorering
+
+Mellanklicka och dra på tidslinje-området för att panorera vänster/höger.
+
+---
+
+## 5. Händelser
+
+### Skapa en händelse
+
+Klicka på en tom cell i tidslinjegriden eller klicka **+ Lägg till händelse** i sidhuvudet.
+
+```
+┌─────────────────────── Lägg till händelse ───────────────────────────┐
+│ Titel *  [                                                        ]   │
+│                                                                       │
+│ Typ      [Aktivitet       ▼]   Färg  [■]                             │
+│                                                                       │
+│ Start *  [2025-06-01T10:00]    Slut  [2025-06-01T11:00]              │
+│                                                                       │
+│ Lager    [Masterlinjen    ▼]  Status [Planerad         ▼]            │
+│                                                                       │
+│ Beskrivning                                                           │
+│ [                                                                 ]   │
+│                                                                       │
+│ Deltagare  [—  ▼]   ☐ Dagshändelse (ingen specifik tid)              │
+│                                                                       │
+│ ☐ Återkommande    Mönster [Veckovis ▼]                               │
+│ Slutdatum  [               ]                                          │
+│                                                                       │
+│ Bilaga 📎 [Välj fil]                                                  │
+│                                                                       │
+│              [Avbryt]   [Spara]                                       │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Händelsetyper
+
+| Typ | Färg | Anteckningar |
+|---|---|---|
+| **Händelse** | Blå | Allmän förekomst |
+| **Ögonblick** | Orange | Enstaka tidpunkt — ingen sluttid. Renderas som en ◆ diamantmarkör. |
+| **Möte** | Grå | Schemalagt möte |
+| **Beslut** | Grön | Beslutspunkt |
+| **Tidsgräns** | Starkt röd | Hård deadline |
+| **Aktivitet** | Grön | Arbetsblock |
+| **Upprepande** | Lila | Återkommande aktivitet |
+| **Rapportering** | Blågrön | Rapport eller genomgång |
+
+Anpassade typer kan läggas till av användare med Läs/Skriv+ från inställningspanelen.
+
+### Ögonblickshändelser
+
+När **Ögonblick** väljs som typ:
+- Fältet **Slut** döljs (ingen varaktighet)
+- Händelsen renderas som en smal vertikal markör med en ◆ diamant överst
+- Den kan inte ställas in som återkommande
+
+### Dagshändelser
+
+Markera **Dagshändelse (ingen specifik tid)** för en händelse som sträcker sig över hela dagen:
+- Start-/sluttidsfälten döljs
+- Händelsen visas i det gråa området utanför dagstimmar
+- Upprepning är inte tillgänglig för dagshändelser
+
+### Deltagare
+
+Fältet **Deltagare** markerar om aktiviteten involverar interna eller externa parter:
+
+| Värde | Märke | Färg |
+|---|---|---|
+| — | inget | — |
+| **Intern** | `INTERN` | Blågrön |
+| **Extern** | `EXTERN` | Röd |
+
+### Återkommande händelser
+
+Markera **Återkommande**, välj sedan ett mönster:
+
+| Mönster | Intervall |
+|---|---|
+| Var 30:e minut | 30 minuter |
+| Varje timme | 1 timme |
+| Varannan / var 3:e / var 4:e timme | 2 / 3 / 4 timmar |
+| Dagligen | 1 dag |
+| Veckovis | 7 dagar |
+| Månadsvis | ~1 månad |
+| Kvartalsvis | ~3 månader |
+
+### Redigera och ta bort händelser
+
+Klicka på ett händelseblock för att öppna detaljvyn. Klicka **Redigera** för att ändra. Klicka **Ta bort** (synligt för skaparen och admins) för att ta bort.
+
+---
+
+## 6. Händelsestatus-arbetsflöde
+
+Varje händelse har en status som fortskrider genom en livscykel:
+
+```
+planerad ──► aktiv ──► besvarad ──► avslutad ──► inskickad
+                                                      │
+                                           ┌──────────┤
+                                           ▼          ▼
+                                       verifierad  avvisad
+                                                      │
+                                                (orsak krävs)
+```
+
+`avbruten` är tillgänglig i vilket stadium som helst.
+
+### Övergångar
+
+| Från → Till | Vem kan agera |
+|---|---|
+| Valfri → valfri (utom verifiera/avvisa) | Skapare, Gruppledare+ |
+| besvarad | Rapportör, Skapare, Gruppledare+ |
+| inskickad → verifierad | Gruppledare+ (registrerar vem och när) |
+| inskickad → avvisad | Gruppledare+ (kräver avvisningsorsak) |
+
+### Rapportörsrollen
+
+Användare med rollen **Rapportör** kan:
+- Posta kommentarer på händelser
+- Ange status som `besvarad` eller `avslutad` (kräver Gruppledarens godkännande)
+
+---
+
+## 7. Kommentarer
+
+Klicka på ett händelseblock för att öppna detaljvyn. Scrolla ner till **Kommentarer**.
+
+- Alla autentiserade användare kan läsa kommentarer
+- Läs/Skriv+-användare kan posta kommentarer
+- Rapportörer kan posta kommentarer; statuständrande kommentarer kräver godkännande
+- Gruppledare+ kan godkänna eller ta bort väntande kommentarer
+
+---
+
+## 8. Lager
+
+Lager är namngivna överlägg ovanpå masterlinjen. De gör det möjligt för olika team att ha separata händelsespår med en gemensam vy.
+
+### Skapa ett lager
+
+1. Öppna fliken **Lager** i sidopanelen eller klicka **🗂 Lager** i verktygsfältet
+2. Klicka **+ Nytt lager**
+3. Ange namn, färg, beskrivning, synlighet och behörigheter
+
+```
+┌──────── Nytt lager ────────────┐
+│ Namn *   [Cyberteam         ]  │
+│ Färg     [■ #9B59B6          ]  │
+│ Beskrivning [                 ]│
+│                                │
+│ Synlighet  [Grupper       ▼]   │
+│ Behörighet [Läs/Skriv    ▼]    │
+│ Grupper    ☐ Alpha  ☐ Bravo    │
+│                                │
+│         [Avbryt]  [Spara]      │
+└────────────────────────────────┘
+```
+
+### Synlighet
+
+| Inställning | Vem kan se lagret |
+|---|---|
+| **Privat** | Bara ägaren |
+| **Grupper** | Ägare + medlemmar i valda grupper |
+| **Offentlig** | Alla autentiserade användare |
+
+### Växla lager
+
+Klicka **🗂 Lager** i verktygsfältet för att öppna snabbväxlingsrutan. Klicka på ett objekt för att växla det. Flera lager kan vara aktiva samtidigt — markera kryssrutorna för de lager du vill se.
+
+---
+
+## 9. Larm och notifieringar
+
+### Ställa in ett larm
+
+1. Klicka på ett händelseblock för att öppna detaljvyn
+2. Klicka **🔔 Ställ larm**
+3. Välj ledtid (vid tidpunkten, 5/10/15/30 min, eller 1 timme innan)
+
+### Larmnotifieringar
+
+När ett larm utlöses visas en notifieringspanel överst på skärmen:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ 🔔 Larm — "ENDEX genomgång" om 15 minuter (10:45)  [ACK] │
+└──────────────────────────────────────────────────────────┘
+```
+
+Klicka **ACK** för att kvittera. Okvitterade larm eskalerar — de blir orange, sedan pulserande röda var 60:e sekund.
+
+### Webhook-notifieringar
+
+Konfigurera en webhook-URL i **Inställningar** för att också ta emot larmnotifieringar via HTTP POST till Mattermost, Slack eller valfri HTTP-endpoint.
+
+### Larm-fliken i sidopanelen
+
+Visa och hantera alla dina aktiva larm från fliken **Larm** i sidopanelen.
+
+---
+
+## 10. Övning och syntetisk tid
+
+För träningsövningar stöder Tidslinjal ett "syntetisk tid"-läge som ersätter riktiga kalenderdatum med övningsdags-/timmetiketter.
+
+### Konfiguration (Bara admin)
+
+1. Öppna fliken **Inställningar** i sidopanelen
+2. Scrolla ner till **Övningsinställningar**
+3. Fyll i:
+   - **Övningsnamn** — visas som ett märke i sidhuvudet
+   - **STARTEX** — det riktiga datumet och tid som mappar till "Dag 1 T+0"
+   - **ENDEX** — det riktiga datumet och tid för övningens slut
+4. Markera **Aktivera syntetisk tidsvisning**
+5. Klicka **Spara**
+
+### Aktivera syntetisk tid
+
+Knappen **🕐 T+** visas i verktygsfältet när övningsläget är konfigurerat. Klicka för att växla mellan riktig och syntetisk tidsvisning.
+
+### Tidslinjefrysen
+
+I **Inställningar**-panelen, använd **Frys/pausa tidslinjen** för att stoppa den syntetiska klockan vid en specifik tidpunkt. Klicka **Återuppta** för att ta bort frysningen.
+
+---
+
+## 11. Övningsfaser
+
+Gruppledare och högre roller kan definiera namngivna, färgade block som täcker hela tidslinjen för att visa övningsfaser.
+
+1. Öppna fliken **Faser** i sidopanelen
+2. Klicka **+ Ny fas**
+3. Ange namn, färg, starttid, sluttid och visningsordning (0–9)
+
+Faser visas som genomskinliga färgband längst upp i tidslinjegriden.
+
+---
+
+## 12. Tidsluckslåsning
+
+Admins och användare med flaggan `kan_låsa` kan låsa tidsintervall för att förhindra skapande av händelser.
+
+1. Klicka **🔒 Lås tidslucka** i sidhuvudet (synligt för admin/kan_låsa-användare)
+2. Ange starttid, sluttid och orsak
+
+Låsta tidsluckor visas som ett rödstreckigt överlägg. Händelser kan inte skapas i låsta tidsluckor.
+
+---
+
+## 13. Roller och behörigheter
+
+| Roll | Förkortning | Funktioner |
+|---|---|---|
+| **Läs** | `read` | Visa tidslinje, händelser, lager; ställa in personliga larm |
+| **Rapportör** | `reporter` | + Posta kommentarer; ange besvarad/avslutad (med godkännande) |
+| **Läs/Skriv** | `readwrite` | + Skapa/redigera egna händelser; skapa händelsetyper och lager |
+| **Gruppledare** | `teamlead` | + Skapa grupper; verifiera/avvisa inskickade händelser; visa granskningslogg; hantera faser |
+| **Operationsledare** | `oplead` | + Skapa/redigera/ta bort händelser på masterlinjen |
+| **Admin** | `admin` | Full åtkomst — hantera alla användare, roller, lås, övningsinställningar |
+
+Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
+
+---
+
+## 14. Inställningar
+
+Öppna fliken **Inställningar** i sidopanelen för att konfigurera dina inställningar.
+
+### Tema och display
+
+| Inställning | Alternativ |
+|---|---|
+| **Tema** | Mörkt / Ljust |
+| **Storlek** | Liten / Normal / Stor / Enorm |
+| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
+| **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
+
+Språket kan också ändras direkt med flaggknapparna (🇬🇧 🇸🇪 🇫🇷) i verktygsfältet.
+
+### Dagstimmar
+
+Ange **Starttimme** och **Sluttimme** för att definiera ditt "arbetsdagsfönster". Tidsluckor utanför detta fönster visas grå/streckade.
+
+### Standardvy
+
+Klicka på en av intervallknapparna (Dag / 2 Dagar / 3 Dagar / 4 Dagar / Vecka) för att ange din standardvy. Att ändra detta växlar också den aktuella vyn omedelbart.
+
+### Händelsetypsynlighet
+
+Slå på/av enskilda händelsetyper. Dolda typer är nedtonade i tidslinjen. Anpassade typer kan skapas med knappen **+ Ny typ** (Läs/Skriv+).
+
+### Nulägesspår (röd linje)
+
+| Inställning | Beskrivning |
+|---|---|
+| Visa / Dölj | Växla den röda linjen |
+| Färg | Linjefärg (standard röd) |
+| Bredd | Linjetjocklek i pixlar |
+| Typ | Solid / Streckad / Prickad |
+| H+N-etikett | Visa övningstimme-etikett på linjen |
+
+### Webhook / Notifieringar
+
+Ange en webhook-URL för att ta emot larmnotifieringar som HTTP POST-förfrågningar:
+- **Mattermost** — `{"text": "..."}` payload
+- **Slack** — `{"text": "..."}` payload
+- **Generisk** — fullt larm-JSON-payload
+
+Klicka **Testa** för att skicka en testnotifiering.
+
+---
+
+## 15. Export och rapporter
+
+### Export
+
+Klicka **⬇ Exportera** i verktygsfältet för att öppna exportmodalen:
+
+| Format | Innehåll |
+|---|---|
+| **ICS** | Händelser i aktuell vy som iCalendar; importera i valfri kalenderapp |
+| **JSON** | Komplett systemexport (alla händelser, användare, grupper, lager, inställningar) — bara admin |
+| **CSV** | Händelser i aktuell vy som kommaseparerat kalkylblad |
+
+### Rapporter
+
+Klicka **📄 Rapport** för att öppna rapportgeneratorn:
+
+| Rapporttyp | Beskrivning |
+|---|---|
+| **Efterhandsbedömning (AAR)** | Sammanfattning av händelser grupperade efter status |
+| **Tidslinjebild** | Kronologisk lista över alla händelser i intervallet |
+| **Per-lager-aktivitet** | Händelser uppdelade per lager |
+
+Välj **HTML** för att visa i webbläsaren, eller **Skriv ut/PDF** för att skriva ut eller spara som PDF.
+
+---
+
+## 16. Adminvy
+
+Navigera till `/admin-view` (kräver rollen **Admin**) för en dedikerad administratörsdashboard.
+
+---
+
+## 17. Tangentbords- och musgenvägar
+
+### Mus
+
+| Åtgärd | Resultat |
+|---|---|
+| Klicka på en tom tidslucka | Öppna Lägg till händelse vid den tidpunkten |
+| Klicka på händelseblock | Öppna händelsedetaljer |
+| Dra händelseblock | Schemalägg om till målslot |
+| Dra tidskolumn | Zooma slothöjd (upp = zooma in) |
+| Dubbelklicka tidskolumn | Återställ zoom till 1× |
+| Mittklicka-dra tidslinje | Panorera horisontellt |
+
+### Tangentbord
+
+| Tangent | Åtgärd |
+|---|---|
+| `←` / `→` | Navigera bakåt / framåt ett intervall |
+| `T` | Hoppa till idag |
+| `N` | Scrolla till aktuell tid |
+| `E` | Öppna Lägg till händelse-dialogrutan |
+| `?` eller `H` | Öppna inbyggd hjälp |
+| `Esc` | Stäng aktuell modal |
+| `+` / `-` | Zooma slothöjd in/ut |
+| `F` | Frys / återuppta syntetisk tid |
+
+---
+
+## 18. Felsökning
+
+### Kan inte logga in
+- Kontrollera användarnamn och lösenord (standard: `admin` / `admin`)
+- Se till att servern körs: `./tidslinjal --port 8080`
+- Kontrollera serverloggen för fel
+
+### Händelser visas inte
+- Kontrollera **Visa**-datumintervallet — du kanske visar ett intervall som inte inkluderar dina händelser
+- Kontrollera **Lager**-filter — klicka 🗂 och se till att rätt lager är aktiva
+- Kontrollera **Händelsetypsynlighet** i Inställningar — dolda typer visas inte
+
+### Larmet utlöses inte
+- SSE kräver en beständig webbläsaranslutning — se till att sidan är öppen
+- Kontrollera att webbläsarnotifieringar är tillåtna för webbplatsen
+- Verifiera larmets ledtid: vid 0 min utlöses larmet exakt vid händelsens starttid
+
+### Lagerväxling fungerar inte
+- Klicka **🗂 Lager** i verktygsfältet
+- Välj **Masterlinjen** för att visa alla lager
+- Eller välj enskilda lager för att filtrera
+
+### Exporten ger en tom fil
+- Se till att det finns händelser i det aktuella visningsintervallet
+- Justera **Visa**-intervallet för att inkludera önskade händelser
+
+### Datakatalogen är inte skrivbar
+- Se till att katalogen `data/` finns och är skrivbar av serverprocessen
+- Använd `--data /sökväg/till/skrivbar/katalog` eller ange miljövariabeln `DATA_DIR`
+
+---
+
+*Tidslinjal v3.2.0 — Samarbetsbaserad operativ tidslinje*

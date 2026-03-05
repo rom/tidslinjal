@@ -34,9 +34,36 @@
       <div id="loginError" class="error-msg" style="display:none"></div>
       <button type="submit" class="btn btn-primary btn-full">Sign In</button>
     </form>
+
+    <!-- SSO / OIDC button — shown dynamically if OIDC is configured -->
+    <div id="oidcSection" style="display:none;margin-top:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,0.15)">
+        <span style="font-size:12px;opacity:0.5">or</span>
+        <hr style="flex:1;border:none;border-top:1px solid rgba(255,255,255,0.15)">
+      </div>
+      <a href="/auth/oidc/login" class="btn btn-secondary btn-full" style="text-align:center;display:block;text-decoration:none">
+        🔐 Sign in with SSO
+      </a>
+    </div>
+
+    <div id="loginUrlError" style="display:none;font-size:12px;color:#E74C3C;margin-top:8px;text-align:center"></div>
   </div>
 
   <script>
+    // Show error from URL query param if OIDC callback failed
+    const urlError = new URLSearchParams(location.search).get('error');
+    if (urlError) {
+      const errDiv = document.getElementById('loginUrlError');
+      errDiv.textContent = 'SSO error: ' + decodeURIComponent(urlError).replace(/_/g, ' ');
+      errDiv.style.display = 'block';
+    }
+
+    // Check if OIDC is configured and show SSO button
+    fetch('/api/auth/oidc-config').then(r => {
+      if (r.ok) document.getElementById('oidcSection').style.display = '';
+    }).catch(() => {});
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errEl = document.getElementById('loginError');

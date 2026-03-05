@@ -3,7 +3,10 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.1.0"
+const AppVersion = "3.2.0"
+
+// AppGitHub is the project repository URL
+const AppGitHub = "https://github.com/rom/tidslinjal"
 
 // Role defines user access levels
 type Role string
@@ -40,11 +43,11 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Händelse", LabelFR: "Événement"},
 	{Key: "instant", Label: "Instant", Color: "#F39C12", IsSystem: true,
 		LabelSV: "Ögonblick", LabelFR: "Instant"},
-	{Key: "mote", Label: "Meeting (Möte)", Color: "#2980B9", IsSystem: true,
+	{Key: "mote", Label: "Meeting (Möte)", Color: "#7F8C8D", IsSystem: true,
 		LabelSV: "Möte", LabelFR: "Réunion"},
-	{Key: "decision", Label: "Decision", Color: "#E67E22", IsSystem: true,
+	{Key: "decision", Label: "Decision", Color: "#27AE60", IsSystem: true,
 		LabelSV: "Beslut", LabelFR: "Décision"},
-	{Key: "deadline", Label: "Deadline", Color: "#E74C3C", IsSystem: true,
+	{Key: "deadline", Label: "Deadline", Color: "#C0392B", IsSystem: true,
 		LabelSV: "Tidsgräns", LabelFR: "Échéance"},
 	{Key: "activity", Label: "Activity", Color: "#2ECC71", IsSystem: true,
 		LabelSV: "Aktivitet", LabelFR: "Activité"},
@@ -273,6 +276,17 @@ type AuditEntry struct {
 	EntityType string    `json:"entity_type"` // event | user | group | layer | lock | alarm
 	EntityID   int64     `json:"entity_id"`
 	Summary    string    `json:"summary"`
+}
+
+// OIDCConfig holds the discovered OIDC provider endpoints
+type OIDCConfig struct {
+	Issuer                string `json:"issuer"`
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
+	UserinfoEndpoint      string `json:"userinfo_endpoint"`
+	ClientID              string `json:"-"`
+	ClientSecret          string `json:"-"`
+	RedirectURL           string `json:"-"`
 }
 
 // ExerciseSettings controls synthetic time display across the application
