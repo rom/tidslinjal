@@ -1,0 +1,5 @@
+# Compiled binary
+tidslinjal
+
+# Runtime data directory (JSON persistence files)
+data/
