@@ -2,6 +2,9 @@ package main
 
 import "time"
 
+// AppVersion is the current application version
+const AppVersion = "2.0.0"
+
 // Role defines user access levels
 type Role string
 
@@ -11,26 +14,36 @@ const (
 	RoleAdmin     Role = "admin"
 )
 
-// EventType categories
-type EventType string
+// EventType is a string key referencing a dynamic EventTypeDef
+type EventType = string
 
-const (
-	EventTypeEvent     EventType = "event"
-	EventTypeDecision  EventType = "decision"
-	EventTypeDeadline  EventType = "deadline"
-	EventTypeActivity  EventType = "activity"
-	EventTypeRepeated  EventType = "repeated"
-	EventTypeReporting EventType = "reporting"
-)
+// SystemEventTypes lists the built-in event type keys (cannot be deleted)
+var SystemEventTypes = []EventTypeDef{
+	{Key: "event", Label: "Event", Color: "#4A90D9", IsSystem: true,
+		LabelSV: "Händelse", LabelFR: "Événement"},
+	{Key: "decision", Label: "Decision", Color: "#E67E22", IsSystem: true,
+		LabelSV: "Beslut", LabelFR: "Décision"},
+	{Key: "deadline", Label: "Deadline", Color: "#E74C3C", IsSystem: true,
+		LabelSV: "Tidsgräns", LabelFR: "Échéance"},
+	{Key: "activity", Label: "Activity", Color: "#2ECC71", IsSystem: true,
+		LabelSV: "Aktivitet", LabelFR: "Activité"},
+	{Key: "repeated", Label: "Repeated", Color: "#9B59B6", IsSystem: true,
+		LabelSV: "Upprepande", LabelFR: "Récurrent"},
+	{Key: "reporting", Label: "Reporting", Color: "#1ABC9C", IsSystem: true,
+		LabelSV: "Rapportering", LabelFR: "Rapport"},
+}
 
-// DefaultEventColors maps event types to their default display colors
-var DefaultEventColors = map[EventType]string{
-	EventTypeEvent:     "#4A90D9", // blue
-	EventTypeDecision:  "#E67E22", // orange
-	EventTypeDeadline:  "#E74C3C", // red
-	EventTypeActivity:  "#2ECC71", // green
-	EventTypeRepeated:  "#9B59B6", // purple
-	EventTypeReporting: "#1ABC9C", // teal
+// EventTypeDef is a dynamic (user/admin definable) event type
+type EventTypeDef struct {
+	ID        int64     `json:"id"`
+	Key       string    `json:"key"`
+	Label     string    `json:"label"`
+	LabelSV   string    `json:"label_sv,omitempty"`
+	LabelFR   string    `json:"label_fr,omitempty"`
+	Color     string    `json:"color"`
+	IsSystem  bool      `json:"is_system"`
+	CreatedBy int64     `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // User represents a system user
@@ -40,11 +53,11 @@ type User struct {
 	PasswordHash string    `json:"password_hash,omitempty"`
 	DisplayName  string    `json:"display_name"`
 	Role         Role      `json:"role"`
-	CanLock      bool      `json:"can_lock"` // designated to lock time slots
+	CanLock      bool      `json:"can_lock"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// UserPublic is the user object returned to clients (no password hash)
+// UserPublic is the safe view of a user (no password hash)
 type UserPublic struct {
 	ID          int64     `json:"id"`
 	Username    string    `json:"username"`
@@ -65,6 +78,48 @@ func (u *User) Public() UserPublic {
 	}
 }
 
+// UserPreferences stores per-user UI settings
+type UserPreferences struct {
+	UserID       int64    `json:"user_id"`
+	Theme        string   `json:"theme"`          // dark | light
+	Size         string   `json:"size"`           // small | normal | large | huge
+	Language     string   `json:"language"`       // en | sv | fr
+	DayStartHour int      `json:"day_start_hour"` // 0-23
+	DayEndHour   int      `json:"day_end_hour"`   // 1-24  (exclusive)
+	HiddenTypes  []string `json:"hidden_types"`   // event type keys to hide
+	ActiveLayers []int64  `json:"active_layers"`  // layer IDs currently visible
+}
+
+// Group is a named set of users used for layer sharing
+type Group struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedBy   int64     `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// GroupMembership links a user to a group
+type GroupMembership struct {
+	GroupID int64  `json:"group_id"`
+	UserID  int64  `json:"user_id"`
+	Role    string `json:"role"` // member | admin
+}
+
+// Layer is a named overlay of events that can be shared with groups
+type Layer struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Color       string    `json:"color"`       // accent color for the layer
+	OwnerID     int64     `json:"owner_id"`
+	OwnerName   string    `json:"owner_name"`
+	Visibility  string    `json:"visibility"`  // private | groups | public
+	GroupIDs    []int64   `json:"group_ids"`
+	Permission  string    `json:"permission"`  // read | readwrite  (for group members)
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // Event represents a timeline event/activity
 type Event struct {
 	ID                int64      `json:"id"`
@@ -75,12 +130,26 @@ type Event struct {
 	StartTime         time.Time  `json:"start_time"`
 	EndTime           *time.Time `json:"end_time,omitempty"`
 	IsRecurring       bool       `json:"is_recurring"`
-	RecurrencePattern string     `json:"recurrence_pattern,omitempty"` // daily, weekly, monthly
+	RecurrencePattern string     `json:"recurrence_pattern,omitempty"` // daily | weekly | monthly
 	RecurrenceEnd     *time.Time `json:"recurrence_end,omitempty"`
+	LayerID           *int64     `json:"layer_id,omitempty"`
 	CreatedBy         int64      `json:"created_by"`
 	CreatedByName     string     `json:"created_by_name"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// Attachment is a file attached to an event
+type Attachment struct {
+	ID           int64     `json:"id"`
+	EventID      int64     `json:"event_id"`
+	Filename     string    `json:"filename"`     // original name
+	StoredName   string    `json:"stored_name"`  // name on disk
+	Size         int64     `json:"size"`
+	MimeType     string    `json:"mime_type"`
+	UploadedBy   int64     `json:"uploaded_by"`
+	UploaderName string    `json:"uploader_name"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // Alarm is a personal user reminder tied to an event
@@ -90,7 +159,7 @@ type Alarm struct {
 	EventID    int64     `json:"event_id"`
 	EventTitle string    `json:"event_title"`
 	EventTime  time.Time `json:"event_time"`
-	LeadTime   int       `json:"lead_time"` // minutes before event
+	LeadTime   int       `json:"lead_time"` // minutes before
 	IsActive   bool      `json:"is_active"`
 	Fired      bool      `json:"fired"`
 	CreatedAt  time.Time `json:"created_at"`
