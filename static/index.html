@@ -54,6 +54,7 @@
       <div class="toolbar-sep"></div>
 
       <button class="btn btn-secondary btn-sm" id="btnLayerToggle">🗂 Layers</button>
+      <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">🕐 T+</button>
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
       <button class="btn btn-secondary btn-sm" id="btnExportICS">📅 Export ICS</button>
@@ -67,6 +68,7 @@
     </div>
 
     <div class="header-right">
+      <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <div class="clock-display">
         <div class="clock-time" id="clockTime">00:00:00</div>
         <div class="clock-date" id="clockDate">—</div>
@@ -99,6 +101,7 @@
         <button class="sidebar-tab" data-tab="layers">Layers</button>
         <button class="sidebar-tab admin-only" data-tab="users" style="display:none">Users</button>
         <button class="sidebar-tab admin-only" data-tab="groups" style="display:none">Groups</button>
+        <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none">Audit</button>
         <button class="sidebar-tab" data-tab="settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
@@ -151,9 +154,23 @@
           <input type="datetime-local" id="eventEnd">
         </div>
       </div>
-      <div class="form-group">
-        <label id="lbl-ev-layer">Layer</label>
-        <select id="eventLayer"><option value="">Master Timeline</option></select>
+      <div class="form-row">
+        <div class="form-group">
+          <label id="lbl-ev-layer">Layer</label>
+          <select id="eventLayer"><option value="">Master Timeline</option></select>
+        </div>
+        <div class="form-group">
+          <label id="lbl-ev-status">Status</label>
+          <select id="eventStatus">
+            <option value="planned">Planned</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="submitted">Submitted</option>
+            <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
       </div>
       <div class="form-group">
         <label id="lbl-ev-desc">Description</label>
@@ -300,6 +317,8 @@
           <select id="uRole">
             <option value="read">Read</option>
             <option value="readwrite">Read/Write</option>
+            <option value="teamlead">Team Lead</option>
+            <option value="oplead">Operations Lead</option>
             <option value="admin">Admin</option>
           </select>
         </div>

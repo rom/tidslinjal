@@ -214,6 +214,48 @@ const TRANSLATIONS = {
     // Alarm ACK
     alarm_ack: 'ACK',
     alarm_acked: 'Alarm acknowledged',
+
+    // Roles (v2.3.0)
+    role_teamlead: 'Team Lead',
+    role_oplead:   'Operations Lead',
+
+    // Sidebar tabs (v2.3.0)
+    tab_audit: 'Audit',
+
+    // Audit log
+    audit_empty: 'No audit entries.',
+    audit_loading: 'Loading…',
+
+    // Event status
+    event_status:          'Status',
+    status_planned:        'Planned',
+    status_active:         'Active',
+    status_completed:      'Completed',
+    status_submitted:      'Submitted',
+    status_verified:       'Verified',
+    status_rejected:       'Rejected',
+    status_cancelled:      'Cancelled',
+    status_verify:         'Verify',
+    status_reject:         'Reject',
+    status_rejection_reason:  'Rejection reason',
+    status_rejection_prompt:  'Enter rejection reason:',
+    status_rejection_required:'Rejection reason is required.',
+    status_verified_by:    'Verified by',
+    status_rejected_by:    'Rejected by',
+    notif_status_changed:  'Status updated',
+
+    // Webhook settings
+    settings_webhook:          'Notifications / Webhook',
+    settings_webhook_url:      'Webhook URL',
+    settings_webhook_type:     'Type',
+    settings_webhook_test:     'Test',
+    settings_webhook_url_required: 'Please enter a webhook URL first.',
+
+    // Exercise / synthetic time
+    settings_exercise:       'Exercise Settings',
+    settings_exercise_label: 'Exercise name',
+    settings_exercise_epoch: 'Epoch (Day 1 T+0)',
+    settings_exercise_enable:'Enable synthetic time display',
   },
 
   sv: {
@@ -382,6 +424,48 @@ const TRANSLATIONS = {
     layer_shared_groups: 'Delade grupper',
     alarm_ack: 'ACK',
     alarm_acked: 'Larm kvitterat',
+
+    // Roles (v2.3.0)
+    role_teamlead: 'Gruppledare',
+    role_oplead:   'Operationsledare',
+
+    // Sidebar tabs (v2.3.0)
+    tab_audit: 'Granskningslogg',
+
+    // Audit log
+    audit_empty: 'Inga loggposter.',
+    audit_loading: 'Laddar…',
+
+    // Event status
+    event_status:          'Status',
+    status_planned:        'Planerad',
+    status_active:         'Aktiv',
+    status_completed:      'Avslutad',
+    status_submitted:      'Inskickad',
+    status_verified:       'Verifierad',
+    status_rejected:       'Avvisad',
+    status_cancelled:      'Avbruten',
+    status_verify:         'Verifiera',
+    status_reject:         'Avvisa',
+    status_rejection_reason:  'Avvisningsorsak',
+    status_rejection_prompt:  'Ange avvisningsorsak:',
+    status_rejection_required:'Avvisningsorsak krävs.',
+    status_verified_by:    'Verifierad av',
+    status_rejected_by:    'Avvisad av',
+    notif_status_changed:  'Status uppdaterad',
+
+    // Webhook settings
+    settings_webhook:          'Notifieringar / Webhook',
+    settings_webhook_url:      'Webhook-URL',
+    settings_webhook_type:     'Typ',
+    settings_webhook_test:     'Testa',
+    settings_webhook_url_required: 'Ange en webhook-URL först.',
+
+    // Exercise / synthetic time
+    settings_exercise:       'Övningsinställningar',
+    settings_exercise_label: 'Övningsnamn',
+    settings_exercise_epoch: 'Epok (Dag 1 T+0)',
+    settings_exercise_enable:'Aktivera syntetisk tidsvisning',
   },
 
   fr: {
@@ -550,6 +634,48 @@ const TRANSLATIONS = {
     layer_shared_groups: 'Groupes partagés',
     alarm_ack: 'ACK',
     alarm_acked: 'Alarme acquittée',
+
+    // Roles (v2.3.0)
+    role_teamlead: 'Chef d\'équipe',
+    role_oplead:   'Chef des opérations',
+
+    // Sidebar tabs (v2.3.0)
+    tab_audit: 'Journal',
+
+    // Audit log
+    audit_empty: 'Aucune entrée dans le journal.',
+    audit_loading: 'Chargement…',
+
+    // Event status
+    event_status:          'Statut',
+    status_planned:        'Planifié',
+    status_active:         'Actif',
+    status_completed:      'Terminé',
+    status_submitted:      'Soumis',
+    status_verified:       'Vérifié',
+    status_rejected:       'Rejeté',
+    status_cancelled:      'Annulé',
+    status_verify:         'Vérifier',
+    status_reject:         'Rejeter',
+    status_rejection_reason:  'Motif du rejet',
+    status_rejection_prompt:  'Entrez le motif du rejet:',
+    status_rejection_required:'Le motif du rejet est requis.',
+    status_verified_by:    'Vérifié par',
+    status_rejected_by:    'Rejeté par',
+    notif_status_changed:  'Statut mis à jour',
+
+    // Webhook settings
+    settings_webhook:          'Notifications / Webhook',
+    settings_webhook_url:      'URL Webhook',
+    settings_webhook_type:     'Type',
+    settings_webhook_test:     'Tester',
+    settings_webhook_url_required: 'Veuillez saisir une URL webhook.',
+
+    // Exercise / synthetic time
+    settings_exercise:       'Paramètres d\'exercice',
+    settings_exercise_label: 'Nom de l\'exercice',
+    settings_exercise_epoch: 'Époque (Jour 1 T+0)',
+    settings_exercise_enable:'Activer l\'affichage de temps synthétique',
   }
 };
 

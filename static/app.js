@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v2.2.0 — Collaborative Operational Timeline
+   Tidslinjal v2.3.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -27,6 +27,8 @@ window.state = {
   sidebarTab:  'legend',
   search:      '',
   zoomFactor:  1.0,
+  exercise:    { enabled: false, epoch: '', label: '' },
+  syntheticOn: false, // user's local toggle (independent of exercise.enabled)
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -170,9 +172,14 @@ function renderTimeline() {
   html += `<div class="tl-corner" style="height:44px"></div>`;
   days.forEach(day => {
     const isToday = isSameDay(day, today);
+    const useSync = synthActive();
+    const dayName = useSync ? synthDayHeader(day) : localDayName(day);
+    const dayDate = useSync
+      ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
+      : localShortDate(day);
     html += `<div class="tl-day-header${isToday?' today':''}" data-date="${day.toISOString()}">
-      <div class="tl-day-name">${localDayName(day)}</div>
-      <div class="tl-day-date">${localShortDate(day)}${isToday?'<span class="today-marker"></span>':''}</div>
+      <div class="tl-day-name">${dayName}</div>
+      <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}</div>
     </div>`;
   });
 
@@ -273,11 +280,17 @@ function renderEventBlocks(days, slotH) {
           if (layer) borderL = layer.color || borderL;
         }
 
+        const statusDot = ev.status && ev.status !== 'planned'
+          ? `<span class="ev-status-dot ev-status-${ev.status}" title="${ev.status}"></span>` : '';
         const block = document.createElement('div');
         block.className = 'event-block';
-        block.style.cssText = `top:${topPx}px;left:${dayMeta[di].left+2}px;width:${dayMeta[di].width-4}px;height:${heightPx}px;background:${ev.color||'#4A90D9'};border-left-color:${borderL};`;
+        block.dataset.evId = ev.id;
+        block.style.cssText = `top:${topPx}px;left:${dayMeta[di].left+2}px;width:${dayMeta[di].width-4}px;height:${heightPx}px;background:${ev.color||'#4A90D9'};border-left-color:${borderL};cursor:grab;`;
+        if (ev.status === 'cancelled') block.style.opacity = '0.45';
+        if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
+        if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${escHtml(ev.title)}</div>
+          <div class="ev-title">${statusDot}${escHtml(ev.title)}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
         `;
@@ -377,10 +390,15 @@ async function fetchAlarms()  { state.alarms     = await apiGet('/api/alarms') |
 async function fetchLayers()  { state.layers     = await apiGet('/api/layers') || []; }
 async function fetchGroups()  { state.groups     = await apiGet('/api/groups') || []; }
 
+async function fetchExercise() {
+  try { state.exercise = await apiGet('/api/exercise'); } catch { /* ignore */ }
+}
+
 async function refreshAll() {
-  await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers()]);
+  await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise()]);
   renderTimeline();
   renderSidebar();
+  updateSyntheticUI();
 }
 
 // ── Preferences ────────────────────────────────────────────────────────────
@@ -460,6 +478,9 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     if (ev.recurrence_end) document.getElementById('eventRecurrenceEnd').value = fmtDateInput(new Date(ev.recurrence_end));
   }
 
+  // Status
+  document.getElementById('eventStatus').value = (ev && ev.status) ? ev.status : 'planned';
+
   // Clear attachment input on each open
   const attachFile = document.getElementById('eventAttachFile');
   if (attachFile) attachFile.value = '';
@@ -496,6 +517,7 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     description:        document.getElementById('eventDescription').value,
     event_type:         document.getElementById('eventType').value,
     color:              document.getElementById('eventColor').value,
+    status:             document.getElementById('eventStatus').value,
     start_time:         new Date(startVal).toISOString(),
     end_time:           endVal ? new Date(endVal).toISOString() : null,
     is_recurring:       recurring,
@@ -529,6 +551,18 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     alert('Error: '+err.error);
   }
 });
+
+async function patchEventStatus(id, status, rejectionReason) {
+  const res = await api('PATCH', `/api/events/${id}/status`, {status, rejection_reason: rejectionReason});
+  if (res.ok) {
+    await refreshAll();
+    closeModal('detailModal');
+    showNotification('success', t('notif_status_changed'));
+  } else {
+    const err = await res.json();
+    alert('Error: ' + err.error);
+  }
+}
 
 async function deleteEvent(id) {
   if (!confirm(t('confirm_delete_event'))) return;
@@ -564,6 +598,9 @@ function showEventDetail(ev) {
           ${layer ? `<b>${t('event_layer')}:</b><span>${escHtml(layer.name)}</span>` : ''}
           <b>${t('detail_created')}:</b><span>${escHtml(ev.created_by_name||'')}</span>
           <b>${t('detail_created_at')}:</b><span>${fmtDateTime(new Date(ev.created_at))}</span>
+          <b>${t('event_status')}:</b><span><span class="status-badge status-${ev.status||'planned'}">${t('status_'+(ev.status||'planned'))}</span></span>
+          ${ev.status==='verified' ? `<b>${t('status_verified_by')}:</b><span>${escHtml(ev.verified_by_name||'')} — ${ev.verified_at?fmtDateTime(new Date(ev.verified_at)):''}</span>` : ''}
+          ${ev.status==='rejected' ? `<b>${t('status_rejection_reason')}:</b><span style="color:var(--red)">${escHtml(ev.rejection_reason||'')}</span>` : ''}
         </div>
       </div>
     </div>
@@ -624,7 +661,34 @@ function showEventDetail(ev) {
   alarmBtn.onclick = () => { closeModal('detailModal'); openAlarmModal(ev); };
   footer.appendChild(alarmBtn);
 
-  const canEdit = state.user && (state.user.role==='admin' || state.user.role==='readwrite' || state.user.id===ev.created_by);
+  // Verify / Reject (teamlead+)
+  if (state.user && hasRole2(state.user.role, 'teamlead') && ev.status !== 'verified' && ev.status !== 'cancelled') {
+    const verBtn = document.createElement('button');
+    verBtn.className = 'btn btn-sm';
+    verBtn.style.background = 'var(--green)';
+    verBtn.textContent = '✓ ' + t('status_verify');
+    verBtn.onclick = () => patchEventStatus(ev.id, 'verified', '');
+    footer.appendChild(verBtn);
+
+    const rejBtn = document.createElement('button');
+    rejBtn.className = 'btn btn-danger btn-sm';
+    rejBtn.textContent = '✕ ' + t('status_reject');
+    rejBtn.onclick = () => {
+      const reason = prompt(t('status_rejection_prompt'));
+      if (reason === null) return;
+      if (!reason.trim()) { alert(t('status_rejection_required')); return; }
+      patchEventStatus(ev.id, 'rejected', reason.trim());
+    };
+    footer.appendChild(rejBtn);
+  }
+
+  // Edit/Delete (creator or readwrite+ on layers, oplead+ on master)
+  const isMaster = !ev.layer_id;
+  const canEdit = state.user && (
+    state.user.role === 'admin' ||
+    (!isMaster && (state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
+    (isMaster && hasRole2(state.user.role, 'oplead'))
+  );
   if (canEdit) {
     const editBtn = document.createElement('button');
     editBtn.className = 'btn btn-primary btn-sm';
@@ -1113,7 +1177,7 @@ function renderSidebar() {
         </div>
       `;
     });
-  } else if (tab === 'groups' && state.user && state.user.role==='admin') {
+  } else if (tab === 'groups' && state.user && hasRole2(state.user.role,'teamlead')) {
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">
@@ -1134,8 +1198,27 @@ function renderSidebar() {
         </div>
       </div>
     `;
+  } else if (tab === 'audit' && state.user && hasRole2(state.user.role, 'teamlead')) {
+    el.innerHTML = `<div class="sidebar-section"><div class="sidebar-section-title">${t('tab_audit')}</div><div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div></div>`;
+    apiGet('/api/audit?limit=200').then(entries => {
+      const container = document.getElementById('auditLog');
+      if (!container) return;
+      if (!entries || entries.length === 0) {
+        container.innerHTML = `<em style="color:var(--text-dim)">${t('audit_empty')}</em>`;
+        return;
+      }
+      container.innerHTML = `<div class="audit-list">${entries.map(e => `
+        <div class="audit-item">
+          <span class="audit-ts">${fmtDateTime(new Date(e.timestamp))}</span>
+          <span class="audit-user">${escHtml(e.user_name)}</span>
+          <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
+          <span class="audit-summary">${escHtml(e.summary)}</span>
+        </div>`).join('')}
+      </div>`;
+    });
   } else if (tab === 'settings') {
-    const p = state.preferences;
+    const p  = state.preferences;
+    const ex = state.exercise || {};
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
@@ -1171,7 +1254,86 @@ function renderSidebar() {
           <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" onchange="setHourPref()">
         </div>
       </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_webhook')}</div>
+        <div class="form-group" style="margin-bottom:6px">
+          <select id="prefWebhookType" style="width:100%;margin-bottom:4px">
+            <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
+            <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
+          </select>
+          <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
+        </div>
+      </div>
+      ${state.user && state.user.role==='admin' ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_exercise')}</div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_exercise_label')}</label>
+          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="Exercise name…"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_exercise_epoch')}</label>
+          <input type="datetime-local" id="exEpoch" value="${ex.epoch ? fmtDateInput(new Date(ex.epoch)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-check" style="margin-bottom:8px">
+          <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
+          <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
+      </div>` : ''}
     `;
+  }
+}
+
+// ── Webhook helpers ────────────────────────────────────────────────────────
+async function saveWebhookPref() {
+  state.preferences.webhook_url  = document.getElementById('prefWebhookURL').value.trim();
+  state.preferences.webhook_type = document.getElementById('prefWebhookType').value;
+  await savePreferences();
+  showNotification('success', t('notif_saved'));
+}
+
+async function testWebhook() {
+  const url  = document.getElementById('prefWebhookURL').value.trim();
+  const type = document.getElementById('prefWebhookType').value;
+  if (!url) { alert(t('settings_webhook_url_required')); return; }
+  const msg  = 'Tidslinjal webhook test';
+  let payload;
+  if (type === 'mattermost' || type === 'slack') {
+    payload = JSON.stringify({text: msg});
+  } else {
+    payload = JSON.stringify({message: msg});
+  }
+  try {
+    const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: payload});
+    showNotification('success', `Webhook: ${res.status}`);
+  } catch(e) {
+    alert('Webhook test failed: ' + e.message);
+  }
+}
+
+// ── Exercise settings ──────────────────────────────────────────────────────
+async function saveExercise() {
+  const epoch   = document.getElementById('exEpoch').value;
+  const label   = document.getElementById('exLabel').value.trim();
+  const enabled = document.getElementById('exEnabled').checked;
+  const payload = { enabled, epoch: epoch ? new Date(epoch).toISOString() : '', label };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    updateSyntheticUI();
+    renderTimeline();
+    showNotification('success', t('notif_saved'));
+  } else {
+    const err = await res.json();
+    alert('Error: ' + err.error);
   }
 }
 
@@ -1229,8 +1391,42 @@ async function toggleAllLayers() {
 }
 
 function hasRole2(userRole, required) {
-  const order = {read:0,readwrite:1,admin:2};
+  const order = {read:0, readwrite:1, teamlead:2, oplead:3, admin:4};
   return (order[userRole]||0) >= (order[required]||0);
+}
+
+// ── Synthetic time helpers ─────────────────────────────────────────────────
+function synthActive() {
+  return state.syntheticOn && state.exercise && state.exercise.enabled && state.exercise.epoch;
+}
+
+function toDayNumber(date) {
+  const epoch = new Date(state.exercise.epoch);
+  const epochDay = startOfDay(epoch);
+  const diffMs   = startOfDay(date) - epochDay;
+  const diffDays = Math.round(diffMs / 86400000);
+  return diffDays + 1; // Day 1 = epoch day
+}
+
+function synthDayHeader(date) {
+  return 'Day ' + toDayNumber(date);
+}
+
+function updateSyntheticUI() {
+  const btn   = document.getElementById('btnSyntheticTime');
+  const badge = document.getElementById('exerciseBadge');
+  const ex    = state.exercise;
+  if (ex && ex.enabled) {
+    btn.style.display = '';
+    btn.classList.toggle('active', state.syntheticOn);
+    if (badge) {
+      badge.style.display = (state.syntheticOn && ex.label) ? '' : 'none';
+      badge.textContent   = ex.label || '';
+    }
+  } else {
+    btn.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+  }
 }
 
 // ── UI labels (i18n) ───────────────────────────────────────────────────────
@@ -1495,6 +1691,99 @@ function setupZoomDrag() {
   });
 }
 
+// ── Drag-to-reschedule ─────────────────────────────────────────────────────
+function setupDragToReschedule() {
+  const container = document.getElementById('timeline-container');
+  let dragging = false, ghost = null, dragEvId = null, dragOrigEl = null;
+
+  container.addEventListener('mousedown', e => {
+    const block = e.target.closest('.event-block[data-ev-id]');
+    if (!block) return;
+    // Only allow drag if user can edit the event (check later on drop)
+    dragging    = true;
+    dragEvId    = parseInt(block.dataset.evId, 10);
+    dragOrigEl  = block;
+    // Create ghost
+    ghost = block.cloneNode(true);
+    ghost.style.cssText = `
+      position: fixed; pointer-events: none; z-index: 999; opacity: 0.75;
+      width: ${block.offsetWidth}px; box-shadow: 0 4px 20px rgba(0,0,0,.5);
+      left: ${e.clientX - block.offsetWidth/2}px;
+      top:  ${e.clientY - 12}px;
+    `;
+    ghost.classList.add('dragging');
+    document.body.appendChild(ghost);
+    block.style.opacity = '0.35';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging || !ghost) return;
+    ghost.style.left = (e.clientX - parseInt(ghost.style.width)/2) + 'px';
+    ghost.style.top  = (e.clientY - 12) + 'px';
+    // Highlight target cell
+    document.querySelectorAll('.tl-cell.drag-target').forEach(c => c.classList.remove('drag-target'));
+    ghost.style.display = 'none';
+    const els = document.elementsFromPoint(e.clientX, e.clientY);
+    ghost.style.display = '';
+    const cell = els.find(el => el.classList.contains('tl-cell'));
+    if (cell) cell.classList.add('drag-target');
+  });
+
+  document.addEventListener('mouseup', async e => {
+    if (!dragging) return;
+    dragging = false;
+    if (ghost) { ghost.remove(); ghost = null; }
+    document.querySelectorAll('.tl-cell.drag-target').forEach(c => c.classList.remove('drag-target'));
+    if (dragOrigEl) dragOrigEl.style.opacity = '';
+
+    // Find drop target cell
+    const els  = document.elementsFromPoint(e.clientX, e.clientY);
+    const cell = els.find(el => el.classList.contains('tl-cell'));
+    if (!cell || !dragEvId) { dragEvId = null; dragOrigEl = null; return; }
+
+    const dayIdx  = parseInt(cell.dataset.day,  10);
+    const slotIdx = parseInt(cell.dataset.slot, 10);
+    if (isNaN(dayIdx) || isNaN(slotIdx)) { dragEvId = null; dragOrigEl = null; return; }
+
+    const ev = state.events.find(ev => ev.id === dragEvId);
+    if (!ev) { dragEvId = null; dragOrigEl = null; return; }
+
+    // Compute new start time
+    const days     = getDays();
+    const targetDay = days[dayIdx];
+    if (!targetDay) { dragEvId = null; dragOrigEl = null; return; }
+
+    const slotMin  = getSlotMinutes();
+    const startOff = getStartHourOffset();
+    const newMin   = startOff + slotIdx * slotMin;
+    const newStart = new Date(targetDay);
+    newStart.setHours(Math.floor(newMin / 60), newMin % 60, 0, 0);
+
+    // Preserve duration
+    const oldStart = new Date(ev.start_time);
+    const oldEnd   = ev.end_time ? new Date(ev.end_time) : null;
+    const payload  = { ...ev, start_time: newStart.toISOString() };
+    if (oldEnd) {
+      const dur = oldEnd - oldStart;
+      payload.end_time = new Date(newStart.getTime() + dur).toISOString();
+    }
+    delete payload.id; delete payload.created_at; delete payload.updated_at;
+    delete payload.created_by_name; delete payload.verified_by_name;
+
+    const res = await apiPut('/api/events/'+dragEvId, payload);
+    if (res.ok) {
+      await refreshAll();
+      showNotification('success', t('notif_event_updated'));
+    } else {
+      const err = await res.json();
+      alert('Error: ' + (err.error || 'could not reschedule'));
+      if (dragOrigEl) dragOrigEl.style.opacity = '';
+    }
+    dragEvId = null; dragOrigEl = null;
+  });
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
   try {
@@ -1544,6 +1833,9 @@ async function init() {
   }
   if (state.user.role==='admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
+  }
+  if (hasRole2(state.user.role, 'teamlead')) {
+    document.querySelectorAll('.teamlead-only').forEach(el => el.style.display='');
   }
 
   // Control events
@@ -1613,6 +1905,16 @@ async function init() {
 
   // Set up drag-to-zoom on time column
   setupZoomDrag();
+
+  // Set up drag-to-reschedule on event blocks
+  setupDragToReschedule();
+
+  // Synthetic time toggle
+  document.getElementById('btnSyntheticTime').addEventListener('click', () => {
+    state.syntheticOn = !state.syntheticOn;
+    updateSyntheticUI();
+    renderTimeline();
+  });
 
   // Scroll to current time
   setTimeout(() => {

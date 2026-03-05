@@ -25,6 +25,8 @@ type Store struct {
 	alarms      []Alarm
 	locks       []LockedSlot
 	sessions    []Session
+	audit       []AuditEntry
+	exercise    ExerciseSettings
 
 	nextEventTypeID int64
 	nextUserID      int64
@@ -34,6 +36,7 @@ type Store struct {
 	nextAttachID    int64
 	nextAlarmID     int64
 	nextLockID      int64
+	nextAuditID     int64
 }
 
 func NewStore(dataDir string) (*Store, error) {
@@ -62,6 +65,8 @@ func (s *Store) load() error {
 	s.loadFile("alarms.json", &s.alarms)
 	s.loadFile("locks.json", &s.locks)
 	s.loadFile("sessions.json", &s.sessions)
+	s.loadFile("audit.json", &s.audit)
+	s.loadFile("exercise.json", &s.exercise)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -103,7 +108,59 @@ func (s *Store) load() error {
 			s.nextLockID = x.ID
 		}
 	}
+	for _, x := range s.audit {
+		if x.ID > s.nextAuditID {
+			s.nextAuditID = x.ID
+		}
+	}
 	return nil
+}
+
+// ── Audit log ──────────────────────────────────────────────────────────────────
+
+func (s *Store) LogAudit(entry AuditEntry) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextAuditID++
+	entry.ID = s.nextAuditID
+	entry.Timestamp = time.Now()
+	s.audit = append(s.audit, entry)
+	// Cap at 10 000 entries (oldest first → drop from front)
+	if len(s.audit) > 10000 {
+		s.audit = s.audit[len(s.audit)-10000:]
+	}
+	return s.saveFile("audit.json", s.audit)
+}
+
+func (s *Store) GetAudit(limit int) []AuditEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := len(s.audit)
+	if limit <= 0 || limit > n {
+		limit = n
+	}
+	result := make([]AuditEntry, limit)
+	copy(result, s.audit[n-limit:])
+	// Reverse so newest first
+	for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+		result[i], result[j] = result[j], result[i]
+	}
+	return result
+}
+
+// ── Exercise settings ──────────────────────────────────────────────────────────
+
+func (s *Store) GetExerciseSettings() ExerciseSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.exercise
+}
+
+func (s *Store) SaveExerciseSettings(es ExerciseSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exercise = es
+	return s.saveFile("exercise.json", es)
 }
 
 func (s *Store) loadFile(filename string, v interface{}) {

@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "2.2.0"
+const AppVersion = "2.3.0"
 
 // Role defines user access levels
 type Role string
@@ -11,7 +11,22 @@ type Role string
 const (
 	RoleRead      Role = "read"
 	RoleReadWrite Role = "readwrite"
-	RoleAdmin     Role = "admin"
+	RoleTeamLead  Role = "teamlead" // can create groups/layers, verify/reject events
+	RoleOpLead    Role = "oplead"   // operations lead: master timeline + teamlead rights
+	RoleAdmin     Role = "admin"    // full access
+)
+
+// EventStatus is the lifecycle state of an event
+type EventStatus string
+
+const (
+	StatusPlanned   EventStatus = "planned"
+	StatusActive    EventStatus = "active"
+	StatusCompleted EventStatus = "completed"
+	StatusSubmitted EventStatus = "submitted"
+	StatusVerified  EventStatus = "verified"
+	StatusRejected  EventStatus = "rejected"
+	StatusCancelled EventStatus = "cancelled"
 )
 
 // EventType is a string key referencing a dynamic EventTypeDef
@@ -88,6 +103,8 @@ type UserPreferences struct {
 	DayEndHour   int      `json:"day_end_hour"`   // 1-24  (exclusive)
 	HiddenTypes  []string `json:"hidden_types"`   // event type keys to hide
 	ActiveLayers []int64  `json:"active_layers"`  // layer IDs currently visible
+	WebhookURL   string   `json:"webhook_url,omitempty"`
+	WebhookType  string   `json:"webhook_type,omitempty"` // mattermost | slack | generic
 }
 
 // Group is a named set of users used for layer sharing
@@ -111,32 +128,38 @@ type Layer struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	Color       string    `json:"color"`       // accent color for the layer
+	Color       string    `json:"color"`      // accent color for the layer
 	OwnerID     int64     `json:"owner_id"`
 	OwnerName   string    `json:"owner_name"`
-	Visibility  string    `json:"visibility"`  // private | groups | public
+	Visibility  string    `json:"visibility"` // private | groups | public
 	GroupIDs    []int64   `json:"group_ids"`
-	Permission  string    `json:"permission"`  // read | readwrite  (for group members)
+	Permission  string    `json:"permission"` // read | readwrite  (for group members)
 	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Event represents a timeline event/activity
 type Event struct {
-	ID                int64      `json:"id"`
-	Title             string     `json:"title"`
-	Description       string     `json:"description"`
-	EventType         EventType  `json:"event_type"`
-	Color             string     `json:"color"`
-	StartTime         time.Time  `json:"start_time"`
-	EndTime           *time.Time `json:"end_time,omitempty"`
-	IsRecurring       bool       `json:"is_recurring"`
-	RecurrencePattern string     `json:"recurrence_pattern,omitempty"` // daily | weekly | monthly
-	RecurrenceEnd     *time.Time `json:"recurrence_end,omitempty"`
-	LayerID           *int64     `json:"layer_id,omitempty"`
-	CreatedBy         int64      `json:"created_by"`
-	CreatedByName     string     `json:"created_by_name"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                int64       `json:"id"`
+	Title             string      `json:"title"`
+	Description       string      `json:"description"`
+	EventType         EventType   `json:"event_type"`
+	Color             string      `json:"color"`
+	Status            EventStatus `json:"status"`
+	StartTime         time.Time   `json:"start_time"`
+	EndTime           *time.Time  `json:"end_time,omitempty"`
+	IsRecurring       bool        `json:"is_recurring"`
+	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // daily | weekly | monthly
+	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
+	LayerID           *int64      `json:"layer_id,omitempty"`
+	CreatedBy         int64       `json:"created_by"`
+	CreatedByName     string      `json:"created_by_name"`
+	CreatedAt         time.Time   `json:"created_at"`
+	UpdatedAt         time.Time   `json:"updated_at"`
+	// Verification
+	VerifiedBy      int64      `json:"verified_by,omitempty"`
+	VerifiedByName  string     `json:"verified_by_name,omitempty"`
+	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
+	RejectionReason string     `json:"rejection_reason,omitempty"`
 }
 
 // Attachment is a file attached to an event
@@ -192,4 +215,23 @@ type AlarmNotification struct {
 	EventTime  time.Time `json:"event_time"`
 	LeadTime   int       `json:"lead_time"`
 	Message    string    `json:"message"`
+}
+
+// AuditEntry records every significant action in the system
+type AuditEntry struct {
+	ID         int64     `json:"id"`
+	Timestamp  time.Time `json:"timestamp"`
+	UserID     int64     `json:"user_id"`
+	UserName   string    `json:"user_name"`
+	Action     string    `json:"action"`      // created | updated | deleted | verified | rejected | status_changed
+	EntityType string    `json:"entity_type"` // event | user | group | layer | lock | alarm
+	EntityID   int64     `json:"entity_id"`
+	Summary    string    `json:"summary"`
+}
+
+// ExerciseSettings controls synthetic time display across the application
+type ExerciseSettings struct {
+	Enabled bool   `json:"enabled"`
+	Epoch   string `json:"epoch"` // ISO8601: real datetime = Day 1 T+0
+	Label   string `json:"label"` // exercise name shown in header
 }
