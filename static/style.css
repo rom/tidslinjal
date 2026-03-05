@@ -37,6 +37,8 @@
   --fs-lg:      15px;
   --fs-xl:      20px;
   --fs-2xl:     24px;
+  /* Zoom — updated by JS on renderTimeline() */
+  --ev-zoom-scale: 1;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
@@ -226,7 +228,7 @@ select.ctrl-select:focus { border-color: var(--accent); }
 /* Event blocks */
 .event-block {
   position: absolute; left: 2px; right: 2px; border-radius: 4px;
-  padding: 2px 5px; font-size: var(--fs-sm); font-weight: 500; color: #fff;
+  padding: 2px 5px; font-size: calc(var(--fs-sm) * var(--ev-zoom-scale)); font-weight: 500; color: #fff;
   overflow: hidden; cursor: pointer; z-index: 5;
   box-shadow: 0 1px 4px var(--shadow);
   transition: transform .1s, box-shadow .1s;
@@ -237,6 +239,25 @@ select.ctrl-select:focus { border-color: var(--accent); }
 .event-block .ev-title  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event-block .ev-time   { font-size: var(--fs-xs); opacity: .8; white-space: nowrap; }
 .event-block .ev-creator { font-size: var(--fs-xs); opacity: .65; }
+
+/* Instant event type — narrow vertical marker with diamond */
+.event-block.ev-type-instant {
+  left: 4px; right: 4px; border-radius: 2px;
+  min-height: 6px;
+}
+.event-block.ev-type-instant::before {
+  content: '◆'; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: inherit; opacity: .9;
+}
+
+/* Intern / Extern participant badges on event blocks */
+.ev-participant {
+  display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  padding: 0 4px; border-radius: 3px; vertical-align: middle; margin-left: 3px;
+  text-transform: uppercase;
+}
+.ev-participant-intern { background: rgba(26,188,156,.35); color: #1abc9c; }
+.ev-participant-extern { background: rgba(231,76,60,.3); color: #e74c3c; }
 
 /* Current time line */
 #current-time-line {
@@ -757,10 +778,10 @@ body.size-huge {
 }
 
 /* Icon scaling with display size */
-.ev-icon { font-size: .85em; }
-body.size-normal .ev-icon { font-size: .9em; }
-body.size-large  .ev-icon { font-size: 1em; }
-body.size-huge   .ev-icon { font-size: 1.1em; }
+.ev-icon { font-size: calc(.85em * var(--ev-zoom-scale)); }
+body.size-normal .ev-icon { font-size: calc(.9em * var(--ev-zoom-scale)); }
+body.size-large  .ev-icon { font-size: calc(1em * var(--ev-zoom-scale)); }
+body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 
 /* H+N synthetic hour labels */
 .synth-hour-label {

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -19,6 +20,24 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// Global logger flags (set in main)
+var (
+	verbose bool
+	debug   bool
+)
+
+func logVerbose(format string, args ...any) {
+	if verbose || debug {
+		log.Printf("[VERBOSE] "+format, args...)
+	}
+}
+
+func logDebug(format string, args ...any) {
+	if debug {
+		log.Printf("[DEBUG] "+format, args...)
+	}
+}
 
 // ── SSE broker ────────────────────────────────────────────────────────────────
 
@@ -1714,6 +1733,13 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/login.html")
 	})
+	mux.HandleFunc("/admin-view", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+		if user.Role != RoleAdmin {
+			http.Error(w, "Forbidden — admin access required", http.StatusForbidden)
+			return
+		}
+		http.ServeFile(w, r, "static/admin.html")
+	}))
 
 	// Version
 	mux.HandleFunc("/api/version", handleVersion)
@@ -2041,13 +2067,35 @@ func (app *App) routes() http.Handler {
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// CLI flags
+	var (
+		host    string
+		port    string
+		dataDir string
+	)
+	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
+	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080, or $PORT env)")
+	flag.StringVar(&dataDir, "data",    "",      "Data directory (default: data, or $DATA_DIR env)")
+	flag.BoolVar(&verbose,   "verbose", false,   "Enable verbose logging")
+	flag.BoolVar(&debug,     "debug",   false,   "Enable debug logging (implies verbose)")
+	flag.Parse()
+
+	if debug {
+		verbose = true
 	}
-	dataDir := os.Getenv("DATA_DIR")
+
+	// Fall back to environment variables, then defaults
+	if port == "" {
+		port = os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+	}
 	if dataDir == "" {
-		dataDir = "data"
+		dataDir = os.Getenv("DATA_DIR")
+		if dataDir == "" {
+			dataDir = "data"
+		}
 	}
 
 	app, err := NewApp(dataDir)
@@ -2058,9 +2106,17 @@ func main() {
 	go app.runAlarmScheduler()
 	go app.runSessionCleaner()
 
-	addr := ":" + port
-	log.Printf("Tidslinjal v%s — http://localhost%s", AppVersion, addr)
+	addr := host + ":" + port
+	listenAddr := addr
+	if host == "" {
+		listenAddr = "0.0.0.0:" + port
+	}
+	log.Printf("Tidslinjal v%s — listening on %s", AppVersion, listenAddr)
 	log.Printf("Default credentials: admin / admin")
+	if verbose {
+		log.Printf("[VERBOSE] data dir: %s", dataDir)
+		log.Printf("[VERBOSE] verbose=%v debug=%v", verbose, debug)
+	}
 
 	if err := http.ListenAndServe(addr, app.routes()); err != nil {
 		log.Fatalf("Server error: %v", err)

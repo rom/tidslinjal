@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v3.0.0 — Collaborative Operational Timeline
+   Tidslinjal v3.1.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -181,6 +181,10 @@ function isLayerActive(id) {
 
 // ── Timeline render ────────────────────────────────────────────────────────
 function renderTimeline() {
+  // Update zoom-dependent CSS variable so event font/icons scale with zoom
+  const zf = state.zoomFactor || 1.0;
+  document.documentElement.style.setProperty('--ev-zoom-scale', Math.max(0.7, Math.min(2.0, zf)).toFixed(3));
+
   const container = document.getElementById('timeline');
   const days       = getDays();
   const slots      = getSlotsPerDay();
@@ -673,6 +677,20 @@ function onCellClick(e, startISO, endISO, outOfHours) {
 }
 
 // ── Event Modal ────────────────────────────────────────────────────────────
+function updateEventModalTimeVisibility() {
+  const allDay  = document.getElementById('eventAllDay')?.checked;
+  const typeVal = document.getElementById('eventType')?.value;
+  const isInstant = typeVal === 'instant';
+
+  const startRow = document.getElementById('eventTimeRow');
+  const endGroup = document.getElementById('eventEndGroup');
+  const recurRow = document.querySelectorAll('#eventModal .recurrence-row');
+
+  if (startRow) startRow.style.display = allDay ? 'none' : '';
+  if (endGroup) endGroup.style.display = (allDay || isInstant) ? 'none' : '';
+  recurRow.forEach(el => { el.style.display = allDay ? 'none' : ''; });
+}
+
 function openEventModal(ev, defaultStart, defaultEnd) {
   const isEdit = !!ev;
   document.getElementById('eventModalTitle').textContent = isEdit ? t('event_edit') : t('event_add');
@@ -692,6 +710,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   typeSelect.onchange = () => {
     const found = state.eventTypes.find(x => x.key === typeSelect.value);
     if (found) document.getElementById('eventColor').value = found.color;
+    updateEventModalTimeVisibility();
   };
 
   // Layer select
@@ -707,6 +726,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventStart').value = fmtDateInput(start);
   document.getElementById('eventEnd').value   = fmtDateInput(end);
 
+  // All-day checkbox
+  const allDayChk = document.getElementById('eventAllDay');
+  if (allDayChk) allDayChk.checked = ev ? !!ev.all_day : false;
+
   const recurring = ev && ev.is_recurring;
   document.getElementById('eventRecurring').checked = recurring;
   document.getElementById('recurrenceGroup').style.display    = recurring ? '' : 'none';
@@ -718,6 +741,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   // Status
   document.getElementById('eventStatus').value = (ev && ev.status) ? ev.status : 'planned';
+
+  // Intern/extern
+  const partSel = document.getElementById('eventParticipant');
+  if (partSel) partSel.value = ev ? (ev.participant || '') : '';
 
   // Clear attachment input on each open
   const attachFile = document.getElementById('eventAttachFile');
@@ -732,6 +759,9 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   delBtn.style.display = canDel ? '' : 'none';
   delBtn.onclick = canDel ? () => deleteEvent(ev.id) : null;
 
+  // Update field visibility for type/allday
+  updateEventModalTimeVisibility();
+
   openModal('eventModal');
 }
 
@@ -739,6 +769,8 @@ document.getElementById('eventRecurring').addEventListener('change', function() 
   document.getElementById('recurrenceGroup').style.display    = this.checked ? '' : 'none';
   document.getElementById('recurrenceEndGroup').style.display = this.checked ? '' : 'none';
 });
+
+document.getElementById('eventAllDay').addEventListener('change', updateEventModalTimeVisibility);
 
 // Auto-adjust end time to start + 1 hour whenever start changes
 document.getElementById('eventStart').addEventListener('change', function() {
@@ -751,24 +783,30 @@ document.getElementById('eventStart').addEventListener('change', function() {
 document.getElementById('btnSaveEvent').addEventListener('click', async () => {
   const id    = document.getElementById('eventId').value;
   const title = document.getElementById('eventTitle').value.trim();
-  if (!title) { alert('Title is required'); return; }
+  if (!title) { alert(t('event_title') + ' ' + (t('required')||'is required')); return; }
+  const allDay   = document.getElementById('eventAllDay')?.checked || false;
+  const typeVal  = document.getElementById('eventType').value;
+  const isInstant = typeVal === 'instant';
   const startVal = document.getElementById('eventStart').value;
   const endVal   = document.getElementById('eventEnd').value;
-  if (!startVal) { alert('Start time is required'); return; }
+  if (!allDay && !startVal) { alert(t('event_start') + ' ' + (t('required')||'is required')); return; }
 
   const recurring = document.getElementById('eventRecurring').checked;
   const layerVal  = document.getElementById('eventLayer').value;
+  const partSel   = document.getElementById('eventParticipant');
   const payload = {
     title,
     description:        document.getElementById('eventDescription').value,
-    event_type:         document.getElementById('eventType').value,
+    event_type:         typeVal,
     color:              document.getElementById('eventColor').value,
     status:             document.getElementById('eventStatus').value,
-    start_time:         new Date(startVal).toISOString(),
-    end_time:           endVal ? new Date(endVal).toISOString() : null,
-    is_recurring:       recurring,
-    recurrence_pattern: recurring ? document.getElementById('eventRecurrencePattern').value : '',
-    recurrence_end:     recurring && document.getElementById('eventRecurrenceEnd').value
+    all_day:            allDay,
+    participant:        partSel ? partSel.value : '',
+    start_time:         (!allDay && startVal) ? new Date(startVal).toISOString() : new Date().toISOString(),
+    end_time:           (!allDay && !isInstant && endVal) ? new Date(endVal).toISOString() : null,
+    is_recurring:       recurring && !allDay && !isInstant,
+    recurrence_pattern: (recurring && !allDay && !isInstant) ? document.getElementById('eventRecurrencePattern').value : '',
+    recurrence_end:     (recurring && !allDay && !isInstant && document.getElementById('eventRecurrenceEnd').value)
                           ? new Date(document.getElementById('eventRecurrenceEnd').value).toISOString() : null,
     layer_id:           layerVal ? parseInt(layerVal, 10) : null,
   };
@@ -1688,7 +1726,15 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
           ${['day','2days','3days','4days','week'].map(v =>
-            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setPref('default_view','${v}')">${t('range_'+v)||v}</button>`
+            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setDefaultView('${v}')">${t('range_'+v)||v}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV']].map(([v,l]) =>
+            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" onclick="setPref('date_format','${v}')">${l}</button>`
           ).join('')}
         </div>
       </div>
@@ -1741,12 +1787,17 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('settings_exercise')}</div>
         <div class="form-group" style="margin-bottom:6px">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_exercise_label')}</label>
-          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="Exercise name…"
+          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="${t('settings_exercise_label_ph')||'Exercise name…'}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_exercise_epoch')}</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">STARTEX — ${t('settings_exercise_epoch')}</label>
           <input type="datetime-local" id="exEpoch" value="${ex.epoch ? fmtDateInput(new Date(ex.epoch)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">ENDEX — ${t('settings_exercise_endex')||'End of exercise'}</label>
+          <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-check" style="margin-bottom:8px">
@@ -1754,6 +1805,7 @@ function renderSidebar() {
           <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
+        <a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">⚙ ${t('admin_view')||'Admin View'}</a>
       </div>` : ''}
     `;
   }
@@ -1822,10 +1874,16 @@ function toggleFreeze() {
 
 // ── Exercise settings ──────────────────────────────────────────────────────
 async function saveExercise() {
-  const epoch   = document.getElementById('exEpoch').value;
-  const label   = document.getElementById('exLabel').value.trim();
-  const enabled = document.getElementById('exEnabled').checked;
-  const payload = { enabled, epoch: epoch ? new Date(epoch).toISOString() : '', label };
+  const epoch   = document.getElementById('exEpoch')?.value;
+  const endex   = document.getElementById('exEndex')?.value;
+  const label   = document.getElementById('exLabel')?.value?.trim() || '';
+  const enabled = document.getElementById('exEnabled')?.checked || false;
+  const payload = {
+    enabled,
+    epoch: epoch ? new Date(epoch).toISOString() : '',
+    endex: endex ? new Date(endex).toISOString() : '',
+    label,
+  };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
     state.exercise = await res.json();
@@ -1836,6 +1894,16 @@ async function saveExercise() {
     const err = await res.json();
     alert('Error: ' + err.error);
   }
+}
+
+async function setDefaultView(view) {
+  state.preferences.default_view = view;
+  state.range = view;
+  document.getElementById('rangeSelect').value = view;
+  applyPreferences();
+  await savePreferences();
+  renderSidebar();
+  await refreshAll();
 }
 
 // ── Preference actions ─────────────────────────────────────────────────────
@@ -1881,6 +1949,8 @@ async function toggleLayer(id) {
   await fetchEvents();
   renderSidebar();
   renderTimeline();
+  const pop = document.getElementById('layerPopover');
+  if (pop && pop.style.display !== 'none') renderLayerPopover();
 }
 
 async function toggleAllLayers() {
@@ -1889,6 +1959,8 @@ async function toggleAllLayers() {
   await fetchEvents();
   renderSidebar();
   renderTimeline();
+  const pop = document.getElementById('layerPopover');
+  if (pop && pop.style.display !== 'none') renderLayerPopover();
 }
 
 function hasRole2(userRole, required) {
@@ -2068,6 +2140,50 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Export ─────────────────────────────────────────────────────────────────
+function openExportModal() {
+  openModal('exportModal');
+}
+
+function doExport(format) {
+  closeModal('exportModal');
+  if (format === 'ics') { exportICS(); return; }
+  if (format === 'json') {
+    window.location.href = '/api/export';
+    return;
+  }
+  if (format === 'csv') { exportCSV(); return; }
+}
+
+function exportCSV() {
+  const events = state.events;
+  if (!events.length) { alert('No events in the current view to export.'); return; }
+  const headers = ['ID','Title','Type','Status','Start','End','All Day','Participant','Layer','Created By','Description'];
+  const rows = events.map(ev => [
+    ev.id,
+    `"${(ev.title||'').replace(/"/g,'""')}"`,
+    ev.event_type,
+    ev.status,
+    ev.all_day ? ev.start_time.slice(0,10) : ev.start_time,
+    ev.all_day ? '' : (ev.end_time || ''),
+    ev.all_day ? 'yes' : 'no',
+    ev.participant || '',
+    ev.layer_id || '',
+    `"${(ev.created_by_name||'').replace(/"/g,'""')}"`,
+    `"${(ev.description||'').replace(/"/g,'""').replace(/\n/g,' ')}"`,
+  ]);
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `tidslinjal-${state.startDate.toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ── ICS Export ─────────────────────────────────────────────────────────────
 function toICSDate(d) {
   const pad = n => String(n).padStart(2,'0');
@@ -2154,20 +2270,6 @@ function openLayerPopover(btn) {
   pop.style.top  = (rect.bottom + 4) + 'px';
   pop.style.left = rect.left + 'px';
   pop.style.display = '';
-}
-
-// Keep popover in sync when layers toggle (called at end of toggleLayer / toggleAllLayers)
-const _origToggleLayer    = toggleLayer;
-const _origToggleAllLayers = toggleAllLayers;
-async function toggleLayer(id) {
-  await _origToggleLayer(id);
-  const pop = document.getElementById('layerPopover');
-  if (pop && pop.style.display !== 'none') renderLayerPopover();
-}
-async function toggleAllLayers() {
-  await _origToggleAllLayers();
-  const pop = document.getElementById('layerPopover');
-  if (pop && pop.style.display !== 'none') renderLayerPopover();
 }
 
 // ── Drag-to-zoom on time column ────────────────────────────────────────────
@@ -2585,7 +2687,7 @@ async function init() {
   document.getElementById('btnToday').addEventListener('click',  goToday);
   document.getElementById('btnZoomNow').addEventListener('click', zoomToNow);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
-  document.getElementById('btnExportICS').addEventListener('click', exportICS);
+  document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;

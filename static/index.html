@@ -57,8 +57,7 @@
       <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">🕐 T+</button>
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
-      <button class="btn btn-secondary btn-sm" id="btnExportICS">📅 Export ICS</button>
-      <button class="btn btn-secondary btn-sm admin-only" id="btnExportData" style="display:none">⬇ Export Data</button>
+      <button class="btn btn-secondary btn-sm" id="btnExport">⬇ Export</button>
       <button class="btn btn-secondary btn-sm" id="btnReport">📄 Report</button>
 
       <div class="toolbar-sep"></div>
@@ -149,12 +148,12 @@
           <input type="color" id="eventColor" value="#4A90D9">
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="eventTimeRow">
         <div class="form-group">
           <label id="lbl-ev-start">Start *</label>
           <input type="datetime-local" id="eventStart">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="eventEndGroup">
           <label id="lbl-ev-end">End</label>
           <input type="datetime-local" id="eventEnd">
         </div>
@@ -184,11 +183,21 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <div class="form-check">
+          <label id="lbl-ev-participant">Participant</label>
+          <select id="eventParticipant">
+            <option value="">—</option>
+            <option value="intern">Intern</option>
+            <option value="extern">Extern</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="form-check" style="margin-top:22px">
             <input type="checkbox" id="eventAllDay">
             <label for="eventAllDay" id="lbl-ev-allday">Day-only (no specific time)</label>
           </div>
         </div>
+      </div>
+      <div class="form-row recurrence-row">
         <div class="form-group">
           <div class="form-check">
             <input type="checkbox" id="eventRecurring">
@@ -210,7 +219,7 @@
           </select>
         </div>
       </div>
-      <div class="form-group" id="recurrenceEndGroup" style="display:none">
+      <div class="form-group recurrence-row" id="recurrenceEndGroup" style="display:none">
         <label id="lbl-ev-recend">Recurrence End</label>
         <input type="datetime-local" id="eventRecurrenceEnd">
       </div>
@@ -756,6 +765,36 @@
     </div><!-- .modal-body -->
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="lbl-export-title">⬇ Export</h2>
+      <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:14px;color:var(--text-dim);font-size:var(--fs-sm)" id="lbl-export-desc">Select export format for the current view.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('ics')">
+          <div style="font-weight:600">📅 ICS / iCalendar</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-ics-desc">Import into Google Calendar, Outlook, Apple Calendar, etc.</div>
+        </button>
+        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('json')">
+          <div style="font-weight:600">{ } JSON</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-json-desc">Full data export for backup or API integration.</div>
+        </button>
+        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('csv')">
+          <div style="font-weight:600">📊 CSV</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-csv-desc">Open in Excel, LibreOffice Calc, or any spreadsheet app.</div>
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('exportModal')" id="lbl-export-cancel">Cancel</button>
     </div>
   </div>
 </div>

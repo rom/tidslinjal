@@ -1,8 +1,24 @@
-# Tidslinjal v3.0.0
+# Tidslinjal v3.1.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
 
 ---
+
+## What's New in v3.1.0
+
+- **STARTEX / ENDEX** — Exercise epoch renamed to "STARTEX"; new "ENDEX" field for end-of-exercise datetime in Settings
+- **Instant event type** — single-point-in-time marker (no end time); rendered as a thin vertical bar with a ◆ diamond
+- **Möte (Meeting) event type** — dedicated meeting type with a distinct blue color
+- **Intern / Extern attribute** — new per-event participant field (`intern` / `extern` / none); shown as colored badge on event blocks
+- **Unified Export modal** — single ⬇ Export button opens a modal to select ICS, JSON, or CSV format
+- **CSV export** — export current view events to a spreadsheet-ready CSV file
+- **Date/time format preference** — select ISO 8601, UK (DD/MM/YYYY), FR (DD.MM.YYYY), or SV format in Settings
+- **Default view applies immediately** — changing the default view in Settings also switches the current view
+- **`/admin-view` page** — admin-only dashboard showing system info, stats, exercise settings, user table, and audit log
+- **CLI flags** — `--host` (bind interface), `--port`, `--data`, `--verbose`, `--debug`
+- **Zoom font/icon scaling** — event text and icons scale proportionally with the drag-to-zoom factor
+- **Full i18n audit** — all UI strings in all 3 locales (EN / SV / FR); missing translations backfilled
+- **Version bump to 3.1.0**
 
 ## What's New in v3.0.0
 
@@ -86,11 +102,13 @@
 - **Event search** — live filter by title, description, or creator
 
 ### Event Management & Status Workflow
-Six built-in event types (plus custom types):
+Eight built-in event types (plus custom types):
 
 | Type | Description | Default Color |
 |---|---|---|
 | **Event** | General occurrence | Blue |
+| **Instant** | Single-point-in-time marker (no end time) | Orange |
+| **Meeting (Möte)** | Scheduled meeting | Blue |
 | **Decision** | Decision point | Orange |
 | **Deadline** | Hard deadline | Red |
 | **Activity** | Planned work | Green |
@@ -100,8 +118,10 @@ Six built-in event types (plus custom types):
 Each event carries:
 - Title, description, type, custom color
 - Start time and optional end time; optional recurrence
+- **Participant** — intern, extern, or none (shown as colored badge on event block)
+- **Day-only** — checkbox to mark an event with no specific time
 - Layer assignment (master timeline or named layer)
-- **Status** — planned / active / completed / submitted / verified / rejected / cancelled
+- **Status** — planned / active / responded_to / completed / submitted / verified / rejected / cancelled
 - Verification record (verified by, verified at) or rejection reason
 - File attachments (up to 25 MB)
 
@@ -168,6 +188,8 @@ A `can_lock` flag can also be granted to non-admin users.
 | Language | English / Svenska / Français |
 | Day start hour | 0–23 |
 | Day end hour | 1–24 |
+| Default view | Day / 2 Days / 3 Days / 4 Days / Week |
+| Date/time format | ISO 8601 / UK / FR / SV |
 | Hidden event types | Toggle per type |
 | Active layers | Toggle per layer |
 | Webhook URL | Any HTTP(S) endpoint |
@@ -213,14 +235,21 @@ Password: admin
 
 **Change the admin password after first login** (Admin → Users tab → edit admin).
 
-### Environment Variables
+### Command-Line Flags & Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `8080` | TCP port |
-| `DATA_DIR` | `data` | Directory for JSON data files and attachments |
+| Flag | Env Var | Default | Description |
+|---|---|---|---|
+| `--port` | `PORT` | `8080` | TCP listen port |
+| `--host` | `HOST` | `` (all interfaces) | Listen interface/address |
+| `--data` | `DATA_DIR` | `data` | Data directory for JSON files and attachments |
+| `--verbose` | — | `false` | Enable verbose log output |
+| `--debug` | — | `false` | Enable debug log output (implies verbose) |
 
 ```bash
+# Bind to localhost only, debug mode
+./tidslinjal --host 127.0.0.1 --port 9000 --data /var/lib/tidslinjal --verbose
+
+# Environment variables
 PORT=9000 DATA_DIR=/var/lib/tidslinjal ./tidslinjal
 ```
 
@@ -314,6 +343,16 @@ tidslinjal/
     └── style.css    # Dark + light themes, 4 size variants, mobile CSS
 ```
 
+### Admin View
+
+Navigate to `/admin-view` (admin role required) for a dashboard showing:
+- System version and data directory
+- User, group, layer, and event counts
+- Exercise STARTEX / ENDEX settings
+- Full user table with roles
+- Audit log (last 50 entries)
+- Full JSON export download link
+
 ### API Endpoints
 
 | Method | Path | Auth | Description |
@@ -321,6 +360,7 @@ tidslinjal/
 | `POST` | `/api/auth/login` | Public | Log in |
 | `POST` | `/api/auth/logout` | Any | Log out |
 | `GET` | `/api/auth/me` | Any | Current user |
+| `POST` | `/api/auth/change-password` | Any | Change own password |
 | `GET` | `/api/version` | Public | App version |
 | `GET/PUT` | `/api/preferences` | Any | User preferences |
 | `GET` | `/api/event-types` | Public | List event types |

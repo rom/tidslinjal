@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.0.0"
+const AppVersion = "3.1.0"
 
 // Role defines user access levels
 type Role string
@@ -38,6 +38,10 @@ type EventType = string
 var SystemEventTypes = []EventTypeDef{
 	{Key: "event", Label: "Event", Color: "#4A90D9", IsSystem: true,
 		LabelSV: "Händelse", LabelFR: "Événement"},
+	{Key: "instant", Label: "Instant", Color: "#F39C12", IsSystem: true,
+		LabelSV: "Ögonblick", LabelFR: "Instant"},
+	{Key: "mote", Label: "Meeting (Möte)", Color: "#2980B9", IsSystem: true,
+		LabelSV: "Möte", LabelFR: "Réunion"},
 	{Key: "decision", Label: "Decision", Color: "#E67E22", IsSystem: true,
 		LabelSV: "Beslut", LabelFR: "Décision"},
 	{Key: "deadline", Label: "Deadline", Color: "#E74C3C", IsSystem: true,
@@ -114,6 +118,7 @@ type UserPreferences struct {
 	RedLineWidth    int      `json:"red_line_width,omitempty"`
 	RedLineStyle    string   `json:"red_line_style,omitempty"` // solid | dashed | dotted
 	SynthLabel      bool     `json:"synth_label"`              // show H+N label on red line
+	DateFormat      string   `json:"date_format,omitempty"`    // iso | uk | fr | sv
 }
 
 // Group is a named set of users used for layer sharing
@@ -157,6 +162,7 @@ type Event struct {
 	StartTime         time.Time   `json:"start_time"`
 	EndTime           *time.Time  `json:"end_time,omitempty"`
 	AllDay            bool        `json:"all_day"`              // day-only activity (no specific time)
+	Participant       string      `json:"participant,omitempty"` // "" | "intern" | "extern"
 	IsRecurring       bool        `json:"is_recurring"`
 	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
@@ -271,9 +277,10 @@ type AuditEntry struct {
 
 // ExerciseSettings controls synthetic time display across the application
 type ExerciseSettings struct {
-	Enabled bool   `json:"enabled"`
-	Epoch   string `json:"epoch"` // ISO8601: real datetime = Day 1 T+0
-	Label   string `json:"label"` // exercise name shown in header
-	Paused  bool   `json:"paused"`  // freeze timeline progression
+	Enabled  bool   `json:"enabled"`
+	Epoch    string `json:"epoch"`             // ISO8601: STARTEX — real datetime = Day 1 T+0
+	Endex    string `json:"endex,omitempty"`   // ISO8601: ENDEX — end of exercise
+	Label    string `json:"label"`             // exercise name shown in header
+	Paused   bool   `json:"paused"`            // freeze timeline progression
 	PausedAt string `json:"paused_at,omitempty"` // ISO8601: when it was paused
 }
