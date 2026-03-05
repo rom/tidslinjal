@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tidslinjal – Operational Timeline</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ───────────────────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="logo">Tids<span>linjal</span></div>
+
+    <div class="header-controls">
+      <!-- Navigation -->
+      <button class="btn btn-secondary btn-icon nav-btn" id="btnPrev" title="Previous">&#8249;</button>
+      <button class="btn btn-secondary btn-sm today-btn" id="btnToday">Today</button>
+      <button class="btn btn-secondary btn-icon nav-btn" id="btnNext" title="Next">&#8250;</button>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Range -->
+      <div class="control-group">
+        <span class="control-label">Show:</span>
+        <select class="ctrl-select" id="rangeSelect">
+          <option value="day">Day</option>
+          <option value="week" selected>Week</option>
+          <option value="month">Month</option>
+          <option value="2months">2 Months</option>
+          <option value="3months">3 Months</option>
+        </select>
+      </div>
+
+      <!-- Resolution -->
+      <div class="control-group">
+        <span class="control-label">Resolution:</span>
+        <select class="ctrl-select" id="resolutionSelect">
+          <option value="quarter">15 min</option>
+          <option value="hour" selected>Hour</option>
+          <option value="day">Day</option>
+        </select>
+      </div>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Add event button (readwrite+) -->
+      <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">
+        + Add Event
+      </button>
+      <!-- Add lock button (admin/canLock) -->
+      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">
+        &#x1F512; Lock Slot
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="clock-display">
+        <div class="clock-time" id="clockTime">00:00:00</div>
+        <div class="clock-date" id="clockDate">—</div>
+      </div>
+      <div class="user-info">
+        <div class="user-badge">
+          <span id="userDisplayName">—</span>
+          <span class="role-badge role-read" id="userRoleBadge">read</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnSidebar" title="Toggle panel">&#9776;</button>
+        <button class="btn btn-secondary btn-sm" id="btnLogout">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main content ──────────────────────────────────────────────────────── -->
+  <div id="main">
+
+    <!-- Timeline -->
+    <div id="timeline-container">
+      <div id="timeline"></div>
+      <div id="current-time-line"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="legend">Legend</button>
+        <button class="sidebar-tab" data-tab="alarms">Alarms</button>
+        <button class="sidebar-tab admin-only" data-tab="users" style="display:none">Users</button>
+      </div>
+      <div class="sidebar-content" id="sidebarContent"></div>
+    </aside>
+  </div>
+
+</div>
+
+<!-- ── Notification area ─────────────────────────────────────────────────── -->
+<div id="notification-area"></div>
+
+<!-- ── Event Modal ───────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="eventModalTitle">Add Event</h2>
+      <button class="modal-close" data-close="eventModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="eventId">
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" id="eventTitle" placeholder="Event title">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="eventType"></select>
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="eventColor" value="#4A90D9">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start *</label>
+          <input type="datetime-local" id="eventStart">
+        </div>
+        <div class="form-group">
+          <label>End</label>
+          <input type="datetime-local" id="eventEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="eventDescription" rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <div class="form-check">
+            <input type="checkbox" id="eventRecurring">
+            <label for="eventRecurring">Recurring</label>
+          </div>
+        </div>
+        <div class="form-group" id="recurrenceGroup" style="display:none">
+          <label>Pattern</label>
+          <select id="eventRecurrencePattern">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="recurrenceEndGroup" style="display:none">
+        <label>Recurrence End</label>
+        <input type="datetime-local" id="eventRecurrenceEnd">
+      </div>
+      <div id="eventCreator" style="display:none; font-size:11px; color:var(--text-dim); margin-top:4px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeleteEvent" style="display:none">Delete</button>
+      <button class="btn btn-secondary" data-close="eventModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveEvent">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Alarm Modal ───────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="alarmModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Set Alarm</h2>
+      <button class="modal-close" data-close="alarmModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="alarmEventId">
+      <div class="form-group">
+        <label>Event</label>
+        <input type="text" id="alarmEventTitle" readonly>
+      </div>
+      <div class="form-group">
+        <label>Event Time</label>
+        <input type="text" id="alarmEventTime" readonly>
+      </div>
+      <div class="form-group">
+        <label>Remind me</label>
+        <select id="alarmLeadTime">
+          <option value="0">At the event time</option>
+          <option value="5">5 minutes before</option>
+          <option value="10">10 minutes before</option>
+          <option value="15">15 minutes before</option>
+          <option value="30">30 minutes before</option>
+          <option value="60">1 hour before</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="alarmModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveAlarm">Set Alarm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lock Modal ───────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="lockModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Lock Time Slot</h2>
+      <button class="modal-close" data-close="lockModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start *</label>
+          <input type="datetime-local" id="lockStart">
+        </div>
+        <div class="form-group">
+          <label>End *</label>
+          <input type="datetime-local" id="lockEnd">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Reason</label>
+        <input type="text" id="lockReason" placeholder="Reason for locking this slot">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="lockModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveLock">Lock Slot</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── User Modal ────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="userModalTitle">Add User</h2>
+      <button class="modal-close" data-close="userModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="userId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Username *</label>
+          <input type="text" id="uUsername">
+        </div>
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" id="uPassword" placeholder="Leave blank to keep">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="uDisplayName">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select id="uRole">
+            <option value="read">Read</option>
+            <option value="readwrite">Read/Write</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-check">
+          <input type="checkbox" id="uCanLock">
+          <label for="uCanLock">Can lock time slots</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
+      <button class="btn btn-secondary" data-close="userModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveUser">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Event Detail Modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="detailTitle">Event Detail</h2>
+      <button class="modal-close" data-close="detailModal">&times;</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
