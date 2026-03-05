@@ -494,9 +494,81 @@ textarea { resize: vertical; min-height: 70px; }
 }
 .attach-file-input::-webkit-file-upload-button:hover { background: var(--border); }
 
-/* ── Responsive ───────────────────────────────────────────────────────────── */
+/* ── Event status badges ──────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-block; font-size: var(--fs-xs); font-weight: 600;
+  padding: 2px 7px; border-radius: 10px; text-transform: uppercase;
+  letter-spacing: .04em; vertical-align: middle;
+}
+.status-planned   { background: rgba(74,144,217,.18);  color: var(--accent); }
+.status-active    { background: rgba(46,204,113,.18);  color: var(--green); }
+.status-completed { background: rgba(122,143,166,.18); color: var(--text-dim); }
+.status-submitted { background: rgba(155,89,182,.18);  color: var(--purple); }
+.status-verified  { background: rgba(46,204,113,.22);  color: var(--green); border: 1px solid var(--green); }
+.status-rejected  { background: rgba(231,76,60,.18);   color: var(--red); border: 1px solid var(--red); }
+.status-cancelled { background: rgba(122,143,166,.12); color: var(--text-dim); text-decoration: line-through; }
+
+/* Status dot on event blocks */
+.ev-status-dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  vertical-align: middle; margin-right: 3px; flex-shrink: 0;
+}
+.ev-status-active    { background: var(--green); }
+.ev-status-completed { background: var(--text-dim); }
+.ev-status-submitted { background: var(--purple); }
+.ev-status-verified  { background: var(--green); box-shadow: 0 0 0 2px rgba(46,204,113,.35); }
+.ev-status-rejected  { background: var(--red); }
+.ev-status-cancelled { background: var(--text-dim); opacity: .6; }
+
+/* ── Audit log ────────────────────────────────────────────────────────────── */
+.audit-list { display: flex; flex-direction: column; gap: 4px; }
+.audit-item {
+  padding: 7px 10px; border-radius: var(--radius); background: var(--bg3);
+  font-size: var(--fs-xs); border-left: 3px solid var(--border);
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: start;
+}
+.audit-ts   { color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; grid-row: 1; }
+.audit-user { color: var(--accent); font-weight: 600; grid-row: 1; }
+.audit-action { color: var(--text); grid-column: 1 / -1; }
+.audit-action-created  { border-left-color: var(--green); }
+.audit-action-updated  { border-left-color: var(--accent); }
+.audit-action-deleted  { border-left-color: var(--red); }
+.audit-action-verified { border-left-color: var(--green); }
+.audit-action-rejected { border-left-color: var(--red); }
+.audit-action-status_changed { border-left-color: var(--purple); }
+
+/* ── Exercise badge ───────────────────────────────────────────────────────── */
+.exercise-badge {
+  background: linear-gradient(90deg, var(--orange), var(--red));
+  color: #fff; font-size: var(--fs-xs); font-weight: 700;
+  padding: 3px 10px; border-radius: 12px; letter-spacing: .05em;
+  text-transform: uppercase; white-space: nowrap;
+}
+
+/* ── Drag-to-reschedule ───────────────────────────────────────────────────── */
+.event-block.dragging {
+  cursor: grabbing !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,.6) !important;
+}
+.tl-cell.drag-target {
+  background: rgba(74,144,217,.18) !important;
+  outline: 2px dashed var(--accent);
+}
+
+/* ── Responsive / mobile ──────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   #sidebar { display: none !important; }
   .header-controls { gap: 4px; }
   .control-label { display: none; }
+  .header-left { gap: 4px; }
+  .lang-flags { display: none; }
+  #btnExportICS { display: none; }
+  .tl-corner, .tl-time-label { font-size: var(--fs-xs); }
+  --time-col-w: 40px;
+}
+@media (max-width: 480px) {
+  :root { --fs-base: 12px; --fs-sm: 10px; }
+  .toolbar { flex-wrap: wrap; gap: 4px; height: auto; padding: 4px 6px; }
+  #btnAddLock { display: none; }
+  .event-block { font-size: 9px; padding: 1px 3px; }
 }

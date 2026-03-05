@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -133,8 +134,55 @@ func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Requ
 }
 
 func hasRole(userRole, required Role) bool {
-	order := map[Role]int{RoleRead: 0, RoleReadWrite: 1, RoleAdmin: 2}
+	order := map[Role]int{
+		RoleRead:      0,
+		RoleReadWrite: 1,
+		RoleTeamLead:  2,
+		RoleOpLead:    3,
+		RoleAdmin:     4,
+	}
 	return order[userRole] >= order[required]
+}
+
+func canEditMasterTimeline(role Role) bool {
+	return hasRole(role, RoleOpLead)
+}
+
+// audit is a fire-and-forget convenience wrapper
+func (app *App) audit(userID int64, userName, action, entityType string, entityID int64, summary string) {
+	app.store.LogAudit(AuditEntry{ //nolint
+		UserID: userID, UserName: userName,
+		Action: action, EntityType: entityType, EntityID: entityID,
+		Summary: summary,
+	})
+}
+
+// callWebhook fires a user's configured webhook (if any) asynchronously
+func (app *App) callWebhook(userID int64, msg string, notif AlarmNotification) {
+	prefs := app.store.GetPreferences(userID)
+	if prefs.WebhookURL == "" {
+		return
+	}
+	var payload []byte
+	switch prefs.WebhookType {
+	case "mattermost", "slack":
+		payload, _ = json.Marshal(map[string]string{"text": msg})
+	default:
+		payload, _ = json.Marshal(map[string]interface{}{
+			"message":     msg,
+			"event_title": notif.EventTitle,
+			"event_time":  notif.EventTime.Format(time.RFC3339),
+			"alarm_id":    notif.AlarmID,
+		})
+	}
+	go func() {
+		resp, err := http.Post(prefs.WebhookURL, "application/json", bytes.NewReader(payload))
+		if err != nil {
+			log.Printf("webhook for user %d failed: %v", userID, err)
+			return
+		}
+		resp.Body.Close()
+	}()
 }
 
 func (app *App) userGroups(userID int64) []int64 {
@@ -411,6 +459,11 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		}
 	}
 
+	// Master-timeline events require oplead or admin
+	if e.LayerID == nil && !canEditMasterTimeline(user.Role) {
+		jsonError(w, "only operations leads and admins may create master-timeline events", http.StatusForbidden)
+		return
+	}
 	// Check layer write permission
 	if e.LayerID != nil {
 		if !app.canWriteLayer(*e.LayerID, user) {
@@ -419,6 +472,9 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		}
 	}
 
+	if e.Status == "" {
+		e.Status = StatusPlanned
+	}
 	e.CreatedBy = user.ID
 	e.CreatedByName = user.DisplayName
 	created, err := app.store.CreateEvent(e)
@@ -426,6 +482,8 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "failed to create event", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "created", "event", created.ID,
+		fmt.Sprintf("Created event %q", created.Title))
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
 }
@@ -441,7 +499,13 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.CreatedBy != user.ID && !hasRole(user.Role, RoleReadWrite) {
+	// Master-timeline events: oplead+
+	if existing.LayerID == nil && !canEditMasterTimeline(user.Role) {
+		jsonError(w, "only operations leads and admins may edit master-timeline events", http.StatusForbidden)
+		return
+	}
+	// Layer events: creator or readwrite+
+	if existing.LayerID != nil && existing.CreatedBy != user.ID && !hasRole(user.Role, RoleReadWrite) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -454,6 +518,14 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 	e.CreatedBy = existing.CreatedBy
 	e.CreatedByName = existing.CreatedByName
 	e.CreatedAt = existing.CreatedAt
+	// Preserve verification fields unless status is being changed via patch
+	e.VerifiedBy = existing.VerifiedBy
+	e.VerifiedByName = existing.VerifiedByName
+	e.VerifiedAt = existing.VerifiedAt
+	e.RejectionReason = existing.RejectionReason
+	if e.Status == "" {
+		e.Status = existing.Status
+	}
 	if e.Color == "" {
 		if et, ok := app.store.GetEventTypeByKey(e.EventType); ok {
 			e.Color = et.Color
@@ -463,6 +535,66 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "failed to update", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "updated", "event", id,
+		fmt.Sprintf("Updated event %q", existing.Title))
+	updated, _ := app.store.GetEventByID(id)
+	jsonOK(w, updated)
+}
+
+func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	existing, ok := app.store.GetEventByID(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Status          string `json:"status"`
+		RejectionReason string `json:"rejection_reason"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	newStatus := EventStatus(req.Status)
+	// Verify/reject require teamlead+
+	if (newStatus == StatusVerified || newStatus == StatusRejected) && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "team lead or above required to verify or reject events", http.StatusForbidden)
+		return
+	}
+	if newStatus == StatusRejected && strings.TrimSpace(req.RejectionReason) == "" {
+		jsonError(w, "rejection_reason is required when rejecting", http.StatusBadRequest)
+		return
+	}
+	existing.Status = newStatus
+	if newStatus == StatusVerified {
+		now := time.Now()
+		existing.VerifiedBy = user.ID
+		existing.VerifiedByName = user.DisplayName
+		existing.VerifiedAt = &now
+		existing.RejectionReason = ""
+	} else if newStatus == StatusRejected {
+		existing.RejectionReason = req.RejectionReason
+		existing.VerifiedBy = 0
+		existing.VerifiedByName = ""
+		existing.VerifiedAt = nil
+	} else {
+		// Clear verification data when moving to any other status
+		existing.VerifiedBy = 0
+		existing.VerifiedByName = ""
+		existing.VerifiedAt = nil
+		existing.RejectionReason = ""
+	}
+	if err := app.store.UpdateEvent(*existing); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "status_changed", "event", id,
+		fmt.Sprintf("Event %q → %s", existing.Title, newStatus))
 	updated, _ := app.store.GetEventByID(id)
 	jsonOK(w, updated)
 }
@@ -482,10 +614,13 @@ func (app *App) handleDeleteEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	title := existing.Title
 	if err := app.store.DeleteEvent(id); err != nil {
 		jsonError(w, "failed to delete", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "deleted", "event", id,
+		fmt.Sprintf("Deleted event %q", title))
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1167,6 +1302,43 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// ── Audit log handler ──────────────────────────────────────────────────────────
+
+func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *User) {
+	limit := 500
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	entries := app.store.GetAudit(limit)
+	if entries == nil {
+		entries = []AuditEntry{}
+	}
+	jsonOK(w, entries)
+}
+
+// ── Exercise settings handlers ─────────────────────────────────────────────────
+
+func (app *App) handleGetExercise(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetExerciseSettings())
+}
+
+func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user *User) {
+	var es ExerciseSettings
+	if err := decode(r, &es); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveExerciseSettings(es); err != nil {
+		jsonError(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "exercise", 0,
+		fmt.Sprintf("Exercise settings updated: enabled=%v epoch=%q label=%q", es.Enabled, es.Epoch, es.Label))
+	jsonOK(w, es)
+}
+
 // ── Version ────────────────────────────────────────────────────────────────────
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -1188,11 +1360,13 @@ func (app *App) runAlarmScheduler() {
 				if alarm.LeadTime == 0 {
 					msg = fmt.Sprintf("Now: \"%s\" is starting", alarm.EventTitle)
 				}
-				app.broker.Notify(alarm.UserID, AlarmNotification{
+				notif := AlarmNotification{
 					AlarmID: alarm.ID, EventID: alarm.EventID,
 					EventTitle: alarm.EventTitle, EventTime: alarm.EventTime,
 					LeadTime: alarm.LeadTime, Message: msg,
-				})
+				}
+				app.broker.Notify(alarm.UserID, notif)
+				app.callWebhook(alarm.UserID, msg, notif)
 			}
 		}
 	}
@@ -1284,6 +1458,12 @@ func (app *App) routes() http.Handler {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
 
+		// /api/events/:id/status
+		if len(parts) == 4 && parts[3] == "status" && r.Method == http.MethodPatch {
+			app.requireAuth(app.handlePatchEventStatus)(w, r)
+			return
+		}
+
 		// /api/events/:id/attachments
 		if len(parts) == 4 && parts[3] == "attachments" {
 			switch r.Method {
@@ -1347,7 +1527,7 @@ func (app *App) routes() http.Handler {
 		case http.MethodGet:
 			app.requireAuth(app.handleGetGroups)(w, r)
 		case http.MethodPost:
-			app.requireRole(RoleAdmin, app.handleCreateGroup)(w, r)
+			app.requireRole(RoleTeamLead, app.handleCreateGroup)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -1402,6 +1582,27 @@ func (app *App) routes() http.Handler {
 		if r.Method == http.MethodDelete {
 			app.requireAuth(app.handleDeleteAlarm)(w, r)
 		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Audit log (teamlead+)
+	mux.HandleFunc("/api/audit", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleTeamLead, app.handleGetAudit)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Exercise settings (admin saves, any auth reads)
+	mux.HandleFunc("/api/exercise", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetExercise)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveExercise)(w, r)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
