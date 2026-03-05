@@ -3,29 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tidslinjal – Operational Timeline</title>
+  <title>Tidslinjal</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div id="app">
 
-  <!-- ── Header ───────────────────────────────────────────────────────────── -->
+  <!-- ── Header ────────────────────────────────────────────────────────────── -->
   <header id="header">
     <div class="logo">Tids<span>linjal</span></div>
 
     <div class="header-controls">
-      <!-- Navigation -->
-      <button class="btn btn-secondary btn-icon nav-btn" id="btnPrev" title="Previous">&#8249;</button>
-      <button class="btn btn-secondary btn-sm today-btn" id="btnToday">Today</button>
-      <button class="btn btn-secondary btn-icon nav-btn" id="btnNext" title="Next">&#8250;</button>
+      <button class="btn btn-secondary btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
+      <button class="btn btn-secondary btn-sm" id="btnToday">Today</button>
+      <button class="btn btn-secondary btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
+      <button class="btn btn-secondary btn-sm" id="btnZoomNow" title="Scroll to current time">⏱</button>
 
       <div class="toolbar-sep"></div>
 
-      <!-- Range -->
       <div class="control-group">
-        <span class="control-label">Show:</span>
+        <span class="control-label" id="lbl-show">Show:</span>
         <select class="ctrl-select" id="rangeSelect">
           <option value="day">Day</option>
+          <option value="2days">2 Days</option>
+          <option value="3days">3 Days</option>
+          <option value="4days">4 Days</option>
           <option value="week" selected>Week</option>
           <option value="month">Month</option>
           <option value="2months">2 Months</option>
@@ -33,9 +35,8 @@
         </select>
       </div>
 
-      <!-- Resolution -->
       <div class="control-group">
-        <span class="control-label">Resolution:</span>
+        <span class="control-label" id="lbl-res">Resolution:</span>
         <select class="ctrl-select" id="resolutionSelect">
           <option value="quarter">15 min</option>
           <option value="hour" selected>Hour</option>
@@ -45,14 +46,8 @@
 
       <div class="toolbar-sep"></div>
 
-      <!-- Add event button (readwrite+) -->
-      <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">
-        + Add Event
-      </button>
-      <!-- Add lock button (admin/canLock) -->
-      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">
-        &#x1F512; Lock Slot
-      </button>
+      <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
+      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
     </div>
 
     <div class="header-right">
@@ -65,83 +60,92 @@
           <span id="userDisplayName">—</span>
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
-        <button class="btn btn-secondary btn-sm" id="btnSidebar" title="Toggle panel">&#9776;</button>
+        <button class="btn btn-secondary btn-icon btn-sm" id="btnSidebar" title="Toggle panel">☰</button>
         <button class="btn btn-secondary btn-sm" id="btnLogout">Logout</button>
       </div>
     </div>
   </header>
 
-  <!-- ── Main content ──────────────────────────────────────────────────────── -->
+  <!-- ── Main content ───────────────────────────────────────────────────────── -->
   <div id="main">
 
     <!-- Timeline -->
     <div id="timeline-container">
       <div id="timeline"></div>
-      <div id="current-time-line"></div>
+      <div id="current-time-line" style="display:none"></div>
     </div>
 
     <!-- Sidebar -->
     <aside id="sidebar">
-      <div class="sidebar-tabs">
+      <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-tab="legend">Legend</button>
         <button class="sidebar-tab" data-tab="alarms">Alarms</button>
+        <button class="sidebar-tab" data-tab="layers">Layers</button>
         <button class="sidebar-tab admin-only" data-tab="users" style="display:none">Users</button>
+        <button class="sidebar-tab admin-only" data-tab="groups" style="display:none">Groups</button>
+        <button class="sidebar-tab" data-tab="settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
     </aside>
-  </div>
 
+  </div>
 </div>
 
-<!-- ── Notification area ─────────────────────────────────────────────────── -->
+<!-- Notifications -->
 <div id="notification-area"></div>
 
-<!-- ── Event Modal ───────────────────────────────────────────────────────── -->
+<!-- ─────────────────────────── MODALS ──────────────────────────────────── -->
+
+<!-- Event Modal -->
 <div class="modal-overlay" id="eventModal">
   <div class="modal">
     <div class="modal-header">
       <h2 id="eventModalTitle">Add Event</h2>
-      <button class="modal-close" data-close="eventModal">&times;</button>
+      <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="eventId">
       <div class="form-group">
-        <label>Title *</label>
-        <input type="text" id="eventTitle" placeholder="Event title">
+        <label id="lbl-ev-title">Title *</label>
+        <input type="text" id="eventTitle">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Type</label>
+          <label id="lbl-ev-type">Type</label>
           <select id="eventType"></select>
         </div>
         <div class="form-group">
-          <label>Color</label>
+          <label id="lbl-ev-color">Color</label>
           <input type="color" id="eventColor" value="#4A90D9">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Start *</label>
+          <label id="lbl-ev-start">Start *</label>
           <input type="datetime-local" id="eventStart">
         </div>
         <div class="form-group">
-          <label>End</label>
+          <label id="lbl-ev-end">End</label>
           <input type="datetime-local" id="eventEnd">
         </div>
       </div>
       <div class="form-group">
-        <label>Description</label>
+        <label id="lbl-ev-layer">Layer</label>
+        <select id="eventLayer"><option value="">Master Timeline</option></select>
+      </div>
+      <div class="form-group">
+        <label id="lbl-ev-desc">Description</label>
         <textarea id="eventDescription" rows="3"></textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
           <div class="form-check">
             <input type="checkbox" id="eventRecurring">
-            <label for="eventRecurring">Recurring</label>
+            <label for="eventRecurring" id="lbl-ev-recurring">Recurring</label>
           </div>
         </div>
         <div class="form-group" id="recurrenceGroup" style="display:none">
-          <label>Pattern</label>
+          <label id="lbl-ev-pattern">Pattern</label>
           <select id="eventRecurrencePattern">
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -150,38 +154,50 @@
         </div>
       </div>
       <div class="form-group" id="recurrenceEndGroup" style="display:none">
-        <label>Recurrence End</label>
+        <label id="lbl-ev-recend">Recurrence End</label>
         <input type="datetime-local" id="eventRecurrenceEnd">
       </div>
-      <div id="eventCreator" style="display:none; font-size:11px; color:var(--text-dim); margin-top:4px;"></div>
+      <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteEvent" style="display:none">Delete</button>
-      <button class="btn btn-secondary" data-close="eventModal">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('eventModal')" id="lbl-btn-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEvent">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ── Alarm Modal ───────────────────────────────────────────────────────── -->
+<!-- Event Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="detailTitle">—</h2>
+      <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer" id="detailFooter"></div>
+  </div>
+</div>
+
+<!-- Alarm Modal -->
 <div class="modal-overlay" id="alarmModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>Set Alarm</h2>
-      <button class="modal-close" data-close="alarmModal">&times;</button>
+      <h2 id="lbl-alarm-title">Set Alarm</h2>
+      <button class="modal-close" onclick="closeModal('alarmModal')">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="alarmEventId">
       <div class="form-group">
-        <label>Event</label>
+        <label id="lbl-alarm-event">Event</label>
         <input type="text" id="alarmEventTitle" readonly>
       </div>
       <div class="form-group">
-        <label>Event Time</label>
+        <label id="lbl-alarm-time">Event Time</label>
         <input type="text" id="alarmEventTime" readonly>
       </div>
       <div class="form-group">
-        <label>Remind me</label>
+        <label id="lbl-alarm-remind">Remind me</label>
         <select id="alarmLeadTime">
           <option value="0">At the event time</option>
           <option value="5">5 minutes before</option>
@@ -193,48 +209,48 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-close="alarmModal">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('alarmModal')">Cancel</button>
       <button class="btn btn-primary" id="btnSaveAlarm">Set Alarm</button>
     </div>
   </div>
 </div>
 
-<!-- ── Lock Modal ───────────────────────────────────────────────────────── -->
+<!-- Lock Modal -->
 <div class="modal-overlay" id="lockModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>Lock Time Slot</h2>
-      <button class="modal-close" data-close="lockModal">&times;</button>
+      <h2 id="lbl-lock-title">Lock Time Slot</h2>
+      <button class="modal-close" onclick="closeModal('lockModal')">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group">
-          <label>Start *</label>
+          <label id="lbl-lock-start">Start *</label>
           <input type="datetime-local" id="lockStart">
         </div>
         <div class="form-group">
-          <label>End *</label>
+          <label id="lbl-lock-end">End *</label>
           <input type="datetime-local" id="lockEnd">
         </div>
       </div>
       <div class="form-group">
-        <label>Reason</label>
-        <input type="text" id="lockReason" placeholder="Reason for locking this slot">
+        <label id="lbl-lock-reason">Reason</label>
+        <input type="text" id="lockReason" placeholder="Reason for locking">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-close="lockModal">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('lockModal')">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLock">Lock Slot</button>
     </div>
   </div>
 </div>
 
-<!-- ── User Modal ────────────────────────────────────────────────────────── -->
+<!-- User Modal -->
 <div class="modal-overlay" id="userModal">
   <div class="modal">
     <div class="modal-header">
       <h2 id="userModalTitle">Add User</h2>
-      <button class="modal-close" data-close="userModal">&times;</button>
+      <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="userId">
@@ -244,7 +260,7 @@
           <input type="text" id="uUsername">
         </div>
         <div class="form-group">
-          <label>Password *</label>
+          <label>Password</label>
           <input type="password" id="uPassword" placeholder="Leave blank to keep">
         </div>
       </div>
@@ -271,24 +287,134 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
-      <button class="btn btn-secondary" data-close="userModal">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
       <button class="btn btn-primary" id="btnSaveUser">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ── Event Detail Modal ────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="detailModal">
+<!-- Group Modal -->
+<div class="modal-overlay" id="groupModal">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="detailTitle">Event Detail</h2>
-      <button class="modal-close" data-close="detailModal">&times;</button>
+      <h2 id="groupModalTitle">Add Group</h2>
+      <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
     </div>
-    <div class="modal-body" id="detailBody"></div>
-    <div class="modal-footer" id="detailFooter"></div>
+    <div class="modal-body">
+      <input type="hidden" id="groupId">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="groupName">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="groupDesc">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeleteGroup" style="display:none">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal('groupModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveGroup">Save</button>
+    </div>
   </div>
 </div>
 
+<!-- Layer Modal -->
+<div class="modal-overlay" id="layerModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="layerModalTitle">New Layer</h2>
+      <button class="modal-close" onclick="closeModal('layerModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="layerId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Name *</label>
+          <input type="text" id="layerName">
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="layerColor" value="#4A90D9">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="layerDesc">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Visibility</label>
+          <select id="layerVisibility">
+            <option value="private">Private</option>
+            <option value="groups">Groups</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Group Permission</label>
+          <select id="layerPermission">
+            <option value="read">Read</option>
+            <option value="readwrite">Read/Write</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="layerGroupsGroup">
+        <label>Shared Groups (IDs, comma-separated)</label>
+        <input type="text" id="layerGroupIDs" placeholder="1, 2, 3">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeleteLayer" style="display:none">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal('layerModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveLayer">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Type Modal -->
+<div class="modal-overlay" id="etypeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="etypeModalTitle">New Event Type</h2>
+      <button class="modal-close" onclick="closeModal('etypeModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="etypeId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Key * <small style="color:var(--text-dim)">(unique, no spaces)</small></label>
+          <input type="text" id="etypeKey" placeholder="my_type">
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" id="etypeColor" value="#4A90D9">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>Label (EN)</label>
+          <input type="text" id="etypeLabel" placeholder="My Type">
+        </div>
+        <div class="form-group">
+          <label>Label (SV)</label>
+          <input type="text" id="etypeLabelSV" placeholder="Min typ">
+        </div>
+        <div class="form-group">
+          <label>Label (FR)</label>
+          <input type="text" id="etypeLabelFR" placeholder="Mon type">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="btnDeleteEtype" style="display:none">Delete</button>
+      <button class="btn btn-secondary" onclick="closeModal('etypeModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveEtype">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
