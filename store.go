@@ -27,6 +27,8 @@ type Store struct {
 	sessions    []Session
 	audit       []AuditEntry
 	exercise    ExerciseSettings
+	comments    []EventComment
+	phases      []ExercisePhase
 
 	nextEventTypeID int64
 	nextUserID      int64
@@ -37,6 +39,8 @@ type Store struct {
 	nextAlarmID     int64
 	nextLockID      int64
 	nextAuditID     int64
+	nextCommentID   int64
+	nextPhaseID     int64
 }
 
 func NewStore(dataDir string) (*Store, error) {
@@ -67,6 +71,8 @@ func (s *Store) load() error {
 	s.loadFile("sessions.json", &s.sessions)
 	s.loadFile("audit.json", &s.audit)
 	s.loadFile("exercise.json", &s.exercise)
+	s.loadFile("comments.json", &s.comments)
+	s.loadFile("phases.json", &s.phases)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -111,6 +117,16 @@ func (s *Store) load() error {
 	for _, x := range s.audit {
 		if x.ID > s.nextAuditID {
 			s.nextAuditID = x.ID
+		}
+	}
+	for _, x := range s.comments {
+		if x.ID > s.nextCommentID {
+			s.nextCommentID = x.ID
+		}
+	}
+	for _, x := range s.phases {
+		if x.ID > s.nextPhaseID {
+			s.nextPhaseID = x.ID
 		}
 	}
 	return nil
@@ -891,5 +907,170 @@ func (s *Store) CleanExpiredSessions() {
 	if len(active) != len(s.sessions) {
 		s.sessions = active
 		s.saveFile("sessions.json", s.sessions) //nolint
+	}
+}
+
+// ── Event Comments ─────────────────────────────────────────────────────────
+
+func (s *Store) GetCommentsByEvent(eventID int64) []EventComment {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []EventComment
+	for _, c := range s.comments {
+		if c.EventID == eventID {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+func (s *Store) CreateComment(c EventComment) (EventComment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextCommentID++
+	c.ID = s.nextCommentID
+	c.CreatedAt = time.Now()
+	s.comments = append(s.comments, c)
+	return c, s.saveFile("comments.json", s.comments)
+}
+
+func (s *Store) DeleteComment(id, userID int64, isAdmin bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, c := range s.comments {
+		if c.ID == id {
+			if !isAdmin && c.AuthorID != userID {
+				return fmt.Errorf("forbidden")
+			}
+			s.comments = append(s.comments[:i], s.comments[i+1:]...)
+			return s.saveFile("comments.json", s.comments)
+		}
+	}
+	return fmt.Errorf("comment not found")
+}
+
+func (s *Store) ApproveComment(id, approverID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.comments {
+		if s.comments[i].ID == id {
+			now := time.Now()
+			s.comments[i].PendingApproval = false
+			s.comments[i].ApprovedBy = approverID
+			s.comments[i].ApprovedAt = &now
+			return s.saveFile("comments.json", s.comments)
+		}
+	}
+	return fmt.Errorf("comment not found")
+}
+
+// commentCounts returns map[eventID]count. Caller must not hold lock.
+func (s *Store) commentCounts() map[int64]int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	m := make(map[int64]int)
+	for _, c := range s.comments {
+		m[c.EventID]++
+	}
+	return m
+}
+
+// ── Exercise Phases ────────────────────────────────────────────────────────
+
+func (s *Store) GetPhases() []ExercisePhase {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]ExercisePhase, len(s.phases))
+	copy(result, s.phases)
+	return result
+}
+
+func (s *Store) GetPhaseByID(id int64) (*ExercisePhase, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.phases {
+		if s.phases[i].ID == id {
+			p := s.phases[i]
+			return &p, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Store) CreatePhase(p ExercisePhase) (ExercisePhase, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextPhaseID++
+	p.ID = s.nextPhaseID
+	p.CreatedAt = time.Now()
+	s.phases = append(s.phases, p)
+	return p, s.saveFile("phases.json", s.phases)
+}
+
+func (s *Store) UpdatePhase(p ExercisePhase) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.phases {
+		if s.phases[i].ID == p.ID {
+			s.phases[i] = p
+			return s.saveFile("phases.json", s.phases)
+		}
+	}
+	return fmt.Errorf("phase not found")
+}
+
+func (s *Store) DeletePhase(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, p := range s.phases {
+		if p.ID == id {
+			s.phases = append(s.phases[:i], s.phases[i+1:]...)
+			return s.saveFile("phases.json", s.phases)
+		}
+	}
+	return fmt.Errorf("phase not found")
+}
+
+// ── Full export ────────────────────────────────────────────────────────────
+
+type ExportData struct {
+	Version  string           `json:"version"`
+	ExportAt time.Time        `json:"export_at"`
+	Events   []Event          `json:"events"`
+	Users    []UserPublic     `json:"users"`
+	Groups   []Group          `json:"groups"`
+	Layers   []Layer          `json:"layers"`
+	Alarms   []Alarm          `json:"alarms"`
+	Exercise ExerciseSettings `json:"exercise"`
+	Phases   []ExercisePhase  `json:"phases"`
+}
+
+func (s *Store) GetExportData() ExportData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	users := make([]UserPublic, len(s.users))
+	for i, u := range s.users {
+		users[i] = u.Public()
+	}
+	events := make([]Event, len(s.events))
+	copy(events, s.events)
+	groups := make([]Group, len(s.groups))
+	copy(groups, s.groups)
+	layers := make([]Layer, len(s.layers))
+	copy(layers, s.layers)
+	alarms := make([]Alarm, len(s.alarms))
+	copy(alarms, s.alarms)
+	phases := make([]ExercisePhase, len(s.phases))
+	copy(phases, s.phases)
+	return ExportData{
+		Version:  AppVersion,
+		ExportAt: time.Now(),
+		Events:   events,
+		Users:    users,
+		Groups:   groups,
+		Layers:   layers,
+		Alarms:   alarms,
+		Exercise: s.exercise,
+		Phases:   phases,
 	}
 }

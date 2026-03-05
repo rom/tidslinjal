@@ -625,3 +625,172 @@ body.light-mode .tl-cell.out-of-hours { background: repeating-linear-gradient(13
   #btnAddLock { display: none; }
   .event-block { font-size: 9px; padding: 1px 3px; }
 }
+
+/* ── v3.0 additions ───────────────────────────────────────────────────────── */
+
+/* Status: responded_to */
+.status-responded_to { background: rgba(26,188,156,.18); color: var(--teal); }
+.ev-status-responded_to { background: var(--teal); }
+
+/* Role: reporter */
+.role-reporter { background: rgba(26,188,156,.2); color: var(--teal); }
+
+/* Out-of-hours ghosted area — enhanced */
+.tl-cell.out-of-hours {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0,0,0,.06),
+    rgba(0,0,0,.06) 4px,
+    transparent 4px,
+    transparent 10px
+  );
+  opacity: .65;
+}
+body.light-mode .tl-cell.out-of-hours { opacity: .55; }
+
+/* Hide out-of-hours if preference set */
+body.hide-out-of-hours .tl-cell.out-of-hours,
+body.hide-out-of-hours .tl-time-label.out-of-hours {
+  display: none;
+}
+
+/* Exercise phase overlay */
+.phase-overlay {
+  position: absolute; pointer-events: none; z-index: 3; opacity: .22;
+  border-left: 3px solid; border-right: 3px solid;
+}
+.phase-label {
+  position: absolute; z-index: 4; font-size: var(--fs-xs); font-weight: 700;
+  padding: 1px 6px; border-radius: 0 0 4px 0; pointer-events: none;
+  text-transform: uppercase; letter-spacing: .06em; opacity: .9;
+}
+
+/* All-day event strip */
+.allday-strip {
+  position: absolute; pointer-events: auto; z-index: 5; cursor: pointer;
+  border-radius: 3px; border-left: 3px solid rgba(255,255,255,.4);
+  display: flex; align-items: center; padding: 0 6px;
+  font-size: var(--fs-xs); font-weight: 600; color: #fff; opacity: .9;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.allday-row {
+  position: sticky; top: 44px; z-index: 10; display: flex;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  min-height: 28px;
+}
+.allday-corner { flex-shrink: 0; border-right: 1px solid var(--border); }
+.allday-day    { flex: 1; position: relative; min-height: 28px; }
+
+/* Comment thread */
+.comment-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.comment-item {
+  background: var(--bg3); border-radius: var(--radius);
+  padding: 8px 10px; font-size: var(--fs-sm); position: relative;
+}
+.comment-item.pending { border-left: 3px solid var(--orange); }
+.comment-author { font-weight: 600; color: var(--accent); font-size: var(--fs-xs); }
+.comment-ts     { color: var(--text-dim); font-size: var(--fs-xs); margin-left: 8px; }
+.comment-text   { margin-top: 4px; color: var(--text); white-space: pre-wrap; }
+.comment-pending-badge {
+  font-size: var(--fs-xs); color: var(--orange); font-style: italic; margin-top: 2px;
+}
+.comment-input-row { display: flex; gap: 6px; margin-top: 8px; }
+.comment-input-row textarea {
+  flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); padding: 6px 8px; font-size: var(--fs-sm); resize: vertical; min-height: 48px;
+  font-family: inherit;
+}
+
+/* Password change form */
+.password-form { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.password-form input {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text); padding: 6px 8px; font-size: var(--fs-sm);
+}
+
+/* Keyboard shortcut table */
+.kbd-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.kbd-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.kbd-table td:first-child { color: var(--text-dim); white-space: nowrap; }
+kbd {
+  display: inline-block; padding: 1px 5px; border: 1px solid var(--border);
+  border-radius: 3px; background: var(--bg3); font-size: var(--fs-xs);
+  font-family: monospace; color: var(--text-bright);
+}
+
+/* Current time line — configurable */
+#current-time-line {
+  --line-color: var(--red);
+  --line-width: 2px;
+  --line-style: solid;
+}
+#current-time-line { border-top-color: var(--line-color); border-top-width: var(--line-width); border-top-style: var(--line-style); }
+#current-time-line::before { background: var(--line-color); }
+.tl-synth-label {
+  position: absolute; left: 54px; font-size: var(--fs-xs); font-weight: 700;
+  background: var(--red); color: #fff; padding: 0 5px; border-radius: 3px;
+  pointer-events: none; z-index: 20; transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+/* Phase management form */
+.phase-form-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.phase-swatch { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; }
+
+/* Freeze indicator */
+.freeze-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(231,76,60,.18); color: var(--red);
+  border: 1px solid rgba(231,76,60,.4); border-radius: 12px;
+  font-size: var(--fs-xs); padding: 2px 10px; font-weight: 700; white-space: nowrap;
+}
+
+/* Size variants: also scale border-radius and padding */
+body.size-normal {
+  --radius: 8px;
+}
+body.size-large {
+  --radius: 10px;
+}
+body.size-huge {
+  --radius: 12px;
+}
+
+/* Icon scaling with display size */
+.ev-icon { font-size: .85em; }
+body.size-normal .ev-icon { font-size: .9em; }
+body.size-large  .ev-icon { font-size: 1em; }
+body.size-huge   .ev-icon { font-size: 1.1em; }
+
+/* H+N synthetic hour labels */
+.synth-hour-label {
+  position: absolute; left: 0; font-size: var(--fs-xs); font-weight: 700;
+  color: var(--orange); background: var(--bg); padding: 0 3px;
+  pointer-events: none; z-index: 12; border-radius: 2px; opacity: .85;
+}
+
+/* Print styles for reports */
+@media print {
+  #sidebar, .toolbar, header, #notification-area { display: none !important; }
+  #timeline-container { overflow: visible !important; height: auto !important; }
+  .event-block { box-shadow: none !important; }
+}
+
+/* Report page */
+.report-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+.report-header { border-bottom: 2px solid var(--accent); padding-bottom: 12px; margin-bottom: 20px; }
+.report-section { margin-bottom: 24px; }
+.report-section h3 { font-size: var(--fs-base); color: var(--accent); margin-bottom: 10px; }
+.report-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.report-table th { background: var(--bg3); text-align: left; padding: 6px 10px; font-size: var(--fs-xs); text-transform: uppercase; color: var(--text-dim); }
+.report-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+
+/* User group picker in user modal */
+.group-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.group-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 12px; font-size: var(--fs-xs);
+  background: var(--bg3); border: 1px solid var(--border); cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.group-chip.selected { background: rgba(74,144,217,.25); border-color: var(--accent); color: var(--accent); }

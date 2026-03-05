@@ -136,10 +136,11 @@ func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Requ
 func hasRole(userRole, required Role) bool {
 	order := map[Role]int{
 		RoleRead:      0,
-		RoleReadWrite: 1,
-		RoleTeamLead:  2,
-		RoleOpLead:    3,
-		RoleAdmin:     4,
+		RoleReporter:  1,
+		RoleReadWrite: 2,
+		RoleTeamLead:  3,
+		RoleOpLead:    4,
+		RoleAdmin:     5,
 	}
 	return order[userRole] >= order[required]
 }
@@ -281,6 +282,53 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
 	jsonOK(w, user.Public())
+}
+
+func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.NewPassword == "" {
+		jsonError(w, "new password required", http.StatusBadRequest)
+		return
+	}
+	// Verify current password (unless admin changing own or other — here it's always self)
+	fullUser, ok := app.store.GetUserByID(user.ID)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if req.CurrentPassword != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+			jsonError(w, "current password incorrect", http.StatusUnauthorized)
+			return
+		}
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	fullUser.PasswordHash = string(hash)
+	if err := app.store.UpdateUser(*fullUser); err != nil {
+		jsonError(w, "failed to update password", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "user", EntityID: user.ID,
+		Summary: "changed own password",
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 // ── Preferences handlers ───────────────────────────────────────────────────────
@@ -434,10 +482,12 @@ func (app *App) handleGetEvents(w http.ResponseWriter, r *http.Request, user *Us
 	if events == nil {
 		events = []Event{}
 	}
-	// Enrich with attachment counts
+	// Enrich with attachment and comment counts
 	counts := app.store.attachmentCounts()
+	ccounts := app.store.commentCounts()
 	for i := range events {
 		events[i].AttachmentCount = counts[events[i].ID]
+		events[i].CommentCount = ccounts[events[i].ID]
 	}
 	jsonOK(w, events)
 }
@@ -569,6 +619,14 @@ func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, u
 	if (newStatus == StatusVerified || newStatus == StatusRejected) && !hasRole(user.Role, RoleTeamLead) {
 		jsonError(w, "team lead or above required to verify or reject events", http.StatusForbidden)
 		return
+	}
+	// Reporter role: can only set responded_to or completed (pending approval)
+	if hasRole(user.Role, RoleReporter) && !hasRole(user.Role, RoleReadWrite) {
+		if newStatus != StatusRespondedTo && newStatus != StatusCompleted {
+			jsonError(w, "reporters may only set status to responded_to or completed", http.StatusForbidden)
+			return
+		}
+		// For reporters, status changes require team lead approval - handled via comments
 	}
 	if newStatus == StatusRejected && strings.TrimSpace(req.RejectionReason) == "" {
 		jsonError(w, "rejection_reason is required when rejecting", http.StatusBadRequest)
@@ -781,8 +839,14 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 // ── Layer handlers ─────────────────────────────────────────────────────────────
 
 func (app *App) handleGetLayers(w http.ResponseWriter, r *http.Request, user *User) {
-	userGroups := app.userGroups(user.ID)
-	layers := app.store.GetLayersVisibleTo(user.ID, userGroups)
+	var layers []Layer
+	if hasRole(user.Role, RoleAdmin) {
+		// Admins see all layers
+		layers = app.store.GetAllLayers()
+	} else {
+		userGroups := app.userGroups(user.ID)
+		layers = app.store.GetLayersVisibleTo(user.ID, userGroups)
+	}
 	if layers == nil {
 		layers = []Layer{}
 	}
@@ -1198,11 +1262,12 @@ func (app *App) handleGetUsers(w http.ResponseWriter, r *http.Request, user *Use
 
 func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Username    string `json:"username"`
-		Password    string `json:"password"`
-		DisplayName string `json:"display_name"`
-		Role        Role   `json:"role"`
-		CanLock     bool   `json:"can_lock"`
+		Username    string  `json:"username"`
+		Password    string  `json:"password"`
+		DisplayName string  `json:"display_name"`
+		Role        Role    `json:"role"`
+		CanLock     bool    `json:"can_lock"`
+		GroupIDs    []int64 `json:"group_ids"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1235,6 +1300,10 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
+	// Add to groups if specified
+	for _, gid := range req.GroupIDs {
+		app.store.AddGroupMember(GroupMembership{GroupID: gid, UserID: created.ID, Role: "member"}) //nolint
+	}
 	app.audit(user.ID, user.DisplayName, "created", "user", created.ID,
 		fmt.Sprintf("Created user %q (role: %s)", created.Username, created.Role))
 	w.WriteHeader(http.StatusCreated)
@@ -1257,10 +1326,12 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	var req struct {
-		Password    string `json:"password"`
-		DisplayName string `json:"display_name"`
-		Role        Role   `json:"role"`
-		CanLock     bool   `json:"can_lock"`
+		Password    string  `json:"password"`
+		DisplayName string  `json:"display_name"`
+		Role        Role    `json:"role"`
+		CanLock     bool    `json:"can_lock"`
+		GroupIDs    []int64 `json:"group_ids"`    // nil = no change; [] = remove all; [...] = replace
+		GroupIDsSet bool    `json:"group_ids_set"` // true if caller passed group_ids field
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1282,6 +1353,18 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			existing.Role = req.Role
 		}
 		existing.CanLock = req.CanLock
+		// Update group memberships if admin passed group_ids
+		if req.GroupIDs != nil {
+			// Remove all existing memberships for this user
+			allGroups := app.store.GetGroups()
+			for _, g := range allGroups {
+				app.store.RemoveGroupMember(g.ID, id) //nolint
+			}
+			// Add new memberships
+			for _, gid := range req.GroupIDs {
+				app.store.AddGroupMember(GroupMembership{GroupID: gid, UserID: id, Role: "member"}) //nolint
+			}
+		}
 	}
 	if err := app.store.UpdateUser(*existing); err != nil {
 		jsonError(w, "failed to update", http.StatusInternalServerError)
@@ -1358,6 +1441,225 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"version": AppVersion})
 }
 
+// ── Event Comment handlers ─────────────────────────────────────────────────────
+
+func (app *App) handleGetComments(w http.ResponseWriter, r *http.Request, user *User) {
+	// path: /api/events/:id/comments
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	eventID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+	comments := app.store.GetCommentsByEvent(eventID)
+	if comments == nil {
+		comments = []EventComment{}
+	}
+	jsonOK(w, comments)
+}
+
+func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	eventID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+	if _, ok := app.store.GetEventByID(eventID); !ok {
+		jsonError(w, "event not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Content      string      `json:"content"`
+		StatusChange EventStatus `json:"status_change,omitempty"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		jsonError(w, "content required", http.StatusBadRequest)
+		return
+	}
+	// For reporters proposing a status change
+	pendingApproval := false
+	if req.StatusChange != "" && hasRole(user.Role, RoleReporter) && !hasRole(user.Role, RoleReadWrite) {
+		pendingApproval = true
+	}
+	c, err := app.store.CreateComment(EventComment{
+		EventID:         eventID,
+		AuthorID:        user.ID,
+		AuthorName:      user.DisplayName,
+		Content:         req.Content,
+		PendingApproval: pendingApproval,
+		StatusChange:    req.StatusChange,
+	})
+	if err != nil {
+		jsonError(w, "failed to create comment", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "commented", "event", eventID,
+		fmt.Sprintf("Comment on event %d", eventID))
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, c)
+}
+
+func (app *App) handleDeleteComment(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	isAdmin := hasRole(user.Role, RoleAdmin)
+	if err := app.store.DeleteComment(id, user.ID, isAdmin); err != nil {
+		if err.Error() == "forbidden" {
+			jsonError(w, "forbidden", http.StatusForbidden)
+		} else {
+			jsonError(w, "not found", http.StatusNotFound)
+		}
+		return
+	}
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+func (app *App) handleApproveComment(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "team lead or above required", http.StatusForbidden)
+		return
+	}
+	if err := app.store.ApproveComment(id, user.ID); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "approved"})
+}
+
+// ── Exercise Phase handlers ────────────────────────────────────────────────────
+
+func (app *App) handleGetPhases(w http.ResponseWriter, r *http.Request, user *User) {
+	phases := app.store.GetPhases()
+	if phases == nil {
+		phases = []ExercisePhase{}
+	}
+	jsonOK(w, phases)
+}
+
+func (app *App) handleCreatePhase(w http.ResponseWriter, r *http.Request, user *User) {
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "team lead or above required", http.StatusForbidden)
+		return
+	}
+	var p ExercisePhase
+	if err := decode(r, &p); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if p.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if p.Color == "" {
+		p.Color = "#888888"
+	}
+	p.CreatedBy = user.ID
+	created, err := app.store.CreatePhase(p)
+	if err != nil {
+		jsonError(w, "failed to create phase", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "created", "phase", created.ID,
+		fmt.Sprintf("Created exercise phase %q", created.Name))
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, created)
+}
+
+func (app *App) handleUpdatePhase(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "team lead or above required", http.StatusForbidden)
+		return
+	}
+	var p ExercisePhase
+	if err := decode(r, &p); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	p.ID = id
+	if err := app.store.UpdatePhase(p); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "phase", id,
+		fmt.Sprintf("Updated exercise phase %q", p.Name))
+	updated, _ := app.store.GetPhaseByID(id)
+	jsonOK(w, updated)
+}
+
+func (app *App) handleDeletePhase(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "team lead or above required", http.StatusForbidden)
+		return
+	}
+	if err := app.store.DeletePhase(id); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// ── Export handler ────────────────────────────────────────────────────────────
+
+func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
+	if !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "admin required", http.StatusForbidden)
+		return
+	}
+	data := app.store.GetExportData()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-export-%s.json"`,
+		time.Now().Format("2006-01-02")))
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.Encode(data) //nolint
+}
+
+// ── User members (groups for a user) ─────────────────────────────────────────
+
+func (app *App) handleGetUserGroups(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	memberships := app.store.GetUserGroups(id)
+	if memberships == nil {
+		memberships = []GroupMembership{}
+	}
+	jsonOK(w, memberships)
+}
+
 // ── Background tasks ───────────────────────────────────────────────────────────
 
 func (app *App) runAlarmScheduler() {
@@ -1420,6 +1722,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/auth/login", app.handleLogin)
 	mux.HandleFunc("/api/auth/logout", app.handleLogout)
 	mux.HandleFunc("/api/auth/me", app.requireAuth(app.handleMe))
+	mux.HandleFunc("/api/auth/change-password", app.requireAuth(app.handleChangePassword))
 
 	// Preferences
 	mux.HandleFunc("/api/preferences", func(w http.ResponseWriter, r *http.Request) {
@@ -1466,7 +1769,7 @@ func (app *App) routes() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
-	// Event sub-resources (attachments) and event CRUD
+	// Event sub-resources (attachments, comments) and event CRUD
 	mux.HandleFunc("/api/events/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
@@ -1489,6 +1792,20 @@ func (app *App) routes() http.Handler {
 			}
 			return
 		}
+
+		// /api/events/:id/comments
+		if len(parts) == 4 && parts[3] == "comments" {
+			switch r.Method {
+			case http.MethodGet:
+				app.requireAuth(app.handleGetComments)(w, r)
+			case http.MethodPost:
+				app.requireAuth(app.handleCreateComment)(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
 		// /api/events/:id
 		switch r.Method {
 		case http.MethodPut:
@@ -1654,12 +1971,66 @@ func (app *App) routes() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/users/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/users/:id/groups
+		if len(parts) == 4 && parts[3] == "groups" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetUserGroups)(w, r)
+			return
+		}
 		switch r.Method {
 		case http.MethodPut:
 			app.requireAuth(app.handleUpdateUser)(w, r)
 		case http.MethodDelete:
 			app.requireRole(RoleAdmin, app.handleDeleteUser)(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Comments delete/approve
+	mux.HandleFunc("/api/comments/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/comments/:id/approve
+		if len(parts) == 4 && parts[3] == "approve" && r.Method == http.MethodPost {
+			app.requireRole(RoleTeamLead, app.handleApproveComment)(w, r)
+			return
+		}
+		if r.Method == http.MethodDelete {
+			app.requireAuth(app.handleDeleteComment)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Exercise Phases
+	mux.HandleFunc("/api/phases", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetPhases)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleCreatePhase)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/phases/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			app.requireRole(RoleTeamLead, app.handleUpdatePhase)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleTeamLead, app.handleDeletePhase)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Export (admin only)
+	mux.HandleFunc("/api/export", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, app.handleExport)(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
