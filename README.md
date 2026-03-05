@@ -1,8 +1,23 @@
-# Tidslinjal v2.3.0
+# Tidslinjal v2.4.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
 
 ---
+
+## What's New in v2.4.0
+
+- **Start→End time auto-adjust** — when you change the Start time in the Add Event dialog, End time automatically updates to Start + 1 hour
+- **Layer visibility fix** — the 🗂 layer toggle now works correctly; all layers are shown by default, and selecting specific layers in the popover filters them client-side
+- **Overlapping events side-by-side** — events that share the same time slot within a day column are now rendered side-by-side, not overlapping
+- **Event block icons** — small inline icons on event blocks: ↻ (recurring), ✎ (edited since creation), 📎 (has file attachments)
+- **Expanded recurrence patterns** — new options: Every 30 min, Hourly, Every 2/3/4 hours, Quarterly
+- **Full 24-hour scrollable view** — the timeline always shows all 24 hours; slots outside the configured Day Hours window are grayed/striped to indicate no event creation, but you can still scroll through them
+- **Audit log for user management** — user create, update, delete, and login events are now recorded in the audit log
+- **Bigger font size gaps** — more visual difference between Small/Normal/Large/Huge display sizes
+- **Larger real-time clock** — the header clock is bigger and has a subtle glow effect
+- **Online help** — click the **?** button in the header to open a comprehensive in-app help reference covering all features
+- **Left-column event clipping fix** — corrected a cell index calculation bug that could misplace events in multi-day views
+- **Role badge colors** — Team Lead (teal) and Operations Lead (orange) badges are now distinguished from other roles
 
 ## What's New in v2.3.0
 

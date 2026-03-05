@@ -266,6 +266,8 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Name: "session", Value: sessID, Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: sess.ExpiresAt,
 	})
+	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
+		fmt.Sprintf("User %q logged in", user.Username))
 	jsonOK(w, user.Public())
 }
 
@@ -427,13 +429,15 @@ func (app *App) handleGetEvents(w http.ResponseWriter, r *http.Request, user *Us
 		to = time.Now().AddDate(0, 1, 0)
 	}
 
-	// Determine which layer IDs to include
-	prefs := app.store.GetPreferences(user.ID)
-	layerIDs := prefs.ActiveLayers
-
-	events := app.store.GetEvents(from, to, layerIDs)
+	// Return all events; layer visibility is filtered client-side
+	events := app.store.GetEvents(from, to, nil)
 	if events == nil {
 		events = []Event{}
+	}
+	// Enrich with attachment counts
+	counts := app.store.attachmentCounts()
+	for i := range events {
+		events[i].AttachmentCount = counts[events[i].ID]
 	}
 	jsonOK(w, events)
 }
@@ -1231,6 +1235,8 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "created", "user", created.ID,
+		fmt.Sprintf("Created user %q (role: %s)", created.Username, created.Role))
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created.Public())
 }
@@ -1282,6 +1288,8 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	updated, _ := app.store.GetUserByID(id)
+	app.audit(user.ID, user.DisplayName, "updated", "user", id,
+		fmt.Sprintf("Updated user %q (role: %s)", updated.Username, updated.Role))
 	jsonOK(w, updated.Public())
 }
 
@@ -1295,9 +1303,14 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "cannot delete yourself", http.StatusBadRequest)
 		return
 	}
+	target, targetOK := app.store.GetUserByID(id)
 	if err := app.store.DeleteUser(id); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
+	}
+	if targetOK {
+		app.audit(user.ID, user.DisplayName, "deleted", "user", id,
+			fmt.Sprintf("Deleted user %q", target.Username))
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }

@@ -98,24 +98,19 @@ function getDays() {
 function getViewEnd() { return addDays(state.startDate, getRangeDays()); }
 
 // ── Slot helpers ───────────────────────────────────────────────────────────
-function getSlotsPerDay() {
-  const startH = state.preferences.day_start_hour || 0;
-  const endH   = state.preferences.day_end_hour   || 24;
-  const hours  = Math.max(1, endH - startH);
-  switch (state.resolution) {
-    case 'ten':     return hours * 6;
-    case 'quarter': return hours * 4;
-    case 'hour':    return hours;
-    case 'day':     return 1;
-  }
-}
 function getSlotMinutes() {
   switch (state.resolution) {
     case 'ten':     return 10;
     case 'quarter': return 15;
     case 'hour':    return 60;
     case 'day':     return 1440;
+    default:        return 60;
   }
+}
+function getSlotsPerDay() {
+  // Always render the full 24h; out-of-hours slots are grayed
+  if (state.resolution === 'day') return 1;
+  return Math.round(1440 / getSlotMinutes());
 }
 function getSlotHeight() {
   const s = getComputedStyle(document.documentElement);
@@ -130,17 +125,22 @@ function getSlotHeight() {
   return Math.max(6, Math.round(h * (state.zoomFactor || 1.0)));
 }
 function getStartHourOffset() {
-  // Minutes from midnight to start of visible day
-  return (state.preferences.day_start_hour || 0) * 60;
+  // Always from midnight — full day is always rendered
+  return 0;
+}
+function isOutOfHours(slotIdx) {
+  if (state.resolution === 'day') return false;
+  const min     = slotIdx * getSlotMinutes();
+  const startH  = (state.preferences.day_start_hour || 0) * 60;
+  const endH    = (state.preferences.day_end_hour   || 24) * 60;
+  return min < startH || min >= endH;
 }
 function slotLabel(slotIdx) {
   if (state.resolution === 'day') return '';
-  const startMin = getStartHourOffset();
-  const minutes  = startMin + slotIdx * getSlotMinutes();
+  const minutes = slotIdx * getSlotMinutes();
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   if (state.resolution === 'hour') return `${String(h).padStart(2,'0')}:00`;
-  // 10-min and 15-min: label on the hour, half-hour label for quarter
   if (m === 0) return `${String(h).padStart(2,'0')}:00`;
   if (state.resolution === 'quarter' && m === 30) return `${String(h).padStart(2,'0')}:30`;
   return '';
@@ -185,8 +185,9 @@ function renderTimeline() {
 
   // ── Body rows ─────────────────────────────────────────────────────────────
   for (let s = 0; s < slots; s++) {
-    const label = slotLabel(s);
-    html += `<div class="tl-time-label" style="height:${slotH}px">${label}</div>`;
+    const label  = slotLabel(s);
+    const oohLbl = isOutOfHours(s) ? ' out-of-hours' : '';
+    html += `<div class="tl-time-label${oohLbl}" style="height:${slotH}px">${label}</div>`;
 
     const startOffset = getStartHourOffset();
     days.forEach((day, di) => {
@@ -202,10 +203,12 @@ function renderTimeline() {
       const isHalf = state.resolution === 'quarter' && (s % 2 === 1);
       const isCur  = isCurrentSlot(slotStart, slotEnd);
 
-      html += `<div class="tl-cell${locked?' locked':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}"
+      const ooh = isOutOfHours(s);
+      html += `<div class="tl-cell${locked?' locked':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}${ooh?' out-of-hours':''}"
         style="height:${slotH}px"
+        data-day="${di}" data-slot="${s}"
         data-start="${slotStart.toISOString()}"
-        ${locked ? `title="Locked"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}')"` }
+        ${(locked || ooh) ? `title="${locked?'Locked':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
       ></div>`;
     });
   }
@@ -225,15 +228,17 @@ function renderEventBlocks(days, slotH) {
   const headerH    = 44;
   const slotMin    = getSlotMinutes();
   const slots      = getSlotsPerDay();
-  const startOff   = getStartHourOffset(); // minutes from midnight to view start
-  const endOff     = startOff + slots * slotMin;
+  const startOff   = 0; // always from midnight (full 24h view)
+  const endOff     = 1440;
 
   requestAnimationFrame(() => {
     const cells = container.querySelectorAll('.tl-cell');
     if (!cells.length) return;
 
+    // FIX: cells are in slot-major order (outer=slot, inner=day).
+    // First slot row occupies indices 0..days-1, so day[di] first-slot cell = cells[di].
     const dayMeta = days.map((_, di) => {
-      const cell = cells[di * slots];
+      const cell = cells[di]; // correct: index di = slot=0, day=di
       return cell ? { left: cell.offsetLeft, width: cell.offsetWidth } : null;
     });
 
@@ -241,14 +246,21 @@ function renderEventBlocks(days, slotH) {
 
     // ── Events ───────────────────────────────────────────────────────────────
     const searchTerm = (state.search||'').trim().toLowerCase();
+    const al         = state.preferences.active_layers || [];
     const visibleEvents = state.events.filter(ev =>
       !isTypeHidden(ev.event_type) &&
+      // Layer visibility: empty list = all shown; else only listed layer IDs (master always shown)
+      (ev.layer_id == null || al.length === 0 || al.includes(ev.layer_id)) &&
       (!searchTerm ||
         ev.title.toLowerCase().includes(searchTerm) ||
         (ev.description||'').toLowerCase().includes(searchTerm) ||
         (ev.created_by_name||'').toLowerCase().includes(searchTerm)
       )
     );
+
+    // Build per-day collision lists for side-by-side layout
+    // evsByDay[di] = [{ev, evStart, evEnd, vsOff, veOff, topPx, heightPx}]
+    const evsByDay = days.map(() => []);
 
     visibleEvents.forEach(ev => {
       const evStart = new Date(ev.start_time);
@@ -267,30 +279,77 @@ function renderEventBlocks(days, slotH) {
         const veMin = visEnd.getHours()*60   + visEnd.getMinutes();
 
         const vsOff = Math.max(vsMin, startOff);
-        const veOff = Math.min(veMin === 0 && visEnd >= dayEnd ? 24*60 : veMin, endOff);
+        const veOff = Math.min(veMin === 0 && visEnd >= dayEnd ? 1440 : veMin, endOff);
         if (veOff <= vsOff) return;
 
         const topPx    = headerH + ((vsOff - startOff) / slotMin) * slotH;
         const heightPx = Math.max(((veOff - vsOff) / slotMin) * slotH - 2, 14);
+        evsByDay[di].push({ ev, evStart, evEnd, vsOff, veOff, topPx, heightPx });
+      });
+    });
 
-        // Get layer color tint for non-master events
+    // Assign columns for overlapping events within each day
+    days.forEach((day, di) => {
+      if (!dayMeta[di]) return;
+      const items = evsByDay[di];
+      if (!items.length) return;
+
+      // Sort by start time
+      items.sort((a, b) => a.vsOff - b.vsOff);
+
+      // Greedy column assignment
+      const colEnd = []; // colEnd[c] = veOff of last event assigned to column c
+      const colOf  = [];
+      items.forEach(item => {
+        let col = colEnd.findIndex(e => e <= item.vsOff);
+        if (col === -1) { col = colEnd.length; colEnd.push(0); }
+        colEnd[col] = item.veOff;
+        colOf.push(col);
+      });
+      const totalCols = colEnd.length;
+
+      const { left: cellLeft, width: cellWidth } = dayMeta[di];
+      const PAD = 2;
+
+      items.forEach((item, idx) => {
+        const col     = colOf[idx];
+        const colW    = Math.floor((cellWidth - PAD*2) / totalCols);
+        const blockL  = cellLeft + PAD + col * colW;
+        const blockW  = colW - (col < totalCols-1 ? 1 : 0); // small gap between cols
+
+        const { ev, evStart, evEnd, topPx, heightPx } = item;
+
+        // Layer color border
         let borderL = 'rgba(255,255,255,.3)';
         if (ev.layer_id) {
           const layer = state.layers.find(l => l.id === ev.layer_id);
           if (layer) borderL = layer.color || borderL;
         }
 
+        // Build icons
         const statusDot = ev.status && ev.status !== 'planned'
           ? `<span class="ev-status-dot ev-status-${ev.status}" title="${ev.status}"></span>` : '';
+        const recurIcon = ev.is_recurring
+          ? `<span class="ev-icon" title="Recurring">↻</span>` : '';
+        // "Edited" = updated more than 10 s after creation
+        const createdAt = ev.created_at ? new Date(ev.created_at) : null;
+        const updatedAt = ev.updated_at ? new Date(ev.updated_at) : null;
+        const editedIcon = (createdAt && updatedAt && (updatedAt - createdAt) > 10000)
+          ? `<span class="ev-icon" title="Modified">✎</span>` : '';
+        // Attachments: tracked via state.events — the API returns has_attachments if we add it,
+        // for now use a placeholder that will be populated once the API exposes it
+        const attachIcon = ev.attachment_count > 0
+          ? `<span class="ev-icon" title="${ev.attachment_count} attachment(s)">📎</span>` : '';
+
         const block = document.createElement('div');
         block.className = 'event-block';
         block.dataset.evId = ev.id;
-        block.style.cssText = `top:${topPx}px;left:${dayMeta[di].left+2}px;width:${dayMeta[di].width-4}px;height:${heightPx}px;background:${ev.color||'#4A90D9'};border-left-color:${borderL};cursor:grab;`;
+        block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${ev.color||'#4A90D9'};border-left-color:${borderL};cursor:grab;`;
         if (ev.status === 'cancelled') block.style.opacity = '0.45';
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${escHtml(ev.title)}</div>
+          <div class="ev-title">${statusDot}${escHtml(ev.title)}${recurIcon}${editedIcon}${attachIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
         `;
@@ -360,13 +419,20 @@ function zoomToNow() {
   }
 }
 function scrollToNow() {
-  const slotH    = getSlotHeight();
-  const startOff = getStartHourOffset();
-  const now      = new Date();
-  const nowMin   = now.getHours()*60 + now.getMinutes();
-  const topPx    = 44 + ((nowMin - startOff) / getSlotMinutes()) * slotH;
-  const tc       = document.getElementById('timeline-container');
-  tc.scrollTop   = Math.max(0, topPx - tc.clientHeight/2);
+  const slotH  = getSlotHeight();
+  const now    = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  const topPx  = 44 + (nowMin / getSlotMinutes()) * slotH;
+  const tc     = document.getElementById('timeline-container');
+  tc.scrollTop = Math.max(0, topPx - tc.clientHeight/2);
+}
+
+function scrollToDayStart() {
+  const slotH   = getSlotHeight();
+  const startH  = (state.preferences.day_start_hour || 0) * 60;
+  const topPx   = 44 + (startH / getSlotMinutes()) * slotH;
+  const tc      = document.getElementById('timeline-container');
+  tc.scrollTop  = Math.max(0, topPx);
 }
 
 // ── Clock ──────────────────────────────────────────────────────────────────
@@ -429,8 +495,9 @@ function goToday() {
 }
 
 // ── Cell click ─────────────────────────────────────────────────────────────
-function onCellClick(e, startISO, endISO) {
+function onCellClick(e, startISO, endISO, outOfHours) {
   if (!state.user || state.user.role === 'read') return;
+  if (outOfHours) return; // out-of-hours slots: no event creation
   openEventModal(null, new Date(startISO), new Date(endISO));
 }
 
@@ -500,6 +567,14 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 document.getElementById('eventRecurring').addEventListener('change', function() {
   document.getElementById('recurrenceGroup').style.display    = this.checked ? '' : 'none';
   document.getElementById('recurrenceEndGroup').style.display = this.checked ? '' : 'none';
+});
+
+// Auto-adjust end time to start + 1 hour whenever start changes
+document.getElementById('eventStart').addEventListener('change', function() {
+  const start = new Date(this.value);
+  if (!isNaN(start.getTime())) {
+    document.getElementById('eventEnd').value = fmtDateInput(addHours(start, 1));
+  }
 });
 
 document.getElementById('btnSaveEvent').addEventListener('click', async () => {
@@ -594,7 +669,7 @@ function showEventDetail(ev) {
         <div style="font-size:var(--fs-sm);color:var(--text-dim);display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
           <b>${t('detail_start')}:</b><span>${fmtDateTime(evStart)}</span>
           ${evEnd ? `<b>${t('detail_end')}:</b><span>${fmtDateTime(evEnd)}</span>` : ''}
-          ${ev.is_recurring ? `<b>${t('detail_repeats')}:</b><span>${ev.recurrence_pattern}</span>` : ''}
+          ${ev.is_recurring ? `<b>${t('detail_repeats')}:</b><span>${t('event_pattern_'+(ev.recurrence_pattern||'weekly'))}</span>` : ''}
           ${layer ? `<b>${t('event_layer')}:</b><span>${escHtml(layer.name)}</span>` : ''}
           <b>${t('detail_created')}:</b><span>${escHtml(ev.created_by_name||'')}</span>
           <b>${t('detail_created_at')}:</b><span>${fmtDateTime(new Date(ev.created_at))}</span>
@@ -1592,9 +1667,20 @@ function exportICS() {
     if (ev.created_by_name) ics += `ORGANIZER;CN=${escICS(ev.created_by_name)}:MAILTO:noreply@tidslinjal\r\n`;
     ics += `CATEGORIES:${escICS(ev.event_type)}\r\n`;
     if (ev.is_recurring && ev.recurrence_pattern) {
-      const rrule = { daily:'DAILY', weekly:'WEEKLY', monthly:'MONTHLY' }[ev.recurrence_pattern];
-      if (rrule) {
-        let rr = `RRULE:FREQ=${rrule}`;
+      const rruleMap = {
+        '30min':     'MINUTELY;INTERVAL=30',
+        'hourly':    'HOURLY',
+        '2hours':    'HOURLY;INTERVAL=2',
+        '3hours':    'HOURLY;INTERVAL=3',
+        '4hours':    'HOURLY;INTERVAL=4',
+        'daily':     'DAILY',
+        'weekly':    'WEEKLY',
+        'monthly':   'MONTHLY',
+        'quarterly': 'MONTHLY;INTERVAL=3',
+      };
+      const freq = rruleMap[ev.recurrence_pattern];
+      if (freq) {
+        let rr = `RRULE:FREQ=${freq}`;
         if (ev.recurrence_end) rr += `;UNTIL=${toICSDate(new Date(ev.recurrence_end))}`;
         ics += rr + '\r\n';
       }
@@ -1916,15 +2002,17 @@ async function init() {
     renderTimeline();
   });
 
-  // Scroll to current time
+  // Scroll to configured day start (or current time if within window)
   setTimeout(() => {
-    const slotH    = getSlotHeight();
-    const startOff = getStartHourOffset();
-    const now      = new Date();
-    const nowMin   = now.getHours()*60 + now.getMinutes();
-    const topPx    = 44 + ((nowMin - startOff) / getSlotMinutes()) * slotH;
-    const tc       = document.getElementById('timeline-container');
-    tc.scrollTop   = Math.max(0, topPx - tc.clientHeight/2);
+    const now    = new Date();
+    const nowMin = now.getHours()*60 + now.getMinutes();
+    const startH = (state.preferences.day_start_hour || 0) * 60;
+    const endH   = (state.preferences.day_end_hour   || 24) * 60;
+    if (nowMin >= startH && nowMin < endH) {
+      scrollToNow();
+    } else {
+      scrollToDayStart();
+    }
   }, 200);
 }
 
