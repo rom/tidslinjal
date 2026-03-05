@@ -716,6 +716,20 @@ func (s *Store) MarkAlarmFired(id int64) error {
 	return nil
 }
 
+func (s *Store) AckAlarm(id, userID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.alarms {
+		if s.alarms[i].ID == id && s.alarms[i].UserID == userID {
+			now := time.Now()
+			s.alarms[i].AcknowledgedAt = &now
+			s.alarms[i].IsActive = false
+			return s.saveFile("alarms.json", s.alarms)
+		}
+	}
+	return fmt.Errorf("alarm not found")
+}
+
 func (s *Store) DeleteAlarm(id, userID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

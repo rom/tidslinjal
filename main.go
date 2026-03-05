@@ -946,6 +946,19 @@ func (app *App) handleDeleteAlarm(w http.ResponseWriter, r *http.Request, user *
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+func (app *App) handleAckAlarm(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.AckAlarm(id, user.ID); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "acknowledged"})
+}
+
 func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 	_, user := app.getSession(r)
 	if user == nil {
@@ -1380,6 +1393,12 @@ func (app *App) routes() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/alarms/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		// POST /api/alarms/:id/ack
+		if len(parts) == 4 && parts[3] == "ack" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleAckAlarm)(w, r)
+			return
+		}
 		if r.Method == http.MethodDelete {
 			app.requireAuth(app.handleDeleteAlarm)(w, r)
 		} else {
