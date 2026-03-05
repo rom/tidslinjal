@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tidslinjal — Admin</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { padding: 32px; max-width: 960px; margin: 0 auto; }
+    h1 { color: var(--text-bright); font-size: var(--fs-xl); margin-bottom: 4px; }
+    .admin-subtitle { color: var(--text-dim); font-size: var(--fs-sm); margin-bottom: 28px; }
+    .admin-section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+    .admin-section h2 { font-size: var(--fs-lg); color: var(--text-bright); margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .admin-stat { background: var(--bg3); border-radius: var(--radius); padding: 14px; }
+    .admin-stat-value { font-size: var(--fs-xl); font-weight: 700; color: var(--accent); }
+    .admin-stat-label { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 2px; }
+    .config-row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; margin-bottom: 10px; font-size: var(--fs-sm); }
+    .config-key { color: var(--text-dim); font-weight: 500; }
+    .config-val { color: var(--text-bright); font-family: monospace; background: var(--bg3); padding: 4px 8px; border-radius: 4px; word-break: break-all; }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 24px; color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-dim); font-weight: 600; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-admin { background: rgba(231,76,60,.18); color: #e74c3c; }
+    .badge-oplead { background: rgba(230,126,34,.18); color: #e67e22; }
+    .badge-teamlead { background: rgba(26,188,156,.18); color: #1abc9c; }
+    .badge-readwrite { background: rgba(52,152,219,.18); color: #3498db; }
+    .badge-reporter { background: rgba(155,89,182,.18); color: #9b59b6; }
+    .badge-read { background: rgba(127,140,141,.18); color: #7f8c8d; }
+    #adminError { color: var(--red); font-size: var(--fs-sm); padding: 12px; background: rgba(231,76,60,.1); border-radius: var(--radius); display: none; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <a class="back-link" href="/">← Back to Timeline</a>
+  <h1>⚙ Admin View</h1>
+  <div class="admin-subtitle">Tidslinjal administration — restricted to admin role</div>
+  <div id="adminError"></div>
+
+  <div class="admin-section">
+    <h2>System Information</h2>
+    <div class="config-row"><span class="config-key">Version</span><span class="config-val" id="cfgVersion">—</span></div>
+    <div class="config-row"><span class="config-key">Data directory</span><span class="config-val" id="cfgDataDir">—</span></div>
+    <div class="config-row"><span class="config-key">Logged in as</span><span class="config-val" id="cfgUser">—</span></div>
+    <div class="action-row">
+      <a href="/api/export" class="btn btn-secondary btn-sm">⬇ Download Full Export (JSON)</a>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h2>Statistics</h2>
+    <div class="admin-grid">
+      <div class="admin-stat"><div class="admin-stat-value" id="statUsers">—</div><div class="admin-stat-label">Users</div></div>
+      <div class="admin-stat"><div class="admin-stat-value" id="statGroups">—</div><div class="admin-stat-label">Groups</div></div>
+      <div class="admin-stat"><div class="admin-stat-value" id="statEvents">—</div><div class="admin-stat-label">Events (current view)</div></div>
+      <div class="admin-stat"><div class="admin-stat-value" id="statLayers">—</div><div class="admin-stat-label">Layers</div></div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h2>Exercise Settings</h2>
+    <div class="config-row"><span class="config-key">Exercise name</span><span class="config-val" id="exLabel">—</span></div>
+    <div class="config-row"><span class="config-key">STARTEX (Epoch)</span><span class="config-val" id="exEpoch">—</span></div>
+    <div class="config-row"><span class="config-key">ENDEX</span><span class="config-val" id="exEndex">—</span></div>
+    <div class="config-row"><span class="config-key">Enabled</span><span class="config-val" id="exEnabled">—</span></div>
+    <div class="action-row">
+      <a href="/" class="btn btn-primary btn-sm">Configure in Settings →</a>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h2>Users</h2>
+    <table id="userTable">
+      <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Can Lock</th><th>Created</th></tr></thead>
+      <tbody id="userTbody"></tbody>
+    </table>
+  </div>
+
+  <div class="admin-section">
+    <h2>Audit Log (last 50)</h2>
+    <table id="auditTable">
+      <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Summary</th></tr></thead>
+      <tbody id="auditTbody"></tbody>
+    </table>
+  </div>
+
+  <script src="/static/i18n.js"></script>
+  <script>
+  'use strict';
+  window.state = { preferences: { language: 'en', theme: 'dark', size: 'small' } };
+
+  async function api(path) {
+    const r = await fetch(path);
+    if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
+    if (r.status === 403) { throw new Error('forbidden'); }
+    return r.json();
+  }
+
+  function fmtDT(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString();
+  }
+
+  async function loadAdmin() {
+    try {
+      const [me, ver, users, groups, layers, exercise, audit] = await Promise.all([
+        api('/api/auth/me'),
+        api('/api/version'),
+        api('/api/users'),
+        api('/api/groups'),
+        api('/api/layers'),
+        api('/api/exercise'),
+        api('/api/audit?limit=50'),
+      ]);
+
+      // System info
+      document.getElementById('cfgVersion').textContent = ver.version || '—';
+      document.getElementById('cfgDataDir').textContent = ver.data_dir || '(not exposed)';
+      document.getElementById('cfgUser').textContent = `${me.display_name || me.username} (${me.role})`;
+      document.title = `Admin — Tidslinjal v${ver.version || ''}`;
+
+      // Stats
+      document.getElementById('statUsers').textContent = (users||[]).length;
+      document.getElementById('statGroups').textContent = (groups||[]).length;
+      document.getElementById('statLayers').textContent = (layers||[]).length;
+
+      // Exercise
+      document.getElementById('exLabel').textContent   = exercise.label   || '(not set)';
+      document.getElementById('exEpoch').textContent   = exercise.epoch   ? fmtDT(exercise.epoch) : '(not set)';
+      document.getElementById('exEndex').textContent   = exercise.endex   ? fmtDT(exercise.endex) : '(not set)';
+      document.getElementById('exEnabled').textContent = exercise.enabled ? '✓ Yes' : '✗ No';
+
+      // Events stat
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const to   = new Date(now.getFullYear(), now.getMonth()+1, 1).toISOString();
+      try {
+        const evs = await api(`/api/events?from=${from}&to=${to}`);
+        document.getElementById('statEvents').textContent = (evs||[]).length;
+      } catch { document.getElementById('statEvents').textContent = '?'; }
+
+      // Users table
+      const roleBadge = r => {
+        const map = {admin:'admin',oplead:'oplead',teamlead:'teamlead',readwrite:'readwrite',reporter:'reporter',read:'read'};
+        return `<span class="badge badge-${r}">${r}</span>`;
+      };
+      document.getElementById('userTbody').innerHTML = (users||[]).map(u => `<tr>
+        <td>${u.id}</td>
+        <td>${u.username}</td>
+        <td>${u.display_name||''}</td>
+        <td>${roleBadge(u.role)}</td>
+        <td>${u.can_lock ? '✓' : ''}</td>
+        <td>${fmtDT(u.created_at)}</td>
+      </tr>`).join('');
+
+      // Audit table
+      document.getElementById('auditTbody').innerHTML = (audit||[]).map(e => `<tr>
+        <td style="white-space:nowrap;font-size:11px">${fmtDT(e.timestamp)}</td>
+        <td>${e.user_name||''}</td>
+        <td><code>${e.action}</code></td>
+        <td style="font-size:11px">${e.entity_type} #${e.entity_id}</td>
+        <td>${e.summary||''}</td>
+      </tr>`).join('');
+
+    } catch(e) {
+      const errEl = document.getElementById('adminError');
+      errEl.style.display = '';
+      errEl.textContent = e.message === 'forbidden'
+        ? 'Access denied — admin role required.'
+        : 'Error loading admin data: ' + e.message;
+    }
+  }
+
+  // Apply theme from localStorage/cookie if available
+  const savedTheme = document.cookie.match(/theme=([^;]+)/);
+  if (savedTheme && savedTheme[1] === 'light') document.body.classList.add('light-mode');
+
+  loadAdmin();
+  </script>
+</body>
+</html>
