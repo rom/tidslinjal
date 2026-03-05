@@ -32,6 +32,7 @@ const TRANSLATIONS = {
     range_3months: '3 Months',
 
     // Resolution options
+    res_ten: '10 min',
     res_quarter: '15 min',
     res_hour: 'Hour',
     res_day: 'Day',
@@ -209,6 +210,10 @@ const TRANSLATIONS = {
     search_placeholder: 'Search…',
     export_ics: '📅 Export ICS',
     layer_shared_groups: 'Shared Groups',
+
+    // Alarm ACK
+    alarm_ack: 'ACK',
+    alarm_acked: 'Alarm acknowledged',
   },
 
   sv: {
@@ -231,6 +236,7 @@ const TRANSLATIONS = {
     range_month: 'Månad',
     range_2months: '2 Månader',
     range_3months: '3 Månader',
+    res_ten: '10 min',
     res_quarter: '15 min',
     res_hour: 'Timme',
     res_day: 'Dag',
@@ -374,6 +380,8 @@ const TRANSLATIONS = {
     search_placeholder: 'Sök…',
     export_ics: '📅 Exportera ICS',
     layer_shared_groups: 'Delade grupper',
+    alarm_ack: 'ACK',
+    alarm_acked: 'Larm kvitterat',
   },
 
   fr: {
@@ -396,6 +404,7 @@ const TRANSLATIONS = {
     range_month: 'Mois',
     range_2months: '2 Mois',
     range_3months: '3 Mois',
+    res_ten: '10 min',
     res_quarter: '15 min',
     res_hour: 'Heure',
     res_day: 'Jour',
@@ -539,6 +548,8 @@ const TRANSLATIONS = {
     search_placeholder: 'Rechercher…',
     export_ics: '📅 Exporter ICS',
     layer_shared_groups: 'Groupes partagés',
+    alarm_ack: 'ACK',
+    alarm_acked: 'Alarme acquittée',
   }
 };
 

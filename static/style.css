@@ -26,6 +26,7 @@
   --day-col-min: 120px;
   --radius:     6px;
   /* Size-small slot heights (default) */
+  --slot-h-ten:     24px;
   --slot-h-quarter: 18px;
   --slot-h-hour:    40px;
   --slot-h-day:     80px;
@@ -62,6 +63,7 @@ body.light-mode ::-webkit-scrollbar-thumb { background: #adb8c5; }
 /* ── Size variants ────────────────────────────────────────────────────────── */
 body.size-normal {
   --fs-base:    14px;  --fs-sm: 12px; --fs-xs: 11px; --fs-lg: 16px; --fs-xl: 22px; --fs-2xl: 26px;
+  --slot-h-ten:     30px;
   --slot-h-quarter: 22px;
   --slot-h-hour:    50px;
   --slot-h-day:     100px;
@@ -70,6 +72,7 @@ body.size-normal {
 }
 body.size-large {
   --fs-base:    16px;  --fs-sm: 13px; --fs-xs: 12px; --fs-lg: 18px; --fs-xl: 24px; --fs-2xl: 30px;
+  --slot-h-ten:     38px;
   --slot-h-quarter: 28px;
   --slot-h-hour:    64px;
   --slot-h-day:     128px;
@@ -78,6 +81,7 @@ body.size-large {
 }
 body.size-huge {
   --fs-base:    18px;  --fs-sm: 15px; --fs-xs: 13px; --fs-lg: 20px; --fs-xl: 28px; --fs-2xl: 36px;
+  --slot-h-ten:     50px;
   --slot-h-quarter: 36px;
   --slot-h-hour:    80px;
   --slot-h-day:     160px;
@@ -199,7 +203,9 @@ select.ctrl-select:focus { border-color: var(--accent); }
   width: var(--time-col-w); font-size: var(--fs-xs); color: var(--text-dim);
   display: flex; align-items: flex-start; padding: 2px 6px; justify-content: flex-end;
   font-variant-numeric: tabular-nums; user-select: none;
+  cursor: ns-resize;
 }
+.tl-corner { cursor: ns-resize; }
 
 .tl-cell {
   border-right: 1px solid var(--border); border-bottom: 1px solid rgba(42,63,86,.5);
@@ -431,6 +437,62 @@ textarea { resize: vertical; min-height: 70px; }
   color: var(--text-dim); font-size: var(--fs-sm); transition: border-color .15s, background .15s;
 }
 .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: rgba(74,144,217,.06); color: var(--accent); }
+
+/* ── Language flag buttons ────────────────────────────────────────────────── */
+.lang-flags { display: flex; gap: 2px; align-items: center; }
+.lang-flag-btn {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  padding: 1px 4px; font-size: 18px; line-height: 1; cursor: pointer;
+  opacity: 0.45; transition: opacity .15s, border-color .15s;
+}
+.lang-flag-btn:hover { opacity: 0.75; }
+.lang-flag-btn.active { opacity: 1; border-color: var(--accent); }
+
+/* ── Layer quick-toggle popover ───────────────────────────────────────────── */
+#layerPopover {
+  position: fixed; z-index: 80; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px; min-width: 210px;
+  box-shadow: 0 4px 20px var(--shadow-lg);
+}
+.layer-pop-header {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px;
+}
+.layer-pop-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border-radius: 4px; cursor: pointer; font-size: var(--fs-sm); color: var(--text);
+  transition: background .1s;
+}
+.layer-pop-item:hover  { background: var(--bg3); }
+.layer-pop-item.active { background: rgba(74,144,217,.12); color: var(--text-bright); }
+.layer-pop-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.layer-pop-check { margin-left: auto; color: var(--accent); font-weight: 700; min-width: 14px; text-align: right; }
+
+/* ── Alarm escalation levels ──────────────────────────────────────────────── */
+.notification.alarm-level-1 {
+  border-left-color: var(--orange);
+  box-shadow: 0 4px 20px rgba(230,126,34,.4);
+}
+.notification.alarm-level-2 {
+  border-left-color: var(--red);
+  box-shadow: 0 4px 24px rgba(231,76,60,.5);
+  animation: alarm-pulse 1.2s ease-in-out infinite;
+}
+@keyframes alarm-pulse {
+  0%,100% { box-shadow: 0 4px 24px rgba(231,76,60,.5); }
+  50%      { box-shadow: 0 6px 32px rgba(231,76,60,.85); }
+}
+
+/* ── File input in event modal ────────────────────────────────────────────── */
+.attach-file-input {
+  padding: 6px 8px; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); width: 100%;
+}
+.attach-file-input::-webkit-file-upload-button {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); padding: 3px 10px; cursor: pointer; font-size: var(--fs-sm);
+}
+.attach-file-input::-webkit-file-upload-button:hover { background: var(--border); }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

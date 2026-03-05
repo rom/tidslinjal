@@ -1,8 +1,26 @@
-# Tidslinjal v2.0.0
+# Tidslinjal v2.2.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness.
 
 ---
+
+## What's New in v2.2.0
+
+- **Language flags** in the toolbar — switch EN 🇬🇧 / SV 🇸🇪 / FR 🇫🇷 with a single click without opening settings
+- **Layer quick-toggle** — 🗂 Layers button in the toolbar opens a popover to show/hide any layer instantly
+- **Alarm ACK** — alarm notifications now include an **ACK** button; unacknowledged alarms escalate every 60 seconds (pulsing animation) until acknowledged or the event time passes; `POST /api/alarms/:id/ack` backend endpoint persists the acknowledgement
+- **Attachment on create** — file attachment input added directly to the Add / Edit Event modal; file is uploaded immediately after the event is saved
+- **10-minute resolution** — new "10 min" slot granularity added alongside 15 min / Hour / Day
+- **Drag-to-zoom** — click-and-drag up/down on the time column (the sticky hour labels on the left) to scale slot heights in real time; double-click to reset to 1 ×
+- **Group member management** — Groups tab now has a 👥 button per group; members can be listed, added (with role), and removed without leaving the page
+- **Layer group selection** — layer editor now shows named checkboxes instead of a raw ID text field; group panel auto-hides when visibility ≠ Groups
+
+## What's New in v2.1.0
+
+- **Group member management** UI — 👥 button per group in the sidebar
+- **Layer group checkboxes** — named checkboxes replace the raw ID text input
+- **Event search** — live search bar in the toolbar filters event blocks by title, description, or creator
+- **ICS export** — 📅 Export ICS downloads an iCalendar file of the current view
 
 ## What's New in v2.0.0
 
@@ -24,12 +42,14 @@
 
 ### Timeline Visualization
 - **Graphical grid view** — days left to right, time-of-day top to bottom in 24-hour format
-- **Configurable resolution** — 15-minute, hourly, or full-day slots
+- **Configurable resolution** — 10-minute, 15-minute, hourly, or full-day slots
+- **Drag-to-zoom** — click-and-drag on the time column to scale slot heights; double-click to reset
 - **Configurable display range** — Day, 2 Days, 3 Days, 4 Days, Week, Month, 2 Months, 3 Months
 - **Configurable day hours** — per-user setting for the visible hour window (e.g. 08:00–20:00)
 - **Live current-time indicator** — red line tracking "now" across the grid
 - **Zoom to now** — ⏱ button in the toolbar scrolls/navigates to the current moment
 - **Day navigation** — ‹ / › buttons and "Today" shortcut; view auto-scrolls to current hour on load
+- **Event search** — live search bar filters visible events by title, description, or creator
 
 ### Event & Activity Management
 Six built-in event types (all editable by admins):
@@ -51,6 +71,7 @@ Each event stores:
 - Optional recurrence (daily / weekly / monthly with end date)
 - Layer assignment (master timeline or a named layer)
 - Creator and creation timestamp
+- File attachments (can be added during creation or from the detail view)
 
 ### Layers
 Layers are named overlays that sit on top of the master timeline:
@@ -72,9 +93,11 @@ Users toggle layers on/off in the Layers sidebar panel. Events created on a laye
 - Delivered in real-time via **Server-Sent Events (SSE)** — no page refresh needed
 - Browser push notifications (when user grants permission)
 - Active alarms listed in the Alarms sidebar tab
+- **ACK button** — alarm notifications include a mandatory acknowledgement button; if not ACK'd within 60 seconds the notification escalates (orange → pulsing red) and repeats every minute until the event time passes or the user acknowledges
 
 ### File Attachments
 - Attach files to any event (up to 25 MB)
+- Attachment can be added **during event creation** or from the event detail view
 - Download or delete attachments from the event detail view
 - Files stored on disk; metadata in JSON
 
@@ -275,6 +298,7 @@ tidslinjal/
 | `DELETE` | `/api/groups/:id/members/:uid` | Admin | Remove member |
 | `GET/POST` | `/api/alarms` | Any | List / create alarms |
 | `DELETE` | `/api/alarms/:id` | Owner | Delete alarm |
+| `POST` | `/api/alarms/:id/ack` | Owner | Acknowledge alarm |
 | `GET` | `/api/notifications/stream` | Any | SSE alarm stream |
 | `GET/POST` | `/api/locks` | Any | List / create locks |
 | `DELETE` | `/api/locks/:id` | Admin/CanLock | Delete lock |

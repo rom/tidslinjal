@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "2.0.0"
+const AppVersion = "2.2.0"
 
 // Role defines user access levels
 type Role string
@@ -154,15 +154,16 @@ type Attachment struct {
 
 // Alarm is a personal user reminder tied to an event
 type Alarm struct {
-	ID         int64     `json:"id"`
-	UserID     int64     `json:"user_id"`
-	EventID    int64     `json:"event_id"`
-	EventTitle string    `json:"event_title"`
-	EventTime  time.Time `json:"event_time"`
-	LeadTime   int       `json:"lead_time"` // minutes before
-	IsActive   bool      `json:"is_active"`
-	Fired      bool      `json:"fired"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID             int64      `json:"id"`
+	UserID         int64      `json:"user_id"`
+	EventID        int64      `json:"event_id"`
+	EventTitle     string     `json:"event_title"`
+	EventTime      time.Time  `json:"event_time"`
+	LeadTime       int        `json:"lead_time"` // minutes before
+	IsActive       bool       `json:"is_active"`
+	Fired          bool       `json:"fired"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 // LockedSlot represents a time slot locked by admin/designated user

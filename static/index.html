@@ -38,6 +38,7 @@
       <div class="control-group">
         <span class="control-label" id="lbl-res">Resolution:</span>
         <select class="ctrl-select" id="resolutionSelect">
+          <option value="ten">10 min</option>
           <option value="quarter">15 min</option>
           <option value="hour" selected>Hour</option>
           <option value="day">Day</option>
@@ -52,9 +53,17 @@
 
       <div class="toolbar-sep"></div>
 
+      <button class="btn btn-secondary btn-sm" id="btnLayerToggle">🗂 Layers</button>
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
       <button class="btn btn-secondary btn-sm" id="btnExportICS">📅 Export ICS</button>
+
+      <div class="toolbar-sep"></div>
+      <div class="lang-flags" id="langFlags">
+        <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
+        <button class="lang-flag-btn" id="flagSV" title="Svenska" onclick="setPref('language','sv')">🇸🇪</button>
+        <button class="lang-flag-btn" id="flagFR" title="Français" onclick="setPref('language','fr')">🇫🇷</button>
+      </div>
     </div>
 
     <div class="header-right">
@@ -96,6 +105,12 @@
     </aside>
 
   </div>
+</div>
+
+<!-- Layer quick-toggle popover -->
+<div id="layerPopover" style="display:none">
+  <div class="layer-pop-header" id="layerPopHeader"></div>
+  <div id="layerPopoverList"></div>
 </div>
 
 <!-- Notifications -->
@@ -163,6 +178,10 @@
       <div class="form-group" id="recurrenceEndGroup" style="display:none">
         <label id="lbl-ev-recend">Recurrence End</label>
         <input type="datetime-local" id="eventRecurrenceEnd">
+      </div>
+      <div class="form-group">
+        <label id="lbl-ev-attach">Attachment <small style="color:var(--text-dim)">(optional)</small></label>
+        <input type="file" id="eventAttachFile" class="attach-file-input">
       </div>
       <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
     </div>

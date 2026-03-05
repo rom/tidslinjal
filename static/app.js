@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v2.0.0 — Collaborative Operational Timeline
+   Tidslinjal v2.2.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -26,6 +26,7 @@ window.state = {
   startDate:   startOfDay(new Date()),
   sidebarTab:  'legend',
   search:      '',
+  zoomFactor:  1.0,
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ function getSlotsPerDay() {
   const endH   = state.preferences.day_end_hour   || 24;
   const hours  = Math.max(1, endH - startH);
   switch (state.resolution) {
+    case 'ten':     return hours * 6;
     case 'quarter': return hours * 4;
     case 'hour':    return hours;
     case 'day':     return 1;
@@ -107,6 +109,7 @@ function getSlotsPerDay() {
 }
 function getSlotMinutes() {
   switch (state.resolution) {
+    case 'ten':     return 10;
     case 'quarter': return 15;
     case 'hour':    return 60;
     case 'day':     return 1440;
@@ -114,11 +117,15 @@ function getSlotMinutes() {
 }
 function getSlotHeight() {
   const s = getComputedStyle(document.documentElement);
+  let h;
   switch (state.resolution) {
-    case 'quarter': return parseInt(s.getPropertyValue('--slot-h-quarter')) || 18;
-    case 'hour':    return parseInt(s.getPropertyValue('--slot-h-hour'))    || 40;
-    case 'day':     return parseInt(s.getPropertyValue('--slot-h-day'))     || 80;
+    case 'ten':     h = parseInt(s.getPropertyValue('--slot-h-ten'))     || 24; break;
+    case 'quarter': h = parseInt(s.getPropertyValue('--slot-h-quarter')) || 18; break;
+    case 'hour':    h = parseInt(s.getPropertyValue('--slot-h-hour'))    || 40; break;
+    case 'day':     h = parseInt(s.getPropertyValue('--slot-h-day'))     || 80; break;
+    default:        h = 40;
   }
+  return Math.max(6, Math.round(h * (state.zoomFactor || 1.0)));
 }
 function getStartHourOffset() {
   // Minutes from midnight to start of visible day
@@ -131,7 +138,10 @@ function slotLabel(slotIdx) {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   if (state.resolution === 'hour') return `${String(h).padStart(2,'0')}:00`;
-  return m === 0 ? `${String(h).padStart(2,'0')}:00` : '';
+  // 10-min and 15-min: label on the hour, half-hour label for quarter
+  if (m === 0) return `${String(h).padStart(2,'0')}:00`;
+  if (state.resolution === 'quarter' && m === 30) return `${String(h).padStart(2,'0')}:30`;
+  return '';
 }
 
 // ── Preferences helpers ────────────────────────────────────────────────────
@@ -387,6 +397,7 @@ function applyPreferences() {
   if (state.preferences.theme === 'light') body.classList.add('light-mode');
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
+  updateLangFlags();
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -449,6 +460,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     if (ev.recurrence_end) document.getElementById('eventRecurrenceEnd').value = fmtDateInput(new Date(ev.recurrence_end));
   }
 
+  // Clear attachment input on each open
+  const attachFile = document.getElementById('eventAttachFile');
+  if (attachFile) attachFile.value = '';
+
   const creatorEl = document.getElementById('eventCreator');
   creatorEl.style.display = isEdit ? '' : 'none';
   if (isEdit) creatorEl.textContent = `${t('event_created_by')} ${ev.created_by_name} — ${fmtDateTime(new Date(ev.created_at))}`;
@@ -492,6 +507,20 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
 
   const res = id ? await apiPut(`/api/events/${id}`, payload) : await apiPost('/api/events', payload);
   if (res.ok) {
+    const saved    = await res.json();
+    const eventID  = saved.id || parseInt(id, 10);
+    // Upload attachment if a file was selected
+    const attachFile = document.getElementById('eventAttachFile');
+    if (attachFile && attachFile.files.length > 0) {
+      const fd = new FormData();
+      fd.append('file', attachFile.files[0]);
+      const upRes = await apiPost(`/api/events/${eventID}/attachments`, fd);
+      if (!upRes.ok) {
+        const upErr = await upRes.json();
+        alert('Event saved, but attachment upload failed: ' + upErr.error);
+      }
+      attachFile.value = '';
+    }
     closeModal('eventModal');
     await refreshAll();
     showNotification('success', t(id ? 'notif_event_updated' : 'notif_event_created'));
@@ -1228,6 +1257,17 @@ function updateUILabels() {
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
     tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
   });
+
+  // Language flag active state
+  updateLangFlags();
+}
+
+function updateLangFlags() {
+  const lang = (state.preferences && state.preferences.language) || 'en';
+  ['EN', 'SV', 'FR'].forEach(code => {
+    const btn = document.getElementById('flag'+code);
+    if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
+  });
 }
 
 // ── Modal helpers ──────────────────────────────────────────────────────────
@@ -1260,12 +1300,69 @@ function connectSSE() {
   const es = new EventSource('/api/notifications/stream');
   es.addEventListener('alarm', e => {
     const data = JSON.parse(e.data);
-    showNotification('alarm', data.message, 0);
-    if (Notification.permission === 'granted') {
-      new Notification('Tidslinjal', {body: data.message});
-    }
+    showAlarmNotification(data, 0);
   });
   es.onerror = () => setTimeout(connectSSE, 5000);
+}
+
+// ── Alarm ACK ──────────────────────────────────────────────────────────────
+const unackedAlarms = new Map(); // alarmID → {data, level, timerID, element}
+
+function showAlarmNotification(data, level) {
+  // Clear any existing notification for this alarm
+  const existing = unackedAlarms.get(data.alarm_id);
+  if (existing) {
+    clearTimeout(existing.timerID);
+    if (existing.element && existing.element.parentNode) existing.element.remove();
+  }
+
+  const area = document.getElementById('notification-area');
+  const el   = document.createElement('div');
+  el.className = `notification alarm alarm-level-${Math.min(level, 2)}`;
+
+  const warnings = level > 0 ? ' ' + '⚠️'.repeat(Math.min(level, 3)) : '';
+  el.innerHTML = `
+    <div class="notification-title">${t('notif_alarm_title')}${escHtml(warnings)}</div>
+    <div class="notification-msg">${escHtml(data.message)}</div>
+    <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm notification-close-btn" onclick="dismissAlarmNotif(${data.alarm_id})">Dismiss</button>
+      <button class="btn btn-primary btn-sm" onclick="ackAlarm(${data.alarm_id}, this.closest('.notification'))">✓ ${t('alarm_ack')}</button>
+    </div>
+  `;
+  area.appendChild(el);
+
+  // Browser notification on first fire
+  if (level === 0 && Notification.permission === 'granted') {
+    new Notification('Tidslinjal — ' + t('notif_alarm_title'), {body: data.message});
+  }
+
+  // Escalate after 60 s if not acked, as long as we're before the event time
+  const eventTime = new Date(data.event_time);
+  const timerID = (new Date() < eventTime)
+    ? setTimeout(() => showAlarmNotification(data, level + 1), 60000)
+    : null;
+
+  unackedAlarms.set(data.alarm_id, {data, level, timerID, element: el});
+}
+
+function dismissAlarmNotif(alarmID) {
+  const entry = unackedAlarms.get(alarmID);
+  if (entry) {
+    clearTimeout(entry.timerID);
+    unackedAlarms.delete(alarmID);
+    if (entry.element && entry.element.parentNode) entry.element.remove();
+  }
+}
+
+async function ackAlarm(alarmID, notifEl) {
+  const res = await apiPost(`/api/alarms/${alarmID}/ack`, {});
+  if (res.ok) {
+    dismissAlarmNotif(alarmID);
+    if (notifEl && notifEl.parentNode) notifEl.remove();
+    await fetchAlarms();
+    renderSidebar();
+    showNotification('success', t('alarm_acked'));
+  }
 }
 
 // ── Utility ────────────────────────────────────────────────────────────────
@@ -1318,6 +1415,84 @@ function exportICS() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ── Layer quick-toggle popover ─────────────────────────────────────────────
+function renderLayerPopover() {
+  const list        = document.getElementById('layerPopoverList');
+  const masterActive = !state.preferences.active_layers || state.preferences.active_layers.length === 0;
+  list.innerHTML = `
+    <div class="layer-pop-item${masterActive?' active':''}" onclick="toggleAllLayers()">
+      <div class="layer-pop-swatch" style="background:var(--accent)"></div>
+      <span>${t('layers_master')}</span>
+      <span class="layer-pop-check">${masterActive?'✓':''}</span>
+    </div>
+    ${state.layers.map(l => {
+      const active = isLayerActive(l.id);
+      return `<div class="layer-pop-item${active?' active':''}" onclick="toggleLayer(${l.id})">
+        <div class="layer-pop-swatch" style="background:${l.color||'#4A90D9'}"></div>
+        <span>${escHtml(l.name)}</span>
+        <span class="layer-pop-check">${active?'✓':''}</span>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function openLayerPopover(btn) {
+  const pop = document.getElementById('layerPopover');
+  if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+  renderLayerPopover();
+  const rect    = btn.getBoundingClientRect();
+  pop.style.top  = (rect.bottom + 4) + 'px';
+  pop.style.left = rect.left + 'px';
+  pop.style.display = '';
+}
+
+// Keep popover in sync when layers toggle (called at end of toggleLayer / toggleAllLayers)
+const _origToggleLayer    = toggleLayer;
+const _origToggleAllLayers = toggleAllLayers;
+async function toggleLayer(id) {
+  await _origToggleLayer(id);
+  const pop = document.getElementById('layerPopover');
+  if (pop && pop.style.display !== 'none') renderLayerPopover();
+}
+async function toggleAllLayers() {
+  await _origToggleAllLayers();
+  const pop = document.getElementById('layerPopover');
+  if (pop && pop.style.display !== 'none') renderLayerPopover();
+}
+
+// ── Drag-to-zoom on time column ────────────────────────────────────────────
+function setupZoomDrag() {
+  const container = document.getElementById('timeline-container');
+  let dragging = false, startY = 0, startZoom = 1.0;
+
+  container.addEventListener('mousedown', e => {
+    if (!e.target.closest('.tl-time-label, .tl-corner')) return;
+    dragging  = true;
+    startY    = e.clientY;
+    startZoom = state.zoomFactor;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    // Drag up = zoom in, drag down = zoom out (150 px per zoom unit)
+    const newZoom = Math.max(0.2, Math.min(6.0, startZoom + (startY - e.clientY) / 150));
+    if (Math.abs(newZoom - state.zoomFactor) > 0.01) {
+      state.zoomFactor = newZoom;
+      renderTimeline();
+    }
+  });
+
+  document.addEventListener('mouseup', () => { dragging = false; });
+
+  // Double-click on time column resets zoom
+  container.addEventListener('dblclick', e => {
+    if (!e.target.closest('.tl-time-label, .tl-corner')) return;
+    state.zoomFactor = 1.0;
+    renderTimeline();
+  });
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -1384,9 +1559,18 @@ async function init() {
   document.getElementById('btnZoomNow').addEventListener('click', zoomToNow);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
   document.getElementById('btnExportICS').addEventListener('click', exportICS);
+  document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;
     renderTimeline();
+  });
+  // Close layer popover when clicking outside
+  document.addEventListener('click', e => {
+    const pop = document.getElementById('layerPopover');
+    if (pop && pop.style.display !== 'none' &&
+        !pop.contains(e.target) && e.target.id !== 'btnLayerToggle') {
+      pop.style.display = 'none';
+    }
   });
   document.getElementById('btnSidebar').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('hidden');
@@ -1426,6 +1610,9 @@ async function init() {
 
   // Initial data load
   await refreshAll();
+
+  // Set up drag-to-zoom on time column
+  setupZoomDrag();
 
   // Scroll to current time
   setTimeout(() => {
