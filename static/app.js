@@ -25,6 +25,7 @@ window.state = {
   range:       'week',
   startDate:   startOfDay(new Date()),
   sidebarTab:  'legend',
+  search:      '',
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -222,7 +223,15 @@ function renderEventBlocks(days, slotH) {
     container.querySelectorAll('.event-block,.lock-overlay,.lock-label').forEach(el => el.remove());
 
     // ── Events ───────────────────────────────────────────────────────────────
-    const visibleEvents = state.events.filter(ev => !isTypeHidden(ev.event_type));
+    const searchTerm = (state.search||'').trim().toLowerCase();
+    const visibleEvents = state.events.filter(ev =>
+      !isTypeHidden(ev.event_type) &&
+      (!searchTerm ||
+        ev.title.toLowerCase().includes(searchTerm) ||
+        (ev.description||'').toLowerCase().includes(searchTerm) ||
+        (ev.created_by_name||'').toLowerCase().includes(searchTerm)
+      )
+    );
 
     visibleEvents.forEach(ev => {
       const evStart = new Date(ev.start_time);
@@ -744,6 +753,90 @@ async function deleteGroup(id) {
   if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
 }
 
+// ── Member Management Modal ────────────────────────────────────────────────
+async function openMemberModal(group) {
+  document.getElementById('memberModalTitle').textContent = `${escHtml(group.name)} — ${t('groups_members')}`;
+  const body = document.getElementById('memberModalBody');
+  body.innerHTML = `<div style="color:var(--text-dim);padding:8px">Loading…</div>`;
+  openModal('memberModal');
+
+  const [members, users] = await Promise.all([
+    apiGet(`/api/groups/${group.id}/members`),
+    apiGet('/api/users'),
+  ]);
+
+  const userMap = {};
+  (users||[]).forEach(u => { userMap[u.id] = u; });
+  const memberIDs = new Set((members||[]).map(m => m.user_id));
+  const nonMembers = (users||[]).filter(u => !memberIDs.has(u.id));
+
+  const memberRows = (members||[]).map(m => {
+    const u = userMap[m.user_id];
+    const name = u ? (u.display_name || u.username) : `User #${m.user_id}`;
+    const role = u ? u.role : 'read';
+    return `<div class="member-item">
+      <span class="member-name">${escHtml(name)}</span>
+      <span class="role-badge role-${role}" style="font-size:var(--fs-xs)">${t('role_'+role)||role}</span>
+      <span style="font-size:var(--fs-xs);color:var(--text-dim)">(${escHtml(m.role)})</span>
+      <button class="btn btn-danger btn-sm" onclick="removeGroupMember(${group.id},${m.user_id})" style="margin-left:auto">✕</button>
+    </div>`;
+  }).join('');
+
+  const addMemberForm = nonMembers.length > 0 ? `
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${t('groups_add_member')}</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="flex:1;min-width:120px;margin:0">
+          <label style="font-size:var(--fs-sm);color:var(--text-dim)">User</label>
+          <select id="addMemberUser">
+            ${nonMembers.map(u => `<option value="${u.id}">${escHtml(u.display_name||u.username)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;min-width:90px">
+          <label style="font-size:var(--fs-sm);color:var(--text-dim)">Role</label>
+          <select id="addMemberRole">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addGroupMember(${group.id})">${t('btn_add')}</button>
+      </div>
+    </div>` : '';
+
+  body.innerHTML = `
+    <div>
+      <div style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${t('groups_members')}</div>
+      <div class="member-list">
+        ${(members||[]).length === 0
+          ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No members yet.</div>`
+          : memberRows}
+      </div>
+    </div>
+    ${addMemberForm}
+  `;
+}
+
+async function addGroupMember(groupID) {
+  const userID = parseInt(document.getElementById('addMemberUser').value, 10);
+  const role   = document.getElementById('addMemberRole').value;
+  const res = await apiPost(`/api/groups/${groupID}/members`, {user_id: userID, role});
+  if (res.ok) {
+    const group = state.groups.find(g => g.id === groupID);
+    if (group) openMemberModal(group);
+    showNotification('success', t('notif_saved'));
+  } else { const err = await res.json(); alert('Error: '+err.error); }
+}
+
+async function removeGroupMember(groupID, userID) {
+  if (!confirm('Remove this member from the group?')) return;
+  const res = await apiDel(`/api/groups/${groupID}/members/${userID}`);
+  if (res.ok) {
+    const group = state.groups.find(g => g.id === groupID);
+    if (group) openMemberModal(group);
+    showNotification('success', t('notif_saved'));
+  } else { alert('Failed to remove member'); }
+}
+
 // ── Layer Modal ────────────────────────────────────────────────────────────
 function openLayerModal(layer) {
   const isEdit = !!layer;
@@ -752,9 +845,35 @@ function openLayerModal(layer) {
   document.getElementById('layerName').value = layer ? layer.name : '';
   document.getElementById('layerDesc').value = layer ? (layer.description||'') : '';
   document.getElementById('layerColor').value = layer ? (layer.color||'#4A90D9') : '#4A90D9';
-  document.getElementById('layerVisibility').value = layer ? layer.visibility : 'private';
-  document.getElementById('layerPermission').value = layer ? layer.permission : 'read';
-  document.getElementById('layerGroupIDs').value = layer ? (layer.group_ids||[]).join(', ') : '';
+
+  const visSel   = document.getElementById('layerVisibility');
+  const permSel  = document.getElementById('layerPermission');
+  const grpGroup = document.getElementById('layerGroupsGroup');
+  visSel.value  = layer ? layer.visibility : 'private';
+  permSel.value = layer ? layer.permission : 'read';
+
+  // Show/hide group section based on visibility
+  const updateGroupsVis = () => {
+    grpGroup.style.display = visSel.value === 'groups' ? '' : 'none';
+  };
+  visSel.onchange = updateGroupsVis;
+  updateGroupsVis();
+
+  // Populate group checkboxes
+  const selectedGroups = layer ? (layer.group_ids||[]) : [];
+  const groupCheckboxes = document.getElementById('layerGroupCheckboxes');
+  if (state.groups.length === 0) {
+    groupCheckboxes.innerHTML = `<span style="color:var(--text-dim);font-size:var(--fs-sm)">No groups available. Create groups first.</span>`;
+  } else {
+    groupCheckboxes.innerHTML = state.groups.map(g => `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" name="layerGroup" value="${g.id}" ${selectedGroups.includes(g.id)?'checked':''} style="width:14px;height:14px;accent-color:var(--accent);flex-shrink:0">
+        <span style="font-size:var(--fs-sm);color:var(--text)">${escHtml(g.name)}</span>
+        ${g.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(g.description)}</span>` : ''}
+      </label>
+    `).join('');
+  }
+
   const delBtn = document.getElementById('btnDeleteLayer');
   delBtn.style.display = isEdit ? '' : 'none';
   delBtn.onclick = isEdit ? () => deleteLayer(layer.id) : null;
@@ -765,8 +884,8 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
   const id = document.getElementById('layerId').value;
   const name = document.getElementById('layerName').value.trim();
   if (!name) { alert('Name required'); return; }
-  const groupIDs = document.getElementById('layerGroupIDs').value
-    .split(',').map(s => parseInt(s.trim(),10)).filter(n => !isNaN(n));
+  const groupIDs = [...document.querySelectorAll('input[name="layerGroup"]:checked')]
+    .map(cb => parseInt(cb.value, 10));
   const payload = {
     name, description: document.getElementById('layerDesc').value,
     color: document.getElementById('layerColor').value,
@@ -980,7 +1099,8 @@ function renderSidebar() {
                 <div>${escHtml(g.name)}</div>
                 ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
               </div>
-              <button class="btn btn-ghost btn-icon" onclick='openGroupModal(${JSON.stringify(g).replace(/'/g,"&#39;")})'>✏️</button>
+              <button class="btn btn-ghost btn-icon btn-sm" onclick='openMemberModal(${JSON.stringify(g).replace(/'/g,"&#39;")})' title="${t('groups_members')}">👥</button>
+              <button class="btn btn-ghost btn-icon" onclick='openGroupModal(${JSON.stringify(g).replace(/'/g,"&#39;")})' title="Edit">✏️</button>
             </div>`).join('')}
         </div>
       </div>
@@ -1154,6 +1274,52 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── ICS Export ─────────────────────────────────────────────────────────────
+function toICSDate(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
+}
+function escICS(s) {
+  return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+}
+function exportICS() {
+  const events = state.events;
+  if (!events.length) { alert('No events in the current view to export.'); return; }
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tidslinjal//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
+  for (const ev of events) {
+    const evStart = new Date(ev.start_time);
+    const evEnd   = ev.end_time ? new Date(ev.end_time) : new Date(evStart.getTime() + 3600000);
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += `UID:tidslinjal-${ev.id}@tidslinjal\r\n`;
+    ics += `DTSTAMP:${toICSDate(new Date(ev.created_at))}\r\n`;
+    ics += `DTSTART:${toICSDate(evStart)}\r\n`;
+    ics += `DTEND:${toICSDate(evEnd)}\r\n`;
+    ics += `SUMMARY:${escICS(ev.title)}\r\n`;
+    if (ev.description) ics += `DESCRIPTION:${escICS(ev.description)}\r\n`;
+    if (ev.created_by_name) ics += `ORGANIZER;CN=${escICS(ev.created_by_name)}:MAILTO:noreply@tidslinjal\r\n`;
+    ics += `CATEGORIES:${escICS(ev.event_type)}\r\n`;
+    if (ev.is_recurring && ev.recurrence_pattern) {
+      const rrule = { daily:'DAILY', weekly:'WEEKLY', monthly:'MONTHLY' }[ev.recurrence_pattern];
+      if (rrule) {
+        let rr = `RRULE:FREQ=${rrule}`;
+        if (ev.recurrence_end) rr += `;UNTIL=${toICSDate(new Date(ev.recurrence_end))}`;
+        ics += rr + '\r\n';
+      }
+    }
+    ics += 'END:VEVENT\r\n';
+  }
+  ics += 'END:VCALENDAR\r\n';
+  const blob = new Blob([ics], {type: 'text/calendar;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `tidslinjal-${state.startDate.toISOString().slice(0,10)}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
   try {
@@ -1217,6 +1383,11 @@ async function init() {
   document.getElementById('btnToday').addEventListener('click',  goToday);
   document.getElementById('btnZoomNow').addEventListener('click', zoomToNow);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
+  document.getElementById('btnExportICS').addEventListener('click', exportICS);
+  document.getElementById('searchInput').addEventListener('input', e => {
+    state.search = e.target.value;
+    renderTimeline();
+  });
   document.getElementById('btnSidebar').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('hidden');
   });

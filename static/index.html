@@ -46,8 +46,15 @@
 
       <div class="toolbar-sep"></div>
 
+      <div class="control-group">
+        <input type="text" id="searchInput" class="ctrl-select" placeholder="🔍 Search…" style="width:150px" autocomplete="off">
+      </div>
+
+      <div class="toolbar-sep"></div>
+
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
+      <button class="btn btn-secondary btn-sm" id="btnExportICS">📅 Export ICS</button>
     </div>
 
     <div class="header-right">
@@ -360,8 +367,8 @@
         </div>
       </div>
       <div class="form-group" id="layerGroupsGroup">
-        <label>Shared Groups (IDs, comma-separated)</label>
-        <input type="text" id="layerGroupIDs" placeholder="1, 2, 3">
+        <label id="lbl-layer-groups">Shared Groups</label>
+        <div id="layerGroupCheckboxes" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px;background:var(--bg3)"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -410,6 +417,20 @@
       <button class="btn btn-danger btn-sm" id="btnDeleteEtype" style="display:none">Delete</button>
       <button class="btn btn-secondary" onclick="closeModal('etypeModal')">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEtype">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Member Management Modal -->
+<div class="modal-overlay" id="memberModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="memberModalTitle">Members</h2>
+      <button class="modal-close" onclick="closeModal('memberModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="memberModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('memberModal')" id="lbl-member-close">Close</button>
     </div>
   </div>
 </div>

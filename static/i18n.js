@@ -204,6 +204,11 @@ const TRANSLATIONS = {
     confirm_delete_group: 'Delete this group?',
     confirm_delete_attachment: 'Delete this attachment?',
     confirm_delete_type: 'Delete this event type?',
+
+    // Search & export
+    search_placeholder: 'Search…',
+    export_ics: '📅 Export ICS',
+    layer_shared_groups: 'Shared Groups',
   },
 
   sv: {
@@ -366,6 +371,9 @@ const TRANSLATIONS = {
     confirm_delete_group: 'Ta bort den här gruppen?',
     confirm_delete_attachment: 'Ta bort den här bilagan?',
     confirm_delete_type: 'Ta bort den här händelsetypen?',
+    search_placeholder: 'Sök…',
+    export_ics: '📅 Exportera ICS',
+    layer_shared_groups: 'Delade grupper',
   },
 
   fr: {
@@ -528,6 +536,9 @@ const TRANSLATIONS = {
     confirm_delete_group: 'Supprimer ce groupe ?',
     confirm_delete_attachment: 'Supprimer cette pièce jointe ?',
     confirm_delete_type: 'Supprimer ce type d\'événement ?',
+    search_placeholder: 'Rechercher…',
+    export_ics: '📅 Exporter ICS',
+    layer_shared_groups: 'Groupes partagés',
   }
 };
 

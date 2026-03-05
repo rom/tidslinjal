@@ -307,6 +307,18 @@ select.ctrl-select:focus { border-color: var(--accent); }
 }
 .group-item .group-name { flex: 1; font-size: var(--fs-sm); }
 
+/* Member list */
+.member-list { display: flex; flex-direction: column; gap: 6px; }
+.member-item {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 7px 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.member-name { flex: 1; font-size: var(--fs-sm); min-width: 80px; }
+
+/* Search input in toolbar */
+#searchInput::placeholder { color: var(--text-dim); }
+#searchInput { min-width: 100px; }
+
 /* Settings panel */
 .setting-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .setting-label { font-size: var(--fs-sm); color: var(--text-dim); min-width: 90px; }
