@@ -11,6 +11,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -87,6 +88,7 @@ func (b *SSEBroker) Notify(userID int64, n AlarmNotification) {
 type App struct {
 	store  *Store
 	broker *SSEBroker
+	oidc   *OIDCConfig // nil if OIDC not configured
 }
 
 func NewApp(dataDir string) (*App, error) {
@@ -1457,7 +1459,7 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 // ── Version ────────────────────────────────────────────────────────────────────
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]string{"version": AppVersion})
+	jsonOK(w, map[string]string{"version": AppVersion, "github": AppGitHub})
 }
 
 // ── Event Comment handlers ─────────────────────────────────────────────────────
@@ -2061,7 +2063,217 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// OIDC SSO routes (only registered if OIDC is configured)
+	if app.oidc != nil {
+		mux.HandleFunc("/auth/oidc/login", app.handleOIDCLogin)
+		mux.HandleFunc("/auth/oidc/callback", app.handleOIDCCallback)
+		mux.HandleFunc("/api/auth/oidc-config", app.handleOIDCInfo)
+	}
+
 	return mux
+}
+
+// ── OIDC SSO ─────────────────────────────────────────────────────────────────
+
+// configureOIDC discovers the OIDC provider endpoints from the issuer's well-known URL.
+func (app *App) configureOIDC(issuer, clientID, clientSecret, redirectURL string) error {
+	if issuer == "" {
+		return fmt.Errorf("issuer URL is required")
+	}
+	// Fetch discovery document
+	discURL := strings.TrimRight(issuer, "/") + "/.well-known/openid-configuration"
+	resp, err := http.Get(discURL) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("fetch discovery document: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("discovery document returned %d", resp.StatusCode)
+	}
+	var cfg OIDCConfig
+	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+		return fmt.Errorf("decode discovery document: %w", err)
+	}
+	cfg.ClientID     = clientID
+	cfg.ClientSecret = clientSecret
+	cfg.RedirectURL  = redirectURL
+	if cfg.RedirectURL == "" {
+		cfg.RedirectURL = "http://localhost:8080/auth/oidc/callback"
+	}
+	app.oidc = &cfg
+	return nil
+}
+
+// handleOIDCInfo returns OIDC configuration info to the frontend (public, no auth required)
+func (app *App) handleOIDCInfo(w http.ResponseWriter, r *http.Request) {
+	if app.oidc == nil {
+		jsonError(w, "OIDC not configured", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{
+		"enabled":     "true",
+		"issuer":      app.oidc.Issuer,
+		"client_id":   app.oidc.ClientID,
+		"redirect_url": app.oidc.RedirectURL,
+	})
+}
+
+// handleOIDCLogin redirects the user to the OIDC authorization endpoint.
+func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
+	if app.oidc == nil {
+		http.Redirect(w, r, "/login?error=oidc_not_configured", http.StatusFound)
+		return
+	}
+	// Generate a random state token and store it in a short-lived cookie
+	stateTok := make([]byte, 16)
+	if _, err := rand.Read(stateTok); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	state := hex.EncodeToString(stateTok)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oidc_state",
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   300, // 5 minutes
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	params := url.Values{
+		"response_type": {"code"},
+		"client_id":     {app.oidc.ClientID},
+		"redirect_uri":  {app.oidc.RedirectURL},
+		"scope":         {"openid profile email"},
+		"state":         {state},
+	}
+	http.Redirect(w, r, app.oidc.AuthorizationEndpoint+"?"+params.Encode(), http.StatusFound)
+}
+
+// handleOIDCCallback exchanges the auth code for tokens, fetches user info, and creates a session.
+func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
+	if app.oidc == nil {
+		http.Redirect(w, r, "/login?error=oidc_not_configured", http.StatusFound)
+		return
+	}
+
+	// Validate state
+	stateCookie, err := r.Cookie("oidc_state")
+	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
+		http.Redirect(w, r, "/login?error=state_mismatch", http.StatusFound)
+		return
+	}
+	// Clear state cookie
+	http.SetCookie(w, &http.Cookie{Name: "oidc_state", Path: "/", MaxAge: -1})
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		errMsg := r.URL.Query().Get("error_description")
+		if errMsg == "" {
+			errMsg = r.URL.Query().Get("error")
+		}
+		http.Redirect(w, r, "/login?error="+url.QueryEscape(errMsg), http.StatusFound)
+		return
+	}
+
+	// Exchange code for tokens
+	tokenResp, err := http.PostForm(app.oidc.TokenEndpoint, url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {app.oidc.RedirectURL},
+		"client_id":     {app.oidc.ClientID},
+		"client_secret": {app.oidc.ClientSecret},
+	})
+	if err != nil || tokenResp.StatusCode != http.StatusOK {
+		http.Redirect(w, r, "/login?error=token_exchange_failed", http.StatusFound)
+		return
+	}
+	defer tokenResp.Body.Close()
+
+	var tokens struct {
+		AccessToken string `json:"access_token"`
+		IDToken     string `json:"id_token"`
+		TokenType   string `json:"token_type"`
+	}
+	if err := json.NewDecoder(tokenResp.Body).Decode(&tokens); err != nil {
+		http.Redirect(w, r, "/login?error=token_parse_failed", http.StatusFound)
+		return
+	}
+
+	// Fetch user info
+	req, _ := http.NewRequest("GET", app.oidc.UserinfoEndpoint, nil)
+	req.Header.Set("Authorization", tokens.TokenType+" "+tokens.AccessToken)
+	uiResp, err := http.DefaultClient.Do(req)
+	if err != nil || uiResp.StatusCode != http.StatusOK {
+		http.Redirect(w, r, "/login?error=userinfo_failed", http.StatusFound)
+		return
+	}
+	defer uiResp.Body.Close()
+
+	var userInfo struct {
+		Sub         string `json:"sub"`
+		Email       string `json:"email"`
+		Name        string `json:"name"`
+		PreferredUN string `json:"preferred_username"`
+	}
+	if err := json.NewDecoder(uiResp.Body).Decode(&userInfo); err != nil {
+		http.Redirect(w, r, "/login?error=userinfo_parse_failed", http.StatusFound)
+		return
+	}
+
+	// Determine username: preferred_username → email → sub
+	username := userInfo.PreferredUN
+	if username == "" {
+		username = userInfo.Email
+	}
+	if username == "" {
+		username = "oidc-" + userInfo.Sub
+	}
+	displayName := userInfo.Name
+	if displayName == "" {
+		displayName = username
+	}
+
+	// Find or auto-create the local user (SSO users get readwrite role by default)
+	user, found := app.store.GetUserByUsername(username)
+	if !found {
+		newUser := User{
+			Username:    username,
+			DisplayName: displayName,
+			Role:        RoleReadWrite,
+		}
+		// No password — OIDC-only login; store empty bcrypt hash placeholder
+		created, err := app.store.CreateUser(newUser)
+		if err != nil {
+			logVerbose("OIDC: failed to create user %s: %v", username, err)
+			http.Redirect(w, r, "/login?error=user_create_failed", http.StatusFound)
+			return
+		}
+		user = &created
+		log.Printf("OIDC: auto-created user %q (role=readwrite)", username)
+	}
+
+	// Create session
+	sessID, err := generateID()
+	if err != nil {
+		http.Redirect(w, r, "/login?error=session_failed", http.StatusFound)
+		return
+	}
+	sess := Session{ID: sessID, UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)}
+	if err := app.store.CreateSession(sess); err != nil {
+		http.Redirect(w, r, "/login?error=session_failed", http.StatusFound)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    sessID,
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  sess.ExpiresAt,
+		SameSite: http.SameSiteLaxMode,
+	})
+	logVerbose("OIDC login: user=%s", username)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
@@ -2072,12 +2284,25 @@ func main() {
 		host    string
 		port    string
 		dataDir string
+		tlsCert string
+		tlsKey  string
+		// OIDC flags
+		oidcIssuer       string
+		oidcClientID     string
+		oidcClientSecret string
+		oidcRedirectURL  string
 	)
 	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
-	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080, or $PORT env)")
+	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 8443 for HTTPS, or $PORT env)")
 	flag.StringVar(&dataDir, "data",    "",      "Data directory (default: data, or $DATA_DIR env)")
 	flag.BoolVar(&verbose,   "verbose", false,   "Enable verbose logging")
 	flag.BoolVar(&debug,     "debug",   false,   "Enable debug logging (implies verbose)")
+	flag.StringVar(&tlsCert, "tls-cert", "",     "Path to TLS certificate file (enables HTTPS)")
+	flag.StringVar(&tlsKey,  "tls-key",  "",     "Path to TLS private key file (enables HTTPS)")
+	flag.StringVar(&oidcIssuer,       "oidc-issuer",        os.Getenv("OIDC_ISSUER"),        "OIDC provider issuer URL (e.g. https://accounts.google.com)")
+	flag.StringVar(&oidcClientID,     "oidc-client-id",     os.Getenv("OIDC_CLIENT_ID"),     "OIDC client ID")
+	flag.StringVar(&oidcClientSecret, "oidc-client-secret", os.Getenv("OIDC_CLIENT_SECRET"), "OIDC client secret")
+	flag.StringVar(&oidcRedirectURL,  "oidc-redirect-url",  os.Getenv("OIDC_REDIRECT_URL"),  "OIDC redirect URL (e.g. https://your-server/auth/oidc/callback)")
 	flag.Parse()
 
 	if debug {
@@ -2088,7 +2313,11 @@ func main() {
 	if port == "" {
 		port = os.Getenv("PORT")
 		if port == "" {
-			port = "8080"
+			if tlsCert != "" && tlsKey != "" {
+				port = "8443"
+			} else {
+				port = "8080"
+			}
 		}
 	}
 	if dataDir == "" {
@@ -2097,10 +2326,25 @@ func main() {
 			dataDir = "data"
 		}
 	}
+	if tlsCert == "" {
+		tlsCert = os.Getenv("TLS_CERT")
+	}
+	if tlsKey == "" {
+		tlsKey = os.Getenv("TLS_KEY")
+	}
 
 	app, err := NewApp(dataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Configure OIDC if issuer is set
+	if oidcIssuer != "" {
+		if err := app.configureOIDC(oidcIssuer, oidcClientID, oidcClientSecret, oidcRedirectURL); err != nil {
+			log.Printf("[WARN] OIDC configuration failed: %v — SSO will be unavailable", err)
+		} else {
+			log.Printf("OIDC SSO enabled: issuer=%s", oidcIssuer)
+		}
 	}
 
 	go app.runAlarmScheduler()
@@ -2111,14 +2355,29 @@ func main() {
 	if host == "" {
 		listenAddr = "0.0.0.0:" + port
 	}
-	log.Printf("Tidslinjal v%s — listening on %s", AppVersion, listenAddr)
+
+	useTLS := tlsCert != "" && tlsKey != ""
+	scheme := "http"
+	if useTLS {
+		scheme = "https"
+	}
+
+	log.Printf("Tidslinjal v%s — listening on %s://%s", AppVersion, scheme, listenAddr)
 	log.Printf("Default credentials: admin / admin")
 	if verbose {
 		log.Printf("[VERBOSE] data dir: %s", dataDir)
-		log.Printf("[VERBOSE] verbose=%v debug=%v", verbose, debug)
+		log.Printf("[VERBOSE] verbose=%v debug=%v tls=%v", verbose, debug, useTLS)
 	}
 
-	if err := http.ListenAndServe(addr, app.routes()); err != nil {
-		log.Fatalf("Server error: %v", err)
+	handler := app.routes()
+	if useTLS {
+		log.Printf("TLS enabled — cert=%s key=%s", tlsCert, tlsKey)
+		if err := http.ListenAndServeTLS(addr, tlsCert, tlsKey, handler); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	} else {
+		if err := http.ListenAndServe(addr, handler); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
 	}
 }

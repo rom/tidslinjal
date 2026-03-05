@@ -2003,15 +2003,23 @@ function updateSyntheticUI() {
 }
 
 // ── UI labels (i18n) ───────────────────────────────────────────────────────
+function setElText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
 function updateUILabels() {
   // Header buttons
   document.getElementById('btnToday').textContent    = t('today');
-  document.getElementById('btnZoomNow').title        = t('zoom_now');
-  document.getElementById('btnAddEvent').textContent = t('add_event');
-  document.getElementById('btnAddLock').textContent  = t('lock_slot');
-  document.getElementById('btnLogout').textContent   = t('logout');
-  document.getElementById('lbl-show').textContent    = t('show')+':';
-  document.getElementById('lbl-res').textContent     = t('resolution')+':';
+  const znBtn = document.getElementById('btnZoomNow');
+  if (znBtn) znBtn.title = t('zoom_now');
+  setElText('btnAddEvent', t('add_event'));
+  setElText('btnAddLock', t('lock_slot'));
+  setElText('btnLogout', t('logout'));
+  setElText('btnExport', t('btn_export'));
+  setElText('btnReport', t('btn_report'));
+  setElText('lbl-show', t('show')+':');
+  setElText('lbl-res', t('resolution')+':');
 
   // Range select options
   const rs = document.getElementById('rangeSelect');
@@ -2026,6 +2034,124 @@ function updateUILabels() {
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
     tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
   });
+
+  // Alarm modal
+  setElText('lbl-alarm-cancel', t('btn_cancel'));
+  setElText('btnSaveAlarm', t('alarm_set'));
+
+  // Lock modal
+  setElText('lbl-lock-cancel', t('btn_cancel'));
+  setElText('btnSaveLock', t('btn_lock'));
+
+  // Event modal
+  setElText('lbl-btn-cancel', t('btn_cancel'));
+  setElText('btnSaveEvent', t('btn_save'));
+  setElText('btnDeleteEvent', t('btn_delete'));
+  // Status options
+  const evStatus = document.getElementById('eventStatus');
+  if (evStatus) {
+    [...evStatus.options].forEach(opt => { opt.text = t('status_'+opt.value) || opt.text; });
+  }
+  // Recurrence pattern options
+  const evPat = document.getElementById('eventRecurrencePattern');
+  if (evPat) {
+    [...evPat.options].forEach(opt => { opt.text = t('event_pattern_'+opt.value) || opt.text; });
+  }
+
+  // User modal
+  setElText('lbl-u-username', t('user_username_lbl') || t('user_username'));
+  setElText('lbl-u-password', t('user_password'));
+  setElText('lbl-u-display', t('user_display'));
+  setElText('lbl-u-role', t('user_role'));
+  setElText('lbl-u-canlock', t('user_can_lock'));
+  setElText('lbl-u-groups', t('user_groups'));
+  setElText('lbl-u-changepwd', t('change_password'));
+  setElText('lbl-u-cancel', t('btn_cancel'));
+  setElText('btnSaveUser', t('btn_save'));
+  setElText('btnDeleteUser', t('user_delete'));
+  const uRole = document.getElementById('uRole');
+  if (uRole) {
+    const roleMap = {read:'role_read',reporter:'role_reporter',readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',admin:'role_admin'};
+    [...uRole.options].forEach(opt => { opt.text = t(roleMap[opt.value]) || opt.text; });
+  }
+
+  // Password modal
+  setElText('lbl-pwd-title', t('change_password'));
+  setElText('lbl-pwd-current', t('current_password'));
+  setElText('lbl-pwd-new', t('new_password'));
+  setElText('lbl-pwd-confirm', t('confirm_password'));
+  setElText('lbl-pwd-cancel', t('btn_cancel'));
+  setElText('btnSavePassword', t('change_password'));
+
+  // Phase modal
+  setElText('lbl-phase-name', t('phase_name'));
+  setElText('lbl-phase-color', t('phase_color'));
+  setElText('lbl-phase-start', t('phase_start'));
+  setElText('lbl-phase-end', t('phase_end'));
+  setElText('lbl-phase-order', t('phase_order_lbl') || 'Order (0-9)');
+  setElText('lbl-phase-cancel', t('btn_cancel'));
+  setElText('btnSavePhase', t('btn_save'));
+  setElText('btnDeletePhase', t('btn_delete'));
+
+  // Group modal
+  setElText('lbl-group-name', t('group_name_lbl') || 'Name *');
+  setElText('lbl-group-desc', t('event_description'));
+  setElText('lbl-group-cancel', t('btn_cancel'));
+  setElText('btnSaveGroup', t('btn_save'));
+  setElText('btnDeleteGroup', t('btn_delete'));
+
+  // Layer modal
+  setElText('lbl-layer-name', t('layer_name_lbl') || 'Name *');
+  setElText('lbl-layer-color', t('event_type_color'));
+  setElText('lbl-layer-desc', t('event_description'));
+  setElText('lbl-layer-vis', t('layer_visibility_private').replace(/^./, '') || 'Visibility');
+  setElText('lbl-layer-perm', t('layer_perm_lbl') || 'Group Permission');
+  setElText('lbl-layer-groups', t('layer_shared_groups'));
+  setElText('lbl-layer-cancel', t('btn_cancel'));
+  setElText('btnSaveLayer', t('btn_save'));
+  setElText('btnDeleteLayer', t('btn_delete'));
+  const lVis = document.getElementById('layerVisibility');
+  if (lVis) {
+    const visMap = {private:'layer_visibility_private',groups:'layer_visibility_groups',public:'layer_visibility_public'};
+    [...lVis.options].forEach(opt => { opt.text = t(visMap[opt.value]) || opt.text; });
+  }
+  const lPerm = document.getElementById('layerPermission');
+  if (lPerm) {
+    const permMap = {read:'layer_permission_read',readwrite:'layer_permission_readwrite'};
+    [...lPerm.options].forEach(opt => { opt.text = t(permMap[opt.value]) || opt.text; });
+  }
+
+  // Event type modal
+  setElText('lbl-etype-key', t('event_type_key'));
+  setElText('lbl-etype-color', t('event_type_color'));
+  setElText('lbl-etype-label', t('event_type_label'));
+  setElText('lbl-etype-label-sv', t('event_type_label_sv'));
+  setElText('lbl-etype-label-fr', t('event_type_label_fr'));
+  setElText('lbl-etype-cancel', t('btn_cancel'));
+  setElText('btnSaveEtype', t('btn_save'));
+  setElText('btnDeleteEtype', t('btn_delete'));
+
+  // Report modal
+  setElText('lbl-report-title', '📄 ' + (t('report_title') || 'Generate Report'));
+  setElText('lbl-report-type', t('report_type_label') || 'Report type');
+  setElText('lbl-report-format', t('report_format_label') || 'Format');
+  setElText('lbl-report-from', t('event_start'));
+  setElText('lbl-report-to', t('event_end'));
+  setElText('lbl-report-cancel', t('btn_cancel'));
+  setElText('lbl-report-generate', t('report_generate'));
+  const rType = document.getElementById('reportType');
+  if (rType) {
+    const typeMap = {aar: t('report_type_aar'), timeline: t('report_type_timeline'), per_layer: t('report_type_perlayer') || 'Per-Layer Activity'};
+    [...rType.options].forEach(opt => { opt.text = typeMap[opt.value] || opt.text; });
+  }
+  const rFmt = document.getElementById('reportFormat');
+  if (rFmt) {
+    const fmtMap = {html: t('report_format_html_opt') || t('report_format_html'), print: t('report_format_print_opt') || t('report_format_pdf')};
+    [...rFmt.options].forEach(opt => { opt.text = fmtMap[opt.value] || opt.text; });
+  }
+
+  // Member modal
+  setElText('lbl-member-close', t('btn_close'));
 
   // Language flag active state
   updateLangFlags();
@@ -2245,20 +2371,23 @@ function exportICS() {
 function renderLayerPopover() {
   const list        = document.getElementById('layerPopoverList');
   const masterActive = !state.preferences.active_layers || state.preferences.active_layers.length === 0;
+  const activeCount  = (state.preferences.active_layers || []).length;
   list.innerHTML = `
+    <div class="layer-pop-hint" style="font-size:10px;opacity:0.6;padding:4px 8px 2px">${t('layers_multi_hint')||'Click to show/hide. Multiple layers can be active.'}</div>
     <div class="layer-pop-item${masterActive?' active':''}" onclick="toggleAllLayers()">
+      <input type="checkbox" class="layer-pop-cb" ${masterActive?'checked':''} onclick="event.stopPropagation()">
       <div class="layer-pop-swatch" style="background:var(--accent)"></div>
       <span>${t('layers_master')}</span>
-      <span class="layer-pop-check">${masterActive?'✓':''}</span>
     </div>
     ${state.layers.map(l => {
       const active = isLayerActive(l.id);
       return `<div class="layer-pop-item${active?' active':''}" onclick="toggleLayer(${l.id})">
+        <input type="checkbox" class="layer-pop-cb" ${active?'checked':''} onclick="event.stopPropagation()">
         <div class="layer-pop-swatch" style="background:${l.color||'#4A90D9'}"></div>
         <span>${escHtml(l.name)}</span>
-        <span class="layer-pop-check">${active?'✓':''}</span>
       </div>`;
     }).join('')}
+    ${activeCount > 0 ? `<div class="layer-pop-hint" style="font-size:10px;opacity:0.5;padding:2px 8px 4px;text-align:right">${activeCount} layer${activeCount>1?'s':''} selected</div>` : ''}
   `;
 }
 
@@ -2608,14 +2737,31 @@ async function generateReport() {
 
   html += '</body></html>';
 
+  const format = document.getElementById('reportFormat')?.value || 'html';
   const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
   const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `report-${type}-${new Date().toISOString().slice(0,10)}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+
+  if (format === 'print') {
+    // Open in new window and trigger print dialog (user can save as PDF)
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.focus();
+      // Delay print to allow rendering
+      setTimeout(() => {
+        printWin.print();
+      }, 500);
+    }
+  } else {
+    // Download as HTML
+    const a = document.createElement('a');
+    a.href     = url;
+    a.download = `report-${type}-${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
   URL.revokeObjectURL(url);
   closeModal('reportModal');
   showNotification('success', t('report_ready')||'Report downloaded');
@@ -2654,6 +2800,19 @@ async function init() {
 
   // Update labels
   updateUILabels();
+
+  // Load and display version + GitHub link
+  try {
+    const vInfo = await apiGet('/api/version');
+    const vLink = document.getElementById('appVersionLink');
+    if (vLink && vInfo) {
+      vLink.textContent = 'v' + (vInfo.version || '?');
+      if (vInfo.github) {
+        vLink.href = vInfo.github;
+        vLink.title = t('github_link') || 'GitHub Repository';
+      }
+    }
+  } catch { /* ignore */ }
 
   // User info in header
   document.getElementById('userDisplayName').textContent = state.user.display_name || state.user.username;

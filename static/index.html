@@ -79,6 +79,7 @@
           <span id="userDisplayName">—</span>
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
+        <a id="appVersionLink" href="#" target="_blank" rel="noopener" class="version-badge" title="GitHub repository" style="font-size:10px;opacity:0.6;text-decoration:none;color:inherit">v?</a>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help" onclick="openModal('helpModal')">?</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnChangePassword" title="Change password">🔑</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnSidebar" title="Toggle panel">☰</button>
@@ -279,7 +280,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('alarmModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('alarmModal')" id="lbl-alarm-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveAlarm">Set Alarm</button>
     </div>
   </div>
@@ -309,7 +310,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('lockModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('lockModal')" id="lbl-lock-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLock">Lock Slot</button>
     </div>
   </div>
@@ -326,43 +327,43 @@
       <input type="hidden" id="userId">
       <div class="form-row">
         <div class="form-group">
-          <label>Username *</label>
+          <label id="lbl-u-username">Username *</label>
           <input type="text" id="uUsername">
         </div>
         <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="uPassword" placeholder="Leave blank to keep">
+          <label id="lbl-u-password">Password</label>
+          <input type="password" id="uPassword" id="lbl-u-password-ph" placeholder="Leave blank to keep">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Display Name</label>
+          <label id="lbl-u-display">Display Name</label>
           <input type="text" id="uDisplayName">
         </div>
         <div class="form-group">
-          <label>Role</label>
+          <label id="lbl-u-role">Role</label>
           <select id="uRole">
-            <option value="read">Read</option>
-            <option value="reporter">Reporter</option>
-            <option value="readwrite">Read/Write</option>
-            <option value="teamlead">Team Lead</option>
-            <option value="oplead">Operations Lead</option>
-            <option value="admin">Admin</option>
+            <option value="read" id="lbl-role-read">Read</option>
+            <option value="reporter" id="lbl-role-reporter">Reporter</option>
+            <option value="readwrite" id="lbl-role-readwrite">Read/Write</option>
+            <option value="teamlead" id="lbl-role-teamlead">Team Lead</option>
+            <option value="oplead" id="lbl-role-oplead">Operations Lead</option>
+            <option value="admin" id="lbl-role-admin">Admin</option>
           </select>
         </div>
       </div>
       <div class="form-group">
         <div class="form-check">
           <input type="checkbox" id="uCanLock">
-          <label for="uCanLock">Can lock time slots</label>
+          <label for="uCanLock" id="lbl-u-canlock">Can lock time slots</label>
         </div>
       </div>
       <div class="form-group" id="uGroupsGroup">
-        <label>Groups</label>
+        <label id="lbl-u-groups">Groups</label>
         <div id="uGroupPicker" class="group-picker"></div>
       </div>
       <div class="form-group" id="uPasswordGroup" style="display:none">
-        <label>Change Password</label>
+        <label id="lbl-u-changepwd">Change Password</label>
         <div class="password-form">
           <input type="password" id="uNewPassword" placeholder="New password">
           <input type="password" id="uConfirmPassword" placeholder="Confirm new password">
@@ -371,7 +372,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
-      <button class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('userModal')" id="lbl-u-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveUser">Save</button>
     </div>
   </div>
@@ -381,27 +382,27 @@
 <div class="modal-overlay" id="passwordModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>Change Password</h2>
+      <h2 id="lbl-pwd-title">Change Password</h2>
       <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
     </div>
     <div class="modal-body">
       <div class="password-form">
         <div class="form-group">
-          <label>Current password</label>
+          <label id="lbl-pwd-current">Current password</label>
           <input type="password" id="pwdCurrent">
         </div>
         <div class="form-group">
-          <label>New password</label>
+          <label id="lbl-pwd-new">New password</label>
           <input type="password" id="pwdNew">
         </div>
         <div class="form-group">
-          <label>Confirm new password</label>
+          <label id="lbl-pwd-confirm">Confirm new password</label>
           <input type="password" id="pwdConfirm">
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('passwordModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('passwordModal')" id="lbl-pwd-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePassword">Change Password</button>
     </div>
   </div>
@@ -418,32 +419,32 @@
       <input type="hidden" id="phaseId">
       <div class="form-row">
         <div class="form-group">
-          <label>Name *</label>
+          <label id="lbl-phase-name">Name *</label>
           <input type="text" id="phaseName">
         </div>
         <div class="form-group">
-          <label>Color</label>
+          <label id="lbl-phase-color">Color</label>
           <input type="color" id="phaseColor" value="#E67E22">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Start *</label>
+          <label id="lbl-phase-start">Start *</label>
           <input type="datetime-local" id="phaseStart">
         </div>
         <div class="form-group">
-          <label>End *</label>
+          <label id="lbl-phase-end">End *</label>
           <input type="datetime-local" id="phaseEnd">
         </div>
       </div>
       <div class="form-group">
-        <label>Order (0-9)</label>
+        <label id="lbl-phase-order">Order (0-9)</label>
         <input type="number" id="phaseOrder" min="0" max="9" value="0" style="width:70px">
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeletePhase" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('phaseModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('phaseModal')" id="lbl-phase-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePhase">Save</button>
     </div>
   </div>
@@ -453,41 +454,41 @@
 <div class="modal-overlay" id="reportModal">
   <div class="modal modal-wide">
     <div class="modal-header">
-      <h2>📄 Generate Report</h2>
+      <h2 id="lbl-report-title">📄 Generate Report</h2>
       <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group">
-          <label>Report type</label>
+          <label id="lbl-report-type">Report type</label>
           <select id="reportType">
-            <option value="aar">After Action Report (AAR)</option>
-            <option value="timeline">Timeline Snapshot</option>
-            <option value="per_layer">Per-Layer Activity</option>
+            <option value="aar" id="lbl-report-aar">After Action Report (AAR)</option>
+            <option value="timeline" id="lbl-report-timeline">Timeline Snapshot</option>
+            <option value="per_layer" id="lbl-report-perlayer">Per-Layer Activity</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Format</label>
+          <label id="lbl-report-format">Format</label>
           <select id="reportFormat">
-            <option value="html">HTML (view)</option>
-            <option value="print">Print / PDF</option>
+            <option value="html" id="lbl-report-html">HTML (view)</option>
+            <option value="print" id="lbl-report-print">Print / PDF</option>
           </select>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>From</label>
+          <label id="lbl-report-from">From</label>
           <input type="datetime-local" id="reportFrom">
         </div>
         <div class="form-group">
-          <label>To</label>
+          <label id="lbl-report-to">To</label>
           <input type="datetime-local" id="reportTo">
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('reportModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="generateReport()">Generate</button>
+      <button class="btn btn-secondary" onclick="closeModal('reportModal')" id="lbl-report-cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="generateReport()" id="lbl-report-generate">Generate</button>
     </div>
   </div>
 </div>
@@ -502,17 +503,17 @@
     <div class="modal-body">
       <input type="hidden" id="groupId">
       <div class="form-group">
-        <label>Name *</label>
+        <label id="lbl-group-name">Name *</label>
         <input type="text" id="groupName">
       </div>
       <div class="form-group">
-        <label>Description</label>
+        <label id="lbl-group-desc">Description</label>
         <input type="text" id="groupDesc">
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteGroup" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('groupModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('groupModal')" id="lbl-group-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveGroup">Save</button>
     </div>
   </div>
@@ -529,32 +530,32 @@
       <input type="hidden" id="layerId">
       <div class="form-row">
         <div class="form-group">
-          <label>Name *</label>
+          <label id="lbl-layer-name">Name *</label>
           <input type="text" id="layerName">
         </div>
         <div class="form-group">
-          <label>Color</label>
+          <label id="lbl-layer-color">Color</label>
           <input type="color" id="layerColor" value="#4A90D9">
         </div>
       </div>
       <div class="form-group">
-        <label>Description</label>
+        <label id="lbl-layer-desc">Description</label>
         <input type="text" id="layerDesc">
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Visibility</label>
+          <label id="lbl-layer-vis">Visibility</label>
           <select id="layerVisibility">
-            <option value="private">Private</option>
-            <option value="groups">Groups</option>
-            <option value="public">Public</option>
+            <option value="private" id="lbl-vis-private">Private</option>
+            <option value="groups" id="lbl-vis-groups">Groups</option>
+            <option value="public" id="lbl-vis-public">Public</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Group Permission</label>
+          <label id="lbl-layer-perm">Group Permission</label>
           <select id="layerPermission">
-            <option value="read">Read</option>
-            <option value="readwrite">Read/Write</option>
+            <option value="read" id="lbl-perm-read">Read</option>
+            <option value="readwrite" id="lbl-perm-readwrite">Read/Write</option>
           </select>
         </div>
       </div>
@@ -565,7 +566,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteLayer" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('layerModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('layerModal')" id="lbl-layer-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLayer">Save</button>
     </div>
   </div>
@@ -582,32 +583,32 @@
       <input type="hidden" id="etypeId">
       <div class="form-row">
         <div class="form-group">
-          <label>Key * <small style="color:var(--text-dim)">(unique, no spaces)</small></label>
+          <label id="lbl-etype-key">Key * <small style="color:var(--text-dim)">(unique, no spaces)</small></label>
           <input type="text" id="etypeKey" placeholder="my_type">
         </div>
         <div class="form-group">
-          <label>Color</label>
+          <label id="lbl-etype-color">Color</label>
           <input type="color" id="etypeColor" value="#4A90D9">
         </div>
       </div>
       <div class="form-row-3">
         <div class="form-group">
-          <label>Label (EN)</label>
+          <label id="lbl-etype-label">Label (EN)</label>
           <input type="text" id="etypeLabel" placeholder="My Type">
         </div>
         <div class="form-group">
-          <label>Label (SV)</label>
+          <label id="lbl-etype-label-sv">Label (SV)</label>
           <input type="text" id="etypeLabelSV" placeholder="Min typ">
         </div>
         <div class="form-group">
-          <label>Label (FR)</label>
+          <label id="lbl-etype-label-fr">Label (FR)</label>
           <input type="text" id="etypeLabelFR" placeholder="Mon type">
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteEtype" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('etypeModal')">Cancel</button>
+      <button class="btn btn-secondary" onclick="closeModal('etypeModal')" id="lbl-etype-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEtype">Save</button>
     </div>
   </div>

@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 3.1.0**
+**Version 3.2.0**
 
 ---
 
@@ -547,7 +547,7 @@ Navigate to `/admin-view` (requires **Admin** role) for a dedicated administrati
 │ ⚙ Admin View                                                       │
 │                                                                    │
 │ ┌─ System Information ──────────────────────────────────────────┐  │
-│ │ Version          3.1.0                                        │  │
+│ │ Version          3.2.0                                        │  │
 │ │ Data directory   data/                                        │  │
 │ │ Logged in as     admin (admin)                                │  │
 │ │                       [⬇ Download Full Export (JSON)]        │  │
@@ -638,4 +638,4 @@ Navigate to `/admin-view` (requires **Admin** role) for a dedicated administrati
 
 ---
 
-*Tidslinjal v3.1.0 — Collaborative Operational Timeline*
+*Tidslinjal v3.2.0 — Collaborative Operational Timeline*
