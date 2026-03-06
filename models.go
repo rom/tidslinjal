@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.2.0"
+const AppVersion = "3.3.0"
 
 // AppGitHub is the project repository URL
 const AppGitHub = "https://github.com/rom/tidslinjal"
@@ -55,6 +55,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Upprepande", LabelFR: "Récurrent"},
 	{Key: "reporting", Label: "Reporting", Color: "#1ABC9C", IsSystem: true,
 		LabelSV: "Rapportering", LabelFR: "Rapport"},
+	{Key: "assigned_task", Label: "Assigned Task", Color: "#E67E22", IsSystem: true,
+		LabelSV: "Tilldelad uppgift", LabelFR: "Tâche assignée"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -111,7 +113,8 @@ type UserPreferences struct {
 	DayStartHour    int      `json:"day_start_hour"`  // 0-23
 	DayEndHour      int      `json:"day_end_hour"`    // 1-24  (exclusive)
 	HiddenTypes     []string `json:"hidden_types"`    // event type keys to hide
-	ActiveLayers    []int64  `json:"active_layers"`   // layer IDs currently visible
+	ActiveLayers    []int64  `json:"active_layers"`   // legacy (was inclusion list)
+	HiddenLayers    []int64  `json:"hidden_layers"`   // layer IDs to hide (exclusion list)
 	WebhookURL      string   `json:"webhook_url,omitempty"`
 	WebhookType     string   `json:"webhook_type,omitempty"` // mattermost | slack | generic
 	DefaultView     string   `json:"default_view,omitempty"` // day|2days|3days|4days|week
@@ -170,6 +173,10 @@ type Event struct {
 	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
 	LayerID           *int64      `json:"layer_id,omitempty"`
+	ResponsibleID     *int64      `json:"responsible_id,omitempty"`
+	ResponsibleName   string      `json:"responsible_name,omitempty"`
+	InvitedUserIDs    []int64     `json:"invited_user_ids,omitempty"`
+	InvitedGroupIDs   []int64     `json:"invited_group_ids,omitempty"`
 	CreatedBy         int64       `json:"created_by"`
 	CreatedByName     string      `json:"created_by_name"`
 	CreatedAt         time.Time   `json:"created_at"`
@@ -207,6 +214,7 @@ type ExercisePhase struct {
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
 	Order     int       `json:"order"` // 0-9
+	LayerID   *int64    `json:"layer_id,omitempty"` // nil = master timeline phase
 	CreatedBy int64     `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -295,6 +303,7 @@ type ExerciseSettings struct {
 	Epoch    string `json:"epoch"`             // ISO8601: STARTEX — real datetime = Day 1 T+0
 	Endex    string `json:"endex,omitempty"`   // ISO8601: ENDEX — end of exercise
 	Label    string `json:"label"`             // exercise name shown in header
-	Paused   bool   `json:"paused"`            // freeze timeline progression
-	PausedAt string `json:"paused_at,omitempty"` // ISO8601: when it was paused
+	Paused       bool   `json:"paused"`              // freeze timeline progression
+	PausedAt     string `json:"paused_at,omitempty"` // ISO8601: when it was paused
+	DayHoursOnly bool   `json:"day_hours_only"`      // synthetic time only advances during day hours
 }

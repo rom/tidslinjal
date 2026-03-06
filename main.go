@@ -559,6 +559,29 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 	app.audit(user.ID, user.DisplayName, "created", "event", created.ID,
 		fmt.Sprintf("Created event %q", created.Title))
+
+	// Notify invited users and group members
+	notifyUsers := make(map[int64]bool)
+	for _, uid := range created.InvitedUserIDs {
+		notifyUsers[uid] = true
+	}
+	for _, gid := range created.InvitedGroupIDs {
+		for _, m := range app.store.GetGroupMembers(gid) {
+			notifyUsers[m.UserID] = true
+		}
+	}
+	inviteNotif := AlarmNotification{
+		EventID:    created.ID,
+		EventTitle: created.Title,
+		EventTime:  created.StartTime,
+		Message:    fmt.Sprintf("You have been invited to: %s", created.Title),
+	}
+	for uid := range notifyUsers {
+		if uid != user.ID {
+			app.broker.Notify(uid, inviteNotif)
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
 }
@@ -1959,7 +1982,7 @@ func (app *App) routes() http.Handler {
 		case http.MethodGet:
 			app.requireAuth(app.handleGetExercise)(w, r)
 		case http.MethodPut:
-			app.requireRole(RoleAdmin, app.handleSaveExercise)(w, r)
+			app.requireRole(RoleOpLead, app.handleSaveExercise)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -1991,7 +2014,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			app.requireRole(RoleAdmin, app.handleGetUsers)(w, r)
+			app.requireRole(RoleRead, app.handleGetUsers)(w, r)
 		case http.MethodPost:
 			app.requireRole(RoleAdmin, app.handleCreateUser)(w, r)
 		default:

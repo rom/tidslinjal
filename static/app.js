@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v3.1.0 — Collaborative Operational Timeline
+   Tidslinjal v3.3.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -21,6 +21,7 @@ window.state = {
     day_end_hour:    24,
     hidden_types:    [],
     active_layers:   [],
+    hidden_layers:   [],
     default_view:    'week',
     show_out_of_hours: true,
     red_line_enabled: true,
@@ -176,7 +177,11 @@ function isTypeHidden(key) {
   return (state.preferences.hidden_types || []).includes(key);
 }
 function isLayerActive(id) {
-  return (state.preferences.active_layers || []).includes(id);
+  // A layer is active (visible) when it is NOT in the hidden_layers exclusion list
+  return !(state.preferences.hidden_layers || []).includes(id);
+}
+function isLayerHidden(id) {
+  return (state.preferences.hidden_layers || []).includes(id);
 }
 
 // ── Timeline render ────────────────────────────────────────────────────────
@@ -327,7 +332,9 @@ function renderEventBlocks(days, slotH) {
 
     // ── Events ───────────────────────────────────────────────────────────────
     const searchTerm = (state.search||'').trim().toLowerCase();
-    const al         = state.preferences.active_layers || [];
+    const hl         = state.preferences.hidden_layers || [];
+    const dayStartMin = (state.preferences.day_start_hour || 0) * 60;
+    const dayEndMin   = (state.preferences.day_end_hour   || 24) * 60;
 
     // Expand recurring events into occurrences for the current view
     const viewStart = days[0];
@@ -352,6 +359,13 @@ function renderEventBlocks(days, slotH) {
       while (cur < viewEnd && cur <= recEnd && safety++ < 500) {
         const occEnd = new Date(cur.getTime() + duration);
         if (cur >= viewStart) {
+          // Skip recurring instances that fall entirely outside day hours
+          const occStartMin = cur.getHours()*60 + cur.getMinutes();
+          const occEndMin   = occEnd.getHours()*60 + occEnd.getMinutes() || 1440;
+          if (occEndMin <= dayStartMin || occStartMin >= dayEndMin) {
+            cur = new Date(cur.getTime() + stepMs);
+            continue;
+          }
           expandedEvents.push({
             ...ev,
             id: ev.id + '_' + cur.getTime(), // synthetic id
@@ -366,8 +380,8 @@ function renderEventBlocks(days, slotH) {
 
     const visibleEvents = expandedEvents.filter(ev =>
       !isTypeHidden(ev.event_type) &&
-      // Layer visibility: empty list = all shown; else only listed layer IDs (master always shown)
-      (ev.layer_id == null || al.length === 0 || al.includes(ev.layer_id)) &&
+      // Layer visibility: hide events whose layer is in the hidden_layers exclusion list
+      (ev.layer_id == null || !hl.includes(ev.layer_id)) &&
       (!searchTerm ||
         ev.title.toLowerCase().includes(searchTerm) ||
         (ev.description||'').toLowerCase().includes(searchTerm) ||
@@ -425,14 +439,27 @@ function renderEventBlocks(days, slotH) {
       });
       const totalCols = colEnd.length;
 
+      // Compute per-event local overlap count (max concurrent events at that slot)
+      const localCols = items.map((item, idx) => {
+        let maxCols = colOf[idx] + 1;
+        for (let j = 0; j < items.length; j++) {
+          if (j === idx) continue;
+          if (items[j].vsOff < item.veOff && items[j].veOff > item.vsOff) {
+            maxCols = Math.max(maxCols, colOf[j] + 1);
+          }
+        }
+        return maxCols;
+      });
+
       const { left: cellLeft, width: cellWidth } = dayMeta[di];
       const PAD = 2;
 
       items.forEach((item, idx) => {
         const col     = colOf[idx];
-        const colW    = Math.floor((cellWidth - PAD*2) / totalCols);
+        const numCols = localCols[idx]; // only as many cols as needed for this event's group
+        const colW    = Math.floor((cellWidth - PAD*2) / numCols);
         const blockL  = cellLeft + PAD + col * colW;
-        const blockW  = colW - (col < totalCols-1 ? 1 : 0); // small gap between cols
+        const blockW  = colW - (col < numCols-1 ? 1 : 0); // small gap between cols
 
         const { ev, evStart, evEnd, topPx, heightPx } = item;
 
@@ -553,7 +580,7 @@ function updateCurrentTimeLine(days, slotH) {
   if (p.synth_label && synthActive()) {
     const epochMs  = new Date(state.exercise.epoch).getTime();
     const nowMs    = now.getTime();
-    const hoursOn  = Math.floor((nowMs - epochMs) / 3600000);
+    const hoursOn  = synthElapsedHours(epochMs, nowMs);
     const label    = hoursOn >= 0 ? `H+${hoursOn}` : `H${hoursOn}`;
     if (!existingLabel) {
       existingLabel = document.createElement('div');
@@ -746,6 +773,37 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   const partSel = document.getElementById('eventParticipant');
   if (partSel) partSel.value = ev ? (ev.participant || '') : '';
 
+  // Responsible user select
+  const respSel = document.getElementById('eventResponsible');
+  if (respSel) {
+    const users = state.users || [];
+    const creatorId = ev ? ev.created_by : (state.user ? state.user.id : null);
+    respSel.innerHTML = `<option value="">— (${t('ev_responsible_creator')||'creator'})</option>` +
+      users.map(u => `<option value="${u.id}" ${ev && ev.responsible_id===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`).join('');
+  }
+
+  // Invited users/groups
+  const invList = document.getElementById('eventInvitedList');
+  if (invList) {
+    const invUserIDs  = ev && ev.invited_user_ids  ? ev.invited_user_ids  : [];
+    const invGroupIDs = ev && ev.invited_group_ids ? ev.invited_group_ids : [];
+    const users = state.users || [];
+    const groups = state.groups || [];
+    invList.innerHTML = [
+      ...users.map(u => `<label class="group-chip${invUserIDs.includes(u.id)?' selected':''}" style="cursor:pointer">
+        <input type="checkbox" class="inv-user-cb" value="${u.id}" ${invUserIDs.includes(u.id)?'checked':''} style="margin-right:4px">
+        👤 ${escHtml(u.display_name||u.username)}
+      </label>`),
+      ...groups.map(g => `<label class="group-chip${invGroupIDs.includes(g.id)?' selected':''}" style="cursor:pointer">
+        <input type="checkbox" class="inv-group-cb" value="${g.id}" ${invGroupIDs.includes(g.id)?'checked':''} style="margin-right:4px">
+        👥 ${escHtml(g.name)}
+      </label>`)
+    ].join('');
+    invList.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => cb.closest('.group-chip').classList.toggle('selected', cb.checked));
+    });
+  }
+
   // Clear attachment input on each open
   const attachFile = document.getElementById('eventAttachFile');
   if (attachFile) attachFile.value = '';
@@ -794,6 +852,11 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
   const recurring = document.getElementById('eventRecurring').checked;
   const layerVal  = document.getElementById('eventLayer').value;
   const partSel   = document.getElementById('eventParticipant');
+  const respSel   = document.getElementById('eventResponsible');
+  const respVal   = respSel ? respSel.value : '';
+  // Collect invited user/group IDs from checkboxes
+  const invUserIDs  = [...(document.querySelectorAll('.inv-user-cb:checked')  || [])].map(cb => parseInt(cb.value, 10));
+  const invGroupIDs = [...(document.querySelectorAll('.inv-group-cb:checked') || [])].map(cb => parseInt(cb.value, 10));
   const payload = {
     title,
     description:        document.getElementById('eventDescription').value,
@@ -802,6 +865,9 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     status:             document.getElementById('eventStatus').value,
     all_day:            allDay,
     participant:        partSel ? partSel.value : '',
+    responsible_id:     respVal ? parseInt(respVal, 10) : null,
+    invited_user_ids:   invUserIDs,
+    invited_group_ids:  invGroupIDs,
     start_time:         (!allDay && startVal) ? new Date(startVal).toISOString() : new Date().toISOString(),
     end_time:           (!allDay && !isInstant && endVal) ? new Date(endVal).toISOString() : null,
     is_recurring:       recurring && !allDay && !isInstant,
@@ -1443,6 +1509,13 @@ function openPhaseModal(ph) {
   document.getElementById('phaseOrder').value = ph ? ph.order : 0;
   document.getElementById('phaseStart').value = ph ? fmtDateInput(new Date(ph.start_time)) : fmtDateInput(state.startDate);
   document.getElementById('phaseEnd').value   = ph ? fmtDateInput(new Date(ph.end_time))   : fmtDateInput(addDays(state.startDate, 1));
+  // Layer selector for phase
+  const phaseLaySel = document.getElementById('phaseLayer');
+  if (phaseLaySel) {
+    const myLayers = state.layers.filter(l => l.owner_id===state.user.id || hasRole2(state.user.role,'oplead'));
+    phaseLaySel.innerHTML = `<option value="">— Master Timeline —</option>` +
+      myLayers.map(l => `<option value="${l.id}" ${ph && ph.layer_id===l.id?'selected':''}>${escHtml(l.name)}</option>`).join('');
+  }
   const delBtn = document.getElementById('btnDeletePhase');
   delBtn.style.display = isEdit ? '' : 'none';
   delBtn.onclick = isEdit ? () => deletePhase(ph.id) : null;
@@ -1456,11 +1529,13 @@ document.getElementById('btnSavePhase').addEventListener('click', async () => {
   const sv = document.getElementById('phaseStart').value;
   const ev = document.getElementById('phaseEnd').value;
   if (!sv || !ev) { alert('Start and end required'); return; }
+  const phaseLayVal = document.getElementById('phaseLayer')?.value;
   const payload = {
     name, color: document.getElementById('phaseColor').value,
     order: parseInt(document.getElementById('phaseOrder').value, 10) || 0,
     start_time: new Date(sv).toISOString(),
     end_time:   new Date(ev).toISOString(),
+    layer_id:   phaseLayVal ? parseInt(phaseLayVal, 10) : null,
   };
   const res = id ? await apiPut(`/api/phases/${id}`, payload) : await apiPost('/api/phases', payload);
   if (res.ok) {
@@ -1546,7 +1621,7 @@ function renderSidebar() {
           ${t('layers_master')}
         </div>
         <div class="layer-list">
-          <div class="layer-item${!(state.preferences.active_layers&&state.preferences.active_layers.length>0)?' active':''}" onclick="toggleAllLayers()">
+          <div class="layer-item${!(state.preferences.hidden_layers&&state.preferences.hidden_layers.length>0)?' active':''}" onclick="toggleAllLayers()">
             <div class="layer-swatch" style="background:var(--accent)"></div>
             <span class="layer-name">${t('layers_master')}</span>
           </div>
@@ -1782,7 +1857,7 @@ function renderSidebar() {
           ${state.timelinePaused ? ('▶ '+(t('btn_resume')||'Resume')) : ('⏸ '+(t('btn_freeze')||'Freeze'))}
         </button>
       </div>` : ''}
-      ${state.user && state.user.role==='admin' ? `
+      ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_exercise')}</div>
         <div class="form-group" style="margin-bottom:6px">
@@ -1800,12 +1875,16 @@ function renderSidebar() {
           <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
-        <div class="form-check" style="margin-bottom:8px">
+        <div class="form-check" style="margin-bottom:6px">
           <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
           <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
         </div>
+        <div class="form-check" style="margin-bottom:8px">
+          <input type="checkbox" id="exDayHoursOnly" ${ex.day_hours_only?'checked':''}>
+          <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
+        </div>
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
-        <a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">⚙ ${t('admin_view')||'Admin View'}</a>
+        ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">⚙ ${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
     `;
   }
@@ -1874,15 +1953,17 @@ function toggleFreeze() {
 
 // ── Exercise settings ──────────────────────────────────────────────────────
 async function saveExercise() {
-  const epoch   = document.getElementById('exEpoch')?.value;
-  const endex   = document.getElementById('exEndex')?.value;
-  const label   = document.getElementById('exLabel')?.value?.trim() || '';
-  const enabled = document.getElementById('exEnabled')?.checked || false;
+  const epoch       = document.getElementById('exEpoch')?.value;
+  const endex       = document.getElementById('exEndex')?.value;
+  const label       = document.getElementById('exLabel')?.value?.trim() || '';
+  const enabled     = document.getElementById('exEnabled')?.checked || false;
+  const dayHrsOnly  = document.getElementById('exDayHoursOnly')?.checked || false;
   const payload = {
     enabled,
     epoch: epoch ? new Date(epoch).toISOString() : '',
     endex: endex ? new Date(endex).toISOString() : '',
     label,
+    day_hours_only: dayHrsOnly,
   };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
@@ -1939,14 +2020,14 @@ async function toggleType(key) {
 }
 
 async function toggleLayer(id) {
-  const al = state.preferences.active_layers || [];
-  if (al.includes(id)) {
-    state.preferences.active_layers = al.filter(x => x!==id);
+  // Exclusion model: hidden_layers lists what to hide; toggling flips visibility
+  const hl = state.preferences.hidden_layers || [];
+  if (hl.includes(id)) {
+    state.preferences.hidden_layers = hl.filter(x => x !== id); // unhide
   } else {
-    state.preferences.active_layers = [...al, id];
+    state.preferences.hidden_layers = [...hl, id]; // hide
   }
   await savePreferences();
-  await fetchEvents();
   renderSidebar();
   renderTimeline();
   const pop = document.getElementById('layerPopover');
@@ -1954,9 +2035,8 @@ async function toggleLayer(id) {
 }
 
 async function toggleAllLayers() {
-  state.preferences.active_layers = [];
+  state.preferences.hidden_layers = []; // show all layers
   await savePreferences();
-  await fetchEvents();
   renderSidebar();
   renderTimeline();
   const pop = document.getElementById('layerPopover');
@@ -1971,6 +2051,30 @@ function hasRole2(userRole, required) {
 // ── Synthetic time helpers ─────────────────────────────────────────────────
 function synthActive() {
   return state.syntheticOn && state.exercise && state.exercise.enabled && state.exercise.epoch;
+}
+
+// Compute elapsed synthetic hours, optionally skipping out-of-hours time
+function synthElapsedHours(epochMs, nowMs) {
+  const ex = state.exercise;
+  if (!ex || !ex.day_hours_only) {
+    return Math.floor((nowMs - epochMs) / 3600000);
+  }
+  const dayStartH = state.preferences.day_start_hour || 0;
+  const dayEndH   = state.preferences.day_end_hour   || 24;
+  const dayMs     = (dayEndH - dayStartH) * 3600000;
+  let elapsed = 0;
+  let cur = epochMs;
+  while (cur < nowMs) {
+    const d = new Date(cur);
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayStartH, 0, 0).getTime();
+    const dayEnd   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayEndH, 0, 0).getTime();
+    const segStart = Math.max(cur, dayStart);
+    const segEnd   = Math.min(nowMs, dayEnd);
+    if (segEnd > segStart) elapsed += segEnd - segStart;
+    // Advance to start of next day
+    cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, dayStartH, 0, 0).getTime();
+  }
+  return Math.floor(elapsed / 3600000);
 }
 
 function toDayNumber(date) {
@@ -2047,6 +2151,9 @@ function updateUILabels() {
   setElText('lbl-btn-cancel', t('btn_cancel'));
   setElText('btnSaveEvent', t('btn_save'));
   setElText('btnDeleteEvent', t('btn_delete'));
+  setElText('lbl-ev-responsible', t('ev_responsible') || 'Responsible');
+  setElText('lbl-ev-invited', t('ev_invited') || 'Invited (notify on creation)');
+  setElText('lbl-report-layers', t('report_layers') || 'Layers to include');
   // Status options
   const evStatus = document.getElementById('eventStatus');
   if (evStatus) {
@@ -2089,6 +2196,7 @@ function updateUILabels() {
   setElText('lbl-phase-start', t('phase_start'));
   setElText('lbl-phase-end', t('phase_end'));
   setElText('lbl-phase-order', t('phase_order_lbl') || 'Order (0-9)');
+  setElText('lbl-phase-layer', t('phase_layer_lbl') || 'Layer (empty = master timeline)');
   setElText('lbl-phase-cancel', t('btn_cancel'));
   setElText('btnSavePhase', t('btn_save'));
   setElText('btnDeletePhase', t('btn_delete'));
@@ -2369,25 +2477,25 @@ function exportICS() {
 
 // ── Layer quick-toggle popover ─────────────────────────────────────────────
 function renderLayerPopover() {
-  const list        = document.getElementById('layerPopoverList');
-  const masterActive = !state.preferences.active_layers || state.preferences.active_layers.length === 0;
-  const activeCount  = (state.preferences.active_layers || []).length;
+  const list         = document.getElementById('layerPopoverList');
+  const hiddenCount  = (state.preferences.hidden_layers || []).length;
+  const allVisible   = hiddenCount === 0;
   list.innerHTML = `
-    <div class="layer-pop-hint" style="font-size:10px;opacity:0.6;padding:4px 8px 2px">${t('layers_multi_hint')||'Click to show/hide. Multiple layers can be active.'}</div>
-    <div class="layer-pop-item${masterActive?' active':''}" onclick="toggleAllLayers()">
-      <input type="checkbox" class="layer-pop-cb" ${masterActive?'checked':''} onclick="event.stopPropagation()">
+    <div class="layer-pop-hint" style="font-size:10px;opacity:0.6;padding:4px 8px 2px">${t('layers_multi_hint')||'Click to show/hide layers.'}</div>
+    <div class="layer-pop-item${allVisible?' active':''}" onclick="toggleAllLayers()">
+      <input type="checkbox" class="layer-pop-cb" ${allVisible?'checked':''} onclick="event.stopPropagation()">
       <div class="layer-pop-swatch" style="background:var(--accent)"></div>
-      <span>${t('layers_master')}</span>
+      <span>${t('layers_master')||'All layers'}</span>
     </div>
     ${state.layers.map(l => {
-      const active = isLayerActive(l.id);
-      return `<div class="layer-pop-item${active?' active':''}" onclick="toggleLayer(${l.id})">
-        <input type="checkbox" class="layer-pop-cb" ${active?'checked':''} onclick="event.stopPropagation()">
+      const visible = isLayerActive(l.id);
+      return `<div class="layer-pop-item${visible?' active':''}" onclick="toggleLayer(${l.id})">
+        <input type="checkbox" class="layer-pop-cb" ${visible?'checked':''} onclick="event.stopPropagation()">
         <div class="layer-pop-swatch" style="background:${l.color||'#4A90D9'}"></div>
         <span>${escHtml(l.name)}</span>
       </div>`;
     }).join('')}
-    ${activeCount > 0 ? `<div class="layer-pop-hint" style="font-size:10px;opacity:0.5;padding:2px 8px 4px;text-align:right">${activeCount} layer${activeCount>1?'s':''} selected</div>` : ''}
+    ${hiddenCount > 0 ? `<div class="layer-pop-hint" style="font-size:10px;opacity:0.5;padding:2px 8px 4px;text-align:right">${hiddenCount} layer${hiddenCount>1?'s':''} hidden</div>` : ''}
   `;
 }
 
@@ -2648,9 +2756,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnReport = document.getElementById('btnReport');
   if (btnReport) {
-    btnReport.addEventListener('click', () => openModal('reportModal'));
+    btnReport.addEventListener('click', () => {
+      // Populate layer checkboxes in report modal
+      const layerList = document.getElementById('reportLayerList');
+      if (layerList) {
+        layerList.innerHTML = `
+          <label class="group-chip selected" style="cursor:pointer">
+            <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
+            ${t('layers_master')||'Master'}
+          </label>
+          ${state.layers.map(l => `
+            <label class="group-chip selected" style="cursor:pointer">
+              <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
+              ${escHtml(l.name)}
+            </label>
+          `).join('')}
+        `;
+        // Toggle chip selected class on change
+        layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
+          cb.addEventListener('change', () => {
+            cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+          });
+        });
+      }
+      openModal('reportModal');
+    });
   }
 });
+
+function fmtDuration(startIso, endIso) {
+  if (!endIso) return '—';
+  const ms = new Date(endIso) - new Date(startIso);
+  if (ms <= 0) return '—';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h === 0) return `${m}min`;
+  return m === 0 ? `${h}h` : `${h}h ${m}min`;
+}
 
 async function generateReport() {
   const type   = document.getElementById('reportType')?.value || 'aar';
@@ -2660,12 +2802,23 @@ async function generateReport() {
   const from   = fromEl && fromEl.value ? new Date(fromEl.value) : state.startDate;
   const to     = toEl   && toEl.value   ? new Date(toEl.value)   : getViewEnd();
 
+  // Layer filter from report modal checkboxes
+  const reportLayerEls = document.querySelectorAll('.report-layer-cb:checked');
+  const reportLayerFilter = reportLayerEls.length > 0
+    ? new Set([...reportLayerEls].map(el => Number(el.value)))
+    : null; // null = all layers
+
   let events = state.events.filter(ev => {
     const evStart = new Date(ev.start_time);
-    return evStart >= from && evStart < to;
+    if (evStart < from || evStart >= to) return false;
+    if (reportLayerFilter !== null) {
+      const lid = ev.layer_id ? Number(ev.layer_id) : 0;
+      if (!reportLayerFilter.has(lid)) return false;
+    }
+    return true;
   });
 
-  const title = `${type.toUpperCase()} Report — ${localShortDate(state.startDate)} to ${localShortDate(addDays(state.startDate, getRangeDays()-1))}`;
+  const title = `${type.toUpperCase()} Report — ${localShortDate(from)} to ${localShortDate(to)}`;
 
   const statusOrder = ['planned','active','responded_to','completed','submitted','verified','rejected','cancelled'];
 
@@ -2689,12 +2842,13 @@ async function generateReport() {
     statusOrder.forEach(s => {
       if (!byStatus[s].length) return;
       html += `<h2>${t('status_'+s)||s} (${byStatus[s].length})</h2>
-      <table><thead><tr><th>Title</th><th>Type</th><th>Start</th><th>End</th><th>Created by</th></tr></thead><tbody>
+      <table><thead><tr><th>Title</th><th>Type</th><th>Start</th><th>End</th><th>Duration</th><th>Created by</th></tr></thead><tbody>
       ${byStatus[s].map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${escHtml(ev.event_type)}</td>
         <td>${new Date(ev.start_time).toLocaleString()}</td>
         <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+        <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
         <td>${escHtml(ev.created_by_name||'')}</td>
       </tr>`).join('')}
       </tbody></table>`;
@@ -2711,25 +2865,27 @@ async function generateReport() {
     Object.values(byLayer).forEach(({name, events: evs}) => {
       if (!evs.length) return;
       html += `<h2>${escHtml(name)} (${evs.length})</h2>
-      <table><thead><tr><th>Title</th><th>Status</th><th>Start</th><th>End</th></tr></thead><tbody>
+      <table><thead><tr><th>Title</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th></tr></thead><tbody>
       ${evs.map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
         <td>${new Date(ev.start_time).toLocaleString()}</td>
         <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+        <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
       </tr>`).join('')}
       </tbody></table>`;
     });
   } else {
     // timeline snapshot
     html += `<h2>Timeline Snapshot</h2>
-    <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Created by</th></tr></thead><tbody>
+    <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th><th>Created by</th></tr></thead><tbody>
     ${events.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).map(ev => `<tr>
       <td>${escHtml(ev.title)}</td>
       <td>${escHtml(ev.event_type)}</td>
       <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
       <td>${new Date(ev.start_time).toLocaleString()}</td>
       <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+      <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
       <td>${escHtml(ev.created_by_name||'')}</td>
     </tr>`).join('')}
     </tbody></table>`;
@@ -2767,6 +2923,42 @@ async function generateReport() {
   showNotification('success', t('report_ready')||'Report downloaded');
 }
 
+// ── Mobile nav ─────────────────────────────────────────────────────────────
+function mobileNavTab(tab) {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (tab === 'timeline') {
+    closeMobileSidebar();
+    return;
+  }
+  if (tab === 'menu') {
+    // Show sidebar with first available tab
+    sidebar.classList.add('visible');
+    backdrop.classList.add('visible');
+    return;
+  }
+  // Open sidebar to specific tab
+  sidebar.classList.add('visible');
+  backdrop.classList.add('visible');
+  state.sidebarTab = tab;
+  renderSidebar();
+  // Update active tab button in sidebar
+  document.querySelectorAll('.sidebar-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  // Highlight active mobile nav button
+  document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const mn = document.getElementById('mn' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  if (mn) mn.classList.add('active');
+}
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('visible');
+  document.getElementById('sidebarBackdrop').classList.remove('visible');
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 async function init() {
   try {
@@ -2777,17 +2969,24 @@ async function init() {
   }
 
   // Load initial data in parallel
-  const [prefs, eventTypes, layers, groups] = await Promise.all([
+  const [prefs, eventTypes, layers, groups, users] = await Promise.all([
     apiGet('/api/preferences'),
     apiGet('/api/event-types'),
     apiGet('/api/layers'),
     apiGet('/api/groups'),
+    apiGet('/api/users').catch(() => []),
   ]);
 
   state.preferences = prefs || state.preferences;
+  // Migrate legacy active_layers to hidden_layers (invert the old whitelist)
+  if (!state.preferences.hidden_layers && state.preferences.active_layers && state.preferences.active_layers.length > 0) {
+    const all = layers || [];
+    state.preferences.hidden_layers = all.map(l => l.id).filter(id => !state.preferences.active_layers.includes(id));
+  }
   state.eventTypes  = eventTypes || [];
   state.layers      = layers  || [];
   state.groups      = groups  || [];
+  state.users       = users   || [];
 
   // Apply theme/size
   applyPreferences();
@@ -2861,9 +3060,16 @@ async function init() {
     }
   });
   document.getElementById('btnSidebar').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('hidden');
-    // Re-position event blocks after sidebar width change
-    renderEventBlocks(getDays(), getSlotHeight());
+    const sidebar = document.getElementById('sidebar');
+    if (window.innerWidth <= 1024) {
+      // Mobile/tablet: overlay drawer
+      sidebar.classList.toggle('visible');
+      document.getElementById('sidebarBackdrop').classList.toggle('visible', sidebar.classList.contains('visible'));
+    } else {
+      // Desktop: push layout
+      sidebar.classList.toggle('hidden');
+      renderEventBlocks(getDays(), getSlotHeight());
+    }
   });
   document.getElementById('btnLogout').addEventListener('click', async () => {
     await apiPost('/api/auth/logout', {});
