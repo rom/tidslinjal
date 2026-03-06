@@ -314,12 +314,15 @@ function renderEventBlocks(days, slotH) {
     container.querySelectorAll('.synth-hour-label').forEach(el => el.remove());
     if (synthActive() && state.preferences.synth_label) {
       const epoch = new Date(state.exercise.epoch);
+      const dayHrsOnly = state.exercise.day_hours_only;
       for (let s = 0; s < slots; s++) {
         const min = s * slotMin;
         if (min % 60 !== 0) continue; // only show on full-hour slots
+        // When day_hours_only is on, don't show H+N labels outside day hours
+        if (dayHrsOnly && isOutOfHours(s)) continue;
         const slotTime = new Date(days[0]);
         slotTime.setHours(0, min, 0, 0);
-        const hoursOn = Math.floor((slotTime - epoch) / 3600000);
+        const hoursOn = synthElapsedHours(epoch.getTime(), slotTime.getTime());
         if (hoursOn < 0) continue;
         const topPx = headerH + s * slotH;
         const lbl = document.createElement('div');
@@ -354,11 +357,17 @@ function renderEventBlocks(days, slotH) {
       const recEnd = ev.recurrence_end ? new Date(ev.recurrence_end) : viewEnd;
       const stepMs = recurStepMs(ev.recurrence_pattern);
       if (!stepMs) return;
+      const exclSet = new Set((ev.recurrence_excl || []).map(ts => new Date(ts).getTime()));
       let cur = new Date(evStart.getTime() + stepMs);
       let safety = 0;
       while (cur < viewEnd && cur <= recEnd && safety++ < 500) {
         const occEnd = new Date(cur.getTime() + duration);
         if (cur >= viewStart) {
+          // Skip excluded occurrences
+          if (exclSet.has(cur.getTime())) {
+            cur = new Date(cur.getTime() + stepMs);
+            continue;
+          }
           // Skip recurring instances that fall entirely outside day hours
           const occStartMin = cur.getHours()*60 + cur.getMinutes();
           const occEndMin   = occEnd.getHours()*60 + occEnd.getMinutes() || 1440;
@@ -501,11 +510,15 @@ function renderEventBlocks(days, slotH) {
         `;
         block.onclick = e => {
           e.stopPropagation();
-          // For recurring instances, show the master event
-          const masterEv = ev._recurring_instance
-            ? state.events.find(x => x.id === parseInt(String(ev.id).split('_')[0], 10)) || ev
-            : ev;
-          showEventDetail(masterEv);
+          if (ev._recurring_instance) {
+            // Track which occurrence was clicked for recurring delete dialog
+            state._currentOccurrenceTime = new Date(ev.start_time);
+            const masterEv = state.events.find(x => x.id === parseInt(String(ev.id).split('_')[0], 10)) || ev;
+            showEventDetail(masterEv);
+          } else {
+            state._currentOccurrenceTime = null;
+            showEventDetail(ev);
+          }
         };
         container.appendChild(block);
       });
@@ -570,6 +583,14 @@ function updateCurrentTimeLine(days, slotH) {
   const nowMin   = now.getHours()*60 + now.getMinutes();
   if (nowMin < startOff || nowMin > startOff + getSlotsPerDay()*getSlotMinutes()) {
     line.style.display='none'; return;
+  }
+  // When day_hours_only synthetic time is active, hide red line outside day hours
+  if (synthActive() && state.exercise.day_hours_only) {
+    const dayStartMin = (p.day_start_hour || 0) * 60;
+    const dayEndMin   = (p.day_end_hour   || 24) * 60;
+    if (nowMin < dayStartMin || nowMin >= dayEndMin) {
+      line.style.display = 'none'; return;
+    }
   }
   const topPx = 44 + ((nowMin - startOff) / getSlotMinutes()) * slotH;
   line.style.display = 'block';
@@ -915,6 +936,11 @@ async function patchEventStatus(id, status, rejectionReason) {
 }
 
 async function deleteEvent(id) {
+  const ev = state.events.find(x => x.id === id);
+  if (ev && ev.is_recurring) {
+    showRecurDeleteDialog(ev);
+    return;
+  }
   if (!confirm(t('confirm_delete_event'))) return;
   const res = await apiDel(`/api/events/${id}`);
   if (res.ok) {
@@ -922,6 +948,62 @@ async function deleteEvent(id) {
     await refreshAll();
     showNotification('success', t('notif_event_deleted'));
   } else { alert('Failed to delete event'); }
+}
+
+function showRecurDeleteDialog(ev) {
+  const occTime = state._currentOccurrenceTime;
+  const msg = occTime
+    ? `"${ev.title}" — occurrence on ${fmtDateTime(occTime)}`
+    : `"${ev.title}" — recurring series`;
+  document.getElementById('recurDeleteMsg').textContent =
+    `This is a recurring event. What would you like to delete?\n${msg}`;
+
+  const thisBtn   = document.getElementById('recurDelThis');
+  const futureBtn = document.getElementById('recurDelFuture');
+  const allBtn    = document.getElementById('recurDelAll');
+
+  // "Delete only this occurrence" (only shown when viewing a specific occurrence)
+  thisBtn.style.display = occTime ? '' : 'none';
+  thisBtn.onclick = async () => {
+    if (!occTime) return;
+    closeModal('recurDeleteModal');
+    // Add occurrence to exclusion list
+    const excl = [...(ev.recurrence_excl || []), occTime.toISOString()];
+    const res = await apiPut(`/api/events/${ev.id}`, {...ev, recurrence_excl: excl});
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { const err = await res.json(); alert('Error: '+err.error); }
+  };
+
+  // "Delete this and all future"
+  futureBtn.style.display = occTime ? '' : 'none';
+  futureBtn.onclick = async () => {
+    if (!occTime) return;
+    closeModal('recurDeleteModal');
+    // Set recurrence_end to just before this occurrence
+    const newEnd = new Date(occTime.getTime() - 60000); // 1 min before
+    const res = await apiPut(`/api/events/${ev.id}`, {...ev, recurrence_end: newEnd.toISOString()});
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { const err = await res.json(); alert('Error: '+err.error); }
+  };
+
+  // "Delete all occurrences"
+  allBtn.onclick = async () => {
+    closeModal('recurDeleteModal');
+    const res = await apiDel(`/api/events/${ev.id}`);
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { alert('Failed to delete event'); }
+  };
+
+  openModal('recurDeleteModal');
 }
 
 // ── Event Detail Modal ─────────────────────────────────────────────────────
@@ -2376,17 +2458,69 @@ function escHtml(s) {
 
 // ── Export ─────────────────────────────────────────────────────────────────
 function openExportModal() {
+  // Show/hide privileged-only categories
+  const isPriv = hasRole2(state.user?.role, 'oplead');
+  const usersCb  = document.getElementById('exportUsersCb');
+  const phasesCb = document.getElementById('exportPhasesCb');
+  if (usersCb)  usersCb.style.display  = isPriv ? '' : 'none';
+  if (phasesCb) phasesCb.style.display = isPriv ? '' : 'none';
+  // Toggle chip style on checkbox change
+  document.querySelectorAll('.export-cat-cb').forEach(cb => {
+    cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+  });
   openModal('exportModal');
 }
 
 function doExport(format) {
-  closeModal('exportModal');
-  if (format === 'ics') { exportICS(); return; }
+  if (format === 'ics') { closeModal('exportModal'); exportICS(); return; }
+  if (format === 'csv') { closeModal('exportModal'); exportCSV(); return; }
   if (format === 'json') {
-    window.location.href = '/api/export';
+    const cats = [...document.querySelectorAll('.export-cat-cb:checked')].map(cb => cb.value);
+    const include = cats.join(',') || 'events';
+    const url = `/api/export?include=${encodeURIComponent(include)}`;
+    window.location.href = url;
+    closeModal('exportModal');
     return;
   }
-  if (format === 'csv') { exportCSV(); return; }
+}
+
+function openImportModal() {
+  const isPriv = hasRole2(state.user?.role, 'oplead');
+  const usersCb     = document.getElementById('importUsersCb');
+  const reassignRow = document.getElementById('importReassignRow');
+  if (usersCb)     usersCb.style.display     = isPriv ? '' : 'none';
+  if (reassignRow) reassignRow.style.display = isPriv ? '' : 'none';
+  // Toggle chip style on checkbox change
+  document.querySelectorAll('.import-cat-cb').forEach(cb => {
+    cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+  });
+  const resultEl = document.getElementById('importResult');
+  if (resultEl) { resultEl.style.display = 'none'; resultEl.textContent = ''; }
+  openModal('importModal');
+}
+
+async function doImport() {
+  const fileEl = document.getElementById('importFile');
+  if (!fileEl || !fileEl.files.length) { alert('Please select a JSON export file.'); return; }
+  const cats = [...document.querySelectorAll('.import-cat-cb:checked')].map(cb => cb.value);
+  if (!cats.length) { alert('Select at least one category to import.'); return; }
+  const reassign = document.getElementById('importReassign')?.checked || false;
+  const fd = new FormData();
+  fd.append('data', fileEl.files[0]);
+  fd.append('include', cats.join(','));
+  fd.append('reassign', reassign ? 'true' : 'false');
+  const res = await api('POST', '/api/import', fd);
+  const resultEl = document.getElementById('importResult');
+  if (res.ok) {
+    const r = await res.json();
+    const msg = `Imported: ${r.events||0} events, ${r.groups||0} groups, ${r.layers||0} layers, ${r.alarms||0} alarms, ${r.users||0} users. Skipped: ${r.skipped||0}.`;
+    if (resultEl) { resultEl.textContent = msg; resultEl.style.display = ''; }
+    await refreshAll();
+    showNotification('success', 'Import complete');
+  } else {
+    const err = await res.json();
+    alert('Import failed: ' + err.error);
+  }
 }
 
 function exportCSV() {
@@ -2842,13 +2976,14 @@ async function generateReport() {
     statusOrder.forEach(s => {
       if (!byStatus[s].length) return;
       html += `<h2>${t('status_'+s)||s} (${byStatus[s].length})</h2>
-      <table><thead><tr><th>Title</th><th>Type</th><th>Start</th><th>End</th><th>Duration</th><th>Created by</th></tr></thead><tbody>
+      <table><thead><tr><th>Title</th><th>Type</th><th>Start</th><th>End</th><th>Duration</th><th>Responsible</th><th>Created by</th></tr></thead><tbody>
       ${byStatus[s].map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${escHtml(ev.event_type)}</td>
         <td>${new Date(ev.start_time).toLocaleString()}</td>
         <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
         <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
+        <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
         <td>${escHtml(ev.created_by_name||'')}</td>
       </tr>`).join('')}
       </tbody></table>`;
@@ -2865,20 +3000,21 @@ async function generateReport() {
     Object.values(byLayer).forEach(({name, events: evs}) => {
       if (!evs.length) return;
       html += `<h2>${escHtml(name)} (${evs.length})</h2>
-      <table><thead><tr><th>Title</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th></tr></thead><tbody>
+      <table><thead><tr><th>Title</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th><th>Responsible</th></tr></thead><tbody>
       ${evs.map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
         <td>${new Date(ev.start_time).toLocaleString()}</td>
         <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
         <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
+        <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
       </tr>`).join('')}
       </tbody></table>`;
     });
   } else {
     // timeline snapshot
     html += `<h2>Timeline Snapshot</h2>
-    <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th><th>Created by</th></tr></thead><tbody>
+    <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th><th>Responsible</th><th>Created by</th></tr></thead><tbody>
     ${events.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).map(ev => `<tr>
       <td>${escHtml(ev.title)}</td>
       <td>${escHtml(ev.event_type)}</td>
@@ -2886,6 +3022,7 @@ async function generateReport() {
       <td>${new Date(ev.start_time).toLocaleString()}</td>
       <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
       <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
+      <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
       <td>${escHtml(ev.created_by_name||'')}</td>
     </tr>`).join('')}
     </tbody></table>`;
@@ -3046,6 +3183,7 @@ async function init() {
   document.getElementById('btnZoomNow').addEventListener('click', zoomToNow);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
   document.getElementById('btnExport').addEventListener('click', openExportModal);
+  document.getElementById('btnImport')?.addEventListener('click', openImportModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;

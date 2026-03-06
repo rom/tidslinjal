@@ -1074,3 +1074,180 @@ func (s *Store) GetExportData() ExportData {
 		Phases:   phases,
 	}
 }
+
+// GetExportDataFiltered returns export data filtered by include set and role.
+// isPrivileged = admin or oplead. include keys: "users","groups","layers","alarms","events","phases"
+func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include map[string]bool) ExportData {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := ExportData{Version: AppVersion, ExportAt: time.Now(), Exercise: s.exercise}
+
+	if include["events"] {
+		for _, e := range s.events {
+			if isPrivileged || e.CreatedBy == userID {
+				out.Events = append(out.Events, e)
+			}
+		}
+	}
+	if include["users"] && isPrivileged {
+		for _, u := range s.users {
+			out.Users = append(out.Users, u.Public())
+		}
+	}
+	if include["groups"] {
+		for _, g := range s.groups {
+			if isPrivileged || g.CreatedBy == userID {
+				out.Groups = append(out.Groups, g)
+			}
+		}
+	}
+	if include["layers"] {
+		for _, l := range s.layers {
+			if isPrivileged || l.OwnerID == userID {
+				out.Layers = append(out.Layers, l)
+			}
+		}
+	}
+	if include["alarms"] {
+		for _, a := range s.alarms {
+			if isPrivileged || a.UserID == userID {
+				out.Alarms = append(out.Alarms, a)
+			}
+		}
+	}
+	if include["phases"] && isPrivileged {
+		out.Phases = make([]ExercisePhase, len(s.phases))
+		copy(out.Phases, s.phases)
+	}
+	return out
+}
+
+// ImportResult describes what was imported.
+type ImportResult struct {
+	Groups  int `json:"groups"`
+	Layers  int `json:"layers"`
+	Alarms  int `json:"alarms"`
+	Events  int `json:"events"`
+	Users   int `json:"users"`
+	Skipped int `json:"skipped"`
+}
+
+// ImportData imports objects from an export. isPrivileged = admin/oplead.
+// reassign=true assigns all objects to currentUserID. include filters what to import.
+func (s *Store) ImportData(data ExportData, currentUserID int64, currentUserName string, isPrivileged bool, reassign bool, include map[string]bool) ImportResult {
+	var res ImportResult
+
+	ownerID := func(original int64) int64 {
+		if reassign || !isPrivileged {
+			return currentUserID
+		}
+		return original
+	}
+	ownerName := func(original string) string {
+		if reassign || !isPrivileged {
+			return currentUserName
+		}
+		return original
+	}
+
+	if include["groups"] {
+		for _, g := range data.Groups {
+			if !isPrivileged && g.CreatedBy != currentUserID {
+				res.Skipped++
+				continue
+			}
+			ng := Group{
+				Name:        g.Name,
+				Description: g.Description,
+				CreatedBy:   ownerID(g.CreatedBy),
+				CreatedAt:   time.Now(),
+			}
+			if _, err := s.CreateGroup(ng); err == nil {
+				res.Groups++
+			}
+		}
+	}
+
+	if include["layers"] {
+		for _, l := range data.Layers {
+			if !isPrivileged && l.OwnerID != currentUserID {
+				res.Skipped++
+				continue
+			}
+			nl := Layer{
+				Name:        l.Name,
+				Description: l.Description,
+				Color:       l.Color,
+				OwnerID:     ownerID(l.OwnerID),
+				OwnerName:   ownerName(l.OwnerName),
+				Visibility:  l.Visibility,
+				Permission:  l.Permission,
+				GroupIDs:    []int64{},
+			}
+			if _, err := s.CreateLayer(nl); err == nil {
+				res.Layers++
+			}
+		}
+	}
+
+	if include["events"] {
+		for _, e := range data.Events {
+			if !isPrivileged && e.CreatedBy != currentUserID {
+				res.Skipped++
+				continue
+			}
+			ne := e
+			ne.ID = 0 // will be assigned by store
+			ne.CreatedBy = ownerID(e.CreatedBy)
+			ne.CreatedByName = ownerName(e.CreatedByName)
+			ne.LayerID = nil // reset layer — cross-system refs not preserved
+			ne.CreatedAt = time.Now()
+			ne.UpdatedAt = time.Now()
+			if _, err := s.CreateEvent(ne); err == nil {
+				res.Events++
+			}
+		}
+	}
+
+	if include["alarms"] {
+		for _, a := range data.Alarms {
+			if !isPrivileged && a.UserID != currentUserID {
+				res.Skipped++
+				continue
+			}
+			na := Alarm{
+				UserID:     ownerID(a.UserID),
+				EventID:    a.EventID,
+				EventTitle: a.EventTitle,
+				EventTime:  a.EventTime,
+				LeadTime:   a.LeadTime,
+			}
+			if _, err := s.CreateAlarm(na); err == nil {
+				res.Alarms++
+			}
+		}
+	}
+
+	if include["users"] && isPrivileged {
+		for _, u := range data.Users {
+			// Skip if username already exists
+			if _, exists := s.GetUserByUsername(u.Username); exists {
+				res.Skipped++
+				continue
+			}
+			nu := User{
+				Username:     u.Username,
+				DisplayName:  u.DisplayName,
+				Role:         u.Role,
+				CanLock:      u.CanLock,
+				PasswordHash: "", // no password; admin must set one
+				CreatedAt:    time.Now(),
+			}
+			if _, err := s.CreateUser(nu); err == nil {
+				res.Users++
+			}
+		}
+	}
+
+	return res
+}
