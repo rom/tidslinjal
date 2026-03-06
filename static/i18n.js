@@ -373,6 +373,14 @@ const TRANSLATIONS = {
     oidc_login:          'Sign in with SSO',
     tls_docs:            'TLS/HTTPS Documentation',
     layers_multi_hint:   'Click layers to show/hide. Multiple layers can be active at once.',
+    // v3.3.0
+    ev_responsible:        'Responsible',
+    ev_responsible_creator:'creator',
+    ev_invited:            'Invited (notify on creation)',
+    report_layers:         'Layers to include',
+    assigned_task_label:   'Assigned Task',
+    phase_layer_lbl:       'Layer (empty = master timeline)',
+    synth_day_hours_only:  'Synthetic time: day hours only',
   },
 
   sv: {
@@ -711,6 +719,14 @@ const TRANSLATIONS = {
     oidc_login:          'Logga in med SSO',
     tls_docs:            'TLS/HTTPS-dokumentation',
     layers_multi_hint:   'Klicka på lager för att visa/dölja. Flera lager kan vara aktiva samtidigt.',
+    // v3.3.0
+    ev_responsible:        'Ansvarig',
+    ev_responsible_creator:'skapare',
+    ev_invited:            'Inbjudna (avisera vid skapande)',
+    report_layers:         'Lager att inkludera',
+    assigned_task_label:   'Tilldelad uppgift',
+    phase_layer_lbl:       'Lager (tomt = mastertidslinje)',
+    synth_day_hours_only:  'Syntetisk tid: endast dagtimmar',
   },
 
   fr: {
@@ -1049,6 +1065,14 @@ const TRANSLATIONS = {
     oidc_login:          'Se connecter avec SSO',
     tls_docs:            'Documentation TLS/HTTPS',
     layers_multi_hint:   'Cliquez sur les couches pour afficher/masquer. Plusieurs couches peuvent être actives simultanément.',
+    // v3.3.0
+    ev_responsible:        'Responsable',
+    ev_responsible_creator:'créateur',
+    ev_invited:            'Invités (notifier à la création)',
+    report_layers:         'Couches à inclure',
+    assigned_task_label:   'Tâche assignée',
+    phase_layer_lbl:       'Couche (vide = chronologie maîtresse)',
+    synth_day_hours_only:  'Temps synthétique : heures de journée uniquement',
   }
 };
 
