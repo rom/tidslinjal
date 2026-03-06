@@ -58,6 +58,7 @@
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
       <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
       <button class="btn btn-secondary btn-sm" id="btnExport">⬇ Export</button>
+      <button class="btn btn-secondary btn-sm" id="btnImport">⬆ Import</button>
       <button class="btn btn-secondary btn-sm" id="btnReport">📄 Report</button>
 
       <div class="toolbar-sep"></div>
@@ -112,6 +113,27 @@
       <div class="sidebar-content" id="sidebarContent"></div>
     </aside>
 
+  </div>
+</div>
+
+<!-- Recurring Delete Dialog -->
+<div class="modal-overlay" id="recurDeleteModal" style="z-index:900">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>🔁 Delete Recurring Event</h2>
+      <button class="modal-close" onclick="closeModal('recurDeleteModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="recurDeleteMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to delete?</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-secondary" id="recurDelThis">Delete only this occurrence</button>
+        <button class="btn btn-secondary" id="recurDelFuture">Delete this and all future occurrences</button>
+        <button class="btn btn-danger"    id="recurDelAll">Delete all occurrences (entire series)</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('recurDeleteModal')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -806,30 +828,75 @@
 
 <!-- Export Modal -->
 <div class="modal-overlay" id="exportModal">
-  <div class="modal">
+  <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="lbl-export-title">⬇ Export</h2>
       <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <p style="margin-bottom:14px;color:var(--text-dim);font-size:var(--fs-sm)" id="lbl-export-desc">Select export format for the current view.</p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('ics')">
+      <!-- JSON export section with category selection -->
+      <div style="margin-bottom:16px">
+        <div style="font-weight:600;margin-bottom:8px">{ } JSON — Full data export</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">Select what to include:</div>
+        <div class="group-picker" id="exportCategoryPicker">
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="events" checked style="margin-right:4px"> Events</label>
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="groups" checked style="margin-right:4px"> Groups</label>
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="layers" checked style="margin-right:4px"> Layers</label>
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="alarms" checked style="margin-right:4px"> Alarms</label>
+          <label class="group-chip" id="exportUsersCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="users" style="margin-right:4px"> Users</label>
+          <label class="group-chip" id="exportPhasesCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="phases" checked style="margin-right:4px"> Phases</label>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="doExport('json')">⬇ Download JSON</button>
+      </div>
+      <hr style="border-color:var(--border);margin:14px 0">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('ics')">
           <div style="font-weight:600">📅 ICS / iCalendar</div>
-          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-ics-desc">Import into Google Calendar, Outlook, Apple Calendar, etc.</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Google Calendar, Outlook, Apple Calendar</div>
         </button>
-        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('json')">
-          <div style="font-weight:600">{ } JSON</div>
-          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-json-desc">Full data export for backup or API integration.</div>
-        </button>
-        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="doExport('csv')">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('csv')">
           <div style="font-weight:600">📊 CSV</div>
-          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px" id="lbl-export-csv-desc">Open in Excel, LibreOffice Calc, or any spreadsheet app.</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Excel, LibreOffice Calc</div>
         </button>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('exportModal')" id="lbl-export-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>⬆ Import</h2>
+      <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>JSON export file</label>
+        <input type="file" id="importFile" accept=".json" class="attach-file-input">
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label>Import categories</label>
+        <div class="group-picker" id="importCategoryPicker" style="margin-top:4px">
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="events" checked style="margin-right:4px"> Events</label>
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="groups" checked style="margin-right:4px"> Groups</label>
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="layers" checked style="margin-right:4px"> Layers</label>
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="alarms" checked style="margin-right:4px"> Alarms</label>
+          <label class="group-chip" id="importUsersCb" style="display:none"><input type="checkbox" class="import-cat-cb" value="users" style="margin-right:4px"> Users</label>
+        </div>
+      </div>
+      <div class="form-check" id="importReassignRow" style="margin-top:10px;display:none">
+        <input type="checkbox" id="importReassign">
+        <label for="importReassign" style="font-size:var(--fs-sm)">Reassign ownership to my account</label>
+      </div>
+      <div id="importResult" style="display:none;margin-top:12px;padding:10px;border-radius:var(--radius);background:var(--bg3);font-size:var(--fs-sm)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="doImport()">⬆ Import</button>
     </div>
   </div>
 </div>

@@ -1021,6 +1021,18 @@ func (app *App) handleCreateGroup(w http.ResponseWriter, r *http.Request, user *
 	}
 	// Auto-add creator as admin
 	app.store.AddGroupMember(GroupMembership{GroupID: created.ID, UserID: user.ID, Role: "admin"}) //nolint
+	// Auto-create a layer with the same name and add the new group to it
+	autoLayer := Layer{
+		Name:        created.Name,
+		Description: created.Description,
+		Color:       "#4A90D9",
+		OwnerID:     user.ID,
+		OwnerName:   user.DisplayName,
+		Visibility:  "groups",
+		GroupIDs:    []int64{created.ID},
+		Permission:  "readwrite",
+	}
+	app.store.CreateLayer(autoLayer) //nolint
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
 }
@@ -1675,18 +1687,62 @@ func (app *App) handleDeletePhase(w http.ResponseWriter, r *http.Request, user *
 
 // ── Export handler ────────────────────────────────────────────────────────────
 
-func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleAdmin) {
-		jsonError(w, "admin required", http.StatusForbidden)
-		return
+func parseCommaSet(s string) map[string]bool {
+	m := map[string]bool{}
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			m[part] = true
+		}
 	}
-	data := app.store.GetExportData()
+	return m
+}
+
+func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
+	isPrivileged := hasRole(user.Role, RoleOpLead)
+	include := r.URL.Query().Get("include")
+	if include == "" {
+		include = "events,groups,layers,alarms,phases"
+		if isPrivileged {
+			include += ",users"
+		}
+	}
+	data := app.store.GetExportDataFiltered(user.ID, isPrivileged, parseCommaSet(include))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-export-%s.json"`,
 		time.Now().Format("2006-01-02")))
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(data) //nolint
+}
+
+func (app *App) handleImport(w http.ResponseWriter, r *http.Request, user *User) {
+	isPrivileged := hasRole(user.Role, RoleOpLead)
+	if err := r.ParseMultipartForm(20 << 20); err != nil {
+		jsonError(w, "failed to parse form (max 20MB)", http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("data")
+	if err != nil {
+		jsonError(w, "no file provided", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	var data ExportData
+	if err := json.NewDecoder(file).Decode(&data); err != nil {
+		jsonError(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	include := r.FormValue("include")
+	if include == "" {
+		include = "events,groups,layers,alarms"
+	}
+	reassign := r.FormValue("reassign") == "true"
+	result := app.store.ImportData(data, user.ID, user.DisplayName, isPrivileged, reassign, parseCommaSet(include))
+	app.audit(user.ID, user.DisplayName, "imported", "data", 0,
+		fmt.Sprintf("Imported groups=%d layers=%d events=%d alarms=%d users=%d skipped=%d",
+			result.Groups, result.Layers, result.Events, result.Alarms, result.Users, result.Skipped))
+	jsonOK(w, result)
 }
 
 // ── User members (groups for a user) ─────────────────────────────────────────
@@ -2077,10 +2133,18 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	// Export (admin only)
+	// Export (authenticated users; admin/oplead can export all)
 	mux.HandleFunc("/api/export", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
-			app.requireRole(RoleAdmin, app.handleExport)(w, r)
+			app.requireAuth(app.handleExport)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	// Import (authenticated users; admin/oplead can import all)
+	mux.HandleFunc("/api/import", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireAuth(app.handleImport)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -172,6 +172,7 @@ type Event struct {
 	IsRecurring       bool        `json:"is_recurring"`
 	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`
+	RecurrenceExcl    []string    `json:"recurrence_excl,omitempty"` // ISO8601 timestamps of excluded occurrences
 	LayerID           *int64      `json:"layer_id,omitempty"`
 	ResponsibleID     *int64      `json:"responsible_id,omitempty"`
 	ResponsibleName   string      `json:"responsible_name,omitempty"`
