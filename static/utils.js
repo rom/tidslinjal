@@ -150,6 +150,12 @@ function hasRole2(userRole, required) {
   return (order[userRole]||0) >= (order[required]||0);
 }
 
+// ── DOM helpers ─────────────────────────────────────────────────────────────
+function setElText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
 // ── Modal helpers ───────────────────────────────────────────────────────────
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
