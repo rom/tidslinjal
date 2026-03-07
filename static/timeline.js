@@ -331,15 +331,24 @@ function renderEventBlocks(days, slotH) {
       }
     });
 
-    const visibleEvents = expandedEvents.filter(ev =>
-      !isTypeHidden(ev.event_type) &&
-      (ev.layer_id == null || !hl.includes(ev.layer_id)) &&
-      (!searchTerm ||
+    const visibleEvents = expandedEvents.filter(ev => {
+      if (isTypeHidden(ev.event_type)) return false;
+      if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
+      if (searchTerm && !(
         ev.title.toLowerCase().includes(searchTerm) ||
         (ev.description||'').toLowerCase().includes(searchTerm) ||
         (ev.created_by_name||'').toLowerCase().includes(searchTerm)
-      )
-    );
+      )) return false;
+      // Apply filters
+      const f = state.filters || {};
+      if (f.status && f.status.length > 0 && !f.status.includes(ev.status)) return false;
+      if (f.responsibleId != null && (ev.responsible_id || null) != f.responsibleId) return false;
+      if (f.layerId !== null && f.layerId !== undefined) {
+        if (f.layerId === 0 && ev.layer_id != null) return false;
+        if (f.layerId !== 0 && ev.layer_id != f.layerId) return false;
+      }
+      return true;
+    });
 
     const evsByDay = days.map(() => []);
 
@@ -440,8 +449,10 @@ function renderEventBlocks(days, slotH) {
           <div class="ev-title">${statusDot}${escHtml(ev.title)}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
+          <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>
         `;
         block.onclick = e => {
+          if (e.target.classList.contains('ev-resize-handle')) return;
           e.stopPropagation();
           if (ev._recurring_instance) {
             state._currentOccurrenceTime = new Date(ev.start_time);
@@ -737,8 +748,17 @@ function setupDragToReschedule() {
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     delete payload.created_by_name; delete payload.verified_by_name;
 
+    // Push undo entry
+    if (typeof pushUndo === 'function') pushUndo('update_event', { id: dragEvId, old: { ...ev } });
+
     const res = await apiPut('/api/events/'+dragEvId, payload);
     if (res.ok) {
+      const updated = await res.json();
+      // Check for conflicts at new position
+      if (typeof checkConflicts === 'function') {
+        const conflicts = checkConflicts(updated);
+        if (conflicts.length) showConflictWarning(conflicts);
+      }
       await refreshAll();
       showNotification('success', t('notif_event_updated'));
     } else {
@@ -798,6 +818,9 @@ function setupKeyboardShortcuts() {
         if (openModals.length) closeModal(openModals[openModals.length-1].id);
         break;
       }
+      case 'z':
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); performUndo(); }
+        break;
       case '+':
       case '=':
         state.zoomFactor = Math.min(6.0, state.zoomFactor + 0.25);
@@ -808,5 +831,74 @@ function setupKeyboardShortcuts() {
         renderTimeline();
         break;
     }
+  });
+}
+
+// ── Event resize by dragging ──────────────────────────────────────────────
+function setupEventResize() {
+  const container = document.getElementById('timeline-container');
+  let resizing = false, resizeEvId = null, startY = 0, origHeight = 0, resizeBlock = null;
+
+  container.addEventListener('mousedown', e => {
+    const handle = e.target.closest('.ev-resize-handle[data-ev-id]');
+    if (!handle) return;
+    resizing = true;
+    resizeEvId = parseInt(handle.dataset.evId, 10);
+    resizeBlock = handle.closest('.event-block');
+    startY = e.clientY;
+    origHeight = resizeBlock.offsetHeight;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!resizing || !resizeBlock) return;
+    const dy = e.clientY - startY;
+    const newHeight = Math.max(14, origHeight + dy);
+    resizeBlock.style.height = newHeight + 'px';
+  });
+
+  document.addEventListener('mouseup', async e => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    if (!resizeBlock || !resizeEvId) { resizeBlock = null; resizeEvId = null; return; }
+
+    const newHeight = resizeBlock.offsetHeight;
+    const slotH = getSlotHeight();
+    const slotMin = getSlotMinutes();
+    const durationMin = Math.round((newHeight / slotH) * slotMin);
+
+    const ev = state.events.find(x => x.id === resizeEvId);
+    if (!ev) { resizeBlock = null; resizeEvId = null; return; }
+
+    const evStart = new Date(ev.start_time);
+    const newEnd = new Date(evStart.getTime() + durationMin * 60000);
+
+    // Save old state for undo
+    if (typeof pushUndo === 'function') pushUndo('update_event', { id: ev.id, old: { ...ev } });
+
+    const payload = { ...ev, end_time: newEnd.toISOString() };
+    delete payload.id; delete payload.created_at; delete payload.updated_at;
+    delete payload.created_by_name; delete payload.verified_by_name;
+
+    const res = await apiPut('/api/events/' + resizeEvId, payload);
+    if (res.ok) {
+      const updated = await res.json();
+      if (typeof checkConflicts === 'function') {
+        const conflicts = checkConflicts(updated);
+        if (conflicts.length) showConflictWarning(conflicts);
+      }
+      await refreshAll();
+    } else {
+      const err = await res.json();
+      showError(err.error || 'Could not resize');
+    }
+    resizeBlock = null;
+    resizeEvId = null;
   });
 }

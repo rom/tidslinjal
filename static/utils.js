@@ -172,8 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function showNotification(type, message, duration=4000) {
   const area = document.getElementById('notification-area');
   const el   = document.createElement('div');
-  el.className = `notification${type==='alarm'?' alarm':''}`;
-  const title  = type==='alarm' ? t('notif_alarm_title') : t('notif_done');
+  el.className = `notification${type==='alarm'?' alarm':''}${type==='warning'?' warning':''}`;
+  const title  = type==='alarm' ? t('notif_alarm_title') : type==='warning' ? 'Warning' : t('notif_done');
   el.innerHTML = `
     <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
     <div class="notification-title">${title}</div>

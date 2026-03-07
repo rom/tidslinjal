@@ -17,7 +17,6 @@
       <button class="btn btn-secondary btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
       <button class="btn btn-secondary btn-sm" id="btnToday">Today</button>
       <button class="btn btn-secondary btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
-      <button class="btn btn-secondary btn-sm" id="btnCenterToday" title="Center today in view">⊙ Center</button>
 
       <div class="toolbar-sep"></div>
 
@@ -48,19 +47,22 @@
       <div class="toolbar-sep"></div>
 
       <div class="control-group">
-        <input type="text" id="searchInput" class="ctrl-select" placeholder="🔍 Search…" style="width:150px" autocomplete="off">
+        <input type="text" id="searchInput" class="ctrl-select" placeholder="Search…" style="width:150px" autocomplete="off">
       </div>
 
       <div class="toolbar-sep"></div>
 
-      <button class="btn btn-secondary btn-sm" id="btnTemplates">📋 Templates</button>
-      <button class="btn btn-secondary btn-sm" id="btnLayerToggle">🗂 Layers</button>
-      <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">🕐 T+</button>
+      <button class="btn btn-secondary btn-sm" id="btnUndo" title="Undo last action (Ctrl+Z)" style="display:none">Undo</button>
+      <button class="btn btn-secondary btn-sm" id="btnFilter" title="Filter events">Filter</button>
+      <button class="btn btn-secondary btn-sm" id="btnTemplates">Templates</button>
+      <button class="btn btn-secondary btn-sm" id="btnLayerToggle">Layers</button>
+      <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">T+</button>
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
-      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
-      <button class="btn btn-secondary btn-sm" id="btnExport">⬇ Export</button>
-      <button class="btn btn-secondary btn-sm" id="btnImport">⬆ Import</button>
-      <button class="btn btn-secondary btn-sm" id="btnReport">📄 Report</button>
+      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">Lock Slot</button>
+      <button class="btn btn-secondary btn-sm" id="btnPrint" title="Print day/week sheet">Print</button>
+      <button class="btn btn-secondary btn-sm" id="btnExport">Export</button>
+      <button class="btn btn-secondary btn-sm" id="btnImport">Import</button>
+      <button class="btn btn-secondary btn-sm" id="btnReport">Report</button>
 
       <div class="toolbar-sep"></div>
       <div class="lang-flags" id="langFlags">
@@ -99,6 +101,9 @@
       <div id="current-time-line" style="display:none"></div>
     </div>
 
+    <!-- Sidebar resize handle -->
+    <div id="sidebarResizeHandle" class="sidebar-resize-handle"></div>
+
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-tabs" id="sidebarTabs">
@@ -109,6 +114,7 @@
         <button class="sidebar-tab admin-only" data-tab="groups" style="display:none">Groups</button>
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none">Phases</button>
+        <button class="sidebar-tab" data-tab="activity">Activity</button>
         <button class="sidebar-tab" data-tab="settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
@@ -124,6 +130,51 @@
   <div class="nav-jump-item" onclick="navJump(3)">3 Days</div>
   <div class="nav-jump-item" onclick="navJump(7)">1 Week</div>
   <div class="nav-jump-item" onclick="navJump(14)">2 Weeks</div>
+</div>
+
+<!-- Filter popover -->
+<div id="filterPopover" class="filter-popover" style="display:none">
+  <div class="filter-popover-header">Filter Events</div>
+  <div class="filter-section">
+    <label class="filter-label">By Status:</label>
+    <div id="filterStatusList" class="filter-list"></div>
+  </div>
+  <div class="filter-section">
+    <label class="filter-label">By Responsible:</label>
+    <select id="filterResponsible" class="ctrl-select" style="width:100%">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div class="filter-section">
+    <label class="filter-label">By Layer:</label>
+    <select id="filterLayer" class="ctrl-select" style="width:100%">
+      <option value="">All</option>
+    </select>
+  </div>
+  <div style="display:flex;gap:6px;margin-top:8px">
+    <button class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
+    <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div id="contextMenu" class="context-menu" style="display:none">
+  <div class="context-menu-item" id="ctxEdit" onclick="ctxAction('edit')">Edit Event</div>
+  <div class="context-menu-item" id="ctxDuplicate" onclick="ctxAction('duplicate')">Duplicate Event</div>
+  <div class="context-menu-item" id="ctxAlarm" onclick="ctxAction('alarm')">Set Alarm</div>
+  <div class="context-menu-sep"></div>
+  <div class="context-menu-item" id="ctxStatusPlanned" onclick="ctxAction('status','planned')">Set Planned</div>
+  <div class="context-menu-item" id="ctxStatusActive" onclick="ctxAction('status','active')">Set Active</div>
+  <div class="context-menu-item" id="ctxStatusCompleted" onclick="ctxAction('status','completed')">Set Completed</div>
+  <div class="context-menu-item" id="ctxStatusCancelled" onclick="ctxAction('status','cancelled')">Set Cancelled</div>
+  <div class="context-menu-sep"></div>
+  <div class="context-menu-item ctx-danger" id="ctxDelete" onclick="ctxAction('delete')">Delete Event</div>
+</div>
+
+<!-- Empty slot context menu -->
+<div id="slotContextMenu" class="context-menu" style="display:none">
+  <div class="context-menu-item" onclick="ctxSlotAction('add')">Add Event Here</div>
+  <div class="context-menu-item" onclick="ctxSlotAction('lock')">Lock This Slot</div>
 </div>
 
 <!-- Error Modal -->

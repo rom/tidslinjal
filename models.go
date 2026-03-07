@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.5.0"
+const AppVersion = "4.0.0"
 
 // AppGitHub is the project repository URL
 const AppGitHub = "https://github.com/rom/tidslinjal"
@@ -305,18 +305,27 @@ type Template struct {
 	ItemCount     int            `json:"item_count"`
 }
 
+// TemplateAttachment stores attachment metadata within a template item
+type TemplateAttachment struct {
+	Filename   string `json:"filename"`
+	StoredName string `json:"stored_name"` // reference to file on disk
+	Size       int64  `json:"size"`
+	MimeType   string `json:"mime_type"`
+}
+
 // TemplateItem is a single event blueprint stored relative to T=0
 type TemplateItem struct {
-	Title             string `json:"title"`
-	EventType         string `json:"event_type"`
-	Color             string `json:"color"`
-	Description       string `json:"description"`
-	StartOffsetMin    int    `json:"start_offset_min"` // minutes from template base time
-	DurationMin       int    `json:"duration_min"`     // 0 = instant
-	AllDay            bool   `json:"all_day"`
-	IsRecurring       bool   `json:"is_recurring"`
-	RecurrencePattern string `json:"recurrence_pattern"`
-	Participant       string `json:"participant"`
+	Title             string               `json:"title"`
+	EventType         string               `json:"event_type"`
+	Color             string               `json:"color"`
+	Description       string               `json:"description"`
+	StartOffsetMin    int                  `json:"start_offset_min"` // minutes from template base time
+	DurationMin       int                  `json:"duration_min"`     // 0 = instant
+	AllDay            bool                 `json:"all_day"`
+	IsRecurring       bool                 `json:"is_recurring"`
+	RecurrencePattern string               `json:"recurrence_pattern"`
+	Participant       string               `json:"participant"`
+	Attachments       []TemplateAttachment `json:"attachments,omitempty"`
 }
 
 // OIDCConfig holds the discovered OIDC provider endpoints
@@ -332,11 +341,13 @@ type OIDCConfig struct {
 
 // ExerciseSettings controls synthetic time display across the application
 type ExerciseSettings struct {
-	Enabled  bool   `json:"enabled"`
-	Epoch    string `json:"epoch"`             // ISO8601: STARTEX — real datetime = Day 1 T+0
-	Endex    string `json:"endex,omitempty"`   // ISO8601: ENDEX — end of exercise
-	Label    string `json:"label"`             // exercise name shown in header
-	Paused       bool   `json:"paused"`              // freeze timeline progression
-	PausedAt     string `json:"paused_at,omitempty"` // ISO8601: when it was paused
-	DayHoursOnly bool   `json:"day_hours_only"`      // synthetic time only advances during day hours
+	Enabled      bool   `json:"enabled"`
+	Epoch        string `json:"epoch"`                    // ISO8601: STARTEX — real datetime = Day 1 T+0
+	Endex        string `json:"endex,omitempty"`          // ISO8601: ENDEX — end of exercise
+	Label        string `json:"label"`                    // exercise name shown in header
+	Paused       bool   `json:"paused"`                   // freeze timeline progression
+	PausedAt     string `json:"paused_at,omitempty"`      // ISO8601: when it was paused
+	DayHoursOnly bool   `json:"day_hours_only"`           // synthetic time only advances during day hours
+	GroupLabel   string `json:"group_label,omitempty"`    // "group" | "unit" | "team"
+	ExIndex      int    `json:"ex_index,omitempty"`       // exercise index number
 }
