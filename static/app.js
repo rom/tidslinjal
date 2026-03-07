@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v3.4.0 — Collaborative Operational Timeline
+   Tidslinjal v3.5.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -60,6 +60,9 @@ async function apiPost(p, b)    { return api('POST', p, b); }
 async function apiPut(p, b)     { return api('PUT', p, b); }
 async function apiDel(p)        { return api('DELETE', p); }
 
+// ── UI state helpers ────────────────────────────────────────────────────────
+let _invitedFilter = 'both'; // current invited list filter (both | users | groups)
+
 // ── Error display ───────────────────────────────────────────────────────────
 function showError(msg, title) {
   const modal = document.getElementById('errorModal');
@@ -97,6 +100,7 @@ function fmtFileSize(bytes) {
 
 function recurStepMs(pattern) {
   const map = {
+    '15min':     15 * 60000,
     '30min':     30 * 60000,
     'hourly':    60 * 60000,
     '2hours':   120 * 60000,
@@ -221,7 +225,7 @@ function renderTimeline() {
     const dayDate = useSync
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);
-    html += `<div class="tl-day-header${isToday?' today':''}" data-date="${day.toISOString()}">
+    html += `<div class="tl-day-header${isToday?' today':''}" data-date="${day.toISOString()}" onclick="centerDay(new Date('${day.toISOString()}'))" title="Click to center this day" style="cursor:pointer">
       <div class="tl-day-name">${dayName}</div>
       <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}</div>
     </div>`;
@@ -240,19 +244,28 @@ function renderTimeline() {
       slotStart.setHours(0, slotStartMin, 0, 0);
       const slotEnd = new Date(slotStart.getTime() + getSlotMinutes() * 60000);
 
+      // A cell is visually "locked" if any scope=all or scope=master lock overlaps,
+      // OR if a scope=layer lock overlaps (shown with different style).
       const locked = state.locks.some(l => {
         const ls = new Date(l.start_time), le = new Date(l.end_time);
-        return slotStart < le && slotEnd > ls;
+        if (slotStart >= le || slotEnd <= ls) return false;
+        const sc = l.scope || 'all';
+        return sc === 'all' || sc === 'master'; // layer-specific locks handled at event level
+      });
+      const lockedLayer = !locked && state.locks.some(l => {
+        const ls = new Date(l.start_time), le = new Date(l.end_time);
+        if (slotStart >= le || slotEnd <= ls) return false;
+        return (l.scope || 'all') === 'layer';
       });
       const isHalf = state.resolution === 'quarter' && (s % 2 === 1);
       const isCur  = isCurrentSlot(slotStart, slotEnd);
 
       const ooh = isOutOfHours(s);
-      html += `<div class="tl-cell${locked?' locked':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}${ooh?' out-of-hours':''}"
+      html += `<div class="tl-cell${locked?' locked':''}${lockedLayer?' locked-layer':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}${ooh?' out-of-hours':''}"
         style="height:${slotH}px"
         data-day="${di}" data-slot="${s}"
         data-start="${slotStart.toISOString()}"
-        ${(locked || ooh) ? `title="${locked?'Locked':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
+        ${(locked || ooh) ? `title="${locked?'Locked: (master/all) — no events can be added or edited':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
       ></div>`;
     });
   }
@@ -549,15 +562,21 @@ function renderEventBlocks(days, slotH) {
         if (veMin <= vsMin) return;
         const topPx    = headerH + ((vsMin-startOff)/slotMin)*slotH;
         const heightPx = Math.max(((veMin-vsMin)/slotMin)*slotH, 14);
+        const scopeColor = (lk.scope||'all') === 'layer' ? 'rgba(74,144,217,.12),rgba(74,144,217,.12) 5px,rgba(74,144,217,.04) 5px,rgba(74,144,217,.04) 12px' : 'rgba(231,76,60,.12),rgba(231,76,60,.12) 5px,rgba(231,76,60,.04) 5px,rgba(231,76,60,.04) 12px';
+        const scopeBorder = (lk.scope||'all') === 'layer' ? 'rgba(74,144,217,.5)' : 'rgba(231,76,60,.5)';
         const el = document.createElement('div');
         el.className = 'lock-overlay';
-        el.style.cssText = `position:absolute;top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:repeating-linear-gradient(45deg,rgba(231,76,60,.12),rgba(231,76,60,.12) 5px,rgba(231,76,60,.04) 5px,rgba(231,76,60,.04) 12px);border-left:2px solid rgba(231,76,60,.5);pointer-events:none;z-index:4;`;
+        el.style.cssText = `position:absolute;top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:repeating-linear-gradient(45deg,${scopeColor});border-left:2px solid ${scopeBorder};pointer-events:none;z-index:4;`;
         container.appendChild(el);
-        if (state.user && (state.user.role==='admin' || state.user.can_lock)) {
+        // Show unlock button: admin can unlock any; creator can unlock their own
+        const canUnlock = state.user && (state.user.role==='admin' || state.user.id===lk.locked_by || state.user.can_lock);
+        if (canUnlock) {
+          const scopeTag = {'all':'ALL','master':'MASTER','layer':'LAYER'}[lk.scope||'all']||'ALL';
           const btn = document.createElement('button');
-          btn.className = 'lock-label btn btn-danger btn-sm';
-          btn.style.cssText = `position:absolute;top:${topPx+2}px;left:${dayMeta[di].left+2}px;z-index:5;font-size:10px;padding:2px 5px;pointer-events:auto;`;
-          btn.textContent = '🔓 ' + (lk.reason||'Locked');
+          btn.className = 'lock-label btn btn-sm';
+          btn.style.cssText = `position:absolute;top:${topPx+2}px;left:${dayMeta[di].left+2}px;z-index:5;font-size:10px;padding:2px 5px;pointer-events:auto;background:rgba(231,76,60,.8);color:#fff;border:none;border-radius:3px;`;
+          btn.innerHTML = `🔓 [${scopeTag}] ${escHtml(lk.reason||'Locked')}`;
+          btn.title = `Locked by ${escHtml(lk.locked_by_name||'?')} — click to unlock`;
           btn.onclick = () => deleteLock(lk.id);
           container.appendChild(btn);
         }
@@ -737,6 +756,28 @@ function centerToday() {
   state.startDate = addDays(today, -Math.floor(getRangeDays() / 2));
   refreshAll();
 }
+function centerDay(date) {
+  state.startDate = addDays(startOfDay(date), -Math.floor(getRangeDays() / 2));
+  refreshAll();
+}
+
+// ── Lock helpers ───────────────────────────────────────────────────────────
+// Returns the first lock that applies to the given event (considering scope).
+function getEventLock(ev) {
+  if (!state.locks || !state.locks.length) return null;
+  const evStart = new Date(ev.start_time);
+  const evEnd   = ev.end_time ? new Date(ev.end_time) : addHours(evStart, 1);
+  return state.locks.find(l => {
+    const ls = new Date(l.start_time), le = new Date(l.end_time);
+    if (evStart >= le || evEnd <= ls) return false;
+    const sc = l.scope || 'all';
+    if (sc === 'all') return true;
+    if (sc === 'master') return !ev.layer_id;
+    if (sc === 'layer') return ev.layer_id && ev.layer_id === l.layer_id;
+    return true;
+  }) || null;
+}
+function isEventLocked(ev) { return !!getEventLock(ev); }
 
 // ── Long-press navigation buttons ──────────────────────────────────────────
 function setupNavLongPress(btn, dir) {
@@ -798,10 +839,15 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventDescription').value = ev ? (ev.description||'') : '';
   document.getElementById('eventColor').value = ev ? (ev.color||'#4A90D9') : '#4A90D9';
 
-  // Type select
+  // Type select — sorted alphabetically by display label
   const typeSelect = document.getElementById('eventType');
   const lang = state.preferences.language || 'en';
-  typeSelect.innerHTML = state.eventTypes.map(et => {
+  const sortedTypes = [...state.eventTypes].sort((a, b) => {
+    const la = (lang==='sv' && a.label_sv ? a.label_sv : lang==='fr' && a.label_fr ? a.label_fr : a.label).toLowerCase();
+    const lb = (lang==='sv' && b.label_sv ? b.label_sv : lang==='fr' && b.label_fr ? b.label_fr : b.label).toLowerCase();
+    return la < lb ? -1 : la > lb ? 1 : 0;
+  });
+  typeSelect.innerHTML = sortedTypes.map(et => {
     const lbl = lang==='sv' && et.label_sv ? et.label_sv :
                 lang==='fr' && et.label_fr ? et.label_fr : et.label;
     return `<option value="${et.key}" ${ev && ev.event_type===et.key?'selected':''}>${lbl}</option>`;
@@ -854,6 +900,12 @@ function openEventModal(ev, defaultStart, defaultEnd) {
       users.map(u => `<option value="${u.id}" ${ev && ev.responsible_id===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`).join('');
   }
 
+  // Reset invited filter to 'both'
+  _invitedFilter = 'both';
+  document.querySelectorAll('.inv-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === 'both');
+  });
+
   // Invited users/groups
   const invList = document.getElementById('eventInvitedList');
   if (invList) {
@@ -892,15 +944,54 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   creatorEl.style.display = isEdit ? '' : 'none';
   if (isEdit) creatorEl.textContent = `${t('event_created_by')} ${ev.created_by_name} — ${fmtDateTime(new Date(ev.created_at))}`;
 
+  // Check if event is within a locked slot
+  const eventIsLocked = isEdit && isEventLocked(ev);
+  if (eventIsLocked) {
+    const lock = getEventLock(ev);
+    const modalBody = document.getElementById('eventModal').querySelector('.modal-body');
+    let lockBanner = document.getElementById('eventLockBanner');
+    if (!lockBanner) {
+      lockBanner = document.createElement('div');
+      lockBanner.id = 'eventLockBanner';
+      modalBody.insertBefore(lockBanner, modalBody.firstChild);
+    }
+    const scopeLabel = { all:'all layers & master', master:'master timeline', layer:'this layer' }[(lock&&lock.scope)||'all'] || 'all';
+    lockBanner.style.cssText = 'background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.4);border-radius:var(--radius);padding:8px 12px;font-size:var(--fs-sm);color:var(--red);margin-bottom:12px;';
+    lockBanner.innerHTML = `🔒 <b>Locked time slot</b> (${scopeLabel}) — editing and deleting disabled.`;
+  } else {
+    const old = document.getElementById('eventLockBanner');
+    if (old) old.remove();
+  }
+
   const delBtn = document.getElementById('btnDeleteEvent');
-  const canDel = isEdit && (state.user.role==='admin' || state.user.id===ev.created_by);
+  const canDel = !eventIsLocked && isEdit && (state.user.role==='admin' || state.user.id===ev.created_by);
   delBtn.style.display = canDel ? '' : 'none';
   delBtn.onclick = canDel ? () => deleteEvent(ev.id) : null;
+
+  const saveBtn = document.getElementById('btnSaveEvent');
+  if (saveBtn) saveBtn.disabled = !!eventIsLocked;
 
   // Update field visibility for type/allday
   updateEventModalTimeVisibility();
 
   openModal('eventModal');
+}
+
+// ── Invited list filter (Users / Groups / Both) ────────────────────────────
+function setInvitedFilter(filter) {
+  _invitedFilter = filter;
+  document.querySelectorAll('.inv-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  const list = document.getElementById('eventInvitedList');
+  if (!list) return;
+  list.querySelectorAll('.group-chip').forEach(chip => {
+    const isUser  = chip.querySelector('.inv-user-cb') !== null;
+    const isGroup = chip.querySelector('.inv-group-cb') !== null;
+    if (filter === 'users')  chip.style.display = isUser  ? '' : 'none';
+    else if (filter === 'groups') chip.style.display = isGroup ? '' : 'none';
+    else chip.style.display = '';
+  });
 }
 
 // Wire up inline alarm checkbox toggle
@@ -1233,9 +1324,19 @@ function showEventDetail(ev) {
     footer.appendChild(rejBtn);
   }
 
+  // Show lock warning if event is within a locked slot
+  const eventLock = getEventLock(ev);
+  if (eventLock) {
+    const lockInfo = document.createElement('div');
+    lockInfo.style.cssText = 'background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.4);border-radius:var(--radius);padding:8px 12px;font-size:var(--fs-sm);color:var(--red);margin-bottom:8px;';
+    const scopeLabel = { all:'all layers & master', master:'master timeline', layer:'this layer' }[eventLock.scope||'all'] || 'all';
+    lockInfo.innerHTML = `🔒 <b>Locked</b> — This time slot is locked (applies to ${scopeLabel}). ${eventLock.reason ? 'Reason: '+escHtml(eventLock.reason) : ''}<br>No editing, moving, or deleting is permitted.`;
+    body.appendChild(lockInfo);
+  }
+
   // Edit/Delete (creator or readwrite+ on layers, oplead+ on master)
   const isMaster = !ev.layer_id;
-  const canEdit = state.user && (
+  const canEdit = !isEventLocked(ev) && state.user && (
     state.user.role === 'admin' ||
     (!isMaster && (state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
     (isMaster && hasRole2(state.user.role, 'oplead'))
@@ -1342,17 +1443,43 @@ document.getElementById('btnAddLock').addEventListener('click', () => {
   document.getElementById('lockStart').value = fmtDateInput(now);
   document.getElementById('lockEnd').value   = fmtDateInput(addHours(now, 1));
   document.getElementById('lockReason').value = '';
-  openModal('lockModal');
+  openLockModal();
 });
+
+// Show/hide layer selector in lock modal based on scope
+function onLockScopeChange() {
+  const scope = document.getElementById('lockScope').value;
+  document.getElementById('lockLayerGroup').style.display = scope === 'layer' ? '' : 'none';
+}
+
+// Populate layer select when opening lock modal
+function openLockModal() {
+  const sel = document.getElementById('lockLayerSelect');
+  if (sel) {
+    sel.innerHTML = state.layers.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+  }
+  document.getElementById('lockScope').value = 'all';
+  document.getElementById('lockLayerGroup').style.display = 'none';
+  openModal('lockModal');
+}
 
 document.getElementById('btnSaveLock').addEventListener('click', async () => {
   const sv = document.getElementById('lockStart').value;
   const ev = document.getElementById('lockEnd').value;
   if (!sv||!ev) { showError('Start and end required', 'Validation'); return; }
+  const scope = document.getElementById('lockScope').value;
+  let layerID = null;
+  if (scope === 'layer') {
+    const lv = document.getElementById('lockLayerSelect').value;
+    if (!lv) { showError('Please select a layer', 'Validation'); return; }
+    layerID = parseInt(lv, 10);
+  }
   const res = await apiPost('/api/locks', {
     start_time: new Date(sv).toISOString(),
     end_time:   new Date(ev).toISOString(),
     reason:     document.getElementById('lockReason').value,
+    scope,
+    layer_id:   layerID,
   });
   if (res.ok) {
     closeModal('lockModal'); await fetchLocks(); renderTimeline();
@@ -2807,6 +2934,7 @@ function exportICS() {
     ics += `CATEGORIES:${escICS(ev.event_type)}\r\n`;
     if (ev.is_recurring && ev.recurrence_pattern) {
       const rruleMap = {
+        '15min':     'MINUTELY;INTERVAL=15',
         '30min':     'MINUTELY;INTERVAL=30',
         'hourly':    'HOURLY',
         '2hours':    'HOURLY;INTERVAL=2',
@@ -2974,6 +3102,12 @@ function setupDragToReschedule() {
     const newStart = new Date(targetDay);
     newStart.setHours(Math.floor(newMin / 60), newMin % 60, 0, 0);
 
+    // Block if the event is currently locked
+    if (isEventLocked(ev)) {
+      showError('This event is in a locked time slot and cannot be moved.');
+      dragEvId = null; dragOrigEl = null; return;
+    }
+
     // Preserve duration
     const oldStart = new Date(ev.start_time);
     const oldEnd   = ev.end_time ? new Date(ev.end_time) : null;
@@ -2981,6 +3115,12 @@ function setupDragToReschedule() {
     if (oldEnd) {
       const dur = oldEnd - oldStart;
       payload.end_time = new Date(newStart.getTime() + dur).toISOString();
+    }
+    // Block if the new target time slot is locked
+    const testEv = { ...ev, start_time: newStart.toISOString(), end_time: payload.end_time };
+    if (isEventLocked(testEv)) {
+      showError('The target time slot is locked. Cannot move event there.');
+      dragEvId = null; dragOrigEl = null; return;
     }
     delete payload.id; delete payload.created_at; delete payload.updated_at;
     delete payload.created_by_name; delete payload.verified_by_name;

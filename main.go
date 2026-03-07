@@ -1298,17 +1298,14 @@ func (app *App) handleCreateLock(w http.ResponseWriter, r *http.Request, user *U
 }
 
 func (app *App) handleDeleteLock(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleAdmin) && !user.CanLock {
-		jsonError(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	id, err := pathID(r)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if err := app.store.DeleteLock(id); err != nil {
-		jsonError(w, "not found", http.StatusNotFound)
+	// Admin can always unlock; lock creator and can_lock users can unlock their own
+	if err := app.store.DeleteLockAuthorized(id, user.ID, hasRole(user.Role, RoleAdmin)); err != nil {
+		jsonError(w, err.Error(), http.StatusForbidden)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

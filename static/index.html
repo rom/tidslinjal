@@ -345,6 +345,7 @@
         <div class="form-group" id="recurrenceGroup" style="display:none">
           <label id="lbl-ev-pattern">Pattern</label>
           <select id="eventRecurrencePattern">
+            <option value="15min">Every 15 min</option>
             <option value="30min">Every 30 min</option>
             <option value="hourly">Hourly</option>
             <option value="2hours">Every 2 hours</option>
@@ -368,7 +369,14 @@
         </div>
       </div>
       <div class="form-group">
-        <label id="lbl-ev-invited">Invited (notify on creation)</label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label id="lbl-ev-invited">Invited (notify on creation)</label>
+          <div class="inv-filter-btns" style="display:flex;gap:2px">
+            <button type="button" class="btn btn-sm inv-filter-btn active" data-filter="both" onclick="setInvitedFilter('both')">Both</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="users" onclick="setInvitedFilter('users')">Users</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="groups" onclick="setInvitedFilter('groups')">Groups</button>
+          </div>
+        </div>
         <div id="eventInvitedList" class="group-picker" style="margin-top:4px"></div>
       </div>
       <div class="form-group">
@@ -474,6 +482,18 @@
           <label id="lbl-lock-end">End *</label>
           <input type="datetime-local" id="lockEnd">
         </div>
+      </div>
+      <div class="form-group">
+        <label id="lbl-lock-scope">Applies to</label>
+        <select id="lockScope" onchange="onLockScopeChange()">
+          <option value="all">All layers and master timeline</option>
+          <option value="master">Master timeline only</option>
+          <option value="layer">Specific layer</option>
+        </select>
+      </div>
+      <div class="form-group" id="lockLayerGroup" style="display:none">
+        <label id="lbl-lock-layer">Layer *</label>
+        <select id="lockLayerSelect"></select>
       </div>
       <div class="form-group">
         <label id="lbl-lock-reason">Reason</label>

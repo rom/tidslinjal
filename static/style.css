@@ -981,3 +981,35 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 /* ── Danger variable for error modal ─────────────────────────────────────── */
 :root { --danger: #C0392B; }
 body.light-mode { --danger: #c0392b; }
+
+/* ── Synthetic time button active state ──────────────────────────────────── */
+#btnSyntheticTime.active {
+  background: var(--orange) !important;
+  color: #fff !important;
+  border-color: var(--orange) !important;
+  box-shadow: 0 0 0 2px rgba(230,126,34,.35);
+  font-weight: 700;
+}
+#btnSyntheticTime.active:hover { background: #d35400 !important; }
+
+/* ── Layer-locked cell (scope=layer) ─────────────────────────────────────── */
+.tl-cell.locked-layer {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(74,144,217,.08),
+    rgba(74,144,217,.08) 4px,
+    transparent 4px,
+    transparent 10px
+  ) !important;
+  cursor: default;
+}
+
+/* ── Invited filter buttons ──────────────────────────────────────────────── */
+.inv-filter-btns .inv-filter-btn {
+  font-size: var(--fs-xs); padding: 2px 8px; border-radius: 20px;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text-dim);
+  cursor: pointer; transition: all .15s;
+}
+.inv-filter-btns .inv-filter-btn.active {
+  background: rgba(74,144,217,.2); border-color: var(--accent); color: var(--accent);
+}
