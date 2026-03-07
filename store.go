@@ -29,6 +29,7 @@ type Store struct {
 	exercise    ExerciseSettings
 	comments    []EventComment
 	phases      []ExercisePhase
+	templates   []Template
 
 	nextEventTypeID int64
 	nextUserID      int64
@@ -41,6 +42,7 @@ type Store struct {
 	nextAuditID     int64
 	nextCommentID   int64
 	nextPhaseID     int64
+	nextTemplateID  int64
 }
 
 func NewStore(dataDir string) (*Store, error) {
@@ -73,6 +75,7 @@ func (s *Store) load() error {
 	s.loadFile("exercise.json", &s.exercise)
 	s.loadFile("comments.json", &s.comments)
 	s.loadFile("phases.json", &s.phases)
+	s.loadFile("templates.json", &s.templates)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -127,6 +130,11 @@ func (s *Store) load() error {
 	for _, x := range s.phases {
 		if x.ID > s.nextPhaseID {
 			s.nextPhaseID = x.ID
+		}
+	}
+	for _, x := range s.templates {
+		if x.ID > s.nextTemplateID {
+			s.nextTemplateID = x.ID
 		}
 	}
 	return nil
@@ -1250,4 +1258,95 @@ func (s *Store) ImportData(data ExportData, currentUserID int64, currentUserName
 	}
 
 	return res
+}
+
+// ── Templates ──────────────────────────────────────────────────────────────
+
+func (s *Store) GetTemplates(userID int64) []Template {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []Template
+	for _, tmpl := range s.templates {
+		if tmpl.Scope == "public" || tmpl.CreatedBy == userID {
+			t2 := tmpl
+			t2.ItemCount = len(tmpl.Items)
+			t2.Items = nil // don't send items in list view
+			out = append(out, t2)
+		}
+	}
+	return out
+}
+
+func (s *Store) GetTemplate(id int64) (Template, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, tmpl := range s.templates {
+		if tmpl.ID == id {
+			return tmpl, true
+		}
+	}
+	return Template{}, false
+}
+
+func (s *Store) CreateTemplate(tmpl Template) (Template, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextTemplateID++
+	tmpl.ID = s.nextTemplateID
+	tmpl.CreatedAt = time.Now()
+	tmpl.ItemCount = len(tmpl.Items)
+	s.templates = append(s.templates, tmpl)
+	return tmpl, s.saveFile("templates.json", s.templates)
+}
+
+func (s *Store) DeleteTemplate(id, userID int64, isAdmin bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, tmpl := range s.templates {
+		if tmpl.ID == id {
+			if tmpl.CreatedBy != userID && !isAdmin {
+				return fmt.Errorf("not authorized")
+			}
+			s.templates = append(s.templates[:i], s.templates[i+1:]...)
+			return s.saveFile("templates.json", s.templates)
+		}
+	}
+	return fmt.Errorf("template not found")
+}
+
+// ApplyTemplate creates events from a template offset by baseTime; returns count created.
+func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, createdBy int64, createdByName string) (int, error) {
+	tmpl, ok := s.GetTemplate(id)
+	if !ok {
+		return 0, fmt.Errorf("template not found")
+	}
+	count := 0
+	for _, item := range tmpl.Items {
+		start := baseTime.Add(time.Duration(item.StartOffsetMin) * time.Minute)
+		var end *time.Time
+		if item.DurationMin > 0 {
+			e := start.Add(time.Duration(item.DurationMin) * time.Minute)
+			end = &e
+		}
+		ev := Event{
+			Title:             item.Title,
+			EventType:         item.EventType,
+			Color:             item.Color,
+			Description:       item.Description,
+			StartTime:         start,
+			EndTime:           end,
+			AllDay:            item.AllDay,
+			IsRecurring:       item.IsRecurring,
+			RecurrencePattern: item.RecurrencePattern,
+			Participant:       item.Participant,
+			Status:            StatusPlanned,
+			LayerID:           layerID,
+			CreatedBy:         createdBy,
+			CreatedByName:     createdByName,
+		}
+		if _, err := s.CreateEvent(ev); err == nil {
+			count++
+		}
+	}
+	return count, nil
 }

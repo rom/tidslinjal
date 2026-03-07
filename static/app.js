@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v3.3.0 — Collaborative Operational Timeline
+   Tidslinjal v3.4.0 — Collaborative Operational Timeline
    ============================================================ */
 'use strict';
 
@@ -59,6 +59,16 @@ async function apiGet(p)        { return (await api('GET', p)).json(); }
 async function apiPost(p, b)    { return api('POST', p, b); }
 async function apiPut(p, b)     { return api('PUT', p, b); }
 async function apiDel(p)        { return api('DELETE', p); }
+
+// ── Error display ───────────────────────────────────────────────────────────
+function showError(msg, title) {
+  const modal = document.getElementById('errorModal');
+  if (!modal) { alert(msg); return; }
+  document.getElementById('errorModalTitle').textContent = title || 'Error';
+  document.getElementById('errorModalMsg').textContent  = msg;
+  openModal('errorModal');
+}
+function showConfirm(msg) { return window.confirm(msg); }
 
 // ── Date utilities ─────────────────────────────────────────────────────────
 function startOfDay(d) { const r = new Date(d); r.setHours(0,0,0,0); return r; }
@@ -712,9 +722,50 @@ function navigate(dir) {
   state.startDate = addDays(state.startDate, dir * getRangeDays());
   refreshAll();
 }
+function navJump(days) {
+  const menu = document.getElementById('navJumpMenu');
+  if (menu) menu.style.display = 'none';
+  state.startDate = addDays(state.startDate, (state._navDir || 1) * days);
+  refreshAll();
+}
 function goToday() {
   state.startDate = startOfDay(new Date());
   refreshAll();
+}
+function centerToday() {
+  const today = startOfDay(new Date());
+  state.startDate = addDays(today, -Math.floor(getRangeDays() / 2));
+  refreshAll();
+}
+
+// ── Long-press navigation buttons ──────────────────────────────────────────
+function setupNavLongPress(btn, dir) {
+  if (!btn) return;
+  let timer = null;
+  let longPressed = false;
+
+  btn.addEventListener('mousedown', () => {
+    longPressed = false;
+    timer = setTimeout(() => {
+      longPressed = true;
+      // Show jump dropdown
+      const menu = document.getElementById('navJumpMenu');
+      if (!menu) return;
+      state._navDir = dir;
+      const rect = btn.getBoundingClientRect();
+      menu.style.left = rect.left + 'px';
+      menu.style.top  = (rect.bottom + 4) + 'px';
+      menu.style.display = '';
+    }, 400);
+  });
+
+  btn.addEventListener('mouseup', () => { clearTimeout(timer); });
+  btn.addEventListener('mouseleave', () => { clearTimeout(timer); });
+
+  btn.addEventListener('click', () => {
+    if (longPressed) { longPressed = false; return; } // Handled by long-press
+    navigate(dir);
+  });
 }
 
 // ── Cell click ─────────────────────────────────────────────────────────────
@@ -829,6 +880,14 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   const attachFile = document.getElementById('eventAttachFile');
   if (attachFile) attachFile.value = '';
 
+  // Reset inline alarm section
+  const inlineAlarmCb = document.getElementById('inlineAlarmEnabled');
+  const inlineAlarmOpts = document.getElementById('inlineAlarmOptions');
+  if (inlineAlarmCb) {
+    inlineAlarmCb.checked = false;
+    if (inlineAlarmOpts) inlineAlarmOpts.style.display = 'none';
+  }
+
   const creatorEl = document.getElementById('eventCreator');
   creatorEl.style.display = isEdit ? '' : 'none';
   if (isEdit) creatorEl.textContent = `${t('event_created_by')} ${ev.created_by_name} — ${fmtDateTime(new Date(ev.created_at))}`;
@@ -843,6 +902,12 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   openModal('eventModal');
 }
+
+// Wire up inline alarm checkbox toggle
+document.getElementById('inlineAlarmEnabled')?.addEventListener('change', function() {
+  const opts = document.getElementById('inlineAlarmOptions');
+  if (opts) opts.style.display = this.checked ? '' : 'none';
+});
 
 document.getElementById('eventRecurring').addEventListener('change', function() {
   document.getElementById('recurrenceGroup').style.display    = this.checked ? '' : 'none';
@@ -862,13 +927,13 @@ document.getElementById('eventStart').addEventListener('change', function() {
 document.getElementById('btnSaveEvent').addEventListener('click', async () => {
   const id    = document.getElementById('eventId').value;
   const title = document.getElementById('eventTitle').value.trim();
-  if (!title) { alert(t('event_title') + ' ' + (t('required')||'is required')); return; }
+  if (!title) { showError(t('event_title') + ' is required', 'Validation'); return; }
   const allDay   = document.getElementById('eventAllDay')?.checked || false;
   const typeVal  = document.getElementById('eventType').value;
   const isInstant = typeVal === 'instant';
   const startVal = document.getElementById('eventStart').value;
   const endVal   = document.getElementById('eventEnd').value;
-  if (!allDay && !startVal) { alert(t('event_start') + ' ' + (t('required')||'is required')); return; }
+  if (!allDay && !startVal) { showError(t('event_start') + ' is required', 'Validation'); return; }
 
   const recurring = document.getElementById('eventRecurring').checked;
   const layerVal  = document.getElementById('eventLayer').value;
@@ -910,16 +975,33 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
       const upRes = await apiPost(`/api/events/${eventID}/attachments`, fd);
       if (!upRes.ok) {
         const upErr = await upRes.json();
-        alert('Event saved, but attachment upload failed: ' + upErr.error);
+        showError('Event saved, but attachment upload failed: ' + upErr.error);
       }
       attachFile.value = '';
+    }
+    // Handle inline alarm
+    const alarmCb = document.getElementById('inlineAlarmEnabled');
+    if (alarmCb && alarmCb.checked && !allDay) {
+      const leadTime = parseInt(document.getElementById('inlineAlarmLeadTime').value, 10) || 0;
+      const scope    = document.getElementById('inlineAlarmScope').value;
+      const eventTime = new Date(payload.start_time);
+      // Create alarm for current user
+      await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString() });
+      // If "all invited" and there are invited users, create alarms for them too (admin/oplead only)
+      if (scope === 'all' && hasRole2(state.user.role, 'oplead') && invUserIDs.length > 0) {
+        for (const uid of invUserIDs) {
+          if (uid !== state.user.id) {
+            await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), for_user_id: uid });
+          }
+        }
+      }
     }
     closeModal('eventModal');
     await refreshAll();
     showNotification('success', t(id ? 'notif_event_updated' : 'notif_event_created'));
   } else {
     const err = await res.json();
-    alert('Error: '+err.error);
+    showError(err.error);
   }
 });
 
@@ -931,7 +1013,7 @@ async function patchEventStatus(id, status, rejectionReason) {
     showNotification('success', t('notif_status_changed'));
   } else {
     const err = await res.json();
-    alert('Error: ' + err.error);
+    showError(err.error);
   }
 }
 
@@ -947,7 +1029,7 @@ async function deleteEvent(id) {
     closeModal('eventModal'); closeModal('detailModal');
     await refreshAll();
     showNotification('success', t('notif_event_deleted'));
-  } else { alert('Failed to delete event'); }
+  } else { showError('Failed to delete event'); }
 }
 
 function showRecurDeleteDialog(ev) {
@@ -974,7 +1056,7 @@ function showRecurDeleteDialog(ev) {
       closeModal('eventModal'); closeModal('detailModal');
       await refreshAll();
       showNotification('success', t('notif_event_deleted'));
-    } else { const err = await res.json(); alert('Error: '+err.error); }
+    } else { const err = await res.json(); showError(err.error); }
   };
 
   // "Delete this and all future"
@@ -989,7 +1071,7 @@ function showRecurDeleteDialog(ev) {
       closeModal('eventModal'); closeModal('detailModal');
       await refreshAll();
       showNotification('success', t('notif_event_deleted'));
-    } else { const err = await res.json(); alert('Error: '+err.error); }
+    } else { const err = await res.json(); showError(err.error); }
   };
 
   // "Delete all occurrences"
@@ -1000,7 +1082,7 @@ function showRecurDeleteDialog(ev) {
       closeModal('eventModal'); closeModal('detailModal');
       await refreshAll();
       showNotification('success', t('notif_event_deleted'));
-    } else { alert('Failed to delete event'); }
+    } else { showError('Failed to delete event'); }
   };
 
   openModal('recurDeleteModal');
@@ -1089,7 +1171,7 @@ function showEventDetail(ev) {
         showEventDetail(ev); // refresh
       } else {
         const err = await res.json();
-        alert('Upload failed: '+err.error);
+        showError('Upload failed: ' + err.error);
       }
     };
   }
@@ -1145,7 +1227,7 @@ function showEventDetail(ev) {
     rejBtn.onclick = () => {
       const reason = prompt(t('status_rejection_prompt'));
       if (reason === null) return;
-      if (!reason.trim()) { alert(t('status_rejection_required')); return; }
+      if (!reason.trim()) { showError(t('status_rejection_required'), 'Validation'); return; }
       patchEventStatus(ev.id, 'rejected', reason.trim());
     };
     footer.appendChild(rejBtn);
@@ -1193,7 +1275,7 @@ async function submitComment(eventId) {
     showNotification('success', t('notif_saved'));
   } else {
     const err = await res.json();
-    alert('Error: ' + err.error);
+    showError(err.error);
   }
 }
 
@@ -1215,7 +1297,7 @@ async function approveComment(commentId, eventId) {
     showNotification('success', t('notif_saved'));
   } else {
     const err = await res.json();
-    alert('Error: ' + err.error);
+    showError(err.error);
   }
 }
 
@@ -1246,7 +1328,7 @@ document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
     closeModal('alarmModal');
     await fetchAlarms(); renderSidebar();
     showNotification('success', t('notif_alarm_set'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteAlarm(id) {
@@ -1266,7 +1348,7 @@ document.getElementById('btnAddLock').addEventListener('click', () => {
 document.getElementById('btnSaveLock').addEventListener('click', async () => {
   const sv = document.getElementById('lockStart').value;
   const ev = document.getElementById('lockEnd').value;
-  if (!sv||!ev) { alert('Start and end required'); return; }
+  if (!sv||!ev) { showError('Start and end required', 'Validation'); return; }
   const res = await apiPost('/api/locks', {
     start_time: new Date(sv).toISOString(),
     end_time:   new Date(ev).toISOString(),
@@ -1275,7 +1357,7 @@ document.getElementById('btnSaveLock').addEventListener('click', async () => {
   if (res.ok) {
     closeModal('lockModal'); await fetchLocks(); renderTimeline();
     showNotification('success', t('notif_locked'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteLock(id) {
@@ -1328,21 +1410,21 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
   const displayName = document.getElementById('uDisplayName').value.trim();
   const role = document.getElementById('uRole').value;
   const canLock = document.getElementById('uCanLock').checked;
-  if (!id && (!username||!password)) { alert('Username and password required'); return; }
+  if (!id && (!username||!password)) { showError('Username and password required', 'Validation'); return; }
   const groupIDs = [...document.querySelectorAll('input[name="uGroup"]:checked')].map(cb => parseInt(cb.value, 10));
   const payload = {display_name:displayName, role, can_lock:canLock, group_ids:groupIDs};
   if (!id) { payload.username=username; payload.password=password; }
   if (id&&password) { payload.password=password; }
   const res = id ? await apiPut(`/api/users/${id}`, payload) : await apiPost('/api/users', payload);
   if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
-  else { const err = await res.json(); alert('Error: '+err.error); }
+  else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteUser(id) {
   if (!confirm(t('confirm_delete_user'))) return;
   const res = await apiDel(`/api/users/${id}`);
   if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
-  else { alert('Failed to delete user'); }
+  else { showError('Failed to delete user'); }
 }
 
 // ── Group Modal ────────────────────────────────────────────────────────────
@@ -1361,11 +1443,11 @@ function openGroupModal(group) {
 document.getElementById('btnSaveGroup').addEventListener('click', async () => {
   const id = document.getElementById('groupId').value;
   const name = document.getElementById('groupName').value.trim();
-  if (!name) { alert('Name required'); return; }
+  if (!name) { showError('Name required', 'Validation'); return; }
   const payload = {name, description: document.getElementById('groupDesc').value};
   const res = id ? await apiPut(`/api/groups/${id}`, payload) : await apiPost('/api/groups', payload);
   if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
-  else { const err = await res.json(); alert('Error: '+err.error); }
+  else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteGroup(id) {
@@ -1445,7 +1527,7 @@ async function addGroupMember(groupID) {
     const group = state.groups.find(g => g.id === groupID);
     if (group) openMemberModal(group);
     showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 }
 
 async function removeGroupMember(groupID, userID) {
@@ -1455,7 +1537,7 @@ async function removeGroupMember(groupID, userID) {
     const group = state.groups.find(g => g.id === groupID);
     if (group) openMemberModal(group);
     showNotification('success', t('notif_saved'));
-  } else { alert('Failed to remove member'); }
+  } else { showError('Failed to remove member'); }
 }
 
 // ── Layer Modal ────────────────────────────────────────────────────────────
@@ -1504,7 +1586,7 @@ function openLayerModal(layer) {
 document.getElementById('btnSaveLayer').addEventListener('click', async () => {
   const id = document.getElementById('layerId').value;
   const name = document.getElementById('layerName').value.trim();
-  if (!name) { alert('Name required'); return; }
+  if (!name) { showError('Name required', 'Validation'); return; }
   const groupIDs = [...document.querySelectorAll('input[name="layerGroup"]:checked')]
     .map(cb => parseInt(cb.value, 10));
   const payload = {
@@ -1518,7 +1600,7 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
   if (res.ok) {
     closeModal('layerModal'); await fetchLayers(); renderSidebar(); renderTimeline();
     showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteLayer(id) {
@@ -1554,7 +1636,7 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
   const id    = document.getElementById('etypeId').value;
   const key   = document.getElementById('etypeKey').value.trim().replace(/\s+/g,'_');
   const label = document.getElementById('etypeLabel').value.trim();
-  if (!label || (!id && !key)) { alert('Key and label required'); return; }
+  if (!label || (!id && !key)) { showError('Key and label required', 'Validation'); return; }
   const payload = {
     key, label,
     label_sv: document.getElementById('etypeLabelSV').value,
@@ -1567,7 +1649,7 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
     state.eventTypes = await apiGet('/api/event-types');
     renderSidebar(); renderTimeline();
     showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteEtype(id) {
@@ -1578,7 +1660,7 @@ async function deleteEtype(id) {
     state.eventTypes = await apiGet('/api/event-types');
     renderSidebar(); renderTimeline();
     showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 }
 
 // ── Phase Modal ────────────────────────────────────────────────────────────
@@ -1607,10 +1689,10 @@ function openPhaseModal(ph) {
 document.getElementById('btnSavePhase').addEventListener('click', async () => {
   const id    = document.getElementById('phaseId').value;
   const name  = document.getElementById('phaseName').value.trim();
-  if (!name) { alert('Name required'); return; }
+  if (!name) { showError('Name required', 'Validation'); return; }
   const sv = document.getElementById('phaseStart').value;
   const ev = document.getElementById('phaseEnd').value;
-  if (!sv || !ev) { alert('Start and end required'); return; }
+  if (!sv || !ev) { showError('Start and end required', 'Validation'); return; }
   const phaseLayVal = document.getElementById('phaseLayer')?.value;
   const payload = {
     name, color: document.getElementById('phaseColor').value,
@@ -1626,7 +1708,7 @@ document.getElementById('btnSavePhase').addEventListener('click', async () => {
     renderSidebar();
     renderTimeline();
     showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); alert('Error: '+err.error); }
+  } else { const err = await res.json(); showError(err.error); }
 });
 
 async function deletePhase(id) {
@@ -1983,7 +2065,7 @@ async function saveWebhookPref() {
 async function testWebhook() {
   const url  = document.getElementById('prefWebhookURL').value.trim();
   const type = document.getElementById('prefWebhookType').value;
-  if (!url) { alert(t('settings_webhook_url_required')); return; }
+  if (!url) { showError(t('settings_webhook_url_required'), 'Validation'); return; }
   const msg  = 'Tidslinjal webhook test';
   let payload;
   if (type === 'mattermost' || type === 'slack') {
@@ -1995,7 +2077,7 @@ async function testWebhook() {
     const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: payload});
     showNotification('success', `Webhook: ${res.status}`);
   } catch(e) {
-    alert('Webhook test failed: ' + e.message);
+    showError('Webhook test failed: ' + e.message);
   }
 }
 
@@ -2055,7 +2137,7 @@ async function saveExercise() {
     showNotification('success', t('notif_saved'));
   } else {
     const err = await res.json();
-    alert('Error: ' + err.error);
+    showError(err.error);
   }
 }
 
@@ -2101,7 +2183,7 @@ async function toggleType(key) {
   renderTimeline();
 }
 
-async function toggleLayer(id) {
+function toggleLayer(id) {
   // Exclusion model: hidden_layers lists what to hide; toggling flips visibility
   const hl = state.preferences.hidden_layers || [];
   if (hl.includes(id)) {
@@ -2109,20 +2191,22 @@ async function toggleLayer(id) {
   } else {
     state.preferences.hidden_layers = [...hl, id]; // hide
   }
-  await savePreferences();
+  // Immediate visual update, save in background
   renderSidebar();
   renderTimeline();
   const pop = document.getElementById('layerPopover');
   if (pop && pop.style.display !== 'none') renderLayerPopover();
+  savePreferences(); // fire-and-forget
 }
 
-async function toggleAllLayers() {
+function toggleAllLayers() {
   state.preferences.hidden_layers = []; // show all layers
-  await savePreferences();
+  // Immediate visual update, save in background
   renderSidebar();
   renderTimeline();
   const pop = document.getElementById('layerPopover');
   if (pop && pop.style.display !== 'none') renderLayerPopover();
+  savePreferences(); // fire-and-forget
 }
 
 function hasRole2(userRole, required) {
@@ -2501,9 +2585,9 @@ function openImportModal() {
 
 async function doImport() {
   const fileEl = document.getElementById('importFile');
-  if (!fileEl || !fileEl.files.length) { alert('Please select a JSON export file.'); return; }
+  if (!fileEl || !fileEl.files.length) { showError('Please select a JSON export file.', 'Validation'); return; }
   const cats = [...document.querySelectorAll('.import-cat-cb:checked')].map(cb => cb.value);
-  if (!cats.length) { alert('Select at least one category to import.'); return; }
+  if (!cats.length) { showError('Select at least one category to import.', 'Validation'); return; }
   const reassign = document.getElementById('importReassign')?.checked || false;
   const fd = new FormData();
   fd.append('data', fileEl.files[0]);
@@ -2519,13 +2603,13 @@ async function doImport() {
     showNotification('success', 'Import complete');
   } else {
     const err = await res.json();
-    alert('Import failed: ' + err.error);
+    showError('Import failed: ' + err.error);
   }
 }
 
 function exportCSV() {
   const events = state.events;
-  if (!events.length) { alert('No events in the current view to export.'); return; }
+  if (!events.length) { showError('No events in the current view to export.', 'Validation'); return; }
   const headers = ['ID','Title','Type','Status','Start','End','All Day','Participant','Layer','Created By','Description'];
   const rows = events.map(ev => [
     ev.id,
@@ -2552,6 +2636,151 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
+// ── Templates ──────────────────────────────────────────────────────────────
+async function openTemplatesModal() {
+  await renderTemplatesList();
+  // Wire up save button
+  const btn = document.getElementById('btnSaveTemplate');
+  if (btn) btn.onclick = openSaveTemplateDialog;
+  openModal('templatesModal');
+}
+
+async function renderTemplatesList() {
+  const listEl = document.getElementById('templatesList');
+  if (!listEl) return;
+  const templates = await apiGet('/api/templates') || [];
+  if (!templates.length) {
+    listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No templates yet. Save the current events as a template to get started.</p>`;
+    return;
+  }
+  listEl.innerHTML = templates.map(tmpl => `
+    <div class="tmpl-card">
+      <div class="tmpl-card-info">
+        <div class="tmpl-card-name">${escHtml(tmpl.name)}</div>
+        <div class="tmpl-card-meta">
+          ${tmpl.item_count || 0} event${(tmpl.item_count||0)!==1?'s':''} ·
+          ${tmpl.scope === 'private' ? '🔒 Private' : '🌐 Public'} ·
+          by ${escHtml(tmpl.created_by_name||'—')}
+          ${tmpl.description ? ' · ' + escHtml(tmpl.description) : ''}
+        </div>
+      </div>
+      <div class="tmpl-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id}, ${JSON.stringify(escHtml(tmpl.name))}, ${tmpl.item_count||0})">▶ Apply</button>
+        ${(state.user && (state.user.id === tmpl.created_by || hasRole2(state.user.role, 'admin')))
+          ? `<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${tmpl.id})">Delete</button>`
+          : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openSaveTemplateDialog() {
+  const evCount = state.events.length;
+  const el = document.getElementById('tmplEventCount');
+  if (el) el.textContent = `Will save ${evCount} event${evCount!==1?'s':''} from the current view.`;
+  document.getElementById('tmplName').value = '';
+  document.getElementById('tmplDescription').value = '';
+  document.getElementById('tmplScope').value = 'private';
+  // Role-based visibility
+  const scopeSel = document.getElementById('tmplScope');
+  if (scopeSel) {
+    const isPriv = hasRole2(state.user?.role, 'oplead');
+    [...scopeSel.options].forEach(opt => {
+      if (opt.value === 'public') opt.hidden = !isPriv;
+    });
+  }
+  document.getElementById('btnConfirmSaveTemplate').onclick = confirmSaveTemplate;
+  openModal('saveTemplateModal');
+}
+
+async function confirmSaveTemplate() {
+  const name = document.getElementById('tmplName').value.trim();
+  if (!name) { showError('Template name is required.', 'Validation'); return; }
+  const scope = document.getElementById('tmplScope').value;
+  // Build items from current events
+  const events = state.events;
+  if (!events.length) { showError('No events in current view.', 'Validation'); return; }
+  // Find earliest start to anchor offsets
+  const earliest = Math.min(...events.map(e => new Date(e.start_time).getTime()));
+  const items = events.map(e => {
+    const startMs = new Date(e.start_time).getTime();
+    const endMs   = e.end_time ? new Date(e.end_time).getTime() : null;
+    return {
+      title:              e.title,
+      event_type:         e.event_type,
+      color:              e.color,
+      description:        e.description || '',
+      start_offset_min:   Math.round((startMs - earliest) / 60000),
+      duration_min:       endMs ? Math.round((endMs - startMs) / 60000) : 0,
+      all_day:            e.all_day,
+      is_recurring:       e.is_recurring,
+      recurrence_pattern: e.recurrence_pattern || '',
+      participant:        e.participant || '',
+    };
+  });
+  const payload = {
+    name,
+    description: document.getElementById('tmplDescription').value.trim(),
+    scope,
+    items,
+  };
+  const res = await apiPost('/api/templates', payload);
+  if (res.ok) {
+    closeModal('saveTemplateModal');
+    showNotification('success', 'Template saved');
+    renderTemplatesList();
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+function openApplyTemplateDialog(id, name, itemCount) {
+  document.getElementById('applyTemplateInfo').textContent =
+    `Apply template "${name}" (${itemCount} event${itemCount!==1?'s':''})`;
+  document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
+  // Populate layer select
+  const layerSel = document.getElementById('applyTemplateLayer');
+  layerSel.innerHTML = `<option value="">Master Timeline</option>` +
+    state.layers.filter(l => l.owner_id===state.user.id || l.permission==='readwrite')
+      .map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+  document.getElementById('btnConfirmApplyTemplate').onclick = () => confirmApplyTemplate(id);
+  openModal('applyTemplateModal');
+}
+
+async function confirmApplyTemplate(id) {
+  const baseVal   = document.getElementById('applyTemplateBase').value;
+  if (!baseVal) { showError('Please select a base date/time.', 'Validation'); return; }
+  const layerVal  = document.getElementById('applyTemplateLayer').value;
+  const payload   = {
+    base_time: new Date(baseVal).toISOString(),
+    layer_id:  layerVal ? parseInt(layerVal, 10) : null,
+  };
+  const res = await apiPost(`/api/templates/${id}/apply`, payload);
+  if (res.ok) {
+    const r = await res.json();
+    closeModal('applyTemplateModal');
+    closeModal('templatesModal');
+    await refreshAll();
+    showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  const res = await apiDel(`/api/templates/${id}`);
+  if (res.ok) {
+    showNotification('success', 'Template deleted');
+    renderTemplatesList();
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
 // ── ICS Export ─────────────────────────────────────────────────────────────
 function toICSDate(d) {
   const pad = n => String(n).padStart(2,'0');
@@ -2562,7 +2791,7 @@ function escICS(s) {
 }
 function exportICS() {
   const events = state.events;
-  if (!events.length) { alert('No events in the current view to export.'); return; }
+  if (!events.length) { showError('No events in the current view to export.', 'Validation'); return; }
   let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tidslinjal//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
   for (const ev of events) {
     const evStart = new Date(ev.start_time);
@@ -2762,7 +2991,7 @@ function setupDragToReschedule() {
       showNotification('success', t('notif_event_updated'));
     } else {
       const err = await res.json();
-      alert('Error: ' + (err.error || 'could not reschedule'));
+      showError(err.error || 'Could not reschedule');
       if (dragOrigEl) dragOrigEl.style.opacity = '';
     }
     dragEvId = null; dragOrigEl = null;
@@ -2858,7 +3087,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const newPw  = document.getElementById('pwdNew')?.value?.trim()    || '';
       const conPw  = document.getElementById('pwdConfirm')?.value?.trim() || '';
       if (!newPw || newPw !== conPw) {
-        alert(t('password_mismatch')||'Passwords do not match'); return;
+        showError(t('password_mismatch') || 'Passwords do not match', 'Validation'); return;
       }
       const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
       if (res.ok) {
@@ -2866,7 +3095,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showNotification('success', t('password_saved')||'Password changed');
       } else {
         const err = await res.json();
-        alert('Error: ' + err.error);
+        showError(err.error);
       }
     });
   }
@@ -2875,7 +3104,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnExport) {
     btnExport.addEventListener('click', async () => {
       const res = await api('GET', '/api/export');
-      if (!res.ok) { alert('Export failed'); return; }
+      if (!res.ok) { showError('Export failed'); return; }
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -3148,6 +3377,10 @@ async function init() {
         vLink.title = t('github_link') || 'GitHub Repository';
       }
     }
+    const helpVer = document.getElementById('helpVersionLine');
+    if (helpVer && vInfo) {
+      helpVer.textContent = `Tidslinjal v${vInfo.version || '?'} — ${vInfo.github || ''}`;
+    }
   } catch { /* ignore */ }
 
   // User info in header
@@ -3177,24 +3410,31 @@ async function init() {
   document.getElementById('resolutionSelect').addEventListener('change', e => {
     state.resolution = e.target.value; refreshAll();
   });
-  document.getElementById('btnPrev').addEventListener('click',   () => navigate(-1));
-  document.getElementById('btnNext').addEventListener('click',   () => navigate(1));
+  // Long-press on prev/next: show jump menu; short click: navigate by current range
+  setupNavLongPress(document.getElementById('btnPrev'), -1);
+  setupNavLongPress(document.getElementById('btnNext'),  1);
   document.getElementById('btnToday').addEventListener('click',  goToday);
-  document.getElementById('btnZoomNow').addEventListener('click', zoomToNow);
+  document.getElementById('btnCenterToday').addEventListener('click', centerToday);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport')?.addEventListener('click', openImportModal);
+  document.getElementById('btnTemplates')?.addEventListener('click', openTemplatesModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;
     renderTimeline();
   });
-  // Close layer popover when clicking outside
+  // Close layer popover and nav jump menu when clicking outside
   document.addEventListener('click', e => {
     const pop = document.getElementById('layerPopover');
     if (pop && pop.style.display !== 'none' &&
         !pop.contains(e.target) && e.target.id !== 'btnLayerToggle') {
       pop.style.display = 'none';
+    }
+    const njm = document.getElementById('navJumpMenu');
+    if (njm && njm.style.display !== 'none' &&
+        !njm.contains(e.target) && e.target.id !== 'btnPrev' && e.target.id !== 'btnNext') {
+      njm.style.display = 'none';
     }
   });
   document.getElementById('btnSidebar').addEventListener('click', () => {

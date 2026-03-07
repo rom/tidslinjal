@@ -1,91 +1,48 @@
-# Tidslinjal v3.1.0
+# Tidslinjal v3.4.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
 
 ---
 
+## What's New in v3.4.0
+
+- **Prettier error messages** — browser `alert()` dialogs replaced with styled in-app error modals that match the app visual language
+- **Inline alarm on event creation/editing** — set a personal alarm directly in the Add/Edit Event modal; choose lead time and whether the alarm is for yourself only or all invited persons (Ops Lead+)
+- **Long-press nav buttons** — short click on ‹/› steps by the current view span as before; hold the button for >400 ms to open a jump-size dropdown (1 day / 2 days / 3 days / 1 week / 2 weeks)
+- **Center Today button** — new ⊙ Center button centers the current date in the view so days before and after today are visible
+- **Templates** — save the current view's events as a named, reusable template (private or public). Apply any template to a chosen base date to create events with offset times. Accessible via the 📋 Templates toolbar button
+- **Layer toggle is now instant** — clicking layers in the 🗂 popover immediately updates the timeline; preferences save in the background
+- **Prettier Help popup** — redesigned help modal with sectioned cards, color-coded icons, styled keyboard shortcut pills, and a version line in the footer
+- **Remove duplicate "goto now" button** — the ⏱ scroll-to-now button has been replaced by ⊙ Center (more useful); the Today button already handles jumping to now
+- **Version bump to 3.4.0**
+
+## What's New in v3.3.0
+
+- **Responsive design overhaul** — mobile bottom nav, tablet overlay sidebar, improved out-of-hours contrast
+- **Assigned Task event type** — orange #E67E22; Swedish/French translations included
+- **Responsible field** — per-event responsible user (dropdown, defaults to creator)
+- **Recurring events hidden outside day hours** — recurring instances are not shown in grayed slots
+- **Print/report improvements** — layer selection checkboxes, duration column, Responsible column in all report types
+- **Layer exclusion model** — `hidden_layers` array replaces `active_layers`; unselected layers hide immediately
+- **Invited field on events** — multi-select users + groups; invited persons receive SSE in-app notifications
+- **Ops Lead can pause/unpause timeline** (was admin-only)
+- **Phase layer assignment** — phases can be attached to specific layers
+- **Synthetic time day-hours-only** — H+N count skips out-of-hours periods; red line hidden outside day hours
+- **Full-width events** — events with no overlapping neighbours span the full column width
+- **Export/import selection** — select which categories to include (events/groups/layers/alarms; users/phases for admins)
+- **Import modal** — JSON file import with category checkboxes, reassign-ownership option, result counts
+- **Auto-create layer on group creation** — a layer with the same name/description is created automatically
+- **Recurring delete dialog** — three-option modal: delete this occurrence / this + all future / entire series
+
 ## What's New in v3.1.0
 
 - **STARTEX / ENDEX** — Exercise epoch renamed to "STARTEX"; new "ENDEX" field for end-of-exercise datetime in Settings
 - **Instant event type** — single-point-in-time marker (no end time); rendered as a thin vertical bar with a ◆ diamond
-- **Möte (Meeting) event type** — dedicated meeting type with a distinct blue color
-- **Intern / Extern attribute** — new per-event participant field (`intern` / `extern` / none); shown as colored badge on event blocks
+- **Möte (Meeting) event type** — dedicated meeting type with a distinct color
+- **Intern / Extern attribute** — new per-event participant field; shown as colored badge on event blocks
 - **Unified Export modal** — single ⬇ Export button opens a modal to select ICS, JSON, or CSV format
 - **CSV export** — export current view events to a spreadsheet-ready CSV file
-- **Date/time format preference** — select ISO 8601, UK (DD/MM/YYYY), FR (DD.MM.YYYY), or SV format in Settings
-- **Default view applies immediately** — changing the default view in Settings also switches the current view
-- **`/admin-view` page** — admin-only dashboard showing system info, stats, exercise settings, user table, and audit log
-- **CLI flags** — `--host` (bind interface), `--port`, `--data`, `--verbose`, `--debug`
-- **Zoom font/icon scaling** — event text and icons scale proportionally with the drag-to-zoom factor
-- **Full i18n audit** — all UI strings in all 3 locales (EN / SV / FR); missing translations backfilled
-- **Version bump to 3.1.0**
-
-## What's New in v3.0.0
-
-- **Reporter role** — new `reporter` role between Read and Read/Write: reporters can comment on events and set statuses to `responded_to` or `completed`; status-changing comments require Team Lead approval
-- **Event comments** — threaded comments on every event with author, timestamp, and pending-approval workflow for reporters
-- **`responded_to` status** — new event lifecycle step between `active` and `completed`
-- **Exercise phases** — up to 10 visually distinct overlaid blocks on the timeline (name, color, start/end); managed in the new **Phases** sidebar tab (Team Lead+)
-- **All-day / day-only events** — events with no specific time display in the ghosted area; create with the "All-day" checkbox
-- **Recurring event occurrences** — recurring events now expand and render all occurrences in the current view; clicking any instance opens the master event
-- **Current-time red line options** — configurable on/off, color, width, and style (solid/dashed/dotted) from Settings
-- **H+N synthetic labels** — toggleable H+N hour labels on the red line and on the time column for exercise contexts
-- **Timeline freeze / pause** — pause progression of synthetic time for exercise review; "Freeze" button in Settings
-- **Admin sees all layers** — admins now see all users' layers in the Layers sidebar
-- **Horizontal drag-to-pan** — drag the timeline horizontally to scroll; drag >40% of visible width to navigate to the adjacent date range
-- **Keyboard shortcuts** — `←` / `→` navigate dates, `T` go today, `N` scroll to now, `E` add event, `?` help, `Esc` close modal, `+` / `-` zoom
-- **User creation with group assignment** — user create/edit dialog includes group multi-select
-- **Group member list in sidebar** — groups tab shows members; 👥 button opens member management
-- **Password change** — 🔑 key button in header opens self-service password change dialog
-- **Full data export** — admin-only JSON export of all data (events, users, groups, layers, settings, alarms) via ⬇ Export Data button
-- **Printable / exportable reports** — 📄 Report button generates AAR, per-layer, or timeline snapshot HTML reports (download or print to PDF)
-- **Configurable default view** — save your preferred date range (day / 2-day / 3-day / 4-day / week) as default in Settings
-- **Out-of-hours toggle** — toggle visibility of ghosted time slots outside configured day hours
-- **"Last updated" timestamp** — shown in event detail when the event was modified after creation
-- **Sidebar toggle glitch fixed** — event blocks correctly reposition when the sidebar opens or closes
-- **Version bump to 3.0.0**
-
-## What's New in v2.4.0
-
-- **Start→End time auto-adjust** — when you change the Start time in the Add Event dialog, End time automatically updates to Start + 1 hour
-- **Layer visibility fix** — the 🗂 layer toggle now works correctly; all layers are shown by default, and selecting specific layers in the popover filters them client-side
-- **Overlapping events side-by-side** — events that share the same time slot within a day column are now rendered side-by-side, not overlapping
-- **Event block icons** — small inline icons on event blocks: ↻ (recurring), ✎ (edited since creation), 📎 (has file attachments)
-- **Expanded recurrence patterns** — new options: Every 30 min, Hourly, Every 2/3/4 hours, Quarterly
-- **Full 24-hour scrollable view** — the timeline always shows all 24 hours; slots outside the configured Day Hours window are grayed/striped to indicate no event creation, but you can still scroll through them
-- **Audit log for user management** — user create, update, delete, and login events are now recorded in the audit log
-- **Bigger font size gaps** — more visual difference between Small/Normal/Large/Huge display sizes
-- **Larger real-time clock** — the header clock is bigger and has a subtle glow effect
-- **Online help** — click the **?** button in the header to open a comprehensive in-app help reference covering all features
-- **Left-column event clipping fix** — corrected a cell index calculation bug that could misplace events in multi-day views
-- **Role badge colors** — Team Lead (teal) and Operations Lead (orange) badges are now distinguished from other roles
-
-## What's New in v2.3.0
-
-- **Role-based access control overhaul** — five-level role hierarchy: Read → Read/Write → Team Lead → Operations Lead → Admin. Team Leads can create groups and layers, and verify/reject events. Operations Leads have full master timeline edit rights. Admins manage everything.
-- **Event status workflow** — every event carries a status: `planned → active → completed → submitted → verified / rejected / cancelled`. Team Leads and above can verify or reject submitted events; rejected events require a mandatory rejection reason. Verified events record who verified them and when.
-- **Drag-to-reschedule** — drag any event block on the timeline grid to a new time slot; the backend is updated immediately.
-- **Audit log** — every create, update, delete, verify, and reject action is recorded with user, timestamp, and summary. Team Leads and above can view the log in the new **Audit** sidebar tab. Capped at 10,000 entries.
-- **Webhook / external notification integration** — per-user webhook URL (Mattermost, Slack, or generic JSON POST) fired whenever an alarm triggers. Configure in the Settings sidebar tab.
-- **Synthetic / exercise time** — admins configure an exercise epoch (a real ISO datetime that maps to "Day 1 T+0"). When enabled, day headers switch to "Day N" (supports negative days: Day 0, Day -1). A labelled exercise badge appears in the header. Users toggle the display on/off with the 🕐 T+ button.
-- **Mobile-friendly UI** — improved responsive CSS with breakpoints at 768 px and 480 px; toolbar, sidebar, and event blocks all adapt to narrow screens.
-- **Updated i18n** — all new strings available in English, Swedish, and French.
-
-## What's New in v2.2.0
-
-- **Language flags** in the toolbar — switch EN 🇬🇧 / SV 🇸🇪 / FR 🇫🇷 with a single click
-- **Layer quick-toggle** — 🗂 Layers button opens a popover to show/hide any layer instantly
-- **Alarm ACK** — alarm notifications include an **ACK** button; unacknowledged alarms escalate every 60 s (pulsing red) until acknowledged
-- **Attachment on create** — file attachment input added directly to the Add / Edit Event modal
-- **10-minute resolution** — new "10 min" slot granularity
-- **Drag-to-zoom** — click-and-drag on the time column to scale slot heights; double-click to reset
-
-## What's New in v2.1.0
-
-- **Group member management** UI — 👥 button per group in the sidebar
-- **Layer group checkboxes** — named checkboxes replace the raw ID text input
-- **Event search** — live search bar in the toolbar filters event blocks
-- **ICS export** — 📅 Export ICS downloads an iCalendar file of the current view
+- **Date/time format preference** — select ISO 8601, UK, FR, or SV format in Settings
 
 ---
 
@@ -98,39 +55,45 @@
 - **Drag-to-reschedule** — drag event blocks to move them to a new time
 - **Configurable display range** — Day, 2–4 Days, Week, Month, 2–3 Months
 - **Live current-time indicator** — red line across the grid updated every 30 s
-- **Synthetic exercise time** — optional "Day N / T+Xh" display with admin-configurable epoch
+- **Synthetic exercise time** — optional "Day N / T+Xh" display with configurable epoch
 - **Event search** — live filter by title, description, or creator
+- **Long-press navigation** — hold ‹/› for jump-size menu; short click steps by current view
 
 ### Event Management & Status Workflow
-Eight built-in event types (plus custom types):
+Nine built-in event types (plus custom types):
 
 | Type | Description | Default Color |
 |---|---|---|
 | **Event** | General occurrence | Blue |
 | **Instant** | Single-point-in-time marker (no end time) | Orange |
-| **Meeting (Möte)** | Scheduled meeting | Blue |
-| **Decision** | Decision point | Orange |
+| **Meeting (Möte)** | Scheduled meeting | Grey |
+| **Decision** | Decision point | Green |
 | **Deadline** | Hard deadline | Red |
-| **Activity** | Planned work | Green |
+| **Activity** | Planned work | Light Green |
 | **Repeated** | Recurring activity | Purple |
 | **Reporting** | Report / briefing | Teal |
+| **Assigned Task** | Delegated task | Orange |
 
 Each event carries:
 - Title, description, type, custom color
 - Start time and optional end time; optional recurrence
-- **Participant** — intern, extern, or none (shown as colored badge on event block)
-- **Day-only** — checkbox to mark an event with no specific time
+- **Participant** — intern, extern, or none
+- **Responsible** — assigned user (defaults to creator)
+- **Invited** — multi-select users and groups (notified on creation)
+- **Inline alarm** — set alarm at creation/edit time for yourself or all invited
+- **Day-only** — no specific time (shown in all-day area)
 - Layer assignment (master timeline or named layer)
 - **Status** — planned / active / responded_to / completed / submitted / verified / rejected / cancelled
-- Verification record (verified by, verified at) or rejection reason
 - File attachments (up to 25 MB)
 
-Status progression (who can act):
-| Transition | Who |
-|---|---|
-| Any → any (except verify/reject) | Creator / Team Lead+ |
-| Submitted → Verified | Team Lead+ (records verified_by, verified_at) |
-| Submitted → Rejected | Team Lead+ (requires rejection_reason) |
+### Templates
+Save and reuse sets of events:
+- Click **📋 Templates** in the toolbar to manage templates
+- **Save**: stores all events in the current view with relative time offsets from the earliest event
+- **Apply**: choose a base date/time — all events are re-created offset from that moment
+- **Private** templates are yours only; **Public** templates are visible to all users
+- Only Ops Lead+ may create public templates with master-timeline events
+- Delete your own templates (admins can delete any)
 
 ### Layers
 Named overlays on top of the master timeline:
@@ -138,22 +101,23 @@ Named overlays on top of the master timeline:
 - **Groups** — shared with specific user groups (read or read/write)
 - **Public** — visible to all authenticated users
 
-Events on a layer show a colored left border. Toggle layers on/off via the 🗂 toolbar button or the Layers sidebar tab.
+Toggle layers on/off with the **🗂 Layers** toolbar button; changes are instant.
 
 ### Access Control
 
 | Role | Capabilities |
 |---|---|
-| **Read** | View timeline, events, layers; set personal alarms |
+| **Read** | View timeline, events, layers; set personal alarms; comment on events |
+| **Reporter** | + Set event status to Responded To / Completed (requires Team Lead approval) |
 | **Read/Write** | + Create/edit own events on accessible layers; create event types and layers |
-| **Team Lead** | + Create groups and layers; verify/reject submitted events; view audit log |
-| **Operations Lead** | + Create/edit/delete master-timeline events |
-| **Admin** | Full access — manage users, roles, locks, exercise settings |
-
-A `can_lock` flag can also be granted to non-admin users.
+| **Team Lead** | + Create groups; verify/reject events; manage phases; approve reporter status changes; view audit log |
+| **Operations Lead** | + Create/edit/delete master-timeline events; manage exercise settings; pause timeline; create public templates; create alarms for other users |
+| **Admin** | Full access — manage users, roles, locks, exercise settings; export all data |
 
 ### Personal Alarms & Webhooks
-- Per-user reminder on any event (lead times: at time, 5/10/15/30/60 min before)
+- Per-user reminder on any event (lead times: at time, 5/10/15/30/60/120 min before)
+- Set alarm **inline** while creating/editing an event, or from the Detail view
+- When setting inline alarm with invited users, Ops Lead+ can notify all invited persons
 - Delivered via **SSE** in real time; optional browser push notification
 - ACK button on notifications — unacknowledged alarms escalate (orange → pulsing red)
 - **Webhook integration** — per-user webhook URL fires on alarm trigger
@@ -161,39 +125,15 @@ A `can_lock` flag can also be granted to non-admin users.
 
 ### Audit Log
 - Every create, update, delete, verify, and reject action is logged
-- Records: timestamp, user, action type, entity type/ID, summary
 - Accessible by Team Leads and above in the **Audit** sidebar tab
 - Capped at 10,000 most-recent entries
 
 ### Synthetic / Exercise Time
-- Admin sets an **exercise epoch** (real datetime = Day 1 T+0) and an optional exercise name
+- Ops Lead+ sets an **exercise epoch** (real datetime = Day 1 T+0) and an optional exercise name
 - Users toggle "exercise time mode" with the 🕐 T+ toolbar button
 - Day headers display "Day N" (Day -1, Day 0, Day 1 … all supported)
-- Exercise name badge displayed in the header when active
-
-### File Attachments
-- Attach files to any event (up to 25 MB)
-- Attachment added during event creation or from the detail view
-- Download or delete from the event detail view
-
-### Time Slot Locking
-- Admin and `can_lock` users can lock any time range
-- Locked slots shown with a red hatched overlay; reason and creator recorded
-
-### Per-User Preferences (persisted server-side)
-| Preference | Options |
-|---|---|
-| Theme | Dark / Light |
-| Display size | Small / Normal / Large / Huge |
-| Language | English / Svenska / Français |
-| Day start hour | 0–23 |
-| Day end hour | 1–24 |
-| Default view | Day / 2 Days / 3 Days / 4 Days / Week |
-| Date/time format | ISO 8601 / UK / FR / SV |
-| Hidden event types | Toggle per type |
-| Active layers | Toggle per layer |
-| Webhook URL | Any HTTP(S) endpoint |
-| Webhook type | Mattermost / Slack / Generic |
+- **Day-hours-only** option counts H+N only within configured day hours
+- **Freeze / pause** timeline progression for planning reviews
 
 ---
 
@@ -204,7 +144,7 @@ A `can_lock` flag can also be granted to non-admin users.
 | Backend | Go 1.21+ (standard library + `golang.org/x/crypto`) |
 | Persistence | JSON file store (no external database required) |
 | Frontend | Vanilla HTML5 / CSS3 / JavaScript — no frameworks |
-| Auth | Cookie-based sessions, bcrypt passwords |
+| Auth | Cookie-based sessions, bcrypt passwords; optional OIDC SSO |
 | Real-time | Server-Sent Events (SSE) |
 | i18n | Client-side translation dictionary (EN / SV / FR) |
 
@@ -243,15 +183,7 @@ Password: admin
 | `--host` | `HOST` | `` (all interfaces) | Listen interface/address |
 | `--data` | `DATA_DIR` | `data` | Data directory for JSON files and attachments |
 | `--verbose` | — | `false` | Enable verbose log output |
-| `--debug` | — | `false` | Enable debug log output (implies verbose) |
-
-```bash
-# Bind to localhost only, debug mode
-./tidslinjal --host 127.0.0.1 --port 9000 --data /var/lib/tidslinjal --verbose
-
-# Environment variables
-PORT=9000 DATA_DIR=/var/lib/tidslinjal ./tidslinjal
-```
+| `--debug` | — | `false` | Enable debug log output |
 
 ---
 
@@ -274,6 +206,9 @@ data/
 ├── sessions.json      # Active login sessions
 ├── audit.json         # Audit log (max 10 000 entries)
 ├── exercise.json      # Exercise / synthetic time settings
+├── comments.json      # Event comments
+├── phases.json        # Exercise phases
+├── templates.json     # Event templates
 └── attachments/       # Uploaded files
 ```
 
@@ -284,45 +219,43 @@ Back up by copying the `data/` directory.
 ## Usage Guide
 
 ### Navigating the Timeline
-- **‹ / ›** — step back/forward by the current display range
+- **‹ / ›** — short click: step back/forward by current view; long press: choose jump size
 - **Today** — jump to current date
-- **⏱** — scroll to current time
+- **⊙ Center** — center today in the view so dates before and after are visible
 - **Show** dropdown — select date range
 - **Resolution** dropdown — select slot granularity
 - **🕐 T+** button (when exercise is enabled) — toggle synthetic time display
 
 ### Adding Events
 1. Click any empty cell in the grid, or use **+ Add Event**
-2. Choose type, times, status, layer, and optional recurrence
-3. Attach a file if needed, then click **Save**
+2. Choose type, times, status, layer, responsible user, and optional invited persons
+3. Enable **🔔 Set alarm** if you want a reminder; choose lead time and notify scope
+4. Attach a file if needed, then click **Save**
 
-### Rescheduling Events
-Click and drag any event block to a new time slot; release to confirm.
-
-### Event Status Workflow
-1. Creator sets status to `submitted` when ready for review
-2. Team Lead opens the event detail view; clicks **Verify** or **Reject**
-3. Rejections require a reason; verifications are timestamped
+### Templates
+1. Navigate to the date range with the events you want to template
+2. Click **📋 Templates** → **💾 Save current events as template…**
+3. Name the template, optionally add a description, choose Private or Public
+4. To apply: click **▶ Apply** next to any template, choose a base date, and click Create Events
 
 ### Layers
-1. Open the **Layers** sidebar tab or click **🗂** in the toolbar
-2. Click **+ New Layer**; set name, color, visibility, and permissions
-3. Toggle layers on/off from the toolbar popover or sidebar
+1. Click **🗂 Layers** in the toolbar — popover shows all layers with checkboxes
+2. Click any layer to instantly show/hide it on the timeline
+3. Manage layers (create, edit, share) in the **Layers** sidebar tab
 
 ### Audit Log (Team Lead+)
 Open the **Audit** sidebar tab to see a timestamped list of all actions.
 
 ### Webhook Notifications
 1. Open the **Settings** sidebar tab
-2. Enter a webhook URL (Mattermost incoming webhook, Slack, or any HTTP endpoint)
-3. Select the format type and click **Test** to verify
-4. Alarms will now also POST to the webhook when they fire
+2. Enter a webhook URL and select the format type
+3. Click **Test** to verify, then **Save**
 
-### Exercise / Synthetic Time (Admin)
-1. Open the **Settings** sidebar tab (Admin only section)
-2. Enter the exercise name and epoch (the real datetime that equals Day 1 T+0)
+### Exercise / Synthetic Time (Ops Lead+)
+1. Open the **Settings** sidebar tab → Exercise Settings section
+2. Enter the exercise name, STARTEX (epoch), and optional ENDEX
 3. Check **Enable synthetic time display** and click **Save**
-4. Users see the 🕐 T+ button appear in the toolbar; click to toggle
+4. Users see the 🕐 T+ button appear; click to toggle
 
 ---
 
@@ -331,8 +264,8 @@ Open the **Audit** sidebar tab to see a timestamped list of all actions.
 ```
 tidslinjal/
 ├── main.go          # Server, routing, all HTTP handlers, SSE, alarm scheduler
-├── models.go        # All data types, roles, event status, audit, exercise
-├── store.go         # Thread-safe JSON file store; audit + exercise methods
+├── models.go        # All data types, roles, event status, audit, exercise, templates
+├── store.go         # Thread-safe JSON file store; all CRUD methods
 ├── go.mod / go.sum
 ├── data/            # Runtime data (auto-created)
 └── static/
@@ -342,16 +275,6 @@ tidslinjal/
     ├── app.js       # Timeline engine, all UI logic
     └── style.css    # Dark + light themes, 4 size variants, mobile CSS
 ```
-
-### Admin View
-
-Navigate to `/admin-view` (admin role required) for a dashboard showing:
-- System version and data directory
-- User, group, layer, and event counts
-- Exercise STARTEX / ENDEX settings
-- Full user table with roles
-- Audit log (last 50 entries)
-- Full JSON export download link
 
 ### API Endpoints
 
@@ -370,11 +293,12 @@ Navigate to `/admin-view` (admin role required) for a dashboard showing:
 | `GET` | `/api/events?from=&to=` | Any | List events in range |
 | `POST` | `/api/events` | RW+ | Create event |
 | `PUT` | `/api/events/:id` | Creator/RW+ | Update event |
-| `PATCH` | `/api/events/:id/status` | TeamLead+ | Verify / reject / change status |
+| `PATCH` | `/api/events/:id/status` | Various | Change status / verify / reject |
 | `DELETE` | `/api/events/:id` | Creator/Admin | Delete event |
 | `GET/POST` | `/api/events/:id/attachments` | Any/Auth | List / upload attachment |
 | `GET` | `/api/attachments/:id` | Any | Download attachment |
 | `DELETE` | `/api/attachments/:id` | Owner/Admin | Delete attachment |
+| `GET/POST` | `/api/events/:id/comments` | Any | List / add comments |
 | `GET` | `/api/layers` | Any | Visible layers |
 | `POST` | `/api/layers` | Any | Create layer |
 | `PUT` | `/api/layers/:id` | Owner/Admin | Update layer |
@@ -389,12 +313,21 @@ Navigate to `/admin-view` (admin role required) for a dashboard showing:
 | `GET` | `/api/notifications/stream` | Any | SSE alarm stream |
 | `GET/POST` | `/api/locks` | Any | List / create locks |
 | `DELETE` | `/api/locks/:id` | Admin/CanLock | Delete lock |
-| `GET/POST` | `/api/users` | Admin | List / create users |
+| `GET/POST` | `/api/users` | Read+/Admin | List / create users |
 | `PUT` | `/api/users/:id` | Admin/Self | Update user |
 | `DELETE` | `/api/users/:id` | Admin | Delete user |
 | `GET` | `/api/audit` | TeamLead+ | Audit log (newest first) |
 | `GET` | `/api/exercise` | Any | Exercise settings |
-| `PUT` | `/api/exercise` | Admin | Update exercise settings |
+| `PUT` | `/api/exercise` | OpLead+ | Update exercise settings |
+| `GET` | `/api/phases` | Any | List phases |
+| `POST` | `/api/phases` | TeamLead+ | Create phase |
+| `PUT/DELETE` | `/api/phases/:id` | Creator/Admin | Update / delete phase |
+| `GET` | `/api/export` | Any | Export data as JSON |
+| `POST` | `/api/import` | Any | Import data from JSON |
+| `GET` | `/api/templates` | Any | List templates |
+| `POST` | `/api/templates` | Any | Create template |
+| `DELETE` | `/api/templates/:id` | Owner/Admin | Delete template |
+| `POST` | `/api/templates/:id/apply` | Any | Apply template to base time |
 
 ---
 

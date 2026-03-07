@@ -1168,8 +1168,9 @@ func (app *App) handleGetAlarms(w http.ResponseWriter, r *http.Request, user *Us
 
 func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		EventID  int64 `json:"event_id"`
-		LeadTime int   `json:"lead_time"`
+		EventID   int64 `json:"event_id"`
+		LeadTime  int   `json:"lead_time"`
+		ForUserID int64 `json:"for_user_id"` // optional: create alarm for another user (oplead+ only)
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1180,8 +1181,16 @@ func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "event not found", http.StatusNotFound)
 		return
 	}
+	targetUserID := user.ID
+	if req.ForUserID != 0 && req.ForUserID != user.ID {
+		if !hasRole(user.Role, RoleOpLead) {
+			jsonError(w, "only operations leads and admins may create alarms for other users", http.StatusForbidden)
+			return
+		}
+		targetUserID = req.ForUserID
+	}
 	created, err := app.store.CreateAlarm(Alarm{
-		UserID: user.ID, EventID: req.EventID,
+		UserID: targetUserID, EventID: req.EventID,
 		EventTitle: event.Title, EventTime: event.StartTime, LeadTime: req.LeadTime,
 	})
 	if err != nil {
@@ -1698,6 +1707,103 @@ func parseCommaSet(s string) map[string]bool {
 	return m
 }
 
+// ── Template handlers ─────────────────────────────────────────────────────
+
+func (app *App) handleGetTemplates(w http.ResponseWriter, r *http.Request, user *User) {
+	templates := app.store.GetTemplates(user.ID)
+	if templates == nil {
+		templates = []Template{}
+	}
+	jsonOK(w, templates)
+}
+
+func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, user *User) {
+	var tmpl Template
+	if err := json.NewDecoder(r.Body).Decode(&tmpl); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if tmpl.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	if tmpl.Scope == "public" && !hasRole(user.Role, RoleOpLead) {
+		jsonError(w, "only operations leads and admins may create public templates", http.StatusForbidden)
+		return
+	}
+	tmpl.CreatedBy = user.ID
+	tmpl.CreatedByName = user.DisplayName
+	if tmpl.CreatedByName == "" {
+		tmpl.CreatedByName = user.Username
+	}
+	created, err := app.store.CreateTemplate(tmpl)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, created)
+}
+
+func (app *App) handleDeleteTemplate(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	isAdmin := hasRole(user.Role, RoleAdmin)
+	if err := app.store.DeleteTemplate(id, user.ID, isAdmin); err != nil {
+		jsonError(w, err.Error(), http.StatusForbidden)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user *User) {
+	// Extract template ID from path /api/templates/{id}/apply
+	path := strings.TrimPrefix(r.URL.Path, "/api/templates/")
+	parts := strings.SplitN(path, "/", 2)
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		BaseTime time.Time `json:"base_time"`
+		LayerID  *int64    `json:"layer_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.BaseTime.IsZero() {
+		jsonError(w, "base_time required", http.StatusBadRequest)
+		return
+	}
+
+	// Check template access
+	tmpl, ok := app.store.GetTemplate(id)
+	if !ok {
+		jsonError(w, "template not found", http.StatusNotFound)
+		return
+	}
+	if tmpl.Scope == "private" && tmpl.CreatedBy != user.ID {
+		jsonError(w, "access denied", http.StatusForbidden)
+		return
+	}
+
+	displayName := user.DisplayName
+	if displayName == "" {
+		displayName = user.Username
+	}
+	count, err := app.store.ApplyTemplate(id, req.BaseTime, req.LayerID, user.ID, displayName)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]int{"created": count})
+}
+
 func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
 	isPrivileged := hasRole(user.Role, RoleOpLead)
 	include := r.URL.Query().Get("include")
@@ -2147,6 +2253,28 @@ func (app *App) routes() http.Handler {
 			app.requireAuth(app.handleImport)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Templates
+	mux.HandleFunc("/api/templates", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetTemplates)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleCreateTemplate)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/templates/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/templates/"), "/")
+		if len(parts) == 1 && r.Method == http.MethodDelete {
+			app.requireAuth(app.handleDeleteTemplate)(w, r)
+		} else if len(parts) == 2 && parts[1] == "apply" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleApplyTemplate)(w, r)
+		} else {
+			http.Error(w, "not found", http.StatusNotFound)
 		}
 	})
 

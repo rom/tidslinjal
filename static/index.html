@@ -17,7 +17,7 @@
       <button class="btn btn-secondary btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
       <button class="btn btn-secondary btn-sm" id="btnToday">Today</button>
       <button class="btn btn-secondary btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
-      <button class="btn btn-secondary btn-sm" id="btnZoomNow" title="Scroll to current time">⏱</button>
+      <button class="btn btn-secondary btn-sm" id="btnCenterToday" title="Center today in view">⊙ Center</button>
 
       <div class="toolbar-sep"></div>
 
@@ -53,6 +53,7 @@
 
       <div class="toolbar-sep"></div>
 
+      <button class="btn btn-secondary btn-sm" id="btnTemplates">📋 Templates</button>
       <button class="btn btn-secondary btn-sm" id="btnLayerToggle">🗂 Layers</button>
       <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">🕐 T+</button>
       <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
@@ -113,6 +114,108 @@
       <div class="sidebar-content" id="sidebarContent"></div>
     </aside>
 
+  </div>
+</div>
+
+<!-- Navigation jump dropdown -->
+<div id="navJumpMenu" class="nav-jump-menu" style="display:none">
+  <div class="nav-jump-item" onclick="navJump(1)">1 Day</div>
+  <div class="nav-jump-item" onclick="navJump(2)">2 Days</div>
+  <div class="nav-jump-item" onclick="navJump(3)">3 Days</div>
+  <div class="nav-jump-item" onclick="navJump(7)">1 Week</div>
+  <div class="nav-jump-item" onclick="navJump(14)">2 Weeks</div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal-overlay" id="errorModal" style="z-index:2000">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header" style="background:var(--danger,#c0392b);border-radius:var(--radius) var(--radius) 0 0">
+      <h2 style="color:#fff;display:flex;align-items:center;gap:8px"><span style="font-size:1.2em">⚠</span> <span id="errorModalTitle">Error</span></h2>
+      <button class="modal-close" style="color:#fff" onclick="closeModal('errorModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="errorModalMsg" style="font-size:var(--fs-base);line-height:1.5;white-space:pre-wrap"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('errorModal')">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Templates Modal -->
+<div class="modal-overlay" id="templatesModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>📋 Templates</h2>
+      <button class="modal-close" onclick="closeModal('templatesModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Templates let you quickly create a pre-defined set of events. Save the current view's events as a template or apply a saved template to any date.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn btn-primary btn-sm" id="btnSaveTemplate">💾 Save current events as template…</button>
+      </div>
+      <div id="templatesList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('templatesModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save Template Dialog -->
+<div class="modal-overlay" id="saveTemplateModal" style="z-index:1100">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h2>💾 Save as Template</h2>
+      <button class="modal-close" onclick="closeModal('saveTemplateModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Template Name *</label>
+        <input type="text" id="tmplName" placeholder="e.g. Morning briefing sequence">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" id="tmplDescription" placeholder="Optional description">
+      </div>
+      <div class="form-group">
+        <label>Visibility</label>
+        <select id="tmplScope">
+          <option value="private">Private (only me)</option>
+          <option value="public">Public (all users)</option>
+        </select>
+      </div>
+      <p id="tmplEventCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:8px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmSaveTemplate">Save Template</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Template Dialog -->
+<div class="modal-overlay" id="applyTemplateModal" style="z-index:1100">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>▶ Apply Template</h2>
+      <button class="modal-close" onclick="closeModal('applyTemplateModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="applyTemplateInfo" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
+      <div class="form-group">
+        <label>Base date/time (T=0 for the template) *</label>
+        <input type="datetime-local" id="applyTemplateBase">
+      </div>
+      <div class="form-group">
+        <label>Target layer <small style="color:var(--text-dim)">(optional — overrides original)</small></label>
+        <select id="applyTemplateLayer"><option value="">Master Timeline</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('applyTemplateModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmApplyTemplate">Create Events</button>
+    </div>
   </div>
 </div>
 
@@ -271,6 +374,30 @@
       <div class="form-group">
         <label id="lbl-ev-attach">Attachment <small style="color:var(--text-dim)">(optional)</small></label>
         <input type="file" id="eventAttachFile" class="attach-file-input">
+      </div>
+      <!-- Inline alarm section -->
+      <div class="form-group inline-alarm-group" id="inlineAlarmGroup">
+        <div class="form-check" style="margin-bottom:6px">
+          <input type="checkbox" id="inlineAlarmEnabled">
+          <label for="inlineAlarmEnabled" id="lbl-ev-setalarm">🔔 Set alarm for this event</label>
+        </div>
+        <div id="inlineAlarmOptions" style="display:none; padding-left:24px; display:flex; flex-direction:column; gap:6px">
+          <div class="form-row" style="gap:8px; align-items:center">
+            <select id="inlineAlarmLeadTime" class="ctrl-select" style="flex:1">
+              <option value="0">At event time</option>
+              <option value="5">5 min before</option>
+              <option value="10">10 min before</option>
+              <option value="15" selected>15 min before</option>
+              <option value="30">30 min before</option>
+              <option value="60">1 hour before</option>
+              <option value="120">2 hours before</option>
+            </select>
+            <select id="inlineAlarmScope" class="ctrl-select" style="flex:1">
+              <option value="self">Only for me</option>
+              <option value="all">For all invited</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
     </div>
@@ -686,141 +813,209 @@
 
 <!-- Help Modal -->
 <div class="modal-overlay" id="helpModal">
-  <div class="modal modal-wide">
-    <div class="modal-header">
-      <h2>📖 Tidslinjal Help</h2>
+  <div class="modal modal-wide help-modal">
+    <div class="modal-header help-modal-header">
+      <div class="help-modal-title">
+        <span class="help-modal-logo">Tids<span>linjal</span></span>
+        <span class="help-modal-subtitle">Quick Reference Guide</span>
+      </div>
       <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
     </div>
     <div class="modal-body help-body">
 
       <div class="help-toc">
-        <a href="#h-nav">Navigation</a>
-        <a href="#h-events">Events</a>
-        <a href="#h-layers">Layers</a>
-        <a href="#h-roles">Roles</a>
-        <a href="#h-alarms">Alarms</a>
-        <a href="#h-status">Status workflow</a>
-        <a href="#h-recur">Recurrence</a>
-        <a href="#h-exercise">Exercise time</a>
-        <a href="#h-webhooks">Webhooks</a>
-        <a href="#h-shortcuts">Shortcuts</a>
+        <a class="help-toc-link" href="#h-nav">🧭 Navigation</a>
+        <a class="help-toc-link" href="#h-events">📅 Events</a>
+        <a class="help-toc-link" href="#h-layers">🗂 Layers</a>
+        <a class="help-toc-link" href="#h-templates">📋 Templates</a>
+        <a class="help-toc-link" href="#h-roles">👥 Roles</a>
+        <a class="help-toc-link" href="#h-alarms">🔔 Alarms</a>
+        <a class="help-toc-link" href="#h-status">🔄 Status</a>
+        <a class="help-toc-link" href="#h-recur">↻ Recurrence</a>
+        <a class="help-toc-link" href="#h-exercise">🕐 Exercise time</a>
+        <a class="help-toc-link" href="#h-webhooks">🔗 Webhooks</a>
+        <a class="help-toc-link" href="#h-shortcuts">⌨ Shortcuts</a>
       </div>
 
       <div class="help-content">
 
-        <h3 id="h-nav">Timeline Navigation</h3>
-        <table class="help-table">
-          <tr><td><b>‹ / ›</b></td><td>Step back/forward one range</td></tr>
-          <tr><td><b>Today</b></td><td>Jump to current date</td></tr>
-          <tr><td><b>⏱</b></td><td>Scroll to current time</td></tr>
-          <tr><td><b>Show</b> dropdown</td><td>Change visible date range (Day → 3 Months)</td></tr>
-          <tr><td><b>Resolution</b> dropdown</td><td>Change slot granularity (10 min → Day)</td></tr>
-          <tr><td><b>Drag time column</b></td><td>Drag up = zoom in, drag down = zoom out; double-click = reset</td></tr>
-          <tr><td><b>Grayed slots</b></td><td>Slots outside your configured day hours — visible but no events can be added</td></tr>
-        </table>
+        <div class="help-section" id="h-nav">
+          <div class="help-section-icon">🧭</div>
+          <div class="help-section-body">
+            <h3>Timeline Navigation</h3>
+            <table class="help-table">
+              <tr><td><span class="help-kbd">‹</span> / <span class="help-kbd">›</span></td><td>Short click: step back/forward by the current view span</td></tr>
+              <tr><td><span class="help-kbd">‹</span> / <span class="help-kbd">›</span> <em>(hold)</em></td><td>Long press: choose a jump size (1, 2, 3 days · 1 or 2 weeks)</td></tr>
+              <tr><td><span class="help-kbd">Today</span></td><td>Jump to today's date</td></tr>
+              <tr><td><span class="help-kbd">⊙ Center</span></td><td>Center today in the current view</td></tr>
+              <tr><td><b>Show</b> dropdown</td><td>Change visible date range (Day → 3 Months)</td></tr>
+              <tr><td><b>Resolution</b> dropdown</td><td>Change slot granularity (10 min → Day)</td></tr>
+              <tr><td><b>Drag time column</b></td><td>Drag up = zoom in, drag down = zoom out; double-click = reset</td></tr>
+              <tr><td><b>Grayed slots</b></td><td>Outside configured day hours — visible but events cannot be added here</td></tr>
+            </table>
+          </div>
+        </div>
 
-        <h3 id="h-events">Working with Events</h3>
-        <p>Click any active time slot to open the <b>Add Event</b> dialog. Fill in title, type, times, and optionally a layer and status.</p>
-        <ul>
-          <li>When you change the <b>Start time</b>, End time automatically adjusts to Start + 1 hour.</li>
-          <li><b>Drag</b> an event block to a new slot to reschedule it.</li>
-          <li>Click an event block to open its <b>Detail view</b>.</li>
-          <li>From the detail view you can edit, delete, set an alarm, or change the status.</li>
-          <li>A <b>📎</b> icon on a block means one or more files are attached.</li>
-          <li>A <b>↻</b> icon means the event is recurring.</li>
-          <li>A <b>✎</b> icon means the event has been edited since creation.</li>
-          <li>Overlapping events in the same day column appear <b>side by side</b>.</li>
-        </ul>
+        <div class="help-section" id="h-events">
+          <div class="help-section-icon">📅</div>
+          <div class="help-section-body">
+            <h3>Working with Events</h3>
+            <p>Click any active time slot to open the <b>Add Event</b> dialog.</p>
+            <ul class="help-list">
+              <li>Fill in title, type, times, optional layer, responsible user, and invited persons.</li>
+              <li>Changing <b>Start time</b> auto-adjusts End to Start + 1 hour.</li>
+              <li><b>Drag</b> an event block to reschedule it.</li>
+              <li>Click a block to open its <b>Detail view</b> (edit, delete, alarm, status).</li>
+              <li>You can set an <b>inline alarm</b> directly while creating or editing an event.</li>
+              <li><span class="help-badge">📎</span> = file attached · <span class="help-badge">↻</span> = recurring · <span class="help-badge">✎</span> = edited</li>
+              <li>Non-overlapping events span the full column width for better readability.</li>
+            </ul>
+          </div>
+        </div>
 
-        <h3 id="h-layers">Layers</h3>
-        <p>Layers are named overlays on top of the master timeline. Each has a color, a visibility setting (Private / Groups / Public), and optional group write access.</p>
-        <ul>
-          <li>Toggle layers on/off using the <b>🗂 Layers</b> toolbar button.</li>
-          <li>When no specific layers are selected (default), <em>all</em> layers are visible.</li>
-          <li>Select specific layers in the popover to show only those.</li>
-          <li>Master timeline events are always shown.</li>
-        </ul>
+        <div class="help-section" id="h-layers">
+          <div class="help-section-icon">🗂</div>
+          <div class="help-section-body">
+            <h3>Layers</h3>
+            <p>Layers are named overlays on the master timeline with their own color, visibility (Private / Groups / Public), and write access.</p>
+            <ul class="help-list">
+              <li>Click <b>🗂 Layers</b> to open the quick-toggle popover — check/uncheck layers for immediate visual change.</li>
+              <li>When all layers are checked (default), everything is visible.</li>
+              <li>Master timeline events are always shown regardless of layer filters.</li>
+              <li>Manage layers (create, edit, share) in the <b>Layers</b> sidebar tab.</li>
+            </ul>
+          </div>
+        </div>
 
-        <h3 id="h-roles">User Roles</h3>
-        <table class="help-table">
-          <tr><th>Role</th><th>Capabilities</th></tr>
-          <tr><td><b>Read</b></td><td>View timeline; set personal alarms; add comments</td></tr>
-          <tr><td><b>Reporter</b></td><td>+ Set event status to "Responded To" or "Completed" (requires team lead approval); add comments</td></tr>
-          <tr><td><b>Read/Write</b></td><td>+ Create/edit own events on accessible layers; create event types and layers</td></tr>
-          <tr><td><b>Team Lead</b></td><td>+ Create groups; verify/reject events; approve reporter status changes; manage exercise phases; view audit log</td></tr>
-          <tr><td><b>Operations Lead</b></td><td>+ Create/edit/delete master timeline events</td></tr>
-          <tr><td><b>Admin</b></td><td>Full access — manage users, roles, locks, exercise settings; see all layers; export all data</td></tr>
-        </table>
+        <div class="help-section" id="h-templates">
+          <div class="help-section-icon">📋</div>
+          <div class="help-section-body">
+            <h3>Templates</h3>
+            <p>Templates capture a set of events relative to a base time so they can be replicated quickly.</p>
+            <ul class="help-list">
+              <li>Click <b>📋 Templates</b> in the toolbar to open the template manager.</li>
+              <li><b>Save</b>: all events in the current view are stored as a template with relative time offsets.</li>
+              <li><b>Apply</b>: choose a base date/time — events are recreated offset from that moment.</li>
+              <li>Private templates are visible only to you; Public templates are visible to all users.</li>
+              <li>Only Admins and Operations Leads can create public templates that include master-timeline events.</li>
+            </ul>
+          </div>
+        </div>
 
-        <h3 id="h-alarms">Alarms</h3>
-        <p>Open any event detail and click <b>🔔 Set Alarm</b>. Choose how far in advance to be notified.</p>
-        <ul>
-          <li>Alarms appear as notification pop-ups and in the <b>Alarms</b> sidebar tab.</li>
-          <li>Each alarm must be <b>ACK</b>nowledged. Un-ACK'd alarms escalate: orange after 60 s, pulsing red every further 60 s until the event time passes.</li>
-          <li>If a webhook URL is configured, alarms also trigger a webhook POST.</li>
-        </ul>
+        <div class="help-section" id="h-roles">
+          <div class="help-section-icon">👥</div>
+          <div class="help-section-body">
+            <h3>User Roles</h3>
+            <table class="help-table">
+              <tr><th>Role</th><th>Capabilities</th></tr>
+              <tr><td><span class="role-badge role-read">Read</span></td><td>View timeline · set personal alarms · comment on events</td></tr>
+              <tr><td><span class="role-badge role-reporter">Reporter</span></td><td>+ Set status to Responded To / Completed (needs Team Lead approval)</td></tr>
+              <tr><td><span class="role-badge role-readwrite">Read/Write</span></td><td>+ Create and edit own events on accessible layers · create event types and layers</td></tr>
+              <tr><td><span class="role-badge role-teamlead">Team Lead</span></td><td>+ Create groups · verify/reject events · manage phases · approve reporter changes · view audit log</td></tr>
+              <tr><td><span class="role-badge role-oplead">Ops Lead</span></td><td>+ Create/edit/delete master timeline events · manage exercise settings · pause timeline</td></tr>
+              <tr><td><span class="role-badge role-admin">Admin</span></td><td>Full access — manage users, roles, locks; export all data</td></tr>
+            </table>
+          </div>
+        </div>
 
-        <h3 id="h-status">Event Status Workflow</h3>
-        <table class="help-table">
-          <tr><th>Status</th><th>Meaning</th><th>Who can set</th></tr>
-          <tr><td>Planned</td><td>Default — not yet active</td><td>Creator / Read/Write+</td></tr>
-          <tr><td>Active</td><td>Currently in progress</td><td>Creator / Read/Write+</td></tr>
-          <tr><td>Responded To</td><td>Event has been acknowledged/responded to</td><td>Reporter+ (Reporter requires approval)</td></tr>
-          <tr><td>Completed</td><td>Finished</td><td>Reporter+ (Reporter requires approval)</td></tr>
-          <tr><td>Submitted</td><td>Ready for review</td><td>Creator / Read/Write+</td></tr>
-          <tr><td>Verified ✓</td><td>Approved by Team Lead+; records who/when</td><td>Team Lead+</td></tr>
-          <tr><td>Rejected ✗</td><td>Returned with mandatory reason</td><td>Team Lead+</td></tr>
-          <tr><td>Cancelled</td><td>Will not happen; shown dimmed</td><td>Creator / Read/Write+</td></tr>
-        </table>
+        <div class="help-section" id="h-alarms">
+          <div class="help-section-icon">🔔</div>
+          <div class="help-section-body">
+            <h3>Alarms</h3>
+            <p>Set an alarm while <b>creating or editing</b> any event, or from the <b>Detail view</b> using <b>🔔 Set Alarm</b>.</p>
+            <ul class="help-list">
+              <li>Choose lead time (at event · 5 min · 10 min · 15 min · 30 min · 1 h · 2 h before).</li>
+              <li>When creating with invited persons, you can set the alarm <b>for yourself only</b> or <b>for all invited</b>.</li>
+              <li>Alarms appear as in-app pop-ups and in the <b>Alarms</b> sidebar tab.</li>
+              <li>Un-ACK'd alarms escalate: orange after 60 s, pulsing red thereafter.</li>
+              <li>Webhook users also receive a POST when an alarm fires.</li>
+            </ul>
+          </div>
+        </div>
 
-        <h3 id="h-recur">Recurrence Patterns</h3>
-        <table class="help-table">
-          <tr><td>Every 30 min</td><td>Hourly</td><td>Every 2 h</td><td>Every 3 h</td></tr>
-          <tr><td>Every 4 h</td><td>Daily</td><td>Weekly</td><td>Monthly</td></tr>
-          <tr><td colspan="4">Quarterly (every 3 months)</td></tr>
-        </table>
-        <p>Set a <b>Recurrence End</b> date to limit repetitions. Recurring events show a ↻ icon.</p>
+        <div class="help-section" id="h-status">
+          <div class="help-section-icon">🔄</div>
+          <div class="help-section-body">
+            <h3>Event Status Workflow</h3>
+            <table class="help-table">
+              <tr><th>Status</th><th>Meaning</th><th>Who can set</th></tr>
+              <tr><td>Planned</td><td>Default — not yet active</td><td>Creator / Read/Write+</td></tr>
+              <tr><td>Active</td><td>Currently in progress</td><td>Creator / Read/Write+</td></tr>
+              <tr><td>Responded To</td><td>Acknowledged/responded to</td><td>Reporter+ (Reporter requires TL approval)</td></tr>
+              <tr><td>Completed</td><td>Finished</td><td>Reporter+ (Reporter requires TL approval)</td></tr>
+              <tr><td>Submitted</td><td>Ready for review</td><td>Creator / Read/Write+</td></tr>
+              <tr><td>Verified ✓</td><td>Approved by Team Lead+</td><td>Team Lead+</td></tr>
+              <tr><td>Rejected ✗</td><td>Returned with reason</td><td>Team Lead+</td></tr>
+              <tr><td>Cancelled</td><td>Will not happen; shown dimmed</td><td>Creator / Read/Write+</td></tr>
+            </table>
+          </div>
+        </div>
 
-        <h3 id="h-exercise">Synthetic Exercise Time</h3>
-        <p>Admins can define an <b>Exercise Epoch</b> — the real datetime that maps to <em>Day 1 T+0</em>. Once enabled, users click the <b>🕐 T+</b> button in the toolbar to toggle exercise day headers (Day -1, Day 0, Day 1 …).</p>
-        <p>In synthetic time mode, the current-time red line shows an <b>H+N</b> label indicating hours since the exercise epoch. The timeline can also be <b>frozen/paused</b> to stop progression for planning.</p>
-        <p><b>Exercise Phases</b> (Team Lead+) appear as color-coded semi-transparent overlays on the timeline. Up to 10 phases can be defined under the Phases sidebar tab.</p>
-        <p>Configure under <b>Settings → Exercise Settings</b> (Admin only).</p>
+        <div class="help-section" id="h-recur">
+          <div class="help-section-icon">↻</div>
+          <div class="help-section-body">
+            <h3>Recurrence Patterns</h3>
+            <p>Available patterns: <b>Every 30 min · Hourly · Every 2/3/4 h · Daily · Weekly · Monthly · Quarterly</b>.</p>
+            <p>Set a <b>Recurrence End</b> to limit repetitions. Recurring events show a <b>↻</b> icon. When deleting, choose to delete: this occurrence / this and all future / the entire series.</p>
+            <p>Recurring events are <b>not shown outside your configured day hours</b> to keep the view clean.</p>
+          </div>
+        </div>
 
-        <h3 id="h-webhooks">Webhook Notifications</h3>
-        <p>Each user can configure a personal webhook URL under <b>Settings → Notifications / Webhook</b>. When an alarm fires, a HTTP POST is sent to the URL.</p>
-        <ul>
-          <li><b>Mattermost / Slack</b>: sends <code>{"text":"..."}</code></li>
-          <li><b>Generic</b>: sends structured JSON <code>{"message":"...","event_id":...}</code></li>
-          <li>Use the <b>Test</b> button to verify the connection.</li>
-        </ul>
+        <div class="help-section" id="h-exercise">
+          <div class="help-section-icon">🕐</div>
+          <div class="help-section-body">
+            <h3>Synthetic Exercise Time</h3>
+            <p>Ops Lead+ can define an <b>Exercise Epoch</b> — the real datetime that maps to <em>Day 1 T+0</em>. Click <b>🕐 T+</b> in the toolbar to toggle synthetic day headers.</p>
+            <ul class="help-list">
+              <li>The red current-time line shows an <b>H+N</b> label (hours since epoch).</li>
+              <li>Enable <b>Day-hours only</b> to count only hours within your configured day window.</li>
+              <li><b>Freeze / pause</b> the timeline to stop synthetic time for planning (Ops Lead+).</li>
+              <li><b>Phases</b> (Team Lead+): color-coded overlays showing exercise phases.</li>
+            </ul>
+          </div>
+        </div>
 
-        <h3 id="h-shortcuts">Keyboard &amp; Mouse Shortcuts</h3>
-        <table class="help-table">
-          <tr><td><b>Click empty slot</b></td><td>Open Add Event at that time</td></tr>
-          <tr><td><b>Click event block</b></td><td>Open event detail</td></tr>
-          <tr><td><b>Drag event block</b></td><td>Reschedule to target slot</td></tr>
-          <tr><td><b>Drag time column</b></td><td>Zoom slot height</td></tr>
-          <tr><td><b>Double-click time column</b></td><td>Reset zoom to 1×</td></tr>
-          <tr><td><b>Drag timeline horizontally</b></td><td>Pan to adjacent dates (middle-drag on timeline area)</td></tr>
-          <tr><td><b>🗂 button</b></td><td>Layer quick-toggle popover</td></tr>
-          <tr><td><b>? button</b></td><td>Open this help</td></tr>
-        </table>
-        <h3>Keyboard Shortcuts</h3>
-        <table class="help-table">
-          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Navigate back / forward one range</td></tr>
-          <tr><td><kbd>T</kbd></td><td>Jump to today</td></tr>
-          <tr><td><kbd>N</kbd></td><td>Scroll to current time (Now)</td></tr>
-          <tr><td><kbd>E</kbd></td><td>Open Add Event dialog</td></tr>
-          <tr><td><kbd>?</kbd> / <kbd>H</kbd></td><td>Open this help</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close current modal</td></tr>
-          <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom in / out (increase / decrease slot height)</td></tr>
-          <tr><td><kbd>F</kbd></td><td>Freeze / resume synthetic time</td></tr>
-        </table>
+        <div class="help-section" id="h-webhooks">
+          <div class="help-section-icon">🔗</div>
+          <div class="help-section-body">
+            <h3>Webhook Notifications</h3>
+            <p>Configure a personal webhook under <b>Settings → Notifications / Webhook</b>. When an alarm fires, a HTTP POST is sent.</p>
+            <ul class="help-list">
+              <li><b>Mattermost / Slack</b>: sends <code>{"text":"…"}</code></li>
+              <li><b>Generic</b>: sends <code>{"message":"…","event_id":…}</code></li>
+              <li>Click <b>Test</b> to verify the endpoint before saving.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-shortcuts">
+          <div class="help-section-icon">⌨</div>
+          <div class="help-section-body">
+            <h3>Keyboard &amp; Mouse Shortcuts</h3>
+            <table class="help-table">
+              <tr><td><span class="help-kbd">←</span> / <span class="help-kbd">→</span></td><td>Navigate back / forward one range</td></tr>
+              <tr><td><span class="help-kbd">T</span></td><td>Jump to today</td></tr>
+              <tr><td><span class="help-kbd">N</span></td><td>Scroll to current time</td></tr>
+              <tr><td><span class="help-kbd">E</span></td><td>Open Add Event dialog</td></tr>
+              <tr><td><span class="help-kbd">?</span> / <span class="help-kbd">H</span></td><td>Open this help</td></tr>
+              <tr><td><span class="help-kbd">Esc</span></td><td>Close current modal</td></tr>
+              <tr><td><span class="help-kbd">+</span> / <span class="help-kbd">-</span></td><td>Zoom in / out slot height</td></tr>
+              <tr><td><span class="help-kbd">F</span></td><td>Freeze / resume synthetic time</td></tr>
+            </table>
+            <table class="help-table" style="margin-top:8px">
+              <tr><td><b>Click empty slot</b></td><td>Open Add Event at that time</td></tr>
+              <tr><td><b>Click event block</b></td><td>Open event detail</td></tr>
+              <tr><td><b>Drag event block</b></td><td>Reschedule to target slot</td></tr>
+              <tr><td><b>Drag time column</b></td><td>Zoom slot height (double-click = reset)</td></tr>
+              <tr><td><b>Horizontal drag</b></td><td>Pan to adjacent dates</td></tr>
+            </table>
+          </div>
+        </div>
 
       </div><!-- .help-content -->
     </div><!-- .modal-body -->
-    <div class="modal-footer">
+    <div class="modal-footer" style="justify-content:space-between;align-items:center">
+      <span style="font-size:var(--fs-xs);color:var(--text-dim)" id="helpVersionLine"></span>
       <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
     </div>
   </div>
