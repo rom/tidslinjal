@@ -869,6 +869,22 @@ func (s *Store) DeleteLock(id int64) error {
 	return fmt.Errorf("lock not found")
 }
 
+// DeleteLockAuthorized deletes a lock if the user is authorized (admin or creator).
+func (s *Store) DeleteLockAuthorized(id, userID int64, isAdmin bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, l := range s.locks {
+		if l.ID == id {
+			if !isAdmin && l.LockedBy != userID {
+				return fmt.Errorf("not authorized to delete this lock")
+			}
+			s.locks = append(s.locks[:i], s.locks[i+1:]...)
+			return s.saveFile("locks.json", s.locks)
+		}
+	}
+	return fmt.Errorf("lock not found")
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 func (s *Store) GetSession(id string) (*Session, bool) {

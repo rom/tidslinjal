@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.4.0"
+const AppVersion = "3.5.0"
 
 // AppGitHub is the project repository URL
 const AppGitHub = "https://github.com/rom/tidslinjal"
@@ -57,6 +57,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Rapportering", LabelFR: "Rapport"},
 	{Key: "assigned_task", Label: "Assigned Task", Color: "#E67E22", IsSystem: true,
 		LabelSV: "Tilldelad uppgift", LabelFR: "Tâche assignée"},
+	{Key: "standup", Label: "Standup Meeting", Color: "#00ACC1", IsSystem: true,
+		LabelSV: "Daglig standup", LabelFR: "Réunion debout"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -253,6 +255,9 @@ type LockedSlot struct {
 	StartTime    time.Time `json:"start_time"`
 	EndTime      time.Time `json:"end_time"`
 	Reason       string    `json:"reason"`
+	// Scope controls what the lock applies to: "all" | "master" | "layer"
+	Scope        string    `json:"scope"`
+	LayerID      *int64    `json:"layer_id,omitempty"` // only used when Scope=="layer"
 	LockedBy     int64     `json:"locked_by"`
 	LockedByName string    `json:"locked_by_name"`
 	CreatedAt    time.Time `json:"created_at"`
