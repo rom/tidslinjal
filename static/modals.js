@@ -254,10 +254,24 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     layer_id:           layerVal ? parseInt(layerVal, 10) : null,
   };
 
+  // Track undo for updates
+  if (id) {
+    const oldEv = state.events.find(e => e.id === parseInt(id, 10));
+    if (oldEv) pushUndo('update_event', { id: parseInt(id, 10), old: { ...oldEv } });
+  }
+
   const res = id ? await apiPut(`/api/events/${id}`, payload) : await apiPost('/api/events', payload);
   if (res.ok) {
     const saved    = await res.json();
     const eventID  = saved.id || parseInt(id, 10);
+
+    // Track undo for new events
+    if (!id) pushUndo('create_event', { id: eventID });
+
+    // Check for conflicts/overlaps
+    const conflicts = checkConflicts(saved);
+    if (conflicts.length) showConflictWarning(conflicts);
+
     // Upload attachment if a file was selected
     const attachFile = document.getElementById('eventAttachFile');
     if (attachFile && attachFile.files.length > 0) {
@@ -315,6 +329,8 @@ async function deleteEvent(id) {
     showRecurDeleteDialog(ev);
     return;
   }
+  // Push undo entry before deletion
+  if (ev) pushUndo('delete_event', { ...ev });
   if (!confirm(t('confirm_delete_event'))) return;
   const res = await apiDel(`/api/events/${id}`);
   if (res.ok) {
@@ -549,6 +565,22 @@ function showEventDetail(ev) {
     editBtn.onclick = () => { closeModal('detailModal'); openEventModal(ev); };
     footer.appendChild(editBtn);
 
+    const dupBtn = document.createElement('button');
+    dupBtn.className = 'btn btn-secondary btn-sm';
+    dupBtn.textContent = t('detail_duplicate') || 'Duplicate';
+    dupBtn.onclick = async () => {
+      const res = await apiPost('/api/events-duplicate/' + ev.id, {});
+      if (res.ok) {
+        closeModal('detailModal');
+        await refreshAll();
+        showNotification('success', 'Event duplicated');
+      } else {
+        const err = await res.json();
+        showError(err.error);
+      }
+    };
+    footer.appendChild(dupBtn);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-danger btn-sm';
     delBtn.textContent = t('detail_delete');
@@ -656,13 +688,15 @@ function onLockScopeChange() {
 }
 
 // Populate layer select when opening lock modal
-function openLockModal() {
+function openLockModal(startDate, endDate) {
   const sel = document.getElementById('lockLayerSelect');
   if (sel) {
     sel.innerHTML = state.layers.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
   }
   document.getElementById('lockScope').value = 'all';
   document.getElementById('lockLayerGroup').style.display = 'none';
+  if (startDate) document.getElementById('lockStart').value = fmtDateInput(startDate);
+  if (endDate) document.getElementById('lockEnd').value = fmtDateInput(endDate);
   openModal('lockModal');
 }
 
@@ -1070,7 +1104,11 @@ function renderSidebar() {
           ${state.user&&hasRole2(state.user.role,'readwrite') ? `<button class="btn btn-primary btn-sm" onclick="openEtypeModal(null)">${t('event_types_add')}</button>` : ''}
         </div>
         <div class="legend-list">
-          ${state.eventTypes.map(et => {
+          ${[...state.eventTypes].sort((a,b) => {
+            const la = (lang==='sv'&&a.label_sv?a.label_sv:lang==='fr'&&a.label_fr?a.label_fr:a.label).toLowerCase();
+            const lb = (lang==='sv'&&b.label_sv?b.label_sv:lang==='fr'&&b.label_fr?b.label_fr:b.label).toLowerCase();
+            return la.localeCompare(lb);
+          }).map(et => {
             const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
             const hidden = isTypeHidden(et.key);
             return `<div class="legend-item${hidden?' hidden-type':''}" onclick="toggleType('${et.key}')">
@@ -1354,6 +1392,24 @@ function renderSidebar() {
           ${state.timelinePaused ? ('▶ '+(t('btn_resume')||'Resume')) : ('⏸ '+(t('btn_freeze')||'Freeze'))}
         </button>
       </div>` : ''}
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_group_label')||'Group Terminology'}</div>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" onclick="setGroupLabel('group')">Group</button>
+          <button class="toggle-btn${ex.group_label==='unit'?' active':''}" onclick="setGroupLabel('unit')">Unit</button>
+          <button class="toggle-btn${ex.group_label==='team'?' active':''}" onclick="setGroupLabel('team')">Team</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_timezone')||'Timezone'}</div>
+        <select id="prefTimezone" onchange="setTimezonePref(this.value)"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <option value=""${!state.timezone?' selected':''}>Browser Default</option>
+          ${['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'].map(tz =>
+            `<option value="${tz}"${state.timezone===tz?' selected':''}>${tz}</option>`
+          ).join('')}
+        </select>
+      </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_exercise')}</div>
@@ -1372,6 +1428,11 @@ function renderSidebar() {
           <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Exercise Index</label>
+          <input type="number" id="exIndex" value="${ex.ex_index||0}" min="0"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
         <div class="form-check" style="margin-bottom:6px">
           <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
           <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
@@ -1381,9 +1442,33 @@ function renderSidebar() {
           <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
         </div>
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
-        ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">⚙ ${t('admin_view')||'Admin View'}</a>` : ''}
+        ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
+      </div>` : ''}
+      ${state.user && state.user.role==='admin' ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
+        <button class="btn btn-danger btn-sm" onclick="resetDatabase()">${t('settings_reset')||'Reset to Empty'}</button>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
       </div>` : ''}
     `;
+  } else if (tab === 'activity') {
+    el.innerHTML = `<div class="sidebar-section"><div class="sidebar-section-title">${t('tab_activity')||'Activity Feed'}</div><div id="activityFeed" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div></div>`;
+    apiGet('/api/activity?limit=100').then(entries => {
+      const container = document.getElementById('activityFeed');
+      if (!container) return;
+      if (!entries || entries.length === 0) {
+        container.innerHTML = '<em style="color:var(--text-dim)">No recent activity.</em>';
+        return;
+      }
+      container.innerHTML = `<div class="activity-list">${entries.map(e => `
+        <div class="activity-item">
+          <span class="activity-ts">${fmtDateTime(new Date(e.timestamp))}</span>
+          <span class="activity-user">${escHtml(e.user_name)}</span>
+          <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
+          <span class="activity-summary">${escHtml(e.summary)}</span>
+        </div>`).join('')}
+      </div>`;
+    });
   }
 }
 
@@ -1457,12 +1542,15 @@ async function saveExercise() {
   const label       = document.getElementById('exLabel')?.value?.trim() || '';
   const enabled     = document.getElementById('exEnabled')?.checked || false;
   const dayHrsOnly  = document.getElementById('exDayHoursOnly')?.checked || false;
+  const exIndex     = parseInt(document.getElementById('exIndex')?.value || '0', 10);
   const payload = {
     enabled,
     epoch: epoch ? new Date(epoch).toISOString() : '',
     endex: endex ? new Date(endex).toISOString() : '',
     label,
     day_hours_only: dayHrsOnly,
+    group_label: state.exercise?.group_label || 'group',
+    ex_index: exIndex,
   };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
@@ -1716,6 +1804,13 @@ function connectSSE() {
     const data = JSON.parse(e.data);
     showAlarmNotification(data, 0);
   });
+  // Listen for event changes from other users
+  es.addEventListener('event_change', e => {
+    const data = JSON.parse(e.data);
+    if (data.action === 'deleted' || data.action === 'created' || data.action === 'updated' || data.action === 'status_changed') {
+      refreshAll();
+    }
+  });
   es.onerror = () => setTimeout(connectSSE, 5000);
 }
 
@@ -1942,9 +2037,23 @@ async function confirmSaveTemplate() {
   if (!events.length) { showError('No events in current view.', 'Validation'); return; }
   // Find earliest start to anchor offsets
   const earliest = Math.min(...events.map(e => new Date(e.start_time).getTime()));
-  const items = events.map(e => {
+  // Fetch attachments for each event to include in template
+  const attachmentPromises = events.map(async e => {
+    try {
+      return await apiGet(`/api/events/${e.id}/attachments`) || [];
+    } catch { return []; }
+  });
+  const allAttachments = await Promise.all(attachmentPromises);
+
+  const items = events.map((e, idx) => {
     const startMs = new Date(e.start_time).getTime();
     const endMs   = e.end_time ? new Date(e.end_time).getTime() : null;
+    const atts = (allAttachments[idx] || []).map(a => ({
+      filename:    a.filename,
+      stored_name: a.stored_name,
+      size:        a.size,
+      mime_type:   a.mime_type,
+    }));
     return {
       title:              e.title,
       event_type:         e.event_type,
@@ -1956,6 +2065,7 @@ async function confirmSaveTemplate() {
       is_recurring:       e.is_recurring,
       recurrence_pattern: e.recurrence_pattern || '',
       participant:        e.participant || '',
+      attachments:        atts,
     };
   });
   const payload = {
@@ -2336,4 +2446,330 @@ function mobileNavTab(tab) {
 function closeMobileSidebar() {
   document.getElementById('sidebar').classList.remove('visible');
   document.getElementById('sidebarBackdrop').classList.remove('visible');
+}
+
+// ── Reset Database ──────────────────────────────────────────────────────────
+async function resetDatabase() {
+  if (!confirm('WARNING: This will permanently delete ALL data except the audit trail. Are you sure?')) return;
+  if (!confirm('This action CANNOT be undone. Type "RESET" in the next prompt to confirm.')) return;
+  const confirmation = prompt('Type RESET to confirm database reset:');
+  if (confirmation !== 'RESET') { showNotification('info', 'Reset cancelled.'); return; }
+  const res = await apiPost('/api/reset', {});
+  if (res.ok) {
+    showNotification('success', 'Database has been reset to empty.');
+    await refreshAll();
+    renderSidebar();
+  } else {
+    const err = await res.json();
+    showError(err.error || 'Reset failed');
+  }
+}
+
+// ── Group Label Switching ──────────────────────────────────────────────────
+async function setGroupLabel(label) {
+  state.exercise = state.exercise || {};
+  state.exercise.group_label = label;
+  const payload = { ...state.exercise };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    renderSidebar();
+    updateUILabels();
+    showNotification('success', 'Group terminology updated to: ' + label);
+  }
+}
+
+// ── Timezone ──────────────────────────────────────────────────────────────
+function setTimezonePref(tz) {
+  state.timezone = tz;
+  renderTimeline();
+  showNotification('success', tz ? 'Timezone set to ' + tz : 'Using browser timezone');
+}
+
+// ── Undo System ─────────────────────────────────────────────────────────────
+const MAX_UNDO_STACK = 50;
+
+function pushUndo(action, data) {
+  state.undoStack.push({ action, data, timestamp: Date.now() });
+  if (state.undoStack.length > MAX_UNDO_STACK) {
+    state.undoStack.shift();
+  }
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const btn = document.getElementById('btnUndo');
+  if (!btn) return;
+  btn.disabled = state.undoStack.length === 0;
+  if (state.undoStack.length > 0) {
+    const last = state.undoStack[state.undoStack.length - 1];
+    btn.title = `Undo: ${last.action} (${state.undoStack.length} actions)`;
+  } else {
+    btn.title = 'Nothing to undo';
+  }
+}
+
+async function performUndo() {
+  if (state.undoStack.length === 0) {
+    showNotification('info', 'Nothing to undo');
+    return;
+  }
+  const entry = state.undoStack.pop();
+  try {
+    if (entry.action === 'create_event') {
+      // Undo creation by deleting
+      await apiDel('/api/events/' + entry.data.id);
+    } else if (entry.action === 'delete_event') {
+      // Undo deletion by re-creating
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      delete payload.updated_at;
+      await apiPost('/api/events', payload);
+    } else if (entry.action === 'update_event') {
+      // Undo update by restoring old data
+      const payload = { ...entry.data.old };
+      delete payload.id;
+      delete payload.created_at;
+      delete payload.updated_at;
+      delete payload.created_by_name;
+      await apiPut('/api/events/' + entry.data.id, payload);
+    } else if (entry.action === 'status_change') {
+      await api('PATCH', `/api/events/${entry.data.id}/status`, { status: entry.data.oldStatus });
+    }
+    await refreshAll();
+    showNotification('success', `Undone: ${entry.action.replace(/_/g, ' ')}`);
+  } catch (e) {
+    showError('Undo failed: ' + (e.message || 'unknown error'));
+  }
+  updateUndoButton();
+}
+
+// ── Filter System ──────────────────────────────────────────────────────────
+function openFilterPopover(btn) {
+  const pop = document.getElementById('filterPopover');
+  if (pop.style.display !== 'none') { pop.style.display = 'none'; return; }
+
+  // Populate status filters
+  const statuses = ['planned','active','responded_to','completed','submitted','verified','rejected','cancelled'];
+  const statusList = document.getElementById('filterStatusList');
+  statusList.innerHTML = statuses.map(s => `
+    <label class="filter-cb-label">
+      <input type="checkbox" class="filter-status-cb" value="${s}" ${state.filters.status.includes(s)?'checked':''}>
+      ${t('status_'+s)||s}
+    </label>
+  `).join('');
+
+  // Populate responsible filter
+  const respSel = document.getElementById('filterResponsible');
+  respSel.innerHTML = '<option value="">All</option>' +
+    (state.users||[]).map(u => `<option value="${u.id}"${state.filters.responsibleId==u.id?' selected':''}>${escHtml(u.display_name||u.username)}</option>`).join('');
+
+  // Populate layer filter
+  const layerSel = document.getElementById('filterLayer');
+  layerSel.innerHTML = '<option value="">All</option>' +
+    '<option value="0"' + (state.filters.layerId===0?' selected':'') + '>Master Timeline</option>' +
+    state.layers.map(l => `<option value="${l.id}"${state.filters.layerId==l.id?' selected':''}>${escHtml(l.name)}</option>`).join('');
+
+  const rect = btn.getBoundingClientRect();
+  pop.style.top  = (rect.bottom + 4) + 'px';
+  pop.style.left = Math.max(4, rect.left - 100) + 'px';
+  pop.style.display = '';
+}
+
+function applyFilters() {
+  const statusCbs = document.querySelectorAll('.filter-status-cb:checked');
+  state.filters.status = [...statusCbs].map(cb => cb.value);
+  const respVal = document.getElementById('filterResponsible').value;
+  state.filters.responsibleId = respVal ? parseInt(respVal, 10) : null;
+  const layerVal = document.getElementById('filterLayer').value;
+  state.filters.layerId = layerVal !== '' ? parseInt(layerVal, 10) : null;
+  document.getElementById('filterPopover').style.display = 'none';
+  // Update filter button to indicate active filters
+  const btn = document.getElementById('btnFilter');
+  const hasFilters = state.filters.status.length > 0 || state.filters.responsibleId !== null || state.filters.layerId !== null;
+  if (btn) btn.classList.toggle('btn-active-filter', hasFilters);
+  renderTimeline();
+}
+
+function clearFilters() {
+  state.filters = { status: [], responsibleId: null, layerId: null };
+  document.getElementById('filterPopover').style.display = 'none';
+  const btn = document.getElementById('btnFilter');
+  if (btn) btn.classList.remove('btn-active-filter');
+  renderTimeline();
+}
+
+// ── Context Menu System ─────────────────────────────────────────────────────
+function setupContextMenus() {
+  const container = document.getElementById('timeline-container');
+
+  container.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    closeAllContextMenus();
+
+    const block = e.target.closest('.event-block[data-ev-id]');
+    if (block) {
+      const evId = parseInt(block.dataset.evId, 10);
+      state._ctxEventId = evId;
+      const menu = document.getElementById('contextMenu');
+      menu.style.top  = e.clientY + 'px';
+      menu.style.left = e.clientX + 'px';
+      menu.style.display = '';
+      return;
+    }
+
+    // Right-click on empty slot
+    const cell = e.target.closest('.tl-cell');
+    if (cell && state.user && hasRole2(state.user.role, 'readwrite')) {
+      const dayIdx  = parseInt(cell.dataset.day, 10);
+      const slotIdx = parseInt(cell.dataset.slot, 10);
+      if (!isNaN(dayIdx) && !isNaN(slotIdx)) {
+        state._ctxSlotDay  = dayIdx;
+        state._ctxSlotMin  = slotIdx;
+        const menu = document.getElementById('slotContextMenu');
+        menu.style.top  = e.clientY + 'px';
+        menu.style.left = e.clientX + 'px';
+        menu.style.display = '';
+      }
+    }
+  });
+
+  document.addEventListener('click', () => closeAllContextMenus());
+}
+
+function closeAllContextMenus() {
+  document.getElementById('contextMenu').style.display = 'none';
+  document.getElementById('slotContextMenu').style.display = 'none';
+}
+
+async function ctxAction(action, value) {
+  closeAllContextMenus();
+  const evId = state._ctxEventId;
+  if (!evId) return;
+  const ev = state.events.find(e => e.id === evId || e.id === parseInt(String(evId).split('_')[0], 10));
+  if (!ev) return;
+
+  if (action === 'edit') {
+    openEventModal(ev);
+  } else if (action === 'duplicate') {
+    const res = await apiPost('/api/events-duplicate/' + ev.id, {});
+    if (res.ok) {
+      await refreshAll();
+      showNotification('success', 'Event duplicated');
+    } else {
+      const err = await res.json();
+      showError(err.error);
+    }
+  } else if (action === 'alarm') {
+    openAlarmModal(ev);
+  } else if (action === 'status') {
+    const res = await api('PATCH', `/api/events/${ev.id}/status`, { status: value });
+    if (res.ok) {
+      await refreshAll();
+      showNotification('success', `Status changed to ${value}`);
+    } else {
+      const err = await res.json();
+      showError(err.error);
+    }
+  } else if (action === 'delete') {
+    if (!confirm(`Delete event "${ev.title}"?`)) return;
+    pushUndo('delete_event', ev);
+    const res = await apiDel('/api/events/' + ev.id);
+    if (res.ok) {
+      await refreshAll();
+      showNotification('success', 'Event deleted');
+    }
+  }
+  state._ctxEventId = null;
+}
+
+function ctxSlotAction(action) {
+  closeAllContextMenus();
+  const dayIdx = state._ctxSlotDay;
+  const slotIdx = state._ctxSlotMin;
+  if (dayIdx == null || slotIdx == null) return;
+
+  const days = getDays();
+  const targetDay = days[dayIdx];
+  if (!targetDay) return;
+  const slotMin  = getSlotMinutes();
+  const startOff = getStartHourOffset();
+  const newMin   = startOff + slotIdx * slotMin;
+  const newStart = new Date(targetDay);
+  newStart.setHours(Math.floor(newMin / 60), newMin % 60, 0, 0);
+  const newEnd = new Date(newStart.getTime() + 60 * 60000);
+
+  if (action === 'add') {
+    openEventModal(null, newStart, newEnd);
+  } else if (action === 'lock') {
+    openLockModal(newStart, newEnd);
+  }
+  state._ctxSlotDay = null;
+  state._ctxSlotMin = null;
+}
+
+// ── Sidebar Resize ──────────────────────────────────────────────────────────
+function setupSidebarResize() {
+  const handle = document.getElementById('sidebarResizeHandle');
+  const sidebar = document.getElementById('sidebar');
+  if (!handle || !sidebar) return;
+
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startWidth = sidebar.offsetWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = startX - e.clientX;
+    const newWidth = Math.max(200, Math.min(800, startWidth + dx));
+    sidebar.style.width = newWidth + 'px';
+    sidebar.style.minWidth = newWidth + 'px';
+    sidebar.style.maxWidth = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    renderEventBlocks(getDays(), getSlotHeight());
+  });
+}
+
+// ── Print Support ──────────────────────────────────────────────────────────
+function printTimeline() {
+  window.print();
+}
+
+// ── Conflict/Overlap Warnings ──────────────────────────────────────────────
+function checkConflicts(ev) {
+  const start = new Date(ev.start_time || ev.startTime);
+  const end = ev.end_time ? new Date(ev.end_time || ev.endTime) : new Date(start.getTime() + 3600000);
+  const conflicts = state.events.filter(e => {
+    if (e.id === ev.id) return false;
+    // Must be on same layer
+    if ((e.layer_id || null) !== (ev.layer_id || null)) return false;
+    const eStart = new Date(e.start_time);
+    const eEnd = e.end_time ? new Date(e.end_time) : new Date(eStart.getTime() + 3600000);
+    return eStart < end && eEnd > start;
+  });
+  return conflicts;
+}
+
+function showConflictWarning(conflicts) {
+  if (!conflicts.length) return;
+  const names = conflicts.map(c => `"${c.title}"`).join(', ');
+  showNotification('warning',
+    `Warning: This event overlaps with ${conflicts.length} other event${conflicts.length>1?'s':''}: ${names}`
+  );
 }

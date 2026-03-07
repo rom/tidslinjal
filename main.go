@@ -28,6 +28,20 @@ var (
 	debug   bool
 )
 
+func init() {
+	// Ensure correct MIME types on all platforms (some Linux distros
+	// map .js → text/plain in /etc/mime.types, causing browsers to
+	// refuse script execution under strict MIME checking).
+	mime.AddExtensionType(".js", "application/javascript")
+	mime.AddExtensionType(".css", "text/css")
+	mime.AddExtensionType(".html", "text/html")
+	mime.AddExtensionType(".json", "application/json")
+	mime.AddExtensionType(".svg", "image/svg+xml")
+	mime.AddExtensionType(".png", "image/png")
+	mime.AddExtensionType(".jpg", "image/jpeg")
+	mime.AddExtensionType(".woff2", "font/woff2")
+}
+
 func logVerbose(format string, args ...any) {
 	if verbose || debug {
 		log.Printf("[VERBOSE] "+format, args...)
@@ -42,9 +56,16 @@ func logDebug(format string, args ...any) {
 
 // ── SSE broker ────────────────────────────────────────────────────────────────
 
+// SSEMessage is a generic SSE message with an event type and JSON data
+type SSEMessage struct {
+	Event string `json:"event"`
+	Data  string `json:"data"`
+}
+
 type SSEClient struct {
-	userID int64
-	ch     chan AlarmNotification
+	userID   int64
+	ch       chan AlarmNotification
+	broadcast chan SSEMessage
 }
 
 type SSEBroker struct {
@@ -59,7 +80,11 @@ func NewSSEBroker() *SSEBroker {
 func (b *SSEBroker) Subscribe(userID int64) *SSEClient {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	c := &SSEClient{userID: userID, ch: make(chan AlarmNotification, 8)}
+	c := &SSEClient{
+		userID:    userID,
+		ch:        make(chan AlarmNotification, 8),
+		broadcast: make(chan SSEMessage, 16),
+	}
 	b.clients[c] = struct{}{}
 	return c
 }
@@ -83,12 +108,91 @@ func (b *SSEBroker) Notify(userID int64, n AlarmNotification) {
 	}
 }
 
+// Broadcast sends an SSE message to all connected clients except the sender
+func (b *SSEBroker) Broadcast(senderID int64, msg SSEMessage) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for c := range b.clients {
+		if c.userID != senderID {
+			select {
+			case c.broadcast <- msg:
+			default:
+			}
+		}
+	}
+}
+
+// BroadcastAll sends an SSE message to ALL connected clients including sender
+func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for c := range b.clients {
+		select {
+		case c.broadcast <- msg:
+		default:
+		}
+	}
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 type App struct {
 	store  *Store
 	broker *SSEBroker
 	oidc   *OIDCConfig // nil if OIDC not configured
+}
+
+// broadcastEventChange sends an SSE notification to all clients about an event change
+func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
+	payload := map[string]interface{}{
+		"action": action,
+		"event":  ev,
+	}
+	data, _ := json.Marshal(payload)
+	app.broker.Broadcast(senderID, SSEMessage{Event: "event_change", Data: string(data)})
+
+	// Fire outbound webhook if configured for the event creator
+	go app.fireWebhooks(action, ev)
+}
+
+// fireWebhooks sends outbound webhook notifications for event state transitions
+func (app *App) fireWebhooks(action string, ev *Event) {
+	// Get all users' preferences and fire webhooks for those who have them configured
+	prefs := app.store.GetAllPreferences()
+	for _, p := range prefs {
+		if p.WebhookURL == "" {
+			continue
+		}
+		payload := map[string]interface{}{
+			"type":       "event_" + action,
+			"event_id":   ev.ID,
+			"event_title": ev.Title,
+			"status":     string(ev.Status),
+			"event_type": ev.EventType,
+			"start_time": ev.StartTime.Format(time.RFC3339),
+			"updated_by": ev.CreatedByName,
+		}
+		var body []byte
+		if p.WebhookType == "mattermost" || p.WebhookType == "slack" {
+			text := fmt.Sprintf("[%s] **%s** — %s (%s)", action, ev.Title, ev.Status, ev.EventType)
+			slackPayload := map[string]string{"text": text}
+			body, _ = json.Marshal(slackPayload)
+		} else {
+			body, _ = json.Marshal(payload)
+		}
+		req, err := http.NewRequest("POST", p.WebhookURL, bytes.NewReader(body))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			logVerbose("webhook error for user %d: %v", p.UserID, err)
+			continue
+		}
+		resp.Body.Close()
+	}
 }
 
 func NewApp(dataDir string) (*App, error) {
@@ -582,6 +686,7 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		}
 	}
 
+	app.broadcastEventChange(user.ID, "created", &created)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
 }
@@ -636,6 +741,7 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 	app.audit(user.ID, user.DisplayName, "updated", "event", id,
 		fmt.Sprintf("Updated event %q", existing.Title))
 	updated, _ := app.store.GetEventByID(id)
+	app.broadcastEventChange(user.ID, "updated", updated)
 	jsonOK(w, updated)
 }
 
@@ -702,6 +808,7 @@ func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, u
 	app.audit(user.ID, user.DisplayName, "status_changed", "event", id,
 		fmt.Sprintf("Event %q → %s", existing.Title, newStatus))
 	updated, _ := app.store.GetEventByID(id)
+	app.broadcastEventChange(user.ID, "status_changed", updated)
 	jsonOK(w, updated)
 }
 
@@ -727,6 +834,9 @@ func (app *App) handleDeleteEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 	app.audit(user.ID, user.DisplayName, "deleted", "event", id,
 		fmt.Sprintf("Deleted event %q", title))
+	// Broadcast deletion to other clients
+	deletedEv := &Event{ID: id, Title: title}
+	app.broadcastEventChange(user.ID, "deleted", deletedEv)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1259,6 +1369,9 @@ func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 			data, _ := json.Marshal(n)
 			fmt.Fprintf(w, "event: alarm\ndata: %s\n\n", data)
 			flusher.Flush()
+		case msg := <-client.broadcast:
+			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", msg.Event, msg.Data)
+			flusher.Flush()
 		case <-ticker.C:
 			fmt.Fprintf(w, "event: ping\ndata: {}\n\n")
 			flusher.Flush()
@@ -1733,6 +1846,12 @@ func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, use
 	if tmpl.CreatedByName == "" {
 		tmpl.CreatedByName = user.Username
 	}
+	// Populate template items with attachment references from their source events
+	for i, item := range tmpl.Items {
+		if item.Attachments == nil {
+			tmpl.Items[i].Attachments = []TemplateAttachment{}
+		}
+	}
 	created, err := app.store.CreateTemplate(tmpl)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -1799,6 +1918,123 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		return
 	}
 	jsonOK(w, map[string]int{"created": count})
+}
+
+// handleResetDatabase resets all data except the audit trail
+func (app *App) handleResetDatabase(w http.ResponseWriter, r *http.Request, user *User) {
+	if err := app.store.ResetDatabase(); err != nil {
+		jsonError(w, "reset failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Re-seed event types
+	if err := app.store.SeedEventTypes(); err != nil {
+		logVerbose("re-seed event types after reset: %v", err)
+	}
+	app.audit(user.ID, user.DisplayName, "reset", "system", 0, "Database reset to empty (audit trail preserved)")
+	jsonOK(w, map[string]string{"status": "reset"})
+}
+
+// handleDuplicateEvent creates a copy of an existing event
+func (app *App) handleDuplicateEvent(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	existing, ok := app.store.GetEventByID(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	dup := *existing
+	dup.ID = 0
+	dup.Title = existing.Title + " (copy)"
+	dup.Status = StatusPlanned
+	dup.CreatedBy = user.ID
+	dup.CreatedByName = user.DisplayName
+	if dup.CreatedByName == "" {
+		dup.CreatedByName = user.Username
+	}
+	dup.VerifiedBy = 0
+	dup.VerifiedByName = ""
+	dup.VerifiedAt = nil
+	dup.RejectionReason = ""
+	created, err := app.store.CreateEvent(dup)
+	if err != nil {
+		jsonError(w, "failed to duplicate", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "created", "event", created.ID,
+		fmt.Sprintf("Duplicated event %q from #%d", created.Title, id))
+	app.broadcastEventChange(user.ID, "created", &created)
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, created)
+}
+
+// handleGetActivityFeed returns recent audit entries as an activity stream
+func (app *App) handleGetActivityFeed(w http.ResponseWriter, r *http.Request, user *User) {
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 500 {
+		limit = l
+	}
+	entries := app.store.GetAudit(limit)
+	if entries == nil {
+		entries = []AuditEntry{}
+	}
+	jsonOK(w, entries)
+}
+
+// handleExportICS exports events as ICS/iCal format
+func (app *App) handleExportICS(w http.ResponseWriter, r *http.Request, user *User) {
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
+	var from, to time.Time
+	if fromStr != "" {
+		from, _ = time.Parse(time.RFC3339, fromStr)
+	}
+	if toStr != "" {
+		to, _ = time.Parse(time.RFC3339, toStr)
+	}
+	if from.IsZero() {
+		from = time.Now().Add(-30 * 24 * time.Hour)
+	}
+	if to.IsZero() {
+		to = time.Now().Add(90 * 24 * time.Hour)
+	}
+
+	events := app.store.GetEventsInRange(from, to)
+
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="tidslinjal.ics"`)
+
+	fmt.Fprint(w, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Tidslinjal//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n")
+	for _, ev := range events {
+		evEnd := ev.EndTime
+		if evEnd == nil {
+			end := ev.StartTime.Add(time.Hour)
+			evEnd = &end
+		}
+		fmt.Fprintf(w, "BEGIN:VEVENT\r\nUID:tidslinjal-%d@tidslinjal\r\nDTSTAMP:%s\r\nDTSTART:%s\r\nDTEND:%s\r\nSUMMARY:%s\r\n",
+			ev.ID,
+			ev.CreatedAt.UTC().Format("20060102T150405Z"),
+			ev.StartTime.UTC().Format("20060102T150405Z"),
+			evEnd.UTC().Format("20060102T150405Z"),
+			escICS(ev.Title))
+		if ev.Description != "" {
+			fmt.Fprintf(w, "DESCRIPTION:%s\r\n", escICS(ev.Description))
+		}
+		fmt.Fprint(w, "END:VEVENT\r\n")
+	}
+	fmt.Fprint(w, "END:VCALENDAR\r\n")
+}
+
+func escICS(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, ";", "\\;")
+	s = strings.ReplaceAll(s, ",", "\\,")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
 }
 
 func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
@@ -2272,6 +2508,42 @@ func (app *App) routes() http.Handler {
 			app.requireAuth(app.handleApplyTemplate)(w, r)
 		} else {
 			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+
+	// Reset database (admin only)
+	mux.HandleFunc("/api/reset", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleResetDatabase)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Event duplicate
+	mux.HandleFunc("/api/events-duplicate/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleReadWrite, app.handleDuplicateEvent)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Activity feed
+	mux.HandleFunc("/api/activity", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetActivityFeed)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ICS export
+	mux.HandleFunc("/api/export/ics", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleExportICS)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 

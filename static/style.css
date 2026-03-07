@@ -1013,3 +1013,175 @@ body.light-mode { --danger: #c0392b; }
 .inv-filter-btns .inv-filter-btn.active {
   background: rgba(74,144,217,.2); border-color: var(--accent); color: var(--accent);
 }
+
+/* ── Sidebar Resize Handle ──────────────────────────────────────────────── */
+.sidebar-resize-handle {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background .15s;
+  z-index: 20;
+}
+.sidebar-resize-handle:hover {
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+/* ── Event Resize Handle ────────────────────────────────────────────────── */
+.ev-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  border-radius: 0 0 var(--radius) var(--radius);
+  transition: background .15s;
+}
+.ev-resize-handle:hover {
+  background: rgba(255,255,255,.3);
+}
+.event-block { position: absolute; }
+
+/* ── Filter Popover ──────────────────────────────────────────────────────── */
+.filter-popover {
+  position: fixed;
+  z-index: 100;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  min-width: 220px;
+  max-width: 320px;
+}
+.filter-popover-header {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.filter-section {
+  margin-bottom: 8px;
+}
+.filter-label {
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 4px;
+}
+.filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.filter-cb-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--text);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--bg3);
+}
+.btn-active-filter {
+  background: rgba(74,144,217,.25) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Context Menu ──────────────────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 0;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  min-width: 160px;
+}
+.context-menu-item {
+  padding: 6px 16px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  cursor: pointer;
+  transition: background .1s;
+}
+.context-menu-item:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.context-menu-item.ctx-danger { color: var(--danger, #c0392b); }
+.context-menu-item.ctx-danger:hover { background: var(--danger, #c0392b); color: #fff; }
+.context-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ── Activity Feed ──────────────────────────────────────────────────────── */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.activity-item {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-xs);
+}
+.activity-ts { color: var(--text-dim); white-space: nowrap; }
+.activity-user { color: var(--accent); font-weight: 600; }
+.activity-summary { color: var(--text); }
+
+/* ── Print Styles ──────────────────────────────────────────────────────── */
+@media print {
+  #header, #sidebar, #sidebarResizeHandle, #sidebarBackdrop,
+  #layerPopover, #filterPopover, #contextMenu, #slotContextMenu,
+  .mobile-nav, #notification-area, #freezeBadge, #navJumpMenu {
+    display: none !important;
+  }
+  #app {
+    display: block !important;
+  }
+  #timeline-container {
+    overflow: visible !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .event-block {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+  .tl-cell {
+    border-color: #ddd !important;
+  }
+  @page {
+    margin: 1cm;
+    size: landscape;
+  }
+}
+
+/* ── Warning notification ──────────────────────────────────────────────── */
+.notification.warning {
+  background: rgba(243, 156, 18, .15);
+  border-left: 4px solid #F39C12;
+}

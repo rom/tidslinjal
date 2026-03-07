@@ -47,7 +47,18 @@ const TRANSLATIONS = {
     tab_layers: 'Layers',
     tab_users: 'Users',
     tab_groups: 'Groups',
+    tab_activity: 'Activity',
     tab_settings: 'Settings',
+
+    // New v4.0 strings
+    settings_group_label: 'Group Terminology',
+    settings_timezone: 'Timezone',
+    settings_danger_zone: 'Danger Zone',
+    settings_reset: 'Reset to Empty',
+    settings_reset_desc: 'Removes all data except the audit trail.',
+    btn_undo: 'Undo',
+    btn_filter: 'Filter',
+    btn_print: 'Print',
 
     // Settings
     settings_theme: 'Theme',
@@ -416,6 +427,7 @@ const TRANSLATIONS = {
     tab_layers: 'Lager',
     tab_users: 'Användare',
     tab_groups: 'Grupper',
+    tab_activity: 'Aktivitet',
     tab_settings: 'Inställningar',
     settings_theme: 'Tema',
     settings_size: 'Storlek',
@@ -731,6 +743,16 @@ const TRANSLATIONS = {
     standup_label:         'Daglig standup',
     phase_layer_lbl:       'Lager (tomt = mastertidslinje)',
     synth_day_hours_only:  'Syntetisk tid: endast dagtimmar',
+
+    // v4.0
+    settings_group_label: 'Gruppterminologi',
+    settings_timezone: 'Tidszon',
+    settings_danger_zone: 'Farozon',
+    settings_reset: 'Återställ till tomt',
+    settings_reset_desc: 'Tar bort all data utom granskningsloggen.',
+    btn_undo: 'Ångra',
+    btn_filter: 'Filter',
+    btn_print: 'Skriv ut',
   },
 
   fr: {
@@ -764,6 +786,7 @@ const TRANSLATIONS = {
     tab_layers: 'Couches',
     tab_users: 'Utilisateurs',
     tab_groups: 'Groupes',
+    tab_activity: 'Activité',
     tab_settings: 'Paramètres',
     settings_theme: 'Thème',
     settings_size: 'Taille',
@@ -1079,6 +1102,16 @@ const TRANSLATIONS = {
     standup_label:         'Réunion debout',
     phase_layer_lbl:       'Couche (vide = chronologie maîtresse)',
     synth_day_hours_only:  'Temps synthétique : heures de journée uniquement',
+
+    // v4.0
+    settings_group_label: 'Terminologie des groupes',
+    settings_timezone: 'Fuseau horaire',
+    settings_danger_zone: 'Zone de danger',
+    settings_reset: 'Réinitialiser',
+    settings_reset_desc: 'Supprime toutes les données sauf le journal d\'audit.',
+    btn_undo: 'Annuler',
+    btn_filter: 'Filtrer',
+    btn_print: 'Imprimer',
   }
 };
 
