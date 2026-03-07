@@ -5,6 +5,7 @@
    ============================================================ */
 'use strict';
 
+// ── applyPreferences ───────────────────────────────────────────────────────
 function applyPreferences() {
   const body = document.body;
   body.className = '';
@@ -14,6 +15,8 @@ function applyPreferences() {
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
   updateLangFlags();
 }
+
+// ── Event Modal Functions + Event Listeners ────────────────────────────────
 function updateEventModalTimeVisibility() {
   const allDay  = document.getElementById('eventAllDay')?.checked;
   const typeVal = document.getElementById('eventType')?.value;
@@ -27,6 +30,7 @@ function updateEventModalTimeVisibility() {
   if (endGroup) endGroup.style.display = (allDay || isInstant) ? 'none' : '';
   recurRow.forEach(el => { el.style.display = allDay ? 'none' : ''; });
 }
+
 function openEventModal(ev, defaultStart, defaultEnd) {
   const isEdit = !!ev;
   document.getElementById('eventModalTitle').textContent = isEdit ? t('event_edit') : t('event_add');
@@ -172,6 +176,8 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   openModal('eventModal');
 }
+
+// ── Invited list filter (Users / Groups / Both) ────────────────────────────
 function setInvitedFilter(filter) {
   _invitedFilter = filter;
   document.querySelectorAll('.inv-filter-btn').forEach(btn => {
@@ -187,6 +193,7 @@ function setInvitedFilter(filter) {
     else chip.style.display = '';
   });
 }
+
 // Wire up inline alarm checkbox toggle
 document.getElementById('inlineAlarmEnabled')?.addEventListener('change', function() {
   const opts = document.getElementById('inlineAlarmOptions');
@@ -288,6 +295,8 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     showError(err.error);
   }
 });
+
+// ── patchEventStatus, deleteEvent, showRecurDeleteDialog, showEventDetail, comments, attachments ──
 async function patchEventStatus(id, status, rejectionReason) {
   const res = await api('PATCH', `/api/events/${id}/status`, {status, rejection_reason: rejectionReason});
   if (res.ok) {
@@ -299,6 +308,7 @@ async function patchEventStatus(id, status, rejectionReason) {
     showError(err.error);
   }
 }
+
 async function deleteEvent(id) {
   const ev = state.events.find(x => x.id === id);
   if (ev && ev.is_recurring) {
@@ -313,6 +323,7 @@ async function deleteEvent(id) {
     showNotification('success', t('notif_event_deleted'));
   } else { showError('Failed to delete event'); }
 }
+
 function showRecurDeleteDialog(ev) {
   const occTime = state._currentOccurrenceTime;
   const msg = occTime
@@ -368,6 +379,8 @@ function showRecurDeleteDialog(ev) {
 
   openModal('recurDeleteModal');
 }
+
+// ── Event Detail Modal ─────────────────────────────────────────────────────
 function showEventDetail(ev) {
   document.getElementById('detailTitle').textContent = ev.title;
   const lang   = state.preferences.language || 'en';
@@ -551,6 +564,7 @@ function showEventDetail(ev) {
 
   openModal('detailModal');
 }
+
 async function submitComment(eventId) {
   const textarea = document.getElementById('commentText');
   const content  = textarea ? textarea.value.trim() : '';
@@ -566,6 +580,7 @@ async function submitComment(eventId) {
     showError(err.error);
   }
 }
+
 async function deleteComment(commentId, eventId) {
   if (!confirm(t('confirm_delete')||'Delete this comment?')) return;
   const res = await apiDel(`/api/comments/${commentId}`);
@@ -574,6 +589,7 @@ async function deleteComment(commentId, eventId) {
     if (ev) showEventDetail(ev);
   }
 }
+
 async function approveComment(commentId, eventId) {
   const res = await apiPost(`/api/comments/${commentId}/approve`, {});
   if (res.ok) {
@@ -586,6 +602,7 @@ async function approveComment(commentId, eventId) {
     showError(err.error);
   }
 }
+
 async function deleteAttachment(id, eventId) {
   if (!confirm(t('confirm_delete_attachment'))) return;
   const res = await apiDel(`/api/attachments/${id}`);
@@ -595,6 +612,10 @@ async function deleteAttachment(id, eventId) {
     if (ev) showEventDetail(ev);
   }
 }
+
+
+// ── Alarm Modal + Lock Modal handlers ─────────────────────────────────────
+// ── Alarm Modal ────────────────────────────────────────────────────────────
 function openAlarmModal(ev) {
   document.getElementById('alarmEventId').value = ev.id;
   document.getElementById('alarmEventTitle').value = ev.title;
@@ -602,6 +623,7 @@ function openAlarmModal(ev) {
   document.getElementById('alarmLeadTime').value = '5';
   openModal('alarmModal');
 }
+
 document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
   const eventId  = parseInt(document.getElementById('alarmEventId').value, 10);
   const leadTime = parseInt(document.getElementById('alarmLeadTime').value, 10);
@@ -612,10 +634,13 @@ document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
     showNotification('success', t('notif_alarm_set'));
   } else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteAlarm(id) {
   const res = await apiDel(`/api/alarms/${id}`);
   if (res.ok) { await fetchAlarms(); renderSidebar(); showNotification('success', t('notif_alarm_removed')); }
 }
+
+// ── Lock Modal ─────────────────────────────────────────────────────────────
 document.getElementById('btnAddLock').addEventListener('click', () => {
   const now = new Date();
   document.getElementById('lockStart').value = fmtDateInput(now);
@@ -623,10 +648,14 @@ document.getElementById('btnAddLock').addEventListener('click', () => {
   document.getElementById('lockReason').value = '';
   openLockModal();
 });
+
+// Show/hide layer selector in lock modal based on scope
 function onLockScopeChange() {
   const scope = document.getElementById('lockScope').value;
   document.getElementById('lockLayerGroup').style.display = scope === 'layer' ? '' : 'none';
 }
+
+// Populate layer select when opening lock modal
 function openLockModal() {
   const sel = document.getElementById('lockLayerSelect');
   if (sel) {
@@ -636,6 +665,7 @@ function openLockModal() {
   document.getElementById('lockLayerGroup').style.display = 'none';
   openModal('lockModal');
 }
+
 document.getElementById('btnSaveLock').addEventListener('click', async () => {
   const sv = document.getElementById('lockStart').value;
   const ev = document.getElementById('lockEnd').value;
@@ -659,11 +689,15 @@ document.getElementById('btnSaveLock').addEventListener('click', async () => {
     showNotification('success', t('notif_locked'));
   } else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteLock(id) {
   if (!confirm(t('confirm_delete_lock'))) return;
   const res = await apiDel(`/api/locks/${id}`);
   if (res.ok) { await fetchLocks(); renderTimeline(); showNotification('success', t('notif_unlocked')); }
 }
+
+// ── User Modal, Group Modal, Member Modal ─────────────────────────────────
+// ── User Modal ─────────────────────────────────────────────────────────────
 async function openUserModal(user) {
   const isEdit = !!user;
   document.getElementById('userModalTitle').textContent = isEdit ? t('user_edit') : t('user_add');
@@ -699,6 +733,7 @@ async function openUserModal(user) {
 
   openModal('userModal');
 }
+
 document.getElementById('btnSaveUser').addEventListener('click', async () => {
   const id = document.getElementById('userId').value;
   const username = document.getElementById('uUsername').value.trim();
@@ -715,12 +750,15 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
   if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
   else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteUser(id) {
   if (!confirm(t('confirm_delete_user'))) return;
   const res = await apiDel(`/api/users/${id}`);
   if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
   else { showError('Failed to delete user'); }
 }
+
+// ── Group Modal ────────────────────────────────────────────────────────────
 function openGroupModal(group) {
   const isEdit = !!group;
   document.getElementById('groupModalTitle').textContent = isEdit ? 'Edit Group' : t('groups_add').replace('+ ','');
@@ -732,6 +770,7 @@ function openGroupModal(group) {
   delBtn.onclick = isEdit ? () => deleteGroup(group.id) : null;
   openModal('groupModal');
 }
+
 document.getElementById('btnSaveGroup').addEventListener('click', async () => {
   const id = document.getElementById('groupId').value;
   const name = document.getElementById('groupName').value.trim();
@@ -741,11 +780,14 @@ document.getElementById('btnSaveGroup').addEventListener('click', async () => {
   if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
   else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteGroup(id) {
   if (!confirm(t('confirm_delete_group'))) return;
   const res = await apiDel(`/api/groups/${id}`);
   if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
 }
+
+// ── Member Management Modal ────────────────────────────────────────────────
 async function openMemberModal(group) {
   document.getElementById('memberModalTitle').textContent = `${escHtml(group.name)} — ${t('groups_members')}`;
   const body = document.getElementById('memberModalBody');
@@ -807,6 +849,7 @@ async function openMemberModal(group) {
     ${addMemberForm}
   `;
 }
+
 async function addGroupMember(groupID) {
   const userID = parseInt(document.getElementById('addMemberUser').value, 10);
   const role   = document.getElementById('addMemberRole').value;
@@ -817,6 +860,7 @@ async function addGroupMember(groupID) {
     showNotification('success', t('notif_saved'));
   } else { const err = await res.json(); showError(err.error); }
 }
+
 async function removeGroupMember(groupID, userID) {
   if (!confirm('Remove this member from the group?')) return;
   const res = await apiDel(`/api/groups/${groupID}/members/${userID}`);
@@ -826,6 +870,9 @@ async function removeGroupMember(groupID, userID) {
     showNotification('success', t('notif_saved'));
   } else { showError('Failed to remove member'); }
 }
+
+// ── Layer Modal, Event Type Modal, Phase Modal ────────────────────────────
+// ── Layer Modal ────────────────────────────────────────────────────────────
 function openLayerModal(layer) {
   const isEdit = !!layer;
   document.getElementById('layerModalTitle').textContent = isEdit ? 'Edit Layer' : t('layers_add').replace('+ ','');
@@ -867,6 +914,7 @@ function openLayerModal(layer) {
   delBtn.onclick = isEdit ? () => deleteLayer(layer.id) : null;
   openModal('layerModal');
 }
+
 document.getElementById('btnSaveLayer').addEventListener('click', async () => {
   const id = document.getElementById('layerId').value;
   const name = document.getElementById('layerName').value.trim();
@@ -886,6 +934,7 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
     showNotification('success', t('notif_saved'));
   } else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteLayer(id) {
   if (!confirm(t('confirm_delete_layer'))) return;
   const res = await apiDel(`/api/layers/${id}`);
@@ -896,6 +945,8 @@ async function deleteLayer(id) {
     showNotification('success', t('notif_saved'));
   }
 }
+
+// ── Event Type Modal ───────────────────────────────────────────────────────
 function openEtypeModal(et) {
   const isEdit = !!et;
   document.getElementById('etypeModalTitle').textContent = isEdit ? 'Edit Event Type' : 'New Event Type';
@@ -912,6 +963,7 @@ function openEtypeModal(et) {
   delBtn.onclick = canDel ? () => deleteEtype(et.id) : null;
   openModal('etypeModal');
 }
+
 document.getElementById('btnSaveEtype').addEventListener('click', async () => {
   const id    = document.getElementById('etypeId').value;
   const key   = document.getElementById('etypeKey').value.trim().replace(/\s+/g,'_');
@@ -931,6 +983,7 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
     showNotification('success', t('notif_saved'));
   } else { const err = await res.json(); showError(err.error); }
 });
+
 async function deleteEtype(id) {
   if (!confirm(t('confirm_delete_type'))) return;
   const res = await apiDel(`/api/event-types/${id}`);
@@ -941,6 +994,8 @@ async function deleteEtype(id) {
     showNotification('success', t('notif_saved'));
   } else { const err = await res.json(); showError(err.error); }
 }
+
+// ── Phase Modal ────────────────────────────────────────────────────────────
 function openPhaseModal(ph) {
   const isEdit = !!ph;
   document.getElementById('phaseModalTitle').textContent = isEdit ? (t('phase_edit')||'Edit Phase') : (t('phase_add')||'New Phase');
@@ -962,6 +1017,7 @@ function openPhaseModal(ph) {
   delBtn.onclick = isEdit ? () => deletePhase(ph.id) : null;
   openModal('phaseModal');
 }
+
 document.getElementById('btnSavePhase').addEventListener('click', async () => {
   const id    = document.getElementById('phaseId').value;
   const name  = document.getElementById('phaseName').value.trim();
@@ -986,6 +1042,7 @@ document.getElementById('btnSavePhase').addEventListener('click', async () => {
     showNotification('success', t('notif_saved'));
   } else { const err = await res.json(); showError(err.error); }
 });
+
 async function deletePhase(id) {
   if (!confirm(t('confirm_delete')||'Delete this phase?')) return;
   const res = await apiDel(`/api/phases/${id}`);
@@ -997,6 +1054,9 @@ async function deletePhase(id) {
     showNotification('success', t('notif_saved'));
   }
 }
+
+// ── renderSidebar ─────────────────────────────────────────────────────────
+// ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar() {
   const tab  = state.sidebarTab;
   const el   = document.getElementById('sidebarContent');
@@ -1326,12 +1386,17 @@ function renderSidebar() {
     `;
   }
 }
+
+// ── Webhook helpers, preference setters: setOOHPref, setRedLinePref, setSynthLabelPref, toggleFreeze, saveExercise, setDefaultView, setPref, setHourPref, toggleType, toggleLayer, toggleAllLayers ──
+
+// ── Webhook helpers ────────────────────────────────────────────────────────
 async function saveWebhookPref() {
   state.preferences.webhook_url  = document.getElementById('prefWebhookURL').value.trim();
   state.preferences.webhook_type = document.getElementById('prefWebhookType').value;
   await savePreferences();
   showNotification('success', t('notif_saved'));
 }
+
 async function testWebhook() {
   const url  = document.getElementById('prefWebhookURL').value.trim();
   const type = document.getElementById('prefWebhookType').value;
@@ -1350,12 +1415,14 @@ async function testWebhook() {
     showError('Webhook test failed: ' + e.message);
   }
 }
+
 async function setOOHPref(val) {
   state.preferences.show_out_of_hours = val;
   applyPreferences();
   await savePreferences();
   renderTimeline();
 }
+
 async function setRedLinePref() {
   state.preferences.red_line_enabled = document.getElementById('prefRedLine')?.checked ?? true;
   state.preferences.red_line_color   = document.getElementById('prefLineColor')?.value || '#E74C3C';
@@ -1364,11 +1431,13 @@ async function setRedLinePref() {
   await savePreferences();
   updateCurrentTimeLine(getDays(), getSlotHeight());
 }
+
 async function setSynthLabelPref(val) {
   state.preferences.synth_label = val;
   await savePreferences();
   updateCurrentTimeLine(getDays(), getSlotHeight());
 }
+
 function toggleFreeze() {
   if (state.timelinePaused) {
     state.timelinePaused = false;
@@ -1380,6 +1449,8 @@ function toggleFreeze() {
   renderSidebar();
   updateCurrentTimeLine(getDays(), getSlotHeight());
 }
+
+// ── Exercise settings ──────────────────────────────────────────────────────
 async function saveExercise() {
   const epoch       = document.getElementById('exEpoch')?.value;
   const endex       = document.getElementById('exEndex')?.value;
@@ -1404,6 +1475,7 @@ async function saveExercise() {
     showError(err.error);
   }
 }
+
 async function setDefaultView(view) {
   state.preferences.default_view = view;
   state.range = view;
@@ -1413,6 +1485,8 @@ async function setDefaultView(view) {
   renderSidebar();
   await refreshAll();
 }
+
+// ── Preference actions ─────────────────────────────────────────────────────
 async function setPref(key, value) {
   state.preferences[key] = value;
   applyPreferences();
@@ -1421,6 +1495,7 @@ async function setPref(key, value) {
   renderTimeline();
   updateUILabels();
 }
+
 async function setHourPref() {
   const sh = parseInt(document.getElementById('prefStartH').value, 10);
   const eh = parseInt(document.getElementById('prefEndH').value, 10);
@@ -1430,6 +1505,7 @@ async function setHourPref() {
   await savePreferences();
   renderTimeline();
 }
+
 async function toggleType(key) {
   const ht = state.preferences.hidden_types || [];
   if (ht.includes(key)) {
@@ -1441,6 +1517,7 @@ async function toggleType(key) {
   renderSidebar();
   renderTimeline();
 }
+
 function toggleLayer(id) {
   // Exclusion model: hidden_layers lists what to hide; toggling flips visibility
   const hl = state.preferences.hidden_layers || [];
@@ -1456,6 +1533,7 @@ function toggleLayer(id) {
   if (pop && pop.style.display !== 'none') renderLayerPopover();
   savePreferences(); // fire-and-forget
 }
+
 function toggleAllLayers() {
   state.preferences.hidden_layers = []; // show all layers
   // Immediate visual update, save in background
@@ -1465,6 +1543,8 @@ function toggleAllLayers() {
   if (pop && pop.style.display !== 'none') renderLayerPopover();
   savePreferences(); // fire-and-forget
 }
+
+// ── updateUILabels, updateLangFlags ───────────────────────────────────────
 function updateUILabels() {
   // Header buttons
   document.getElementById('btnToday').textContent    = t('today');
@@ -1617,6 +1697,7 @@ function updateUILabels() {
   // Language flag active state
   updateLangFlags();
 }
+
 function updateLangFlags() {
   const lang = (state.preferences && state.preferences.language) || 'en';
   ['EN', 'SV', 'FR'].forEach(code => {
@@ -1624,6 +1705,11 @@ function updateLangFlags() {
     if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
   });
 }
+
+// ── SSE ────────────────────────────────────────────────────────────────────
+
+// ── SSE, Alarm ACK: connectSSE, unackedAlarms, showAlarmNotification, dismissAlarmNotif, ackAlarm ──
+// ── SSE ────────────────────────────────────────────────────────────────────
 function connectSSE() {
   const es = new EventSource('/api/notifications/stream');
   es.addEventListener('alarm', e => {
@@ -1692,6 +1778,9 @@ async function ackAlarm(alarmID, notifEl) {
     showNotification('success', t('alarm_acked'));
   }
 }
+
+// ── Export, Import, exportCSV, ICS helpers, exportICS, Templates ─────────
+// ── Export ─────────────────────────────────────────────────────────────────
 function openExportModal() {
   // Show/hide privileged-only categories
   const isPriv = hasRole2(state.user?.role, 'oplead');
@@ -1705,6 +1794,7 @@ function openExportModal() {
   });
   openModal('exportModal');
 }
+
 function doExport(format) {
   if (format === 'ics') { closeModal('exportModal'); exportICS(); return; }
   if (format === 'csv') { closeModal('exportModal'); exportCSV(); return; }
@@ -1717,6 +1807,7 @@ function doExport(format) {
     return;
   }
 }
+
 function openImportModal() {
   const isPriv = hasRole2(state.user?.role, 'oplead');
   const usersCb     = document.getElementById('importUsersCb');
@@ -1731,6 +1822,7 @@ function openImportModal() {
   if (resultEl) { resultEl.style.display = 'none'; resultEl.textContent = ''; }
   openModal('importModal');
 }
+
 async function doImport() {
   const fileEl = document.getElementById('importFile');
   if (!fileEl || !fileEl.files.length) { showError('Please select a JSON export file.', 'Validation'); return; }
@@ -1754,6 +1846,7 @@ async function doImport() {
     showError('Import failed: ' + err.error);
   }
 }
+
 function exportCSV() {
   const events = state.events;
   if (!events.length) { showError('No events in the current view to export.', 'Validation'); return; }
@@ -1782,6 +1875,153 @@ function exportCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ── Templates ──────────────────────────────────────────────────────────────
+async function openTemplatesModal() {
+  await renderTemplatesList();
+  // Wire up save button
+  const btn = document.getElementById('btnSaveTemplate');
+  if (btn) btn.onclick = openSaveTemplateDialog;
+  openModal('templatesModal');
+}
+
+async function renderTemplatesList() {
+  const listEl = document.getElementById('templatesList');
+  if (!listEl) return;
+  const templates = await apiGet('/api/templates') || [];
+  if (!templates.length) {
+    listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No templates yet. Save the current events as a template to get started.</p>`;
+    return;
+  }
+  listEl.innerHTML = templates.map(tmpl => `
+    <div class="tmpl-card">
+      <div class="tmpl-card-info">
+        <div class="tmpl-card-name">${escHtml(tmpl.name)}</div>
+        <div class="tmpl-card-meta">
+          ${tmpl.item_count || 0} event${(tmpl.item_count||0)!==1?'s':''} ·
+          ${tmpl.scope === 'private' ? '🔒 Private' : '🌐 Public'} ·
+          by ${escHtml(tmpl.created_by_name||'—')}
+          ${tmpl.description ? ' · ' + escHtml(tmpl.description) : ''}
+        </div>
+      </div>
+      <div class="tmpl-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id}, ${JSON.stringify(escHtml(tmpl.name))}, ${tmpl.item_count||0})">▶ Apply</button>
+        ${(state.user && (state.user.id === tmpl.created_by || hasRole2(state.user.role, 'admin')))
+          ? `<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${tmpl.id})">Delete</button>`
+          : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openSaveTemplateDialog() {
+  const evCount = state.events.length;
+  const el = document.getElementById('tmplEventCount');
+  if (el) el.textContent = `Will save ${evCount} event${evCount!==1?'s':''} from the current view.`;
+  document.getElementById('tmplName').value = '';
+  document.getElementById('tmplDescription').value = '';
+  document.getElementById('tmplScope').value = 'private';
+  // Role-based visibility
+  const scopeSel = document.getElementById('tmplScope');
+  if (scopeSel) {
+    const isPriv = hasRole2(state.user?.role, 'oplead');
+    [...scopeSel.options].forEach(opt => {
+      if (opt.value === 'public') opt.hidden = !isPriv;
+    });
+  }
+  document.getElementById('btnConfirmSaveTemplate').onclick = confirmSaveTemplate;
+  openModal('saveTemplateModal');
+}
+
+async function confirmSaveTemplate() {
+  const name = document.getElementById('tmplName').value.trim();
+  if (!name) { showError('Template name is required.', 'Validation'); return; }
+  const scope = document.getElementById('tmplScope').value;
+  // Build items from current events
+  const events = state.events;
+  if (!events.length) { showError('No events in current view.', 'Validation'); return; }
+  // Find earliest start to anchor offsets
+  const earliest = Math.min(...events.map(e => new Date(e.start_time).getTime()));
+  const items = events.map(e => {
+    const startMs = new Date(e.start_time).getTime();
+    const endMs   = e.end_time ? new Date(e.end_time).getTime() : null;
+    return {
+      title:              e.title,
+      event_type:         e.event_type,
+      color:              e.color,
+      description:        e.description || '',
+      start_offset_min:   Math.round((startMs - earliest) / 60000),
+      duration_min:       endMs ? Math.round((endMs - startMs) / 60000) : 0,
+      all_day:            e.all_day,
+      is_recurring:       e.is_recurring,
+      recurrence_pattern: e.recurrence_pattern || '',
+      participant:        e.participant || '',
+    };
+  });
+  const payload = {
+    name,
+    description: document.getElementById('tmplDescription').value.trim(),
+    scope,
+    items,
+  };
+  const res = await apiPost('/api/templates', payload);
+  if (res.ok) {
+    closeModal('saveTemplateModal');
+    showNotification('success', 'Template saved');
+    renderTemplatesList();
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+function openApplyTemplateDialog(id, name, itemCount) {
+  document.getElementById('applyTemplateInfo').textContent =
+    `Apply template "${name}" (${itemCount} event${itemCount!==1?'s':''})`;
+  document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
+  // Populate layer select
+  const layerSel = document.getElementById('applyTemplateLayer');
+  layerSel.innerHTML = `<option value="">Master Timeline</option>` +
+    state.layers.filter(l => l.owner_id===state.user.id || l.permission==='readwrite')
+      .map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+  document.getElementById('btnConfirmApplyTemplate').onclick = () => confirmApplyTemplate(id);
+  openModal('applyTemplateModal');
+}
+
+async function confirmApplyTemplate(id) {
+  const baseVal   = document.getElementById('applyTemplateBase').value;
+  if (!baseVal) { showError('Please select a base date/time.', 'Validation'); return; }
+  const layerVal  = document.getElementById('applyTemplateLayer').value;
+  const payload   = {
+    base_time: new Date(baseVal).toISOString(),
+    layer_id:  layerVal ? parseInt(layerVal, 10) : null,
+  };
+  const res = await apiPost(`/api/templates/${id}/apply`, payload);
+  if (res.ok) {
+    const r = await res.json();
+    closeModal('applyTemplateModal');
+    closeModal('templatesModal');
+    await refreshAll();
+    showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+async function deleteTemplate(id) {
+  if (!confirm('Delete this template?')) return;
+  const res = await apiDel(`/api/templates/${id}`);
+  if (res.ok) {
+    showNotification('success', 'Template deleted');
+    renderTemplatesList();
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+// ── ICS Export ─────────────────────────────────────────────────────────────
 function toICSDate(d) {
   const pad = n => String(n).padStart(2,'0');
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
@@ -1836,145 +2076,100 @@ function exportICS() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+// ── Password change, Report modal setup (DOMContentLoaded) ───────────────
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 4) panTriggered = true;
+    container.scrollLeft = startScrollLeft - dx;
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (!dragging) return;
+    dragging = false;
+    container.style.cursor = '';
+    // If we dragged far enough horizontally, navigate to adjacent date range
+    const dx = startX - e.clientX;
+    if (Math.abs(dx) > container.clientWidth * 0.4) {
+      navigate(dx > 0 ? 1 : -1);
+    }
+  });
 }
-async function openTemplatesModal() {
-  await renderTemplatesList();
-  // Wire up save button
-  const btn = document.getElementById('btnSaveTemplate');
-  if (btn) btn.onclick = openSaveTemplateDialog;
-  openModal('templatesModal');
-}
-async function renderTemplatesList() {
-  const listEl = document.getElementById('templatesList');
-  if (!listEl) return;
-  const templates = await apiGet('/api/templates') || [];
-  if (!templates.length) {
-    listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No templates yet. Save the current events as a template to get started.</p>`;
-    return;
-  }
-  listEl.innerHTML = templates.map(tmpl => `
-    <div class="tmpl-card">
-      <div class="tmpl-card-info">
-        <div class="tmpl-card-name">${escHtml(tmpl.name)}</div>
-        <div class="tmpl-card-meta">
-          ${tmpl.item_count || 0} event${(tmpl.item_count||0)!==1?'s':''} ·
-          ${tmpl.scope === 'private' ? '🔒 Private' : '🌐 Public'} ·
-          by ${escHtml(tmpl.created_by_name||'—')}
-          ${tmpl.description ? ' · ' + escHtml(tmpl.description) : ''}
-        </div>
-      </div>
-      <div class="tmpl-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id}, ${JSON.stringify(escHtml(tmpl.name))}, ${tmpl.item_count||0})">▶ Apply</button>
-        ${(state.user && (state.user.id === tmpl.created_by || hasRole2(state.user.role, 'admin')))
-          ? `<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${tmpl.id})">Delete</button>`
-          : ''}
-      </div>
-    </div>
-  `).join('');
-}
-function openSaveTemplateDialog() {
-  const evCount = state.events.length;
-  const el = document.getElementById('tmplEventCount');
-  if (el) el.textContent = `Will save ${evCount} event${evCount!==1?'s':''} from the current view.`;
-  document.getElementById('tmplName').value = '';
-  document.getElementById('tmplDescription').value = '';
-  document.getElementById('tmplScope').value = 'private';
-  // Role-based visibility
-  const scopeSel = document.getElementById('tmplScope');
-  if (scopeSel) {
-    const isPriv = hasRole2(state.user?.role, 'oplead');
-    [...scopeSel.options].forEach(opt => {
-      if (opt.value === 'public') opt.hidden = !isPriv;
+
+// ── Password change ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const btnSavePw = document.getElementById('btnSavePassword');
+  if (btnSavePw) {
+    btnSavePw.addEventListener('click', async () => {
+      const curPw  = document.getElementById('pwdCurrent')?.value || '';
+      const newPw  = document.getElementById('pwdNew')?.value?.trim()    || '';
+      const conPw  = document.getElementById('pwdConfirm')?.value?.trim() || '';
+      if (!newPw || newPw !== conPw) {
+        showError(t('password_mismatch') || 'Passwords do not match', 'Validation'); return;
+      }
+      const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
+      if (res.ok) {
+        closeModal('passwordModal');
+        showNotification('success', t('password_saved')||'Password changed');
+      } else {
+        const err = await res.json();
+        showError(err.error);
+      }
     });
   }
-  document.getElementById('btnConfirmSaveTemplate').onclick = confirmSaveTemplate;
-  openModal('saveTemplateModal');
-}
-async function confirmSaveTemplate() {
-  const name = document.getElementById('tmplName').value.trim();
-  if (!name) { showError('Template name is required.', 'Validation'); return; }
-  const scope = document.getElementById('tmplScope').value;
-  // Build items from current events
-  const events = state.events;
-  if (!events.length) { showError('No events in current view.', 'Validation'); return; }
-  // Find earliest start to anchor offsets
-  const earliest = Math.min(...events.map(e => new Date(e.start_time).getTime()));
-  const items = events.map(e => {
-    const startMs = new Date(e.start_time).getTime();
-    const endMs   = e.end_time ? new Date(e.end_time).getTime() : null;
-    return {
-      title:              e.title,
-      event_type:         e.event_type,
-      color:              e.color,
-      description:        e.description || '',
-      start_offset_min:   Math.round((startMs - earliest) / 60000),
-      duration_min:       endMs ? Math.round((endMs - startMs) / 60000) : 0,
-      all_day:            e.all_day,
-      is_recurring:       e.is_recurring,
-      recurrence_pattern: e.recurrence_pattern || '',
-      participant:        e.participant || '',
-    };
-  });
-  const payload = {
-    name,
-    description: document.getElementById('tmplDescription').value.trim(),
-    scope,
-    items,
-  };
-  const res = await apiPost('/api/templates', payload);
-  if (res.ok) {
-    closeModal('saveTemplateModal');
-    showNotification('success', 'Template saved');
-    renderTemplatesList();
-  } else {
-    const err = await res.json();
-    showError(err.error);
+
+  const btnExport = document.getElementById('btnExportData');
+  if (btnExport) {
+    btnExport.addEventListener('click', async () => {
+      const res = await api('GET', '/api/export');
+      if (!res.ok) { showError('Export failed'); return; }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `tidslinjal-export-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
   }
-}
-function openApplyTemplateDialog(id, name, itemCount) {
-  document.getElementById('applyTemplateInfo').textContent =
-    `Apply template "${name}" (${itemCount} event${itemCount!==1?'s':''})`;
-  document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
-  // Populate layer select
-  const layerSel = document.getElementById('applyTemplateLayer');
-  layerSel.innerHTML = `<option value="">Master Timeline</option>` +
-    state.layers.filter(l => l.owner_id===state.user.id || l.permission==='readwrite')
-      .map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
-  document.getElementById('btnConfirmApplyTemplate').onclick = () => confirmApplyTemplate(id);
-  openModal('applyTemplateModal');
-}
-async function confirmApplyTemplate(id) {
-  const baseVal   = document.getElementById('applyTemplateBase').value;
-  if (!baseVal) { showError('Please select a base date/time.', 'Validation'); return; }
-  const layerVal  = document.getElementById('applyTemplateLayer').value;
-  const payload   = {
-    base_time: new Date(baseVal).toISOString(),
-    layer_id:  layerVal ? parseInt(layerVal, 10) : null,
-  };
-  const res = await apiPost(`/api/templates/${id}/apply`, payload);
-  if (res.ok) {
-    const r = await res.json();
-    closeModal('applyTemplateModal');
-    closeModal('templatesModal');
-    await refreshAll();
-    showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
-  } else {
-    const err = await res.json();
-    showError(err.error);
+
+  const btnReport = document.getElementById('btnReport');
+  if (btnReport) {
+    btnReport.addEventListener('click', () => {
+      // Populate layer checkboxes in report modal
+      const layerList = document.getElementById('reportLayerList');
+      if (layerList) {
+        layerList.innerHTML = `
+          <label class="group-chip selected" style="cursor:pointer">
+            <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
+            ${t('layers_master')||'Master'}
+          </label>
+          ${state.layers.map(l => `
+            <label class="group-chip selected" style="cursor:pointer">
+              <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
+              ${escHtml(l.name)}
+            </label>
+          `).join('')}
+        `;
+        // Toggle chip selected class on change
+        layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
+          cb.addEventListener('change', () => {
+            cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+          });
+        });
+      }
+      openModal('reportModal');
+    });
   }
-}
-async function deleteTemplate(id) {
-  if (!confirm('Delete this template?')) return;
-  const res = await apiDel(`/api/templates/${id}`);
-  if (res.ok) {
-    showNotification('success', 'Template deleted');
-    renderTemplatesList();
-  } else {
-    const err = await res.json();
-    showError(err.error);
-  }
-}
+});
+
+
+// ── generateReport, mobileNavTab, closeMobileSidebar ─────────────────────
 async function generateReport() {
   const type   = document.getElementById('reportType')?.value || 'aar';
   // Optionally use date range from report modal if provided
@@ -2106,6 +2301,8 @@ async function generateReport() {
   closeModal('reportModal');
   showNotification('success', t('report_ready')||'Report downloaded');
 }
+
+// ── Mobile nav ─────────────────────────────────────────────────────────────
 function mobileNavTab(tab) {
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
@@ -2135,6 +2332,7 @@ function mobileNavTab(tab) {
   const mn = document.getElementById('mn' + tab.charAt(0).toUpperCase() + tab.slice(1));
   if (mn) mn.classList.add('active');
 }
+
 function closeMobileSidebar() {
   document.getElementById('sidebar').classList.remove('visible');
   document.getElementById('sidebarBackdrop').classList.remove('visible');
