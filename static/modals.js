@@ -2076,10 +2076,10 @@ function exportICS() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
 
-// ── Password change, Report modal setup (DOMContentLoaded) ───────────────
-  });
-
+// ── Mouse drag-to-pan (DOMContentLoaded) ──────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
     const dx = e.clientX - startX;
@@ -2097,7 +2097,7 @@ function exportICS() {
       navigate(dx > 0 ? 1 : -1);
     }
   });
-}
+});
 
 // ── Password change ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
