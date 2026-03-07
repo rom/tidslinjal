@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "3.3.0"
+const AppVersion = "3.4.0"
 
 // AppGitHub is the project repository URL
 const AppGitHub = "https://github.com/rom/tidslinjal"
@@ -285,6 +285,33 @@ type AuditEntry struct {
 	EntityType string    `json:"entity_type"` // event | user | group | layer | lock | alarm
 	EntityID   int64     `json:"entity_id"`
 	Summary    string    `json:"summary"`
+}
+
+// Template is a named, reusable set of events (with relative time offsets)
+type Template struct {
+	ID            int64          `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	Scope         string         `json:"scope"` // private | public
+	CreatedBy     int64          `json:"created_by"`
+	CreatedByName string         `json:"created_by_name"`
+	CreatedAt     time.Time      `json:"created_at"`
+	Items         []TemplateItem `json:"items"`
+	ItemCount     int            `json:"item_count"`
+}
+
+// TemplateItem is a single event blueprint stored relative to T=0
+type TemplateItem struct {
+	Title             string `json:"title"`
+	EventType         string `json:"event_type"`
+	Color             string `json:"color"`
+	Description       string `json:"description"`
+	StartOffsetMin    int    `json:"start_offset_min"` // minutes from template base time
+	DurationMin       int    `json:"duration_min"`     // 0 = instant
+	AllDay            bool   `json:"all_day"`
+	IsRecurring       bool   `json:"is_recurring"`
+	RecurrencePattern string `json:"recurrence_pattern"`
+	Participant       string `json:"participant"`
 }
 
 // OIDCConfig holds the discovered OIDC provider endpoints
