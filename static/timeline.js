@@ -411,13 +411,17 @@ function renderEventBlocks(days, slotH) {
 
       const { left: cellLeft, width: cellWidth } = dayMeta[di];
       const PAD = 6;
+      const halfCell = Math.floor((cellWidth - PAD*2) / 2);
 
       items.forEach((item, idx) => {
         const col     = colOf[idx];
         const numCols = localCols[idx];
         const colW    = Math.floor((cellWidth - PAD*2) / numCols);
         const blockL  = cellLeft + PAD + col * colW;
-        const blockW  = colW - (col < numCols-1 ? 1 : 0);
+        const isInstant = item.ev.event_type === 'instant';
+        const blockW  = isInstant
+          ? Math.min(colW - (col < numCols-1 ? 1 : 0), halfCell)
+          : colW - (col < numCols-1 ? 1 : 0);
 
         const { ev, evStart, evEnd, topPx, heightPx } = item;
 
@@ -441,6 +445,8 @@ function renderEventBlocks(days, slotH) {
           ? `<span class="ev-icon" title="${ev.comment_count} comment(s)">💬</span>` : '';
         const allDayIcon = ev.all_day
           ? `<span class="ev-icon" title="Day-only">📅</span>` : '';
+        const instantIcon = isInstant
+          ? `<span class="ev-icon" title="Instant">⚡</span>` : '';
 
         const block = document.createElement('div');
         block.className = 'event-block';
@@ -450,7 +456,7 @@ function renderEventBlocks(days, slotH) {
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${escHtml(ev.title)}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
+          <div class="ev-title">${statusDot}${instantIcon}${escHtml(ev.title)}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>
