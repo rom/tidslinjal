@@ -247,7 +247,7 @@
 
 <!-- Save Template Dialog -->
 <div class="modal-overlay" id="saveTemplateModal" style="z-index:1100">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <h2>💾 Save as Template</h2>
       <button class="modal-close" onclick="closeModal('saveTemplateModal')">&times;</button>
@@ -268,7 +268,20 @@
           <option value="public">Public (all users)</option>
         </select>
       </div>
-      <p id="tmplEventCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:8px"></p>
+      <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-top:8px">
+        <legend style="font-size:var(--fs-sm);padding:0 6px;color:var(--text-dim)">📅 Date range to capture</legend>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0">
+            <label style="font-size:var(--fs-sm)">From</label>
+            <input type="datetime-local" id="tmplRangeFrom">
+          </div>
+          <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0">
+            <label style="font-size:var(--fs-sm)">To</label>
+            <input type="datetime-local" id="tmplRangeTo">
+          </div>
+        </div>
+        <p id="tmplEventCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:8px;margin-bottom:0"></p>
+      </fieldset>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
@@ -287,8 +300,9 @@
     <div class="modal-body">
       <p id="applyTemplateInfo" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
       <div class="form-group">
-        <label>Base date/time (T=0 for the template) *</label>
+        <label>📅 Exercise start date &amp; time (STARTEX / T=0) *</label>
         <input type="datetime-local" id="applyTemplateBase">
+        <small style="color:var(--text-dim)">All template events, phases and locks are scheduled relative to this moment.</small>
       </div>
       <div class="form-group">
         <label>Target layer <small style="color:var(--text-dim)">(optional — overrides original)</small></label>
@@ -297,7 +311,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('applyTemplateModal')">Cancel</button>
-      <button class="btn btn-primary" id="btnConfirmApplyTemplate">Create Events</button>
+      <button class="btn btn-primary" id="btnConfirmApplyTemplate">Load Template</button>
     </div>
   </div>
 </div>

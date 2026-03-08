@@ -1,0 +1,34 @@
+{
+  "name": "EX-01 Quick Reaction Force",
+  "description": "Single-day rapid response exercise (0800–1700). A QRF unit responds to two sequential security incidents within a 9-hour window. Focus on rapid decision-making, escalation authority, and after-action review. Good first template for 1-day exercises.",
+  "scope": "public",
+  "phases": [
+    {"name": "INITEX & Preparation",  "color": "#F39C12", "start_offset_min": 0,   "end_offset_min": 60,  "order": 0},
+    {"name": "Initial Response",       "color": "#E74C3C", "start_offset_min": 60,  "end_offset_min": 240, "order": 1},
+    {"name": "Resolution",             "color": "#27AE60", "start_offset_min": 240, "end_offset_min": 480, "order": 2},
+    {"name": "ENDEX & AAR",            "color": "#3498DB", "start_offset_min": 480, "end_offset_min": 540, "order": 3}
+  ],
+  "locks": [
+    {"start_offset_min": 240, "end_offset_min": 300, "reason": "Mandatory lunch break — no exercise injections", "scope": "all"}
+  ],
+  "items": [
+    {"title": "STARTEX",                          "event_type": "instant",       "color": "#E74C3C", "description": "Exercise begins. Synthetic time activated. All participants take their assigned roles.", "start_offset_min": 0,   "duration_min": 0},
+    {"title": "Commander's Brief",                "event_type": "activity",      "color": "#2ECC71", "description": "Exercise director briefs all participants on the scenario background, rules of engagement, and communication plan.", "start_offset_min": 0,   "duration_min": 60},
+    {"title": "Intel Report: Threat Overview",    "event_type": "reporting",     "color": "#1ABC9C", "description": "Intelligence cell submits the initial threat picture including known hostile elements and likely courses of action.", "start_offset_min": 0,   "duration_min": 30},
+    {"title": "QRF Alpha: Ready Check",           "event_type": "standup",       "color": "#00ACC1", "description": "Team Alpha reports readiness status — personnel, equipment, comms, vehicle status.", "start_offset_min": 60,  "duration_min": 0},
+    {"title": "INJECT: Perimeter Breach — Alpha", "event_type": "event",         "color": "#C0392B", "description": "Exercise inject: hostile element has breached the northern perimeter of the secured facility. QRF Alpha is ordered to respond.", "start_offset_min": 60,  "duration_min": 0},
+    {"title": "QRF Alpha Deployment",             "event_type": "assigned_task", "color": "#E67E22", "description": "QRF Team Alpha deploys to the northern perimeter. Establish cordon, assess situation, request fire support if needed.", "start_offset_min": 60,  "duration_min": 120},
+    {"title": "QRF Bravo: Stand-to",              "event_type": "assigned_task", "color": "#E67E22", "description": "Team Bravo placed on immediate notice to move (NTM15) in support of Team Alpha or secondary incident.", "start_offset_min": 60,  "duration_min": 30},
+    {"title": "SITREP 1 — Incident Alpha",        "event_type": "reporting",     "color": "#1ABC9C", "description": "Situation report on Incident Alpha. Alpha team reports contact, request for reinforcement, ammunition status.", "start_offset_min": 120, "duration_min": 0},
+    {"title": "INJECT: Hostile Vehicle — Bravo",  "event_type": "event",         "color": "#C0392B", "description": "Exercise inject: a suspicious vehicle is reported approaching the eastern checkpoint. Possible secondary hostile element.", "start_offset_min": 150, "duration_min": 0},
+    {"title": "QRF Bravo Deployment",             "event_type": "assigned_task", "color": "#E67E22", "description": "QRF Team Bravo deploys to eastern checkpoint. Contain the vehicle, conduct search, report findings.", "start_offset_min": 150, "duration_min": 120},
+    {"title": "Escalation Decision Point",        "event_type": "decision",      "color": "#27AE60", "description": "Commander decides whether to escalate to full emergency protocols or maintain current response level based on SITREP data.", "start_offset_min": 210, "duration_min": 0},
+    {"title": "Lunch Break",                      "event_type": "activity",      "color": "#95A5A6", "description": "Mandatory rest period. All exercise activity paused. Personnel rotate through feeding schedule.", "start_offset_min": 240, "duration_min": 60},
+    {"title": "SITREP 2 — Combined Update",       "event_type": "reporting",     "color": "#1ABC9C", "description": "Combined situation report from both QRF teams. Current status, casualties (simulated), resource consumption.", "start_offset_min": 300, "duration_min": 0},
+    {"title": "Alpha: Incident Resolved",         "event_type": "event",         "color": "#27AE60", "description": "QRF Alpha confirms northern perimeter secure. Hostile element neutralised (simulated). Area clear for follow-on forces.", "start_offset_min": 300, "duration_min": 60},
+    {"title": "Bravo: Vehicle Cleared",           "event_type": "event",         "color": "#27AE60", "description": "QRF Bravo confirms vehicle and occupants cleared. No hostile intent confirmed. Checkpoint returned to normal.", "start_offset_min": 330, "duration_min": 60},
+    {"title": "Post-Incident Assessment",         "event_type": "activity",      "color": "#2ECC71", "description": "Teams compile post-incident assessments. Document timelines, resource expenditure, communications log, lessons observed.", "start_offset_min": 420, "duration_min": 60},
+    {"title": "After Action Review",              "event_type": "mote",          "color": "#7F8C8D", "description": "Structured AAR with all participants. What was planned, what happened, why the difference, what to sustain and improve.", "start_offset_min": 480, "duration_min": 60},
+    {"title": "ENDEX",                            "event_type": "instant",       "color": "#E74C3C", "description": "Exercise concluded. Synthetic time deactivated. All participants revert to normal duties.", "start_offset_min": 540, "duration_min": 0}
+  ]
+}

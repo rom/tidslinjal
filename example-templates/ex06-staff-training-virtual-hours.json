@@ -1,0 +1,35 @@
+{
+  "name": "EX-06 Staff Training — Virtual, Working Hours",
+  "description": "2-day virtual staff officer training exercise, working hours (0800–1700). Participants at different locations connected via MS Teams. Day 1 covers staff procedure modules; Day 2 applies them in a live scenario. Heavy use of standups and structured reporting. Contrast with EX-04 (co-located working hours).",
+  "scope": "public",
+  "phases": [
+    {"name": "Day 1 — Training Modules", "color": "#3498DB", "start_offset_min": 0,    "end_offset_min": 540,  "order": 0},
+    {"name": "Overnight Recess",          "color": "#BDC3C7", "start_offset_min": 540,  "end_offset_min": 1440, "order": 1},
+    {"name": "Day 2 — Applied Exercise",  "color": "#E74C3C", "start_offset_min": 1440, "end_offset_min": 1980, "order": 2}
+  ],
+  "locks": [
+    {"start_offset_min": 240,  "end_offset_min": 300,  "reason": "Day 1 lunch break — virtual channels closed", "scope": "all"},
+    {"start_offset_min": 540,  "end_offset_min": 1440, "reason": "Overnight recess — exercise resumes Day 2 at 0800", "scope": "all"},
+    {"start_offset_min": 1680, "end_offset_min": 1740, "reason": "Day 2 lunch break — virtual channels closed", "scope": "all"}
+  ],
+  "items": [
+    {"title": "STARTEX",                                   "event_type": "instant",       "color": "#E74C3C", "description": "Day 1 begins. All participants connect to MS Teams. Synthetic time activated.", "start_offset_min": 0,    "duration_min": 0},
+    {"title": "Virtual: Welcome & Exercise Overview",       "event_type": "mote",          "color": "#7F8C8D", "description": "Exercise director opens Day 1. Overview of the 2-day programme, learning objectives, and how virtual tools will be used. Confirm all participants have access.", "start_offset_min": 0,    "duration_min": 60},
+    {"title": "Module 1: Information Management",           "event_type": "activity",      "color": "#2ECC71", "description": "Structured training module. Staff procedures for information collection, processing, and dissemination. Includes shared document exercise on Teams.", "start_offset_min": 60,   "duration_min": 120},
+    {"title": "Virtual: Module 1 Review Standup",          "event_type": "standup",       "color": "#00ACC1", "description": "Short standup via Teams. Each participant confirms: one thing learned, one question, one improvement suggestion for information management.", "start_offset_min": 180,  "duration_min": 0},
+    {"title": "Module 2: Orders Process",                   "event_type": "activity",      "color": "#2ECC71", "description": "Training on the five-paragraph field order format (SMEAC / SMESC). Practice writing abbreviated orders. Peer review via Teams shared doc.", "start_offset_min": 180,  "duration_min": 60},
+    {"title": "Virtual: Lunch Coordination Sync",          "event_type": "standup",       "color": "#00ACC1", "description": "Brief sync before lunch. Confirm afternoon schedule, pre-read assignments for Module 3.", "start_offset_min": 300,  "duration_min": 0},
+    {"title": "Module 3: Battle Rhythm Planning",           "event_type": "activity",      "color": "#2ECC71", "description": "Practical session on designing an exercise battle rhythm. Teams create a daily schedule using the Tidslinjal timeline. Share via screenshot to Teams channel.", "start_offset_min": 300,  "duration_min": 120},
+    {"title": "Assignment: Design a 24h Battle Rhythm",    "event_type": "assigned_task", "color": "#E67E22", "description": "Individual assignment distributed via Teams. Participants design a 24-hour battle rhythm for a fictional HQ. Due before Day 2.", "start_offset_min": 480,  "duration_min": 0},
+    {"title": "Virtual: Day 1 Wrap-up",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Day 1 close-out. Trainer reviews the day, previews Day 2 applied exercise, confirms assignment submission instructions.", "start_offset_min": 480,  "duration_min": 60},
+    {"title": "Day 1 Close",                               "event_type": "instant",       "color": "#95A5A6", "description": "Day 1 training concluded. Participants released for overnight recess. Complete and submit assignment before Day 2.", "start_offset_min": 540,  "duration_min": 0},
+    {"title": "Virtual: Day 2 Morning Standup",            "event_type": "standup",       "color": "#00ACC1", "description": "Day 2 commences. Trainer reviews submitted assignments, confirms exercise objectives, and opens the applied scenario.", "start_offset_min": 1440, "duration_min": 0},
+    {"title": "Applied Exercise — Phase Alpha",             "event_type": "activity",      "color": "#2ECC71", "description": "Live exercise scenario. Participants apply Day 1 skills in a realistic information management scenario. HQ operations running in Tidslinjal.", "start_offset_min": 1500, "duration_min": 180},
+    {"title": "Virtual: SITREP Submission — Teams Form",   "event_type": "reporting",     "color": "#1ABC9C", "description": "Participants submit structured SITREP using the Teams form provided. Assessed on format, content, and timeliness.", "start_offset_min": 1620, "duration_min": 0},
+    {"title": "Virtual: Decision Brief",                   "event_type": "mote",          "color": "#7F8C8D", "description": "Commander (trainer) presents a scenario decision point. Staff provide recommendations using the process from Module 2.", "start_offset_min": 1680, "duration_min": 60},
+    {"title": "Applied Exercise — Phase Bravo",             "event_type": "activity",      "color": "#2ECC71", "description": "Second exercise phase. Increased information flow and competing priorities. Participants manage multiple simultaneous tasks.", "start_offset_min": 1740, "duration_min": 180},
+    {"title": "Virtual: Lessons Observed Report",          "event_type": "reporting",     "color": "#1ABC9C", "description": "Each participant submits their lessons observed report via Teams. Three columns: observed, standard, recommendation.", "start_offset_min": 1920, "duration_min": 0},
+    {"title": "Virtual: Final Debrief",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Trainer-led debrief. Review of exercise performance against learning objectives. Participant feedback collected.", "start_offset_min": 1920, "duration_min": 60},
+    {"title": "ENDEX",                                     "event_type": "instant",       "color": "#E74C3C", "description": "2-day virtual training exercise concluded. Certificates issued post-exercise. Synthetic time deactivated.", "start_offset_min": 1980, "duration_min": 0}
+  ]
+}
