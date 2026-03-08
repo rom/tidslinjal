@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 3.2.0**
+**Version 3.6.0**
 
 ---
 
@@ -61,6 +61,26 @@ Gå till `http://<server>:<port>` (standard: `http://localhost:8080`).
 Standarduppgifter: `admin` / `admin`
 
 > **Säkerhetsnotering:** Byt adminlösenordet omedelbart efter första inloggning med 🔑-knappen i övre högra hörnet.
+
+### Självregistrering
+
+Om administratören har aktiverat självregistrering visas länken **"Inget konto? Registrera dig"** på inloggningssidan. Det finns fyra registreringslägen:
+
+| Läge | Beskrivning |
+|---|---|
+| **Öppen** | Vem som helst kan registrera sig; kontot aktiveras direkt |
+| **Granskad** | Vem som helst kan registrera sig; admin måste godkänna kontot innan inloggning tillåts |
+| **Generell inbjudan** | Registrering kräver en delad inbjudningskod som adminen tillhandahåller |
+| **Personlig inbjudan** | Registrering kräver en personlig engångskod som adminen genererar per användare |
+
+### Lösenordsåterställning
+
+Om du har registrerat en e-postadress på din profil:
+
+1. Klicka på **Glömt lösenord?** på inloggningssidan
+2. Ange ditt användarnamn eller din e-postadress
+3. En återställningstoken genereras (visas på skärmen om ingen e-postserver är konfigurerad)
+4. Klicka på **Återställ lösenord**, klistra in token och välj ett nytt lösenord
 
 ### Byta lösenord
 
@@ -402,12 +422,14 @@ Låsta tidsluckor visas som ett rödstreckigt överlägg. Händelser kan inte sk
 
 | Roll | Förkortning | Funktioner |
 |---|---|---|
+| **Observatör** | `observer` | Skrivskyddad åtkomst till tidslinje och händelser — kan inte redigera, kommentera eller låsa |
 | **Läs** | `read` | Visa tidslinje, händelser, lager; ställa in personliga larm |
 | **Rapportör** | `reporter` | + Posta kommentarer; ange besvarad/avslutad (med godkännande) |
 | **Läs/Skriv** | `readwrite` | + Skapa/redigera egna händelser; skapa händelsetyper och lager |
 | **Gruppledare** | `teamlead` | + Skapa grupper; verifiera/avvisa inskickade händelser; visa granskningslogg; hantera faser |
 | **Operationsledare** | `oplead` | + Skapa/redigera/ta bort händelser på masterlinjen |
-| **Admin** | `admin` | Full åtkomst — hantera alla användare, roller, lås, övningsinställningar |
+| **Stabsassistent** | `staffofficer` | Samma rättigheter som operationsledare — alternativ beteckning för stabspersonal |
+| **Admin** | `admin` | Full åtkomst — hantera alla användare, roller, lås, övningsinställningar, registrering |
 
 Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 
@@ -428,9 +450,17 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 
 Språket kan också ändras direkt med flaggknapparna (🇬🇧 🇸🇪 🇫🇷) i verktygsfältet.
 
-### Dagstimmar
+### Datum-/tidsformat och dagstimmar
 
-Ange **Starttimme** och **Sluttimme** för att definiera ditt "arbetsdagsfönster". Tidsluckor utanför detta fönster visas grå/streckade.
+Avsnittet **Datum-/tidsformat** grupperar både formatval och konfiguration av dagstimmar:
+
+| Inställning | Beskrivning |
+|---|---|
+| **Datumformat** | ISO 8601 / UK / FR / SV |
+| **Dag start** | Första timmen på arbetsdagen |
+| **Dag slut** | Sista timmen på arbetsdagen |
+
+Tidsluckor utanför dag start–slut visas grå/streckade.
 
 ### Standardvy
 

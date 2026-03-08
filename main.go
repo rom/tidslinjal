@@ -213,6 +213,7 @@ func NewApp(dataDir string) (*App, error) {
 			DisplayName:  "Administrator",
 			Role:         RoleAdmin,
 			CanLock:      true,
+			Vetted:       true,
 		})
 		log.Println("Created default admin (username: admin, password: admin)")
 	}
@@ -260,12 +261,14 @@ func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Requ
 
 func hasRole(userRole, required Role) bool {
 	order := map[Role]int{
-		RoleRead:      0,
-		RoleReporter:  1,
-		RoleReadWrite: 2,
-		RoleTeamLead:  3,
-		RoleOpLead:    4,
-		RoleAdmin:     5,
+		RoleObserver:     0,
+		RoleRead:         0,
+		RoleReporter:     1,
+		RoleReadWrite:    2,
+		RoleTeamLead:     3,
+		RoleOpLead:       4,
+		RoleStaffOfficer: 4,
+		RoleAdmin:        5,
 	}
 	return order[userRole] >= order[required]
 }
@@ -378,6 +381,11 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Deny login for unvetted accounts (pending admin approval)
+	if !user.Vetted && user.Role != RoleAdmin {
+		jsonError(w, "account pending approval", http.StatusForbidden)
+		return
+	}
 	sessID, err := generateID()
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
@@ -453,6 +461,358 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		Action: "updated", EntityType: "user", EntityID: user.ID,
 		Summary: "changed own password",
 	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Registration handler ───────────────────────────────────────────────────────
+
+func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	rs := app.store.GetRegistrationSettings()
+	if rs.Mode == "" || rs.Mode == "off" {
+		jsonError(w, "registration is disabled", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Username       string `json:"username"`
+		Password       string `json:"password"`
+		DisplayName    string `json:"display_name"`
+		Email          string `json:"email"`
+		InvitationCode string `json:"invitation_code"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		jsonError(w, "username and password required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 6 {
+		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Check username availability
+	if _, exists := app.store.GetUserByUsername(req.Username); exists {
+		jsonError(w, "username already taken", http.StatusConflict)
+		return
+	}
+
+	// Validate invitation codes
+	var invID int64
+	switch rs.Mode {
+	case "generic_invitation":
+		if req.InvitationCode != rs.InvitationCode || rs.InvitationCode == "" {
+			jsonError(w, "invalid invitation code", http.StatusForbidden)
+			return
+		}
+	case "personal_invitation":
+		inv, ok := app.store.GetInvitationByCode(req.InvitationCode)
+		if !ok || inv.Used {
+			jsonError(w, "invalid or already-used invitation code", http.StatusForbidden)
+			return
+		}
+		invID = inv.ID
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	displayName := req.DisplayName
+	if displayName == "" {
+		displayName = req.Username
+	}
+
+	// Vetted mode: user must be approved before login
+	vetted := rs.Mode != "vetted"
+
+	newUser := User{
+		Username:    req.Username,
+		PasswordHash: string(hash),
+		DisplayName: displayName,
+		Email:       req.Email,
+		Role:        RoleRead,
+		Vetted:      vetted,
+	}
+	created, err := app.store.CreateUser(newUser)
+	if err != nil {
+		jsonError(w, "failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	// Mark personal invitation as used
+	if invID > 0 {
+		app.store.MarkInvitationUsed(invID, req.Username) //nolint
+	}
+
+	app.audit(0, "system", "created", "user", created.ID,
+		fmt.Sprintf("Self-registered user %q via %s mode", req.Username, rs.Mode))
+
+	if vetted {
+		jsonOK(w, map[string]interface{}{"status": "registered", "vetted": true})
+	} else {
+		jsonOK(w, map[string]interface{}{"status": "pending_approval", "vetted": false})
+	}
+}
+
+// ── Registration Settings handler ──────────────────────────────────────────────
+
+func (app *App) handleRegistrationSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		jsonOK(w, app.store.GetRegistrationSettings())
+	case http.MethodPut:
+		var rs RegistrationSettings
+		if err := decode(r, &rs); err != nil {
+			jsonError(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		validModes := map[string]bool{"off": true, "open": true, "vetted": true, "generic_invitation": true, "personal_invitation": true}
+		if !validModes[rs.Mode] {
+			jsonError(w, "invalid mode", http.StatusBadRequest)
+			return
+		}
+		if err := app.store.SaveRegistrationSettings(rs); err != nil {
+			jsonError(w, "failed to save", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, rs)
+	default:
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ── Invitation handlers ─────────────────────────────────────────────────────────
+
+func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		jsonOK(w, app.store.GetInvitations())
+	case http.MethodPost:
+		var req struct {
+			Note string `json:"note"`
+		}
+		if err := decode(r, &req); err != nil {
+			jsonError(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		code, err := generateID()
+		if err != nil {
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		// Use a shorter, more readable code
+		code = code[:12]
+		inv, err := app.store.CreateInvitation(PersonalInvitation{
+			Code:      code,
+			Note:      req.Note,
+			CreatedBy: user.ID,
+		})
+		if err != nil {
+			jsonError(w, "failed to create invitation", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, inv)
+	default:
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (app *App) handleDeleteInvitation(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodDelete {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "missing id", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteInvitation(id); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Vet User handler ────────────────────────────────────────────────────────────
+
+func (app *App) handleVetUser(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	// /api/users/:id/vet
+	if len(parts) < 4 {
+		jsonError(w, "missing id", http.StatusBadRequest)
+		return
+	}
+	uid, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.VetUser(uid); err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "user", uid,
+		fmt.Sprintf("Admin %q vetted user #%d", user.Username, uid))
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Password Reset handlers ────────────────────────────────────────────────────
+
+func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Find user by username or email
+	var targetUser *User
+	if req.Username != "" {
+		u, ok := app.store.GetUserByUsername(req.Username)
+		if ok {
+			targetUser = u
+		}
+	}
+	if targetUser == nil && req.Email != "" {
+		users := app.store.GetUsers()
+		for i := range users {
+			if users[i].Email == req.Email && req.Email != "" {
+				targetUser = &users[i]
+				break
+			}
+		}
+	}
+
+	// Always return success to avoid user enumeration
+	if targetUser == nil {
+		jsonOK(w, map[string]string{"status": "ok"})
+		return
+	}
+
+	token, err := generateID()
+	if err != nil {
+		jsonOK(w, map[string]string{"status": "ok"})
+		return
+	}
+	expiry := time.Now().Add(2 * time.Hour)
+	app.store.SetPasswordResetToken(targetUser.ID, token, expiry) //nolint
+
+	// Log token for admin visibility (no email sending without SMTP config)
+	log.Printf("Password reset requested for user %q — token: %s (valid 2h)", targetUser.Username, token)
+
+	jsonOK(w, map[string]string{"status": "ok", "token": token})
+}
+
+func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Token == "" || req.NewPassword == "" {
+		jsonError(w, "token and new_password required", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 6 {
+		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
+		return
+	}
+
+	user, ok := app.store.GetUserByResetToken(req.Token)
+	if !ok {
+		jsonError(w, "invalid or expired token", http.StatusBadRequest)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		jsonError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	user.PasswordHash = string(hash)
+	user.PasswordResetToken = ""
+	user.PasswordResetExpiry = nil
+	if err := app.store.UpdateUser(*user); err != nil {
+		jsonError(w, "failed to update password", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.Username, "updated", "user", user.ID, "password reset via token")
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Update email handler ────────────────────────────────────────────────────────
+
+func (app *App) handleUpdateEmail(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	fullUser, ok := app.store.GetUserByID(user.ID)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	fullUser.Email = req.Email
+	if err := app.store.UpdateUser(*fullUser); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -656,6 +1016,10 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 	e.CreatedBy = user.ID
 	e.CreatedByName = user.DisplayName
+
+	// Check for scheduling overlaps (non-blocking: returns warnings)
+	overlaps := app.store.CheckOverlaps(e.StartTime, e.EndTime, e.ResponsibleID, e.InvitedUserIDs, 0)
+
 	created, err := app.store.CreateEvent(e)
 	if err != nil {
 		jsonError(w, "failed to create event", http.StatusInternalServerError)
@@ -688,7 +1052,12 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 
 	app.broadcastEventChange(user.ID, "created", &created)
 	w.WriteHeader(http.StatusCreated)
-	jsonOK(w, created)
+	// Include overlap_warnings alongside event fields for non-breaking backward compat
+	type createResp struct {
+		Event
+		OverlapWarnings []OverlapWarning `json:"overlap_warnings,omitempty"`
+	}
+	jsonOK(w, createResp{Event: created, OverlapWarnings: overlaps})
 }
 
 func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *User) {
@@ -734,6 +1103,9 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 			e.Color = et.Color
 		}
 	}
+	// Check for scheduling overlaps (non-blocking: returns warnings)
+	overlaps := app.store.CheckOverlaps(e.StartTime, e.EndTime, e.ResponsibleID, e.InvitedUserIDs, id)
+
 	if err := app.store.UpdateEvent(e); err != nil {
 		jsonError(w, "failed to update", http.StatusInternalServerError)
 		return
@@ -742,7 +1114,11 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		fmt.Sprintf("Updated event %q", existing.Title))
 	updated, _ := app.store.GetEventByID(id)
 	app.broadcastEventChange(user.ID, "updated", updated)
-	jsonOK(w, updated)
+	type updateResp struct {
+		Event
+		OverlapWarnings []OverlapWarning `json:"overlap_warnings,omitempty"`
+	}
+	jsonOK(w, updateResp{Event: *updated, OverlapWarnings: overlaps})
 }
 
 func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, user *User) {
@@ -1467,9 +1843,10 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 	if req.DisplayName == "" {
 		req.DisplayName = req.Username
 	}
+	// Admin-created users are always vetted
 	created, err := app.store.CreateUser(User{
 		Username: req.Username, PasswordHash: string(hash),
-		DisplayName: req.DisplayName, Role: req.Role, CanLock: req.CanLock,
+		DisplayName: req.DisplayName, Role: req.Role, CanLock: req.CanLock, Vetted: true,
 	})
 	if err != nil {
 		jsonError(w, "failed to create user", http.StatusInternalServerError)
@@ -1503,6 +1880,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	var req struct {
 		Password    string  `json:"password"`
 		DisplayName string  `json:"display_name"`
+		Email       string  `json:"email"`
 		Role        Role    `json:"role"`
 		CanLock     bool    `json:"can_lock"`
 		GroupIDs    []int64 `json:"group_ids"`    // nil = no change; [] = remove all; [...] = replace
@@ -1523,6 +1901,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	if req.DisplayName != "" {
 		existing.DisplayName = req.DisplayName
 	}
+	existing.Email = req.Email
 	if hasRole(user.Role, RoleAdmin) {
 		if req.Role != "" {
 			existing.Role = req.Role
@@ -1630,17 +2009,18 @@ func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *U
 	}
 	// Confirm intent via request body
 	var req struct {
-		Confirm string `json:"confirm"`
+		Confirm       string `json:"confirm"`
+		KeepTemplates bool   `json:"keep_templates"`
 	}
 	if err := decode(r, &req); err != nil || req.Confirm != "RESET" {
 		jsonError(w, "confirmation required: send {\"confirm\":\"RESET\"}", http.StatusBadRequest)
 		return
 	}
-	if err := app.store.ResetToEmpty(*user); err != nil {
+	if err := app.store.ResetToEmpty(*user, req.KeepTemplates); err != nil {
 		jsonError(w, "reset failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Printf("Admin %q triggered a full system reset (data cleared, admin account preserved)", user.Username)
+	log.Printf("Admin %q triggered a full system reset (data cleared, admin account preserved, keepTemplates=%v)", user.Username, req.KeepTemplates)
 	jsonOK(w, map[string]string{"status": "reset complete"})
 }
 
@@ -2194,12 +2574,34 @@ func (app *App) routes() http.Handler {
 
 	// Admin operations
 	mux.HandleFunc("/api/admin/reset", app.requireAuth(app.handleAdminReset))
+	mux.HandleFunc("/api/admin/registration", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			// Public: expose only the mode (not the invitation code) so login page can check
+			_, u := app.getSession(r)
+			rs := app.store.GetRegistrationSettings()
+			if u != nil && u.Role == RoleAdmin {
+				// Admin sees full settings including invitation code
+				jsonOK(w, rs)
+			} else {
+				// Public only sees mode
+				jsonOK(w, map[string]string{"mode": rs.Mode})
+			}
+			return
+		}
+		app.requireAuth(app.handleRegistrationSettings)(w, r)
+	})
+	mux.HandleFunc("/api/admin/invitations", app.requireAuth(app.handleInvitations))
+	mux.HandleFunc("/api/admin/invitations/", app.requireAuth(app.handleDeleteInvitation))
 
 	// Auth
 	mux.HandleFunc("/api/auth/login", app.handleLogin)
 	mux.HandleFunc("/api/auth/logout", app.handleLogout)
 	mux.HandleFunc("/api/auth/me", app.requireAuth(app.handleMe))
 	mux.HandleFunc("/api/auth/change-password", app.requireAuth(app.handleChangePassword))
+	mux.HandleFunc("/api/auth/register", app.handleRegister)
+	mux.HandleFunc("/api/auth/forgot-password", app.handleForgotPassword)
+	mux.HandleFunc("/api/auth/reset-password", app.handleResetPassword)
+	mux.HandleFunc("/api/auth/update-email", app.requireAuth(app.handleUpdateEmail))
 
 	// Preferences
 	mux.HandleFunc("/api/preferences", func(w http.ResponseWriter, r *http.Request) {
@@ -2453,6 +2855,11 @@ func (app *App) routes() http.Handler {
 		// /api/users/:id/groups
 		if len(parts) == 4 && parts[3] == "groups" && r.Method == http.MethodGet {
 			app.requireAuth(app.handleGetUserGroups)(w, r)
+			return
+		}
+		// /api/users/:id/vet
+		if len(parts) == 4 && parts[3] == "vet" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleVetUser)(w, r)
 			return
 		}
 		switch r.Method {

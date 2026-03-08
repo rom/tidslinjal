@@ -107,15 +107,15 @@
     <!-- Sidebar -->
     <aside id="sidebar">
       <div class="sidebar-tabs" id="sidebarTabs">
-        <button class="sidebar-tab active" data-tab="legend">Legend</button>
-        <button class="sidebar-tab" data-tab="alarms">Alarms</button>
-        <button class="sidebar-tab" data-tab="layers">Layers</button>
-        <button class="sidebar-tab admin-only" data-tab="users" style="display:none">Users</button>
-        <button class="sidebar-tab admin-only" data-tab="groups" style="display:none">Groups</button>
-        <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none">Audit</button>
-        <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none">Phases</button>
-        <button class="sidebar-tab" data-tab="activity">Activity</button>
-        <button class="sidebar-tab" data-tab="settings">Settings</button>
+        <button class="sidebar-tab active" data-tab="legend" data-i18n="tab_legend">Legend</button>
+        <button class="sidebar-tab" data-tab="alarms" data-i18n="tab_alarms">Alarms</button>
+        <button class="sidebar-tab" data-tab="layers" data-i18n="tab_layers">Layers</button>
+        <button class="sidebar-tab admin-only" data-tab="users" style="display:none" data-i18n="tab_users">Users</button>
+        <button class="sidebar-tab admin-only" data-tab="groups" style="display:none" data-i18n="tab_groups">Groups</button>
+        <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
+        <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
+        <button class="sidebar-tab" data-tab="activity" data-i18n="tab_activity">Activity</button>
+        <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
     </aside>
@@ -624,13 +624,21 @@
           <input type="text" id="uDisplayName">
         </div>
         <div class="form-group">
+          <label id="lbl-u-email" data-i18n="user_email">Email</label>
+          <input type="email" id="uEmail" placeholder="user@example.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label id="lbl-u-role">Role</label>
           <select id="uRole">
+            <option value="observer">Observer</option>
             <option value="read" id="lbl-role-read">Read</option>
             <option value="reporter" id="lbl-role-reporter">Reporter</option>
             <option value="readwrite" id="lbl-role-readwrite">Read/Write</option>
             <option value="teamlead" id="lbl-role-teamlead">Team Lead</option>
             <option value="oplead" id="lbl-role-oplead">Operations Lead</option>
+            <option value="staffofficer">Staff Officer Asst.</option>
             <option value="admin" id="lbl-role-admin">Admin</option>
           </select>
         </div>
@@ -1017,15 +1025,17 @@
         <div class="help-section" id="h-roles">
           <div class="help-section-icon">👥</div>
           <div class="help-section-body">
-            <h3>User Roles</h3>
+            <h3 data-i18n="help_roles_title">User Roles</h3>
             <table class="help-table">
-              <tr><th>Role</th><th>Capabilities</th></tr>
-              <tr><td><span class="role-badge role-read">Read</span></td><td>View timeline · set personal alarms · comment on events</td></tr>
-              <tr><td><span class="role-badge role-reporter">Reporter</span></td><td>+ Set status to Responded To / Completed (needs Team Lead approval)</td></tr>
-              <tr><td><span class="role-badge role-readwrite">Read/Write</span></td><td>+ Create and edit own events on accessible layers · create event types and layers</td></tr>
-              <tr><td><span class="role-badge role-teamlead">Team Lead</span></td><td>+ Create groups · verify/reject events · manage phases · approve reporter changes · view audit log</td></tr>
-              <tr><td><span class="role-badge role-oplead">Ops Lead</span></td><td>+ Create/edit/delete master timeline events · manage exercise settings · pause timeline</td></tr>
-              <tr><td><span class="role-badge role-admin">Admin</span></td><td>Full access — manage users, roles, locks; export all data</td></tr>
+              <tr><th data-i18n="help_roles_role">Role</th><th data-i18n="help_roles_capabilities">Capabilities</th></tr>
+              <tr><td><span class="role-badge role-observer">Observer</span></td><td data-i18n="help_role_observer">Read-only view of the timeline · no editing</td></tr>
+              <tr><td><span class="role-badge role-read">Read</span></td><td data-i18n="help_role_read">View timeline · set personal alarms · comment on events</td></tr>
+              <tr><td><span class="role-badge role-reporter">Reporter</span></td><td data-i18n="help_role_reporter">+ Set status to Responded To / Completed (needs Team Lead approval)</td></tr>
+              <tr><td><span class="role-badge role-readwrite">Read/Write</span></td><td data-i18n="help_role_readwrite">+ Create and edit own events on accessible layers · create event types and layers</td></tr>
+              <tr><td><span class="role-badge role-teamlead">Team Lead</span></td><td data-i18n="help_role_teamlead">+ Create groups · verify/reject events · manage phases · approve reporter changes · view audit log</td></tr>
+              <tr><td><span class="role-badge role-oplead">Ops Lead</span></td><td data-i18n="help_role_oplead">+ Create/edit/delete master timeline events · manage exercise settings · pause timeline</td></tr>
+              <tr><td><span class="role-badge role-staffofficer">Staff Officer Asst.</span></td><td data-i18n="help_role_staffofficer">Same rights as Operations Lead</td></tr>
+              <tr><td><span class="role-badge role-admin">Admin</span></td><td data-i18n="help_role_admin">Full access — manage users, roles, locks; export all data</td></tr>
             </table>
           </div>
         </div>
