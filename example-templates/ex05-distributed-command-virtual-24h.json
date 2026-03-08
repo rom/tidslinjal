@@ -1,40 +1,238 @@
 {
   "name": "EX-05 Distributed Command — Virtual, 48h",
   "description": "48-hour distributed command post exercise with participants at different geographic locations. All coordination is conducted virtually via Mattermost and MS Teams. Demonstrates remote collaboration patterns, virtual meeting rhythm, and digital information management. Around-the-clock operations. Contrast with EX-03 (co-located).",
+  "exercise_name": "EX-05 Distributed Command",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
   "scope": "public",
   "phases": [
-    {"name": "INITEX & System Check",   "color": "#F39C12", "start_offset_min": 0,    "end_offset_min": 120,  "order": 0},
-    {"name": "Phase 1 — Establish",     "color": "#E74C3C", "start_offset_min": 120,  "end_offset_min": 960,  "order": 1},
-    {"name": "Phase 2 — Develop",       "color": "#8E44AD", "start_offset_min": 960,  "end_offset_min": 2160, "order": 2},
-    {"name": "Phase 3 — Consolidate",   "color": "#27AE60", "start_offset_min": 2160, "end_offset_min": 2880, "order": 3}
+    {
+      "name": "INITEX & System Check",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Phase 1 — Establish",
+      "color": "#E74C3C",
+      "start_offset_min": 120,
+      "end_offset_min": 960,
+      "order": 1
+    },
+    {
+      "name": "Phase 2 — Develop",
+      "color": "#8E44AD",
+      "start_offset_min": 960,
+      "end_offset_min": 2160,
+      "order": 2
+    },
+    {
+      "name": "Phase 3 — Consolidate",
+      "color": "#27AE60",
+      "start_offset_min": 2160,
+      "end_offset_min": 2880,
+      "order": 3
+    }
   ],
   "locks": [
-    {"start_offset_min": 900,  "end_offset_min": 960,  "reason": "System maintenance window — virtual platform restart, max 60 min", "scope": "all"},
-    {"start_offset_min": 2340, "end_offset_min": 2400, "reason": "System maintenance window D2/D3 — no new exercise injections", "scope": "all"}
+    {
+      "start_offset_min": 900,
+      "end_offset_min": 960,
+      "reason": "System maintenance window — virtual platform restart, max 60 min",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2340,
+      "end_offset_min": 2400,
+      "reason": "System maintenance window D2/D3 — no new exercise injections",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                                    "event_type": "instant",       "color": "#E74C3C", "description": "Exercise begins. All participants log into virtual exercise environment. Synthetic time activated.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "Virtual: All-Hands Kickoff — Teams",         "event_type": "mote",          "color": "#7F8C8D", "description": "MS Teams all-hands meeting. Exercise director brief, introductions across locations, exercise rules confirmed. Each location unmutes and confirms audio/video.", "start_offset_min": 0,    "duration_min": 60},
-    {"title": "Connectivity Check All Nodes",               "event_type": "standup",       "color": "#00ACC1", "description": "Each site confirms: audio/video OK, access to shared drive, Mattermost channel connectivity, VPN status.", "start_offset_min": 60,   "duration_min": 0},
-    {"title": "Virtual: Orders Group — Mattermost #ops",    "event_type": "mote",          "color": "#7F8C8D", "description": "Orders issued via Mattermost video channel #ops-exercise. Commander briefs Phase 1 tasks. All elements confirm receipt in thread.", "start_offset_min": 60,   "duration_min": 120},
-    {"title": "Digital Intel Package Distribution",         "event_type": "assigned_task", "color": "#E67E22", "description": "Intel officer distributes Phase 1 intel packages via secure shared drive. Elements confirm download and reading.", "start_offset_min": 120,  "duration_min": 30},
-    {"title": "Virtual: Blue Force Tracking Brief — Teams", "event_type": "mote",          "color": "#7F8C8D", "description": "MS Teams session showing shared digital map with force dispositions. Each element confirms their position and status on the COP.", "start_offset_min": 180,  "duration_min": 60},
-    {"title": "SITREP 1 — Channel #sitrep",                 "event_type": "reporting",     "color": "#1ABC9C", "description": "All elements post SITREP in Mattermost #sitrep channel using standard format: LOCATION / STATUS / TASKS / ISSUES / ETA.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "Phase 1 Activity — Distributed",             "event_type": "activity",      "color": "#2ECC71", "description": "Phase 1 core activity. Elements work independently at their locations, coordinating via Mattermost channels. CP monitors dashboard.", "start_offset_min": 240,  "duration_min": 360},
-    {"title": "Virtual: Commander's Update — Teams",        "event_type": "mote",          "color": "#7F8C8D", "description": "Commander's virtual update brief. Progress assessment, task adjustments, cross-location coordination issues addressed.", "start_offset_min": 480,  "duration_min": 60},
-    {"title": "SITREP 1800 D1 — Channel #sitrep",           "event_type": "reporting",     "color": "#1ABC9C", "description": "End-of-day D1 consolidated SITREP from all locations.", "start_offset_min": 600,  "duration_min": 0},
-    {"title": "Virtual: Night Shift Handover — Teams",      "event_type": "mote",          "color": "#7F8C8D", "description": "Virtual handover to night duty officers at each location. Outgoing briefs incoming: current status, overnight priorities, escalation contacts.", "start_offset_min": 720,  "duration_min": 60},
-    {"title": "Remote Night Operations — D1",               "event_type": "activity",      "color": "#2C3E50", "description": "Night operations with reduced staffing across all locations. Duty officers monitor shared dashboard. Escalation via Mattermost #urgent.", "start_offset_min": 780,  "duration_min": 420},
-    {"title": "SITREP 0200 D2 — Channel #sitrep",           "event_type": "reporting",     "color": "#1ABC9C", "description": "Night duty report from all locations. Overnight activity, incidents, readiness for D2 morning.", "start_offset_min": 1080, "duration_min": 0},
-    {"title": "Virtual: Morning Brief D2 — Teams",          "event_type": "mote",          "color": "#7F8C8D", "description": "D2 morning kick-off via Teams. Commander reviews overnight events, issues Phase 2 directives, confirms cross-location coordination.", "start_offset_min": 1440, "duration_min": 60},
-    {"title": "Phase 2 Activity — Distributed",             "event_type": "activity",      "color": "#2ECC71", "description": "Phase 2 core activity. Higher tempo, more complex cross-location coordination. Multiple Mattermost channels active simultaneously.", "start_offset_min": 1500, "duration_min": 540},
-    {"title": "Virtual: SITREP 1400 D2 — Teams",            "event_type": "reporting",     "color": "#1ABC9C", "description": "Afternoon D2 comprehensive situation update via Teams. Include: progress, blockers, resource status, cross-location dependencies.", "start_offset_min": 1800, "duration_min": 0},
-    {"title": "Virtual: Crisis Decision Brief — Teams",     "event_type": "decision",      "color": "#27AE60", "description": "Commander convenes emergency Teams call. Presents crisis inject to all locations. Decision required within 30 minutes.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "Phase 2 Evening Operations",                 "event_type": "activity",      "color": "#2ECC71", "description": "Evening continuation. Locations work on follow-on tasks from the crisis decision. CP coordinates cross-location dependencies.", "start_offset_min": 2040, "duration_min": 360},
-    {"title": "Virtual: Night Handover D2 — Teams",         "event_type": "mote",          "color": "#7F8C8D", "description": "D2 night handover across all locations. Prioritise overnight consolidation and AAR preparation.", "start_offset_min": 2160, "duration_min": 60},
-    {"title": "Remote Night Ops D2",                        "event_type": "activity",      "color": "#2C3E50", "description": "Second night watch. Minimal activity. Duty officers prepare AAR documentation. Final exercise administration.", "start_offset_min": 2220, "duration_min": 420},
-    {"title": "Virtual: AAR Prep Session — Teams",          "event_type": "mote",          "color": "#7F8C8D", "description": "All locations join Teams to align on AAR format, assign presentation sections, and confirm lessons captured.", "start_offset_min": 2760, "duration_min": 60},
-    {"title": "Virtual: Final AAR — Teams",                 "event_type": "mote",          "color": "#7F8C8D", "description": "Full exercise AAR across all locations via Teams. Each location presents: what worked, what didn't, recommendations for virtual exercise improvement.", "start_offset_min": 2820, "duration_min": 60},
-    {"title": "ENDEX",                                      "event_type": "instant",       "color": "#E74C3C", "description": "Exercise concluded. All virtual channels archived. Synthetic time deactivated.", "start_offset_min": 2880, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise begins. All participants log into virtual exercise environment. Synthetic time activated.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Virtual: All-Hands Kickoff — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "MS Teams all-hands meeting. Exercise director brief, introductions across locations, exercise rules confirmed. Each location unmutes and confirms audio/video.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Connectivity Check All Nodes",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Each site confirms: audio/video OK, access to shared drive, Mattermost channel connectivity, VPN status.",
+      "start_offset_min": 60,
+      "duration_min": 0
+    },
+    {
+      "title": "Virtual: Orders Group — Mattermost #ops",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Orders issued via Mattermost video channel #ops-exercise. Commander briefs Phase 1 tasks. All elements confirm receipt in thread.",
+      "start_offset_min": 60,
+      "duration_min": 120
+    },
+    {
+      "title": "Digital Intel Package Distribution",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Intel officer distributes Phase 1 intel packages via secure shared drive. Elements confirm download and reading.",
+      "start_offset_min": 120,
+      "duration_min": 30
+    },
+    {
+      "title": "Virtual: Blue Force Tracking Brief — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "MS Teams session showing shared digital map with force dispositions. Each element confirms their position and status on the COP.",
+      "start_offset_min": 180,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP 1 — Channel #sitrep",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "All elements post SITREP in Mattermost #sitrep channel using standard format: LOCATION / STATUS / TASKS / ISSUES / ETA.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Activity — Distributed",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 1 core activity. Elements work independently at their locations, coordinating via Mattermost channels. CP monitors dashboard.",
+      "start_offset_min": 240,
+      "duration_min": 360
+    },
+    {
+      "title": "Virtual: Commander's Update — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Commander's virtual update brief. Progress assessment, task adjustments, cross-location coordination issues addressed.",
+      "start_offset_min": 480,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP 1800 D1 — Channel #sitrep",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "End-of-day D1 consolidated SITREP from all locations.",
+      "start_offset_min": 600,
+      "duration_min": 0
+    },
+    {
+      "title": "Virtual: Night Shift Handover — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Virtual handover to night duty officers at each location. Outgoing briefs incoming: current status, overnight priorities, escalation contacts.",
+      "start_offset_min": 720,
+      "duration_min": 60
+    },
+    {
+      "title": "Remote Night Operations — D1",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Night operations with reduced staffing across all locations. Duty officers monitor shared dashboard. Escalation via Mattermost #urgent.",
+      "start_offset_min": 780,
+      "duration_min": 420
+    },
+    {
+      "title": "SITREP 0200 D2 — Channel #sitrep",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Night duty report from all locations. Overnight activity, incidents, readiness for D2 morning.",
+      "start_offset_min": 1080,
+      "duration_min": 0
+    },
+    {
+      "title": "Virtual: Morning Brief D2 — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "D2 morning kick-off via Teams. Commander reviews overnight events, issues Phase 2 directives, confirms cross-location coordination.",
+      "start_offset_min": 1440,
+      "duration_min": 60
+    },
+    {
+      "title": "Phase 2 Activity — Distributed",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 2 core activity. Higher tempo, more complex cross-location coordination. Multiple Mattermost channels active simultaneously.",
+      "start_offset_min": 1500,
+      "duration_min": 540
+    },
+    {
+      "title": "Virtual: SITREP 1400 D2 — Teams",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Afternoon D2 comprehensive situation update via Teams. Include: progress, blockers, resource status, cross-location dependencies.",
+      "start_offset_min": 1800,
+      "duration_min": 0
+    },
+    {
+      "title": "Virtual: Crisis Decision Brief — Teams",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Commander convenes emergency Teams call. Presents crisis inject to all locations. Decision required within 30 minutes.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 2 Evening Operations",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Evening continuation. Locations work on follow-on tasks from the crisis decision. CP coordinates cross-location dependencies.",
+      "start_offset_min": 2040,
+      "duration_min": 360
+    },
+    {
+      "title": "Virtual: Night Handover D2 — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "D2 night handover across all locations. Prioritise overnight consolidation and AAR preparation.",
+      "start_offset_min": 2160,
+      "duration_min": 60
+    },
+    {
+      "title": "Remote Night Ops D2",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Second night watch. Minimal activity. Duty officers prepare AAR documentation. Final exercise administration.",
+      "start_offset_min": 2220,
+      "duration_min": 420
+    },
+    {
+      "title": "Virtual: AAR Prep Session — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "All locations join Teams to align on AAR format, assign presentation sections, and confirm lessons captured.",
+      "start_offset_min": 2760,
+      "duration_min": 60
+    },
+    {
+      "title": "Virtual: Final AAR — Teams",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full exercise AAR across all locations via Teams. Each location presents: what worked, what didn't, recommendations for virtual exercise improvement.",
+      "start_offset_min": 2820,
+      "duration_min": 60
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise concluded. All virtual channels archived. Synthetic time deactivated.",
+      "start_offset_min": 2880,
+      "duration_min": 0
+    }
   ]
 }

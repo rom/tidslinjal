@@ -1,47 +1,293 @@
 {
   "name": "EX-03 Joint Command Post — Co-located, 48h",
   "description": "48-hour around-the-clock joint command post exercise. All participants at the same physical location. Demonstrates battle rhythm, night operations, shift handovers, and continuous command. Uses physical meetings throughout. Shows how to structure a multi-day exercise with night watch and day/night rhythm.",
+  "exercise_name": "EX-03 Joint Command Post",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
   "scope": "public",
   "phases": [
-    {"name": "INITEX & Setup",       "color": "#F39C12", "start_offset_min": 0,    "end_offset_min": 120,  "order": 0},
-    {"name": "Phase 1 — Establish",  "color": "#E74C3C", "start_offset_min": 120,  "end_offset_min": 720,  "order": 1},
-    {"name": "Night Watch D1",       "color": "#2C3E50", "start_offset_min": 720,  "end_offset_min": 1440, "order": 2},
-    {"name": "Phase 2 — Develop",    "color": "#8E44AD", "start_offset_min": 1440, "end_offset_min": 2160, "order": 3},
-    {"name": "Phase 3 — Consolidate","color": "#27AE60", "start_offset_min": 2160, "end_offset_min": 2880, "order": 4}
+    {
+      "name": "INITEX & Setup",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Phase 1 — Establish",
+      "color": "#E74C3C",
+      "start_offset_min": 120,
+      "end_offset_min": 720,
+      "order": 1
+    },
+    {
+      "name": "Night Watch D1",
+      "color": "#2C3E50",
+      "start_offset_min": 720,
+      "end_offset_min": 1440,
+      "order": 2
+    },
+    {
+      "name": "Phase 2 — Develop",
+      "color": "#8E44AD",
+      "start_offset_min": 1440,
+      "end_offset_min": 2160,
+      "order": 3
+    },
+    {
+      "name": "Phase 3 — Consolidate",
+      "color": "#27AE60",
+      "start_offset_min": 2160,
+      "end_offset_min": 2880,
+      "order": 4
+    }
   ],
   "locks": [
-    {"start_offset_min": 960,  "end_offset_min": 1020, "reason": "Night admin window D1/D2 — hot food / mandatory rest rotation, no new exercise injections", "scope": "all"},
-    {"start_offset_min": 2400, "end_offset_min": 2460, "reason": "Night admin window D2/D3 — hot food / mandatory rest rotation, no new exercise injections", "scope": "all"}
+    {
+      "start_offset_min": 960,
+      "end_offset_min": 1020,
+      "reason": "Night admin window D1/D2 — hot food / mandatory rest rotation, no new exercise injections",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2400,
+      "end_offset_min": 2460,
+      "reason": "Night admin window D2/D3 — hot food / mandatory rest rotation, no new exercise injections",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                              "event_type": "instant",          "color": "#E74C3C", "description": "Exercise begins at the Main Ops Room. All staff report to assigned positions. Synthetic time activated.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "Physical: CP Activation Brief",        "event_type": "physical_meeting", "color": "#D35400", "description": "On-site at Main Operations Room. All element commanders present. Exercise director activates the command post and confirms communications plan.", "start_offset_min": 0,    "duration_min": 60},
-    {"title": "Commander's Initial Brief",            "event_type": "mote",             "color": "#7F8C8D", "description": "Commander briefs the mission, commander's intent, phase objectives, and decision points for Phase 1.", "start_offset_min": 0,    "duration_min": 60},
-    {"title": "Orders Group — Phase 1",               "event_type": "mote",             "color": "#7F8C8D", "description": "Full orders group. Each element receives their Phase 1 tasks, reporting requirements, and coordination measures.", "start_offset_min": 60,   "duration_min": 120},
-    {"title": "Intel Package Distribution",           "event_type": "assigned_task",    "color": "#E67E22", "description": "Intelligence officer distributes Phase 1 intel packages to all element commanders. Confirm receipt and understanding.", "start_offset_min": 120,  "duration_min": 60},
-    {"title": "Comms Check All Stations",             "event_type": "standup",          "color": "#00ACC1", "description": "Radio/network comms check with all elements. Confirm primary and alternate comms are functioning.", "start_offset_min": 180,  "duration_min": 0},
-    {"title": "Physical: Force Deployment Brief",     "event_type": "physical_meeting", "color": "#D35400", "description": "Map room briefing. All element commanders at the map table. Commander confirms disposition of forces and Phase 1 boundaries.", "start_offset_min": 180,  "duration_min": 60},
-    {"title": "Initial SITREP",                       "event_type": "reporting",        "color": "#1ABC9C", "description": "First consolidated situation report from all elements. Confirms Phase 1 start state.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "Phase 1 Main Activity",                "event_type": "activity",         "color": "#2ECC71", "description": "Phase 1 core exercise activity. Elements execute assigned tasks, process information, and report to the CP.", "start_offset_min": 240,  "duration_min": 480},
-    {"title": "Physical: Situation Update Brief",     "event_type": "physical_meeting", "color": "#D35400", "description": "Ops Room briefing. Standing update at the battle board. Commander addresses emerging issues and adjusts tasks.", "start_offset_min": 360,  "duration_min": 60},
-    {"title": "SITREP 1800 D1",                       "event_type": "reporting",        "color": "#1ABC9C", "description": "End-of-day situation report. All elements report status to the CP. Summary briefed to commander.", "start_offset_min": 600,  "duration_min": 0},
-    {"title": "Night Watch Handover",                 "event_type": "mote",             "color": "#7F8C8D", "description": "Day shift to night watch handover. Outgoing staff brief incoming watch on current situation, outstanding tasks, and night priorities.", "start_offset_min": 720,  "duration_min": 60},
-    {"title": "Night Operations — Watch 1",           "event_type": "activity",         "color": "#2C3E50", "description": "First night watch (D1 2000–D2 0000). CP maintains minimal essential functions. Reduced staffing. Priority: monitoring and reporting.", "start_offset_min": 780,  "duration_min": 180},
-    {"title": "SITREP 0000 D1/D2",                   "event_type": "reporting",        "color": "#1ABC9C", "description": "Midnight situation report. Night watch briefs current status, any overnight incidents, and early morning priorities.", "start_offset_min": 960,  "duration_min": 0},
-    {"title": "Night Operations — Watch 2",           "event_type": "activity",         "color": "#2C3E50", "description": "Second night watch (D2 0000–D2 0600). Continuation of CP monitoring. Pre-brief for D2 morning activity.", "start_offset_min": 960,  "duration_min": 300},
-    {"title": "SITREP 0400 D2",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Early morning report from night watch. Covers overnight activity and pre-brief for D2 morning shift.", "start_offset_min": 1200, "duration_min": 0},
-    {"title": "Morning Watch Handover",               "event_type": "standup",          "color": "#00ACC1", "description": "Night watch to day shift handover standup. Short and sharp. Current situation, key tasks, commander's priorities for D2.", "start_offset_min": 1380, "duration_min": 0},
-    {"title": "Physical: Morning Brief D2",           "event_type": "physical_meeting", "color": "#D35400", "description": "D2 morning brief in Ops Room. All element commanders. Commander outlines Phase 2 intent and adjusts plan based on overnight events.", "start_offset_min": 1440, "duration_min": 60},
-    {"title": "Phase 2 Orders Group",                 "event_type": "mote",             "color": "#7F8C8D", "description": "Phase 2 orders issued to all elements. Updated tasks, new coordination measures, fire support plan.", "start_offset_min": 1440, "duration_min": 120},
-    {"title": "Phase 2 Main Activity",                "event_type": "activity",         "color": "#2ECC71", "description": "Phase 2 core exercise activity. Higher tempo operations, increased reporting requirements.", "start_offset_min": 1560, "duration_min": 600},
-    {"title": "SITREP D2 1200",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Midday D2 situation report. Element status, Phase 2 progress, resource consumption.", "start_offset_min": 1680, "duration_min": 0},
-    {"title": "Physical: Commanders Conference D2",   "event_type": "physical_meeting", "color": "#D35400", "description": "Conference room. Commanders-only briefing. Phase 2 assessment and decision for Phase 3.", "start_offset_min": 1800, "duration_min": 60},
-    {"title": "SITREP D2 1800",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D2 situation report. Transition status to Phase 3.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "Phase 3 Night Watch Handover",         "event_type": "mote",             "color": "#7F8C8D", "description": "D2 evening handover to Phase 3 night watch. Priorities: consolidation, preparation for AAR.", "start_offset_min": 2160, "duration_min": 60},
-    {"title": "Night Operations D2",                  "event_type": "activity",         "color": "#2C3E50", "description": "Phase 3 overnight: consolidation operations, AAR preparation, post-exercise administration.", "start_offset_min": 2220, "duration_min": 420},
-    {"title": "SITREP D2/D3 0000",                   "event_type": "reporting",        "color": "#1ABC9C", "description": "Midnight report from Phase 3 night watch.", "start_offset_min": 2280, "duration_min": 0},
-    {"title": "Physical: Final Brief Preparation",    "event_type": "physical_meeting", "color": "#D35400", "description": "Briefing room. Staff prepare AAR slides and lessons observed summary for the final brief.", "start_offset_min": 2760, "duration_min": 60},
-    {"title": "After Action Review",                  "event_type": "mote",             "color": "#7F8C8D", "description": "Full AAR with all participants. Command assessment, element reports, lessons learned discussion.", "start_offset_min": 2820, "duration_min": 60},
-    {"title": "ENDEX",                                "event_type": "instant",          "color": "#E74C3C", "description": "Exercise concluded after 48 hours. All exercise roles released. Synthetic time deactivated.", "start_offset_min": 2880, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise begins at the Main Ops Room. All staff report to assigned positions. Synthetic time activated.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: CP Activation Brief",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "On-site at Main Operations Room. All element commanders present. Exercise director activates the command post and confirms communications plan.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Commander's Initial Brief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Commander briefs the mission, commander's intent, phase objectives, and decision points for Phase 1.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Orders Group — Phase 1",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full orders group. Each element receives their Phase 1 tasks, reporting requirements, and coordination measures.",
+      "start_offset_min": 60,
+      "duration_min": 120
+    },
+    {
+      "title": "Intel Package Distribution",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Intelligence officer distributes Phase 1 intel packages to all element commanders. Confirm receipt and understanding.",
+      "start_offset_min": 120,
+      "duration_min": 60
+    },
+    {
+      "title": "Comms Check All Stations",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Radio/network comms check with all elements. Confirm primary and alternate comms are functioning.",
+      "start_offset_min": 180,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Force Deployment Brief",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Map room briefing. All element commanders at the map table. Commander confirms disposition of forces and Phase 1 boundaries.",
+      "start_offset_min": 180,
+      "duration_min": 60
+    },
+    {
+      "title": "Initial SITREP",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "First consolidated situation report from all elements. Confirms Phase 1 start state.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Main Activity",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 1 core exercise activity. Elements execute assigned tasks, process information, and report to the CP.",
+      "start_offset_min": 240,
+      "duration_min": 480
+    },
+    {
+      "title": "Physical: Situation Update Brief",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Ops Room briefing. Standing update at the battle board. Commander addresses emerging issues and adjusts tasks.",
+      "start_offset_min": 360,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP 1800 D1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "End-of-day situation report. All elements report status to the CP. Summary briefed to commander.",
+      "start_offset_min": 600,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Watch Handover",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Day shift to night watch handover. Outgoing staff brief incoming watch on current situation, outstanding tasks, and night priorities.",
+      "start_offset_min": 720,
+      "duration_min": 60
+    },
+    {
+      "title": "Night Operations — Watch 1",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "First night watch (D1 2000–D2 0000). CP maintains minimal essential functions. Reduced staffing. Priority: monitoring and reporting.",
+      "start_offset_min": 780,
+      "duration_min": 180
+    },
+    {
+      "title": "SITREP 0000 D1/D2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Midnight situation report. Night watch briefs current status, any overnight incidents, and early morning priorities.",
+      "start_offset_min": 960,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Operations — Watch 2",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Second night watch (D2 0000–D2 0600). Continuation of CP monitoring. Pre-brief for D2 morning activity.",
+      "start_offset_min": 960,
+      "duration_min": 300
+    },
+    {
+      "title": "SITREP 0400 D2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Early morning report from night watch. Covers overnight activity and pre-brief for D2 morning shift.",
+      "start_offset_min": 1200,
+      "duration_min": 0
+    },
+    {
+      "title": "Morning Watch Handover",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Night watch to day shift handover standup. Short and sharp. Current situation, key tasks, commander's priorities for D2.",
+      "start_offset_min": 1380,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Morning Brief D2",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "D2 morning brief in Ops Room. All element commanders. Commander outlines Phase 2 intent and adjusts plan based on overnight events.",
+      "start_offset_min": 1440,
+      "duration_min": 60
+    },
+    {
+      "title": "Phase 2 Orders Group",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Phase 2 orders issued to all elements. Updated tasks, new coordination measures, fire support plan.",
+      "start_offset_min": 1440,
+      "duration_min": 120
+    },
+    {
+      "title": "Phase 2 Main Activity",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 2 core exercise activity. Higher tempo operations, increased reporting requirements.",
+      "start_offset_min": 1560,
+      "duration_min": 600
+    },
+    {
+      "title": "SITREP D2 1200",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Midday D2 situation report. Element status, Phase 2 progress, resource consumption.",
+      "start_offset_min": 1680,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Commanders Conference D2",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Conference room. Commanders-only briefing. Phase 2 assessment and decision for Phase 3.",
+      "start_offset_min": 1800,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP D2 1800",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D2 situation report. Transition status to Phase 3.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 3 Night Watch Handover",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "D2 evening handover to Phase 3 night watch. Priorities: consolidation, preparation for AAR.",
+      "start_offset_min": 2160,
+      "duration_min": 60
+    },
+    {
+      "title": "Night Operations D2",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Phase 3 overnight: consolidation operations, AAR preparation, post-exercise administration.",
+      "start_offset_min": 2220,
+      "duration_min": 420
+    },
+    {
+      "title": "SITREP D2/D3 0000",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Midnight report from Phase 3 night watch.",
+      "start_offset_min": 2280,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Final Brief Preparation",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Briefing room. Staff prepare AAR slides and lessons observed summary for the final brief.",
+      "start_offset_min": 2760,
+      "duration_min": 60
+    },
+    {
+      "title": "After Action Review",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full AAR with all participants. Command assessment, element reports, lessons learned discussion.",
+      "start_offset_min": 2820,
+      "duration_min": 60
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise concluded after 48 hours. All exercise roles released. Synthetic time deactivated.",
+      "start_offset_min": 2880,
+      "duration_min": 0
+    }
   ]
 }

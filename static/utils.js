@@ -185,11 +185,21 @@ function showNotification(type, message, duration=4000) {
 }
 
 // ── Clock ───────────────────────────────────────────────────────────────────
-let _clockUTC = false; // false = local time, true = UTC
+let _clockUTC = localStorage.getItem('clockFmt') === 'zulu'; // false = local time, true = UTC
+
+function setClockFormat(fmt) {
+  _clockUTC = (fmt === 'zulu');
+  localStorage.setItem('clockFmt', _clockUTC ? 'zulu' : 'local');
+  updateClock();
+  // Sync buttons in settings panel if open
+  const localBtn = document.getElementById('clockFmtLocal');
+  const zuluBtn  = document.getElementById('clockFmtZulu');
+  if (localBtn) localBtn.classList.toggle('active', !_clockUTC);
+  if (zuluBtn)  zuluBtn.classList.toggle('active',  _clockUTC);
+}
 
 function toggleClockTZ() {
-  _clockUTC = !_clockUTC;
-  updateClock();
+  setClockFormat(_clockUTC ? 'local' : 'zulu');
 }
 
 function updateClock() {

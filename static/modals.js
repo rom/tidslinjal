@@ -189,6 +189,8 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     inlineAlarmCb.checked = false;
     if (inlineAlarmOpts) inlineAlarmOpts.style.display = 'none';
   }
+  const inlineWh = document.getElementById('inlineAlarmWebhookURL');
+  if (inlineWh) inlineWh.value = '';
 
   const creatorEl = document.getElementById('eventCreator');
   creatorEl.style.display = isEdit ? '' : 'none';
@@ -352,13 +354,15 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     // Handle inline alarm
     const alarmCb = document.getElementById('inlineAlarmEnabled');
     if (alarmCb && alarmCb.checked && !allDay) {
-      const leadTime  = parseInt(document.getElementById('inlineAlarmLeadTime').value, 10) || 0;
-      const scope     = document.getElementById('inlineAlarmScope').value;
-      const soundEl   = document.getElementById('inlineAlarmSound');
-      const sound     = soundEl ? soundEl.value : 'klaxon';
+      const leadTime    = parseInt(document.getElementById('inlineAlarmLeadTime').value, 10) || 0;
+      const scope       = document.getElementById('inlineAlarmScope').value;
+      const soundEl     = document.getElementById('inlineAlarmSound');
+      const sound       = soundEl ? soundEl.value : 'klaxon';
+      const webhookEl2  = document.getElementById('inlineAlarmWebhookURL');
+      const webhook_url = webhookEl2 ? webhookEl2.value.trim() : '';
       const eventTime = new Date(payload.start_time);
       // Create alarm for current user
-      await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), sound });
+      await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), sound, webhook_url });
       // If "all invited" and there are invited users, create alarms for them too (admin/oplead only)
       if (scope === 'all' && hasRole2(state.user.role, 'oplead') && invUserIDs.length > 0) {
         for (const uid of invUserIDs) {
@@ -730,15 +734,19 @@ function openAlarmModal(ev) {
   document.getElementById('alarmEventTitle').value = ev.title;
   document.getElementById('alarmEventTime').value = fmtDateTime(new Date(ev.start_time));
   document.getElementById('alarmLeadTime').value = '5';
+  const whEl = document.getElementById('alarmWebhookURL');
+  if (whEl) whEl.value = '';
   openModal('alarmModal');
 }
 
 document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
-  const eventId  = parseInt(document.getElementById('alarmEventId').value, 10);
-  const leadTime = parseInt(document.getElementById('alarmLeadTime').value, 10);
-  const soundEl  = document.getElementById('alarmSound');
-  const sound    = soundEl ? soundEl.value : 'klaxon';
-  const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime, sound});
+  const eventId     = parseInt(document.getElementById('alarmEventId').value, 10);
+  const leadTime    = parseInt(document.getElementById('alarmLeadTime').value, 10);
+  const soundEl     = document.getElementById('alarmSound');
+  const sound       = soundEl ? soundEl.value : 'klaxon';
+  const webhookEl   = document.getElementById('alarmWebhookURL');
+  const webhook_url = webhookEl ? webhookEl.value.trim() : '';
+  const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime, sound, webhook_url});
   if (res.ok) {
     closeModal('alarmModal');
     await fetchAlarms(); renderSidebar();
@@ -1509,6 +1517,26 @@ function renderSidebar() {
         </div>`).join('')}
       </div>`;
     });
+  } else if (tab === 'integrations' && state.user && state.user.role === 'admin') {
+    const p = state.preferences;
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔔 ${t('settings_webhook')||'Notifications / Webhook'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure a webhook to receive alarm notifications. Changes are audited.</p>
+        <div class="form-group" style="margin-bottom:6px">
+          <select id="prefWebhookType" style="width:100%;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
+            <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
+          </select>
+          <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
+        </div>
+      </div>
+    `;
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -1518,7 +1546,7 @@ function renderSidebar() {
         <div class="toggle-btn-group">
           <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
           <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')||'Light'}</button>
-          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Urban camouflage (greens/grays)">🏙 City Camo</button>
+          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Camouflage (greens/grays)">🏕 Camo</button>
           <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" onclick="setPref('theme','urban-camo')" title="Urban warfare (blues)">🌆 Urban Camo</button>
         </div>
       </div>
@@ -1563,6 +1591,13 @@ function renderSidebar() {
               `<option value="${tz}"${state.timezone===tz?' selected':''}>${tz}</option>`
             ).join('')}
           </select>
+        </div>
+        <div style="margin-top:10px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">Real time clock time format:</span>
+          <div class="toggle-btn-group" style="margin-top:4px">
+            <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" onclick="setClockFormat('local')">Local time</button>
+            <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  onclick="setClockFormat('zulu')">ZULU / UTC</button>
+          </div>
         </div>
       </div>
       <div class="sidebar-section">
@@ -1659,21 +1694,6 @@ function renderSidebar() {
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">🔔 ${t('settings_webhook')||'Notifications / Webhook'}</div>
-        <div class="form-group" style="margin-bottom:6px">
-          <select id="prefWebhookType" style="width:100%;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
-            <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
-          </select>
-          <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
-        </div>
-      </div>
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section" id="enrollmentSettingsSection">
         <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
@@ -2683,6 +2703,11 @@ async function confirmApplyTemplate(id) {
       state.exercise = state.exercise || {};
       state.exercise.label = r.exercise_name;
     }
+    // If server applied day hour preferences from the template, update local state
+    if (r.day_end_hour > 0) {
+      state.preferences.day_start_hour = r.day_start_hour;
+      state.preferences.day_end_hour   = r.day_end_hour;
+    }
     await refreshAll();
     const nameSuffix = r.exercise_name ? ` — exercise: ${r.exercise_name}` : '';
     showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template${nameSuffix}`);
@@ -2745,13 +2770,16 @@ async function handleTemplateFileLoad(input) {
     }
     const scope = (tmpl.scope === 'public' && canPublic) ? 'public' : 'private';
     const payload = {
-      name:        tmpl.name,
-      description: tmpl.description || '',
+      name:          tmpl.name,
+      description:   tmpl.description || '',
+      exercise_name: tmpl.exercise_name || undefined,
+      day_start_hour: tmpl.day_start_hour || undefined,
+      day_end_hour:  tmpl.day_end_hour  || undefined,
       scope,
-      items:       tmpl.items,
-      phases:      tmpl.phases  || undefined,
-      locks:       tmpl.locks   || undefined,
-      roles:       tmpl.roles   || undefined,
+      items:         tmpl.items,
+      phases:        tmpl.phases  || undefined,
+      locks:         tmpl.locks   || undefined,
+      roles:         tmpl.roles   || undefined,
     };
     dbg('[template] importing %o: items=%o phases=%o locks=%o scope=%o',
       tmpl.name, tmpl.items.length, (tmpl.phases||[]).length, (tmpl.locks||[]).length, scope);
@@ -2777,6 +2805,14 @@ async function handleTemplateFileLoad(input) {
       state.exercise = ex;
       dbg('[template] Set exercise name from template: %o', firstWithName.exercise_name);
     }
+  }
+  // If any imported template had day_hours, update preferences
+  const firstWithDayHours = templates.find(t => t.day_end_hour > 0);
+  if (firstWithDayHours) {
+    state.preferences.day_start_hour = firstWithDayHours.day_start_hour || 0;
+    state.preferences.day_end_hour   = firstWithDayHours.day_end_hour;
+    await savePreferences();
+    dbg('[template] Set day hours from template: %o-%o', firstWithDayHours.day_start_hour, firstWithDayHours.day_end_hour);
   }
   if (created > 0) {
     showNotification('success', `Imported ${created} template${created!==1?'s':''}${errors>0?' ('+errors+' failed)':''}${firstWithName?' — exercise: '+firstWithName.exercise_name:''}`);

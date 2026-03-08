@@ -1,51 +1,324 @@
 {
   "name": "EX-07 Combined Arms Manoeuvre — 3 Days",
   "description": "3-day combined arms manoeuvre exercise. Days 1–2 are around-the-clock; Day 3 (wrap-up) is working hours. Covers the full find-fix-finish-exploit cycle with fire support coordination, night operations, and combined arms integration. Rich event set showing how a realistic field exercise is structured.",
+  "exercise_name": "EX-07 Combined Arms Manoeuvre",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
   "scope": "public",
   "phases": [
-    {"name": "INITEX & Fire Plan",        "color": "#F39C12", "start_offset_min": 0,    "end_offset_min": 240,  "order": 0},
-    {"name": "Advance to Contact",        "color": "#E74C3C", "start_offset_min": 240,  "end_offset_min": 1440, "order": 1},
-    {"name": "Breach & Exploitation",     "color": "#8E44AD", "start_offset_min": 1440, "end_offset_min": 2880, "order": 2},
-    {"name": "Consolidation & AAR",       "color": "#27AE60", "start_offset_min": 2880, "end_offset_min": 3420, "order": 3}
+    {
+      "name": "INITEX & Fire Plan",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 240,
+      "order": 0
+    },
+    {
+      "name": "Advance to Contact",
+      "color": "#E74C3C",
+      "start_offset_min": 240,
+      "end_offset_min": 1440,
+      "order": 1
+    },
+    {
+      "name": "Breach & Exploitation",
+      "color": "#8E44AD",
+      "start_offset_min": 1440,
+      "end_offset_min": 2880,
+      "order": 2
+    },
+    {
+      "name": "Consolidation & AAR",
+      "color": "#27AE60",
+      "start_offset_min": 2880,
+      "end_offset_min": 3420,
+      "order": 3
+    }
   ],
   "locks": [
-    {"start_offset_min": 840,  "end_offset_min": 960,  "reason": "Fire support exclusion zone — D1 night safety window, coordinate before resuming", "scope": "all"},
-    {"start_offset_min": 2280, "end_offset_min": 2400, "reason": "Fire support exclusion zone — D2 night safety window", "scope": "all"},
-    {"start_offset_min": 3120, "end_offset_min": 3180, "reason": "Day 3 lunch break", "scope": "all"}
+    {
+      "start_offset_min": 840,
+      "end_offset_min": 960,
+      "reason": "Fire support exclusion zone — D1 night safety window, coordinate before resuming",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2280,
+      "end_offset_min": 2400,
+      "reason": "Fire support exclusion zone — D2 night safety window",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 3120,
+      "end_offset_min": 3180,
+      "reason": "Day 3 lunch break",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                              "event_type": "instant",          "color": "#E74C3C", "description": "Exercise commences. All elements confirm readiness. Synthetic time activated at Day 1 0800.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "Commander's Briefing",                 "event_type": "mote",             "color": "#7F8C8D", "description": "Commander delivers the mission brief. Covers: mission analysis, commander's intent, scheme of manoeuvre, and task org.", "start_offset_min": 0,    "duration_min": 60},
-    {"title": "Fire Support Coordination Meeting",    "event_type": "mote",             "color": "#7F8C8D", "description": "FSCM meeting. Fire support officer, air element, and ground commanders align on fire support plan, targets, and coordination measures.", "start_offset_min": 60,   "duration_min": 60},
-    {"title": "Phase 1 Orders Distribution",          "event_type": "assigned_task",    "color": "#E67E22", "description": "Staff distribute Phase 1 orders to all element commanders. Confirm receipt. Questions period.", "start_offset_min": 120,  "duration_min": 0},
-    {"title": "Physical: TAA Activation",             "event_type": "physical_meeting", "color": "#D35400", "description": "Physical meeting at the Tactical Assembly Area. All sub-unit commanders confirm vehicle loads, personnel, ammunition states.", "start_offset_min": 120,  "duration_min": 120},
-    {"title": "Intel: Enemy Order of Battle",         "event_type": "reporting",        "color": "#1ABC9C", "description": "Intelligence officer briefs the enemy order of battle: known positions, capabilities, likely courses of action.", "start_offset_min": 180,  "duration_min": 0},
-    {"title": "INJECT: Advance Begins",               "event_type": "event",            "color": "#C0392B", "description": "Lead elements begin advance to contact. All units in march order. Air cover overhead.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "INJECT: Contact Alpha",                "event_type": "event",            "color": "#C0392B", "description": "Lead element reports contact with enemy forward positions. Small arms fire. Grid reference provided. QRF elements on standby.", "start_offset_min": 360,  "duration_min": 0},
-    {"title": "Fire Mission Request",                 "event_type": "assigned_task",    "color": "#E67E22", "description": "Forward observer calls fire mission. Target: enemy forward position. Method: observed fire. Authorization from commander required.", "start_offset_min": 360,  "duration_min": 60},
-    {"title": "SITREP D1 1400",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Afternoon situation report. Lead element contact report, fire mission status, manoeuvre plan update.", "start_offset_min": 360,  "duration_min": 0},
-    {"title": "Decision: Commit Reserve",             "event_type": "decision",         "color": "#27AE60", "description": "Commander decides whether to commit the reserve to exploit the contact or hold and continue main advance.", "start_offset_min": 480,  "duration_min": 0},
-    {"title": "Physical: Commanders Update D1",       "event_type": "physical_meeting", "color": "#D35400", "description": "Command Post briefing. Commanders update the battle picture on the map board. Next phase tasking issued.", "start_offset_min": 480,  "duration_min": 60},
-    {"title": "Night Navigation Exercise",            "event_type": "activity",         "color": "#2C3E50", "description": "Elements conduct night navigation to Phase 2 forming-up positions. No lights, comms-limited movement.", "start_offset_min": 720,  "duration_min": 360},
-    {"title": "SITREP D1 0000",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Midnight report. All elements confirm position, readiness for Phase 2, and any equipment issues.", "start_offset_min": 960,  "duration_min": 0},
-    {"title": "Night Fire Support Activity",          "event_type": "activity",         "color": "#2C3E50", "description": "Night fire missions to suppress enemy positions ahead of Phase 2. Illumination rounds to support FUP occupation.", "start_offset_min": 960,  "duration_min": 480},
-    {"title": "SITREP D2 0400",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Pre-dawn report. Elements confirm FUP positions occupied, ready for Phase 2 H-Hour.", "start_offset_min": 1200, "duration_min": 0},
-    {"title": "Physical: Morning Sync D2",            "event_type": "physical_meeting", "color": "#D35400", "description": "Main CP morning synchronization. Phase 2 orders, fire support update, air support tasking.", "start_offset_min": 1440, "duration_min": 60},
-    {"title": "Phase 2 Orders Group",                 "event_type": "mote",             "color": "#7F8C8D", "description": "Full orders for Phase 2 Breach. Sub-unit tasks, lanes, breach points, phase lines, and ROE.", "start_offset_min": 1440, "duration_min": 120},
-    {"title": "INJECT: Breach Phase Alpha",           "event_type": "event",            "color": "#C0392B", "description": "Breach begins on Phase Alpha axis. Lead elements engage obstacle complex. Engineers forward.", "start_offset_min": 1560, "duration_min": 240},
-    {"title": "INJECT: Breach Phase Bravo",           "event_type": "event",            "color": "#C0392B", "description": "Bravo axis breach commences. Deception operation on the flanks. Fire support active.", "start_offset_min": 1620, "duration_min": 300},
-    {"title": "SITREP D2 1200",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Phase 2 midpoint report. Breach progress on both axes, obstacle status, casualties, ammo consumption.", "start_offset_min": 1680, "duration_min": 0},
-    {"title": "Exploitation Phase",                   "event_type": "activity",         "color": "#2ECC71", "description": "Exploitation of breach success. Armoured elements pass through breached obstacle. Follow-on forces advance.", "start_offset_min": 1800, "duration_min": 600},
-    {"title": "Decision: Pursue or Consolidate",      "event_type": "decision",         "color": "#27AE60", "description": "Commander decides: pursue the enemy or consolidate the objective. Assessment of enemy strength and own logistics required.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "Physical: Update D2 Evening",          "event_type": "physical_meeting", "color": "#D35400", "description": "CP evening update. Map updated with exploitation results. Logistics resupply plan coordinated.", "start_offset_min": 1800, "duration_min": 60},
-    {"title": "SITREP D2 2000",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D2 comprehensive report. Objective status, forward element positions, log state.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "Night Consolidation",                  "event_type": "activity",         "color": "#2C3E50", "description": "All-round defence. Elements consolidate on objectives. Re-org, casualty collection, prisoner handling, resupply.", "start_offset_min": 2160, "duration_min": 720},
-    {"title": "SITREP D3 0400",                      "event_type": "reporting",        "color": "#1ABC9C", "description": "Pre-dawn D3 report. Overnight consolidation status, readiness for ENDEX phase.", "start_offset_min": 2520, "duration_min": 0},
-    {"title": "Physical: Morning Brief D3",           "event_type": "physical_meeting", "color": "#D35400", "description": "D3 Main CP morning brief. Transition to consolidation and ENDEX phase.", "start_offset_min": 2880, "duration_min": 60},
-    {"title": "Consolidation Activity D3",            "event_type": "activity",         "color": "#2ECC71", "description": "Final consolidation. Admin, casualty reports, log reconciliation, lessons observed capture.", "start_offset_min": 2880, "duration_min": 240},
-    {"title": "Final SITREP",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Exercise final situation report. All elements confirm end state. Compare to planned objectives.", "start_offset_min": 3120, "duration_min": 0},
-    {"title": "After Action Review",                  "event_type": "mote",             "color": "#7F8C8D", "description": "Full 3-day AAR. Commander's assessment, element reports, fire support review, lessons identified.", "start_offset_min": 3120, "duration_min": 180},
-    {"title": "Lessons Observed Report",              "event_type": "reporting",        "color": "#1ABC9C", "description": "Exercise director compiles the formal lessons observed report. Submitted to higher command for action.", "start_offset_min": 3300, "duration_min": 120},
-    {"title": "ENDEX",                                "event_type": "instant",          "color": "#E74C3C", "description": "3-day combined arms exercise concluded. Synthetic time deactivated.", "start_offset_min": 3420, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise commences. All elements confirm readiness. Synthetic time activated at Day 1 0800.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Commander's Briefing",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Commander delivers the mission brief. Covers: mission analysis, commander's intent, scheme of manoeuvre, and task org.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Fire Support Coordination Meeting",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "FSCM meeting. Fire support officer, air element, and ground commanders align on fire support plan, targets, and coordination measures.",
+      "start_offset_min": 60,
+      "duration_min": 60
+    },
+    {
+      "title": "Phase 1 Orders Distribution",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Staff distribute Phase 1 orders to all element commanders. Confirm receipt. Questions period.",
+      "start_offset_min": 120,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: TAA Activation",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Physical meeting at the Tactical Assembly Area. All sub-unit commanders confirm vehicle loads, personnel, ammunition states.",
+      "start_offset_min": 120,
+      "duration_min": 120
+    },
+    {
+      "title": "Intel: Enemy Order of Battle",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Intelligence officer briefs the enemy order of battle: known positions, capabilities, likely courses of action.",
+      "start_offset_min": 180,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Advance Begins",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Lead elements begin advance to contact. All units in march order. Air cover overhead.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Contact Alpha",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Lead element reports contact with enemy forward positions. Small arms fire. Grid reference provided. QRF elements on standby.",
+      "start_offset_min": 360,
+      "duration_min": 0
+    },
+    {
+      "title": "Fire Mission Request",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Forward observer calls fire mission. Target: enemy forward position. Method: observed fire. Authorization from commander required.",
+      "start_offset_min": 360,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP D1 1400",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Afternoon situation report. Lead element contact report, fire mission status, manoeuvre plan update.",
+      "start_offset_min": 360,
+      "duration_min": 0
+    },
+    {
+      "title": "Decision: Commit Reserve",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Commander decides whether to commit the reserve to exploit the contact or hold and continue main advance.",
+      "start_offset_min": 480,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Commanders Update D1",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Command Post briefing. Commanders update the battle picture on the map board. Next phase tasking issued.",
+      "start_offset_min": 480,
+      "duration_min": 60
+    },
+    {
+      "title": "Night Navigation Exercise",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Elements conduct night navigation to Phase 2 forming-up positions. No lights, comms-limited movement.",
+      "start_offset_min": 720,
+      "duration_min": 360
+    },
+    {
+      "title": "SITREP D1 0000",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Midnight report. All elements confirm position, readiness for Phase 2, and any equipment issues.",
+      "start_offset_min": 960,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Fire Support Activity",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Night fire missions to suppress enemy positions ahead of Phase 2. Illumination rounds to support FUP occupation.",
+      "start_offset_min": 960,
+      "duration_min": 480
+    },
+    {
+      "title": "SITREP D2 0400",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Pre-dawn report. Elements confirm FUP positions occupied, ready for Phase 2 H-Hour.",
+      "start_offset_min": 1200,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Morning Sync D2",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Main CP morning synchronization. Phase 2 orders, fire support update, air support tasking.",
+      "start_offset_min": 1440,
+      "duration_min": 60
+    },
+    {
+      "title": "Phase 2 Orders Group",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full orders for Phase 2 Breach. Sub-unit tasks, lanes, breach points, phase lines, and ROE.",
+      "start_offset_min": 1440,
+      "duration_min": 120
+    },
+    {
+      "title": "INJECT: Breach Phase Alpha",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Breach begins on Phase Alpha axis. Lead elements engage obstacle complex. Engineers forward.",
+      "start_offset_min": 1560,
+      "duration_min": 240
+    },
+    {
+      "title": "INJECT: Breach Phase Bravo",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Bravo axis breach commences. Deception operation on the flanks. Fire support active.",
+      "start_offset_min": 1620,
+      "duration_min": 300
+    },
+    {
+      "title": "SITREP D2 1200",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Phase 2 midpoint report. Breach progress on both axes, obstacle status, casualties, ammo consumption.",
+      "start_offset_min": 1680,
+      "duration_min": 0
+    },
+    {
+      "title": "Exploitation Phase",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Exploitation of breach success. Armoured elements pass through breached obstacle. Follow-on forces advance.",
+      "start_offset_min": 1800,
+      "duration_min": 600
+    },
+    {
+      "title": "Decision: Pursue or Consolidate",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Commander decides: pursue the enemy or consolidate the objective. Assessment of enemy strength and own logistics required.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Update D2 Evening",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "CP evening update. Map updated with exploitation results. Logistics resupply plan coordinated.",
+      "start_offset_min": 1800,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP D2 2000",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D2 comprehensive report. Objective status, forward element positions, log state.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Consolidation",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "All-round defence. Elements consolidate on objectives. Re-org, casualty collection, prisoner handling, resupply.",
+      "start_offset_min": 2160,
+      "duration_min": 720
+    },
+    {
+      "title": "SITREP D3 0400",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Pre-dawn D3 report. Overnight consolidation status, readiness for ENDEX phase.",
+      "start_offset_min": 2520,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Morning Brief D3",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "D3 Main CP morning brief. Transition to consolidation and ENDEX phase.",
+      "start_offset_min": 2880,
+      "duration_min": 60
+    },
+    {
+      "title": "Consolidation Activity D3",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Final consolidation. Admin, casualty reports, log reconciliation, lessons observed capture.",
+      "start_offset_min": 2880,
+      "duration_min": 240
+    },
+    {
+      "title": "Final SITREP",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Exercise final situation report. All elements confirm end state. Compare to planned objectives.",
+      "start_offset_min": 3120,
+      "duration_min": 0
+    },
+    {
+      "title": "After Action Review",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full 3-day AAR. Commander's assessment, element reports, fire support review, lessons identified.",
+      "start_offset_min": 3120,
+      "duration_min": 180
+    },
+    {
+      "title": "Lessons Observed Report",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Exercise director compiles the formal lessons observed report. Submitted to higher command for action.",
+      "start_offset_min": 3300,
+      "duration_min": 120
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "3-day combined arms exercise concluded. Synthetic time deactivated.",
+      "start_offset_min": 3420,
+      "duration_min": 0
+    }
   ]
 }

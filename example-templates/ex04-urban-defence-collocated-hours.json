@@ -1,34 +1,189 @@
 {
   "name": "EX-04 Urban Defence — Co-located, Working Hours",
   "description": "2-day urban defence planning and execution exercise, working hours (0800–1700) at a shared physical training facility. Day 1 focuses on planning and map exercises; Day 2 on execution and consolidation. Demonstrates working-hours-only scheduling with overnight recess and physical meeting locations throughout.",
+  "exercise_name": "EX-04 Urban Defence",
+  "day_start_hour": 8,
+  "day_end_hour": 17,
   "scope": "public",
   "phases": [
-    {"name": "Day 1 — Planning",     "color": "#3498DB", "start_offset_min": 0,    "end_offset_min": 540,  "order": 0},
-    {"name": "Overnight Recess",     "color": "#BDC3C7", "start_offset_min": 540,  "end_offset_min": 1440, "order": 1},
-    {"name": "Day 2 — Execution",    "color": "#E74C3C", "start_offset_min": 1440, "end_offset_min": 1980, "order": 2}
+    {
+      "name": "Day 1 — Planning",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 540,
+      "order": 0
+    },
+    {
+      "name": "Overnight Recess",
+      "color": "#BDC3C7",
+      "start_offset_min": 540,
+      "end_offset_min": 1440,
+      "order": 1
+    },
+    {
+      "name": "Day 2 — Execution",
+      "color": "#E74C3C",
+      "start_offset_min": 1440,
+      "end_offset_min": 1980,
+      "order": 2
+    }
   ],
   "locks": [
-    {"start_offset_min": 240,  "end_offset_min": 300,  "reason": "Day 1 lunch break — no exercise activity", "scope": "all"},
-    {"start_offset_min": 540,  "end_offset_min": 1440, "reason": "Overnight recess — exercise resumes Day 2 at 0800", "scope": "all"},
-    {"start_offset_min": 1680, "end_offset_min": 1740, "reason": "Day 2 lunch break — no exercise activity", "scope": "all"}
+    {
+      "start_offset_min": 240,
+      "end_offset_min": 300,
+      "reason": "Day 1 lunch break — no exercise activity",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 540,
+      "end_offset_min": 1440,
+      "reason": "Overnight recess — exercise resumes Day 2 at 0800",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1680,
+      "end_offset_min": 1740,
+      "reason": "Day 2 lunch break — no exercise activity",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                             "event_type": "instant",          "color": "#E74C3C", "description": "Exercise begins. All participants assemble at Main Hall. Synthetic time activated at Day 1, 0800.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "Physical: Opening Brief — Main Hall", "event_type": "physical_meeting", "color": "#D35400", "description": "All participants in Main Hall. Exercise director delivers mission brief, exercise objectives, and ground rules. Physical location: Main Hall, Building 1.", "start_offset_min": 0,    "duration_min": 60},
-    {"title": "Ground Assessment — Zone Alpha",      "event_type": "activity",         "color": "#2ECC71", "description": "Teams conduct detailed assessment of Zone Alpha (northern urban area). Terrain analysis, key buildings, approach routes, chokepoints.", "start_offset_min": 60,   "duration_min": 120},
-    {"title": "Ground Assessment — Zone Bravo",      "event_type": "activity",         "color": "#2ECC71", "description": "Parallel assessment of Zone Bravo (southern urban area). Assessment teams report findings to command cell.", "start_offset_min": 120,  "duration_min": 120},
-    {"title": "Map Exercise — Urban Terrain Analysis", "event_type": "activity",       "color": "#2ECC71", "description": "Structured map exercise using the urban terrain model. Teams identify defensible positions, axes of advance, and fire support positions.", "start_offset_min": 240,  "duration_min": 120},
-    {"title": "Tactical Planning Session",           "event_type": "mote",             "color": "#7F8C8D", "description": "All commanders around the planning table. Develop the tactical plan: defensive scheme of manoeuvre, task allocation, fire support integration.", "start_offset_min": 300,  "duration_min": 120},
-    {"title": "Physical: Orders Brief D1 — Ops Room","event_type": "physical_meeting", "color": "#D35400", "description": "Ops Room, Building 2. Commander delivers orders to all element commanders. Confirm tasks, timings, coordinating measures.", "start_offset_min": 420,  "duration_min": 120},
-    {"title": "Day 1 Summary Report",                "event_type": "reporting",        "color": "#1ABC9C", "description": "Element leaders submit Day 1 planning summaries: assessment findings, questions for commander, resource requests.", "start_offset_min": 510,  "duration_min": 0},
-    {"title": "Day 1 Close",                         "event_type": "instant",          "color": "#95A5A6", "description": "Day 1 activities concluded. Participants released for overnight recess. Exercise resumes Day 2 at 0800.", "start_offset_min": 540,  "duration_min": 0},
-    {"title": "Physical: Morning Brief D2 — Main Hall", "event_type": "physical_meeting", "color": "#D35400", "description": "Day 2 commences. Commander delivers the execution brief. Phase 1 tasks, timings, fire support summary. Physical location: Main Hall.", "start_offset_min": 1440, "duration_min": 60},
-    {"title": "Execution Phase Alpha — Zone Alpha",  "event_type": "activity",         "color": "#2ECC71", "description": "Teams execute Phase Alpha tasks in Zone Alpha. Establish defensive positions, conduct clearing patrols, report contact.", "start_offset_min": 1500, "duration_min": 180},
-    {"title": "SITREP D2 1200",                     "event_type": "reporting",        "color": "#1ABC9C", "description": "Midday situation report from all elements. Progress on Phase Alpha tasks, casualties (simulated), ammunition status.", "start_offset_min": 1620, "duration_min": 0},
-    {"title": "INJECT: Urban Contact",               "event_type": "event",            "color": "#C0392B", "description": "Exercise inject: one section in Zone Alpha reports contact with hostile elements occupying a building complex. Commander's decision required.", "start_offset_min": 1620, "duration_min": 180},
-    {"title": "Decision: Engage or Contain",         "event_type": "decision",         "color": "#27AE60", "description": "Commander decides whether to engage the contact directly, contain and bypass, or request reinforcement.", "start_offset_min": 1740, "duration_min": 0},
-    {"title": "Consolidation Phase",                 "event_type": "activity",         "color": "#2ECC71", "description": "All elements consolidate positions, resupply, treat casualties (simulated), and prepare for end-of-exercise administration.", "start_offset_min": 1800, "duration_min": 120},
-    {"title": "Physical: Final Debrief — Conference Room", "event_type": "physical_meeting", "color": "#D35400", "description": "All participants in Conference Room, Building 1. Commander's assessment, element reports, lessons observed. Physical location: Conference Room.", "start_offset_min": 1920, "duration_min": 60},
-    {"title": "ENDEX",                               "event_type": "instant",          "color": "#E74C3C", "description": "Exercise concluded after 2 days (working hours only). Synthetic time deactivated.", "start_offset_min": 1980, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise begins. All participants assemble at Main Hall. Synthetic time activated at Day 1, 0800.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Opening Brief — Main Hall",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "All participants in Main Hall. Exercise director delivers mission brief, exercise objectives, and ground rules. Physical location: Main Hall, Building 1.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Ground Assessment — Zone Alpha",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Teams conduct detailed assessment of Zone Alpha (northern urban area). Terrain analysis, key buildings, approach routes, chokepoints.",
+      "start_offset_min": 60,
+      "duration_min": 120
+    },
+    {
+      "title": "Ground Assessment — Zone Bravo",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Parallel assessment of Zone Bravo (southern urban area). Assessment teams report findings to command cell.",
+      "start_offset_min": 120,
+      "duration_min": 120
+    },
+    {
+      "title": "Map Exercise — Urban Terrain Analysis",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Structured map exercise using the urban terrain model. Teams identify defensible positions, axes of advance, and fire support positions.",
+      "start_offset_min": 240,
+      "duration_min": 120
+    },
+    {
+      "title": "Tactical Planning Session",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "All commanders around the planning table. Develop the tactical plan: defensive scheme of manoeuvre, task allocation, fire support integration.",
+      "start_offset_min": 300,
+      "duration_min": 120
+    },
+    {
+      "title": "Physical: Orders Brief D1 — Ops Room",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Ops Room, Building 2. Commander delivers orders to all element commanders. Confirm tasks, timings, coordinating measures.",
+      "start_offset_min": 420,
+      "duration_min": 120
+    },
+    {
+      "title": "Day 1 Summary Report",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Element leaders submit Day 1 planning summaries: assessment findings, questions for commander, resource requests.",
+      "start_offset_min": 510,
+      "duration_min": 0
+    },
+    {
+      "title": "Day 1 Close",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "Day 1 activities concluded. Participants released for overnight recess. Exercise resumes Day 2 at 0800.",
+      "start_offset_min": 540,
+      "duration_min": 0
+    },
+    {
+      "title": "Physical: Morning Brief D2 — Main Hall",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Day 2 commences. Commander delivers the execution brief. Phase 1 tasks, timings, fire support summary. Physical location: Main Hall.",
+      "start_offset_min": 1440,
+      "duration_min": 60
+    },
+    {
+      "title": "Execution Phase Alpha — Zone Alpha",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Teams execute Phase Alpha tasks in Zone Alpha. Establish defensive positions, conduct clearing patrols, report contact.",
+      "start_offset_min": 1500,
+      "duration_min": 180
+    },
+    {
+      "title": "SITREP D2 1200",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Midday situation report from all elements. Progress on Phase Alpha tasks, casualties (simulated), ammunition status.",
+      "start_offset_min": 1620,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Urban Contact",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Exercise inject: one section in Zone Alpha reports contact with hostile elements occupying a building complex. Commander's decision required.",
+      "start_offset_min": 1620,
+      "duration_min": 180
+    },
+    {
+      "title": "Decision: Engage or Contain",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Commander decides whether to engage the contact directly, contain and bypass, or request reinforcement.",
+      "start_offset_min": 1740,
+      "duration_min": 0
+    },
+    {
+      "title": "Consolidation Phase",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "All elements consolidate positions, resupply, treat casualties (simulated), and prepare for end-of-exercise administration.",
+      "start_offset_min": 1800,
+      "duration_min": 120
+    },
+    {
+      "title": "Physical: Final Debrief — Conference Room",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "All participants in Conference Room, Building 1. Commander's assessment, element reports, lessons observed. Physical location: Conference Room.",
+      "start_offset_min": 1920,
+      "duration_min": 60
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise concluded after 2 days (working hours only). Synthetic time deactivated.",
+      "start_offset_min": 1980,
+      "duration_min": 0
+    }
   ]
 }

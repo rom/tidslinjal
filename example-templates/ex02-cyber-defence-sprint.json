@@ -1,33 +1,199 @@
 {
   "name": "EX-02 Cyber Defence Sprint",
   "description": "Single-day cyber defence technical exercise (0800–1700). Blue team defends infrastructure against a simulated red team attack campaign. Covers detection, response, containment, and recovery. Ideal for IT security teams and cyber incident response training.",
+  "exercise_name": "EX-02 Cyber Defence Sprint",
+  "day_start_hour": 8,
+  "day_end_hour": 17,
   "scope": "public",
   "phases": [
-    {"name": "Setup & Reconnaissance", "color": "#7F8C8D", "start_offset_min": 0,   "end_offset_min": 60,  "order": 0},
-    {"name": "Initial Attack Wave",     "color": "#E74C3C", "start_offset_min": 60,  "end_offset_min": 240, "order": 1},
-    {"name": "Defence & Recovery",      "color": "#3498DB", "start_offset_min": 240, "end_offset_min": 420, "order": 2},
-    {"name": "Advanced Threat",         "color": "#8E44AD", "start_offset_min": 420, "end_offset_min": 480, "order": 3},
-    {"name": "Debrief",                 "color": "#27AE60", "start_offset_min": 480, "end_offset_min": 540, "order": 4}
+    {
+      "name": "Setup & Reconnaissance",
+      "color": "#7F8C8D",
+      "start_offset_min": 0,
+      "end_offset_min": 60,
+      "order": 0
+    },
+    {
+      "name": "Initial Attack Wave",
+      "color": "#E74C3C",
+      "start_offset_min": 60,
+      "end_offset_min": 240,
+      "order": 1
+    },
+    {
+      "name": "Defence & Recovery",
+      "color": "#3498DB",
+      "start_offset_min": 240,
+      "end_offset_min": 420,
+      "order": 2
+    },
+    {
+      "name": "Advanced Threat",
+      "color": "#8E44AD",
+      "start_offset_min": 420,
+      "end_offset_min": 480,
+      "order": 3
+    },
+    {
+      "name": "Debrief",
+      "color": "#27AE60",
+      "start_offset_min": 480,
+      "end_offset_min": 540,
+      "order": 4
+    }
   ],
   "items": [
-    {"title": "STARTEX",                              "event_type": "instant",       "color": "#E74C3C", "description": "Exercise begins. Blue team takes defensive positions. All monitoring tools active. Red team isolated to simulation environment.", "start_offset_min": 0,   "duration_min": 0},
-    {"title": "Security Baseline Assessment",         "event_type": "activity",      "color": "#2ECC71", "description": "Blue team documents current security posture: active services, open ports, patch levels, IDS/IPS baseline alerts.", "start_offset_min": 0,   "duration_min": 60},
-    {"title": "Network Topology Briefing",            "event_type": "mote",          "color": "#7F8C8D", "description": "Exercise director briefs all participants on the target network topology, known assets, and red team objectives.", "start_offset_min": 0,   "duration_min": 45},
-    {"title": "INJECT: Red — Port Scan",              "event_type": "event",         "color": "#C0392B", "description": "Red team initiates reconnaissance via port scanning and service enumeration. Blue team should detect via IDS alerts.", "start_offset_min": 60,  "duration_min": 0},
-    {"title": "Blue: Anomaly Detection Alert",        "event_type": "assigned_task", "color": "#E67E22", "description": "Blue team triage the IDS alert. Confirm hostile reconnaissance in progress. Document and escalate to team lead.", "start_offset_min": 75,  "duration_min": 30},
-    {"title": "INJECT: Red — Phishing Campaign",      "event_type": "event",         "color": "#C0392B", "description": "Red team launches targeted phishing campaign at three user accounts. Blue team should identify via email gateway logs.", "start_offset_min": 120, "duration_min": 30},
-    {"title": "Decision: Isolate Subnet",             "event_type": "decision",      "color": "#27AE60", "description": "Blue team lead must decide: isolate the affected subnet to prevent lateral movement, accepting service disruption.", "start_offset_min": 120, "duration_min": 0},
-    {"title": "SITREP 1 — Blue Team Status",          "event_type": "reporting",     "color": "#1ABC9C", "description": "Blue team reports current threat status, actions taken, impacted systems, and recommended next steps.", "start_offset_min": 120, "duration_min": 0},
-    {"title": "Vulnerability Analysis",               "event_type": "activity",      "color": "#2ECC71", "description": "Blue team runs targeted vulnerability scans on affected systems to identify attack vectors being exploited.", "start_offset_min": 90,  "duration_min": 90},
-    {"title": "Patch Deployment Sprint",              "event_type": "assigned_task", "color": "#E67E22", "description": "Blue team deploys emergency patches to the three most critical vulnerabilities identified. Document each change.", "start_offset_min": 150, "duration_min": 120},
-    {"title": "INJECT: Red — Lateral Movement",       "event_type": "event",         "color": "#C0392B", "description": "Red team attempts lateral movement from compromised workstation to file server using credential harvesting.", "start_offset_min": 180, "duration_min": 0},
-    {"title": "Log Analysis — Forensics",             "event_type": "activity",      "color": "#2ECC71", "description": "Blue team performs live forensic log analysis to trace attack path, identify compromised accounts, and establish timeline.", "start_offset_min": 180, "duration_min": 90},
-    {"title": "SITREP 2 — Incident Status",           "event_type": "reporting",     "color": "#1ABC9C", "description": "Comprehensive incident report: compromise scope, affected assets, containment status, estimated recovery time.", "start_offset_min": 240, "duration_min": 0},
-    {"title": "INJECT: Red — Data Exfiltration Attempt", "event_type": "event",      "color": "#C0392B", "description": "Red team attempts to exfiltrate simulated sensitive data via encrypted channel to external C2 server.", "start_offset_min": 300, "duration_min": 0},
-    {"title": "Decision: Network Segmentation",       "event_type": "decision",      "color": "#27AE60", "description": "Decision to implement emergency network segmentation to prevent exfiltration. Accept partial service outage.", "start_offset_min": 300, "duration_min": 0},
-    {"title": "System Hardening",                     "event_type": "assigned_task", "color": "#E67E22", "description": "Blue team applies hardening measures: disable unused services, reset compromised credentials, update firewall rules.", "start_offset_min": 360, "duration_min": 90},
-    {"title": "Incident Report Compilation",          "event_type": "reporting",     "color": "#1ABC9C", "description": "Blue team compiles formal incident report documenting timeline, IOCs, attack vectors, and remediation steps taken.", "start_offset_min": 450, "duration_min": 30},
-    {"title": "Technical Debrief",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Joint red/blue debrief. Red team reveals all attack steps taken. Blue team compares with detected activity. Gap analysis.", "start_offset_min": 480, "duration_min": 60},
-    {"title": "ENDEX",                                "event_type": "instant",       "color": "#E74C3C", "description": "Exercise concluded. Systems restored. Lessons captured for follow-up training.", "start_offset_min": 540, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise begins. Blue team takes defensive positions. All monitoring tools active. Red team isolated to simulation environment.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Security Baseline Assessment",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Blue team documents current security posture: active services, open ports, patch levels, IDS/IPS baseline alerts.",
+      "start_offset_min": 0,
+      "duration_min": 60
+    },
+    {
+      "title": "Network Topology Briefing",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Exercise director briefs all participants on the target network topology, known assets, and red team objectives.",
+      "start_offset_min": 0,
+      "duration_min": 45
+    },
+    {
+      "title": "INJECT: Red — Port Scan",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Red team initiates reconnaissance via port scanning and service enumeration. Blue team should detect via IDS alerts.",
+      "start_offset_min": 60,
+      "duration_min": 0
+    },
+    {
+      "title": "Blue: Anomaly Detection Alert",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Blue team triage the IDS alert. Confirm hostile reconnaissance in progress. Document and escalate to team lead.",
+      "start_offset_min": 75,
+      "duration_min": 30
+    },
+    {
+      "title": "INJECT: Red — Phishing Campaign",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Red team launches targeted phishing campaign at three user accounts. Blue team should identify via email gateway logs.",
+      "start_offset_min": 120,
+      "duration_min": 30
+    },
+    {
+      "title": "Decision: Isolate Subnet",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Blue team lead must decide: isolate the affected subnet to prevent lateral movement, accepting service disruption.",
+      "start_offset_min": 120,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1 — Blue Team Status",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Blue team reports current threat status, actions taken, impacted systems, and recommended next steps.",
+      "start_offset_min": 120,
+      "duration_min": 0
+    },
+    {
+      "title": "Vulnerability Analysis",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Blue team runs targeted vulnerability scans on affected systems to identify attack vectors being exploited.",
+      "start_offset_min": 90,
+      "duration_min": 90
+    },
+    {
+      "title": "Patch Deployment Sprint",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Blue team deploys emergency patches to the three most critical vulnerabilities identified. Document each change.",
+      "start_offset_min": 150,
+      "duration_min": 120
+    },
+    {
+      "title": "INJECT: Red — Lateral Movement",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Red team attempts lateral movement from compromised workstation to file server using credential harvesting.",
+      "start_offset_min": 180,
+      "duration_min": 0
+    },
+    {
+      "title": "Log Analysis — Forensics",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Blue team performs live forensic log analysis to trace attack path, identify compromised accounts, and establish timeline.",
+      "start_offset_min": 180,
+      "duration_min": 90
+    },
+    {
+      "title": "SITREP 2 — Incident Status",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Comprehensive incident report: compromise scope, affected assets, containment status, estimated recovery time.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Red — Data Exfiltration Attempt",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Red team attempts to exfiltrate simulated sensitive data via encrypted channel to external C2 server.",
+      "start_offset_min": 300,
+      "duration_min": 0
+    },
+    {
+      "title": "Decision: Network Segmentation",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Decision to implement emergency network segmentation to prevent exfiltration. Accept partial service outage.",
+      "start_offset_min": 300,
+      "duration_min": 0
+    },
+    {
+      "title": "System Hardening",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Blue team applies hardening measures: disable unused services, reset compromised credentials, update firewall rules.",
+      "start_offset_min": 360,
+      "duration_min": 90
+    },
+    {
+      "title": "Incident Report Compilation",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Blue team compiles formal incident report documenting timeline, IOCs, attack vectors, and remediation steps taken.",
+      "start_offset_min": 450,
+      "duration_min": 30
+    },
+    {
+      "title": "Technical Debrief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Joint red/blue debrief. Red team reveals all attack steps taken. Blue team compares with detected activity. Gap analysis.",
+      "start_offset_min": 480,
+      "duration_min": 60
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise concluded. Systems restored. Lessons captured for follow-up training.",
+      "start_offset_min": 540,
+      "duration_min": 0
+    }
   ]
 }
