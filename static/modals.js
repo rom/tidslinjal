@@ -815,8 +815,10 @@ function renderExistingLocks() {
 
 async function unlockFromModal(id) {
   if (!confirm(t('confirm_delete_lock')||'Remove this lock?')) return;
+  const lockToRemove = (state.locks || []).find(l => l.id === id);
   const res = await apiDel(`/api/locks/${id}`);
   if (res.ok) {
+    if (lockToRemove) pushUndo('delete_lock', { ...lockToRemove });
     await fetchLocks();
     renderTimeline();
     renderExistingLocks();
@@ -838,14 +840,17 @@ document.getElementById('btnSaveLock').addEventListener('click', async () => {
     if (!lv) { showError('Please select a layer', 'Validation'); return; }
     layerID = parseInt(lv, 10);
   }
-  const res = await apiPost('/api/locks', {
+  const lockPayload = {
     start_time: new Date(sv).toISOString(),
     end_time:   new Date(ev).toISOString(),
     reason:     document.getElementById('lockReason').value,
     scope,
     layer_id:   layerID,
-  });
+  };
+  const res = await apiPost('/api/locks', lockPayload);
   if (res.ok) {
+    const created = await res.json();
+    pushUndo('create_lock', { id: created.id });
     closeModal('lockModal'); await fetchLocks(); renderTimeline();
     showNotification('success', t('notif_locked'));
   } else { const err = await res.json(); showError(err.error); }
@@ -853,8 +858,12 @@ document.getElementById('btnSaveLock').addEventListener('click', async () => {
 
 async function deleteLock(id) {
   if (!confirm(t('confirm_delete_lock'))) return;
+  const lockToRemove = (state.locks || []).find(l => l.id === id);
   const res = await apiDel(`/api/locks/${id}`);
-  if (res.ok) { await fetchLocks(); renderTimeline(); showNotification('success', t('notif_unlocked')); }
+  if (res.ok) {
+    if (lockToRemove) pushUndo('delete_lock', { ...lockToRemove });
+    await fetchLocks(); renderTimeline(); showNotification('success', t('notif_unlocked'));
+  }
 }
 
 // ── User Modal, Group Modal, Member Modal ─────────────────────────────────
@@ -1171,6 +1180,13 @@ async function deleteLayer(id) {
 }
 
 // ── Event Type Modal ───────────────────────────────────────────────────────
+function pickEtypeIcon(icon) {
+  document.getElementById('etypeIcon').value = icon;
+  document.querySelectorAll('.icon-pick-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.icon === icon);
+  });
+}
+
 function openEtypeModal(et) {
   const isEdit = !!et;
   document.getElementById('etypeModalTitle').textContent = isEdit ? 'Edit Event Type' : 'New Event Type';
@@ -1181,6 +1197,7 @@ function openEtypeModal(et) {
   document.getElementById('etypeLabelSV').value = et ? (et.label_sv||'') : '';
   document.getElementById('etypeLabelFR').value = et ? (et.label_fr||'') : '';
   document.getElementById('etypeColor').value   = et ? et.color : '#4A90D9';
+  pickEtypeIcon(et ? (et.icon||'') : '');
   const delBtn = document.getElementById('btnDeleteEtype');
   const canDel = isEdit && !et.is_system;
   delBtn.style.display = canDel ? '' : 'none';
@@ -1198,6 +1215,7 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
     label_sv: document.getElementById('etypeLabelSV').value,
     label_fr: document.getElementById('etypeLabelFR').value,
     color:    document.getElementById('etypeColor').value,
+    icon:     document.getElementById('etypeIcon').value.trim(),
   };
   const res = id ? await apiPut(`/api/event-types/${id}`, payload) : await apiPost('/api/event-types', payload);
   if (res.ok) {
@@ -1614,6 +1632,15 @@ function renderSidebar() {
           <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} onchange="setOOHPref(this.checked)"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_out_of_hours')||'Show ghosted area outside day hours'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_event_icons')||'Event Icons'}</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="prefShowEventIcons" ${p.show_event_icons!==false?'checked':''}
+            onchange="setPref('show_event_icons', this.checked)"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_event_icons')||'Show icons on events (type, attachments, etc.)'}
         </label>
       </div>
       <div class="sidebar-section">
@@ -3070,7 +3097,7 @@ async function generateReport() {
   .status{display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600}
   </style></head><body>
   <h1>${escHtml(title)}</h1>
-  <p style="color:#666;font-size:13px">Generated: ${new Date().toLocaleString()}</p>`;
+  <p style="color:#666;font-size:13px">Generated: ${fmtDateTime(new Date())}</p>`;
 
   if (type === 'aar') {
     const byStatus = {};
@@ -3084,8 +3111,8 @@ async function generateReport() {
       ${byStatus[s].map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${escHtml(ev.event_type)}</td>
-        <td>${new Date(ev.start_time).toLocaleString()}</td>
-        <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+        <td>${fmtDateTime(new Date(ev.start_time))}</td>
+        <td>${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
         <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
         <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
         <td>${escHtml(ev.created_by_name||'')}</td>
@@ -3108,8 +3135,8 @@ async function generateReport() {
       ${evs.map(ev => `<tr>
         <td>${escHtml(ev.title)}</td>
         <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
-        <td>${new Date(ev.start_time).toLocaleString()}</td>
-        <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+        <td>${fmtDateTime(new Date(ev.start_time))}</td>
+        <td>${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
         <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
         <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
       </tr>`).join('')}
@@ -3344,6 +3371,19 @@ async function performUndo() {
       await apiPut('/api/events/' + entry.data.id, payload);
     } else if (entry.action === 'status_change') {
       await api('PATCH', `/api/events/${entry.data.id}/status`, { status: entry.data.oldStatus });
+    } else if (entry.action === 'create_lock') {
+      // Undo lock creation by deleting the lock
+      await apiDel('/api/locks/' + entry.data.id);
+      await fetchLocks();
+    } else if (entry.action === 'delete_lock') {
+      // Undo lock removal by re-creating it
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.locked_by;
+      delete payload.locked_by_name;
+      delete payload.created_at;
+      await apiPost('/api/locks', payload);
+      await fetchLocks();
     }
     await refreshAll();
     showNotification('success', `Undone: ${entry.action.replace(/_/g, ' ')}`);

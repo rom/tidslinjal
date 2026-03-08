@@ -47,7 +47,7 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Händelse", LabelFR: "Événement"},
 	{Key: "instant", Label: "Instant", Color: "#F39C12", IsSystem: true,
 		LabelSV: "Ögonblick", LabelFR: "Instant"},
-	{Key: "mote", Label: "Meeting (Möte)", Color: "#7F8C8D", IsSystem: true,
+	{Key: "mote", Label: "Meeting", Color: "#7F8C8D", IsSystem: true,
 		LabelSV: "Möte", LabelFR: "Réunion"},
 	{Key: "decision", Label: "Decision", Color: "#27AE60", IsSystem: true,
 		LabelSV: "Beslut", LabelFR: "Décision"},
@@ -75,6 +75,7 @@ type EventTypeDef struct {
 	LabelSV   string    `json:"label_sv,omitempty"`
 	LabelFR   string    `json:"label_fr,omitempty"`
 	Color     string    `json:"color"`
+	Icon      string    `json:"icon,omitempty"`
 	IsSystem  bool      `json:"is_system"`
 	CreatedBy int64     `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
