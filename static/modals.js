@@ -2703,6 +2703,11 @@ async function confirmApplyTemplate(id) {
       state.exercise = state.exercise || {};
       state.exercise.label = r.exercise_name;
     }
+    // Update STARTEX epoch to the base time the user specified
+    if (r.startex) {
+      state.exercise = state.exercise || {};
+      state.exercise.epoch = r.startex;
+    }
     // If server applied day hour preferences from the template, update local state
     if (r.day_end_hour > 0) {
       state.preferences.day_start_hour = r.day_start_hour;
