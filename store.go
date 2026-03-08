@@ -1678,6 +1678,8 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 	if !ok {
 		return 0, fmt.Errorf("template not found")
 	}
+	logDebug("[template] ApplyTemplate: name=%q items=%d phases=%d locks=%d base=%s",
+		tmpl.Name, len(tmpl.Items), len(tmpl.Phases), len(tmpl.Locks), baseTime.Format(time.RFC3339))
 	count := 0
 	for _, item := range tmpl.Items {
 		start := baseTime.Add(time.Duration(item.StartOffsetMin) * time.Minute)
@@ -1703,6 +1705,7 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 			CreatedByName:     createdByName,
 		}
 		created, err := s.CreateEvent(ev)
+		logDebug("[template] item %q -> event start=%s err=%v", item.Title, start.Format(time.RFC3339), err)
 		if err == nil {
 			count++
 			// Copy template attachments to the new event

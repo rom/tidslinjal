@@ -185,11 +185,33 @@ function showNotification(type, message, duration=4000) {
 }
 
 // ── Clock ───────────────────────────────────────────────────────────────────
+let _clockUTC = false; // false = local time, true = UTC
+
+function toggleClockTZ() {
+  _clockUTC = !_clockUTC;
+  updateClock();
+}
+
 function updateClock() {
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
-  document.getElementById('clockTime').textContent =
-    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  document.getElementById('clockDate').textContent =
-    now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  let h, m, s, dateStr, tzLabel;
+  if (_clockUTC) {
+    h = now.getUTCHours(); m = now.getUTCMinutes(); s = now.getUTCSeconds();
+    dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
+    tzLabel = 'UTC';
+  } else {
+    h = now.getHours(); m = now.getMinutes(); s = now.getSeconds();
+    dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    // Show short timezone name
+    try {
+      tzLabel = now.toLocaleTimeString(getLocale(), {timeZoneName:'short'}).split(' ').pop();
+    } catch { tzLabel = ''; }
+  }
+  const timeEl = document.getElementById('clockTime');
+  if (timeEl) timeEl.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  const dateEl = document.getElementById('clockDate');
+  if (dateEl) dateEl.textContent = dateStr;
+  const tzEl = document.getElementById('clockTZ');
+  if (tzEl) tzEl.textContent = tzLabel;
 }

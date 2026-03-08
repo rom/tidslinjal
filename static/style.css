@@ -62,6 +62,40 @@ body.light-mode .event-block          { box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 body.light-mode ::-webkit-scrollbar-track { background: var(--bg3); }
 body.light-mode ::-webkit-scrollbar-thumb { background: #adb8c5; }
 
+/* ── City Camouflage theme ─────────────────────────────────────────────────── */
+/* Urban pattern: muted greens, grays, tans — like digital/urban camo */
+body.city-camo {
+  --bg:         #3a3d2e;
+  --bg2:        #4a4d38;
+  --bg3:        #555847;
+  --border:     #6b6e58;
+  --accent:     #8faa5a;
+  --accent2:    #6d8440;
+  --text:       #d4d8c4;
+  --text-dim:   #9a9e8a;
+  --text-bright:#eef0e0;
+  --shadow:     rgba(0,0,0,.6);
+  --shadow-lg:  rgba(0,0,0,.75);
+  --red:        #c0392b;
+  --green:      #7fb069;
+  --orange:     #c68642;
+  --purple:     #7b6fa0;
+  --teal:       #4e8f7e;
+}
+/* Subtle camo texture on cells via repeating angular blocks */
+body.city-camo .tl-cell {
+  background-image:
+    repeating-linear-gradient(45deg, rgba(0,0,0,.04) 0px, rgba(0,0,0,.04) 8px, transparent 8px, transparent 16px),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 12px, transparent 12px, transparent 24px);
+}
+body.city-camo .tl-cell:hover        { background-color: rgba(143,170,90,.12); }
+body.city-camo .tl-cell.locked       { background: repeating-linear-gradient(45deg,rgba(192,57,43,.1),rgba(192,57,43,.1) 4px,transparent 4px,transparent 10px); }
+body.city-camo .tl-row-current       { background: rgba(143,170,90,.08) !important; }
+body.city-camo #header               { background: #2e3022; border-bottom-color: #5a5d48; }
+body.city-camo .sidebar              { background: #343628; }
+body.city-camo ::-webkit-scrollbar-track { background: var(--bg3); }
+body.city-camo ::-webkit-scrollbar-thumb { background: #7a7d6a; }
+
 /* ── Size variants ────────────────────────────────────────────────────────── */
 body.size-normal {
   --fs-base:    15px;  --fs-sm: 13px; --fs-xs: 11px; --fs-lg: 17px; --fs-xl: 26px; --fs-2xl: 30px;
