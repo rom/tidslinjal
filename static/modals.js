@@ -40,6 +40,7 @@ function applyPreferences() {
   body.className = '';
   if (state.preferences.theme === 'light') body.classList.add('light-mode');
   if (state.preferences.theme === 'city-camo') body.classList.add('city-camo');
+  if (state.preferences.theme === 'urban-camo') body.classList.add('urban-camo');
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
@@ -351,16 +352,18 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     // Handle inline alarm
     const alarmCb = document.getElementById('inlineAlarmEnabled');
     if (alarmCb && alarmCb.checked && !allDay) {
-      const leadTime = parseInt(document.getElementById('inlineAlarmLeadTime').value, 10) || 0;
-      const scope    = document.getElementById('inlineAlarmScope').value;
+      const leadTime  = parseInt(document.getElementById('inlineAlarmLeadTime').value, 10) || 0;
+      const scope     = document.getElementById('inlineAlarmScope').value;
+      const soundEl   = document.getElementById('inlineAlarmSound');
+      const sound     = soundEl ? soundEl.value : 'klaxon';
       const eventTime = new Date(payload.start_time);
       // Create alarm for current user
-      await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString() });
+      await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), sound });
       // If "all invited" and there are invited users, create alarms for them too (admin/oplead only)
       if (scope === 'all' && hasRole2(state.user.role, 'oplead') && invUserIDs.length > 0) {
         for (const uid of invUserIDs) {
           if (uid !== state.user.id) {
-            await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), for_user_id: uid });
+            await apiPost('/api/alarms', { event_id: eventID, lead_time: leadTime, event_time: eventTime.toISOString(), sound, for_user_id: uid });
           }
         }
       }
@@ -480,6 +483,16 @@ function showEventDetail(ev) {
         <div style="font-size:var(--fs-sm);color:var(--text-dim);display:grid;grid-template-columns:auto 1fr;gap:3px 10px">
           <b>${t('detail_start')}:</b><span>${fmtDateTime(evStart)}</span>
           ${evEnd ? `<b>${t('detail_end')}:</b><span>${fmtDateTime(evEnd)}</span>` : ''}
+          ${(function(){
+            if (!synthActive || !synthActive()) return '';
+            const epochMs = new Date(state.exercise.epoch).getTime();
+            const startH  = synthElapsedHours(epochMs, evStart.getTime());
+            const startLabel = startH >= 0 ? `H+${startH}` : `H${startH}`;
+            const endPart = evEnd
+              ? (() => { const eh = synthElapsedHours(epochMs, evEnd.getTime()); return ` → ${eh >= 0 ? 'H+'+eh : 'H'+eh}`; })()
+              : '';
+            return `<b>⏱ ${t('info_synth_time')||'Synth time'}:</b><span style="color:var(--accent);font-weight:600">${startLabel}${endPart}</span>`;
+          })()}
           ${ev.is_recurring ? `<b>${t('detail_repeats')}:</b><span>${t('event_pattern_'+(ev.recurrence_pattern||'weekly'))}</span>` : ''}
           ${layer ? `<b>${t('event_layer')}:</b><span>${escHtml(layer.name)}</span>` : ''}
           <b>${t('detail_created')}:</b><span>${escHtml(ev.created_by_name||'')}</span>
@@ -723,7 +736,9 @@ function openAlarmModal(ev) {
 document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
   const eventId  = parseInt(document.getElementById('alarmEventId').value, 10);
   const leadTime = parseInt(document.getElementById('alarmLeadTime').value, 10);
-  const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime});
+  const soundEl  = document.getElementById('alarmSound');
+  const sound    = soundEl ? soundEl.value : 'klaxon';
+  const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime, sound});
   if (res.ok) {
     closeModal('alarmModal');
     await fetchAlarms(); renderSidebar();
@@ -851,7 +866,7 @@ async function openUserModal(user) {
     {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
     {key:'reporter', label:'Reporter'}, {key:'readwrite', label:'Read/Write'},
     {key:'teamlead', label:'Team Lead'}, {key:'oplead', label:'Operations Lead'},
-    {key:'staffofficer', label:'Staff Officer Asst.'}, {key:'admin', label:'Admin'},
+    {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
   ];
   const allRoles = [...builtinRoles];
   (state.roleConfigs || []).forEach(rc => {
@@ -923,6 +938,11 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
   const email = document.getElementById('uEmail').value.trim();
   const groupIDs = [...document.querySelectorAll('input[name="uGroup"]:checked')].map(cb => parseInt(cb.value, 10));
   const natoDesignations = [...document.querySelectorAll('input[name="uNATO"]:checked')].map(cb => cb.value);
+  // Staff Officer role requires at least one J-designation
+  if (role === 'staffofficer_full' && natoDesignations.length === 0) {
+    showError('The Staff Officer role requires at least one J-designation to be assigned.', 'Validation');
+    return;
+  }
   const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs, nato_designations:natoDesignations};
   if (!id) { payload.username=username; payload.password=password; }
   if (id&&password) { payload.password=password; }
@@ -1304,7 +1324,7 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
         </div>
         ${(() => {
-          const roleOrder = ['admin','staffofficer','oplead','teamlead','readwrite','reporter','read','observer'];
+          const roleOrder = ['admin','staffofficer_full','staffofficer','oplead','teamlead','readwrite','reporter','read','observer'];
           const roleCounts = {};
           (state.users||[]).forEach(u => { roleCounts[u.role] = (roleCounts[u.role]||0)+1; });
           const rows = roleOrder.filter(r => roleCounts[r]).map(r =>
@@ -1498,7 +1518,8 @@ function renderSidebar() {
         <div class="toggle-btn-group">
           <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
           <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')||'Light'}</button>
-          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Urban camouflage pattern">🏙 Camo</button>
+          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Urban camouflage (greens/grays)">🏙 City Camo</button>
+          <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" onclick="setPref('theme','urban-camo')" title="Urban warfare (blues)">🌆 Urban Camo</button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -2006,7 +2027,7 @@ function updateUILabels() {
     const roleMap = {
       observer:'role_observer',read:'role_read',reporter:'role_reporter',
       readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',
-      staffofficer:'role_staffofficer',admin:'role_admin'
+      staffofficer:'role_staffofficer',staffofficer_full:'role_staffofficer_full',admin:'role_admin'
     };
     [...uRole.options].forEach(opt => { const k = roleMap[opt.value]; if (k) opt.text = t(k) || opt.text; });
   }
@@ -2113,6 +2134,79 @@ function updateLangFlags() {
   });
 }
 
+// ── Alarm sound engine (Web Audio API) ─────────────────────────────────────
+function playAlarmSound(sound) {
+  if (!sound || sound === 'none') return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+
+    if (sound === 'klaxon') {
+      // Fast alternating high-low tone, 3 cycles
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        osc.connect(gain);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, now + i * 0.4);
+        osc.frequency.setValueAtTime(440, now + i * 0.4 + 0.2);
+        gain.gain.setValueAtTime(0.4, now + i * 0.4);
+        gain.gain.setValueAtTime(0, now + i * 0.4 + 0.38);
+        osc.start(now + i * 0.4);
+        osc.stop(now + i * 0.4 + 0.39);
+      }
+    } else if (sound === 'alert') {
+      // 4 short beeps
+      for (let i = 0; i < 4; i++) {
+        const osc = ctx.createOscillator();
+        osc.connect(gain);
+        osc.type = 'square';
+        osc.frequency.value = 1000;
+        gain.gain.setValueAtTime(0.3, now + i * 0.25);
+        gain.gain.setValueAtTime(0, now + i * 0.25 + 0.15);
+        osc.start(now + i * 0.25);
+        osc.stop(now + i * 0.25 + 0.16);
+      }
+    } else if (sound === 'siren') {
+      // Rising-falling sweep
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + 0.5);
+      osc.frequency.linearRampToValueAtTime(300, now + 1.0);
+      osc.frequency.linearRampToValueAtTime(1200, now + 1.5);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.setValueAtTime(0, now + 1.8);
+      osc.start(now);
+      osc.stop(now + 1.9);
+    } else if (sound === 'chime') {
+      // Soft bell-like tone
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.5, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+      osc.start(now);
+      osc.stop(now + 1.6);
+    } else if (sound === 'beep') {
+      // Single beep
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'sine';
+      osc.frequency.value = 750;
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.setValueAtTime(0, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.31);
+    }
+    // Auto-close context after sounds finish
+    setTimeout(() => ctx.close(), 3000);
+  } catch (e) { /* Audio not available */ }
+}
+
 // ── SSE ────────────────────────────────────────────────────────────────────
 
 // ── SSE, Alarm ACK: connectSSE, unackedAlarms, showAlarmNotification, dismissAlarmNotif, ackAlarm ──
@@ -2121,6 +2215,7 @@ function connectSSE() {
   const es = new EventSource('/api/notifications/stream');
   es.addEventListener('alarm', e => {
     const data = JSON.parse(e.data);
+    playAlarmSound(data.sound || 'klaxon');
     showAlarmNotification(data, 0);
   });
   // Listen for event changes from other users
@@ -2578,13 +2673,19 @@ async function confirmApplyTemplate(id) {
   }
   if (res.ok) {
     const r = await res.json();
-    dbg('[template] applied: created=%o', r.created);
+    dbg('[template] applied: created=%o exerciseName=%o', r.created, r.exercise_name);
     closeModal('applyTemplateModal');
     closeModal('templatesModal');
     const tmpl = (state.templates || []).find(t2 => t2.id === id);
     if (tmpl) state.lastAppliedTemplate = tmpl.name;
+    // If server set an exercise name from the template, update local state
+    if (r.exercise_name) {
+      state.exercise = state.exercise || {};
+      state.exercise.label = r.exercise_name;
+    }
     await refreshAll();
-    showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
+    const nameSuffix = r.exercise_name ? ` — exercise: ${r.exercise_name}` : '';
+    showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template${nameSuffix}`);
   } else {
     let errMsg = 'Failed to apply template';
     try { const err = await res.json(); errMsg = err.error || errMsg; } catch(_) {}
@@ -2667,8 +2768,18 @@ async function handleTemplateFileLoad(input) {
       } catch { /* ignore */ }
     }
   }
+  // If any imported template had an exercise_name, set it in exercise settings
+  const firstWithName = templates.find(t => t.exercise_name);
+  if (firstWithName && firstWithName.exercise_name) {
+    const ex = { ...(state.exercise || {}), label: firstWithName.exercise_name };
+    const exRes = await apiPut('/api/exercise', ex);
+    if (exRes.ok) {
+      state.exercise = ex;
+      dbg('[template] Set exercise name from template: %o', firstWithName.exercise_name);
+    }
+  }
   if (created > 0) {
-    showNotification('success', `Imported ${created} template${created!==1?'s':''}${errors>0?' ('+errors+' failed)':''}`);
+    showNotification('success', `Imported ${created} template${created!==1?'s':''}${errors>0?' ('+errors+' failed)':''}${firstWithName?' — exercise: '+firstWithName.exercise_name:''}`);
   } else {
     showError(`No templates imported.${errors>0?' '+errors+' file(s) failed.':''}`);
   }
@@ -3453,13 +3564,14 @@ function showConflictWarning(conflicts) {
 
 // Default role configurations
 const DEFAULT_ROLE_CONFIGS = [
-  { key: 'observer',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
-  { key: 'read',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
-  { key: 'reporter',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
-  { key: 'readwrite',    display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
-  { key: 'teamlead',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
-  { key: 'oplead',       display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
-  { key: 'staffofficer', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
+  { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
+  { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
+  { key: 'readwrite',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
+  { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
+  { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
 ];
 
 // Ordered list of all capabilities shown in role editor
@@ -3567,7 +3679,8 @@ function addNewRoleRow() {
   if (!tbody) return;
   state._roleEditorCustomCounter = (state._roleEditorCustomCounter || 0) + 1;
   const key = `custom_role_${state._roleEditorCustomCounter}`;
-  const role = { key, display_name: '', display_names: {}, capabilities: {} };
+  // All new custom roles start with see_groups and see_users enabled by default
+  const role = { key, display_name: '', display_names: {}, capabilities: { see_groups: true, see_users: true } };
   const adminRow = tbody.querySelector('tr[style*="opacity"]');
   const tmp = document.createElement('tbody');
   tmp.innerHTML = _renderRoleRow(role, false);

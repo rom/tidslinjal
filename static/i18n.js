@@ -447,8 +447,10 @@ const TRANSLATIONS = {
     synth_day_hours_only:  'Synthetic time: day hours only',
 
     // v3.6.0 — new roles
-    role_observer:       'Observer',
-    role_staffofficer:   'Staff Officer Assistant',
+    role_observer:            'Observer',
+    role_staffofficer:        'Staff Officer Assistant',
+    role_staffofficer_full:   'Staff Officer',
+    help_role_staffofficer_full: 'Full Staff Officer role. Same rights as Operations Lead. Requires a J-designation.',
 
     // v3.6.0 — user modal email
     user_email:          'Email (for password reset)',
@@ -832,8 +834,10 @@ const TRANSLATIONS = {
     synth_day_hours_only:  'Syntetisk tid: endast dagtimmar',
 
     // v3.6.0 — nya roller
-    role_observer:       'Observatör',
-    role_staffofficer:   'Stabsassistent',
+    role_observer:            'Observatör',
+    role_staffofficer:        'Stabsassistent',
+    role_staffofficer_full:   'Stabsofficer',
+    help_role_staffofficer_full: 'Full stabsofficersroll. Samma rättigheter som operationsledare. Kräver J-beteckning.',
 
     // v3.6.0 — e-post för användare
     user_email:          'E-post (för lösenordsåterställning)',
@@ -1277,8 +1281,10 @@ const TRANSLATIONS = {
     synth_day_hours_only:  'Temps synthétique : heures de journée uniquement',
 
     // v3.6.0 — nouveaux rôles
-    role_observer:       'Observateur',
-    role_staffofficer:   'Officier de renseignement adjoint',
+    role_observer:            'Observateur',
+    role_staffofficer:        'Officier d\'état-major adjoint',
+    role_staffofficer_full:   'Officier d\'état-major',
+    help_role_staffofficer_full: 'Rôle complet d\'officier d\'état-major. Mêmes droits que le chef des opérations. Nécessite une désignation J.',
 
     // v3.6.0 — courriel utilisateur
     user_email:          'Courriel (pour réinitialisation du mot de passe)',

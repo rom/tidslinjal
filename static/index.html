@@ -106,7 +106,7 @@
         <div class="clock-time" id="clockTime">00:00:00</div>
         <div style="display:flex;align-items:center;gap:4px">
           <div class="clock-date" id="clockDate">—</div>
-          <span id="clockTZ" style="font-size:9px;opacity:0.65;font-weight:600;letter-spacing:.05em"></span>
+          <span id="clockTZ" style="font-size:12px;font-weight:700;letter-spacing:.07em;color:var(--accent)"></span>
         </div>
       </div>
       <div class="user-info">
@@ -539,6 +539,16 @@
               <option value="all">For all invited</option>
             </select>
           </div>
+          <div class="form-row" style="gap:8px; align-items:center">
+            <select id="inlineAlarmSound" class="ctrl-select" style="flex:1">
+              <option value="klaxon">🔊 Klaxon</option>
+              <option value="alert">🔔 Alert</option>
+              <option value="siren">🚨 Siren</option>
+              <option value="chime">🎵 Chime</option>
+              <option value="beep">📢 Beep</option>
+              <option value="none">🔇 Silent</option>
+            </select>
+          </div>
         </div>
       </div>
       <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
@@ -589,6 +599,17 @@
           <option value="15">15 minutes before</option>
           <option value="30">30 minutes before</option>
           <option value="60">1 hour before</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="lbl-alarm-sound">Alarm sound</label>
+        <select id="alarmSound">
+          <option value="klaxon">🔊 Klaxon</option>
+          <option value="alert">🔔 Alert (beeps)</option>
+          <option value="siren">🚨 Siren</option>
+          <option value="chime">🎵 Chime</option>
+          <option value="beep">📢 Single beep</option>
+          <option value="none">🔇 Silent</option>
         </select>
       </div>
     </div>
@@ -686,7 +707,8 @@
             <option value="readwrite" id="lbl-role-readwrite">Read/Write</option>
             <option value="teamlead" id="lbl-role-teamlead">Team Lead</option>
             <option value="oplead" id="lbl-role-oplead">Operations Lead</option>
-            <option value="staffofficer">Staff Officer Asst.</option>
+            <option value="staffofficer" id="lbl-role-staffofficer">Staff Officer Assistant</option>
+            <option value="staffofficer_full" id="lbl-role-staffofficer-full">Staff Officer</option>
             <option value="admin" id="lbl-role-admin">Admin</option>
           </select>
         </div>
@@ -1272,14 +1294,14 @@
 
 <!-- Role Editor Modal -->
 <div class="modal-overlay" id="roleEditorModal">
-  <div class="modal modal-xl">
+  <div class="modal modal-xl" style="max-width:1400px;width:99vw;max-height:92vh">
     <div class="modal-header">
       <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
       <button class="modal-close" onclick="closeModal('roleEditorModal')">&times;</button>
     </div>
-    <div class="modal-body" style="padding-bottom:8px">
+    <div class="modal-body" style="padding-bottom:8px;overflow-y:auto;max-height:calc(92vh - 120px)">
       <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Admin role is locked.</p>
-      <div id="roleEditorTable" style="max-height:65vh;overflow-y:auto"></div>
+      <div id="roleEditorTable"></div>
     </div>
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-secondary" onclick="addNewRoleRow()">＋ Add Custom Role</button>
