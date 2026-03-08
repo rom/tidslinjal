@@ -14,64 +14,90 @@
     <div class="logo">Tids<span>linjal</span></div>
 
     <div class="header-controls">
-      <button class="btn btn-secondary btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
-      <button class="btn btn-secondary btn-sm" id="btnToday">Today</button>
-      <button class="btn btn-secondary btn-icon" id="btnDatePicker" title="Go to date…" style="font-size:14px">&#128197;</button>
-      <input type="date" id="datePickerInput" style="display:none;position:absolute" onchange="goToDate(this.value)">
-      <button class="btn btn-secondary btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
 
-      <div class="toolbar-sep"></div>
-
-      <div class="control-group">
-        <span class="control-label" id="lbl-show">Show:</span>
-        <select class="ctrl-select" id="rangeSelect">
-          <option value="day">Day</option>
-          <option value="2days">2 Days</option>
-          <option value="3days">3 Days</option>
-          <option value="4days">4 Days</option>
-          <option value="week" selected>Week</option>
-          <option value="month">Month</option>
-          <option value="2months">2 Months</option>
-          <option value="3months">3 Months</option>
-        </select>
-      </div>
-
-      <div class="control-group">
-        <span class="control-label" id="lbl-res">Resolution:</span>
-        <select class="ctrl-select" id="resolutionSelect">
-          <option value="ten">10 min</option>
-          <option value="quarter">15 min</option>
-          <option value="hour" selected>Hour</option>
-          <option value="day">Day</option>
-        </select>
+      <!-- Group 1: Navigation -->
+      <div class="toolbar-group">
+        <button class="btn btn-secondary toolbar-btn btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnToday">📍 Today</button>
+        <button class="btn btn-secondary toolbar-btn btn-icon" id="btnDatePicker" title="Go to date…">📅</button>
+        <input type="date" id="datePickerInput" style="display:none;position:absolute" onchange="goToDate(this.value)">
+        <button class="btn btn-secondary toolbar-btn btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
       </div>
 
       <div class="toolbar-sep"></div>
 
-      <div class="control-group">
-        <input type="text" id="searchInput" class="ctrl-select" placeholder="Search…" style="width:150px" autocomplete="off">
+      <!-- Group 2: View settings -->
+      <div class="toolbar-group">
+        <div class="control-group">
+          <span class="control-label" id="lbl-show">Show:</span>
+          <select class="ctrl-select" id="rangeSelect">
+            <option value="day">Day</option>
+            <option value="2days">2 Days</option>
+            <option value="3days">3 Days</option>
+            <option value="4days">4 Days</option>
+            <option value="5days">5 Days</option>
+            <option value="week" selected>Week</option>
+            <option value="month">Month</option>
+            <option value="2months">2 Months</option>
+            <option value="3months">3 Months</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <span class="control-label" id="lbl-res">Res:</span>
+          <select class="ctrl-select" id="resolutionSelect">
+            <option value="ten">10 min</option>
+            <option value="quarter">15 min</option>
+            <option value="hour" selected>Hour</option>
+            <option value="day">Day</option>
+          </select>
+        </div>
       </div>
 
       <div class="toolbar-sep"></div>
 
-      <button class="btn btn-secondary btn-sm" id="btnUndo" title="Undo last action (Ctrl+Z)" style="display:none">Undo</button>
-      <button class="btn btn-secondary btn-sm" id="btnFilter" title="Filter events">Filter</button>
-      <button class="btn btn-secondary btn-sm" id="btnTemplates">Templates</button>
-      <button class="btn btn-secondary btn-sm" id="btnLayerToggle">Layers</button>
-      <button class="btn btn-secondary btn-sm" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">T+</button>
-      <button class="btn btn-primary btn-sm" id="btnAddEvent" style="display:none">+ Add Event</button>
-      <button class="btn btn-secondary btn-sm" id="btnAddLock" style="display:none">Lock Slot</button>
-      <button class="btn btn-secondary btn-sm" id="btnPrint" title="Print day/week sheet">Print</button>
-      <button class="btn btn-secondary btn-sm" id="btnExport">Export</button>
-      <button class="btn btn-secondary btn-sm" id="btnImport">Import</button>
-      <button class="btn btn-secondary btn-sm" id="btnReport">Report</button>
+      <!-- Group 3: Search -->
+      <div class="toolbar-group">
+        <input type="text" id="searchInput" class="ctrl-select" placeholder="🔍 Search…" style="width:140px" autocomplete="off">
+      </div>
 
       <div class="toolbar-sep"></div>
+
+      <!-- Group 4: View controls -->
+      <div class="toolbar-group">
+        <button class="btn btn-secondary toolbar-btn" id="btnUndo" title="Undo last action (Ctrl+Z)" style="display:none">↩ Undo</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnFilter" title="Filter events">🔍 Filter</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnLayerToggle">🗂 Layers</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">⏱ T+</button>
+      </div>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Group 5: Event actions -->
+      <div class="toolbar-group">
+        <button class="btn btn-primary toolbar-btn" id="btnAddEvent" style="display:none">➕ Add Event</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnAddLock" style="display:none">🔒 Lock Slot</button>
+      </div>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Group 6: Data management -->
+      <div class="toolbar-group">
+        <button class="btn btn-secondary toolbar-btn" id="btnTemplates">📋 Templates</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnExport">⬇ Export</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnImport">⬆ Import</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnReport">📄 Report</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnPrint" title="Print day/week sheet">🖨 Print</button>
+      </div>
+
+      <div class="toolbar-sep"></div>
+
+      <!-- Group 7: Language -->
       <div class="lang-flags" id="langFlags">
         <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
         <button class="lang-flag-btn" id="flagSV" title="Svenska" onclick="setPref('language','sv')">🇸🇪</button>
         <button class="lang-flag-btn" id="flagFR" title="Français" onclick="setPref('language','fr')">🇫🇷</button>
       </div>
+
     </div>
 
     <div class="header-right">
@@ -161,16 +187,17 @@
 
 <!-- Context menu -->
 <div id="contextMenu" class="context-menu" style="display:none">
-  <div class="context-menu-item" id="ctxEdit" onclick="ctxAction('edit')">Edit Event</div>
-  <div class="context-menu-item" id="ctxDuplicate" onclick="ctxAction('duplicate')">Duplicate Event</div>
-  <div class="context-menu-item" id="ctxAlarm" onclick="ctxAction('alarm')">Set Alarm</div>
+  <div class="context-menu-item" id="ctxEdit" onclick="ctxAction('edit')">✏️ Edit Event</div>
+  <div class="context-menu-item" id="ctxDuplicate" onclick="ctxAction('duplicate')">⧉ Duplicate</div>
+  <div class="context-menu-item" id="ctxAlarm" onclick="ctxAction('alarm')">🔔 Set Alarm</div>
+  <div class="context-menu-item" id="ctxMove" onclick="ctxAction('move')">📅 Move to new time/date…</div>
   <div class="context-menu-sep"></div>
   <div class="context-menu-item" id="ctxStatusPlanned" onclick="ctxAction('status','planned')">Set Planned</div>
   <div class="context-menu-item" id="ctxStatusActive" onclick="ctxAction('status','active')">Set Active</div>
   <div class="context-menu-item" id="ctxStatusCompleted" onclick="ctxAction('status','completed')">Set Completed</div>
   <div class="context-menu-item" id="ctxStatusCancelled" onclick="ctxAction('status','cancelled')">Set Cancelled</div>
   <div class="context-menu-sep"></div>
-  <div class="context-menu-item ctx-danger" id="ctxDelete" onclick="ctxAction('delete')">Delete Event</div>
+  <div class="context-menu-item ctx-danger" id="ctxDelete" onclick="ctxAction('delete')">🗑 Delete</div>
 </div>
 
 <!-- Empty slot context menu -->
@@ -232,7 +259,7 @@
       </div>
       <div class="form-group">
         <label>Description</label>
-        <input type="text" id="tmplDescription" placeholder="Optional description">
+        <textarea id="tmplDescription" rows="4" placeholder="Optional description" style="resize:vertical;min-height:80px"></textarea>
       </div>
       <div class="form-group">
         <label>Visibility</label>
@@ -1217,10 +1244,57 @@
       <div id="importResult" style="display:none;margin-top:12px;padding:10px;border-radius:var(--radius);background:var(--bg3);font-size:var(--fs-sm)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('importModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="doImport()">⬆ Import</button>
+      <button class="btn btn-secondary" id="btnImportCancel" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnDoImport" onclick="doImport()">⬆ Import</button>
     </div>
   </div>
+</div>
+
+<!-- Role Editor Modal -->
+<div class="modal-overlay" id="roleEditorModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
+      <button class="modal-close" onclick="closeModal('roleEditorModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:16px">Edit display names for each role. Admin role is locked.</p>
+      <div id="roleEditorTable"></div>
+      <p id="lbl-role-editor-admin-note" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:12px">Admin role cannot be changed.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('roleEditorModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move Event Dialog -->
+<div class="modal-overlay" id="moveEventModal" style="z-index:1100">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2 id="lbl-move-event-title">📅 Move Event</h2>
+      <button class="modal-close" onclick="closeModal('moveEventModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="lbl-move-event-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
+      <div class="form-group">
+        <label id="lbl-move-event-time">New date and time</label>
+        <input type="datetime-local" id="moveEventNewTime">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('moveEventModal')">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmMove" onclick="confirmMoveEvents()">Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- Multi-select info bar -->
+<div id="multiselectBar" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:20px;z-index:500;display:flex;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:var(--fs-sm)">
+  <span id="multiselectCount"></span>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openMoveSelectedDialog()">📅 Move</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="clearSelection()">✕ Clear</button>
 </div>
 
 <script src="/static/i18n.js"></script>

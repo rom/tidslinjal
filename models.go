@@ -339,6 +339,7 @@ type Template struct {
 	CreatedAt     time.Time      `json:"created_at"`
 	Items         []TemplateItem `json:"items"`
 	ItemCount     int            `json:"item_count"`
+	Roles         []RoleConfig   `json:"roles,omitempty"` // optional role configs saved with template
 }
 
 // TemplateAttachment stores attachment metadata within a template item
@@ -362,6 +363,13 @@ type TemplateItem struct {
 	RecurrencePattern string               `json:"recurrence_pattern"`
 	Participant       string               `json:"participant"`
 	Attachments       []TemplateAttachment `json:"attachments,omitempty"`
+}
+
+// RoleConfig holds a customisable display name and capability flags for a role
+type RoleConfig struct {
+	Key          string          `json:"key"`
+	DisplayName  string          `json:"display_name"`
+	Capabilities map[string]bool `json:"capabilities"`
 }
 
 // OIDCConfig holds the discovered OIDC provider endpoints

@@ -2328,6 +2328,36 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	jsonOK(w, map[string]int{"created": count})
 }
 
+// handleGetRoles returns the current role configurations
+func (app *App) handleGetRoles(w http.ResponseWriter, r *http.Request, user *User) {
+	roles := app.store.GetRoleConfigs()
+	if roles == nil {
+		roles = []RoleConfig{}
+	}
+	jsonOK(w, roles)
+}
+
+// handleUpdateRoles saves updated role configurations (admin only)
+func (app *App) handleUpdateRoles(w http.ResponseWriter, r *http.Request, user *User) {
+	var configs []RoleConfig
+	if err := json.NewDecoder(r.Body).Decode(&configs); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	// Protect the admin role — remove it if someone tried to include it
+	filtered := make([]RoleConfig, 0, len(configs))
+	for _, c := range configs {
+		if c.Key != "admin" {
+			filtered = append(filtered, c)
+		}
+	}
+	if err := app.store.SaveRoleConfigs(filtered); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, filtered)
+}
+
 // handleResetDatabase resets all data except the audit trail
 func (app *App) handleResetDatabase(w http.ResponseWriter, r *http.Request, user *User) {
 	if err := app.store.ResetDatabase(); err != nil {
@@ -3216,6 +3246,18 @@ func (app *App) routes() http.Handler {
 			app.requireAuth(app.handleApplyTemplate)(w, r)
 		} else {
 			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+
+	// Role configuration (admin only for PUT)
+	mux.HandleFunc("/api/roles", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetRoles)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleUpdateRoles)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 

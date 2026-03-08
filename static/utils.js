@@ -72,6 +72,7 @@ function getRangeDays() {
     case '2days':   return 2;
     case '3days':   return 3;
     case '4days':   return 4;
+    case '5days':   return 5;
     case 'week':    return 7;
     case 'month':   return daysInMonth(state.startDate);
     case '2months': return daysInMonth(state.startDate) + daysInMonth(addMonths(state.startDate,1));

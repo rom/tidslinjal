@@ -458,6 +458,14 @@ function renderEventBlocks(days, slotH) {
         block.onclick = e => {
           if (e.target.classList.contains('ev-resize-handle')) return;
           e.stopPropagation();
+          // Ctrl+click (or Meta+click on Mac) toggles event selection for multi-move
+          if (e.ctrlKey || e.metaKey) {
+            const realId = ev._recurring_instance
+              ? parseInt(String(ev.id).split('_')[0], 10)
+              : ev.id;
+            if (typeof toggleEventSelection === 'function') toggleEventSelection(realId);
+            return;
+          }
           if (ev._recurring_instance) {
             state._currentOccurrenceTime = new Date(ev.start_time);
             const masterEv = state.events.find(x => x.id === parseInt(String(ev.id).split('_')[0], 10)) || ev;
@@ -737,6 +745,36 @@ function setupDragToReschedule() {
 
     if (isEventLocked(ev)) {
       showError('This event is in a locked time slot and cannot be moved.');
+      dragEvId = null; dragOrigEl = null; return;
+    }
+
+    // Check if this event is part of a multi-selection
+    const selIds = state.selectedEventIds || [];
+    const isMultiMove = selIds.length > 1 && selIds.includes(dragEvId);
+
+    if (isMultiMove) {
+      // Move all selected events by the same time offset
+      const oldStart = new Date(ev.start_time);
+      const offset = newStart.getTime() - oldStart.getTime();
+      const selectedEvs = state.events.filter(e => selIds.includes(e.id));
+      const movePromises = selectedEvs.map(async selEv => {
+        const sOldStart = new Date(selEv.start_time);
+        const sNewStart = new Date(sOldStart.getTime() + offset);
+        const payload = { ...selEv, start_time: sNewStart.toISOString() };
+        if (selEv.end_time) {
+          const dur = new Date(selEv.end_time) - sOldStart;
+          payload.end_time = new Date(sNewStart.getTime() + dur).toISOString();
+        }
+        delete payload.id; delete payload.created_at; delete payload.updated_at;
+        delete payload.created_by_name; delete payload.verified_by_name;
+        if (typeof pushUndo === 'function') pushUndo('update_event', { id: selEv.id, old: { ...selEv } });
+        return apiPut('/api/events/' + selEv.id, payload);
+      });
+      try {
+        await Promise.all(movePromises);
+        await refreshAll();
+        showNotification('success', t('notif_event_updated'));
+      } catch { showError('Failed to move some events'); }
       dragEvId = null; dragOrigEl = null; return;
     }
 
