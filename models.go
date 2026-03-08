@@ -89,6 +89,7 @@ type User struct {
 	Role                Role      `json:"role"`
 	CanLock             bool      `json:"can_lock"`
 	Vetted              bool      `json:"vetted"`                        // false = pending admin approval (vetted registration mode)
+	NATODesignations    []string  `json:"nato_designations,omitempty"`   // NATO J-staff designations e.g. ["J3","J5"]
 	PasswordResetToken  string    `json:"password_reset_token,omitempty"`
 	PasswordResetExpiry *time.Time `json:"password_reset_expiry,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
@@ -96,26 +97,28 @@ type User struct {
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
 type UserPublic struct {
-	ID          int64     `json:"id"`
-	Username    string    `json:"username"`
-	DisplayName string    `json:"display_name"`
-	Email       string    `json:"email,omitempty"`
-	Role        Role      `json:"role"`
-	CanLock     bool      `json:"can_lock"`
-	Vetted      bool      `json:"vetted"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID               int64     `json:"id"`
+	Username         string    `json:"username"`
+	DisplayName      string    `json:"display_name"`
+	Email            string    `json:"email,omitempty"`
+	Role             Role      `json:"role"`
+	CanLock          bool      `json:"can_lock"`
+	Vetted           bool      `json:"vetted"`
+	NATODesignations []string  `json:"nato_designations,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 func (u *User) Public() UserPublic {
 	return UserPublic{
-		ID:          u.ID,
-		Username:    u.Username,
-		DisplayName: u.DisplayName,
-		Email:       u.Email,
-		Role:        u.Role,
-		CanLock:     u.CanLock,
-		Vetted:      u.Vetted,
-		CreatedAt:   u.CreatedAt,
+		ID:               u.ID,
+		Username:         u.Username,
+		DisplayName:      u.DisplayName,
+		Email:            u.Email,
+		Role:             u.Role,
+		CanLock:          u.CanLock,
+		Vetted:           u.Vetted,
+		NATODesignations: u.NATODesignations,
+		CreatedAt:        u.CreatedAt,
 	}
 }
 
@@ -386,9 +389,10 @@ type TemplateLock struct {
 
 // RoleConfig holds a customisable display name and capability flags for a role
 type RoleConfig struct {
-	Key          string          `json:"key"`
-	DisplayName  string          `json:"display_name"`
-	Capabilities map[string]bool `json:"capabilities"`
+	Key          string            `json:"key"`
+	DisplayName  string            `json:"display_name"`           // default (English) display name
+	DisplayNames map[string]string `json:"display_names,omitempty"` // per-language names: "en", "sv", "fr"
+	Capabilities map[string]bool   `json:"capabilities"`
 }
 
 // OIDCConfig holds the discovered OIDC provider endpoints

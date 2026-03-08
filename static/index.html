@@ -699,6 +699,10 @@
         <label id="lbl-u-groups">Groups</label>
         <div id="uGroupPicker" class="group-picker"></div>
       </div>
+      <div class="form-group" id="uNATOGroup">
+        <label id="lbl-u-nato">NATO J-Staff Designation(s)</label>
+        <div id="uNATOPicker" style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0"></div>
+      </div>
       <div class="form-group" id="uPasswordGroup" style="display:none">
         <label id="lbl-u-changepwd">Change Password</label>
         <div class="password-form">
@@ -1266,19 +1270,21 @@
 
 <!-- Role Editor Modal -->
 <div class="modal-overlay" id="roleEditorModal">
-  <div class="modal modal-wide">
+  <div class="modal modal-xl">
     <div class="modal-header">
       <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
       <button class="modal-close" onclick="closeModal('roleEditorModal')">&times;</button>
     </div>
-    <div class="modal-body">
-      <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:16px">Edit display names for each role. Admin role is locked.</p>
-      <div id="roleEditorTable"></div>
-      <p id="lbl-role-editor-admin-note" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:12px">Admin role cannot be changed.</p>
+    <div class="modal-body" style="padding-bottom:8px">
+      <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Admin role is locked.</p>
+      <div id="roleEditorTable" style="max-height:65vh;overflow-y:auto"></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('roleEditorModal')">Cancel</button>
-      <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-secondary" onclick="addNewRoleRow()">＋ Add Custom Role</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal('roleEditorModal')">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
+      </div>
     </div>
   </div>
 </div>

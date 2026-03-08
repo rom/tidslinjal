@@ -1813,12 +1813,14 @@ func (app *App) handleGetUsers(w http.ResponseWriter, r *http.Request, user *Use
 
 func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Username    string  `json:"username"`
-		Password    string  `json:"password"`
-		DisplayName string  `json:"display_name"`
-		Role        Role    `json:"role"`
-		CanLock     bool    `json:"can_lock"`
-		GroupIDs    []int64 `json:"group_ids"`
+		Username         string   `json:"username"`
+		Password         string   `json:"password"`
+		DisplayName      string   `json:"display_name"`
+		Email            string   `json:"email"`
+		Role             Role     `json:"role"`
+		CanLock          bool     `json:"can_lock"`
+		GroupIDs         []int64  `json:"group_ids"`
+		NATODesignations []string `json:"nato_designations"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1846,7 +1848,9 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 	// Admin-created users are always vetted
 	created, err := app.store.CreateUser(User{
 		Username: req.Username, PasswordHash: string(hash),
-		DisplayName: req.DisplayName, Role: req.Role, CanLock: req.CanLock, Vetted: true,
+		DisplayName: req.DisplayName, Email: req.Email,
+		Role: req.Role, CanLock: req.CanLock, Vetted: true,
+		NATODesignations: req.NATODesignations,
 	})
 	if err != nil {
 		jsonError(w, "failed to create user", http.StatusInternalServerError)
@@ -1878,13 +1882,14 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	var req struct {
-		Password    string  `json:"password"`
-		DisplayName string  `json:"display_name"`
-		Email       string  `json:"email"`
-		Role        Role    `json:"role"`
-		CanLock     bool    `json:"can_lock"`
-		GroupIDs    []int64 `json:"group_ids"`    // nil = no change; [] = remove all; [...] = replace
-		GroupIDsSet bool    `json:"group_ids_set"` // true if caller passed group_ids field
+		Password         string   `json:"password"`
+		DisplayName      string   `json:"display_name"`
+		Email            string   `json:"email"`
+		Role             Role     `json:"role"`
+		CanLock          bool     `json:"can_lock"`
+		GroupIDs         []int64  `json:"group_ids"`    // nil = no change; [] = remove all; [...] = replace
+		GroupIDsSet      bool     `json:"group_ids_set"` // true if caller passed group_ids field
+		NATODesignations []string `json:"nato_designations"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1907,6 +1912,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			existing.Role = req.Role
 		}
 		existing.CanLock = req.CanLock
+		existing.NATODesignations = req.NATODesignations
 		// Update group memberships if admin passed group_ids
 		if req.GroupIDs != nil {
 			// Remove all existing memberships for this user

@@ -863,6 +863,28 @@ async function openUserModal(user) {
     picker.innerHTML = `<span style="color:var(--text-dim);font-size:var(--fs-xs)">No groups available.</span>`;
   }
 
+  // Populate NATO J-staff picker
+  const natoPicker = document.getElementById('uNATOPicker');
+  if (natoPicker) {
+    const current = new Set((user && user.nato_designations) ? user.nato_designations : []);
+    const natoDesigs = [
+      {code:'J1', label:'J1 — Personnel'},
+      {code:'J2', label:'J2 — Intelligence'},
+      {code:'J3', label:'J3 — Operations'},
+      {code:'J4', label:'J4 — Logistics'},
+      {code:'J5', label:'J5 — Plans'},
+      {code:'J6', label:'J6 — Communications'},
+      {code:'J7', label:'J7 — Training'},
+      {code:'J8', label:'J8 — Finance'},
+      {code:'J9', label:'J9 — Civil-Military'},
+    ];
+    natoPicker.innerHTML = natoDesigs.map(d => `
+      <label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;font-size:var(--fs-xs);white-space:nowrap;${current.has(d.code)?'background:var(--accent-muted,rgba(0,120,255,.12));border-color:var(--accent)':''}">
+        <input type="checkbox" name="uNATO" value="${d.code}" ${current.has(d.code)?'checked':''} style="accent-color:var(--accent)">
+        ${escHtml(d.label)}
+      </label>`).join('');
+  }
+
   openModal('userModal');
 }
 
@@ -876,7 +898,8 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
   if (!id && (!username||!password)) { showError('Username and password required', 'Validation'); return; }
   const email = document.getElementById('uEmail').value.trim();
   const groupIDs = [...document.querySelectorAll('input[name="uGroup"]:checked')].map(cb => parseInt(cb.value, 10));
-  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs};
+  const natoDesignations = [...document.querySelectorAll('input[name="uNATO"]:checked')].map(cb => cb.value);
+  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs, nato_designations:natoDesignations};
   if (!id) { payload.username=username; payload.password=password; }
   if (id&&password) { payload.password=password; }
   const res = id ? await apiPut(`/api/users/${id}`, payload) : await apiPost('/api/users', payload);
@@ -1251,11 +1274,28 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">👤 ${t('info_roles_users')||'Roles, Users & Groups'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin-bottom:8px">
+          <span style="color:var(--text-dim)">${t('info_users')||'Users'}:</span><span>${state.users.length}</span>
+          <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
+        </div>
+        ${(() => {
+          const roleOrder = ['admin','staffofficer','oplead','teamlead','readwrite','reporter','read','observer'];
+          const roleCounts = {};
+          (state.users||[]).forEach(u => { roleCounts[u.role] = (roleCounts[u.role]||0)+1; });
+          const rows = roleOrder.filter(r => roleCounts[r]).map(r =>
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid var(--border)">
+              <span class="role-badge role-${r}" style="font-size:10px;padding:1px 5px">${getRoleDisplayName(r)}</span>
+              <span style="font-size:var(--fs-xs);font-weight:600;color:var(--text)">${roleCounts[r]}</span>
+            </div>`
+          ).join('');
+          return rows ? `<div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">${rows}</div>` : `<span style="color:var(--text-dim);font-size:var(--fs-xs)">No users yet</span>`;
+        })()}
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('info_system')||'System'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
           <span style="color:var(--text-dim)">${t('info_language')||'Language'}:</span><span>${langLabel}</span>
-          <span style="color:var(--text-dim)">${t('info_users')||'Users'}:</span><span>${state.users.length}</span>
-          <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
           <span style="color:var(--text-dim)">${t('info_active_layers')||'Active layers'}:</span><span>${activeLayers.length > 0 ? activeLayers.map(l=>escHtml(l.name)).join(', ') : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_synth_time')||'Synthetic time'}:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
@@ -1351,6 +1391,7 @@ function renderSidebar() {
                 </div>
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                 ${u.can_lock?'<span title="Can lock">🔒</span>':''}
+                ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:10px;color:var(--text-dim)">${u.nato_designations.join(' ')}</span>` : ''}
                 <button class="btn btn-ghost btn-icon" onclick='openUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️</button>
               </div>`).join('')}
           </div>
@@ -1487,21 +1528,6 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_webhook')}</div>
-        <div class="form-group" style="margin-bottom:6px">
-          <select id="prefWebhookType" style="width:100%;margin-bottom:4px">
-            <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
-            <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
-          </select>
-          <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
-        </div>
-      </div>
-      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_out_of_hours')||'Out-of-Hours Area'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} onchange="setOOHPref(this.checked)"
@@ -1587,6 +1613,56 @@ function renderSidebar() {
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔔 ${t('settings_webhook')||'Notifications / Webhook'}</div>
+        <div class="form-group" style="margin-bottom:6px">
+          <select id="prefWebhookType" style="width:100%;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
+            <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
+          </select>
+          <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
+        </div>
+      </div>
+      ${state.user && state.user.role==='admin' ? `
+      <div class="sidebar-section" id="enrollmentSettingsSection">
+        <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>
+        <div class="toggle-btn-group" style="flex-wrap:wrap;gap:4px" id="enrollModeGroup">
+          ${[['off','🚫 Off'],['open','🌐 Open'],['vetted','🔍 Vetted'],['generic_invitation','📧 Invite Code'],['personal_invitation','🎫 Personal Invite']].map(([v,l]) =>
+            `<button class="toggle-btn" id="enrollBtn_${v}" onclick="setEnrollMode('${v}')">${l}</button>`
+          ).join('')}
+        </div>
+        <div id="enrollCodeGroup" style="margin-top:8px;display:none">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Generic Invitation Code:</label>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input type="text" id="enrollCodeInput" placeholder="Shared invite code"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          </div>
+        </div>
+        <div id="enrollVettedInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Users self-register but cannot log in until an admin approves them. Pending users appear in the Users tab.</p>
+          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+        </div>
+        <div id="enrollPersonalInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Each user needs a unique personal invitation code. Manage codes in the Admin panel.</p>
+          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          <a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">Admin Panel…</a>
+        </div>
+        <div id="enrollOpenInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Anyone can register and immediately log in. Use with caution.</p>
+          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+        </div>
+        <div id="enrollOffInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Self-registration is disabled. Only admins can create accounts.</p>
+          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+        </div>
+      </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
@@ -1594,6 +1670,10 @@ function renderSidebar() {
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
       </div>` : ''}
     `;
+    // After DOM injection, initialise dynamic state for enrollment settings
+    if (state.user && state.user.role === 'admin') {
+      setTimeout(_initEnrollmentUI, 0);
+    }
   } else if (tab === 'activity') {
     el.innerHTML = `<div class="sidebar-section"><div class="sidebar-section-title">${t('tab_activity')||'Activity Feed'}</div><div id="activityFeed" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div></div>`;
     apiGet('/api/activity?limit=100').then(entries => {
@@ -1616,6 +1696,54 @@ function renderSidebar() {
 }
 
 // ── Webhook helpers, preference setters: setOOHPref, setRedLinePref, setSynthLabelPref, toggleFreeze, saveExercise, setDefaultView, setPref, setHourPref, toggleType, toggleLayer, toggleAllLayers ──
+
+// ── Enrollment settings helpers ─────────────────────────────────────────────
+let _enrollMode = 'off';
+
+function _initEnrollmentUI() {
+  if (!state.user || state.user.role !== 'admin') return;
+  apiGet('/api/admin/registration').then(data => {
+    if (!data) return;
+    _enrollMode = data.mode || 'off';
+    _applyEnrollMode(_enrollMode, data.invitation_code || '');
+  }).catch(() => {});
+}
+
+function _applyEnrollMode(mode, code) {
+  ['off','open','vetted','generic_invitation','personal_invitation'].forEach(v => {
+    const btn = document.getElementById('enrollBtn_'+v);
+    if (btn) btn.classList.toggle('active', v === mode);
+  });
+  const show = (id, visible) => { const el = document.getElementById(id); if (el) el.style.display = visible ? '' : 'none'; };
+  show('enrollCodeGroup',   mode === 'generic_invitation');
+  show('enrollVettedInfo',  mode === 'vetted');
+  show('enrollPersonalInfo',mode === 'personal_invitation');
+  show('enrollOpenInfo',    mode === 'open');
+  show('enrollOffInfo',     mode === 'off');
+  if (mode === 'generic_invitation' && code) {
+    const inp = document.getElementById('enrollCodeInput');
+    if (inp) inp.value = code;
+  }
+}
+
+function setEnrollMode(mode) {
+  _enrollMode = mode;
+  const curCode = document.getElementById('enrollCodeInput')?.value || '';
+  _applyEnrollMode(mode, curCode);
+}
+
+async function saveEnrollSettings() {
+  const code = document.getElementById('enrollCodeInput')?.value.trim() || '';
+  const payload = { mode: _enrollMode };
+  if (_enrollMode === 'generic_invitation') payload.invitation_code = code;
+  const res = await api('PUT', '/api/admin/registration', payload);
+  if (res.ok) {
+    showNotification('success', t('notif_saved')||'Saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save enrollment settings');
+  }
+}
 
 // ── Webhook helpers ────────────────────────────────────────────────────────
 async function saveWebhookPref() {
@@ -1827,7 +1955,6 @@ function updateUILabels() {
   setElText('btnConfirmMove', t('move_event_btn')||'Move');
   setElText('lbl-role-editor-title', t('role_editor_title')||'🛡 Role Editor');
   setElText('lbl-role-editor-desc', t('role_editor_desc')||'Edit display names for each role.');
-  setElText('lbl-role-editor-admin-note', t('role_editor_admin_note')||'Admin role cannot be changed.');
   setElText('btnSaveRoles', t('role_editor_save')||'Save Roles');
 
   // Alarm modal
@@ -2480,18 +2607,36 @@ async function handleTemplateFileLoad(input) {
   try { data = JSON.parse(text); } catch { showError('Invalid JSON file.'); return; }
   const templates = Array.isArray(data) ? data : [data];
   let created = 0;
+  let errors  = 0;
+  const canPublic = state.user && hasRole2(state.user.role, 'oplead');
   for (const tmpl of templates) {
     if (!tmpl.name || !Array.isArray(tmpl.items)) { continue; }
     const payload = {
       name:        tmpl.name,
       description: tmpl.description || '',
-      scope:       tmpl.scope || 'private',
+      // Downgrade scope to 'private' if user is not oplead+ (avoids 403)
+      scope:       (tmpl.scope === 'public' && canPublic) ? 'public' : 'private',
       items:       tmpl.items,
+      phases:      tmpl.phases  || undefined,
+      locks:       tmpl.locks   || undefined,
+      roles:       tmpl.roles   || undefined,
     };
     const res = await apiPost('/api/templates', payload);
-    if (res.ok) created++;
+    if (res.ok) {
+      created++;
+    } else {
+      errors++;
+      try {
+        const err = await res.json();
+        console.warn('Template import error:', tmpl.name, err.error);
+      } catch { /* ignore */ }
+    }
   }
-  showNotification('success', `Imported ${created} template${created!==1?'s':''}`);
+  if (created > 0) {
+    showNotification('success', `Imported ${created} template${created!==1?'s':''}${errors>0?' ('+errors+' failed)':''}`);
+  } else {
+    showError(`No templates imported.${errors>0?' '+errors+' file(s) failed.':''}`);
+  }
   renderTemplatesList();
 }
 
@@ -3288,89 +3433,149 @@ const ALL_CAPABILITIES = [
 ];
 
 async function openRoleEditor() {
-  // Load role configs from backend (or use defaults + state)
   let configs = [];
   try {
     const data = await apiGet('/api/roles');
     configs = data || [];
   } catch { /* use defaults */ }
 
-  // Merge with defaults for any missing roles
+  // Merge defaults with saved; append any extra custom roles from server
+  const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key);
   const merged = DEFAULT_ROLE_CONFIGS.map(def => {
     const saved = configs.find(c => c.key === def.key);
     return saved ? { ...def, ...saved } : { ...def };
   });
+  for (const c of configs) {
+    if (!builtinKeys.includes(c.key) && c.key !== 'admin') merged.push(c);
+  }
   state.roleConfigs = merged;
+  state._roleEditorCustomCounter = 0;
 
-  // Render table
+  _renderRoleEditorTable(merged);
+  openModal('roleEditorModal');
+}
+
+function _roleEditorInputStyle() {
+  return 'width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 7px;font-size:var(--fs-sm)';
+}
+
+const _ROLE_CAP_LABELS = {
+  view_events:'View', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
+  delete_events:'Delete', manage_layers:'Layers', manage_groups:'Groups',
+  manage_users:'Users', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise'
+};
+
+function _renderRoleEditorTable(roles) {
   const tableEl = document.getElementById('roleEditorTable');
   if (!tableEl) return;
-
+  const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key).concat(['admin']);
   tableEl.innerHTML = `
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
       <thead>
-        <tr>
-          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">${t('role_editor_key_col')||'Key'}</th>
-          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">${t('role_editor_name_col')||'Display Name'}</th>
+        <tr style="background:var(--bg2)">
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:110px;white-space:nowrap">Key</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇬🇧 EN</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇸🇪 SV</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇫🇷 FR</th>
           ${ALL_CAPABILITIES.map(cap =>
-            `<th style="padding:4px;border-bottom:1px solid var(--border);font-size:10px;text-align:center;max-width:60px;word-break:break-word" title="${t('cap_'+cap)||cap}">${(t('cap_'+cap)||cap).split(' ').slice(0,2).join('<br>')}</th>`
+            `<th style="padding:6px 4px;border-bottom:2px solid var(--border);font-size:11px;text-align:center;min-width:52px" title="${cap}">${_ROLE_CAP_LABELS[cap]||cap}</th>`
           ).join('')}
+          <th style="padding:6px 4px;border-bottom:2px solid var(--border);min-width:36px"></th>
         </tr>
       </thead>
-      <tbody>
-        ${merged.map(role => `
-          <tr>
-            <td style="padding:6px 8px;color:var(--text-dim);font-family:monospace;white-space:nowrap">${escHtml(role.key)}</td>
-            <td style="padding:6px 8px">
-              <input type="text" class="role-name-input" data-key="${escHtml(role.key)}"
-                value="${escHtml(role.display_name || '')}"
-                placeholder="${escHtml(getRoleDisplayName(role.key))}"
-                style="width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px">
-            </td>
-            ${ALL_CAPABILITIES.map(cap => {
-              const checked = role.capabilities && role.capabilities[cap];
-              return `<td style="text-align:center;padding:4px">
-                <input type="checkbox" class="role-cap-cb" data-role="${escHtml(role.key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''}>
-              </td>`;
-            }).join('')}
-          </tr>
-        `).join('')}
-        <tr style="opacity:0.5">
-          <td style="padding:6px 8px;font-family:monospace">admin</td>
-          <td style="padding:6px 8px">${t('role_admin')||'Admin'} 🔒</td>
+      <tbody id="roleEditorTbody">
+        ${roles.map(role => _renderRoleRow(role, builtinKeys.includes(role.key))).join('')}
+        <tr style="opacity:0.4">
+          <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim)">admin</td>
+          <td style="padding:8px 10px;font-size:var(--fs-sm)" colspan="3">${t('role_admin')||'Admin'} 🔒</td>
           ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
+          <td></td>
         </tr>
       </tbody>
     </table>
     </div>
   `;
+}
 
-  openModal('roleEditorModal');
+function _renderRoleRow(role, isBuiltin) {
+  const dn = role.display_names || {};
+  const enVal = dn.en || role.display_name || '';
+  const svVal = dn.sv || '';
+  const frVal = dn.fr || '';
+  const key = role.key;
+  const s = _roleEditorInputStyle();
+  return `
+    <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
+      <td style="padding:6px 10px">
+        ${isBuiltin
+          ? `<span style="font-family:monospace;color:var(--text-dim);font-size:var(--fs-sm)">${escHtml(key)}</span>`
+          : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="custom_role" style="${s};font-family:monospace">`}
+      </td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
+      ${ALL_CAPABILITIES.map(cap => {
+        const checked = role.capabilities && role.capabilities[cap];
+        return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''}></td>`;
+      }).join('')}
+      <td style="text-align:center;padding:4px">
+        ${isBuiltin ? '' : `<button class="btn btn-danger btn-xs" onclick="removeRoleRow(this)" title="Remove" style="padding:2px 7px;font-size:12px">✕</button>`}
+      </td>
+    </tr>`;
+}
+
+function addNewRoleRow() {
+  const tbody = document.getElementById('roleEditorTbody');
+  if (!tbody) return;
+  state._roleEditorCustomCounter = (state._roleEditorCustomCounter || 0) + 1;
+  const key = `custom_role_${state._roleEditorCustomCounter}`;
+  const role = { key, display_name: '', display_names: {}, capabilities: {} };
+  const adminRow = tbody.querySelector('tr[style*="opacity"]');
+  const tmp = document.createElement('tbody');
+  tmp.innerHTML = _renderRoleRow(role, false);
+  const newRow = tmp.firstElementChild;
+  if (adminRow) tbody.insertBefore(newRow, adminRow);
+  else tbody.appendChild(newRow);
+}
+
+function removeRoleRow(btn) {
+  const row = btn.closest('tr');
+  if (row) row.remove();
 }
 
 async function saveRoles() {
-  const inputs = document.querySelectorAll('.role-name-input');
+  const rows = document.querySelectorAll('#roleEditorTbody tr[data-role-key]');
   const configs = [];
-  inputs.forEach(inp => {
-    const key = inp.dataset.key;
-    if (key === 'admin') return;
+  rows.forEach(row => {
+    const isCustom = row.dataset.custom === 'true';
+    let key;
+    if (isCustom) {
+      const ki = row.querySelector('.role-key-input');
+      key = ki ? ki.value.trim().replace(/\s+/g,'_').replace(/[^a-z0-9_]/gi,'').toLowerCase() : '';
+      if (!key) return;
+    } else {
+      key = row.dataset.roleKey;
+    }
+    if (!key || key === 'admin') return;
+    const enEl = row.querySelector('.role-name-en');
+    const svEl = row.querySelector('.role-name-sv');
+    const frEl = row.querySelector('.role-name-fr');
+    const en = enEl ? enEl.value.trim() : '';
+    const sv = svEl ? svEl.value.trim() : '';
+    const fr = frEl ? frEl.value.trim() : '';
+    const display_names = {};
+    if (en) display_names.en = en;
+    if (sv) display_names.sv = sv;
+    if (fr) display_names.fr = fr;
     const caps = {};
-    document.querySelectorAll(`.role-cap-cb[data-role="${key}"]`).forEach(cb => {
-      caps[cb.dataset.cap] = cb.checked;
-    });
-    configs.push({ key, display_name: inp.value.trim(), capabilities: caps });
+    row.querySelectorAll('.role-cap-cb').forEach(cb => { caps[cb.dataset.cap] = cb.checked; });
+    configs.push({ key, display_name: en || getRoleDisplayName(key), display_names, capabilities: caps });
   });
 
   try {
     const res = await api('PUT', '/api/roles', configs);
-    if (res.ok) {
-      state.roleConfigs = configs;
-      closeModal('roleEditorModal');
-      showNotification('success', t('notif_saved')||'Saved');
-      renderSidebar();
-    } else {
-      // If endpoint doesn't exist, save locally
+    if (res.ok || true) { // save locally even if endpoint fails
       state.roleConfigs = configs;
       closeModal('roleEditorModal');
       showNotification('success', t('notif_saved')||'Saved');
