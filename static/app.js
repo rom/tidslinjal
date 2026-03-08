@@ -179,23 +179,30 @@ async function init() {
   setupNavLongPress(document.getElementById('btnPrev'), -1);
   setupNavLongPress(document.getElementById('btnNext'),  1);
   document.getElementById('btnToday').addEventListener('click', goToday);
-  document.getElementById('btnCenterToday').addEventListener('click', centerToday);
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport')?.addEventListener('click', openImportModal);
   document.getElementById('btnTemplates')?.addEventListener('click', openTemplatesModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
+  document.getElementById('btnFilter')?.addEventListener('click', e => openFilterPopover(e.currentTarget));
+  document.getElementById('btnUndo')?.addEventListener('click', performUndo);
+  document.getElementById('btnPrint')?.addEventListener('click', printTimeline);
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;
     renderTimeline();
   });
 
-  // Close layer popover and nav jump menu when clicking outside
+  // Close layer popover, filter popover, and nav jump menu when clicking outside
   document.addEventListener('click', e => {
     const pop = document.getElementById('layerPopover');
     if (pop && pop.style.display !== 'none' &&
         !pop.contains(e.target) && e.target.id !== 'btnLayerToggle') {
       pop.style.display = 'none';
+    }
+    const fpop = document.getElementById('filterPopover');
+    if (fpop && fpop.style.display !== 'none' &&
+        !fpop.contains(e.target) && e.target.id !== 'btnFilter') {
+      fpop.style.display = 'none';
     }
     const njm = document.getElementById('navJumpMenu');
     if (njm && njm.style.display !== 'none' &&
@@ -250,8 +257,11 @@ async function init() {
   // Set up interactions
   setupZoomDrag();
   setupDragToReschedule();
+  setupEventResize();
   setupKeyboardShortcuts();
   setupHorizontalDrag();
+  setupSidebarResize();
+  setupContextMenus();
 
   // Change password button
   const btnChgPw = document.getElementById('btnChangePassword');
@@ -269,6 +279,11 @@ async function init() {
   const reportTo   = document.getElementById('reportTo');
   if (reportFrom) reportFrom.value = fmtDateInput(state.startDate);
   if (reportTo)   reportTo.value   = fmtDateInput(getViewEnd());
+
+  // Show undo button if user has write access
+  if (hasRole2(state.user.role, 'readwrite')) {
+    document.getElementById('btnUndo').style.display = '';
+  }
 
   // Synthetic time toggle
   document.getElementById('btnSyntheticTime').addEventListener('click', () => {

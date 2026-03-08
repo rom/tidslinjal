@@ -476,6 +476,14 @@ func (s *Store) GetPreferences(userID int64) UserPreferences {
 	}
 }
 
+func (s *Store) GetAllPreferences() []UserPreferences {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]UserPreferences, len(s.preferences))
+	copy(result, s.preferences)
+	return result
+}
+
 func (s *Store) SavePreferences(p UserPreferences) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -721,6 +729,11 @@ func (s *Store) GetEvents(from, to time.Time, layerIDs []int64) []Event {
 		}
 	}
 	return result
+}
+
+// GetEventsInRange returns all events within the given time range (no layer filtering)
+func (s *Store) GetEventsInRange(from, to time.Time) []Event {
+	return s.GetEvents(from, to, nil)
 }
 
 func (s *Store) GetEventByID(id int64) (*Event, bool) {
@@ -1405,6 +1418,7 @@ func (s *Store) DeleteTemplate(id, userID int64, isAdmin bool) error {
 }
 
 // ApplyTemplate creates events from a template offset by baseTime; returns count created.
+// It also copies any template attachments to the newly created events.
 func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, createdBy int64, createdByName string) (int, error) {
 	tmpl, ok := s.GetTemplate(id)
 	if !ok {
@@ -1434,9 +1448,97 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 			CreatedBy:         createdBy,
 			CreatedByName:     createdByName,
 		}
-		if _, err := s.CreateEvent(ev); err == nil {
+		created, err := s.CreateEvent(ev)
+		if err == nil {
 			count++
+			// Copy template attachments to the new event
+			for _, ta := range item.Attachments {
+				srcPath := filepath.Join(s.AttachmentDir(), ta.StoredName)
+				if _, err := os.Stat(srcPath); err != nil {
+					continue // source file missing, skip
+				}
+				newStoredName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), ta.Filename)
+				dstPath := filepath.Join(s.AttachmentDir(), newStoredName)
+				srcData, err := os.ReadFile(srcPath)
+				if err != nil {
+					continue
+				}
+				if err := os.WriteFile(dstPath, srcData, 0644); err != nil {
+					continue
+				}
+				att := Attachment{
+					EventID:      created.ID,
+					Filename:     ta.Filename,
+					StoredName:   newStoredName,
+					Size:         ta.Size,
+					MimeType:     ta.MimeType,
+					UploadedBy:   createdBy,
+					UploaderName: createdByName,
+				}
+				s.CreateAttachment(att) //nolint
+			}
 		}
 	}
 	return count, nil
+}
+
+// ResetDatabase clears all data except the audit trail.
+func (s *Store) ResetDatabase() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.eventTypes = nil
+	s.nextEventTypeID = 0
+	s.preferences = nil
+	s.groups = nil
+	s.nextGroupID = 0
+	s.memberships = nil
+	s.layers = nil
+	s.nextLayerID = 0
+	s.events = nil
+	s.nextEventID = 0
+	s.attachments = nil
+	s.nextAttachID = 0
+	s.alarms = nil
+	s.nextAlarmID = 0
+	s.locks = nil
+	s.nextLockID = 0
+	s.comments = nil
+	s.nextCommentID = 0
+	s.phases = nil
+	s.nextPhaseID = 0
+	s.templates = nil
+	s.nextTemplateID = 0
+	s.exercise = ExerciseSettings{}
+
+	// Save all cleared files
+	files := map[string]interface{}{
+		"event_types.json":  s.eventTypes,
+		"preferences.json":  s.preferences,
+		"groups.json":       s.groups,
+		"memberships.json":  s.memberships,
+		"layers.json":       s.layers,
+		"events.json":       s.events,
+		"attachments.json":  s.attachments,
+		"alarms.json":       s.alarms,
+		"locks.json":        s.locks,
+		"comments.json":     s.comments,
+		"phases.json":       s.phases,
+		"templates.json":    s.templates,
+		"exercise.json":     s.exercise,
+	}
+	for fname, data := range files {
+		if err := s.saveFile(fname, data); err != nil {
+			return fmt.Errorf("reset %s: %w", fname, err)
+		}
+	}
+
+	// Clear attachment files
+	attDir := filepath.Join(s.dataDir, "attachments")
+	entries, _ := os.ReadDir(attDir)
+	for _, e := range entries {
+		os.Remove(filepath.Join(attDir, e.Name()))
+	}
+
+	return nil
 }

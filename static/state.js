@@ -41,6 +41,22 @@ window.state = {
   syntheticOn:   false, // user's local toggle (independent of exercise.enabled)
   timelinePaused: false, // local freeze state
   pausedAt:      null,   // Date when frozen
+  // Undo stack
+  undoStack:     [],     // array of {action, data} for undo
+  // Filters
+  filters: {
+    status:        [],     // array of status strings to show (empty = all)
+    responsibleId: null,   // filter by responsible user ID
+    layerId:       null,   // filter by layer ID (separate from hidden_layers)
+  },
+  // Swimlane mode
+  swimlaneMode:  false,   // toggle swimlane/resource row view
+  // Timezone
+  timezone:      '',       // IANA timezone string (empty = browser default)
+  // Context menu state
+  _ctxEventId:   null,
+  _ctxSlotDay:   null,
+  _ctxSlotMin:   null,
 };
 
 // ── UI state helpers ────────────────────────────────────────────────────────
