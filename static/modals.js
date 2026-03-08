@@ -5,6 +5,29 @@
    ============================================================ */
 'use strict';
 
+// ── Group label helper ─────────────────────────────────────────────────────
+function getGroupLabel() {
+  const key = (state.exercise && state.exercise.group_label) || 'group';
+  const map = {
+    group: { singular: 'Group',  plural: 'Groups',  sv_s: 'Grupp',  sv_p: 'Grupper',  fr_s: 'Groupe',  fr_p: 'Groupes'  },
+    unit:  { singular: 'Unit',   plural: 'Units',   sv_s: 'Enhet',  sv_p: 'Enheter',  fr_s: 'Unité',   fr_p: 'Unités'   },
+    team:  { singular: 'Team',   plural: 'Teams',   sv_s: 'Team',   sv_p: 'Team',     fr_s: 'Équipe',  fr_p: 'Équipes'  },
+  };
+  const lang = (state.preferences && state.preferences.language) || 'en';
+  const entry = map[key] || map.group;
+  if (lang === 'sv') return { singular: entry.sv_s, plural: entry.sv_p };
+  if (lang === 'fr') return { singular: entry.fr_s, plural: entry.fr_p };
+  return { singular: entry.singular, plural: entry.plural };
+}
+
+// ── Role display name helper ───────────────────────────────────────────────
+function getRoleDisplayName(roleKey) {
+  // Check custom role names first
+  const custom = state.roleConfigs && state.roleConfigs.find(r => r.key === roleKey);
+  if (custom && custom.display_name) return custom.display_name;
+  return t('role_' + roleKey) || roleKey;
+}
+
 // ── applyPreferences ───────────────────────────────────────────────────────
 function applyPreferences() {
   const body = document.body;
@@ -1326,23 +1349,29 @@ function renderSidebar() {
                   <div>${escHtml(u.display_name||u.username)}</div>
                   <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}</div>
                 </div>
-                <span class="role-badge role-${u.role}">${t('role_'+u.role)||u.role}</span>
+                <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                 ${u.can_lock?'<span title="Can lock">🔒</span>':''}
                 <button class="btn btn-ghost btn-icon" onclick='openUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️</button>
               </div>`).join('')}
           </div>
         </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">🛡 ${t('role_editor_title')||'Role Editor'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('role_editor_desc')||'Edit role display names and capabilities.'}</p>
+          <button class="btn btn-secondary btn-sm" onclick="openRoleEditor()">🛡 ${t('role_editor_title')||'Role Editor'}…</button>
+        </div>
       `;
     });
   } else if (tab === 'groups' && state.user && hasRole2(state.user.role,'teamlead')) {
+    const gl = getGroupLabel();
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">
-          ${t('groups_title')}
-          <button class="btn btn-primary btn-sm" onclick="openGroupModal(null)">${t('groups_add')}</button>
+          👥 ${gl.plural}
+          <button class="btn btn-primary btn-sm" onclick="openGroupModal(null)">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
         </div>
         <div class="group-list">
-          ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No groups yet.</div>` : ''}
+          ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
           ${state.groups.map(g => `
             <div class="group-item">
               <div class="group-name">
@@ -1450,6 +1479,14 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${['day','2days','3days','4days','5days','week'].map(v =>
+            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setDefaultView('${v}')">${t('range_'+v)||v}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_webhook')}</div>
         <div class="form-group" style="margin-bottom:6px">
           <select id="prefWebhookType" style="width:100%;margin-bottom:4px">
@@ -1462,14 +1499,6 @@ function renderSidebar() {
         <div style="display:flex;gap:6px;margin-top:4px">
           <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
           <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
-        <div class="toggle-btn-group" style="flex-wrap:wrap">
-          ${['day','2days','3days','4days','week'].map(v =>
-            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setDefaultView('${v}')">${t('range_'+v)||v}</button>`
-          ).join('')}
         </div>
       </div>
       <div class="sidebar-section">
@@ -1760,19 +1789,46 @@ function updateUILabels() {
   setElText('lbl-show', t('show')+':');
   setElText('lbl-res', t('resolution')+':');
 
+  // Toolbar group buttons
+  setElText('btnTemplates', '📋 ' + (t('btn_templates')||'Templates'));
+  setElText('btnLayerToggle', '🗂 ' + (t('btn_layers')||'Layers'));
+  setElText('btnImport', t('btn_import')||'⬆ Import');
+  setElText('btnSyntheticTime', t('btn_synth_time')||'⏱ T+');
+  setElText('btnPrint', '🖨 ' + (t('btn_print')||'Print'));
+  setElText('btnFilter', '🔍 ' + (t('btn_filter')||'Filter'));
+  const undoEl = document.getElementById('btnUndo');
+  if (undoEl) undoEl.textContent = '↩ ' + (t('btn_undo')||'Undo');
+
   // Range select options
   const rs = document.getElementById('rangeSelect');
-  const rangeKeys = ['day','2days','3days','4days','week','month','2months','3months'];
-  [...rs.options].forEach((opt, i) => { opt.text = t('range_'+rangeKeys[i]); });
+  const rangeKeys = ['day','2days','3days','4days','5days','week','month','2months','3months'];
+  [...rs.options].forEach(opt => { opt.text = t('range_'+opt.value) || opt.text; });
 
   // Resolution select
   const res = document.getElementById('resolutionSelect');
   [...res.options].forEach(opt => { opt.text = t('res_'+opt.value); });
 
-  // Sidebar tabs
+  // Sidebar tabs — use dynamic group terminology for the groups tab
+  const gl = getGroupLabel();
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
-    tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
+    if (tab.dataset.tab === 'groups') {
+      tab.textContent = '👥 ' + gl.plural;
+    } else {
+      tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
+    }
   });
+
+  // Invited filter "Groups" button uses group terminology
+  const filterGroupsBtn = document.querySelector('.inv-filter-btn[data-filter="groups"]');
+  if (filterGroupsBtn) filterGroupsBtn.textContent = gl.plural;
+
+  // Move event dialog labels
+  setElText('lbl-move-event-time', t('move_event_new_time')||'New date and time');
+  setElText('btnConfirmMove', t('move_event_btn')||'Move');
+  setElText('lbl-role-editor-title', t('role_editor_title')||'🛡 Role Editor');
+  setElText('lbl-role-editor-desc', t('role_editor_desc')||'Edit display names for each role.');
+  setElText('lbl-role-editor-admin-note', t('role_editor_admin_note')||'Admin role cannot be changed.');
+  setElText('btnSaveRoles', t('role_editor_save')||'Save Roles');
 
   // Alarm modal
   setElText('lbl-alarm-cancel', t('btn_cancel'));
@@ -2075,6 +2131,7 @@ async function doImport() {
       if (resultEl) { resultEl.textContent = msg; resultEl.style.display = ''; }
       await refreshAll();
       showNotification('success', 'ICS import complete');
+      _setImportDoneMode();
     } else {
       const err = await res.json();
       showError('ICS import failed: ' + err.error);
@@ -2096,9 +2153,30 @@ async function doImport() {
     if (resultEl) { resultEl.textContent = msg; resultEl.style.display = ''; }
     await refreshAll();
     showNotification('success', 'Import complete');
+    _setImportDoneMode();
   } else {
     const err = await res.json();
     showError('Import failed: ' + err.error);
+  }
+}
+
+function _setImportDoneMode() {
+  const cancelBtn = document.getElementById('btnImportCancel');
+  const importBtn = document.getElementById('btnDoImport');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (importBtn) {
+    importBtn.textContent = '✓ ' + (t('import_done')||'Done');
+    importBtn.onclick = () => {
+      closeModal('importModal');
+      // Reset for next open
+      setTimeout(() => {
+        if (cancelBtn) cancelBtn.style.display = '';
+        if (importBtn) {
+          importBtn.textContent = t('btn_import')||'⬆ Import';
+          importBtn.onclick = doImport;
+        }
+      }, 300);
+    };
   }
 }
 
@@ -2234,6 +2312,7 @@ async function confirmSaveTemplate() {
     description: document.getElementById('tmplDescription').value.trim(),
     scope,
     items,
+    roles: (state.roleConfigs && state.roleConfigs.length) ? state.roleConfigs : undefined,
   };
   const res = await apiPost('/api/templates', payload);
   if (res.ok) {
@@ -2931,6 +3010,16 @@ function setupContextMenus() {
     if (block) {
       const evId = parseInt(block.dataset.evId, 10);
       state._ctxEventId = evId;
+      // Update "Move" label based on multi-select state
+      const selIds = state.selectedEventIds || [];
+      const ctxMoveEl = document.getElementById('ctxMove');
+      if (ctxMoveEl) {
+        if (selIds.length > 1 && selIds.includes(evId)) {
+          ctxMoveEl.textContent = '📅 ' + (t('ctx_move_selected')||'Move selected events…');
+        } else {
+          ctxMoveEl.textContent = '📅 ' + (t('ctx_move')||'Move to new time/date…');
+        }
+      }
       const menu = document.getElementById('contextMenu');
       menu.style.top  = e.clientY + 'px';
       menu.style.left = e.clientX + 'px';
@@ -2982,6 +3071,14 @@ async function ctxAction(action, value) {
     }
   } else if (action === 'alarm') {
     openAlarmModal(ev);
+  } else if (action === 'move') {
+    // If multiple events selected and this event is among them, move all selected
+    const selIds = state.selectedEventIds || [];
+    if (selIds.length > 1 && selIds.includes(ev.id)) {
+      openMoveSelectedDialog();
+    } else {
+      openMoveEventDialog(ev.id);
+    }
   } else if (action === 'status') {
     const res = await api('PATCH', `/api/events/${ev.id}/status`, { status: value });
     if (res.ok) {
@@ -3093,4 +3190,264 @@ function showConflictWarning(conflicts) {
   );
 }
 // old conflict ended here new code
+
+// ── Role Editor ─────────────────────────────────────────────────────────────
+
+// Default role configurations
+const DEFAULT_ROLE_CONFIGS = [
+  { key: 'observer',     display_name: '',  capabilities: { view_events: true } },
+  { key: 'read',         display_name: '',  capabilities: { view_events: true } },
+  { key: 'reporter',     display_name: '',  capabilities: { view_events: true, create_events: true } },
+  { key: 'readwrite',    display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, delete_events: true } },
+  { key: 'teamlead',     display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
+  { key: 'oplead',       display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'staffofficer', display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, manage_templates: true, exercise: true, view_audit: true } },
+];
+
+const ALL_CAPABILITIES = [
+  'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
+  'manage_layers', 'manage_groups', 'manage_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise'
+];
+
+async function openRoleEditor() {
+  // Load role configs from backend (or use defaults + state)
+  let configs = [];
+  try {
+    const data = await apiGet('/api/roles');
+    configs = data || [];
+  } catch { /* use defaults */ }
+
+  // Merge with defaults for any missing roles
+  const merged = DEFAULT_ROLE_CONFIGS.map(def => {
+    const saved = configs.find(c => c.key === def.key);
+    return saved ? { ...def, ...saved } : { ...def };
+  });
+  state.roleConfigs = merged;
+
+  // Render table
+  const tableEl = document.getElementById('roleEditorTable');
+  if (!tableEl) return;
+
+  tableEl.innerHTML = `
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">${t('role_editor_key_col')||'Key'}</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)">${t('role_editor_name_col')||'Display Name'}</th>
+          ${ALL_CAPABILITIES.map(cap =>
+            `<th style="padding:4px;border-bottom:1px solid var(--border);font-size:10px;text-align:center;max-width:60px;word-break:break-word" title="${t('cap_'+cap)||cap}">${(t('cap_'+cap)||cap).split(' ').slice(0,2).join('<br>')}</th>`
+          ).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${merged.map(role => `
+          <tr>
+            <td style="padding:6px 8px;color:var(--text-dim);font-family:monospace;white-space:nowrap">${escHtml(role.key)}</td>
+            <td style="padding:6px 8px">
+              <input type="text" class="role-name-input" data-key="${escHtml(role.key)}"
+                value="${escHtml(role.display_name || '')}"
+                placeholder="${escHtml(getRoleDisplayName(role.key))}"
+                style="width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px">
+            </td>
+            ${ALL_CAPABILITIES.map(cap => {
+              const checked = role.capabilities && role.capabilities[cap];
+              return `<td style="text-align:center;padding:4px">
+                <input type="checkbox" class="role-cap-cb" data-role="${escHtml(role.key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''}>
+              </td>`;
+            }).join('')}
+          </tr>
+        `).join('')}
+        <tr style="opacity:0.5">
+          <td style="padding:6px 8px;font-family:monospace">admin</td>
+          <td style="padding:6px 8px">${t('role_admin')||'Admin'} 🔒</td>
+          ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  `;
+
+  openModal('roleEditorModal');
+}
+
+async function saveRoles() {
+  const inputs = document.querySelectorAll('.role-name-input');
+  const configs = [];
+  inputs.forEach(inp => {
+    const key = inp.dataset.key;
+    if (key === 'admin') return;
+    const caps = {};
+    document.querySelectorAll(`.role-cap-cb[data-role="${key}"]`).forEach(cb => {
+      caps[cb.dataset.cap] = cb.checked;
+    });
+    configs.push({ key, display_name: inp.value.trim(), capabilities: caps });
+  });
+
+  try {
+    const res = await api('PUT', '/api/roles', configs);
+    if (res.ok) {
+      state.roleConfigs = configs;
+      closeModal('roleEditorModal');
+      showNotification('success', t('notif_saved')||'Saved');
+      renderSidebar();
+    } else {
+      // If endpoint doesn't exist, save locally
+      state.roleConfigs = configs;
+      closeModal('roleEditorModal');
+      showNotification('success', t('notif_saved')||'Saved');
+      renderSidebar();
+    }
+  } catch {
+    state.roleConfigs = configs;
+    closeModal('roleEditorModal');
+    showNotification('success', t('notif_saved')||'Saved');
+    renderSidebar();
+  }
+}
+
+// ── Multi-select events ─────────────────────────────────────────────────────
+
+function updateMultiselectBar() {
+  const bar = document.getElementById('multiselectBar');
+  if (!bar) return;
+  const count = (state.selectedEventIds || []).length;
+  if (count === 0) {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+    const countEl = document.getElementById('multiselectCount');
+    if (countEl) countEl.textContent = `${count} ${t('multiselect_selected')||'selected'}`;
+  }
+  // Update event block highlights
+  document.querySelectorAll('.event-block[data-ev-id]').forEach(block => {
+    const id = parseInt(block.dataset.evId, 10);
+    const sel = (state.selectedEventIds || []).includes(id);
+    block.classList.toggle('event-selected', sel);
+  });
+}
+
+function toggleEventSelection(evId) {
+  if (!state.selectedEventIds) state.selectedEventIds = [];
+  const idx = state.selectedEventIds.indexOf(evId);
+  if (idx === -1) {
+    state.selectedEventIds.push(evId);
+  } else {
+    state.selectedEventIds.splice(idx, 1);
+  }
+  updateMultiselectBar();
+}
+
+function clearSelection() {
+  state.selectedEventIds = [];
+  updateMultiselectBar();
+}
+
+function openMoveSelectedDialog() {
+  const count = (state.selectedEventIds || []).length;
+  if (!count) return;
+  const isMulti = count > 1;
+  const titleEl = document.getElementById('lbl-move-event-title');
+  if (titleEl) titleEl.textContent = isMulti ? (t('move_event_title_multi')||'📅 Move Selected Events') : (t('move_event_title')||'📅 Move Event');
+  const descEl = document.getElementById('lbl-move-event-desc');
+  if (descEl) descEl.textContent = isMulti ? (t('move_event_desc')||'All selected events will be shifted by the same offset.') : '';
+
+  // Pre-fill with the earliest selected event time
+  const selectedEvs = state.events.filter(e => (state.selectedEventIds||[]).includes(e.id));
+  const earliest = selectedEvs.length ? selectedEvs.reduce((a,b) => new Date(a.start_time) < new Date(b.start_time) ? a : b) : null;
+  const timeInput = document.getElementById('moveEventNewTime');
+  if (timeInput && earliest) timeInput.value = fmtDateInput(new Date(earliest.start_time));
+
+  const confirmBtn = document.getElementById('btnConfirmMove');
+  if (confirmBtn) confirmBtn.onclick = confirmMoveEvents;
+
+  openModal('moveEventModal');
+}
+
+async function confirmMoveEvents() {
+  const timeInput = document.getElementById('moveEventNewTime');
+  if (!timeInput || !timeInput.value) { showError('Please select a new date and time.', 'Validation'); return; }
+  const newBase = new Date(timeInput.value);
+
+  const ids = state.selectedEventIds || [];
+  if (!ids.length) { closeModal('moveEventModal'); return; }
+
+  const selectedEvs = state.events.filter(e => ids.includes(e.id));
+  if (!selectedEvs.length) { closeModal('moveEventModal'); return; }
+  const earliest = Math.min(...selectedEvs.map(e => new Date(e.start_time).getTime()));
+  const offset = newBase.getTime() - earliest;
+
+  const movePromises = selectedEvs.map(async ev => {
+    const oldStart = new Date(ev.start_time);
+    const newStart = new Date(oldStart.getTime() + offset);
+    const payload = { ...ev, start_time: newStart.toISOString() };
+    if (ev.end_time) {
+      const oldEnd = new Date(ev.end_time);
+      payload.end_time = new Date(oldEnd.getTime() + offset).toISOString();
+    }
+    delete payload.id; delete payload.created_at; delete payload.updated_at;
+    delete payload.created_by_name; delete payload.verified_by_name;
+    pushUndo('update_event', { id: ev.id, old: { ...ev } });
+    return apiPut('/api/events/' + ev.id, payload);
+  });
+
+  try {
+    await Promise.all(movePromises);
+    closeModal('moveEventModal');
+    clearSelection();
+    await refreshAll();
+    showNotification('success', t('notif_event_updated')||'Events moved');
+  } catch {
+    showError('Failed to move some events');
+  }
+}
+
+// ── Move single event via context menu ──────────────────────────────────────
+
+function openMoveEventDialog(evId) {
+  const ev = state.events.find(e => e.id === evId);
+  if (!ev) return;
+
+  const titleEl = document.getElementById('lbl-move-event-title');
+  if (titleEl) titleEl.textContent = t('move_event_title')||'📅 Move Event';
+  const descEl = document.getElementById('lbl-move-event-desc');
+  if (descEl) descEl.textContent = escHtml(ev.title||'');
+
+  const timeInput = document.getElementById('moveEventNewTime');
+  if (timeInput) timeInput.value = fmtDateInput(new Date(ev.start_time));
+
+  const confirmBtn = document.getElementById('btnConfirmMove');
+  if (confirmBtn) confirmBtn.onclick = () => confirmMoveSingleEvent(evId);
+
+  openModal('moveEventModal');
+}
+
+async function confirmMoveSingleEvent(evId) {
+  const timeInput = document.getElementById('moveEventNewTime');
+  if (!timeInput || !timeInput.value) { showError('Please select a new date and time.', 'Validation'); return; }
+  const newStart = new Date(timeInput.value);
+
+  const ev = state.events.find(e => e.id === evId);
+  if (!ev) { closeModal('moveEventModal'); return; }
+
+  const oldStart = new Date(ev.start_time);
+  const payload = { ...ev, start_time: newStart.toISOString() };
+  if (ev.end_time) {
+    const dur = new Date(ev.end_time) - oldStart;
+    payload.end_time = new Date(newStart.getTime() + dur).toISOString();
+  }
+  delete payload.id; delete payload.created_at; delete payload.updated_at;
+  delete payload.created_by_name; delete payload.verified_by_name;
+  pushUndo('update_event', { id: evId, old: { ...ev } });
+
+  const res = await apiPut('/api/events/' + evId, payload);
+  if (res.ok) {
+    closeModal('moveEventModal');
+    await refreshAll();
+    showNotification('success', t('notif_event_updated')||'Event moved');
+  } else {
+    const err = await res.json();
+    showError(err.error || 'Failed to move event');
+  }
+}
 

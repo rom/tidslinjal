@@ -156,12 +156,30 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .header-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; }
 .control-group  { display: flex; align-items: center; gap: 4px; }
 .control-label  { font-size: var(--fs-xs); color: var(--text-dim); white-space: nowrap; }
+/* Toolbar groups: uniform height, consistent look */
+.toolbar-group { display: flex; align-items: center; gap: 4px; }
+.toolbar-btn {
+  height: 30px; padding: 0 10px; font-size: var(--fs-sm);
+  display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.toolbar-btn.btn-icon { padding: 0 8px; }
 select.ctrl-select {
   background: var(--bg3); border: 1px solid var(--border); color: var(--text-bright);
   border-radius: var(--radius); padding: 4px 8px; outline: none; font-size: var(--fs-sm);
+  height: 30px;
+}
+input.ctrl-select {
+  height: 30px; box-sizing: border-box;
 }
 select.ctrl-select:focus { border-color: var(--accent); }
 .toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+/* Multi-select highlight for event blocks */
+.event-block.event-selected {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px var(--accent), 0 2px 8px var(--shadow);
+}
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .clock-display { text-align: right; }
 .clock-time {

@@ -86,12 +86,13 @@ async function init() {
   }
 
   // Load initial data in parallel
-  const [prefs, eventTypes, layers, groups, users] = await Promise.all([
+  const [prefs, eventTypes, layers, groups, users, roles] = await Promise.all([
     apiGet('/api/preferences'),
     apiGet('/api/event-types'),
     apiGet('/api/layers'),
     apiGet('/api/groups'),
     apiGet('/api/users').catch(() => []),
+    apiGet('/api/roles').catch(() => []),
   ]);
 
   state.preferences = prefs || state.preferences;
@@ -100,10 +101,11 @@ async function init() {
     const all = layers || [];
     state.preferences.hidden_layers = all.map(l => l.id).filter(id => !state.preferences.active_layers.includes(id));
   }
-  state.eventTypes = eventTypes || [];
-  state.layers     = layers  || [];
-  state.groups     = groups  || [];
-  state.users      = users   || [];
+  state.eventTypes  = eventTypes || [];
+  state.layers      = layers  || [];
+  state.groups      = groups  || [];
+  state.users       = users   || [];
+  state.roleConfigs = roles   || [];
 
   applyPreferences();
 

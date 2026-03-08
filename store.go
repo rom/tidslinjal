@@ -30,6 +30,7 @@ type Store struct {
 	comments             []EventComment
 	phases               []ExercisePhase
 	templates            []Template
+	roleConfigs          []RoleConfig
 	registrationSettings RegistrationSettings
 	invitations          []PersonalInvitation
 
@@ -79,6 +80,7 @@ func (s *Store) load() error {
 	s.loadFile("comments.json", &s.comments)
 	s.loadFile("phases.json", &s.phases)
 	s.loadFile("templates.json", &s.templates)
+	s.loadFile("roles.json", &s.roleConfigs)
 	s.loadFile("registration.json", &s.registrationSettings)
 	s.loadFile("invitations.json", &s.invitations)
 
@@ -1553,6 +1555,23 @@ func (s *Store) DeleteTemplate(id, userID int64, isAdmin bool) error {
 		}
 	}
 	return fmt.Errorf("template not found")
+}
+
+// ── Role Configurations ────────────────────────────────────────────────────────
+
+func (s *Store) GetRoleConfigs() []RoleConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]RoleConfig, len(s.roleConfigs))
+	copy(out, s.roleConfigs)
+	return out
+}
+
+func (s *Store) SaveRoleConfigs(configs []RoleConfig) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.roleConfigs = configs
+	return s.saveFile("roles.json", configs)
 }
 
 // ── Overlap detection ──────────────────────────────────────────────────────────

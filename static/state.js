@@ -57,6 +57,10 @@ window.state = {
   _ctxEventId:   null,
   _ctxSlotDay:   null,
   _ctxSlotMin:   null,
+  // Multi-select
+  selectedEventIds: [],
+  // Role configs (loaded from /api/roles)
+  roleConfigs:   [],
 };
 
 // ── UI state helpers ────────────────────────────────────────────────────────

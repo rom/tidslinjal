@@ -26,6 +26,7 @@ const TRANSLATIONS = {
     range_2days: '2 Days',
     range_3days: '3 Days',
     range_4days: '4 Days',
+    range_5days: '5 Days',
     range_week: 'Week',
     range_month: 'Month',
     range_2months: '2 Months',
@@ -59,6 +60,56 @@ const TRANSLATIONS = {
     btn_undo: 'Undo',
     btn_filter: 'Filter',
     btn_print: 'Print',
+    btn_templates: 'Templates',
+    btn_layers: 'Layers',
+    btn_import: '⬆ Import',
+    btn_synth_time: '⏱ T+',
+    btn_report: '📄 Report',
+
+    // Role editor
+    role_editor_title: '🛡 Role Editor',
+    role_editor_name_col: 'Role Name',
+    role_editor_key_col: 'Key',
+    role_editor_save: 'Save Roles',
+    role_editor_admin_note: 'Admin role cannot be changed.',
+    role_editor_desc: 'Edit display names for each role. Admin role is locked.',
+    role_editor_capabilities: 'Capabilities',
+    cap_view_events: 'View events',
+    cap_create_events: 'Create events',
+    cap_edit_own: 'Edit own events',
+    cap_edit_all: 'Edit all events',
+    cap_delete_events: 'Delete events',
+    cap_manage_layers: 'Manage layers',
+    cap_manage_groups: 'Manage groups',
+    cap_manage_users: 'Manage users',
+    cap_manage_templates: 'Manage templates',
+    cap_lock_slots: 'Lock time slots',
+    cap_view_audit: 'View audit log',
+    cap_exercise: 'Exercise settings',
+
+    // Context menu
+    ctx_edit: 'Edit Event',
+    ctx_duplicate: 'Duplicate',
+    ctx_alarm: 'Set Alarm',
+    ctx_delete: 'Delete',
+    ctx_move: 'Move to new time/date…',
+    ctx_move_selected: 'Move selected events…',
+
+    // Move event dialog
+    move_event_title: '📅 Move Event',
+    move_event_title_multi: '📅 Move Selected Events',
+    move_event_new_time: 'New date and time',
+    move_event_btn: 'Move',
+    move_event_desc: 'All selected events will be shifted by the same offset.',
+
+    // Multi-select
+    multiselect_hint: 'Hold Ctrl and click events to select multiple',
+    multiselect_selected: 'selected',
+    multiselect_clear: 'Clear',
+    multiselect_move: 'Move',
+
+    // Import done
+    import_done: 'Done',
 
     // Settings
     settings_theme: 'Theme',
@@ -447,6 +498,7 @@ const TRANSLATIONS = {
     range_2days: '2 Dagar',
     range_3days: '3 Dagar',
     range_4days: '4 Dagar',
+    range_5days: '5 Dagar',
     range_week: 'Vecka',
     range_month: 'Månad',
     range_2months: '2 Månader',
@@ -823,6 +875,56 @@ const TRANSLATIONS = {
     btn_undo: 'Ångra',
     btn_filter: 'Filter',
     btn_print: 'Skriv ut',
+    btn_templates: 'Mallar',
+    btn_layers: 'Lager',
+    btn_import: '⬆ Importera',
+    btn_synth_time: '⏱ T+',
+    btn_report: '📄 Rapport',
+
+    // Rollredigering
+    role_editor_title: '🛡 Rollredigering',
+    role_editor_name_col: 'Rollnamn',
+    role_editor_key_col: 'Nyckel',
+    role_editor_save: 'Spara roller',
+    role_editor_admin_note: 'Admin-rollen kan inte ändras.',
+    role_editor_desc: 'Redigera visningsnamn för varje roll. Admin-rollen är låst.',
+    role_editor_capabilities: 'Behörigheter',
+    cap_view_events: 'Visa händelser',
+    cap_create_events: 'Skapa händelser',
+    cap_edit_own: 'Redigera egna händelser',
+    cap_edit_all: 'Redigera alla händelser',
+    cap_delete_events: 'Ta bort händelser',
+    cap_manage_layers: 'Hantera lager',
+    cap_manage_groups: 'Hantera grupper',
+    cap_manage_users: 'Hantera användare',
+    cap_manage_templates: 'Hantera mallar',
+    cap_lock_slots: 'Lås tidsluckor',
+    cap_view_audit: 'Visa granskningslogg',
+    cap_exercise: 'Övningsinställningar',
+
+    // Snabbmeny
+    ctx_edit: 'Redigera händelse',
+    ctx_duplicate: 'Duplicera',
+    ctx_alarm: 'Ställ larm',
+    ctx_delete: 'Ta bort',
+    ctx_move: 'Flytta till ny tid/datum…',
+    ctx_move_selected: 'Flytta markerade händelser…',
+
+    // Flytta händelse
+    move_event_title: '📅 Flytta händelse',
+    move_event_title_multi: '📅 Flytta markerade händelser',
+    move_event_new_time: 'Nytt datum och tid',
+    move_event_btn: 'Flytta',
+    move_event_desc: 'Alla markerade händelser förskjuts med samma offset.',
+
+    // Flerval
+    multiselect_hint: 'Håll Ctrl och klicka för att välja flera händelser',
+    multiselect_selected: 'markerade',
+    multiselect_clear: 'Rensa',
+    multiselect_move: 'Flytta',
+
+    // Import klar
+    import_done: 'Klar',
   },
 
   fr: {
@@ -841,6 +943,7 @@ const TRANSLATIONS = {
     range_2days: '2 Jours',
     range_3days: '3 Jours',
     range_4days: '4 Jours',
+    range_5days: '5 Jours',
     range_week: 'Semaine',
     range_month: 'Mois',
     range_2months: '2 Mois',
@@ -1217,6 +1320,56 @@ const TRANSLATIONS = {
     btn_undo: 'Annuler',
     btn_filter: 'Filtrer',
     btn_print: 'Imprimer',
+    btn_templates: 'Modèles',
+    btn_layers: 'Couches',
+    btn_import: '⬆ Importer',
+    btn_synth_time: '⏱ T+',
+    btn_report: '📄 Rapport',
+
+    // Éditeur de rôles
+    role_editor_title: '🛡 Éditeur de rôles',
+    role_editor_name_col: 'Nom du rôle',
+    role_editor_key_col: 'Clé',
+    role_editor_save: 'Enregistrer les rôles',
+    role_editor_admin_note: 'Le rôle Admin ne peut pas être modifié.',
+    role_editor_desc: 'Modifiez les noms d\'affichage pour chaque rôle. Le rôle Admin est verrouillé.',
+    role_editor_capabilities: 'Capacités',
+    cap_view_events: 'Voir les événements',
+    cap_create_events: 'Créer des événements',
+    cap_edit_own: 'Modifier ses propres événements',
+    cap_edit_all: 'Modifier tous les événements',
+    cap_delete_events: 'Supprimer des événements',
+    cap_manage_layers: 'Gérer les couches',
+    cap_manage_groups: 'Gérer les groupes',
+    cap_manage_users: 'Gérer les utilisateurs',
+    cap_manage_templates: 'Gérer les modèles',
+    cap_lock_slots: 'Verrouiller les créneaux',
+    cap_view_audit: 'Voir le journal d\'audit',
+    cap_exercise: 'Paramètres d\'exercice',
+
+    // Menu contextuel
+    ctx_edit: 'Modifier l\'événement',
+    ctx_duplicate: 'Dupliquer',
+    ctx_alarm: 'Définir une alarme',
+    ctx_delete: 'Supprimer',
+    ctx_move: 'Déplacer vers date/heure…',
+    ctx_move_selected: 'Déplacer les événements sélectionnés…',
+
+    // Déplacer un événement
+    move_event_title: '📅 Déplacer l\'événement',
+    move_event_title_multi: '📅 Déplacer les événements sélectionnés',
+    move_event_new_time: 'Nouvelle date et heure',
+    move_event_btn: 'Déplacer',
+    move_event_desc: 'Tous les événements sélectionnés seront décalés du même offset.',
+
+    // Multi-sélection
+    multiselect_hint: 'Maintenez Ctrl et cliquez pour sélectionner plusieurs événements',
+    multiselect_selected: 'sélectionnés',
+    multiselect_clear: 'Effacer',
+    multiselect_move: 'Déplacer',
+
+    // Import terminé
+    import_done: 'Terminé',
   }
 };
 
