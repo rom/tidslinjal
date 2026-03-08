@@ -370,6 +370,41 @@
         <label id="lbl-ev-desc">Description</label>
         <textarea id="eventDescription" rows="3"></textarea>
       </div>
+      <!-- Physical meeting location (shown only for physical_meeting type) -->
+      <div class="form-group" id="physicalLocationGroup" style="display:none">
+        <label id="lbl-ev-location">📍 Physical Location</label>
+        <input type="text" id="eventPhysicalLocation" placeholder="Room, address, building…">
+      </div>
+      <!-- Contact / virtual meeting info (shown for non-physical meeting types) -->
+      <div id="contactInfoGroup" style="display:none">
+        <div class="form-row">
+          <div class="form-group">
+            <label id="lbl-ev-contact-type">Contact type</label>
+            <select id="eventContactType" onchange="onContactTypeChange()">
+              <option value="">— None —</option>
+              <option value="url">URL</option>
+              <option value="ip">IP address</option>
+              <option value="phone">Phone number</option>
+            </select>
+          </div>
+          <div class="form-group" id="eventContactURLGroup" style="display:none">
+            <label id="lbl-ev-contact-url">URL / IP / Phone</label>
+            <input type="text" id="eventContactURL" placeholder="https://… or 192.168.x.x or +46…">
+          </div>
+        </div>
+        <div class="form-group" id="virtualMeetingTypeGroup" style="display:none">
+          <label id="lbl-ev-virtual-type">Virtual meeting platform</label>
+          <select id="eventVirtualMeetingType">
+            <option value="">— Not specified —</option>
+            <option value="mattermost">Mattermost</option>
+            <option value="teams">Microsoft Teams</option>
+            <option value="signal">Signal</option>
+            <option value="discord">Discord</option>
+            <option value="teleconf">Tele conference</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label id="lbl-ev-participant">Participant</label>
@@ -520,10 +555,16 @@
 <div class="modal-overlay" id="lockModal">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="lbl-lock-title">Lock Time Slot</h2>
+      <h2 id="lbl-lock-title">Lock / Unlock Time Slot</h2>
       <button class="modal-close" onclick="closeModal('lockModal')">&times;</button>
     </div>
     <div class="modal-body">
+      <!-- Existing locks list -->
+      <div id="existingLocksSection">
+        <div class="sidebar-section-title" style="margin-bottom:6px" id="lbl-existing-locks">Active Locks</div>
+        <div id="existingLocksList" style="margin-bottom:12px"></div>
+      </div>
+      <div class="sidebar-section-title" style="margin-bottom:6px" id="lbl-add-lock">Add New Lock</div>
       <div class="form-row">
         <div class="form-group">
           <label id="lbl-lock-start">Start *</label>

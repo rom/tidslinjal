@@ -17,6 +17,24 @@ function applyPreferences() {
 }
 
 // ── Event Modal Functions + Event Listeners ────────────────────────────────
+function updateEventModalContactVisibility() {
+  const typeVal = document.getElementById('eventType')?.value;
+  const isPhysical = typeVal === 'physical_meeting';
+  const physGroup = document.getElementById('physicalLocationGroup');
+  const contactGroup = document.getElementById('contactInfoGroup');
+  if (physGroup) physGroup.style.display = isPhysical ? '' : 'none';
+  if (contactGroup) contactGroup.style.display = (!isPhysical && typeVal) ? '' : 'none';
+  onContactTypeChange();
+}
+
+function onContactTypeChange() {
+  const ct = document.getElementById('eventContactType')?.value;
+  const urlGroup = document.getElementById('eventContactURLGroup');
+  const vmGroup  = document.getElementById('virtualMeetingTypeGroup');
+  if (urlGroup) urlGroup.style.display = ct ? '' : 'none';
+  if (vmGroup)  vmGroup.style.display  = ct === 'url' ? '' : 'none';
+}
+
 function updateEventModalTimeVisibility() {
   const allDay  = document.getElementById('eventAllDay')?.checked;
   const typeVal = document.getElementById('eventType')?.value;
@@ -56,6 +74,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     const found = state.eventTypes.find(x => x.key === typeSelect.value);
     if (found) document.getElementById('eventColor').value = found.color;
     updateEventModalTimeVisibility();
+    updateEventModalContactVisibility();
   };
 
   // Layer select
@@ -171,8 +190,15 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   const saveBtn = document.getElementById('btnSaveEvent');
   if (saveBtn) saveBtn.disabled = !!eventIsLocked;
 
+  // Physical location and contact/communication fields
+  document.getElementById('eventPhysicalLocation').value = ev ? (ev.physical_location||'') : '';
+  document.getElementById('eventContactType').value = ev ? (ev.contact_type||'') : '';
+  document.getElementById('eventContactURL').value = ev ? (ev.contact_url||'') : '';
+  document.getElementById('eventVirtualMeetingType').value = ev ? (ev.virtual_meeting_type||'') : '';
+
   // Update field visibility for type/allday
   updateEventModalTimeVisibility();
+  updateEventModalContactVisibility();
 
   openModal('eventModal');
 }
@@ -252,6 +278,10 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     recurrence_end:     (recurring && !allDay && !isInstant && document.getElementById('eventRecurrenceEnd').value)
                           ? new Date(document.getElementById('eventRecurrenceEnd').value).toISOString() : null,
     layer_id:           layerVal ? parseInt(layerVal, 10) : null,
+    physical_location:  document.getElementById('eventPhysicalLocation')?.value || '',
+    contact_type:       document.getElementById('eventContactType')?.value || '',
+    contact_url:        document.getElementById('eventContactURL')?.value || '',
+    virtual_meeting_type: document.getElementById('eventVirtualMeetingType')?.value || '',
   };
 
   // Track undo for updates
@@ -695,9 +725,49 @@ function openLockModal(startDate, endDate) {
   }
   document.getElementById('lockScope').value = 'all';
   document.getElementById('lockLayerGroup').style.display = 'none';
+
   if (startDate) document.getElementById('lockStart').value = fmtDateInput(startDate);
   if (endDate) document.getElementById('lockEnd').value = fmtDateInput(endDate);
+  renderExistingLocks();
   openModal('lockModal');
+}
+
+function renderExistingLocks() {
+  const listEl = document.getElementById('existingLocksList');
+  if (!listEl) return;
+  const locks = state.locks || [];
+  if (locks.length === 0) {
+    listEl.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:4px">No active locks.</div>`;
+    return;
+  }
+  const isAdmin = state.user && state.user.role === 'admin';
+  listEl.innerHTML = locks.map(l => {
+    const canUnlock = isAdmin || (state.user && l.locked_by === state.user.id);
+    const scopeLabel = {all:'All', master:'Master', layer:'Layer'}[l.scope||'all']||l.scope;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;font-size:var(--fs-sm)">
+      <span style="flex:1;min-width:0">
+        <span style="color:var(--text-dim)">${scopeLabel}:</span>
+        <span style="color:var(--text-bright)">${fmtDateTime(new Date(l.start_time))} – ${fmtDateTime(new Date(l.end_time))}</span>
+        ${l.reason ? `<span style="color:var(--text-dim);margin-left:4px">"${escHtml(l.reason)}"</span>` : ''}
+        <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">by ${escHtml(l.locked_by_name||'')}</span>
+      </span>
+      ${canUnlock ? `<button class="btn btn-danger btn-sm" onclick="unlockFromModal(${l.id})">🔓 Unlock</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function unlockFromModal(id) {
+  if (!confirm(t('confirm_delete_lock')||'Remove this lock?')) return;
+  const res = await apiDel(`/api/locks/${id}`);
+  if (res.ok) {
+    await fetchLocks();
+    renderTimeline();
+    renderExistingLocks();
+    showNotification('success', t('notif_unlocked')||'Lock removed');
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
 }
 
 document.getElementById('btnSaveLock').addEventListener('click', async () => {
@@ -966,6 +1036,22 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
   if (res.ok) {
     closeModal('layerModal'); await fetchLayers(); renderSidebar(); renderTimeline();
     showNotification('success', t('notif_saved'));
+    // When creating a new layer, offer to also create a group with the same name
+    if (!id) {
+      const existingGroup = state.groups.find(g => g.name.toLowerCase() === name.toLowerCase());
+      if (!existingGroup) {
+        const createGroup = confirm(`No group named "${name}" exists. Create a group with the same name?`);
+        if (createGroup) {
+          const gRes = await apiPost('/api/groups', { name, description: '' });
+          if (gRes.ok) {
+            const newGroup = await gRes.json();
+            await fetchGroups();
+            renderSidebar();
+            showNotification('success', `Group "${name}" created.`);
+          }
+        }
+      }
+    }
   } else { const err = await res.json(); showError(err.error); }
 });
 
@@ -1097,6 +1183,11 @@ function renderSidebar() {
   const lang = state.preferences.language || 'en';
 
   if (tab === 'legend') {
+    const activeLayers = state.layers.filter(l => isLayerActive(l.id));
+    const isSynthActive = synthActive ? synthActive() : false;
+    const lastTemplate = state.lastAppliedTemplate || null;
+    const langLabel = {en:'English 🇬🇧', sv:'Svenska 🇸🇪', fr:'Français 🇫🇷'}[lang] || lang;
+    const vInfo = state._versionInfo || {};
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">
@@ -1128,6 +1219,18 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_to')}:</span><span>${localShortDate(addDays(state.startDate, getRangeDays()-1))}</span>
           <span style="color:var(--text-dim)">${t('info_events')}:</span><span>${state.events.filter(e=>!isTypeHidden(e.event_type)).length}</span>
           <span style="color:var(--text-dim)">${t('info_locks')}:</span><span>${state.locks.length}</span>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">System</div>
+        <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
+          <span style="color:var(--text-dim)">Language:</span><span>${langLabel}</span>
+          <span style="color:var(--text-dim)">Users:</span><span>${state.users.length}</span>
+          <span style="color:var(--text-dim)">Groups:</span><span>${state.groups.length}</span>
+          <span style="color:var(--text-dim)">Active layers:</span><span>${activeLayers.length > 0 ? activeLayers.map(l=>escHtml(l.name)).join(', ') : '—'}</span>
+          <span style="color:var(--text-dim)">Synthetic time:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
+          <span style="color:var(--text-dim)">Last template:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
+          <span style="color:var(--text-dim)">Version:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
         </div>
       </div>
     `;
@@ -1308,6 +1411,14 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV']].map(([v,l]) =>
+            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" onclick="setPref('date_format','${v}')">${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_day_hours')}</div>
         <div class="hour-range">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
@@ -1341,14 +1452,6 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
-        <div class="toggle-btn-group" style="flex-wrap:wrap">
-          ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV']].map(([v,l]) =>
-            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" onclick="setPref('date_format','${v}')">${l}</button>`
-          ).join('')}
-        </div>
-      </div>
-      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_out_of_hours')||'Out-of-Hours Area'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} onchange="setOOHPref(this.checked)"
@@ -1358,10 +1461,15 @@ function renderSidebar() {
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_red_line')||'Current-time Line'}</div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
           <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} onchange="setRedLinePref()"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_red_line_enabled')||'Show current-time line'}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="prefSynthLabel" ${p.synth_label?'checked':''} onchange="setSynthLabelPref(this.checked)"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_synth_label')||'Show H+N label on red line'}
         </label>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center;font-size:var(--fs-xs);color:var(--text-dim)">
           <span>${t('settings_red_line_color')||'Color'}:</span>
@@ -1378,11 +1486,6 @@ function renderSidebar() {
             <option value="dotted" ${p.red_line_style==='dotted'?'selected':''}>Dotted</option>
           </select>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:8px">
-          <input type="checkbox" id="prefSynthLabel" ${p.synth_label?'checked':''} onchange="setSynthLabelPref(this.checked)"
-            style="width:14px;height:14px;accent-color:var(--accent)">
-          ${t('settings_synth_label')||'Show H+N label on red line'}
-        </label>
       </div>
       ${synthActive() ? `
       <div class="sidebar-section">
@@ -1984,6 +2087,7 @@ async function renderTemplatesList() {
   const listEl = document.getElementById('templatesList');
   if (!listEl) return;
   const templates = await apiGet('/api/templates') || [];
+  state.templates = templates; // keep in state for legend
   if (!templates.length) {
     listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No templates yet. Save the current events as a template to get started.</p>`;
     return;
@@ -2111,6 +2215,9 @@ async function confirmApplyTemplate(id) {
     const r = await res.json();
     closeModal('applyTemplateModal');
     closeModal('templatesModal');
+    // Track last applied template for legend
+    const tmpl = state.templates ? state.templates.find(t2 => t2.id === id) : null;
+    if (tmpl) state.lastAppliedTemplate = tmpl.name;
     await refreshAll();
     showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
   } else {
@@ -2448,6 +2555,62 @@ function closeMobileSidebar() {
   document.getElementById('sidebarBackdrop').classList.remove('visible');
 }
 
+// ── Help modal left-pane navigation ────────────────────────────────────────
+// old conflict started here: old code
+
+function initHelpNav() {
+  const toc     = document.querySelector('.help-toc');
+  const content = document.querySelector('.help-content');
+  if (!toc || !content) return;
+
+  const links = toc.querySelectorAll('.help-toc-link');
+  links.forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const targetId = link.getAttribute('href')?.replace('#', '');
+      if (!targetId) return;
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  });
+
+  // Highlight active section on scroll
+  content.addEventListener('scroll', () => {
+    let activeId = null;
+    links.forEach(link => {
+      const id = link.getAttribute('href')?.replace('#', '');
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top - content.getBoundingClientRect().top < 80) {
+        activeId = id;
+      }
+    });
+    links.forEach(link => {
+      const id = link.getAttribute('href')?.replace('#', '');
+      link.classList.toggle('active', id === activeId);
+    });
+  });
+
+  // Activate first link by default
+  if (links.length > 0) links[0].classList.add('active');
+}
+
+// Call when help modal opens
+document.addEventListener('DOMContentLoaded', () => {
+  const helpBtn = document.getElementById('btnHelp');
+  if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+      setTimeout(initHelpNav, 50);
+    });
+  }
+});
+
+// old conflict ended here for old code =======
+// new code start here
 // ── Reset Database ──────────────────────────────────────────────────────────
 async function resetDatabase() {
   if (!confirm('WARNING: This will permanently delete ALL data except the audit trail. Are you sure?')) return;
@@ -2773,3 +2936,5 @@ function showConflictWarning(conflicts) {
     `Warning: This event overlaps with ${conflicts.length} other event${conflicts.length>1?'s':''}: ${names}`
   );
 }
+// old conflict ended here new code
+

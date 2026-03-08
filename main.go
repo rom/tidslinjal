@@ -1616,6 +1616,34 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"version": AppVersion, "github": AppGitHub})
 }
 
+// ── Admin Reset ────────────────────────────────────────────────────────────────
+
+func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// Only admin can reset
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	// Confirm intent via request body
+	var req struct {
+		Confirm string `json:"confirm"`
+	}
+	if err := decode(r, &req); err != nil || req.Confirm != "RESET" {
+		jsonError(w, "confirmation required: send {\"confirm\":\"RESET\"}", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.ResetToEmpty(*user); err != nil {
+		jsonError(w, "reset failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Admin %q triggered a full system reset (data cleared, admin account preserved)", user.Username)
+	jsonOK(w, map[string]string{"status": "reset complete"})
+}
+
 // ── Event Comment handlers ─────────────────────────────────────────────────────
 
 func (app *App) handleGetComments(w http.ResponseWriter, r *http.Request, user *User) {
@@ -2163,6 +2191,9 @@ func (app *App) routes() http.Handler {
 
 	// Version
 	mux.HandleFunc("/api/version", handleVersion)
+
+	// Admin operations
+	mux.HandleFunc("/api/admin/reset", app.requireAuth(app.handleAdminReset))
 
 	// Auth
 	mux.HandleFunc("/api/auth/login", app.handleLogin)

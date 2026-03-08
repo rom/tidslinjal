@@ -3,7 +3,8 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "4.0.0"
+const AppVersion = "3.6.0"
+
 
 // AppGitHub is the project repository URL
 const AppGitHub = "https://github.com/rom/tidslinjal"
@@ -59,6 +60,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Tilldelad uppgift", LabelFR: "Tâche assignée"},
 	{Key: "standup", Label: "Standup Meeting", Color: "#00ACC1", IsSystem: true,
 		LabelSV: "Daglig standup", LabelFR: "Réunion debout"},
+	{Key: "physical_meeting", Label: "Physical Meeting", Color: "#D35400", IsSystem: true,
+		LabelSV: "Fysiskt möte", LabelFR: "Réunion physique"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -169,8 +172,12 @@ type Event struct {
 	Status            EventStatus `json:"status"`
 	StartTime         time.Time   `json:"start_time"`
 	EndTime           *time.Time  `json:"end_time,omitempty"`
-	AllDay            bool        `json:"all_day"`              // day-only activity (no specific time)
+	AllDay            bool        `json:"all_day"`               // day-only activity (no specific time)
 	Participant       string      `json:"participant,omitempty"` // "" | "intern" | "extern"
+	PhysicalLocation  string      `json:"physical_location,omitempty"` // for physical_meeting type
+	ContactURL        string      `json:"contact_url,omitempty"`       // URL, IP address, or phone number
+	ContactType       string      `json:"contact_type,omitempty"`      // url | ip | phone
+	VirtualMeetingType string     `json:"virtual_meeting_type,omitempty"` // mattermost|teams|signal|discord|teleconf|other
 	IsRecurring       bool        `json:"is_recurring"`
 	RecurrencePattern string      `json:"recurrence_pattern,omitempty"` // 30min | hourly | 2hours | 3hours | 4hours | daily | weekly | monthly | quarterly
 	RecurrenceEnd     *time.Time  `json:"recurrence_end,omitempty"`

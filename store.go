@@ -214,6 +214,80 @@ func (s *Store) saveFile(filename string, v interface{}) error {
 	return os.Rename(tmp, path)
 }
 
+// ── Reset ──────────────────────────────────────────────────────────────────────
+
+// ResetToEmpty clears all data except the admin account (and its preferences/session).
+func (s *Store) ResetToEmpty(adminUser User) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Keep only the admin user
+	s.users = []User{adminUser}
+	s.nextUserID = adminUser.ID
+
+	// Keep admin preferences if present, clear others
+	var adminPrefs []UserPreferences
+	for _, p := range s.preferences {
+		if p.UserID == adminUser.ID {
+			adminPrefs = append(adminPrefs, p)
+			break
+		}
+	}
+	s.preferences = adminPrefs
+
+	// Clear everything else
+	s.groups = nil
+	s.memberships = nil
+	s.layers = nil
+	s.events = nil
+	s.attachments = nil
+	s.alarms = nil
+	s.locks = nil
+	s.sessions = nil
+	s.audit = nil
+	s.comments = nil
+	s.phases = nil
+	s.templates = nil
+	s.exercise = ExerciseSettings{}
+	s.nextGroupID = 0
+	s.nextLayerID = 0
+	s.nextEventID = 0
+	s.nextAttachID = 0
+	s.nextAlarmID = 0
+	s.nextLockID = 0
+	s.nextAuditID = 0
+	s.nextCommentID = 0
+	s.nextPhaseID = 0
+	s.nextTemplateID = 0
+
+	// Persist all cleared files
+	for _, file := range []struct {
+		name string
+		val  interface{}
+	}{
+		{"users.json", s.users},
+		{"preferences.json", s.preferences},
+		{"groups.json", []Group{}},
+		{"memberships.json", []GroupMembership{}},
+		{"layers.json", []Layer{}},
+		{"events.json", []Event{}},
+		{"attachments.json", []Attachment{}},
+		{"alarms.json", []Alarm{}},
+		{"locks.json", []LockedSlot{}},
+		{"sessions.json", []Session{}},
+		{"audit.json", []AuditEntry{}},
+		{"comments.json", []EventComment{}},
+		{"phases.json", []ExercisePhase{}},
+		{"templates.json", []Template{}},
+		{"exercise.json", ExerciseSettings{}},
+	} {
+		if err := s.saveFile(file.name, file.val); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ── Event Types ───────────────────────────────────────────────────────────────
 
 func (s *Store) GetEventTypes() []EventTypeDef {
