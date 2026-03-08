@@ -1,62 +1,407 @@
 {
   "name": "EX-09 NATO Integration Exercise — 5 Days",
   "description": "Full-week NATO-style multinational integration exercise, around-the-clock (D1–D4) with working-hours wrap-up on D5. Demonstrates the complexity of coalition coordination, liaison officer management, and multi-phase operations. Uses LOGREP reporting alongside SITREPs. Good reference for large, complex exercises requiring sustained operations planning.",
+  "exercise_name": "EX-09 NATO Integration Exercise",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
   "scope": "public",
   "phases": [
-    {"name": "INITEX & Force Laydown",   "color": "#F39C12", "start_offset_min": 0,    "end_offset_min": 480,  "order": 0},
-    {"name": "Phase 1 — Shaping",        "color": "#E74C3C", "start_offset_min": 480,  "end_offset_min": 2880, "order": 1},
-    {"name": "Phase 2 — Decision",       "color": "#8E44AD", "start_offset_min": 2880, "end_offset_min": 4320, "order": 2},
-    {"name": "Phase 3 — Exploitation",   "color": "#C0392B", "start_offset_min": 4320, "end_offset_min": 5760, "order": 3},
-    {"name": "Consolidation & AAR",      "color": "#27AE60", "start_offset_min": 5760, "end_offset_min": 6300, "order": 4}
+    {
+      "name": "INITEX & Force Laydown",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Phase 1 — Shaping",
+      "color": "#E74C3C",
+      "start_offset_min": 480,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Phase 2 — Decision",
+      "color": "#8E44AD",
+      "start_offset_min": 2880,
+      "end_offset_min": 4320,
+      "order": 2
+    },
+    {
+      "name": "Phase 3 — Exploitation",
+      "color": "#C0392B",
+      "start_offset_min": 4320,
+      "end_offset_min": 5760,
+      "order": 3
+    },
+    {
+      "name": "Consolidation & AAR",
+      "color": "#27AE60",
+      "start_offset_min": 5760,
+      "end_offset_min": 6300,
+      "order": 4
+    }
   ],
   "locks": [
-    {"start_offset_min": 1020, "end_offset_min": 1080, "reason": "Coalition admin window D1 night — no exercise injections", "scope": "all"},
-    {"start_offset_min": 2460, "end_offset_min": 2520, "reason": "Coalition admin window D2 night — no exercise injections", "scope": "all"},
-    {"start_offset_min": 3900, "end_offset_min": 3960, "reason": "Coalition admin window D3 night — no exercise injections", "scope": "all"},
-    {"start_offset_min": 5340, "end_offset_min": 5400, "reason": "Coalition admin window D4 night — no exercise injections", "scope": "all"},
-    {"start_offset_min": 6000, "end_offset_min": 6060, "reason": "D5 lunch break", "scope": "all"}
+    {
+      "start_offset_min": 1020,
+      "end_offset_min": 1080,
+      "reason": "Coalition admin window D1 night — no exercise injections",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2460,
+      "end_offset_min": 2520,
+      "reason": "Coalition admin window D2 night — no exercise injections",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 3900,
+      "end_offset_min": 3960,
+      "reason": "Coalition admin window D3 night — no exercise injections",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 5340,
+      "end_offset_min": 5400,
+      "reason": "Coalition admin window D4 night — no exercise injections",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 6000,
+      "end_offset_min": 6060,
+      "reason": "D5 lunch break",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                                 "event_type": "instant",          "color": "#E74C3C", "description": "5-day NATO exercise begins. All national contingents confirmed at their assigned positions. Coalition HQ activated.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "Nations Representatives Brief",           "event_type": "mote",             "color": "#7F8C8D", "description": "Exercise director briefs all national contingent commanders. Coalition HQ structure, communication plan, exercise objectives.", "start_offset_min": 0,    "duration_min": 120},
-    {"title": "Force Laydown Confirmation",              "event_type": "activity",         "color": "#2ECC71", "description": "Each national contingent confirms their force laydown on the Coalition COP. Interoperability checks completed.", "start_offset_min": 0,    "duration_min": 240},
-    {"title": "Coalition Orders Group",                  "event_type": "mote",             "color": "#7F8C8D", "description": "Full coalition orders. Phase 1 tasks to all national contingents. Liaison officer assignments confirmed.", "start_offset_min": 120,  "duration_min": 120},
-    {"title": "Intel: Coalition Assessment D1",          "event_type": "reporting",        "color": "#1ABC9C", "description": "Coalition intelligence assessment. Fused intelligence from all national contributions. Common threat picture.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "LOGREP 1 — Logistics Status",             "event_type": "reporting",        "color": "#1ABC9C", "description": "First logistics report from all contingents. Supply status, fuel, ammunition, medical capacity.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "Phase 1 Initiating Directive",            "event_type": "assigned_task",    "color": "#E67E22", "description": "Coalition HQ issues the Phase 1 initiating directive to all contingents via secure communications.", "start_offset_min": 480,  "duration_min": 0},
-    {"title": "Coalition Standup D1",                    "event_type": "standup",          "color": "#00ACC1", "description": "Daily coalition standup. Quick status from each national contingent: green/amber/red status.", "start_offset_min": 720,  "duration_min": 0},
-    {"title": "Phase 1 Main Operations D1",              "event_type": "activity",         "color": "#2ECC71", "description": "Phase 1 multinational operations. Contingents execute assigned tasks, coordinate via coalition comms.", "start_offset_min": 480,  "duration_min": 960},
-    {"title": "SITREP 1800 D1",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D1 coalition SITREP. All contingents report. Summary for coalition commander.", "start_offset_min": 600,  "duration_min": 0},
-    {"title": "Night Operations Phase 1 D1",             "event_type": "activity",         "color": "#2C3E50", "description": "Night operations. Coalition HQ maintains watch. Contingents continue Phase 1 tasks.", "start_offset_min": 720,  "duration_min": 720},
-    {"title": "SITREP 0200 D2",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Night coalition SITREP from watch officers.", "start_offset_min": 1080, "duration_min": 0},
-    {"title": "Coalition Standup D2",                    "event_type": "standup",          "color": "#00ACC1", "description": "D2 morning standup. Overnight summary. Day priorities.", "start_offset_min": 1440, "duration_min": 0},
-    {"title": "Phase 1 Operations D2",                   "event_type": "activity",         "color": "#2ECC71", "description": "D2 Phase 1 continuation. Increasing coordination complexity as Phase 2 approaches.", "start_offset_min": 1440, "duration_min": 960},
-    {"title": "LOGREP 2 — Mid-Exercise Log",             "event_type": "reporting",        "color": "#1ABC9C", "description": "Second logistics report. Identify resupply requirements for Phase 2.", "start_offset_min": 1680, "duration_min": 0},
-    {"title": "Decision Point Alpha — Phase 2 Gateway",  "event_type": "decision",         "color": "#27AE60", "description": "Coalition commander decides to proceed to Phase 2. All contingent commanders confirm readiness.", "start_offset_min": 1920, "duration_min": 0},
-    {"title": "SITREP 1800 D2",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D2 SITREP. Phase 1 close-out status.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "Phase 1 Night Ops D2",                    "event_type": "activity",         "color": "#2C3E50", "description": "D2 night operations. Transition preparations for Phase 2.", "start_offset_min": 2160, "duration_min": 720},
-    {"title": "SITREP 0400 D3",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Pre-dawn D3 report. Readiness for Phase 2 transition.", "start_offset_min": 2520, "duration_min": 0},
-    {"title": "Phase 2 Initiating",                      "event_type": "event",            "color": "#C0392B", "description": "Phase 2 begins. Increased operational tempo. All national contingents transition to Phase 2 tasks.", "start_offset_min": 2880, "duration_min": 0},
-    {"title": "Phase 2 Orders Group",                    "event_type": "mote",             "color": "#7F8C8D", "description": "Full coalition Phase 2 orders. New tasks, coordination measures, fire support plan.", "start_offset_min": 2880, "duration_min": 120},
-    {"title": "Coalition Intelligence Fusion",           "event_type": "activity",         "color": "#2ECC71", "description": "All national intelligence cells fuse their collection into a common picture for the coalition commander.", "start_offset_min": 3000, "duration_min": 240},
-    {"title": "LOGREP 3 — Phase 2 Log",                  "event_type": "reporting",        "color": "#1ABC9C", "description": "Phase 2 logistics report. Critical supplies identified. Emergency resupply requests.", "start_offset_min": 3120, "duration_min": 0},
-    {"title": "Phase 2 Main Activity",                   "event_type": "activity",         "color": "#2ECC71", "description": "Phase 2 core operations. Multi-domain coordination: ground, air, cyber, information.", "start_offset_min": 3240, "duration_min": 1080},
-    {"title": "Decision Point Bravo — Phase 3 Gateway",  "event_type": "decision",         "color": "#27AE60", "description": "Coalition commander decision: conditions for Phase 3 met? All contingents must be above 70% effective strength.", "start_offset_min": 3480, "duration_min": 0},
-    {"title": "SITREP 1800 D3",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D3 coalition SITREP.", "start_offset_min": 3480, "duration_min": 0},
-    {"title": "Night Ops Phase 2 D3",                    "event_type": "activity",         "color": "#2C3E50", "description": "D3 night operations. Phase 2 continuation.", "start_offset_min": 3600, "duration_min": 720},
-    {"title": "SITREP 0400 D4",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Pre-dawn D4 report. Phase 3 readiness.", "start_offset_min": 3960, "duration_min": 0},
-    {"title": "Phase 3 Initiating",                      "event_type": "event",            "color": "#C0392B", "description": "Phase 3 begins — Exploitation. All coalition elements advance on assigned axes.", "start_offset_min": 4320, "duration_min": 0},
-    {"title": "Phase 3 Orders Group",                    "event_type": "mote",             "color": "#7F8C8D", "description": "Phase 3 coalition orders. Final objectives, decision points, end state conditions.", "start_offset_min": 4320, "duration_min": 120},
-    {"title": "Exploitation Operations D4",              "event_type": "activity",         "color": "#2ECC71", "description": "Exploitation phase. All national contingents execute Phase 3 tasks.", "start_offset_min": 4440, "duration_min": 1080},
-    {"title": "LOGREP 4 — Final Log",                    "event_type": "reporting",        "color": "#1ABC9C", "description": "Final logistics report. End-state log status for all contingents.", "start_offset_min": 4680, "duration_min": 0},
-    {"title": "Decision Point Charlie — End State",      "event_type": "decision",         "color": "#27AE60", "description": "Coalition commander confirms exercise end state achieved. All Phase 3 objectives met.", "start_offset_min": 4920, "duration_min": 0},
-    {"title": "SITREP 1800 D4",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Evening D4 SITREP. Phase 3 status.", "start_offset_min": 4920, "duration_min": 0},
-    {"title": "Night Ops D4",                            "event_type": "activity",         "color": "#2C3E50", "description": "D4 night. Final operations and consolidation. AAR preparation begins.", "start_offset_min": 5160, "duration_min": 600},
-    {"title": "SITREP 0400 D5",                         "event_type": "reporting",        "color": "#1ABC9C", "description": "Pre-dawn D5 report. All contingents confirm Phase 3 complete.", "start_offset_min": 5400, "duration_min": 0},
-    {"title": "D5 Morning Brief",                        "event_type": "mote",             "color": "#7F8C8D", "description": "Day 5 morning brief. Exercise overview, AAR schedule, national debrief timings.", "start_offset_min": 5760, "duration_min": 60},
-    {"title": "Multinational AAR",                       "event_type": "mote",             "color": "#7F8C8D", "description": "Full coalition after action review. Each national contingent presents: strengths, weaknesses, interoperability issues, recommendations.", "start_offset_min": 5820, "duration_min": 300},
-    {"title": "Physical: Closing Ceremony",              "event_type": "physical_meeting", "color": "#D35400", "description": "Closing ceremony with all national representatives. Exercise commander's assessment delivered. Certificate of participation.", "start_offset_min": 6000, "duration_min": 120},
-    {"title": "Final Exercise Report",                   "event_type": "reporting",        "color": "#1ABC9C", "description": "Coalition exercise report submitted. Distributed to all national HQs within 48 hours.", "start_offset_min": 6120, "duration_min": 180},
-    {"title": "ENDEX",                                   "event_type": "instant",          "color": "#E74C3C", "description": "5-day NATO integration exercise concluded. All national contingents released.", "start_offset_min": 6300, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "5-day NATO exercise begins. All national contingents confirmed at their assigned positions. Coalition HQ activated.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "Nations Representatives Brief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Exercise director briefs all national contingent commanders. Coalition HQ structure, communication plan, exercise objectives.",
+      "start_offset_min": 0,
+      "duration_min": 120
+    },
+    {
+      "title": "Force Laydown Confirmation",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Each national contingent confirms their force laydown on the Coalition COP. Interoperability checks completed.",
+      "start_offset_min": 0,
+      "duration_min": 240
+    },
+    {
+      "title": "Coalition Orders Group",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full coalition orders. Phase 1 tasks to all national contingents. Liaison officer assignments confirmed.",
+      "start_offset_min": 120,
+      "duration_min": 120
+    },
+    {
+      "title": "Intel: Coalition Assessment D1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Coalition intelligence assessment. Fused intelligence from all national contributions. Common threat picture.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "LOGREP 1 — Logistics Status",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "First logistics report from all contingents. Supply status, fuel, ammunition, medical capacity.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Initiating Directive",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Coalition HQ issues the Phase 1 initiating directive to all contingents via secure communications.",
+      "start_offset_min": 480,
+      "duration_min": 0
+    },
+    {
+      "title": "Coalition Standup D1",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Daily coalition standup. Quick status from each national contingent: green/amber/red status.",
+      "start_offset_min": 720,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Main Operations D1",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 1 multinational operations. Contingents execute assigned tasks, coordinate via coalition comms.",
+      "start_offset_min": 480,
+      "duration_min": 960
+    },
+    {
+      "title": "SITREP 1800 D1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D1 coalition SITREP. All contingents report. Summary for coalition commander.",
+      "start_offset_min": 600,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Operations Phase 1 D1",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "Night operations. Coalition HQ maintains watch. Contingents continue Phase 1 tasks.",
+      "start_offset_min": 720,
+      "duration_min": 720
+    },
+    {
+      "title": "SITREP 0200 D2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Night coalition SITREP from watch officers.",
+      "start_offset_min": 1080,
+      "duration_min": 0
+    },
+    {
+      "title": "Coalition Standup D2",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "D2 morning standup. Overnight summary. Day priorities.",
+      "start_offset_min": 1440,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Operations D2",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "D2 Phase 1 continuation. Increasing coordination complexity as Phase 2 approaches.",
+      "start_offset_min": 1440,
+      "duration_min": 960
+    },
+    {
+      "title": "LOGREP 2 — Mid-Exercise Log",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Second logistics report. Identify resupply requirements for Phase 2.",
+      "start_offset_min": 1680,
+      "duration_min": 0
+    },
+    {
+      "title": "Decision Point Alpha — Phase 2 Gateway",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Coalition commander decides to proceed to Phase 2. All contingent commanders confirm readiness.",
+      "start_offset_min": 1920,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1800 D2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D2 SITREP. Phase 1 close-out status.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 1 Night Ops D2",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "D2 night operations. Transition preparations for Phase 2.",
+      "start_offset_min": 2160,
+      "duration_min": 720
+    },
+    {
+      "title": "SITREP 0400 D3",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Pre-dawn D3 report. Readiness for Phase 2 transition.",
+      "start_offset_min": 2520,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 2 Initiating",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Phase 2 begins. Increased operational tempo. All national contingents transition to Phase 2 tasks.",
+      "start_offset_min": 2880,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 2 Orders Group",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full coalition Phase 2 orders. New tasks, coordination measures, fire support plan.",
+      "start_offset_min": 2880,
+      "duration_min": 120
+    },
+    {
+      "title": "Coalition Intelligence Fusion",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "All national intelligence cells fuse their collection into a common picture for the coalition commander.",
+      "start_offset_min": 3000,
+      "duration_min": 240
+    },
+    {
+      "title": "LOGREP 3 — Phase 2 Log",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Phase 2 logistics report. Critical supplies identified. Emergency resupply requests.",
+      "start_offset_min": 3120,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 2 Main Activity",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Phase 2 core operations. Multi-domain coordination: ground, air, cyber, information.",
+      "start_offset_min": 3240,
+      "duration_min": 1080
+    },
+    {
+      "title": "Decision Point Bravo — Phase 3 Gateway",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Coalition commander decision: conditions for Phase 3 met? All contingents must be above 70% effective strength.",
+      "start_offset_min": 3480,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1800 D3",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D3 coalition SITREP.",
+      "start_offset_min": 3480,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Ops Phase 2 D3",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "D3 night operations. Phase 2 continuation.",
+      "start_offset_min": 3600,
+      "duration_min": 720
+    },
+    {
+      "title": "SITREP 0400 D4",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Pre-dawn D4 report. Phase 3 readiness.",
+      "start_offset_min": 3960,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 3 Initiating",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Phase 3 begins — Exploitation. All coalition elements advance on assigned axes.",
+      "start_offset_min": 4320,
+      "duration_min": 0
+    },
+    {
+      "title": "Phase 3 Orders Group",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Phase 3 coalition orders. Final objectives, decision points, end state conditions.",
+      "start_offset_min": 4320,
+      "duration_min": 120
+    },
+    {
+      "title": "Exploitation Operations D4",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Exploitation phase. All national contingents execute Phase 3 tasks.",
+      "start_offset_min": 4440,
+      "duration_min": 1080
+    },
+    {
+      "title": "LOGREP 4 — Final Log",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Final logistics report. End-state log status for all contingents.",
+      "start_offset_min": 4680,
+      "duration_min": 0
+    },
+    {
+      "title": "Decision Point Charlie — End State",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Coalition commander confirms exercise end state achieved. All Phase 3 objectives met.",
+      "start_offset_min": 4920,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1800 D4",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Evening D4 SITREP. Phase 3 status.",
+      "start_offset_min": 4920,
+      "duration_min": 0
+    },
+    {
+      "title": "Night Ops D4",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "D4 night. Final operations and consolidation. AAR preparation begins.",
+      "start_offset_min": 5160,
+      "duration_min": 600
+    },
+    {
+      "title": "SITREP 0400 D5",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Pre-dawn D5 report. All contingents confirm Phase 3 complete.",
+      "start_offset_min": 5400,
+      "duration_min": 0
+    },
+    {
+      "title": "D5 Morning Brief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Day 5 morning brief. Exercise overview, AAR schedule, national debrief timings.",
+      "start_offset_min": 5760,
+      "duration_min": 60
+    },
+    {
+      "title": "Multinational AAR",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full coalition after action review. Each national contingent presents: strengths, weaknesses, interoperability issues, recommendations.",
+      "start_offset_min": 5820,
+      "duration_min": 300
+    },
+    {
+      "title": "Physical: Closing Ceremony",
+      "event_type": "physical_meeting",
+      "color": "#D35400",
+      "description": "Closing ceremony with all national representatives. Exercise commander's assessment delivered. Certificate of participation.",
+      "start_offset_min": 6000,
+      "duration_min": 120
+    },
+    {
+      "title": "Final Exercise Report",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Coalition exercise report submitted. Distributed to all national HQs within 48 hours.",
+      "start_offset_min": 6120,
+      "duration_min": 180
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "5-day NATO integration exercise concluded. All national contingents released.",
+      "start_offset_min": 6300,
+      "duration_min": 0
+    }
   ]
 }

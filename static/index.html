@@ -145,6 +145,7 @@
         <button class="sidebar-tab admin-only" data-tab="groups" style="display:none" data-i18n="tab_groups">Groups</button>
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
+        <button class="sidebar-tab admin-only" data-tab="integrations" style="display:none" data-i18n="tab_integrations">🔌 Integrations</button>
         <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
@@ -549,6 +550,9 @@
               <option value="none">🔇 Silent</option>
             </select>
           </div>
+          <div style="margin-top:4px">
+            <input type="url" id="inlineAlarmWebhookURL" class="ctrl-select" style="width:100%;height:auto;padding:4px 8px" placeholder="Notify webhook URL (optional)">
+          </div>
         </div>
       </div>
       <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
@@ -611,6 +615,10 @@
           <option value="beep">📢 Single beep</option>
           <option value="none">🔇 Silent</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label id="lbl-alarm-webhook">Notify webhook (optional)</label>
+        <input type="url" id="alarmWebhookURL" placeholder="https://…/webhook (fires when alarm triggers)">
       </div>
     </div>
     <div class="modal-footer">

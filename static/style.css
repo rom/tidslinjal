@@ -142,6 +142,7 @@ body.size-normal {
 }
 body.size-large {
   --fs-base:    18px;  --fs-sm: 15px; --fs-xs: 13px; --fs-lg: 21px; --fs-xl: 32px; --fs-2xl: 38px;
+  --header-h:   68px;
   --slot-h-ten:     40px;
   --slot-h-quarter: 30px;
   --slot-h-hour:    70px;
@@ -151,6 +152,7 @@ body.size-large {
 }
 body.size-huge {
   --fs-base:    22px;  --fs-sm: 18px; --fs-xs: 15px; --fs-lg: 26px; --fs-xl: 42px; --fs-2xl: 50px;
+  --header-h:   80px;
   --slot-h-ten:     56px;
   --slot-h-quarter: 42px;
   --slot-h-hour:    96px;
@@ -216,8 +218,9 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 #header {
-  height: var(--header-h); background: var(--bg2); border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; padding: 0 12px; gap: 8px; flex-shrink: 0; z-index: 50;
+  min-height: var(--header-h); background: var(--bg2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 4px 12px; gap: 8px; flex-shrink: 0; z-index: 50;
+  flex-wrap: wrap;
 }
 #header .logo { font-size: var(--fs-xl); font-weight: 700; color: var(--text-bright); letter-spacing: .02em; margin-right: 6px; white-space: nowrap; }
 #header .logo span { color: var(--accent); }

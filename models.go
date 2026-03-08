@@ -283,7 +283,8 @@ type Alarm struct {
 	EventTitle     string     `json:"event_title"`
 	EventTime      time.Time  `json:"event_time"`
 	LeadTime       int        `json:"lead_time"` // minutes before
-	Sound          string     `json:"sound,omitempty"` // alarm sound: "klaxon" | "beep" | "chime" | "siren" | "alert" | "none"
+	Sound          string     `json:"sound,omitempty"`       // alarm sound: "klaxon" | "beep" | "chime" | "siren" | "alert" | "none"
+	WebhookURL     string     `json:"webhook_url,omitempty"` // optional per-alarm webhook URL called when alarm fires
 	IsActive       bool       `json:"is_active"`
 	Fired          bool       `json:"fired"`
 	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
@@ -340,6 +341,8 @@ type Template struct {
 	Name          string          `json:"name"`
 	Description   string          `json:"description"`
 	ExerciseName  string          `json:"exercise_name,omitempty"` // optional: sets exercise label when applied/imported
+	DayStartHour  int             `json:"day_start_hour,omitempty"` // preferred start of day when applied (0-23)
+	DayEndHour    int             `json:"day_end_hour,omitempty"`   // preferred end of day when applied (1-24)
 	Scope         string          `json:"scope"`                   // private | public
 	CreatedBy     int64           `json:"created_by"`
 	CreatedByName string          `json:"created_by_name"`

@@ -287,14 +287,13 @@ func (app *App) audit(userID int64, userName, action, entityType string, entityI
 	})
 }
 
-// callWebhook fires a user's configured webhook (if any) asynchronously
-func (app *App) callWebhook(userID int64, msg string, notif AlarmNotification) {
-	prefs := app.store.GetPreferences(userID)
-	if prefs.WebhookURL == "" {
+// callWebhookURL fires an arbitrary webhook URL asynchronously
+func (app *App) callWebhookURL(url, webhookType, msg string, notif AlarmNotification) {
+	if url == "" {
 		return
 	}
 	var payload []byte
-	switch prefs.WebhookType {
+	switch webhookType {
 	case "mattermost", "slack":
 		payload, _ = json.Marshal(map[string]string{"text": msg})
 	default:
@@ -306,13 +305,19 @@ func (app *App) callWebhook(userID int64, msg string, notif AlarmNotification) {
 		})
 	}
 	go func() {
-		resp, err := http.Post(prefs.WebhookURL, "application/json", bytes.NewReader(payload))
+		resp, err := http.Post(url, "application/json", bytes.NewReader(payload))
 		if err != nil {
-			log.Printf("webhook for user %d failed: %v", userID, err)
+			log.Printf("webhook to %s failed: %v", url, err)
 			return
 		}
 		resp.Body.Close()
 	}()
+}
+
+// callWebhook fires a user's configured webhook (if any) asynchronously
+func (app *App) callWebhook(userID int64, msg string, notif AlarmNotification) {
+	prefs := app.store.GetPreferences(userID)
+	app.callWebhookURL(prefs.WebhookURL, prefs.WebhookType, msg, notif)
 }
 
 func (app *App) userGroups(userID int64) []int64 {
@@ -828,6 +833,7 @@ func (app *App) handleGetPreferences(w http.ResponseWriter, r *http.Request, use
 }
 
 func (app *App) handleSavePreferences(w http.ResponseWriter, r *http.Request, user *User) {
+	oldPrefs := app.store.GetPreferences(user.ID)
 	var p UserPreferences
 	if err := decode(r, &p); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -843,6 +849,18 @@ func (app *App) handleSavePreferences(w http.ResponseWriter, r *http.Request, us
 	if err := app.store.SavePreferences(p); err != nil {
 		jsonError(w, "failed to save", http.StatusInternalServerError)
 		return
+	}
+	// Audit webhook/integration changes
+	if p.WebhookURL != oldPrefs.WebhookURL {
+		if p.WebhookURL == "" {
+			app.audit(user.ID, user.DisplayName, "deleted", "integration", 0, "Webhook integration removed")
+		} else if oldPrefs.WebhookURL == "" {
+			app.audit(user.ID, user.DisplayName, "created", "integration", 0,
+				fmt.Sprintf("Webhook integration configured: type=%s", p.WebhookType))
+		} else {
+			app.audit(user.ID, user.DisplayName, "updated", "integration", 0,
+				fmt.Sprintf("Webhook integration updated: type=%s", p.WebhookType))
+		}
 	}
 	jsonOK(w, p)
 }
@@ -1666,10 +1684,11 @@ func (app *App) handleGetAlarms(w http.ResponseWriter, r *http.Request, user *Us
 
 func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		EventID   int64  `json:"event_id"`
-		LeadTime  int    `json:"lead_time"`
-		Sound     string `json:"sound"`      // optional alarm sound
-		ForUserID int64  `json:"for_user_id"` // optional: create alarm for another user (oplead+ only)
+		EventID    int64  `json:"event_id"`
+		LeadTime   int    `json:"lead_time"`
+		Sound      string `json:"sound"`       // optional alarm sound
+		WebhookURL string `json:"webhook_url"` // optional per-alarm webhook URL
+		ForUserID  int64  `json:"for_user_id"` // optional: create alarm for another user (oplead+ only)
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1691,7 +1710,7 @@ func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *
 	created, err := app.store.CreateAlarm(Alarm{
 		UserID: targetUserID, EventID: req.EventID,
 		EventTitle: event.Title, EventTime: event.StartTime, LeadTime: req.LeadTime,
-		Sound: req.Sound,
+		Sound: req.Sound, WebhookURL: req.WebhookURL,
 	})
 	if err != nil {
 		jsonError(w, "failed to create alarm", http.StatusInternalServerError)
@@ -2361,7 +2380,22 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		app.store.SaveExerciseSettings(ex) //nolint
 		exerciseNameSet = tmpl.ExerciseName
 	}
-	jsonOK(w, map[string]interface{}{"created": count, "exercise_name": exerciseNameSet})
+	// If the template carries day hour preferences, update the requesting user's preferences
+	dayStartHour, dayEndHour := 0, 0
+	if tmpl.DayEndHour > 0 {
+		prefs := app.store.GetPreferences(user.ID)
+		prefs.DayStartHour = tmpl.DayStartHour
+		prefs.DayEndHour = tmpl.DayEndHour
+		app.store.SavePreferences(prefs) //nolint
+		dayStartHour = tmpl.DayStartHour
+		dayEndHour = tmpl.DayEndHour
+	}
+	jsonOK(w, map[string]interface{}{
+		"created":        count,
+		"exercise_name":  exerciseNameSet,
+		"day_start_hour": dayStartHour,
+		"day_end_hour":   dayEndHour,
+	})
 }
 
 // handleGetRoles returns the current role configurations
@@ -2391,6 +2425,8 @@ func (app *App) handleUpdateRoles(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "updated", "roles", 0,
+		fmt.Sprintf("Updated %d role configuration(s)", len(filtered)))
 	jsonOK(w, filtered)
 }
 
@@ -2858,6 +2894,18 @@ func (app *App) runAlarmScheduler() {
 					LeadTime: alarm.LeadTime, Sound: alarm.Sound, Message: msg,
 				}
 				app.broker.Notify(alarm.UserID, notif)
+				// Call per-alarm webhook if set
+				if alarm.WebhookURL != "" {
+					app.callWebhookURL(alarm.WebhookURL, "generic", msg, notif)
+					app.audit(alarm.UserID, "", "posted", "integration", alarm.ID,
+						fmt.Sprintf("Alarm webhook fired for %q (event: %s)", alarm.EventTitle, alarm.EventTime.Format("2006-01-02 15:04")))
+				}
+				// Call user-level webhook if configured, and audit it
+				userPrefs := app.store.GetPreferences(alarm.UserID)
+				if userPrefs.WebhookURL != "" {
+					app.audit(alarm.UserID, "", "posted", "integration", alarm.ID,
+						fmt.Sprintf("Alarm notification posted to user webhook for %q", alarm.EventTitle))
+				}
 				app.callWebhook(alarm.UserID, msg, notif)
 			}
 		}

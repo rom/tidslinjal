@@ -1,52 +1,326 @@
 {
   "name": "EX-08 Crisis Management Simulation — 3 Days",
   "description": "3-day multi-agency crisis management simulation, working hours (0800–1800). Covers initial crisis notification, escalation, inter-agency coordination, public information management, and recovery. Demonstrates how a civilian crisis management exercise differs from military exercises: emphasis on information, legal authority, and media management.",
+  "exercise_name": "EX-08 Crisis Management",
+  "day_start_hour": 8,
+  "day_end_hour": 18,
   "scope": "public",
   "phases": [
-    {"name": "Initial Response",    "color": "#E74C3C", "start_offset_min": 0,    "end_offset_min": 360,  "order": 0},
-    {"name": "Crisis Escalation",   "color": "#C0392B", "start_offset_min": 360,  "end_offset_min": 600,  "order": 1},
-    {"name": "D1 Recess",           "color": "#BDC3C7", "start_offset_min": 600,  "end_offset_min": 1440, "order": 2},
-    {"name": "Stabilization",       "color": "#F39C12", "start_offset_min": 1440, "end_offset_min": 2040, "order": 3},
-    {"name": "D2 Recess",           "color": "#BDC3C7", "start_offset_min": 2040, "end_offset_min": 2880, "order": 4},
-    {"name": "Recovery & Lessons",  "color": "#27AE60", "start_offset_min": 2880, "end_offset_min": 3480, "order": 5}
+    {
+      "name": "Initial Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 360,
+      "order": 0
+    },
+    {
+      "name": "Crisis Escalation",
+      "color": "#C0392B",
+      "start_offset_min": 360,
+      "end_offset_min": 600,
+      "order": 1
+    },
+    {
+      "name": "D1 Recess",
+      "color": "#BDC3C7",
+      "start_offset_min": 600,
+      "end_offset_min": 1440,
+      "order": 2
+    },
+    {
+      "name": "Stabilization",
+      "color": "#F39C12",
+      "start_offset_min": 1440,
+      "end_offset_min": 2040,
+      "order": 3
+    },
+    {
+      "name": "D2 Recess",
+      "color": "#BDC3C7",
+      "start_offset_min": 2040,
+      "end_offset_min": 2880,
+      "order": 4
+    },
+    {
+      "name": "Recovery & Lessons",
+      "color": "#27AE60",
+      "start_offset_min": 2880,
+      "end_offset_min": 3480,
+      "order": 5
+    }
   ],
   "locks": [
-    {"start_offset_min": 240,  "end_offset_min": 300,  "reason": "Day 1 lunch break — no crisis injects", "scope": "all"},
-    {"start_offset_min": 600,  "end_offset_min": 1440, "reason": "Overnight recess D1/D2 — exercise continues at 0800 Day 2", "scope": "all"},
-    {"start_offset_min": 1680, "end_offset_min": 1740, "reason": "Day 2 lunch break", "scope": "all"},
-    {"start_offset_min": 2040, "end_offset_min": 2880, "reason": "Overnight recess D2/D3 — exercise continues at 0800 Day 3", "scope": "all"},
-    {"start_offset_min": 3120, "end_offset_min": 3180, "reason": "Day 3 lunch break", "scope": "all"}
+    {
+      "start_offset_min": 240,
+      "end_offset_min": 300,
+      "reason": "Day 1 lunch break — no crisis injects",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 600,
+      "end_offset_min": 1440,
+      "reason": "Overnight recess D1/D2 — exercise continues at 0800 Day 2",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1680,
+      "end_offset_min": 1740,
+      "reason": "Day 2 lunch break",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2040,
+      "end_offset_min": 2880,
+      "reason": "Overnight recess D2/D3 — exercise continues at 0800 Day 3",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 3120,
+      "end_offset_min": 3180,
+      "reason": "Day 3 lunch break",
+      "scope": "all"
+    }
   ],
   "items": [
-    {"title": "STARTEX",                             "event_type": "instant",       "color": "#E74C3C", "description": "Exercise begins. Emergency Operations Centre (EOC) activated. All agency representatives take their seats.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "INJECT: Crisis Notification",         "event_type": "instant",       "color": "#C0392B", "description": "Exercise inject: notification received of a major infrastructure failure affecting power and communications across the region.", "start_offset_min": 0,    "duration_min": 0},
-    {"title": "EOC Activation",                      "event_type": "activity",      "color": "#2ECC71", "description": "Emergency Operations Centre fully activated. Agency leads confirm presence, comms tested, situation boards updated.", "start_offset_min": 0,    "duration_min": 120},
-    {"title": "Initial Situation Briefing",          "event_type": "mote",          "color": "#7F8C8D", "description": "Crisis coordinator briefs all agencies on the initial incident: scope, affected area, known impacts, initial priorities.", "start_offset_min": 60,   "duration_min": 60},
-    {"title": "PIO: Initial Media Brief Preparation", "event_type": "assigned_task", "color": "#E67E22", "description": "Public Information Officer prepares the first public statement. Draft for approval by crisis coordinator before release.", "start_offset_min": 120,  "duration_min": 60},
-    {"title": "Inter-Agency Coordination Call",      "event_type": "mote",          "color": "#7F8C8D", "description": "Call with all represented agencies (Police, Fire, Health, Utilities, Transport). Establish responsibilities, resources, and coordination channels.", "start_offset_min": 180,  "duration_min": 60},
-    {"title": "Deadline: First Public Statement",    "event_type": "deadline",      "color": "#C0392B", "description": "First public statement must be released by this time. Delay risks public anxiety and media pressure.", "start_offset_min": 240,  "duration_min": 0},
-    {"title": "SITREP 1300 D1",                     "event_type": "reporting",     "color": "#1ABC9C", "description": "Mid-day consolidated situation report. All agencies submit status to the EOC crisis coordinator.", "start_offset_min": 300,  "duration_min": 0},
-    {"title": "INJECT: Escalation — Additional Area", "event_type": "event",        "color": "#C0392B", "description": "Exercise inject: the crisis has spread to an additional district. New agency resources required. Legal authority for emergency powers activation.", "start_offset_min": 300,  "duration_min": 0},
-    {"title": "Resource Allocation Decision",        "event_type": "decision",      "color": "#27AE60", "description": "Crisis coordinator must allocate additional resources across the expanded affected area. Prioritization required.", "start_offset_min": 300,  "duration_min": 0},
-    {"title": "Evacuation Coordination",             "event_type": "assigned_task", "color": "#E67E22", "description": "Police and Transport agencies coordinate evacuation of affected residential zones. 2000 simulated residents.", "start_offset_min": 300,  "duration_min": 120},
-    {"title": "Medical Response Coordination",       "event_type": "assigned_task", "color": "#E67E22", "description": "Health agency coordinates medical response. Field hospitals activated. Patient tracking initiated.", "start_offset_min": 360,  "duration_min": 120},
-    {"title": "Deadline: Second Public Statement",   "event_type": "deadline",      "color": "#C0392B", "description": "Updated public statement required with evacuation guidance.", "start_offset_min": 420,  "duration_min": 0},
-    {"title": "SITREP 1600 D1",                     "event_type": "reporting",     "color": "#1ABC9C", "description": "Afternoon report. Evacuation progress, medical status, utilities restoration estimate, public response.", "start_offset_min": 480,  "duration_min": 0},
-    {"title": "Day 1 Operations Review",             "event_type": "mote",          "color": "#7F8C8D", "description": "EOC close-of-day review. Assess Day 1 response effectiveness. Priorities for Day 2. Media strategy update.", "start_offset_min": 540,  "duration_min": 60},
-    {"title": "D1 Close",                            "event_type": "instant",       "color": "#95A5A6", "description": "Day 1 exercise activities concluded. Overnight recess. EOC maintains minimal watch.", "start_offset_min": 600,  "duration_min": 0},
-    {"title": "D2 Morning Brief",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Day 2 commences. Overnight summary. Resource status. Day 2 stabilization objectives.", "start_offset_min": 1440, "duration_min": 60},
-    {"title": "Resource Status Update",              "event_type": "reporting",     "color": "#1ABC9C", "description": "All agencies report resource consumption, availability for Day 2, and gaps requiring inter-agency support.", "start_offset_min": 1500, "duration_min": 0},
-    {"title": "Stabilization Operations D2",         "event_type": "activity",      "color": "#2ECC71", "description": "Stabilization phase. Utilities restoration, shelter coordination, return-to-home assessment for cleared areas.", "start_offset_min": 1500, "duration_min": 300},
-    {"title": "External Agency Debrief",             "event_type": "mote",          "color": "#7F8C8D", "description": "Debrief with external agencies (National Red Cross, NGOs, Media representatives). Information sharing and coordination.", "start_offset_min": 1680, "duration_min": 60},
-    {"title": "SITREP D2 Afternoon",                "event_type": "reporting",     "color": "#1ABC9C", "description": "Afternoon D2 report. Stabilization progress, remaining critical tasks, Day 3 priorities.", "start_offset_min": 1860, "duration_min": 0},
-    {"title": "Stabilization Decision Point",        "event_type": "decision",      "color": "#27AE60", "description": "Decision: Is the situation stable enough to begin phased return and stand-down of emergency resources?", "start_offset_min": 1920, "duration_min": 0},
-    {"title": "Day 2 Summary",                       "event_type": "mote",          "color": "#7F8C8D", "description": "D2 close. Confirm Day 3 recovery plan. Media statement for overnight.", "start_offset_min": 1980, "duration_min": 60},
-    {"title": "D2 Close",                            "event_type": "instant",       "color": "#95A5A6", "description": "Day 2 exercise activities concluded. Overnight recess.", "start_offset_min": 2040, "duration_min": 0},
-    {"title": "D3 Morning Brief",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Day 3 commences. Transition to recovery phase. Review D1/D2 performance.", "start_offset_min": 2880, "duration_min": 60},
-    {"title": "Recovery Operations D3",              "event_type": "activity",      "color": "#2ECC71", "description": "Recovery phase. Infrastructure restoration, returning residents, service normalisation, administration.", "start_offset_min": 2940, "duration_min": 240},
-    {"title": "Lessons Observed Collection",         "event_type": "activity",      "color": "#2ECC71", "description": "Structured lessons observed exercise. All agencies document: what was planned, what happened, gap analysis.", "start_offset_min": 3180, "duration_min": 120},
-    {"title": "Final Report Compilation",            "event_type": "reporting",     "color": "#1ABC9C", "description": "Crisis coordinator compiles the final exercise report for all agency heads.", "start_offset_min": 3300, "duration_min": 120},
-    {"title": "Multi-Agency AAR",                    "event_type": "mote",          "color": "#7F8C8D", "description": "Full multi-agency after action review. Structured: situation, actions, results, lessons. Actionable recommendations.", "start_offset_min": 3420, "duration_min": 60},
-    {"title": "ENDEX",                               "event_type": "instant",       "color": "#E74C3C", "description": "3-day crisis management exercise concluded. Exercise reports to be submitted within 5 working days.", "start_offset_min": 3480, "duration_min": 0}
+    {
+      "title": "STARTEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Exercise begins. Emergency Operations Centre (EOC) activated. All agency representatives take their seats.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Crisis Notification",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "Exercise inject: notification received of a major infrastructure failure affecting power and communications across the region.",
+      "start_offset_min": 0,
+      "duration_min": 0
+    },
+    {
+      "title": "EOC Activation",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Emergency Operations Centre fully activated. Agency leads confirm presence, comms tested, situation boards updated.",
+      "start_offset_min": 0,
+      "duration_min": 120
+    },
+    {
+      "title": "Initial Situation Briefing",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Crisis coordinator briefs all agencies on the initial incident: scope, affected area, known impacts, initial priorities.",
+      "start_offset_min": 60,
+      "duration_min": 60
+    },
+    {
+      "title": "PIO: Initial Media Brief Preparation",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Public Information Officer prepares the first public statement. Draft for approval by crisis coordinator before release.",
+      "start_offset_min": 120,
+      "duration_min": 60
+    },
+    {
+      "title": "Inter-Agency Coordination Call",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Call with all represented agencies (Police, Fire, Health, Utilities, Transport). Establish responsibilities, resources, and coordination channels.",
+      "start_offset_min": 180,
+      "duration_min": 60
+    },
+    {
+      "title": "Deadline: First Public Statement",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "First public statement must be released by this time. Delay risks public anxiety and media pressure.",
+      "start_offset_min": 240,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1300 D1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Mid-day consolidated situation report. All agencies submit status to the EOC crisis coordinator.",
+      "start_offset_min": 300,
+      "duration_min": 0
+    },
+    {
+      "title": "INJECT: Escalation — Additional Area",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "Exercise inject: the crisis has spread to an additional district. New agency resources required. Legal authority for emergency powers activation.",
+      "start_offset_min": 300,
+      "duration_min": 0
+    },
+    {
+      "title": "Resource Allocation Decision",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Crisis coordinator must allocate additional resources across the expanded affected area. Prioritization required.",
+      "start_offset_min": 300,
+      "duration_min": 0
+    },
+    {
+      "title": "Evacuation Coordination",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Police and Transport agencies coordinate evacuation of affected residential zones. 2000 simulated residents.",
+      "start_offset_min": 300,
+      "duration_min": 120
+    },
+    {
+      "title": "Medical Response Coordination",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Health agency coordinates medical response. Field hospitals activated. Patient tracking initiated.",
+      "start_offset_min": 360,
+      "duration_min": 120
+    },
+    {
+      "title": "Deadline: Second Public Statement",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Updated public statement required with evacuation guidance.",
+      "start_offset_min": 420,
+      "duration_min": 0
+    },
+    {
+      "title": "SITREP 1600 D1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Afternoon report. Evacuation progress, medical status, utilities restoration estimate, public response.",
+      "start_offset_min": 480,
+      "duration_min": 0
+    },
+    {
+      "title": "Day 1 Operations Review",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "EOC close-of-day review. Assess Day 1 response effectiveness. Priorities for Day 2. Media strategy update.",
+      "start_offset_min": 540,
+      "duration_min": 60
+    },
+    {
+      "title": "D1 Close",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "Day 1 exercise activities concluded. Overnight recess. EOC maintains minimal watch.",
+      "start_offset_min": 600,
+      "duration_min": 0
+    },
+    {
+      "title": "D2 Morning Brief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Day 2 commences. Overnight summary. Resource status. Day 2 stabilization objectives.",
+      "start_offset_min": 1440,
+      "duration_min": 60
+    },
+    {
+      "title": "Resource Status Update",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "All agencies report resource consumption, availability for Day 2, and gaps requiring inter-agency support.",
+      "start_offset_min": 1500,
+      "duration_min": 0
+    },
+    {
+      "title": "Stabilization Operations D2",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Stabilization phase. Utilities restoration, shelter coordination, return-to-home assessment for cleared areas.",
+      "start_offset_min": 1500,
+      "duration_min": 300
+    },
+    {
+      "title": "External Agency Debrief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Debrief with external agencies (National Red Cross, NGOs, Media representatives). Information sharing and coordination.",
+      "start_offset_min": 1680,
+      "duration_min": 60
+    },
+    {
+      "title": "SITREP D2 Afternoon",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Afternoon D2 report. Stabilization progress, remaining critical tasks, Day 3 priorities.",
+      "start_offset_min": 1860,
+      "duration_min": 0
+    },
+    {
+      "title": "Stabilization Decision Point",
+      "event_type": "decision",
+      "color": "#27AE60",
+      "description": "Decision: Is the situation stable enough to begin phased return and stand-down of emergency resources?",
+      "start_offset_min": 1920,
+      "duration_min": 0
+    },
+    {
+      "title": "Day 2 Summary",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "D2 close. Confirm Day 3 recovery plan. Media statement for overnight.",
+      "start_offset_min": 1980,
+      "duration_min": 60
+    },
+    {
+      "title": "D2 Close",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "Day 2 exercise activities concluded. Overnight recess.",
+      "start_offset_min": 2040,
+      "duration_min": 0
+    },
+    {
+      "title": "D3 Morning Brief",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Day 3 commences. Transition to recovery phase. Review D1/D2 performance.",
+      "start_offset_min": 2880,
+      "duration_min": 60
+    },
+    {
+      "title": "Recovery Operations D3",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Recovery phase. Infrastructure restoration, returning residents, service normalisation, administration.",
+      "start_offset_min": 2940,
+      "duration_min": 240
+    },
+    {
+      "title": "Lessons Observed Collection",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Structured lessons observed exercise. All agencies document: what was planned, what happened, gap analysis.",
+      "start_offset_min": 3180,
+      "duration_min": 120
+    },
+    {
+      "title": "Final Report Compilation",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Crisis coordinator compiles the final exercise report for all agency heads.",
+      "start_offset_min": 3300,
+      "duration_min": 120
+    },
+    {
+      "title": "Multi-Agency AAR",
+      "event_type": "mote",
+      "color": "#7F8C8D",
+      "description": "Full multi-agency after action review. Structured: situation, actions, results, lessons. Actionable recommendations.",
+      "start_offset_min": 3420,
+      "duration_min": 60
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "3-day crisis management exercise concluded. Exercise reports to be submitted within 5 working days.",
+      "start_offset_min": 3480,
+      "duration_min": 0
+    }
   ]
 }
