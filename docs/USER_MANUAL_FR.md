@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 3.2.0**
+**Version 3.6.0**
 
 ---
 
@@ -61,6 +61,26 @@ Naviguez vers `http://<serveur>:<port>` (par défaut : `http://localhost:8080`).
 Identifiants par défaut : `admin` / `admin`
 
 > **Note de sécurité :** Changez le mot de passe administrateur immédiatement après la première connexion en utilisant le bouton 🔑 en haut à droite de l'en-tête.
+
+### Auto-inscription
+
+Si l'administrateur a activé l'auto-inscription, un lien **« Pas encore de compte ? S'inscrire »** apparaît sur la page de connexion. Il existe quatre modes d'inscription :
+
+| Mode | Description |
+|---|---|
+| **Ouvert** | Tout le monde peut s'inscrire ; le compte est immédiatement actif |
+| **Validé** | Tout le monde peut s'inscrire ; l'administrateur doit approuver le compte avant la connexion |
+| **Invitation générique** | L'inscription requiert un code d'invitation partagé fourni par l'administrateur |
+| **Invitation personnelle** | L'inscription requiert un code à usage unique généré par l'administrateur pour chaque utilisateur |
+
+### Réinitialisation du mot de passe
+
+Si vous avez enregistré une adresse courriel sur votre profil :
+
+1. Cliquez sur **Mot de passe oublié ?** sur la page de connexion
+2. Saisissez votre nom d'utilisateur ou votre adresse courriel
+3. Un jeton de réinitialisation est généré (affiché à l'écran si aucun serveur de messagerie n'est configuré)
+4. Cliquez sur **Réinitialiser le mot de passe**, collez le jeton et choisissez un nouveau mot de passe
 
 ### Changer votre mot de passe
 
@@ -398,12 +418,14 @@ Les créneaux verrouillés apparaissent avec un motif hachuré rouge. Les évén
 
 | Rôle | Abréviation | Capacités |
 |---|---|---|
+| **Observateur** | `observer` | Accès en lecture seule à la chronologie et aux événements — ne peut pas modifier, commenter ou verrouiller |
 | **Lecture** | `read` | Voir la chronologie, les événements, les couches ; définir des alarmes personnelles |
 | **Rapporteur** | `reporter` | + Publier des commentaires ; définir répondu/terminé (avec approbation) |
 | **Lecture/Écriture** | `readwrite` | + Créer/modifier ses propres événements ; créer des types d'événements et des couches |
 | **Chef d'équipe** | `teamlead` | + Créer des groupes ; vérifier/rejeter les événements soumis ; voir le journal d'audit ; gérer les phases |
 | **Chef des opérations** | `oplead` | + Créer/modifier/supprimer des événements sur la chronologie principale |
-| **Admin** | `admin` | Accès complet — gérer tous les utilisateurs, rôles, verrous, paramètres d'exercice |
+| **Officier de renseignement adjoint** | `staffofficer` | Mêmes droits que le chef des opérations — désignation alternative pour le personnel d'état-major |
+| **Admin** | `admin` | Accès complet — gérer tous les utilisateurs, rôles, verrous, paramètres d'exercice, inscription |
 
 Le drapeau `peut_verrouiller` peut être accordé à n'importe quel utilisateur quel que soit son rôle.
 
@@ -424,9 +446,17 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 
 La langue peut aussi être changée instantanément avec les boutons de drapeaux (🇬🇧 🇸🇪 🇫🇷) dans la barre d'outils.
 
-### Heures de journée
+### Format date/heure et heures de journée
 
-Définissez **Heure de début** et **Heure de fin** pour votre « fenêtre de travail ». Les créneaux en dehors de cette fenêtre apparaissent grisés/rayés.
+La section **Format date/heure** regroupe à la fois la sélection du format et la configuration des heures de journée :
+
+| Réglage | Description |
+|---|---|
+| **Format de date** | ISO 8601 / UK / FR / SV |
+| **Début du jour** | Première heure de la journée de travail |
+| **Fin du jour** | Dernière heure de la journée de travail |
+
+Les créneaux en dehors des heures de journée apparaissent grisés/rayés.
 
 ### Vue par défaut
 

@@ -298,9 +298,13 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     // Track undo for new events
     if (!id) pushUndo('create_event', { id: eventID });
 
-    // Check for conflicts/overlaps
-    const conflicts = checkConflicts(saved);
-    if (conflicts.length) showConflictWarning(conflicts);
+    // Show overlap warnings if any
+    if (saved.overlap_warnings && saved.overlap_warnings.length > 0) {
+      const msgs = saved.overlap_warnings.map(w =>
+        `• ${escHtml(w.user_name||'User #'+w.user_id)} ${t('overlap_also_in')||'is also scheduled in'}: "${escHtml(w.event_title)}"`
+      ).join('\n');
+      showError(`${t('overlap_warning')||'Scheduling overlap detected'}:\n${msgs}`, t('overlap_warning_title')||'Overlap Warning');
+    }
 
     // Upload attachment if a file was selected
     const attachFile = document.getElementById('eventAttachFile');
@@ -810,6 +814,7 @@ async function openUserModal(user) {
   document.getElementById('uUsername').disabled = isEdit;
   document.getElementById('uPassword').value = '';
   document.getElementById('uDisplayName').value = user ? (user.display_name||'') : '';
+  document.getElementById('uEmail').value = user ? (user.email||'') : '';
   document.getElementById('uRole').value = user ? user.role : 'read';
   document.getElementById('uCanLock').checked = user ? user.can_lock : false;
   const delBtn = document.getElementById('btnDeleteUser');
@@ -846,8 +851,9 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
   const role = document.getElementById('uRole').value;
   const canLock = document.getElementById('uCanLock').checked;
   if (!id && (!username||!password)) { showError('Username and password required', 'Validation'); return; }
+  const email = document.getElementById('uEmail').value.trim();
   const groupIDs = [...document.querySelectorAll('input[name="uGroup"]:checked')].map(cb => parseInt(cb.value, 10));
-  const payload = {display_name:displayName, role, can_lock:canLock, group_ids:groupIDs};
+  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs};
   if (!id) { payload.username=username; payload.password=password; }
   if (id&&password) { payload.password=password; }
   const res = id ? await apiPut(`/api/users/${id}`, payload) : await apiPost('/api/users', payload);
@@ -1222,17 +1228,24 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">System</div>
+        <div class="sidebar-section-title">${t('info_system')||'System'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
-          <span style="color:var(--text-dim)">Language:</span><span>${langLabel}</span>
-          <span style="color:var(--text-dim)">Users:</span><span>${state.users.length}</span>
-          <span style="color:var(--text-dim)">Groups:</span><span>${state.groups.length}</span>
-          <span style="color:var(--text-dim)">Active layers:</span><span>${activeLayers.length > 0 ? activeLayers.map(l=>escHtml(l.name)).join(', ') : '—'}</span>
-          <span style="color:var(--text-dim)">Synthetic time:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
-          <span style="color:var(--text-dim)">Last template:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
-          <span style="color:var(--text-dim)">Version:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_language')||'Language'}:</span><span>${langLabel}</span>
+          <span style="color:var(--text-dim)">${t('info_users')||'Users'}:</span><span>${state.users.length}</span>
+          <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
+          <span style="color:var(--text-dim)">${t('info_active_layers')||'Active layers'}:</span><span>${activeLayers.length > 0 ? activeLayers.map(l=>escHtml(l.name)).join(', ') : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_synth_time')||'Synthetic time'}:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
         </div>
       </div>
+      ${vInfo.github ? `
+      <div class="sidebar-section" style="padding-top:6px">
+        <a href="${escHtml(vInfo.github)}" target="_blank" rel="noopener" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:5px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          ${t('github_link')||'GitHub Repository'}
+        </a>
+      </div>` : ''}
     `;
   } else if (tab === 'alarms') {
     const active = state.alarms.filter(a => !a.fired);
@@ -1417,10 +1430,8 @@ function renderSidebar() {
             `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" onclick="setPref('date_format','${v}')">${l}</button>`
           ).join('')}
         </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_day_hours')}</div>
-        <div class="hour-range">
+        <div class="hour-range" style="margin-top:10px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_day_hours')}:</span>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
           <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH" style="width:52px" onchange="setHourPref()">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">–</label>
@@ -1802,8 +1813,12 @@ function updateUILabels() {
   setElText('btnDeleteUser', t('user_delete'));
   const uRole = document.getElementById('uRole');
   if (uRole) {
-    const roleMap = {read:'role_read',reporter:'role_reporter',readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',admin:'role_admin'};
-    [...uRole.options].forEach(opt => { opt.text = t(roleMap[opt.value]) || opt.text; });
+    const roleMap = {
+      observer:'role_observer',read:'role_read',reporter:'role_reporter',
+      readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',
+      staffofficer:'role_staffofficer',admin:'role_admin'
+    };
+    [...uRole.options].forEach(opt => { const k = roleMap[opt.value]; if (k) opt.text = t(k) || opt.text; });
   }
 
   // Password modal
@@ -1884,6 +1899,17 @@ function updateUILabels() {
 
   // Member modal
   setElText('lbl-member-close', t('btn_close'));
+
+  // Translate any element with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const translated = t(key);
+    if (translated && translated !== key) el.textContent = translated;
+  });
+
+  // Search placeholder
+  const si = document.getElementById('searchInput');
+  if (si) si.placeholder = t('search_placeholder') || 'Search…';
 
   // Language flag active state
   updateLangFlags();

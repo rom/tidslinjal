@@ -26,12 +26,23 @@
     .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
     .badge-admin { background: rgba(231,76,60,.18); color: #e74c3c; }
     .badge-oplead { background: rgba(230,126,34,.18); color: #e67e22; }
+    .badge-staffofficer { background: rgba(230,126,34,.18); color: #e67e22; }
     .badge-teamlead { background: rgba(26,188,156,.18); color: #1abc9c; }
     .badge-readwrite { background: rgba(52,152,219,.18); color: #3498db; }
     .badge-reporter { background: rgba(155,89,182,.18); color: #9b59b6; }
     .badge-read { background: rgba(127,140,141,.18); color: #7f8c8d; }
+    .badge-observer { background: rgba(127,140,141,.18); color: #7f8c8d; }
     #adminError { color: var(--red); font-size: var(--fs-sm); padding: 12px; background: rgba(231,76,60,.1); border-radius: var(--radius); display: none; }
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .form-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .form-inline label { font-size: var(--fs-sm); color: var(--text-dim); }
+    select.admin-select, input.admin-input {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); padding: 6px 10px; font-size: var(--fs-sm);
+    }
+    .inv-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }
+    .inv-code { font-family: monospace; background: var(--bg3); padding: 2px 6px; border-radius: 4px; }
+    .pending-badge { background: rgba(230,126,34,.2); color: #e67e22; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
   </style>
 </head>
 <body>
@@ -55,7 +66,7 @@
     <div class="admin-grid">
       <div class="admin-stat"><div class="admin-stat-value" id="statUsers">—</div><div class="admin-stat-label">Users</div></div>
       <div class="admin-stat"><div class="admin-stat-value" id="statGroups">—</div><div class="admin-stat-label">Groups</div></div>
-      <div class="admin-stat"><div class="admin-stat-value" id="statEvents">—</div><div class="admin-stat-label">Events (current view)</div></div>
+      <div class="admin-stat"><div class="admin-stat-value" id="statEvents">—</div><div class="admin-stat-label">Events (current month)</div></div>
       <div class="admin-stat"><div class="admin-stat-value" id="statLayers">—</div><div class="admin-stat-label">Layers</div></div>
     </div>
   </div>
@@ -73,10 +84,46 @@
 
   <div class="admin-section">
     <h2>Users</h2>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">
+      Users marked <span class="pending-badge">Pending</span> have self-registered via vetted mode and must be approved before they can log in.
+    </p>
     <table id="userTable">
-      <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Can Lock</th><th>Created</th></tr></thead>
+      <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Email</th><th>Role</th><th>Can Lock</th><th>Status</th><th>Created</th><th></th></tr></thead>
       <tbody id="userTbody"></tbody>
     </table>
+  </div>
+
+  <div class="admin-section">
+    <h2>🔐 Registration Settings</h2>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:14px">
+      Control how new users can self-register on the login page.
+    </p>
+    <div class="form-inline" style="margin-bottom:14px">
+      <label>Registration mode:</label>
+      <select class="admin-select" id="regMode">
+        <option value="off">Off (registration disabled)</option>
+        <option value="open">Open (anyone can register)</option>
+        <option value="vetted">Vetted (admin must approve before login)</option>
+        <option value="generic_invitation">Generic Invitation (shared code required)</option>
+        <option value="personal_invitation">Personal Invitation (unique per-person code)</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="saveRegistrationMode()">Save</button>
+    </div>
+    <div id="genericCodeSection" style="display:none;margin-bottom:14px">
+      <div class="form-inline">
+        <label>Invitation code:</label>
+        <input type="text" class="admin-input" id="genericCode" placeholder="Enter shared invitation code" style="flex:1">
+        <button class="btn btn-secondary btn-sm" onclick="saveRegistrationMode()">Save</button>
+      </div>
+    </div>
+    <div id="personalInvSection" style="display:none">
+      <h3 style="font-size:var(--fs-sm);color:var(--text-bright);margin:10px 0 8px">Personal Invitations</h3>
+      <div class="form-inline" style="margin-bottom:10px">
+        <input type="text" class="admin-input" id="invNote" placeholder="Note (e.g. recipient name/email)">
+        <button class="btn btn-primary btn-sm" onclick="createInvitation()">+ Generate Code</button>
+      </div>
+      <div id="invitationsList"></div>
+    </div>
   </div>
 
   <div class="admin-section" style="border-color: rgba(231,76,60,.5);">
@@ -85,12 +132,18 @@
     <div class="action-row" style="align-items:center;gap:12px">
       <div style="flex:1">
         <div style="font-weight:600;font-size:var(--fs-sm);color:var(--text-bright);margin-bottom:2px">Reset to empty</div>
-        <div style="font-size:var(--fs-xs);color:var(--text-dim)">Deletes all events, layers, groups, locks, templates, and exercise data. Admin account is kept.</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim)">Deletes all events, layers, groups, locks, and exercise data. Admin account is kept. Templates are preserved by default.</div>
       </div>
       <button class="btn btn-danger btn-sm" id="btnResetToEmpty">Reset to empty…</button>
     </div>
     <div id="resetConfirmBox" style="display:none;margin-top:14px;padding:12px;background:rgba(231,76,60,.1);border-radius:var(--radius);border:1px solid rgba(231,76,60,.3)">
       <p style="font-size:var(--fs-sm);color:var(--red);font-weight:600;margin-bottom:8px">⚠ Type RESET to confirm — this cannot be undone</p>
+      <div style="margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="keepTemplatesCheck" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          Keep templates (recommended)
+        </label>
+      </div>
       <div style="display:flex;gap:8px">
         <input type="text" id="resetConfirmInput" placeholder="RESET" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)">
         <button class="btn btn-danger btn-sm" id="btnConfirmReset">Confirm Reset</button>
@@ -99,23 +152,20 @@
     </div>
   </div>
 
-  <div class="admin-section">
-    <h2>Audit Log (last 50)</h2>
-    <table id="auditTable">
-      <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Summary</th></tr></thead>
-      <tbody id="auditTbody"></tbody>
-    </table>
-  </div>
-
   <script src="/static/i18n.js"></script>
   <script>
   'use strict';
   window.state = { preferences: { language: 'en', theme: 'dark', size: 'small' } };
 
-  async function api(path) {
-    const r = await fetch(path);
+  async function api(path, opts) {
+    const r = await fetch(path, opts);
     if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
     if (r.status === 403) { throw new Error('forbidden'); }
+    return r;
+  }
+
+  async function apiJSON(path) {
+    const r = await api(path);
     return r.json();
   }
 
@@ -126,14 +176,14 @@
 
   async function loadAdmin() {
     try {
-      const [me, ver, users, groups, layers, exercise, audit] = await Promise.all([
-        api('/api/auth/me'),
-        api('/api/version'),
-        api('/api/users'),
-        api('/api/groups'),
-        api('/api/layers'),
-        api('/api/exercise'),
-        api('/api/audit?limit=50'),
+      const [me, ver, users, groups, layers, exercise, regSettings] = await Promise.all([
+        apiJSON('/api/auth/me'),
+        apiJSON('/api/version'),
+        apiJSON('/api/users'),
+        apiJSON('/api/groups'),
+        apiJSON('/api/layers'),
+        apiJSON('/api/exercise'),
+        apiJSON('/api/admin/registration'),
       ]);
 
       // System info
@@ -158,32 +208,33 @@
       const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const to   = new Date(now.getFullYear(), now.getMonth()+1, 1).toISOString();
       try {
-        const evs = await api(`/api/events?from=${from}&to=${to}`);
+        const evs = await apiJSON(`/api/events?from=${from}&to=${to}`);
         document.getElementById('statEvents').textContent = (evs||[]).length;
       } catch { document.getElementById('statEvents').textContent = '?'; }
 
       // Users table
-      const roleBadge = r => {
-        const map = {admin:'admin',oplead:'oplead',teamlead:'teamlead',readwrite:'readwrite',reporter:'reporter',read:'read'};
-        return `<span class="badge badge-${r}">${r}</span>`;
-      };
+      const roleBadge = r => `<span class="badge badge-${r}">${r}</span>`;
       document.getElementById('userTbody').innerHTML = (users||[]).map(u => `<tr>
         <td>${u.id}</td>
         <td>${u.username}</td>
         <td>${u.display_name||''}</td>
+        <td style="font-size:11px">${u.email||'—'}</td>
         <td>${roleBadge(u.role)}</td>
         <td>${u.can_lock ? '✓' : ''}</td>
-        <td>${fmtDT(u.created_at)}</td>
+        <td>${u.vetted ? '✓ Active' : '<span class="pending-badge">Pending</span>'}</td>
+        <td style="white-space:nowrap;font-size:11px">${fmtDT(u.created_at)}</td>
+        <td>${!u.vetted ? `<button class="btn btn-primary btn-sm" onclick="vetUser(${u.id}, this)">Approve</button>` : ''}</td>
       </tr>`).join('');
 
-      // Audit table
-      document.getElementById('auditTbody').innerHTML = (audit||[]).map(e => `<tr>
-        <td style="white-space:nowrap;font-size:11px">${fmtDT(e.timestamp)}</td>
-        <td>${e.user_name||''}</td>
-        <td><code>${e.action}</code></td>
-        <td style="font-size:11px">${e.entity_type} #${e.entity_id}</td>
-        <td>${e.summary||''}</td>
-      </tr>`).join('');
+      // Registration settings
+      const mode = (regSettings && regSettings.mode) || 'off';
+      document.getElementById('regMode').value = mode;
+      document.getElementById('genericCode').value = (regSettings && regSettings.invitation_code) || '';
+      updateRegUI(mode);
+
+      if (mode === 'personal_invitation') {
+        loadInvitations();
+      }
 
     } catch(e) {
       const errEl = document.getElementById('adminError');
@@ -192,6 +243,87 @@
         ? 'Access denied — admin role required.'
         : 'Error loading admin data: ' + e.message;
     }
+  }
+
+  function updateRegUI(mode) {
+    document.getElementById('genericCodeSection').style.display = mode === 'generic_invitation' ? '' : 'none';
+    document.getElementById('personalInvSection').style.display = mode === 'personal_invitation' ? '' : 'none';
+  }
+
+  document.getElementById('regMode').addEventListener('change', e => {
+    updateRegUI(e.target.value);
+    if (e.target.value === 'personal_invitation') loadInvitations();
+  });
+
+  async function saveRegistrationMode() {
+    const mode = document.getElementById('regMode').value;
+    const code = document.getElementById('genericCode').value.trim();
+    try {
+      const r = await api('/api/admin/registration', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode, invitation_code: code}),
+      });
+      if (r.ok) { alert('Registration settings saved.'); }
+      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function loadInvitations() {
+    try {
+      const invs = await apiJSON('/api/admin/invitations');
+      const el = document.getElementById('invitationsList');
+      if (!invs || invs.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm)">No invitations yet.</div>';
+        return;
+      }
+      el.innerHTML = invs.map(inv => `
+        <div class="inv-item">
+          <span class="inv-code">${inv.code}</span>
+          <span style="color:var(--text-dim);flex:1">${inv.note||''}</span>
+          ${inv.used ? `<span style="color:var(--green);font-size:11px">✓ Used by ${inv.used_by||'?'}</span>` : '<span style="color:var(--accent);font-size:11px">Available</span>'}
+          <button class="btn btn-danger btn-sm" onclick="deleteInvitation(${inv.id}, this)">✕</button>
+        </div>`).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  async function createInvitation() {
+    const note = document.getElementById('invNote').value.trim();
+    try {
+      const r = await api('/api/admin/invitations', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({note}),
+      });
+      if (r.ok) {
+        document.getElementById('invNote').value = '';
+        loadInvitations();
+      } else {
+        const e = await r.json(); alert('Error: ' + (e.error||'unknown'));
+      }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function deleteInvitation(id, btn) {
+    if (!confirm('Delete this invitation code?')) return;
+    try {
+      const r = await api(`/api/admin/invitations/${id}`, {method: 'DELETE'});
+      if (r.ok) loadInvitations();
+      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function vetUser(id, btn) {
+    try {
+      const r = await api(`/api/users/${id}/vet`, {method: 'POST'});
+      if (r.ok) {
+        btn.closest('tr').querySelector('td:nth-child(7)').innerHTML = '✓ Active';
+        btn.remove();
+        alert('User approved successfully.');
+      } else {
+        const e = await r.json(); alert('Error: ' + (e.error||'unknown'));
+      }
+    } catch(e) { alert('Error: ' + e.message); }
   }
 
   // Apply theme from localStorage/cookie if available
@@ -210,14 +342,15 @@
       alert('Please type RESET to confirm.');
       return;
     }
+    const keepTemplates = document.getElementById('keepTemplatesCheck').checked;
     try {
       const r = await fetch('/api/admin/reset', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({confirm: 'RESET'}),
+        body: JSON.stringify({confirm: 'RESET', keep_templates: keepTemplates}),
       });
       if (r.ok) {
-        alert('Reset complete. All data has been cleared. Reloading...');
+        alert(`Reset complete. All data has been cleared${keepTemplates ? ' (templates preserved)' : ''}. Reloading...`);
         window.location.reload();
       } else {
         const err = await r.json();

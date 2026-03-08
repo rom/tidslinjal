@@ -13,12 +13,14 @@ const AppGitHub = "https://github.com/rom/tidslinjal"
 type Role string
 
 const (
-	RoleRead      Role = "read"
-	RoleReporter  Role = "reporter"  // can comment + set responded/completed, needs approval
-	RoleReadWrite Role = "readwrite"
-	RoleTeamLead  Role = "teamlead" // can create groups/layers, verify/reject events
-	RoleOpLead    Role = "oplead"   // operations lead: master timeline + teamlead rights
-	RoleAdmin     Role = "admin"    // full access
+	RoleObserver      Role = "observer"      // read-only access (same level as read)
+	RoleRead          Role = "read"
+	RoleReporter      Role = "reporter"      // can comment + set responded/completed, needs approval
+	RoleReadWrite     Role = "readwrite"
+	RoleTeamLead      Role = "teamlead"      // can create groups/layers, verify/reject events
+	RoleOpLead        Role = "oplead"        // operations lead: master timeline + teamlead rights
+	RoleStaffOfficer  Role = "staffofficer"  // staff officer assistant: same rights as oplead
+	RoleAdmin         Role = "admin"         // full access
 )
 
 // EventStatus is the lifecycle state of an event
@@ -79,22 +81,28 @@ type EventTypeDef struct {
 
 // User represents a system user
 type User struct {
-	ID           int64     `json:"id"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"password_hash,omitempty"`
-	DisplayName  string    `json:"display_name"`
-	Role         Role      `json:"role"`
-	CanLock      bool      `json:"can_lock"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                  int64     `json:"id"`
+	Username            string    `json:"username"`
+	PasswordHash        string    `json:"password_hash,omitempty"`
+	DisplayName         string    `json:"display_name"`
+	Email               string    `json:"email,omitempty"`
+	Role                Role      `json:"role"`
+	CanLock             bool      `json:"can_lock"`
+	Vetted              bool      `json:"vetted"`                        // false = pending admin approval (vetted registration mode)
+	PasswordResetToken  string    `json:"password_reset_token,omitempty"`
+	PasswordResetExpiry *time.Time `json:"password_reset_expiry,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
-// UserPublic is the safe view of a user (no password hash)
+// UserPublic is the safe view of a user (no password hash or reset tokens)
 type UserPublic struct {
 	ID          int64     `json:"id"`
 	Username    string    `json:"username"`
 	DisplayName string    `json:"display_name"`
+	Email       string    `json:"email,omitempty"`
 	Role        Role      `json:"role"`
 	CanLock     bool      `json:"can_lock"`
+	Vetted      bool      `json:"vetted"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -103,10 +111,31 @@ func (u *User) Public() UserPublic {
 		ID:          u.ID,
 		Username:    u.Username,
 		DisplayName: u.DisplayName,
+		Email:       u.Email,
 		Role:        u.Role,
 		CanLock:     u.CanLock,
+		Vetted:      u.Vetted,
 		CreatedAt:   u.CreatedAt,
 	}
+}
+
+// RegistrationSettings controls how new users can self-register
+type RegistrationSettings struct {
+	// Mode: off | open | vetted | generic_invitation | personal_invitation
+	Mode           string `json:"mode"`
+	InvitationCode string `json:"invitation_code,omitempty"` // used in generic_invitation mode
+}
+
+// PersonalInvitation is a single-use code for inviting a specific person
+type PersonalInvitation struct {
+	ID        int64      `json:"id"`
+	Code      string     `json:"code"`
+	Note      string     `json:"note,omitempty"` // e.g. intended recipient name/email
+	Used      bool       `json:"used"`
+	UsedBy    string     `json:"used_by,omitempty"`
+	CreatedBy int64      `json:"created_by"`
+	CreatedAt time.Time  `json:"created_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty"`
 }
 
 // UserPreferences stores per-user UI settings

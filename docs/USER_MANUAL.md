@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 3.2.0**
+**Version 3.6.0**
 
 ---
 
@@ -54,13 +54,38 @@ Navigate to `http://<server>:<port>` (default: `http://localhost:8080`).
 │  Username: [admin            ]  │
 │  Password: [••••••••••••••••]  │
 │                                 │
-│         [ Log in ]              │
+│         [ Sign In ]             │
+│                                 │
+│  Forgot password?               │
+│  Don't have an account? Register│
 └─────────────────────────────────┘
 ```
 
 Default credentials: `admin` / `admin`
 
 > **Security note:** Change the admin password immediately after first login using the 🔑 button in the top-right header.
+
+### Self-Registration
+
+If the admin has enabled self-registration, a **"Don't have an account? Register"** link appears on the login page. There are four registration modes:
+
+| Mode | Description |
+|---|---|
+| **Open** | Anyone can register; accounts are immediately active |
+| **Vetted** | Anyone can register; admin must approve the account before login is allowed |
+| **Generic Invitation** | Registration requires a shared invitation code provided by the admin |
+| **Personal Invitation** | Registration requires a personal single-use code that the admin generates per user |
+
+When registration requires approval (vetted mode), you will see a confirmation message after submitting. Your account will be activated by an admin.
+
+### Password Reset
+
+If you have registered an email address on your profile:
+
+1. Click **Forgot password?** on the login page
+2. Enter your username or email address
+3. A reset token is generated (shown on-screen if no email server is configured, or sent to your address)
+4. Click **Reset password**, paste the token, and choose a new password
 
 ### Changing Your Password
 
@@ -154,6 +179,16 @@ Middle-click and drag on the timeline area to pan left/right. Drag more than 40%
 ### Creating an Event
 
 Click any empty cell in the timeline grid, or click **+ Add Event** in the header.
+
+#### Scheduling Conflict Warnings
+
+If an event's **Responsible** person or any **Invited** person is already scheduled in another overlapping event, a warning is shown after saving. The event is saved regardless — the warning is informational only:
+
+```
+⚠ Scheduling Conflict
+Warning: the following persons are already scheduled in overlapping events:
+  • Alice is also in "Alpha Brief" (10:00–11:00)
+```
 
 ```
 ┌─────────────────────── Add Event ────────────────────────────────┐
@@ -429,14 +464,24 @@ Locked slots appear as a red hatched overlay. Events cannot be created in locked
 
 | Role | Abbreviated | Capabilities |
 |---|---|---|
+| **Observer** | `observer` | Read-only access to timeline and events — cannot edit, comment, or lock |
 | **Read** | `read` | View timeline, events, layers; set personal alarms |
 | **Reporter** | `reporter` | + Post comments; set responded_to / completed (with approval) |
 | **Read/Write** | `readwrite` | + Create/edit own events; create event types and layers |
 | **Team Lead** | `teamlead` | + Create groups; verify/reject submitted events; view audit log; manage phases |
 | **Operations Lead** | `oplead` | + Create/edit/delete master-timeline events |
-| **Admin** | `admin` | Full access — manage all users, roles, locks, exercise settings |
+| **Staff Officer Assistant** | `staffofficer` | Same rights as Operations Lead — alternative command-staff designation |
+| **Admin** | `admin` | Full access — manage all users, roles, locks, exercise settings, registration |
 
 The `can_lock` flag can be granted to any user regardless of role.
+
+### Observer vs Read
+
+**Observer** accounts are intended for passive monitoring — stakeholders, liaison officers, or external parties who should only see the timeline. Unlike **Read**, they cannot set alarms or post comments.
+
+### Staff Officer Assistant
+
+The **Staff Officer Assistant** role is functionally identical to Operations Lead. It exists as a distinct label for organizations that differentiate between operations staff and planning staff at the same authority level.
 
 ---
 
@@ -455,9 +500,17 @@ Open the **Settings** sidebar tab to configure your preferences.
 
 Language can also be changed instantly using the flag buttons (🇬🇧 🇸🇪 🇫🇷) in the toolbar.
 
-### Day Hours
+### Date/Time Format & Day Hours
 
-Set **Start hour** and **End hour** to define your "working day" window. Slots outside this window appear grayed/striped. Toggle **Show time outside day hours** to show or hide those slots.
+The **Date/Time Format** section groups both format selection and day-hours configuration:
+
+| Setting | Description |
+|---|---|
+| **Date format** | ISO 8601 / UK / FR / SV |
+| **Day Start** | First hour of the working day |
+| **Day End** | Last hour of the working day |
+
+Slots outside the Day Start–End window appear grayed/striped. Toggle **Show time outside day hours** to show or hide those slots.
 
 ### Default View
 
@@ -542,39 +595,34 @@ Choose **HTML** to view in the browser, or **Print/PDF** to print or save as PDF
 
 Navigate to `/admin-view` (requires **Admin** role) for a dedicated administration dashboard.
 
-```
-┌───────────────────────── Admin View ───────────────────────────────┐
-│ ⚙ Admin View                                                       │
-│                                                                    │
-│ ┌─ System Information ──────────────────────────────────────────┐  │
-│ │ Version          3.2.0                                        │  │
-│ │ Data directory   data/                                        │  │
-│ │ Logged in as     admin (admin)                                │  │
-│ │                       [⬇ Download Full Export (JSON)]        │  │
-│ └───────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│ ┌─ Statistics ──────────────────────────────────────────────────┐  │
-│ │  12 Users    4 Groups    37 Events    5 Layers                 │  │
-│ └───────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│ ┌─ Exercise Settings ───────────────────────────────────────────┐  │
-│ │ Exercise name   EXALPHA-25                                    │  │
-│ │ STARTEX         2025-06-01 08:00                              │  │
-│ │ ENDEX           2025-06-05 18:00                              │  │
-│ │ Enabled         ✓ Yes                                         │  │
-│ └───────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│ ┌─ Users ───────────────────────────────────────────────────────┐  │
-│ │ ID  Username  Display Name  Role       Can Lock  Created      │  │
-│ │  1  admin     Admin User    [admin]    ✓         2025-01-01   │  │
-│ └───────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│ ┌─ Audit Log (last 50) ─────────────────────────────────────────┐  │
-│ │ Time           User   Action   Entity     Summary             │  │
-│ │ 2025-06-01 ...  admin  created  event #42  "ENDEX Brief"      │  │
-│ └───────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────┘
-```
+### Users
+
+The users table shows each user's email address, role, `can_lock` flag, and whether the account is **Vetted** (approved) or **Pending** (awaiting approval). Click **Approve** to vet a pending account.
+
+To edit a user, click the username. The user form includes:
+- Display name
+- Email address (used for password reset)
+- Role
+- Can lock flag
+- Group assignments
+
+### Registration Settings
+
+The **Registration Settings** section lets you control how new users can self-register:
+
+| Mode | Behaviour |
+|---|---|
+| **Off** (default) | Registration link hidden; no self-registration |
+| **Open** | Anyone can register; immediately active |
+| **Vetted** | Anyone can register; admin must approve before login |
+| **Generic Invitation** | Set a single shared invitation code; all registrants must enter it |
+| **Personal Invitation** | Generate per-user single-use codes; each code can only be used once |
+
+For **Personal Invitation**, use the invitation table to create codes (with an optional note, e.g. the invitee's name) and delete unused codes.
+
+### Reset to Empty
+
+The **Reset to empty** action clears all events, layers, groups, and users (except the admin). By default, **Keep templates (recommended)** is checked — this preserves any saved template events so you can quickly repopulate a new exercise from the same templates.
 
 ---
 
@@ -638,4 +686,10 @@ Navigate to `/admin-view` (requires **Admin** role) for a dedicated administrati
 
 ---
 
-*Tidslinjal v3.2.0 — Collaborative Operational Timeline*
+### Legend — System Info & GitHub Link
+
+The **Legend** sidebar tab includes a **System** info panel showing language, user count, group count, active layers, synthetic time state, last template, and version number. If the server is built with a GitHub link configured, a direct link to the repository appears at the bottom of the legend.
+
+---
+
+*Tidslinjal v3.6.0 — Collaborative Operational Timeline*

@@ -14,35 +14,38 @@ type Store struct {
 	mu      sync.RWMutex
 	dataDir string
 
-	eventTypes  []EventTypeDef
-	users       []User
-	preferences []UserPreferences
-	groups      []Group
-	memberships []GroupMembership
-	layers      []Layer
-	events      []Event
-	attachments []Attachment
-	alarms      []Alarm
-	locks       []LockedSlot
-	sessions    []Session
-	audit       []AuditEntry
-	exercise    ExerciseSettings
-	comments    []EventComment
-	phases      []ExercisePhase
-	templates   []Template
+	eventTypes           []EventTypeDef
+	users                []User
+	preferences          []UserPreferences
+	groups               []Group
+	memberships          []GroupMembership
+	layers               []Layer
+	events               []Event
+	attachments          []Attachment
+	alarms               []Alarm
+	locks                []LockedSlot
+	sessions             []Session
+	audit                []AuditEntry
+	exercise             ExerciseSettings
+	comments             []EventComment
+	phases               []ExercisePhase
+	templates            []Template
+	registrationSettings RegistrationSettings
+	invitations          []PersonalInvitation
 
-	nextEventTypeID int64
-	nextUserID      int64
-	nextGroupID     int64
-	nextLayerID     int64
-	nextEventID     int64
-	nextAttachID    int64
-	nextAlarmID     int64
-	nextLockID      int64
-	nextAuditID     int64
-	nextCommentID   int64
-	nextPhaseID     int64
-	nextTemplateID  int64
+	nextEventTypeID  int64
+	nextUserID       int64
+	nextGroupID      int64
+	nextLayerID      int64
+	nextEventID      int64
+	nextAttachID     int64
+	nextAlarmID      int64
+	nextLockID       int64
+	nextAuditID      int64
+	nextCommentID    int64
+	nextPhaseID      int64
+	nextTemplateID   int64
+	nextInvitationID int64
 }
 
 func NewStore(dataDir string) (*Store, error) {
@@ -76,6 +79,8 @@ func (s *Store) load() error {
 	s.loadFile("comments.json", &s.comments)
 	s.loadFile("phases.json", &s.phases)
 	s.loadFile("templates.json", &s.templates)
+	s.loadFile("registration.json", &s.registrationSettings)
+	s.loadFile("invitations.json", &s.invitations)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -135,6 +140,11 @@ func (s *Store) load() error {
 	for _, x := range s.templates {
 		if x.ID > s.nextTemplateID {
 			s.nextTemplateID = x.ID
+		}
+	}
+	for _, x := range s.invitations {
+		if x.ID > s.nextInvitationID {
+			s.nextInvitationID = x.ID
 		}
 	}
 	return nil
@@ -217,7 +227,8 @@ func (s *Store) saveFile(filename string, v interface{}) error {
 // ── Reset ──────────────────────────────────────────────────────────────────────
 
 // ResetToEmpty clears all data except the admin account (and its preferences/session).
-func (s *Store) ResetToEmpty(adminUser User) error {
+// If keepTemplates is true, public templates are preserved.
+func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -235,6 +246,12 @@ func (s *Store) ResetToEmpty(adminUser User) error {
 	}
 	s.preferences = adminPrefs
 
+	// Optionally preserve templates
+	var savedTemplates []Template
+	if keepTemplates {
+		savedTemplates = append([]Template{}, s.templates...)
+	}
+
 	// Clear everything else
 	s.groups = nil
 	s.memberships = nil
@@ -247,7 +264,6 @@ func (s *Store) ResetToEmpty(adminUser User) error {
 	s.audit = nil
 	s.comments = nil
 	s.phases = nil
-	s.templates = nil
 	s.exercise = ExerciseSettings{}
 	s.nextGroupID = 0
 	s.nextLayerID = 0
@@ -258,7 +274,13 @@ func (s *Store) ResetToEmpty(adminUser User) error {
 	s.nextAuditID = 0
 	s.nextCommentID = 0
 	s.nextPhaseID = 0
-	s.nextTemplateID = 0
+
+	if keepTemplates {
+		s.templates = savedTemplates
+	} else {
+		s.templates = nil
+		s.nextTemplateID = 0
+	}
 
 	// Persist all cleared files
 	for _, file := range []struct {
@@ -278,7 +300,7 @@ func (s *Store) ResetToEmpty(adminUser User) error {
 		{"audit.json", []AuditEntry{}},
 		{"comments.json", []EventComment{}},
 		{"phases.json", []ExercisePhase{}},
-		{"templates.json", []Template{}},
+		{"templates.json", s.templates},
 		{"exercise.json", ExerciseSettings{}},
 	} {
 		if err := s.saveFile(file.name, file.val); err != nil {
@@ -286,6 +308,122 @@ func (s *Store) ResetToEmpty(adminUser User) error {
 		}
 	}
 	return nil
+}
+
+// ── Registration Settings ──────────────────────────────────────────────────────
+
+func (s *Store) GetRegistrationSettings() RegistrationSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.registrationSettings
+}
+
+func (s *Store) SaveRegistrationSettings(rs RegistrationSettings) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.registrationSettings = rs
+	return s.saveFile("registration.json", rs)
+}
+
+// ── Personal Invitations ───────────────────────────────────────────────────────
+
+func (s *Store) GetInvitations() []PersonalInvitation {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]PersonalInvitation, len(s.invitations))
+	copy(result, s.invitations)
+	return result
+}
+
+func (s *Store) CreateInvitation(inv PersonalInvitation) (PersonalInvitation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextInvitationID++
+	inv.ID = s.nextInvitationID
+	inv.CreatedAt = time.Now()
+	s.invitations = append(s.invitations, inv)
+	return inv, s.saveFile("invitations.json", s.invitations)
+}
+
+func (s *Store) GetInvitationByCode(code string) (*PersonalInvitation, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.invitations {
+		if s.invitations[i].Code == code {
+			inv := s.invitations[i]
+			return &inv, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Store) MarkInvitationUsed(id int64, usedBy string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for i := range s.invitations {
+		if s.invitations[i].ID == id {
+			s.invitations[i].Used = true
+			s.invitations[i].UsedBy = usedBy
+			s.invitations[i].UsedAt = &now
+			return s.saveFile("invitations.json", s.invitations)
+		}
+	}
+	return fmt.Errorf("invitation not found")
+}
+
+func (s *Store) DeleteInvitation(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, inv := range s.invitations {
+		if inv.ID == id {
+			s.invitations = append(s.invitations[:i], s.invitations[i+1:]...)
+			return s.saveFile("invitations.json", s.invitations)
+		}
+	}
+	return fmt.Errorf("invitation not found")
+}
+
+// ── Password Reset ─────────────────────────────────────────────────────────────
+
+func (s *Store) SetPasswordResetToken(userID int64, token string, expiry time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.users {
+		if s.users[i].ID == userID {
+			s.users[i].PasswordResetToken = token
+			s.users[i].PasswordResetExpiry = &expiry
+			return s.saveFile("users.json", s.users)
+		}
+	}
+	return fmt.Errorf("user not found")
+}
+
+func (s *Store) GetUserByResetToken(token string) (*User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	for i := range s.users {
+		u := &s.users[i]
+		if u.PasswordResetToken == token && u.PasswordResetExpiry != nil && u.PasswordResetExpiry.After(now) {
+			cp := *u
+			return &cp, true
+		}
+	}
+	return nil, false
+}
+
+// VetUser approves a pending (unvetted) user registration
+func (s *Store) VetUser(userID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.users {
+		if s.users[i].ID == userID {
+			s.users[i].Vetted = true
+			return s.saveFile("users.json", s.users)
+		}
+	}
+	return fmt.Errorf("user not found")
 }
 
 // ── Event Types ───────────────────────────────────────────────────────────────
@@ -1415,6 +1553,103 @@ func (s *Store) DeleteTemplate(id, userID int64, isAdmin bool) error {
 		}
 	}
 	return fmt.Errorf("template not found")
+}
+
+// ── Overlap detection ──────────────────────────────────────────────────────────
+
+// OverlapWarning describes a scheduling conflict for a specific user
+type OverlapWarning struct {
+	UserID    int64  `json:"user_id"`
+	UserName  string `json:"user_name"`
+	EventID   int64  `json:"event_id"`
+	EventTitle string `json:"event_title"`
+}
+
+// CheckOverlaps returns warnings for any of the given users (responsible + invited)
+// who are already scheduled in events overlapping the given time range.
+// excludeEventID is used when editing an event (to exclude itself from the check).
+func (s *Store) CheckOverlaps(start time.Time, end *time.Time, responsibleID *int64, invitedUserIDs []int64, excludeEventID int64) []OverlapWarning {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Collect user IDs to check
+	checkUsers := map[int64]bool{}
+	if responsibleID != nil && *responsibleID > 0 {
+		checkUsers[*responsibleID] = true
+	}
+	for _, uid := range invitedUserIDs {
+		if uid > 0 {
+			checkUsers[uid] = true
+		}
+	}
+	if len(checkUsers) == 0 {
+		return nil
+	}
+
+	// Determine event end time (default: start + 1 hour)
+	evEnd := start.Add(time.Hour)
+	if end != nil && end.After(start) {
+		evEnd = *end
+	}
+
+	var warnings []OverlapWarning
+	seen := map[string]bool{}
+
+	for _, ev := range s.events {
+		if ev.ID == excludeEventID {
+			continue
+		}
+		// Compute existing event's end
+		existEnd := ev.StartTime.Add(time.Hour)
+		if ev.EndTime != nil && ev.EndTime.After(ev.StartTime) {
+			existEnd = *ev.EndTime
+		}
+
+		// Check time overlap: events overlap if start < other.end && end > other.start
+		if !start.Before(existEnd) || !evEnd.After(ev.StartTime) {
+			continue
+		}
+
+		// Check if any watched user is involved in this overlapping event
+		if ev.ResponsibleID != nil && checkUsers[*ev.ResponsibleID] {
+			key := fmt.Sprintf("%d-%d", *ev.ResponsibleID, ev.ID)
+			if !seen[key] {
+				seen[key] = true
+				warnings = append(warnings, OverlapWarning{
+					UserID:     *ev.ResponsibleID,
+					UserName:   ev.ResponsibleName,
+					EventID:    ev.ID,
+					EventTitle: ev.Title,
+				})
+			}
+		}
+		for _, uid := range ev.InvitedUserIDs {
+			if checkUsers[uid] {
+				key := fmt.Sprintf("%d-%d", uid, ev.ID)
+				if !seen[key] {
+					seen[key] = true
+					// Find user name
+					userName := fmt.Sprintf("user#%d", uid)
+					for _, u := range s.users {
+						if u.ID == uid {
+							userName = u.DisplayName
+							if userName == "" {
+								userName = u.Username
+							}
+							break
+						}
+					}
+					warnings = append(warnings, OverlapWarning{
+						UserID:     uid,
+						UserName:   userName,
+						EventID:    ev.ID,
+						EventTitle: ev.Title,
+					})
+				}
+			}
+		}
+	}
+	return warnings
 }
 
 // ApplyTemplate creates events from a template offset by baseTime; returns count created.

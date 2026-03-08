@@ -394,6 +394,41 @@ const TRANSLATIONS = {
     standup_label:         'Standup Meeting',
     phase_layer_lbl:       'Layer (empty = master timeline)',
     synth_day_hours_only:  'Synthetic time: day hours only',
+
+    // v3.6.0 — new roles
+    role_observer:       'Observer',
+    role_staffofficer:   'Staff Officer Assistant',
+
+    // v3.6.0 — user modal email
+    user_email:          'Email (for password reset)',
+
+    // v3.6.0 — overlap warnings
+    overlap_warning_title: 'Scheduling Conflict',
+    overlap_warning:       'Warning: the following persons are already scheduled in overlapping events:',
+    overlap_also_in:       'is also in',
+
+    // v3.6.0 — legend system info labels
+    info_system:          'System',
+    info_language:        'Language',
+    info_users:           'Users',
+    info_groups:          'Groups',
+    info_active_layers:   'Active layers',
+    info_synth_time:      'Synthetic time',
+    info_last_template:   'Last template',
+    info_version:         'Version',
+
+    // v3.6.0 — help / quick-reference roles table
+    help_roles_title:        'Roles & Permissions',
+    help_roles_role:         'Role',
+    help_roles_capabilities: 'Capabilities',
+    help_role_observer:      'Read-only access to timeline and events. Cannot edit, comment, or lock.',
+    help_role_read:          'Read-only access. Can set personal alarms.',
+    help_role_reporter:      'Can create events on the master timeline. Can add comments.',
+    help_role_readwrite:     'Can create, edit and delete events. Can manage attachments.',
+    help_role_teamlead:      'Read/Write + can manage layers and groups.',
+    help_role_oplead:        'Team Lead + can manage users and event types.',
+    help_role_staffofficer:  'Same rights as Operations Lead. Alternative command-staff designation.',
+    help_role_admin:         'Full access including system settings, resets, and user vetting.',
   },
 
   sv: {
@@ -743,6 +778,41 @@ const TRANSLATIONS = {
     standup_label:         'Daglig standup',
     phase_layer_lbl:       'Lager (tomt = mastertidslinje)',
     synth_day_hours_only:  'Syntetisk tid: endast dagtimmar',
+
+    // v3.6.0 — nya roller
+    role_observer:       'Observatör',
+    role_staffofficer:   'Stabsassistent',
+
+    // v3.6.0 — e-post för användare
+    user_email:          'E-post (för lösenordsåterställning)',
+
+    // v3.6.0 — överlappningsvarningar
+    overlap_warning_title: 'Schemakonflikt',
+    overlap_warning:       'Varning: följande personer är redan schemalagda i överlappande händelser:',
+    overlap_also_in:       'finns även i',
+
+    // v3.6.0 — systeminformation i förklaring
+    info_system:          'System',
+    info_language:        'Språk',
+    info_users:           'Användare',
+    info_groups:          'Grupper',
+    info_active_layers:   'Aktiva lager',
+    info_synth_time:      'Syntetisk tid',
+    info_last_template:   'Senaste mall',
+    info_version:         'Version',
+
+    // v3.6.0 — hjälp / rollbeskrivningar
+    help_roles_title:        'Roller och behörigheter',
+    help_roles_role:         'Roll',
+    help_roles_capabilities: 'Behörigheter',
+    help_role_observer:      'Skrivskyddad åtkomst till tidslinje och händelser. Kan inte redigera, kommentera eller låsa.',
+    help_role_read:          'Skrivskyddad åtkomst. Kan ange personliga larm.',
+    help_role_reporter:      'Kan skapa händelser på masterlinjen. Kan lägga till kommentarer.',
+    help_role_readwrite:     'Kan skapa, redigera och ta bort händelser. Kan hantera bilagor.',
+    help_role_teamlead:      'Läs/Skriv + kan hantera lager och grupper.',
+    help_role_oplead:        'Gruppledare + kan hantera användare och händelsetyper.',
+    help_role_staffofficer:  'Samma rättigheter som operationsledare. Alternativ beteckning för stabspersonal.',
+    help_role_admin:         'Full åtkomst inklusive systeminställningar, återställningar och användarvalidering.',
 
     // v4.0
     settings_group_label: 'Gruppterminologi',
@@ -1102,6 +1172,41 @@ const TRANSLATIONS = {
     standup_label:         'Réunion debout',
     phase_layer_lbl:       'Couche (vide = chronologie maîtresse)',
     synth_day_hours_only:  'Temps synthétique : heures de journée uniquement',
+
+    // v3.6.0 — nouveaux rôles
+    role_observer:       'Observateur',
+    role_staffofficer:   'Officier de renseignement adjoint',
+
+    // v3.6.0 — courriel utilisateur
+    user_email:          'Courriel (pour réinitialisation du mot de passe)',
+
+    // v3.6.0 — avertissements de chevauchement
+    overlap_warning_title: 'Conflit de planification',
+    overlap_warning:       'Attention : les personnes suivantes sont déjà programmées dans des événements qui se chevauchent :',
+    overlap_also_in:       'est également dans',
+
+    // v3.6.0 — informations système dans la légende
+    info_system:          'Système',
+    info_language:        'Langue',
+    info_users:           'Utilisateurs',
+    info_groups:          'Groupes',
+    info_active_layers:   'Couches actives',
+    info_synth_time:      'Temps synthétique',
+    info_last_template:   'Dernier modèle',
+    info_version:         'Version',
+
+    // v3.6.0 — aide / tableau des rôles
+    help_roles_title:        'Rôles et permissions',
+    help_roles_role:         'Rôle',
+    help_roles_capabilities: 'Capacités',
+    help_role_observer:      'Accès en lecture seule à la chronologie et aux événements. Ne peut pas modifier, commenter ou verrouiller.',
+    help_role_read:          'Accès en lecture seule. Peut définir des alarmes personnelles.',
+    help_role_reporter:      'Peut créer des événements sur la chronologie principale. Peut ajouter des commentaires.',
+    help_role_readwrite:     'Peut créer, modifier et supprimer des événements. Peut gérer les pièces jointes.',
+    help_role_teamlead:      'Lecture/Écriture + peut gérer les couches et les groupes.',
+    help_role_oplead:        'Chef d\'équipe + peut gérer les utilisateurs et les types d\'événements.',
+    help_role_staffofficer:  'Mêmes droits que le chef des opérations. Désignation alternative pour le personnel d\'état-major.',
+    help_role_admin:         'Accès complet incluant les paramètres système, les réinitialisations et la validation des utilisateurs.',
 
     // v4.0
     settings_group_label: 'Terminologie des groupes',
