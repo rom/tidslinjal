@@ -209,9 +209,12 @@ select.ctrl-select:focus { border-color: var(--accent); }
   position: sticky; left: 0; z-index: 10;
   background: var(--bg2); border-right: 2px solid var(--border);
   width: var(--time-col-w); font-size: var(--fs-xs); color: var(--text-dim);
-  display: flex; align-items: flex-start; padding: 2px 6px; justify-content: flex-end;
+  display: flex; align-items: flex-start; padding: 2px 4px; justify-content: space-between;
   font-variant-numeric: tabular-nums; user-select: none;
-  cursor: ns-resize;
+  cursor: ns-resize; overflow: hidden;
+}
+.synth-inline {
+  color: var(--orange); font-weight: 700; flex-shrink: 0; padding-right: 2px;
 }
 .tl-corner { cursor: ns-resize; }
 
@@ -864,12 +867,6 @@ body.size-normal .ev-icon { font-size: calc(.9em * var(--ev-zoom-scale)); }
 body.size-large  .ev-icon { font-size: calc(1em * var(--ev-zoom-scale)); }
 body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 
-/* H+N synthetic hour labels */
-.synth-hour-label {
-  position: absolute; left: 0; font-size: var(--fs-xs); font-weight: 700;
-  color: var(--orange); background: var(--bg); padding: 0 3px;
-  pointer-events: none; z-index: 12; border-radius: 2px; opacity: .85;
-}
 
 /* Print styles for reports */
 @media print {
