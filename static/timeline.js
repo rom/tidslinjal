@@ -397,7 +397,7 @@ function renderEventBlocks(days, slotH) {
       });
 
       const { left: cellLeft, width: cellWidth } = dayMeta[di];
-      const PAD = 2;
+      const PAD = 6;
 
       items.forEach((item, idx) => {
         const col     = colOf[idx];
@@ -609,6 +609,9 @@ function renderLayerPopover() {
       </div>`;
     }).join('')}
     ${hiddenCount > 0 ? `<div class="layer-pop-hint" style="font-size:10px;opacity:0.5;padding:2px 8px 4px;text-align:right">${hiddenCount} layer${hiddenCount>1?'s':''} hidden</div>` : ''}
+    ${state.user && hasRole2(state.user.role, 'readwrite') ? `<div style="border-top:1px solid var(--border);padding:6px 8px 4px;margin-top:2px">
+      <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('layerPopover').style.display='none';openLayerModal(null)">+ ${t('layers_add')||'Create Layer'}</button>
+    </div>` : ''}
   `;
 }
 

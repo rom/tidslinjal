@@ -1,5 +1,5 @@
 /* ============================================================
-   Tidslinjal v3.5.0 — Collaborative Operational Timeline
+   Tidslinjal v3.6.0 — Collaborative Operational Timeline
    Main entry point: initialisation and top-level wiring.
 
    Module load order (all plain <script> tags):
@@ -129,6 +129,7 @@ async function init() {
     if (helpVer && vInfo) {
       helpVer.textContent = `Tidslinjal v${vInfo.version || '?'} — ${vInfo.github || ''}`;
     }
+    state._versionInfo = vInfo;
   } catch { /* ignore */ }
 
   // User info in header
@@ -138,12 +139,29 @@ async function init() {
   roleEl.className   = `role-badge role-${state.user.role}`;
 
   // Show/hide role-gated controls
-  if (hasRole2(state.user.role, 'readwrite')) {
+  const role = state.user.role;
+  const isAdminOrOplead = hasRole2(role, 'oplead');
+  const isTeamLead      = hasRole2(role, 'teamlead');
+  const canWrite        = hasRole2(role, 'readwrite');
+
+  if (canWrite) {
     document.getElementById('btnAddEvent').style.display = '';
   }
   if (state.user.role==='admin' || state.user.can_lock) {
     document.getElementById('btnAddLock').style.display = '';
   }
+  // Templates: admin + oplead only
+  const btnTemplates = document.getElementById('btnTemplates');
+  if (btnTemplates) btnTemplates.style.display = isAdminOrOplead ? '' : 'none';
+  // Export/Import: admin + oplead only
+  const btnExport = document.getElementById('btnExport');
+  if (btnExport) btnExport.style.display = isAdminOrOplead ? '' : 'none';
+  const btnImport = document.getElementById('btnImport');
+  if (btnImport) btnImport.style.display = isAdminOrOplead ? '' : 'none';
+  // Report: teamlead+
+  const btnReport = document.getElementById('btnReport');
+  if (btnReport) btnReport.style.display = isTeamLead ? '' : 'none';
+
   if (state.user.role==='admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
   }

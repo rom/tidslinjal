@@ -259,14 +259,18 @@ select.ctrl-select:focus { border-color: var(--accent); }
 .ev-participant-intern { background: rgba(26,188,156,.35); color: #1abc9c; }
 .ev-participant-extern { background: rgba(231,76,60,.3); color: #e74c3c; }
 
-/* Current time line */
+/* Current time line — uses CSS variables set by JS (--line-color, --line-width, --line-style) */
 #current-time-line {
-  position: absolute; left: 0; right: 0; height: 2px;
-  background: var(--red); z-index: 15; pointer-events: none;
+  --line-color: var(--red);
+  --line-width: 2px;
+  --line-style: solid;
+  position: absolute; left: 0; right: 0;
+  height: 0; border-top-width: var(--line-width); border-top-style: var(--line-style); border-top-color: var(--line-color);
+  z-index: 15; pointer-events: none; background: none;
 }
 #current-time-line::before {
-  content: ''; position: absolute; left: calc(var(--time-col-w) - 5px); top: -4px;
-  width: 10px; height: 10px; border-radius: 50%; background: var(--red);
+  content: ''; position: absolute; left: calc(var(--time-col-w) - 5px); top: calc(-1 * (var(--line-width) / 2) - 4px);
+  width: 10px; height: 10px; border-radius: 50%; background: var(--line-color);
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -823,14 +827,7 @@ kbd {
   font-family: monospace; color: var(--text-bright);
 }
 
-/* Current time line — configurable */
-#current-time-line {
-  --line-color: var(--red);
-  --line-width: 2px;
-  --line-style: solid;
-}
-#current-time-line { border-top-color: var(--line-color); border-top-width: var(--line-width); border-top-style: var(--line-style); }
-#current-time-line::before { background: var(--line-color); }
+/* Current time line dot color update (handled by the main rule above) */
 .tl-synth-label {
   position: absolute; left: 54px; font-size: var(--fs-xs); font-weight: 700;
   background: var(--red); color: #fff; padding: 0 5px; border-radius: 3px;
@@ -935,15 +932,19 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .help-modal-logo span { color: var(--accent); }
 .help-modal-subtitle { font-size: var(--fs-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
 
+/* Left-pane navigation for help modal (overrides the basic block above) */
 .help-toc {
-  display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+  width: 160px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 10px; border-right: 1px solid var(--border); overflow-y: auto;
+  border-bottom: none; flex-wrap: nowrap; margin-bottom: 0;
 }
 .help-toc-link {
-  font-size: var(--fs-xs); text-decoration: none; color: var(--text-dim);
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 20px;
-  padding: 3px 10px; transition: all .15s;
+  display: block; font-size: var(--fs-sm); text-decoration: none; color: var(--text-dim);
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius);
+  padding: 5px 10px; transition: all .15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.help-toc-link:hover { color: var(--accent); border-color: var(--accent); background: rgba(74,144,217,.08); }
+.help-toc-link:hover { color: var(--text); background: var(--bg3); border-color: var(--border); }
+.help-toc-link.active { color: var(--accent); background: rgba(74,144,217,.12); border-color: var(--accent); font-weight: 600; }
 
 .help-section {
   display: flex; gap: 14px; margin-bottom: 20px;

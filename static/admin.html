@@ -79,6 +79,26 @@
     </table>
   </div>
 
+  <div class="admin-section" style="border-color: rgba(231,76,60,.5);">
+    <h2 style="color:#e74c3c">⚠ Danger Zone</h2>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:14px">These actions are irreversible. The admin account will be preserved.</p>
+    <div class="action-row" style="align-items:center;gap:12px">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:var(--fs-sm);color:var(--text-bright);margin-bottom:2px">Reset to empty</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim)">Deletes all events, layers, groups, locks, templates, and exercise data. Admin account is kept.</div>
+      </div>
+      <button class="btn btn-danger btn-sm" id="btnResetToEmpty">Reset to empty…</button>
+    </div>
+    <div id="resetConfirmBox" style="display:none;margin-top:14px;padding:12px;background:rgba(231,76,60,.1);border-radius:var(--radius);border:1px solid rgba(231,76,60,.3)">
+      <p style="font-size:var(--fs-sm);color:var(--red);font-weight:600;margin-bottom:8px">⚠ Type RESET to confirm — this cannot be undone</p>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="resetConfirmInput" placeholder="RESET" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)">
+        <button class="btn btn-danger btn-sm" id="btnConfirmReset">Confirm Reset</button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('resetConfirmBox').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div class="admin-section">
     <h2>Audit Log (last 50)</h2>
     <table id="auditTable">
@@ -177,6 +197,36 @@
   // Apply theme from localStorage/cookie if available
   const savedTheme = document.cookie.match(/theme=([^;]+)/);
   if (savedTheme && savedTheme[1] === 'light') document.body.classList.add('light-mode');
+
+  document.getElementById('btnResetToEmpty').addEventListener('click', () => {
+    document.getElementById('resetConfirmBox').style.display = '';
+    document.getElementById('resetConfirmInput').value = '';
+    document.getElementById('resetConfirmInput').focus();
+  });
+
+  document.getElementById('btnConfirmReset').addEventListener('click', async () => {
+    const val = document.getElementById('resetConfirmInput').value.trim();
+    if (val !== 'RESET') {
+      alert('Please type RESET to confirm.');
+      return;
+    }
+    try {
+      const r = await fetch('/api/admin/reset', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({confirm: 'RESET'}),
+      });
+      if (r.ok) {
+        alert('Reset complete. All data has been cleared. Reloading...');
+        window.location.reload();
+      } else {
+        const err = await r.json();
+        alert('Reset failed: ' + (err.error || 'unknown error'));
+      }
+    } catch(e) {
+      alert('Reset failed: ' + e.message);
+    }
+  });
 
   loadAdmin();
   </script>
