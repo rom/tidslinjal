@@ -261,14 +261,15 @@ func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Requ
 
 func hasRole(userRole, required Role) bool {
 	order := map[Role]int{
-		RoleObserver:     0,
-		RoleRead:         0,
-		RoleReporter:     1,
-		RoleReadWrite:    2,
-		RoleTeamLead:     3,
-		RoleOpLead:       4,
-		RoleStaffOfficer: 4,
-		RoleAdmin:        5,
+		RoleObserver:         0,
+		RoleRead:             0,
+		RoleReporter:         1,
+		RoleReadWrite:        2,
+		RoleTeamLead:         3,
+		RoleOpLead:           4,
+		RoleStaffOfficer:     4,
+		RoleStaffOfficerFull: 4,
+		RoleAdmin:            5,
 	}
 	return order[userRole] >= order[required]
 }
@@ -1665,9 +1666,10 @@ func (app *App) handleGetAlarms(w http.ResponseWriter, r *http.Request, user *Us
 
 func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		EventID   int64 `json:"event_id"`
-		LeadTime  int   `json:"lead_time"`
-		ForUserID int64 `json:"for_user_id"` // optional: create alarm for another user (oplead+ only)
+		EventID   int64  `json:"event_id"`
+		LeadTime  int    `json:"lead_time"`
+		Sound     string `json:"sound"`      // optional alarm sound
+		ForUserID int64  `json:"for_user_id"` // optional: create alarm for another user (oplead+ only)
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1689,6 +1691,7 @@ func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *
 	created, err := app.store.CreateAlarm(Alarm{
 		UserID: targetUserID, EventID: req.EventID,
 		EventTitle: event.Title, EventTime: event.StartTime, LeadTime: req.LeadTime,
+		Sound: req.Sound,
 	})
 	if err != nil {
 		jsonError(w, "failed to create alarm", http.StatusInternalServerError)
@@ -2350,7 +2353,15 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	logDebug("[template] Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339))
 	app.audit(user.ID, user.DisplayName, "applied", "template", id,
 		fmt.Sprintf("Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339)))
-	jsonOK(w, map[string]int{"created": count})
+	// If the template carries an exercise name, update the exercise label
+	exerciseNameSet := ""
+	if tmpl.ExerciseName != "" {
+		ex := app.store.GetExerciseSettings()
+		ex.Label = tmpl.ExerciseName
+		app.store.SaveExerciseSettings(ex) //nolint
+		exerciseNameSet = tmpl.ExerciseName
+	}
+	jsonOK(w, map[string]interface{}{"created": count, "exercise_name": exerciseNameSet})
 }
 
 // handleGetRoles returns the current role configurations
@@ -2844,7 +2855,7 @@ func (app *App) runAlarmScheduler() {
 				notif := AlarmNotification{
 					AlarmID: alarm.ID, EventID: alarm.EventID,
 					EventTitle: alarm.EventTitle, EventTime: alarm.EventTime,
-					LeadTime: alarm.LeadTime, Message: msg,
+					LeadTime: alarm.LeadTime, Sound: alarm.Sound, Message: msg,
 				}
 				app.broker.Notify(alarm.UserID, notif)
 				app.callWebhook(alarm.UserID, msg, notif)

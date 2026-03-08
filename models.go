@@ -19,8 +19,9 @@ const (
 	RoleReadWrite     Role = "readwrite"
 	RoleTeamLead      Role = "teamlead"      // can create groups/layers, verify/reject events
 	RoleOpLead        Role = "oplead"        // operations lead: master timeline + teamlead rights
-	RoleStaffOfficer  Role = "staffofficer"  // staff officer assistant: same rights as oplead
-	RoleAdmin         Role = "admin"         // full access
+	RoleStaffOfficer     Role = "staffofficer"      // staff officer assistant: same rights as oplead
+	RoleStaffOfficerFull Role = "staffofficer_full" // staff officer: same rights as oplead; requires J-designation
+	RoleAdmin            Role = "admin"             // full access
 )
 
 // EventStatus is the lifecycle state of an event
@@ -282,6 +283,7 @@ type Alarm struct {
 	EventTitle     string     `json:"event_title"`
 	EventTime      time.Time  `json:"event_time"`
 	LeadTime       int        `json:"lead_time"` // minutes before
+	Sound          string     `json:"sound,omitempty"` // alarm sound: "klaxon" | "beep" | "chime" | "siren" | "alert" | "none"
 	IsActive       bool       `json:"is_active"`
 	Fired          bool       `json:"fired"`
 	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
@@ -316,6 +318,7 @@ type AlarmNotification struct {
 	EventTitle string    `json:"event_title"`
 	EventTime  time.Time `json:"event_time"`
 	LeadTime   int       `json:"lead_time"`
+	Sound      string    `json:"sound,omitempty"`
 	Message    string    `json:"message"`
 }
 
@@ -336,7 +339,8 @@ type Template struct {
 	ID            int64           `json:"id"`
 	Name          string          `json:"name"`
 	Description   string          `json:"description"`
-	Scope         string          `json:"scope"` // private | public
+	ExerciseName  string          `json:"exercise_name,omitempty"` // optional: sets exercise label when applied/imported
+	Scope         string          `json:"scope"`                   // private | public
 	CreatedBy     int64           `json:"created_by"`
 	CreatedByName string          `json:"created_by_name"`
 	CreatedAt     time.Time       `json:"created_at"`

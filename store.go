@@ -266,6 +266,7 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 	s.audit = nil
 	s.comments = nil
 	s.phases = nil
+	s.roleConfigs = nil
 	s.exercise = ExerciseSettings{}
 	s.nextGroupID = 0
 	s.nextLayerID = 0
@@ -304,6 +305,7 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 		{"phases.json", []ExercisePhase{}},
 		{"templates.json", s.templates},
 		{"exercise.json", ExerciseSettings{}},
+		{"roles.json", []RoleConfig{}},
 	} {
 		if err := s.saveFile(file.name, file.val); err != nil {
 			return err

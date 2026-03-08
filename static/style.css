@@ -96,6 +96,40 @@ body.city-camo .sidebar              { background: #343628; }
 body.city-camo ::-webkit-scrollbar-track { background: var(--bg3); }
 body.city-camo ::-webkit-scrollbar-thumb { background: #7a7d6a; }
 
+/* ── Urban Camouflage theme ────────────────────────────────────────────────── */
+/* Urban warfare: steel blues, slate grays, muted blue-gray palette */
+body.urban-camo {
+  --bg:         #1a2233;
+  --bg2:        #1e293b;
+  --bg3:        #243044;
+  --border:     #3a4a5c;
+  --accent:     #4a90d9;
+  --accent2:    #2e70b8;
+  --text:       #c8d8e8;
+  --text-dim:   #7a90a8;
+  --text-bright:#e8f0f8;
+  --shadow:     rgba(0,0,0,.65);
+  --shadow-lg:  rgba(0,0,0,.8);
+  --red:        #c0392b;
+  --green:      #3aaa6e;
+  --orange:     #c07830;
+  --purple:     #6a5fa0;
+  --teal:       #2a7fa8;
+}
+/* Urban pattern: diagonal blue-toned blocks */
+body.urban-camo .tl-cell {
+  background-image:
+    repeating-linear-gradient(60deg, rgba(74,144,217,.04) 0px, rgba(74,144,217,.04) 6px, transparent 6px, transparent 14px),
+    repeating-linear-gradient(-60deg, rgba(30,60,100,.05) 0px, rgba(30,60,100,.05) 10px, transparent 10px, transparent 20px);
+}
+body.urban-camo .tl-cell:hover        { background-color: rgba(74,144,217,.1); }
+body.urban-camo .tl-cell.locked       { background: repeating-linear-gradient(45deg,rgba(192,57,43,.1),rgba(192,57,43,.1) 4px,transparent 4px,transparent 10px); }
+body.urban-camo .tl-row-current       { background: rgba(74,144,217,.07) !important; }
+body.urban-camo #header               { background: #111927; border-bottom-color: #2a3d54; }
+body.urban-camo .sidebar              { background: #161e2e; }
+body.urban-camo ::-webkit-scrollbar-track { background: var(--bg3); }
+body.urban-camo ::-webkit-scrollbar-thumb { background: #3a5278; }
+
 /* ── Size variants ────────────────────────────────────────────────────────── */
 body.size-normal {
   --fs-base:    15px;  --fs-sm: 13px; --fs-xs: 11px; --fs-lg: 17px; --fs-xl: 26px; --fs-2xl: 30px;
