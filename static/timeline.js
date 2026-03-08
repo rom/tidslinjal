@@ -431,22 +431,32 @@ function renderEventBlocks(days, slotH) {
           if (layer) borderL = layer.color || borderL;
         }
 
+        const showIcons = state.preferences.show_event_icons !== false;
         const statusDot  = ev.status && ev.status !== 'planned'
           ? `<span class="ev-status-dot ev-status-${ev.status}" title="${ev.status}"></span>` : '';
-        const recurIcon  = ev.is_recurring
+        const recurIcon  = showIcons && ev.is_recurring
           ? `<span class="ev-icon" title="Recurring">↻</span>` : '';
         const createdAt  = ev.created_at ? new Date(ev.created_at) : null;
         const updatedAt  = ev.updated_at ? new Date(ev.updated_at) : null;
-        const editedIcon = (createdAt && updatedAt && (updatedAt - createdAt) > 10000)
+        const editedIcon = showIcons && (createdAt && updatedAt && (updatedAt - createdAt) > 10000)
           ? `<span class="ev-icon" title="Modified ${fmtDateTime(updatedAt)}">✎</span>` : '';
-        const attachIcon = ev.attachment_count > 0
+        const attachIcon = showIcons && ev.attachment_count > 0
           ? `<span class="ev-icon" title="${ev.attachment_count} attachment(s)">📎</span>` : '';
-        const commentIcon = ev.comment_count > 0
+        const commentIcon = showIcons && ev.comment_count > 0
           ? `<span class="ev-icon" title="${ev.comment_count} comment(s)">💬</span>` : '';
-        const allDayIcon = ev.all_day
+        const allDayIcon = showIcons && ev.all_day
           ? `<span class="ev-icon" title="Day-only">📅</span>` : '';
-        const instantIcon = isInstant
+        const instantIcon = showIcons && isInstant
           ? `<span class="ev-icon" title="Instant">⚡</span>` : '';
+
+        // Event-type icon: custom icon from type def, or built-in defaults
+        const evTypeDef = state.eventTypes ? state.eventTypes.find(x => x.key === ev.event_type) : null;
+        const builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
+        const typeIconChar = showIcons
+          ? (evTypeDef && evTypeDef.icon ? evTypeDef.icon : (builtinTypeIcons[ev.event_type] || ''))
+          : '';
+        const typeIcon = typeIconChar
+          ? `<span class="ev-icon ev-type-icon" title="${escHtml(ev.event_type)}">${typeIconChar}</span>` : '';
 
         const block = document.createElement('div');
         block.className = 'event-block';
@@ -456,7 +466,7 @@ function renderEventBlocks(days, slotH) {
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${instantIcon}${escHtml(ev.title)}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
+          <div class="ev-title">${statusDot}${instantIcon}${escHtml(ev.title)}${typeIcon}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>
