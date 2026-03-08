@@ -102,9 +102,12 @@
 
     <div class="header-right">
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
-      <div class="clock-display">
+      <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
         <div class="clock-time" id="clockTime">00:00:00</div>
-        <div class="clock-date" id="clockDate">—</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="clock-date" id="clockDate">—</div>
+          <span id="clockTZ" style="font-size:9px;opacity:0.65;font-weight:600;letter-spacing:.05em"></span>
+        </div>
       </div>
       <div class="user-info">
         <div class="user-badge">
@@ -142,7 +145,6 @@
         <button class="sidebar-tab admin-only" data-tab="groups" style="display:none" data-i18n="tab_groups">Groups</button>
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
-        <button class="sidebar-tab" data-tab="activity" data-i18n="tab_activity">Activity</button>
         <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>

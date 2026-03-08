@@ -400,8 +400,12 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Name: "session", Value: sessID, Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: sess.ExpiresAt,
 	})
+	clientIP := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		clientIP = strings.SplitN(fwd, ",", 2)[0]
+	}
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
-		fmt.Sprintf("User %q logged in", user.Username))
+		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
 	jsonOK(w, user.Public())
 }
 
@@ -1465,6 +1469,8 @@ func (app *App) handleDeleteLayer(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "failed to delete", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "deleted", "layer", id,
+		fmt.Sprintf("Deleted layer %q", existing.Name))
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1560,9 +1566,14 @@ func (app *App) handleDeleteGroup(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	grp, grpOK := app.store.GetGroupByID(id)
 	if err := app.store.DeleteGroup(id); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
+	}
+	if grpOK {
+		app.audit(user.ID, user.DisplayName, "deleted", "group", id,
+			fmt.Sprintf("Deleted group %q", grp.Name))
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
@@ -1998,7 +2009,7 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 // ── Version ────────────────────────────────────────────────────────────────────
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]string{"version": AppVersion, "github": AppGitHub})
+	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "debug": debug})
 }
 
 // ── Admin Reset ────────────────────────────────────────────────────────────────
@@ -2271,6 +2282,9 @@ func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "saved", "template", created.ID,
+		fmt.Sprintf("Saved template %q (%d items, scope=%s)", created.Name, len(created.Items), created.Scope))
+	logDebug("[template] Created template id=%d name=%q items=%d scope=%s", created.ID, created.Name, len(created.Items), created.Scope)
 	jsonOK(w, created)
 }
 
@@ -2326,11 +2340,16 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	if displayName == "" {
 		displayName = user.Username
 	}
+	logDebug("[template] Applying template id=%d name=%q base=%s layer=%v user=%s",
+		id, tmpl.Name, req.BaseTime.Format(time.RFC3339), req.LayerID, displayName)
 	count, err := app.store.ApplyTemplate(id, req.BaseTime, req.LayerID, user.ID, displayName)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	logDebug("[template] Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339))
+	app.audit(user.ID, user.DisplayName, "applied", "template", id,
+		fmt.Sprintf("Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339)))
 	jsonOK(w, map[string]int{"created": count})
 }
 
@@ -2753,6 +2772,8 @@ func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User)
 		}
 	}
 	data := app.store.GetExportDataFiltered(user.ID, isPrivileged, parseCommaSet(include))
+	app.audit(user.ID, user.DisplayName, "exported", "data", 0,
+		fmt.Sprintf("Exported JSON data (include=%s)", include))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-export-%s.json"`,
 		time.Now().Format("2006-01-02")))

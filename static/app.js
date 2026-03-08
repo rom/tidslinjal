@@ -78,6 +78,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
+  // Check if server was started with --debug flag
+  try {
+    const ver = await apiGet('/api/version');
+    if (ver && ver.debug) {
+      window.TIDSLINJAL_DEBUG = true;
+      console.info('[TL] Debug mode enabled (server started with --debug)');
+    }
+  } catch { /* ignore */ }
+
   try {
     state.user = await apiGet('/api/auth/me');
   } catch {

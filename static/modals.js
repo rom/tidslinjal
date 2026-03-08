@@ -5,6 +5,12 @@
    ============================================================ */
 'use strict';
 
+// ── Debug helper ────────────────────────────────────────────────────────────
+// window.TIDSLINJAL_DEBUG is set by app.js after checking /api/version
+function dbg(...args) {
+  if (window.TIDSLINJAL_DEBUG) console.debug('[TL]', ...args);
+}
+
 // ── Group label helper ─────────────────────────────────────────────────────
 function getGroupLabel() {
   const key = (state.exercise && state.exercise.group_label) || 'group';
@@ -33,6 +39,7 @@ function applyPreferences() {
   const body = document.body;
   body.className = '';
   if (state.preferences.theme === 'light') body.classList.add('light-mode');
+  if (state.preferences.theme === 'city-camo') body.classList.add('city-camo');
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
@@ -838,7 +845,24 @@ async function openUserModal(user) {
   document.getElementById('uPassword').value = '';
   document.getElementById('uDisplayName').value = user ? (user.display_name||'') : '';
   document.getElementById('uEmail').value = user ? (user.email||'') : '';
-  document.getElementById('uRole').value = user ? user.role : 'read';
+  // Populate role dropdown dynamically (includes custom roles)
+  const roleSel = document.getElementById('uRole');
+  const builtinRoles = [
+    {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
+    {key:'reporter', label:'Reporter'}, {key:'readwrite', label:'Read/Write'},
+    {key:'teamlead', label:'Team Lead'}, {key:'oplead', label:'Operations Lead'},
+    {key:'staffofficer', label:'Staff Officer Asst.'}, {key:'admin', label:'Admin'},
+  ];
+  const allRoles = [...builtinRoles];
+  (state.roleConfigs || []).forEach(rc => {
+    if (!allRoles.find(r => r.key === rc.key)) {
+      allRoles.push({key: rc.key, label: rc.display_name || rc.key});
+    }
+  });
+  const currentRole = user ? user.role : 'read';
+  roleSel.innerHTML = allRoles.map(r =>
+    `<option value="${escHtml(r.key)}" ${r.key===currentRole?'selected':''}>${escHtml(getRoleDisplayName(r.key) || r.label)}</option>`
+  ).join('');
   document.getElementById('uCanLock').checked = user ? user.can_lock : false;
   const delBtn = document.getElementById('btnDeleteUser');
   delBtn.style.display = isEdit ? '' : 'none';
@@ -1391,7 +1415,7 @@ function renderSidebar() {
                 </div>
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                 ${u.can_lock?'<span title="Can lock">🔒</span>':''}
-                ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:10px;color:var(--text-dim)">${u.nato_designations.join(' ')}</span>` : ''}
+                ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
                 <button class="btn btn-ghost btn-icon" onclick='openUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️</button>
               </div>`).join('')}
           </div>
@@ -1472,8 +1496,9 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')}</button>
-          <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')}</button>
+          <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
+          <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')||'Light'}</button>
+          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Urban camouflage pattern">🏙 Camo</button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -1674,24 +1699,6 @@ function renderSidebar() {
     if (state.user && state.user.role === 'admin') {
       setTimeout(_initEnrollmentUI, 0);
     }
-  } else if (tab === 'activity') {
-    el.innerHTML = `<div class="sidebar-section"><div class="sidebar-section-title">${t('tab_activity')||'Activity Feed'}</div><div id="activityFeed" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div></div>`;
-    apiGet('/api/activity?limit=100').then(entries => {
-      const container = document.getElementById('activityFeed');
-      if (!container) return;
-      if (!entries || entries.length === 0) {
-        container.innerHTML = '<em style="color:var(--text-dim)">No recent activity.</em>';
-        return;
-      }
-      container.innerHTML = `<div class="activity-list">${entries.map(e => `
-        <div class="activity-item">
-          <span class="activity-ts">${fmtDateTime(new Date(e.timestamp))}</span>
-          <span class="activity-user">${escHtml(e.user_name)}</span>
-          <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
-          <span class="activity-summary">${escHtml(e.summary)}</span>
-        </div>`).join('')}
-      </div>`;
-    });
   }
 }
 
@@ -2366,7 +2373,7 @@ async function renderTemplatesList() {
         </div>
       </div>
       <div class="tmpl-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id}, ${JSON.stringify(escHtml(tmpl.name))}, ${tmpl.item_count||0})">▶ Apply</button>
+        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id})">▶ Apply</button>
         ${(state.user && (state.user.id === tmpl.created_by || hasRole2(state.user.role, 'admin')))
           ? `<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${tmpl.id})">Delete</button>`
           : ''}
@@ -2530,40 +2537,59 @@ async function confirmSaveTemplate() {
   }
 }
 
-function openApplyTemplateDialog(id, name, itemCount) {
-  document.getElementById('applyTemplateInfo').textContent =
-    `Apply template "${name}" (${itemCount} event${itemCount!==1?'s':''})`;
-  document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
-  // Populate layer select
-  const layerSel = document.getElementById('applyTemplateLayer');
-  layerSel.innerHTML = `<option value="">Master Timeline</option>` +
-    state.layers.filter(l => l.owner_id===state.user.id || l.permission==='readwrite')
-      .map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
-  document.getElementById('btnConfirmApplyTemplate').onclick = () => confirmApplyTemplate(id);
-  openModal('applyTemplateModal');
+function openApplyTemplateDialog(id) {
+  try {
+    const tmpl = (state.templates || []).find(t => t.id === id);
+    const name = tmpl ? tmpl.name : `Template ${id}`;
+    const itemCount = tmpl ? (tmpl.item_count || 0) : 0;
+    dbg('[template] openApplyTemplateDialog id=%o name=%o items=%o', id, name, itemCount);
+    document.getElementById('applyTemplateInfo').textContent =
+      `Apply template "${name}" — ${itemCount} event${itemCount!==1?'s':''}`;
+    document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
+    // Populate layer select
+    const layerSel = document.getElementById('applyTemplateLayer');
+    layerSel.innerHTML = `<option value="">Master Timeline</option>` +
+      (state.layers || []).filter(l => l.owner_id===(state.user&&state.user.id) || l.permission==='readwrite')
+        .map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+    document.getElementById('btnConfirmApplyTemplate').onclick = () => confirmApplyTemplate(id);
+    openModal('applyTemplateModal');
+  } catch(e) {
+    console.error('[template] openApplyTemplateDialog error:', e);
+    showError('Failed to open apply dialog: ' + e.message);
+  }
 }
 
 async function confirmApplyTemplate(id) {
-  const baseVal   = document.getElementById('applyTemplateBase').value;
+  const baseVal  = document.getElementById('applyTemplateBase').value;
   if (!baseVal) { showError('Please select a base date/time.', 'Validation'); return; }
-  const layerVal  = document.getElementById('applyTemplateLayer').value;
-  const payload   = {
+  const layerVal = document.getElementById('applyTemplateLayer').value;
+  const payload  = {
     base_time: new Date(baseVal).toISOString(),
     layer_id:  layerVal ? parseInt(layerVal, 10) : null,
   };
-  const res = await apiPost(`/api/templates/${id}/apply`, payload);
+  dbg('[template] confirmApplyTemplate id=%o payload=%o', id, payload);
+  let res;
+  try {
+    res = await apiPost(`/api/templates/${id}/apply`, payload);
+  } catch(e) {
+    console.error('[template] apply fetch error:', e);
+    showError('Network error applying template: ' + e.message);
+    return;
+  }
   if (res.ok) {
     const r = await res.json();
+    dbg('[template] applied: created=%o', r.created);
     closeModal('applyTemplateModal');
     closeModal('templatesModal');
-    // Track last applied template for legend
-    const tmpl = state.templates ? state.templates.find(t2 => t2.id === id) : null;
+    const tmpl = (state.templates || []).find(t2 => t2.id === id);
     if (tmpl) state.lastAppliedTemplate = tmpl.name;
     await refreshAll();
     showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template`);
   } else {
-    const err = await res.json();
-    showError(err.error);
+    let errMsg = 'Failed to apply template';
+    try { const err = await res.json(); errMsg = err.error || errMsg; } catch(_) {}
+    console.error('[template] apply error:', res.status, errMsg);
+    showError(errMsg);
   }
 }
 
@@ -2604,31 +2630,40 @@ async function handleTemplateFileLoad(input) {
   if (!file) return;
   const text = await file.text();
   let data;
-  try { data = JSON.parse(text); } catch { showError('Invalid JSON file.'); return; }
+  try { data = JSON.parse(text); } catch(e) { showError('Invalid JSON file: ' + e.message); return; }
   const templates = Array.isArray(data) ? data : [data];
+  dbg('[template] loading file %o: found %o template(s)', file.name, templates.length);
   let created = 0;
   let errors  = 0;
   const canPublic = state.user && hasRole2(state.user.role, 'oplead');
   for (const tmpl of templates) {
-    if (!tmpl.name || !Array.isArray(tmpl.items)) { continue; }
+    if (!tmpl.name || !Array.isArray(tmpl.items)) {
+      dbg('[template] skipped (no name or items):', tmpl);
+      errors++;
+      continue;
+    }
+    const scope = (tmpl.scope === 'public' && canPublic) ? 'public' : 'private';
     const payload = {
       name:        tmpl.name,
       description: tmpl.description || '',
-      // Downgrade scope to 'private' if user is not oplead+ (avoids 403)
-      scope:       (tmpl.scope === 'public' && canPublic) ? 'public' : 'private',
+      scope,
       items:       tmpl.items,
       phases:      tmpl.phases  || undefined,
       locks:       tmpl.locks   || undefined,
       roles:       tmpl.roles   || undefined,
     };
+    dbg('[template] importing %o: items=%o phases=%o locks=%o scope=%o',
+      tmpl.name, tmpl.items.length, (tmpl.phases||[]).length, (tmpl.locks||[]).length, scope);
     const res = await apiPost('/api/templates', payload);
     if (res.ok) {
+      const created_tmpl = await res.json();
+      dbg('[template] imported OK id=%o', created_tmpl.id);
       created++;
     } else {
       errors++;
       try {
         const err = await res.json();
-        console.warn('Template import error:', tmpl.name, err.error);
+        console.warn('[template] import error:', tmpl.name, res.status, err.error);
       } catch { /* ignore */ }
     }
   }
@@ -2637,7 +2672,7 @@ async function handleTemplateFileLoad(input) {
   } else {
     showError(`No templates imported.${errors>0?' '+errors+' file(s) failed.':''}`);
   }
-  renderTemplatesList();
+  await renderTemplatesList();
 }
 
 // ── ICS Export ─────────────────────────────────────────────────────────────
@@ -3418,18 +3453,19 @@ function showConflictWarning(conflicts) {
 
 // Default role configurations
 const DEFAULT_ROLE_CONFIGS = [
-  { key: 'observer',     display_name: '',  capabilities: { view_events: true } },
-  { key: 'read',         display_name: '',  capabilities: { view_events: true } },
-  { key: 'reporter',     display_name: '',  capabilities: { view_events: true, create_events: true } },
-  { key: 'readwrite',    display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, delete_events: true } },
-  { key: 'teamlead',     display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
-  { key: 'oplead',       display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, manage_templates: true, exercise: true, view_audit: true } },
-  { key: 'staffofficer', display_name: '',  capabilities: { view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'observer',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
+  { key: 'read',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
+  { key: 'reporter',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
+  { key: 'readwrite',    display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
+  { key: 'teamlead',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
+  { key: 'oplead',       display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'staffofficer', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
 ];
 
+// Ordered list of all capabilities shown in role editor
 const ALL_CAPABILITIES = [
-  'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
-  'manage_layers', 'manage_groups', 'manage_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise'
+  'see_groups', 'see_users', 'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
+  'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise'
 ];
 
 async function openRoleEditor() {
@@ -3460,9 +3496,10 @@ function _roleEditorInputStyle() {
 }
 
 const _ROLE_CAP_LABELS = {
-  view_events:'View', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
-  delete_events:'Delete', manage_layers:'Layers', manage_groups:'Groups',
-  manage_users:'Users', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise'
+  see_groups:'See Groups', see_users:'See Users',
+  view_events:'View Evts', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
+  delete_events:'Delete', manage_layers:'Layers', manage_groups:'Manage Groups',
+  manage_users:'Manage Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise'
 };
 
 function _renderRoleEditorTable(roles) {
