@@ -2248,10 +2248,39 @@ async function renderTemplatesList() {
   `).join('');
 }
 
+function _fmtLocalDTInput(d) {
+  // Format a Date as "YYYY-MM-DDTHH:MM" for datetime-local inputs
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function _countEventsInRange(from, to) {
+  return (state.events || []).filter(e => {
+    const s = new Date(e.start_time);
+    const endT = e.end_time ? new Date(e.end_time) : s;
+    return s < to && endT >= from;
+  }).length;
+}
+
+function _updateTmplRangeCount() {
+  const fromEl = document.getElementById('tmplRangeFrom');
+  const toEl   = document.getElementById('tmplRangeTo');
+  const countEl = document.getElementById('tmplEventCount');
+  if (!fromEl || !toEl || !countEl) return;
+  const from = fromEl.value ? new Date(fromEl.value) : null;
+  const to   = toEl.value   ? new Date(toEl.value)   : null;
+  if (!from || !to) { countEl.textContent = ''; return; }
+  const evCount = _countEventsInRange(from, to);
+  const phases = (state.phases||[]).filter(p => new Date(p.start_time) < to && new Date(p.end_time) > from);
+  const locks  = (state.locks ||[]).filter(l => new Date(l.start_time) < to && new Date(l.end_time) > from);
+  let msg = `Will save ${evCount} event${evCount!==1?'s':''}`;
+  if (phases.length) msg += `, ${phases.length} phase${phases.length!==1?'s':''}`;
+  if (locks.length)  msg += `, ${locks.length} lock${locks.length!==1?'s':''}`;
+  msg += ' in selected range.';
+  countEl.textContent = msg;
+}
+
 function openSaveTemplateDialog() {
-  const evCount = state.events.length;
-  const el = document.getElementById('tmplEventCount');
-  if (el) el.textContent = `Will save ${evCount} event${evCount!==1?'s':''} from the current view.`;
   document.getElementById('tmplName').value = '';
   document.getElementById('tmplDescription').value = '';
   document.getElementById('tmplScope').value = 'private';
@@ -2263,6 +2292,16 @@ function openSaveTemplateDialog() {
       if (opt.value === 'public') opt.hidden = !isPriv;
     });
   }
+  // Default date range to current view
+  const days = typeof getDays === 'function' ? getDays() : [];
+  const fromDef = days.length ? days[0] : state.startDate || new Date();
+  const toDef   = days.length ? (() => { const d = new Date(days[days.length-1]); d.setDate(d.getDate()+1); return d; })()
+                              : (() => { const d = new Date(fromDef); d.setDate(d.getDate()+7); return d; })();
+  const fromEl = document.getElementById('tmplRangeFrom');
+  const toEl   = document.getElementById('tmplRangeTo');
+  if (fromEl) { fromEl.value = _fmtLocalDTInput(fromDef); fromEl.oninput = _updateTmplRangeCount; }
+  if (toEl)   { toEl.value   = _fmtLocalDTInput(toDef);   toEl.oninput   = _updateTmplRangeCount; }
+  _updateTmplRangeCount();
   document.getElementById('btnConfirmSaveTemplate').onclick = confirmSaveTemplate;
   openModal('saveTemplateModal');
 }
@@ -2271,9 +2310,21 @@ async function confirmSaveTemplate() {
   const name = document.getElementById('tmplName').value.trim();
   if (!name) { showError('Template name is required.', 'Validation'); return; }
   const scope = document.getElementById('tmplScope').value;
-  // Build items from current events
-  const events = state.events;
-  if (!events.length) { showError('No events in current view.', 'Validation'); return; }
+  // Get date range
+  const fromVal = document.getElementById('tmplRangeFrom')?.value;
+  const toVal   = document.getElementById('tmplRangeTo')?.value;
+  const rangeFrom = fromVal ? new Date(fromVal) : null;
+  const rangeTo   = toVal   ? new Date(toVal)   : null;
+  // Filter events by range (or all if no range set)
+  let events = state.events || [];
+  if (rangeFrom && rangeTo) {
+    events = events.filter(e => {
+      const s = new Date(e.start_time);
+      const en = e.end_time ? new Date(e.end_time) : s;
+      return s < rangeTo && en >= rangeFrom;
+    });
+  }
+  if (!events.length) { showError('No events in the selected date range.', 'Validation'); return; }
   // Find earliest start to anchor offsets
   const earliest = Math.min(...events.map(e => new Date(e.start_time).getTime()));
   // Fetch attachments for each event to include in template
@@ -2307,12 +2358,39 @@ async function confirmSaveTemplate() {
       attachments:        atts,
     };
   });
+  // Build phases relative to earliest event time
+  const phases = (state.phases || [])
+    .filter(p => {
+      if (!rangeFrom || !rangeTo) return true;
+      return new Date(p.start_time) < rangeTo && new Date(p.end_time) > rangeFrom;
+    })
+    .map(p => ({
+      name:             p.name,
+      color:            p.color,
+      start_offset_min: Math.round((new Date(p.start_time).getTime() - earliest) / 60000),
+      end_offset_min:   Math.round((new Date(p.end_time).getTime()   - earliest) / 60000),
+      order:            p.order || 0,
+    }));
+  // Build locks relative to earliest event time
+  const locks = (state.locks || [])
+    .filter(l => {
+      if (!rangeFrom || !rangeTo) return true;
+      return new Date(l.start_time) < rangeTo && new Date(l.end_time) > rangeFrom;
+    })
+    .map(l => ({
+      start_offset_min: Math.round((new Date(l.start_time).getTime() - earliest) / 60000),
+      end_offset_min:   Math.round((new Date(l.end_time).getTime()   - earliest) / 60000),
+      reason:           l.reason || '',
+      scope:            l.scope  || 'all',
+    }));
   const payload = {
     name,
     description: document.getElementById('tmplDescription').value.trim(),
     scope,
     items,
-    roles: (state.roleConfigs && state.roleConfigs.length) ? state.roleConfigs : undefined,
+    phases: phases.length ? phases : undefined,
+    locks:  locks.length  ? locks  : undefined,
+    roles:  (state.roleConfigs && state.roleConfigs.length) ? state.roleConfigs : undefined,
   };
   const res = await apiPost('/api/templates', payload);
   if (res.ok) {

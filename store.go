@@ -1733,6 +1733,38 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 			}
 		}
 	}
+	// Create phases from template
+	for _, tp := range tmpl.Phases {
+		start := baseTime.Add(time.Duration(tp.StartOffsetMin) * time.Minute)
+		end := baseTime.Add(time.Duration(tp.EndOffsetMin) * time.Minute)
+		ph := ExercisePhase{
+			Name:      tp.Name,
+			Color:     tp.Color,
+			StartTime: start,
+			EndTime:   end,
+			Order:     tp.Order,
+			CreatedBy: createdBy,
+		}
+		s.CreatePhase(ph) //nolint
+	}
+	// Create locks from template
+	for _, tl := range tmpl.Locks {
+		start := baseTime.Add(time.Duration(tl.StartOffsetMin) * time.Minute)
+		end := baseTime.Add(time.Duration(tl.EndOffsetMin) * time.Minute)
+		scope := tl.Scope
+		if scope == "" {
+			scope = "all"
+		}
+		lk := LockedSlot{
+			StartTime:    start,
+			EndTime:      end,
+			Reason:       tl.Reason,
+			Scope:        scope,
+			LockedBy:     createdBy,
+			LockedByName: createdByName,
+		}
+		s.CreateLock(lk) //nolint
+	}
 	return count, nil
 }
 

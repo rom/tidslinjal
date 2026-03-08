@@ -1,6 +1,35 @@
-# Tidslinjal v3.4.0
+# Tidslinjal v3.7.0
 
 **Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
+
+---
+
+## What's New in v3.7.0
+
+- **Toolbar redesign** — logical button groupings with separator lines, uniform 30 px height, icons + text labels on every button; 7 groups: Navigation, View, Search, Controls, Event Actions, Data, Language
+- **5-day view** — new "5 Days" option added to the range selector and to the Default View setting
+- **i18n coverage** — all new and existing toolbar elements fully translated to English, Swedish, and French
+- **Dynamic group terminology** — sidebar tab, filter button, and group headings now respect the "Group Terminology" setting (Group / Unit / Team) in real time
+- **Settings order** — Default View moved to appear directly after Timezone in the Settings panel
+- **Role editor** — 🛡 Role Editor button in the Users tab opens an authorization matrix; edit display names and capability flags for all roles except admin; saved to `roles.json` and loadable from `/api/roles`
+- **Roles saved with templates** — role configurations are optionally saved alongside template events when saving a template
+- **Import "Done" mode** — after a successful data import, the Cancel button is hidden and Import becomes ✓ Done (closes and resets the dialog)
+- **Larger template description** — "Save as Template" description field is now a resizable `<textarea>` (4 rows)
+- **Template date-range selection** — when saving a template, choose exactly which portion of the calendar to capture (from/to date range); phases and locks in range are included
+- **Phases and locks in templates** — templates now store `TemplatePhase` and `TemplateLock` entries; applying a template also creates the corresponding phases and locked slots
+- **Multi-select events** — Ctrl+click to select multiple events; selected events are highlighted with an accent-coloured outline; a floating bar shows the count with Move and Clear actions
+- **Right-click "Move to new time/date"** — context menu item opens a date/time dialog; works for single events and multi-select (all selected events move by the same offset)
+- **10 example exercise templates** — ready-made templates in `example-templates/` covering 1-day, 2-day, 3-day, and 5-day exercises across co-located and virtual modalities; see `example-templates/README.md`
+
+---
+
+## What's New in v3.6.0
+
+- **New roles** — Observer, Reporter, Staff Officer; fine-grained permission model
+- **Self-registration modes** — off / open / vetted / generic invitation / personal invitation
+- **Overlap warnings** — event creation warns when a responsible person or invited user has a scheduling conflict
+- **i18n foundation** — English, Swedish, and French translations; language preference saved per user
+- **Improved docs** — this README and in-app help updated
 
 ---
 
@@ -87,13 +116,32 @@ Each event carries:
 - File attachments (up to 25 MB)
 
 ### Templates
-Save and reuse sets of events:
+Save and reuse sets of events, phases, and locks:
 - Click **📋 Templates** in the toolbar to manage templates
-- **Save**: stores all events in the current view with relative time offsets from the earliest event
-- **Apply**: choose a base date/time — all events are re-created offset from that moment
+- **Save**: choose a date range — events, phases, and locks within that range are stored with relative time offsets from the earliest event; role configurations are optionally included
+- **Apply**: enter the **Exercise start date & time (STARTEX / T=0)** — all events, phases, and locks are re-created offset from that moment
+- **Import from file**: load `.json` template files exported by Tidslinjal or from the `example-templates/` directory
 - **Private** templates are yours only; **Public** templates are visible to all users
 - Only Ops Lead+ may create public templates with master-timeline events
 - Delete your own templates (admins can delete any)
+
+### Example Templates
+The `example-templates/` directory contains **10 ready-made exercise templates**:
+
+| Template | Duration | Hours |
+|---|---|---|
+| EX-01 Quick Reaction Force | 1 day | 0800–1700 |
+| EX-02 Cyber Defence Sprint | 1 day | 0800–1700 |
+| EX-03 Joint Command Post — Co-located | 2 days | 24/7 |
+| EX-04 Urban Defence — Co-located | 2 days | 0800–1700 |
+| EX-05 Distributed Command — Virtual | 2 days | 24/7 |
+| EX-06 Staff Training — Virtual | 2 days | 0800–1700 |
+| EX-07 Combined Arms Manoeuvre | 3 days | 24/7 + working hours |
+| EX-08 Crisis Management Simulation | 3 days | 0800–1800 |
+| EX-09 NATO Integration Exercise | 5 days | 24/7 + working hours |
+| EX-10 Full Spectrum Warfare | 5 days | Mixed intensity |
+
+See `example-templates/README.md` for detailed descriptions, design principles, and loading instructions.
 
 ### Layers
 Named overlays on top of the master timeline:

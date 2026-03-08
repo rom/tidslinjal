@@ -330,16 +330,18 @@ type AuditEntry struct {
 
 // Template is a named, reusable set of events (with relative time offsets)
 type Template struct {
-	ID            int64          `json:"id"`
-	Name          string         `json:"name"`
-	Description   string         `json:"description"`
-	Scope         string         `json:"scope"` // private | public
-	CreatedBy     int64          `json:"created_by"`
-	CreatedByName string         `json:"created_by_name"`
-	CreatedAt     time.Time      `json:"created_at"`
-	Items         []TemplateItem `json:"items"`
-	ItemCount     int            `json:"item_count"`
-	Roles         []RoleConfig   `json:"roles,omitempty"` // optional role configs saved with template
+	ID            int64           `json:"id"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description"`
+	Scope         string          `json:"scope"` // private | public
+	CreatedBy     int64           `json:"created_by"`
+	CreatedByName string          `json:"created_by_name"`
+	CreatedAt     time.Time       `json:"created_at"`
+	Items         []TemplateItem  `json:"items"`
+	ItemCount     int             `json:"item_count"`
+	Phases        []TemplatePhase `json:"phases,omitempty"` // optional phase blocks
+	Locks         []TemplateLock  `json:"locks,omitempty"`  // optional time locks
+	Roles         []RoleConfig    `json:"roles,omitempty"`  // optional role configs
 }
 
 // TemplateAttachment stores attachment metadata within a template item
@@ -363,6 +365,23 @@ type TemplateItem struct {
 	RecurrencePattern string               `json:"recurrence_pattern"`
 	Participant       string               `json:"participant"`
 	Attachments       []TemplateAttachment `json:"attachments,omitempty"`
+}
+
+// TemplatePhase is a phase block stored relative to T=0 for use in templates
+type TemplatePhase struct {
+	Name           string `json:"name"`
+	Color          string `json:"color"`
+	StartOffsetMin int    `json:"start_offset_min"`
+	EndOffsetMin   int    `json:"end_offset_min"`
+	Order          int    `json:"order"`
+}
+
+// TemplateLock is a time lock stored relative to T=0 for use in templates
+type TemplateLock struct {
+	StartOffsetMin int    `json:"start_offset_min"`
+	EndOffsetMin   int    `json:"end_offset_min"`
+	Reason         string `json:"reason"`
+	Scope          string `json:"scope"` // all | master | layer
 }
 
 // RoleConfig holds a customisable display name and capability flags for a role
