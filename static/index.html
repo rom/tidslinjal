@@ -16,6 +16,8 @@
     <div class="header-controls">
       <button class="btn btn-secondary btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
       <button class="btn btn-secondary btn-sm" id="btnToday">Today</button>
+      <button class="btn btn-secondary btn-icon" id="btnDatePicker" title="Go to date…" style="font-size:14px">&#128197;</button>
+      <input type="date" id="datePickerInput" style="display:none;position:absolute" onchange="goToDate(this.value)">
       <button class="btn btn-secondary btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
 
       <div class="toolbar-sep"></div>
@@ -204,6 +206,9 @@
       <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Templates let you quickly create a pre-defined set of events. Save the current view's events as a template or apply a saved template to any date.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" id="btnSaveTemplate">💾 Save current events as template…</button>
+        <button class="btn btn-secondary btn-sm" id="btnImportTemplate" onclick="importTemplateFromFile()">📂 Load from file…</button>
+        <button class="btn btn-secondary btn-sm" id="btnExportTemplates" onclick="exportTemplatesToFile()">⬇ Save to file…</button>
+        <input type="file" id="templateFileInput" accept=".json" style="display:none" onchange="handleTemplateFileLoad(this)">
       </div>
       <div id="templatesList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>

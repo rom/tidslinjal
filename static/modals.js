@@ -1438,6 +1438,16 @@ function renderSidebar() {
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_end')}</label>
           <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" onchange="setHourPref()">
         </div>
+        <div style="margin-top:10px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_timezone')||'Timezone'}:</span>
+          <select id="prefTimezone" onchange="setTimezonePref(this.value)"
+            style="margin-top:4px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value=""${!state.timezone?' selected':''}>Browser Default</option>
+            ${['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'].map(tz =>
+              `<option value="${tz}"${state.timezone===tz?' selected':''}>${tz}</option>`
+            ).join('')}
+          </select>
+        </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_webhook')}</div>
@@ -1513,16 +1523,6 @@ function renderSidebar() {
           <button class="toggle-btn${ex.group_label==='unit'?' active':''}" onclick="setGroupLabel('unit')">Unit</button>
           <button class="toggle-btn${ex.group_label==='team'?' active':''}" onclick="setGroupLabel('team')">Team</button>
         </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_timezone')||'Timezone'}</div>
-        <select id="prefTimezone" onchange="setTimezonePref(this.value)"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          <option value=""${!state.timezone?' selected':''}>Browser Default</option>
-          ${['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'].map(tz =>
-            `<option value="${tz}"${state.timezone===tz?' selected':''}>${tz}</option>`
-          ).join('')}
-        </select>
       </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
@@ -2293,6 +2293,49 @@ async function deleteTemplate(id) {
     const err = await res.json();
     showError(err.error);
   }
+}
+
+// ── Template file import / export ─────────────────────────────────────────
+async function exportTemplatesToFile() {
+  const templates = await apiGet('/api/templates') || [];
+  if (!templates.length) { showNotification('warning', 'No templates to export.'); return; }
+  const blob = new Blob([JSON.stringify(templates, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'templates.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importTemplateFromFile() {
+  document.getElementById('templateFileInput').value = '';
+  document.getElementById('templateFileInput').click();
+}
+
+async function handleTemplateFileLoad(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const text = await file.text();
+  let data;
+  try { data = JSON.parse(text); } catch { showError('Invalid JSON file.'); return; }
+  const templates = Array.isArray(data) ? data : [data];
+  let created = 0;
+  for (const tmpl of templates) {
+    if (!tmpl.name || !Array.isArray(tmpl.items)) { continue; }
+    const payload = {
+      name:        tmpl.name,
+      description: tmpl.description || '',
+      scope:       tmpl.scope || 'private',
+      items:       tmpl.items,
+    };
+    const res = await apiPost('/api/templates', payload);
+    if (res.ok) created++;
+  }
+  showNotification('success', `Imported ${created} template${created!==1?'s':''}`);
+  renderTemplatesList();
 }
 
 // ── ICS Export ─────────────────────────────────────────────────────────────

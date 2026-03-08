@@ -179,6 +179,15 @@ async function init() {
   setupNavLongPress(document.getElementById('btnPrev'), -1);
   setupNavLongPress(document.getElementById('btnNext'),  1);
   document.getElementById('btnToday').addEventListener('click', goToday);
+  document.getElementById('btnDatePicker').addEventListener('click', e => {
+    const inp = document.getElementById('datePickerInput');
+    const btn = e.currentTarget;
+    const r   = btn.getBoundingClientRect();
+    inp.style.left = r.left + 'px';
+    inp.style.top  = (r.bottom + 2) + 'px';
+    inp.style.position = 'fixed';
+    inp.showPicker ? inp.showPicker() : inp.click();
+  });
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
   document.getElementById('btnExport').addEventListener('click', openExportModal);
   document.getElementById('btnImport')?.addEventListener('click', openImportModal);

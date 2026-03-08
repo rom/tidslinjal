@@ -20,6 +20,13 @@ function goToday() {
   state.startDate = startOfDay(new Date());
   refreshAll();
 }
+function goToDate(dateStr) {
+  if (!dateStr) return;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return;
+  state.startDate = startOfDay(d);
+  refreshAll();
+}
 function centerToday() {
   const today = startOfDay(new Date());
   state.startDate = addDays(today, -Math.floor(getRangeDays() / 2));
@@ -147,7 +154,10 @@ function renderTimeline() {
   const days       = getDays();
   const slots      = getSlotsPerDay();
   const slotH      = getSlotHeight();
-  const timeColW   = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--time-col-w')) || 52;
+  const baseTimeColW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--time-col-w')) || 52;
+  const synthLabelActive = synthActive() && state.preferences.synth_label;
+  const synthExtra = synthLabelActive ? 44 : 0;
+  const timeColW   = baseTimeColW + synthExtra;
   const today      = new Date();
 
   container.style.gridTemplateColumns =
@@ -156,7 +166,7 @@ function renderTimeline() {
   let html = '';
 
   // ── Header row ─────────────────────────────────────────────────────────────
-  html += `<div class="tl-corner" style="height:44px"></div>`;
+  html += `<div class="tl-corner" style="height:44px;width:${timeColW}px"></div>`;
   days.forEach(day => {
     const isToday = isSameDay(day, today);
     const useSync = synthActive();
@@ -171,10 +181,26 @@ function renderTimeline() {
   });
 
   // ── Body rows ───────────────────────────────────────────────────────────────
+  const synthEpoch = synthLabelActive ? new Date(state.exercise.epoch) : null;
+  const synthDayHrsOnly = synthLabelActive && state.exercise.day_hours_only;
+  const slotMinutes = getSlotMinutes();
   for (let s = 0; s < slots; s++) {
     const label  = slotLabel(s);
     const oohLbl = isOutOfHours(s) ? ' out-of-hours' : '';
-    html += `<div class="tl-time-label${oohLbl}" style="height:${slotH}px">${label}</div>`;
+    let synthSpan = '';
+    if (synthLabelActive) {
+      const slotMin = s * slotMinutes;
+      const isHourBoundary = slotMin % 60 === 0;
+      if (isHourBoundary && !(synthDayHrsOnly && isOutOfHours(s))) {
+        const slotTime = new Date(days[0]);
+        slotTime.setHours(0, slotMin, 0, 0);
+        const hoursOn = synthElapsedHours(synthEpoch.getTime(), slotTime.getTime());
+        if (hoursOn >= 0) {
+          synthSpan = `<span class="synth-inline">H+${hoursOn}</span>`;
+        }
+      }
+    }
+    html += `<div class="tl-time-label${oohLbl}" style="height:${slotH}px;width:${timeColW}px">${synthSpan}<span>${label}</span></div>`;
 
     const startOffset = getStartHourOffset();
     days.forEach((day, di) => {
@@ -262,28 +288,6 @@ function renderEventBlocks(days, slotH) {
           }
         });
       });
-    }
-
-    // ── Synthetic H+N hour labels on time column ────────────────────────────
-    container.querySelectorAll('.synth-hour-label').forEach(el => el.remove());
-    if (synthActive() && state.preferences.synth_label) {
-      const epoch = new Date(state.exercise.epoch);
-      const dayHrsOnly = state.exercise.day_hours_only;
-      for (let s = 0; s < slots; s++) {
-        const min = s * slotMin;
-        if (min % 60 !== 0) continue;
-        if (dayHrsOnly && isOutOfHours(s)) continue;
-        const slotTime = new Date(days[0]);
-        slotTime.setHours(0, min, 0, 0);
-        const hoursOn = synthElapsedHours(epoch.getTime(), slotTime.getTime());
-        if (hoursOn < 0) continue;
-        const topPx = headerH + s * slotH;
-        const lbl = document.createElement('div');
-        lbl.className = 'synth-hour-label';
-        lbl.style.cssText = `top:${topPx + 2}px;`;
-        lbl.textContent = `H+${hoursOn}`;
-        container.appendChild(lbl);
-      }
     }
 
     // ── Events ─────────────────────────────────────────────────────────────
