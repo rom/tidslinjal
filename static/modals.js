@@ -2042,6 +2042,17 @@ function openImportModal() {
   document.querySelectorAll('.import-cat-cb').forEach(cb => {
     cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
   });
+  // Show/hide category section based on file type
+  const fileEl = document.getElementById('importFile');
+  if (fileEl) {
+    fileEl.onchange = () => {
+      const isICS = fileEl.files.length && fileEl.files[0].name.toLowerCase().endsWith('.ics');
+      const catGroup   = document.getElementById('importCategoryGroup');
+      const reassignR  = document.getElementById('importReassignRow');
+      if (catGroup) catGroup.style.display = isICS ? 'none' : '';
+      if (reassignR) reassignR.style.display = isICS ? 'none' : (isPriv ? '' : 'none');
+    };
+  }
   const resultEl = document.getElementById('importResult');
   if (resultEl) { resultEl.style.display = 'none'; resultEl.textContent = ''; }
   openModal('importModal');
@@ -2049,16 +2060,36 @@ function openImportModal() {
 
 async function doImport() {
   const fileEl = document.getElementById('importFile');
-  if (!fileEl || !fileEl.files.length) { showError('Please select a JSON export file.', 'Validation'); return; }
+  if (!fileEl || !fileEl.files.length) { showError('Please select a JSON or ICS file.', 'Validation'); return; }
+  const file = fileEl.files[0];
+  const isICS = file.name.toLowerCase().endsWith('.ics');
+  const resultEl = document.getElementById('importResult');
+
+  if (isICS) {
+    const fd = new FormData();
+    fd.append('data', file);
+    const res = await api('POST', '/api/import/ics', fd);
+    if (res.ok) {
+      const r = await res.json();
+      const msg = `ICS imported: ${r.events||0} events. Skipped: ${r.skipped||0}.`;
+      if (resultEl) { resultEl.textContent = msg; resultEl.style.display = ''; }
+      await refreshAll();
+      showNotification('success', 'ICS import complete');
+    } else {
+      const err = await res.json();
+      showError('ICS import failed: ' + err.error);
+    }
+    return;
+  }
+
   const cats = [...document.querySelectorAll('.import-cat-cb:checked')].map(cb => cb.value);
   if (!cats.length) { showError('Select at least one category to import.', 'Validation'); return; }
   const reassign = document.getElementById('importReassign')?.checked || false;
   const fd = new FormData();
-  fd.append('data', fileEl.files[0]);
+  fd.append('data', file);
   fd.append('include', cats.join(','));
   fd.append('reassign', reassign ? 'true' : 'false');
   const res = await api('POST', '/api/import', fd);
-  const resultEl = document.getElementById('importResult');
   if (res.ok) {
     const r = await res.json();
     const msg = `Imported: ${r.events||0} events, ${r.groups||0} groups, ${r.layers||0} layers, ${r.alarms||0} alarms, ${r.users||0} users. Skipped: ${r.skipped||0}.`;
@@ -2338,6 +2369,62 @@ document.addEventListener('DOMContentLoaded', () => {
     const dx = startX - e.clientX;
     if (Math.abs(dx) > container.clientWidth * 0.4) {
       navigate(dx > 0 ? 1 : -1);
+    }
+  });
+});
+
+// ── ICS drag-and-drop on the calendar view ────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const tc = document.getElementById('timeline-container');
+  if (!tc) return;
+
+  // Overlay shown while dragging an ICS file over the calendar
+  const overlay = document.createElement('div');
+  overlay.id = 'ics-drop-overlay';
+  overlay.style.cssText = [
+    'position:absolute','inset:0','display:none','align-items:center',
+    'justify-content:center','background:rgba(0,0,0,0.45)',
+    'color:#fff','font-size:1.4rem','font-weight:600',
+    'pointer-events:none','border-radius:var(--radius)',
+    'z-index:900','border:3px dashed var(--accent)',
+  ].join(';');
+  overlay.textContent = '📅 Drop ICS file to import';
+  tc.style.position = tc.style.position || 'relative';
+  tc.appendChild(overlay);
+
+  let dragDepth = 0;
+
+  tc.addEventListener('dragenter', e => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dragDepth++;
+    overlay.style.display = 'flex';
+    e.preventDefault();
+  });
+  tc.addEventListener('dragleave', () => {
+    dragDepth--;
+    if (dragDepth <= 0) { dragDepth = 0; overlay.style.display = 'none'; }
+  });
+  tc.addEventListener('dragover', e => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  tc.addEventListener('drop', async e => {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.style.display = 'none';
+    const file = [...e.dataTransfer.files].find(f => f.name.toLowerCase().endsWith('.ics'));
+    if (!file) { showError('Please drop an .ics file.', 'ICS Import'); return; }
+    const fd = new FormData();
+    fd.append('data', file);
+    const res = await api('POST', '/api/import/ics', fd);
+    if (res.ok) {
+      const r = await res.json();
+      showNotification('success', `ICS imported: ${r.events||0} events, ${r.skipped||0} skipped`);
+      await refreshAll();
+    } else {
+      const err = await res.json();
+      showError('ICS import failed: ' + err.error);
     }
   });
 });

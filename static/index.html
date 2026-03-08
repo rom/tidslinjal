@@ -1192,11 +1192,11 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>JSON export file</label>
-        <input type="file" id="importFile" accept=".json" class="attach-file-input">
+        <label>JSON or ICS file</label>
+        <input type="file" id="importFile" accept=".json,.ics" class="attach-file-input">
       </div>
-      <div class="form-group" style="margin-top:10px">
-        <label>Import categories</label>
+      <div class="form-group" id="importCategoryGroup" style="margin-top:10px">
+        <label>Import categories <span style="font-size:var(--fs-sm);opacity:0.6">(JSON only)</span></label>
         <div class="group-picker" id="importCategoryPicker" style="margin-top:4px">
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="events" checked style="margin-right:4px"> Events</label>
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="groups" checked style="margin-right:4px"> Groups</label>
