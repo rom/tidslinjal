@@ -378,12 +378,20 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	clientIP := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		clientIP = strings.SplitN(fwd, ",", 2)[0]
+	}
 	user, ok := app.store.GetUserByUsername(req.Username)
 	if !ok {
+		app.audit(0, "system", "login_failed", "user", 0,
+			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, clientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		app.audit(0, "system", "login_failed", "user", user.ID,
+			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, clientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -406,10 +414,6 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Name: "session", Value: sessID, Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: sess.ExpiresAt,
 	})
-	clientIP := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		clientIP = strings.SplitN(fwd, ",", 2)[0]
-	}
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
 		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
 	jsonOK(w, user.Public())
@@ -2372,6 +2376,12 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	logDebug("[template] Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339))
 	app.audit(user.ID, user.DisplayName, "applied", "template", id,
 		fmt.Sprintf("Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339)))
+	// Set STARTEX (exercise epoch) to the base time specified by the user
+	{
+		ex := app.store.GetExerciseSettings()
+		ex.Epoch = req.BaseTime.Format(time.RFC3339)
+		app.store.SaveExerciseSettings(ex) //nolint
+	}
 	// If the template carries an exercise name, update the exercise label
 	exerciseNameSet := ""
 	if tmpl.ExerciseName != "" {
@@ -2395,6 +2405,7 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		"exercise_name":  exerciseNameSet,
 		"day_start_hour": dayStartHour,
 		"day_end_hour":   dayEndHour,
+		"startex":        req.BaseTime.Format(time.RFC3339),
 	})
 }
 
