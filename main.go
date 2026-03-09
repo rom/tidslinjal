@@ -828,6 +828,151 @@ func (app *App) handleOIDCSettings(w http.ResponseWriter, r *http.Request, user 
 	}
 }
 
+// ── OIDC test / diagnostic handler ──────────────────────────────────────────────
+//
+// POST /api/admin/oidc/test — tests OIDC connectivity and configuration end-to-end.
+// Returns a structured diagnostic report with status for each step.
+
+func (app *App) handleOIDCTest(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	type stepResult struct {
+		Step    string `json:"step"`
+		OK      bool   `json:"ok"`
+		Message string `json:"message"`
+		Detail  string `json:"detail,omitempty"`
+	}
+	var steps []stepResult
+
+	addStep := func(step string, ok bool, msg, detail string) {
+		steps = append(steps, stepResult{Step: step, OK: ok, Message: msg, Detail: detail})
+		if ok {
+			logVerbose("OIDC test [%s]: OK — %s", step, msg)
+		} else {
+			log.Printf("[WARN] OIDC test [%s]: FAIL — %s | %s", step, msg, detail)
+		}
+	}
+
+	// Step 1: Check in-memory OIDC config
+	if app.oidc == nil {
+		cfg := app.store.GetOIDCSettings()
+		if !cfg.Enabled || cfg.Issuer == "" || cfg.ClientID == "" {
+			addStep("config", false, "OIDC is not enabled or configured", "Enable OIDC and provide Issuer URL, Client ID, and Client Secret.")
+			jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
+			return
+		}
+		addStep("config", false, "OIDC settings are stored but not yet active (server not yet loaded them)", "Try saving the settings again or restarting the server.")
+	} else {
+		addStep("config", true,
+			fmt.Sprintf("OIDC configured: issuer=%s client_id=%s", app.oidc.Issuer, app.oidc.ClientID),
+			fmt.Sprintf("authorization_endpoint=%s token_endpoint=%s userinfo_endpoint=%s",
+				app.oidc.AuthorizationEndpoint, app.oidc.TokenEndpoint, app.oidc.UserinfoEndpoint))
+	}
+
+	if app.oidc == nil {
+		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
+		return
+	}
+
+	// Step 2: Fetch discovery document (re-fetch live)
+	discURL := strings.TrimRight(app.oidc.Issuer, "/") + "/.well-known/openid-configuration"
+	log.Printf("[INFO] OIDC test: fetching discovery document from %s", discURL)
+	discResp, err := http.Get(discURL) //nolint:gosec
+	if err != nil {
+		addStep("discovery", false, "Cannot reach OIDC discovery endpoint", err.Error())
+		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
+		return
+	}
+	defer discResp.Body.Close()
+	if discResp.StatusCode != http.StatusOK {
+		addStep("discovery", false,
+			fmt.Sprintf("Discovery endpoint returned HTTP %d", discResp.StatusCode),
+			"Expected HTTP 200. Check that the Issuer URL is correct.")
+		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
+		return
+	}
+	var disc map[string]interface{}
+	if err := json.NewDecoder(discResp.Body).Decode(&disc); err != nil {
+		addStep("discovery", false, "Discovery document is not valid JSON", err.Error())
+		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
+		return
+	}
+	discDetail := fmt.Sprintf("issuer=%v auth=%v token=%v userinfo=%v",
+		disc["issuer"], disc["authorization_endpoint"], disc["token_endpoint"], disc["userinfo_endpoint"])
+	addStep("discovery", true, "Discovery document fetched successfully", discDetail)
+
+	// Step 3: Verify required fields in discovery document
+	requiredFields := []string{"authorization_endpoint", "token_endpoint", "userinfo_endpoint"}
+	var missingFields []string
+	for _, f := range requiredFields {
+		if _, ok := disc[f]; !ok {
+			missingFields = append(missingFields, f)
+		}
+	}
+	if len(missingFields) > 0 {
+		addStep("discovery_fields", false,
+			"Discovery document is missing required fields: "+strings.Join(missingFields, ", "),
+			"The OIDC provider may not be fully compliant with the OpenID Connect specification.")
+	} else {
+		addStep("discovery_fields", true, "All required OIDC fields present in discovery document", "")
+	}
+
+	// Step 4: Check that redirect URL is configured
+	if app.oidc.RedirectURL == "" {
+		addStep("redirect_url", false, "Redirect URL is not configured", "Set the Redirect URL to https://your-server/auth/oidc/callback")
+	} else {
+		addStep("redirect_url", true, "Redirect URL configured: "+app.oidc.RedirectURL, "Make sure this URL is registered in your identity provider's allowed redirect URIs.")
+	}
+
+	// Step 5: Check that client credentials are present
+	if app.oidc.ClientID == "" {
+		addStep("credentials", false, "Client ID is not set", "")
+	} else if app.oidc.ClientSecret == "" {
+		addStep("credentials", false, "Client Secret is not set", "")
+	} else {
+		addStep("credentials", true, "Client credentials present (ID and Secret)", "The secret is not shown for security.")
+	}
+
+	// Step 6: Check exclusive mode setting
+	if app.oidcExclusive {
+		addStep("exclusive_mode", true, "Exclusive mode is ON — local login is disabled (admin account excepted)", "")
+	} else {
+		addStep("exclusive_mode", true, "Exclusive mode is OFF — local login is available alongside SSO", "")
+	}
+
+	// Step 7: OIDC route registration
+	addStep("routes", true,
+		"OIDC routes are registered: /auth/oidc/login and /auth/oidc/callback",
+		fmt.Sprintf("Default role for new SSO users: %s", app.oidcDefaultRole))
+
+	// Overall result
+	overall := true
+	for _, s := range steps {
+		if !s.OK {
+			overall = false
+			break
+		}
+	}
+
+	jsonOK(w, map[string]interface{}{
+		"steps":   steps,
+		"overall": overall,
+		"summary": func() string {
+			if overall {
+				return "OIDC configuration looks correct. Users can sign in via SSO."
+			}
+			return "OIDC configuration has issues. Review the steps above."
+		}(),
+	})
+}
+
 // ── Invitation handlers ─────────────────────────────────────────────────────────
 
 func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *User) {
@@ -3663,6 +3808,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/admin/invitations", app.requireAuth(app.handleInvitations))
 	mux.HandleFunc("/api/admin/invitations/", app.requireAuth(app.handleDeleteInvitation))
 	mux.HandleFunc("/api/admin/oidc", app.requireAuth(app.handleOIDCSettings))
+	mux.HandleFunc("/api/admin/oidc/test", app.requireAuth(app.handleOIDCTest))
 	mux.HandleFunc("/api/admin/sessions", app.requireRole(RoleAdmin, app.handleAdminSessions))
 	mux.HandleFunc("/api/admin/sessions/", app.requireRole(RoleAdmin, app.handleAdminDeleteSession))
 	mux.HandleFunc("/api/admin/bulk/status", app.requireRole(RoleAdmin, app.handleAdminBulkStatus))
