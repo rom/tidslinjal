@@ -28,6 +28,8 @@ const TRANSLATIONS = {
     range_4days: '4 Days',
     range_5days: '5 Days',
     range_week: 'Week',
+    range_2weeks: '2 Weeks',
+    range_3weeks: '3 Weeks',
     range_month: 'Month',
     range_2months: '2 Months',
     range_3months: '3 Months',
@@ -87,6 +89,8 @@ const TRANSLATIONS = {
     cap_lock_slots: 'Lock time slots',
     cap_view_audit: 'View audit log',
     cap_exercise: 'Exercise settings',
+    cap_report: 'Generate reports',
+    cap_auto_report: 'Auto-generate reports',
 
     // Context menu
     ctx_edit: 'Edit Event',
@@ -517,6 +521,8 @@ const TRANSLATIONS = {
     range_4days: '4 Dagar',
     range_5days: '5 Dagar',
     range_week: 'Vecka',
+    range_2weeks: '2 Veckor',
+    range_3weeks: '3 Veckor',
     range_month: 'Månad',
     range_2months: '2 Månader',
     range_3months: '3 Månader',
@@ -935,6 +941,8 @@ const TRANSLATIONS = {
     cap_lock_slots: 'Lås tidsluckor',
     cap_view_audit: 'Visa granskningslogg',
     cap_exercise: 'Övningsinställningar',
+    cap_report: 'Generera rapporter',
+    cap_auto_report: 'Generera rapporter automatiskt',
 
     // Snabbmeny
     ctx_edit: 'Redigera händelse',
@@ -979,6 +987,8 @@ const TRANSLATIONS = {
     range_4days: '4 Jours',
     range_5days: '5 Jours',
     range_week: 'Semaine',
+    range_2weeks: '2 Semaines',
+    range_3weeks: '3 Semaines',
     range_month: 'Mois',
     range_2months: '2 Mois',
     range_3months: '3 Mois',
@@ -1397,6 +1407,8 @@ const TRANSLATIONS = {
     cap_lock_slots: 'Verrouiller les créneaux',
     cap_view_audit: 'Voir le journal d\'audit',
     cap_exercise: 'Paramètres d\'exercice',
+    cap_report: 'Générer des rapports',
+    cap_auto_report: 'Générer des rapports automatiquement',
 
     // Menu contextuel
     ctx_edit: 'Modifier l\'événement',

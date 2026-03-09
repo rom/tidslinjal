@@ -49,6 +49,46 @@
       "order": 5
     }
   ],
+  "groups": [
+    {
+      "name": "SOC Team",
+      "description": "Security Operations Centre — first responders"
+    },
+    {
+      "name": "Network Team",
+      "description": "Network and infrastructure team"
+    },
+    {
+      "name": "Management",
+      "description": "Incident management and coordination"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOC Operations",
+      "description": "SOC incident response layer",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Network Ops",
+      "description": "Network team activity layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Management",
+      "description": "Management decisions and escalations",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [2]
+    }
+  ],
   "locks": [
     {
       "start_offset_min": 720,

@@ -37,6 +37,8 @@
             <option value="4days">4 Days</option>
             <option value="5days">5 Days</option>
             <option value="week" selected>Week</option>
+            <option value="2weeks">2 Weeks</option>
+            <option value="3weeks">3 Weeks</option>
             <option value="month">Month</option>
             <option value="2months">2 Months</option>
             <option value="3months">3 Months</option>
@@ -66,6 +68,7 @@
       <div class="toolbar-group">
         <button class="btn btn-secondary toolbar-btn" id="btnUndo" title="Undo last action (Ctrl+Z)" style="display:none">↩ Undo</button>
         <button class="btn btn-secondary toolbar-btn" id="btnFilter" title="Filter events">🔍 Filter</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnViewToggle" title="Toggle list/calendar view">📋 List</button>
         <button class="btn btn-secondary toolbar-btn" id="btnLayerToggle">🗂 Layers</button>
         <button class="btn btn-secondary toolbar-btn" id="btnSyntheticTime" title="Toggle synthetic exercise time" style="display:none">⏱ T+</button>
       </div>
@@ -86,6 +89,7 @@
         <button class="btn btn-secondary toolbar-btn" id="btnExport">⬇ Export</button>
         <button class="btn btn-secondary toolbar-btn" id="btnImport">⬆ Import</button>
         <button class="btn btn-secondary toolbar-btn" id="btnReport">📄 Report</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnAutoReport" style="display:none" title="Configure automatic scheduled reports">⏰ Auto Report</button>
         <button class="btn btn-secondary toolbar-btn" id="btnPrint" title="Print day/week sheet">🖨 Print</button>
       </div>
 
@@ -139,7 +143,7 @@
         </div>
       </div>
       <div class="user-info">
-        <div class="user-badge">
+        <div class="user-badge" style="cursor:pointer" onclick="openProfileModal()" title="My Profile">
           <span id="userDisplayName">—</span>
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
@@ -159,6 +163,39 @@
     <div id="timeline-container">
       <div id="timeline"></div>
       <div id="current-time-line" style="display:none"></div>
+    </div>
+
+    <!-- List View -->
+    <div id="list-view" style="display:none;overflow:auto;flex:1;padding:16px">
+      <div id="list-view-toolbar" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="listSearch" placeholder="🔍 Search…" style="width:200px" autocomplete="off" oninput="renderListView()">
+        <select id="listStatusFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+          <option value="">All statuses</option>
+          <option value="planned">Planned</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="verified">Verified</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select id="listTypeFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+          <option value="">All types</option>
+        </select>
+        <span id="listCount" style="color:var(--text-dim);font-size:var(--fs-sm)"></span>
+      </div>
+      <table id="list-view-table" style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead>
+          <tr style="background:var(--bg3);position:sticky;top:0;z-index:1">
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('title')">Title <span id="listSort-title"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('event_type')">Type <span id="listSort-event_type"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('status')">Status <span id="listSort-status"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('start_time')">Start <span id="listSort-start_time">▲</span></th>
+            <th style="padding:8px 10px;text-align:left">End</th>
+            <th style="padding:8px 10px;text-align:left">Responsible</th>
+            <th style="padding:8px 10px;text-align:left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="list-view-tbody"></tbody>
+      </table>
     </div>
 
     <!-- Sidebar resize handle -->
@@ -214,6 +251,14 @@
   <div style="display:flex;gap:6px;margin-top:8px">
     <button class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
     <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+  <div class="filter-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+    <label class="filter-label">💾 Saved Presets:</label>
+    <div id="filterPresetList" style="margin-bottom:6px"></div>
+    <div style="display:flex;gap:4px">
+      <input type="text" id="filterPresetName" placeholder="Preset name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+      <button class="btn btn-secondary btn-sm" onclick="saveFilterPreset()">Save</button>
+    </div>
   </div>
 </div>
 
@@ -472,15 +517,17 @@
         </div>
         <div class="form-group" id="virtualMeetingTypeGroup" style="display:none">
           <label id="lbl-ev-virtual-type">Virtual meeting platform</label>
-          <select id="eventVirtualMeetingType">
+          <select id="eventVirtualMeetingType" onchange="onVirtualMeetingTypeChange()">
             <option value="">— Not specified —</option>
             <option value="mattermost">Mattermost</option>
             <option value="teams">Microsoft Teams</option>
+            <option value="zoom">Zoom</option>
             <option value="signal">Signal</option>
             <option value="discord">Discord</option>
             <option value="teleconf">Tele conference</option>
             <option value="other">Other</option>
           </select>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnGenerateMeetingLink" style="margin-top:6px;display:none" onclick="generateMeetingLink()">🔗 Generate Meeting Link</button>
         </div>
       </div>
       <div class="form-row">
@@ -780,6 +827,59 @@
   </div>
 </div>
 
+<!-- User Profile Modal -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>👤 My Profile</h2>
+      <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="profileUsername" readonly style="opacity:0.6">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <input type="text" id="profileRole" readonly style="opacity:0.6">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" id="profileDisplayName" placeholder="Your display name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="profileEmail" placeholder="your@email.com">
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">Change Password</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="profilePwdCurrent">
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="profilePwdNew">
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="profilePwdConfirm">
+        </div>
+      </div>
+      <hr style="border-color:var(--border);margin:16px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:6px">Account Info</h3>
+      <div id="profileInfo" style="font-size:var(--fs-sm);color:var(--text-dim)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+    </div>
+  </div>
+</div>
+
 <!-- Password Change Modal (self-service) -->
 <div class="modal-overlay" id="passwordModal">
   <div class="modal">
@@ -903,6 +1003,60 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('reportModal')" id="lbl-report-cancel">Cancel</button>
       <button class="btn btn-primary" onclick="generateReport()" id="lbl-report-generate">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auto Report Modal -->
+<div class="modal-overlay" id="autoReportModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>⏰ Automatic Report Scheduling</h2>
+      <button class="modal-close" onclick="closeModal('autoReportModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">Configure scheduled reports to be automatically generated and distributed.</p>
+      <div id="autoReportList" style="margin-bottom:16px">
+        <!-- populated by openAutoReportModal() -->
+      </div>
+      <hr style="border-color:var(--border);margin:12px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">Add Schedule</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Report Type</label>
+          <select id="arType">
+            <option value="aar">After Action Report (AAR)</option>
+            <option value="timeline">Timeline Snapshot</option>
+            <option value="per_layer">Per-Layer Activity</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequency</label>
+          <select id="arFrequency">
+            <option value="hourly">Every Hour</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Delivery</label>
+          <select id="arDelivery">
+            <option value="webhook">Webhook</option>
+            <option value="email">Email</option>
+            <option value="download">Download only</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recipient / URL</label>
+          <input type="text" id="arRecipient" placeholder="email@example.com or webhook URL" style="width:100%">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('autoReportModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addAutoReport()">➕ Add Schedule</button>
     </div>
   </div>
 </div>
