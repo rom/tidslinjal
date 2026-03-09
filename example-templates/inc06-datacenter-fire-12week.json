@@ -1,0 +1,273 @@
+[
+  {
+    "name": "Datacenter Fire Response — 12 Weeks",
+    "description": "Catastrophic datacenter fire or major physical disaster response. Covers immediate life safety, emergency DR activation, insurance, regulatory, customer management, full infrastructure rebuild at alternative site, and systematic return to normal operations over 12 weeks. Involves IT, Facilities, Legal, Insurance, PR, and executive leadership.",
+    "exercise_name": "Datacenter Disaster",
+    "scope": "public",
+    "operation_mode": "incident",
+    "group_label": "team",
+    "user_label": "personnel",
+    "day_start_hour": 6,
+    "day_end_hour": 22,
+    "phases": [
+      {
+        "name": "Immediate Emergency Response",
+        "color": "#e74c3c",
+        "start_offset_min": 0,
+        "end_offset_min": 480,
+        "order": 1
+      },
+      {
+        "name": "Emergency DR Operations",
+        "color": "#e67e22",
+        "start_offset_min": 480,
+        "end_offset_min": 10080,
+        "order": 2
+      },
+      {
+        "name": "Damage Assessment & Insurance",
+        "color": "#f39c12",
+        "start_offset_min": 480,
+        "end_offset_min": 20160,
+        "order": 3
+      },
+      {
+        "name": "Infrastructure Rebuild",
+        "color": "#f1c40f",
+        "start_offset_min": 10080,
+        "end_offset_min": 80640,
+        "order": 4
+      },
+      {
+        "name": "Return to Normal Operations",
+        "color": "#27ae60",
+        "start_offset_min": 80640,
+        "end_offset_min": 120960,
+        "order": 5
+      }
+    ],
+    "items": [
+      {
+        "title": "🔥 Datacenter fire alarm triggered — evacuation",
+        "event_type": "alarm",
+        "color": "#e74c3c",
+        "description": "Fire alarm in datacenter. IMMEDIATE: evacuate all staff. Do NOT attempt to save equipment. Safety first.",
+        "start_offset_min": 0,
+        "duration_min": 0,
+        "alarm_lead_time": 0,
+        "alarm_sound": "klaxon"
+      },
+      {
+        "title": "🚒 Fire brigade called — site evacuated",
+        "event_type": "task",
+        "color": "#e74c3c",
+        "description": "Fire services called. All personnel evacuated and accounted for. Automated halon/suppression system triggered.",
+        "start_offset_min": 5,
+        "duration_min": 60
+      },
+      {
+        "title": "📋 Incident Commander and Crisis Team assembled",
+        "event_type": "meeting",
+        "color": "#e74c3c",
+        "description": "CTO, CISO, CEO, CFO, Facilities Director, Legal assembled. Incident Commander designated. DR plan activated.",
+        "start_offset_min": 30,
+        "duration_min": 60,
+        "alarm_lead_time": 10,
+        "alarm_sound": "siren"
+      },
+      {
+        "title": "⚡ DR site activation — emergency failover",
+        "event_type": "task",
+        "color": "#e74c3c",
+        "description": "Activate Disaster Recovery site. Failover critical systems to DR. Verify backups are intact and services are coming up.",
+        "start_offset_min": 60,
+        "duration_min": 240,
+        "alarm_lead_time": 15,
+        "alarm_sound": "alert"
+      },
+      {
+        "title": "📞 Insurance company notified",
+        "event_type": "task",
+        "color": "#9b59b6",
+        "description": "Notify property and business interruption insurance carriers. Open claim. Do NOT touch or move anything until insurer approves.",
+        "start_offset_min": 60,
+        "duration_min": 60,
+        "participant": "Insurance",
+        "alarm_lead_time": 15,
+        "alarm_sound": "beep"
+      },
+      {
+        "title": "📢 Customer emergency communication",
+        "event_type": "task",
+        "color": "#9b59b6",
+        "description": "Status page updated. Customer emergency email sent. Avoid speculation — acknowledge impact, state you are working to restore.",
+        "start_offset_min": 120,
+        "duration_min": 60,
+        "participant": "PR / Customer Relations"
+      },
+      {
+        "title": "⚖️ Legal: regulatory notification assessment",
+        "event_type": "meeting",
+        "color": "#9b59b6",
+        "description": "Assess notification obligations: GDPR (if data affected), sector regulators, stock exchange (if listed). Define notification timeline.",
+        "start_offset_min": 120,
+        "duration_min": 60,
+        "participant": "Legal / DPO",
+        "alarm_lead_time": 15,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "✅ DR services confirmed operational",
+        "event_type": "status",
+        "color": "#27ae60",
+        "description": "Priority services running from DR site. Service levels degraded but operational. Communicate status to customers.",
+        "start_offset_min": 300,
+        "duration_min": 60
+      },
+      {
+        "title": "📊 End of Day 1 — management briefing",
+        "event_type": "briefing",
+        "color": "#9b59b6",
+        "description": "Full situation report: life safety, DR status, estimated damage, insurance status, regulatory requirements, media queries.",
+        "start_offset_min": 720,
+        "duration_min": 60,
+        "alarm_lead_time": 30,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "🔍 Week 1 — Site access and damage assessment",
+        "event_type": "task",
+        "color": "#f39c12",
+        "description": "Fire brigade clears site. Insurance loss adjuster and structural engineers assess damage. Document everything with photos/video for claim.",
+        "start_offset_min": 1440,
+        "duration_min": 7200
+      },
+      {
+        "title": "📋 Week 1 — GDPR notification (if required)",
+        "event_type": "task",
+        "color": "#e74c3c",
+        "description": "If personal data affected or inaccessible, notify supervisory authority within 72h. Coordinate with DPO.",
+        "start_offset_min": 1440,
+        "duration_min": 120,
+        "participant": "DPO / Legal",
+        "alarm_lead_time": 60,
+        "alarm_sound": "siren"
+      },
+      {
+        "title": "📊 Daily status briefing — during emergency DR",
+        "event_type": "briefing",
+        "color": "#9b59b6",
+        "description": "Daily update to management on DR capacity, customer impact, insurance progress, rebuild planning.",
+        "start_offset_min": 1440,
+        "duration_min": 30,
+        "is_recurring": true,
+        "recurrence_pattern": "daily",
+        "alarm_lead_time": 20,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "🏗️ Week 2 — Engage datacenter provider / colocation",
+        "event_type": "meeting",
+        "color": "#3498db",
+        "description": "Procure replacement datacenter capacity: colocation, cloud expansion, or new hosted facility. Emergency procurement process.",
+        "start_offset_min": 10080,
+        "duration_min": 480,
+        "participant": "Procurement / Facilities / Cloud Provider",
+        "alarm_lead_time": 60,
+        "alarm_sound": "beep"
+      },
+      {
+        "title": "🔧 Weeks 2–4 — Hardware procurement (emergency)",
+        "event_type": "task",
+        "color": "#f1c40f",
+        "description": "Emergency hardware procurement: servers, networking, storage. Use insurance advance payment if available. Consider cloud-first approach for speed.",
+        "start_offset_min": 10080,
+        "duration_min": 20160
+      },
+      {
+        "title": "📋 Week 2 — Insurance loss assessment submitted",
+        "event_type": "task",
+        "color": "#9b59b6",
+        "description": "Submit initial loss assessment to insurer: hardware value, data loss, business interruption costs, recovery expenses.",
+        "start_offset_min": 10080,
+        "duration_min": 480,
+        "participant": "Finance / Insurance"
+      },
+      {
+        "title": "🔧 Weeks 4–8 — Infrastructure build at new site",
+        "event_type": "task",
+        "color": "#f1c40f",
+        "description": "Rack, stack, cable, and configure new infrastructure at alternative site. Deploy from configuration management / IaC where available.",
+        "start_offset_min": 40320,
+        "duration_min": 40320
+      },
+      {
+        "title": "📊 Weekly management update — rebuild progress",
+        "event_type": "briefing",
+        "color": "#9b59b6",
+        "description": "Weekly progress report to board: timeline, budget, risks, insurance updates.",
+        "start_offset_min": 10080,
+        "duration_min": 60,
+        "is_recurring": true,
+        "recurrence_pattern": "weekly",
+        "alarm_lead_time": 60,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "🔧 Weeks 8–10 — Application migration and testing",
+        "event_type": "task",
+        "color": "#f1c40f",
+        "description": "Migrate applications to new infrastructure. Test each system thoroughly. Validate data integrity and functionality before cutover.",
+        "start_offset_min": 80640,
+        "duration_min": 20160
+      },
+      {
+        "title": "✅ Week 10 — Planned cutover from DR to new production",
+        "event_type": "meeting",
+        "color": "#27ae60",
+        "description": "Formal cutover from DR site to new production infrastructure. Stakeholder sign-off. Planned maintenance window with customer notification.",
+        "start_offset_min": 100800,
+        "duration_min": 480,
+        "participant": "All Teams / Customer Relations",
+        "alarm_lead_time": 120,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "🔐 Weeks 10–11 — Security hardening and compliance",
+        "event_type": "task",
+        "color": "#3498db",
+        "description": "Enhanced security baseline on new infrastructure: segmentation, PAM, SIEM, backup hardening, DR plan update.",
+        "start_offset_min": 100800,
+        "duration_min": 10080
+      },
+      {
+        "title": "📝 Week 12 — Post-Incident Review",
+        "event_type": "meeting",
+        "color": "#27ae60",
+        "description": "Comprehensive PIR: incident timeline, DR effectiveness, total financial impact, insurance settlement, lessons learned, resilience improvements.",
+        "start_offset_min": 117600,
+        "duration_min": 240,
+        "participant": "Board / Executive / Legal / Insurance / Facilities",
+        "alarm_lead_time": 120,
+        "alarm_sound": "chime"
+      },
+      {
+        "title": "📄 Week 12 — Final insurance claim submitted",
+        "event_type": "task",
+        "color": "#9b59b6",
+        "description": "Submit comprehensive final insurance claim with all documented costs, losses, and recovery expenses.",
+        "start_offset_min": 118080,
+        "duration_min": 480,
+        "participant": "Finance / Insurance / Legal"
+      },
+      {
+        "title": "🏁 Normal operations resumed at new site",
+        "event_type": "status",
+        "color": "#27ae60",
+        "description": "All systems operational at new production site. DR plan updated for new configuration. Resilience audit scheduled.",
+        "start_offset_min": 120960,
+        "duration_min": 0
+      }
+    ]
+  }
+]

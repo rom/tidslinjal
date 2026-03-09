@@ -1,0 +1,396 @@
+{
+  "name": "INC-05 Wiper Attack — 4 Weeks",
+  "description": "28-day incident response for a destructive wiper malware attack that destroys data and systems across a large organisation. Recovery requires complete infrastructure reconstruction. Involves Government CERT, National Cybersecurity Agency, external IR firm, hardware vendors, software license vendors, and key business partners. 24/7 operations in first two weeks, transitioning to structured working hours in weeks 3-4.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Crisis Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 2880,
+      "order": 0
+    },
+    {
+      "name": "Forensic Investigation",
+      "color": "#8E44AD",
+      "start_offset_min": 2880,
+      "end_offset_min": 7200,
+      "order": 1
+    },
+    {
+      "name": "Emergency Operations",
+      "color": "#E67E22",
+      "start_offset_min": 7200,
+      "end_offset_min": 11520,
+      "order": 2
+    },
+    {
+      "name": "System Reconstruction — Stage 1",
+      "color": "#F39C12",
+      "start_offset_min": 11520,
+      "end_offset_min": 17280,
+      "order": 3
+    },
+    {
+      "name": "System Reconstruction — Stage 2",
+      "color": "#F1C40F",
+      "start_offset_min": 17280,
+      "end_offset_min": 24480,
+      "order": 4
+    },
+    {
+      "name": "Data Recovery & Validation",
+      "color": "#27AE60",
+      "start_offset_min": 24480,
+      "end_offset_min": 36000,
+      "order": 5
+    },
+    {
+      "name": "Hardening & Return to Normal",
+      "color": "#3498DB",
+      "start_offset_min": 36000,
+      "end_offset_min": 40320,
+      "order": 6
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 480,
+      "end_offset_min": 540,
+      "reason": "Day 1 executive crisis meeting — all C-suite and board required. No system changes.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1500,
+      "reason": "Daily management briefing — Day 2.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2880,
+      "end_offset_min": 2940,
+      "reason": "Daily management briefing — Day 3.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 4320,
+      "end_offset_min": 4380,
+      "reason": "Daily management briefing — Day 4.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 5760,
+      "end_offset_min": 5820,
+      "reason": "Daily management briefing — Day 5.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 7200,
+      "end_offset_min": 7260,
+      "reason": "Daily management briefing — Day 6.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 8640,
+      "end_offset_min": 8700,
+      "reason": "Daily management briefing — Day 7.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 10080,
+      "end_offset_min": 10140,
+      "reason": "Week 2 review — Day 8. Weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 14400,
+      "end_offset_min": 14460,
+      "reason": "Week 3 review — Day 11. Weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 20160,
+      "end_offset_min": 20220,
+      "reason": "Week 3 end review — Day 15. Management progress briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 25920,
+      "end_offset_min": 25980,
+      "reason": "Week 4 review — Day 19. Validation and hardening briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 37440,
+      "end_offset_min": 37500,
+      "reason": "Final week review — Day 27. Return to operations readiness briefing.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "Wiper Malware Detonation",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Destructive wiper malware detonates across the organisation's IT environment simultaneously. Master Boot Record (MBR) overwriting detected on hundreds of endpoints. File system corruption spreading via network shares. Servers going offline. CrowdStrike Falcon detects WhisperGate/HermeticWiper variant. Network Team confirms lateral propagation via SMB. T=0 established. Total organisational IT failure imminent. All emergency response protocols activated.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Emergency Network Kill Switch",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "Network Team executes emergency network kill switch — all inter-site connectivity severed, internet egress blocked, data centre network isolated. Action prevents further wiper propagation but does not save already-affected systems. Estimated 70% of endpoints and 80% of servers destroyed before containment.",
+      "start_offset_min": 5,
+      "duration_min": 15,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Government CERT Emergency Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "CISO sends FLASH emergency notification to Government CERT and National Cybersecurity Agency via dedicated secure hotline. Wiper malware attack confirmed. Critical infrastructure organisation affected. National security implications assessed. National Cybersecurity Agency activates national incident response protocol. Government CERT assigns senior incident coordinator.",
+      "start_offset_min": 15,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "External IR Firm Mobilised",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "External IR firm (tier-1 cyber incident response company) mobilises maximum response team: 5 forensic analysts, 2 malware reverse engineers, 2 network forensics specialists, 1 threat intelligence lead, 1 crisis communications advisor. First wave on-site within 2 hours. Remote analyst team activated immediately. Secure war room established.",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Scope Assessment — Systems Destroyed",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "IT Operations and external IR firm conduct rapid scope assessment. Confirmed destroyed systems: 1,200 workstations (MBR overwritten), 85 servers (including Domain Controllers, file servers, application servers), 12 SAN/NAS storage systems (volumes overwritten). Backup systems destroyed — backup server included in wiper scope. Surviving: 3 isolated development servers not on corporate LAN, cloud infrastructure (Microsoft 365, Azure) intact.",
+      "start_offset_min": 30,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Executive Crisis Meeting",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Emergency executive crisis meeting: CEO, CFO, CISO, COO, CTO, General Counsel, Board Chairman. Full catastrophic failure assessment presented. Immediate decisions: activate major incident plan, engage government support, notify insurance, prepare for extended business disruption (estimated 3-4 weeks), allocate emergency budget (est. $15M for full reconstruction), engage external crisis communications firm.",
+      "start_offset_min": 480,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Law Enforcement and Regulatory Notifications",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal team submits simultaneous notifications: (1) National Police cybercrime unit — destructive cyberattack, (2) FBI Cyber Division — cross-border attack, (3) Data Protection Authority — GDPR breach notification (72-hour clock started), (4) Sector regulator — critical infrastructure incident. All notifications with preliminary impact assessments.",
+      "start_offset_min": 480,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Wiper Malware Analysis",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "External IR firm malware reverse engineering team analyses recovered wiper samples from memory forensics of surviving systems. Identifies: HermeticWiper variant with custom propagation module, initial access via supply chain compromise (IT management software update), pre-positioned 6 weeks prior, triggered via C2 command. IOCs shared with Government CERT and National Cybersecurity Agency under TLP:RED.",
+      "start_offset_min": 720,
+      "duration_min": 2160,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Business Partner Notifications",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Communications team contacts Key Business Partners to notify of IT outage and expected service disruption. Priority partners: top 20 customers, critical suppliers, financial institutions (bank, payment processor), logistics partners. Estimated service restoration timeline provided (4 weeks). Manual workaround arrangements initiated with key partners.",
+      "start_offset_min": 720,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Daily Standup — Day 2",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Day 2 morning standup: Incident Commander, IR firm lead, Government CERT liaison, IT Operations lead, Communications lead. Status: forensic investigation ongoing, hardware procurement initiated, emergency operations in manual mode. Priority tasks for Day 2: complete forensic scope, begin hardware sourcing, activate emergency comms plan.",
+      "start_offset_min": 1440,
+      "duration_min": 60,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Emergency Hardware Procurement",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations engages Hardware Vendors (Dell, HP, Lenovo) via emergency procurement channels. Emergency PO issued for: 200 laptops (immediate), 1,200 workstations (phased delivery over 2 weeks), 30 replacement servers (rack servers for data centre rebuild), networking equipment (Cisco/Juniper switches and firewalls). Hardware Vendors commit to emergency delivery schedules.",
+      "start_offset_min": 1440,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Software License Emergency Procurement",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations engages Software License Vendors for emergency license provisioning: Microsoft Enterprise Agreement — emergency activation of additional Windows/Office licenses for rebuild fleet, CrowdStrike — expanded EDR coverage for 2,000 endpoints, VMware emergency license for virtualisation rebuild, application software vendors contacted for license resets. Microsoft FastTrack emergency support engaged.",
+      "start_offset_min": 1680,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Government Cybersecurity Agency Briefing",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Classified briefing with National Cybersecurity Agency. Attack attribution assessment: wiper campaign consistent with state-sponsored threat actor targeting critical sector. Supply chain compromise via IT management software vendor (SolarWinds-style attack). Intelligence products shared under national security protocols. Government offers incident response support resources and classified threat intelligence.",
+      "start_offset_min": 2160,
+      "duration_min": 120,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "SITREP 1 — End of Day 2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 2 SITREP. Forensic summary: supply chain compromise via IT management tool update (6 weeks pre-positioning). 1,200 workstations, 85 servers, 12 storage systems destroyed. Cloud environment intact. No viable backup found. Hardware procurement: 200 emergency laptops ETA 48h, server hardware ETA 5-7 days. Business operations in manual mode. Government CERT and National Cybersecurity Agency engaged.",
+      "start_offset_min": 2820,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Emergency Operations Baseline",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Emergency operations team establishes minimal IT baseline using surviving cloud infrastructure (Microsoft 365, Teams, SharePoint) and 200 emergency laptops. Priority: email communications restored via Exchange Online, Finance team enabled on cloud-only systems, Customer Support telephone operations restored, critical data from cloud repositories identified and made accessible.",
+      "start_offset_min": 4320,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Daily Standup — Day 5",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Day 5 standup: all team leads. Emergency operations functional (email, Teams). First server hardware batch arrived. Reconstruction environment being prepared in data centre. IR forensics 80% complete. Government support team on-site. Software license vendors have provided emergency keys. Target: begin active reconstruction Day 6.",
+      "start_offset_min": 5760,
+      "duration_min": 60,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Forensic Investigation Complete",
+      "event_type": "event",
+      "color": "#8E44AD",
+      "description": "External IR firm delivers complete forensic investigation report. Full attack timeline: T-42 days — supply chain compromise; T-7 days — internal reconnaissance; T-1 day — staging on Domain Controllers; T=0 — wiper detonation. Data destruction: no evidence of prior exfiltration. Attribution: nation-state sponsored group. All IOCs, TTPs documented. Environment declared safe for reconstruction.",
+      "start_offset_min": 7200,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "System Reconstruction Kickoff",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Reconstruction kickoff meeting: IT Operations, Hardware Vendors (Dell on-site), Software Vendors (Microsoft FastTrack engineer), External IR firm. Reconstruction plan: Phase 1 — core infrastructure (Days 9-12), Phase 2 — application servers (Days 11-17), Phase 3 — endpoint fleet (Days 8-21, phased). Clean build standard enforced. Zero-trust architecture mandated for rebuild.",
+      "start_offset_min": 11520,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Core Infrastructure Reconstruction",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Stage 1 reconstruction: Active Directory forest rebuild from scratch (new forest, clean design), DNS/DHCP, core networking (new VLAN architecture with micro-segmentation), identity infrastructure (Azure AD Connect, MFA for all accounts), PAM solution (CyberArk) deployed from Day 1. Hardware Vendors (Dell) provide on-site field engineers. No legacy domain trusts restored.",
+      "start_offset_min": 11520,
+      "duration_min": 5760,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 3",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 3 management briefing: CEO, CISO, Board representative. Reconstruction progress: core infrastructure complete, 300 endpoints rebuilt and deployed. Application servers 40% rebuilt. Email and Teams fully operational from cloud. Business partners updated. Insurance: interim payment approved for emergency hardware. Government CERT: supply chain vendor (IT management software) notified and patch issued.",
+      "start_offset_min": 20160,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Application Server Reconstruction",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "Stage 2: Application server reconstruction. ERP system rebuilt on new server infrastructure — Application Vendor (SAP) provides on-site technical consultant for rebuild and data restoration from cloud-sourced backups. Legacy data recovered from: offsite tape (partial — 8 weeks old), cloud archive, business partner data mirrors. Application Vendors engaged for each critical system.",
+      "start_offset_min": 17280,
+      "duration_min": 7200,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Endpoint Fleet Rebuild — Phase 1",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Endpoint rebuild Phase 1: 400 priority endpoints rebuilt using Microsoft Autopilot/SCCM OSD. Hardware Vendors provide additional deployment technicians. New security baseline enforced: CrowdStrike EDR mandatory, MFA enforced, local admin rights removed, application allowlisting (Windows Defender Application Control). Priority users: Finance, Operations, Customer-facing staff.",
+      "start_offset_min": 14400,
+      "duration_min": 5760,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Data Recovery Assessment",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "IT Operations and Application Vendors conduct systematic data recovery assessment across all business systems. Sources: (1) Microsoft 365 cloud — current data intact, (2) Offsite tape — 8-week-old snapshot, (3) Business partner data mirrors — order/invoice data recoverable, (4) Cloud provider (Azure) DR copies, (5) Employee personal cloud backups (controlled recovery). Total estimated data recovery: 65% of pre-incident state.",
+      "start_offset_min": 24480,
+      "duration_min": 4320,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Endpoint Fleet Rebuild — Phase 2",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "Endpoint rebuild Phase 2: remaining 800 endpoints rebuilt in batches. Hardware: mix of recovered (hardware undamaged — wiper was software only) and new Dell hardware. Autopilot deployment at scale. Verizon/Intune MDM for all devices. User data restored from OneDrive cloud. Local data lost — users briefed. Target completion: Day 22.",
+      "start_offset_min": 20160,
+      "duration_min": 7200,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Security Hardening Programme",
+      "event_type": "activity",
+      "color": "#3498DB",
+      "description": "Comprehensive security hardening implemented across reconstructed environment: Zero-trust network architecture with microsegmentation, privileged access workstations for IT admins, CyberArk PAM for all service accounts, immutable backup solution (Rubrik with air-gapped copy), supply chain security programme launched (vendor security assessments), 24/7 SOC with enhanced SIEM tuning, national threat intelligence feed integrated.",
+      "start_offset_min": 36000,
+      "duration_min": 4320,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Full Environment Validation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "External IR firm and National Cybersecurity Agency conduct joint validation of fully reconstructed environment. Full penetration test of new infrastructure. Vulnerability scan (Tenable.sc) — all critical findings remediated. EDR coverage verification — 100% of endpoints. Network traffic analysis baseline established. Business partner connectivity tested. Environment declared clean and hardened.",
+      "start_offset_min": 36720,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Return to Normal Operations",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Full return to normal operations. All 1,200 workstations rebuilt and operational. All 85 server equivalents rebuilt (mix of physical and virtualised). Core business applications operational. Business Continuity Plan stood down. Staff return to normal workflows. Key Business Partners notified of full service restoration. Enhanced monitoring maintained indefinitely.",
+      "start_offset_min": 38880,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Board Post-Incident Review",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Board-level post-incident review. Full incident report presented: attack timeline, forensic findings, attribution, total financial impact (hardware replacement $8M, IR firm $3M, staff costs $2M, business interruption $25M, total estimated $38M+). Insurance claim status. Regulatory compliance. Long-term security investment programme approved. Supply chain security as board-level priority.",
+      "start_offset_min": 39600,
+      "duration_min": 180,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Final Post-Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Final Post-Incident Report submitted to Board, National Cybersecurity Agency, Government CERT, Regulatory Body, Insurance Company, and Law Enforcement. Report: complete forensic timeline, attribution assessment, total impact quantification, supply chain compromise analysis, reconstruction programme summary, security programme implemented, 3-year resilience roadmap. Classified annex for government distribution.",
+      "start_offset_min": 40320,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

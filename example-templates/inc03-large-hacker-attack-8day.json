@@ -1,0 +1,317 @@
+{
+  "name": "INC-03 Large Hacker Attack (APT) — 8 Days",
+  "description": "192-hour around-the-clock incident response for a sophisticated Advanced Persistent Threat (APT) attack on critical infrastructure. A nation-state or advanced cybercriminal group has achieved deep network penetration. Involves National CERT, external forensics firm, regulatory body, government security agency, and multiple system/application vendors.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Initial Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 1440,
+      "order": 0
+    },
+    {
+      "name": "Full Investigation",
+      "color": "#8E44AD",
+      "start_offset_min": 1440,
+      "end_offset_min": 4320,
+      "order": 1
+    },
+    {
+      "name": "Containment",
+      "color": "#E67E22",
+      "start_offset_min": 4320,
+      "end_offset_min": 5760,
+      "order": 2
+    },
+    {
+      "name": "System Rebuild",
+      "color": "#F39C12",
+      "start_offset_min": 5760,
+      "end_offset_min": 8640,
+      "order": 3
+    },
+    {
+      "name": "Validation",
+      "color": "#27AE60",
+      "start_offset_min": 8640,
+      "end_offset_min": 10800,
+      "order": 4
+    },
+    {
+      "name": "Return to Operations",
+      "color": "#3498DB",
+      "start_offset_min": 10800,
+      "end_offset_min": 11520,
+      "order": 5
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1500,
+      "reason": "Day 2 morning command briefing — National CERT and government agency join. No system changes during briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2880,
+      "end_offset_min": 2940,
+      "reason": "Day 3 management and regulatory update briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 4320,
+      "end_offset_min": 4380,
+      "reason": "Day 4 containment decision briefing — all leads required.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 5760,
+      "end_offset_min": 5820,
+      "reason": "Day 5 rebuild kickoff briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 7200,
+      "end_offset_min": 7260,
+      "reason": "Day 6 progress briefing — rebuild status.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 8640,
+      "end_offset_min": 8700,
+      "reason": "Day 7 validation kickoff briefing.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "APT Intrusion Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "SOC Team detects multiple simultaneous high-severity alerts across the SIEM (Splunk Enterprise Security). CrowdStrike Falcon identifies advanced malware with rootkit capabilities on 7 systems. Unusual outbound encrypted traffic to infrastructure in foreign jurisdictions. Incident declared at CRITICAL severity. T=0 established. All senior staff notified immediately.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Incident Command Structure Activated",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Senior Incident Commander designated (CISO or Deputy). Incident Command structure activated per IRP-APT-003. War room established. All teams placed on emergency footing: SOC, Network, IT Operations, Legal, Communications. External resource mobilisation begins immediately.",
+      "start_offset_min": 0,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "National CERT Notified",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "CISO submits emergency notification to National CERT (e.g., NCSC / CISA) via secure reporting portal. Provides: initial IOCs, affected system types, preliminary attack vector assessment. National CERT assigns dedicated liaison officer. Government security agency (intelligence community) put on standby notification.",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "External Forensics Firm Mobilised",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Elite external forensics firm (IR retainer activated) mobilises full response team: 2 senior forensic analysts, 1 malware reverse engineer, 1 network forensics specialist, 1 threat intelligence analyst. First team members on-site within 3 hours. Secure evidence handling room prepared.",
+      "start_offset_min": 30,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Emergency Network Segmentation",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Network Team executes emergency network segmentation plan. Critical infrastructure segments isolated from corporate network. Internet egress firewalling tightened to whitelist-only. All VPN and remote access connections terminated and reviewed. BGP route filtering applied. MPLS circuit to affected data centre isolated.",
+      "start_offset_min": 60,
+      "duration_min": 120,
+      "alarm_lead_time": 5
+    },
+    {
+      "title": "Board and Executive Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "CISO and CEO brief Board of Directors and Executive Leadership via secure conference call. APT intrusion confirmed, national security implications possible, full IR response activated, external CERT and forensics engaged, regulatory notification being assessed. Board authorises unlimited emergency IR spend.",
+      "start_offset_min": 120,
+      "duration_min": 60,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Forensic Evidence Preservation",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "External forensics firm begins systematic evidence preservation. Live memory acquisition from all identified compromised systems. Forensic disk images created with cryptographic hash verification. Network packet capture initiated at all key ingress/egress points. Cloud audit logs (Microsoft 365, Azure) preserved and exported.",
+      "start_offset_min": 240,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Government Security Agency Briefing",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Classified briefing with Government Security Agency (national intelligence / signals intelligence liaison). Initial IOC sharing under government information sharing protocol. Agency assesses whether attack is attributed to known nation-state threat actor. Handling caveats applied to intelligence products.",
+      "start_offset_min": 480,
+      "duration_min": 120,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Regulatory Body Notified",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal team submits mandatory breach notification to sector Regulatory Body within required timeframe. Notification includes: affected systems description, initial impact assessment, containment measures taken, IR team composition. Regulatory liaison officer assigned. 72-hour GDPR notification clock assessed by Data Protection Officer.",
+      "start_offset_min": 480,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 1 — End of Day 1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 1 SITREP distributed to: CISO, CEO, National CERT liaison, Government Security Agency, Regulatory Body, Legal, Communications. Confirmed: 12 systems with IOCs identified, advanced rootkit malware, C2 communications to 3 foreign IPs, estimated dwell time 6-8 weeks (based on earliest IOC timestamps). Full forensic investigation underway.",
+      "start_offset_min": 1380,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "National CERT On-Site Team Arrival",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "National CERT deploys on-site technical team to assist with investigation and provide government-classified threat intelligence. Joint working arrangements established with external forensics firm. Secure government communications channel established in war room.",
+      "start_offset_min": 1440,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Malware Reverse Engineering",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "External forensics firm malware reverse engineer conducts detailed analysis of recovered malware samples in isolated sandbox environment. Identifies: custom implant with anti-forensic capabilities, encrypted C2 protocol, data staging and exfiltration module, persistence via UEFI firmware implant on 2 servers. IOCs compiled and shared with National CERT.",
+      "start_offset_min": 1440,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Vendor Security Advisory Request",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations contacts System and Application Vendors for security advisories related to identified vulnerabilities. Affected vendors: enterprise ERP vendor, industrial control system (ICS/SCADA) vendor, network equipment vendor (Cisco). Vendors provide emergency security contacts and patch availability assessment.",
+      "start_offset_min": 1680,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Threat Intelligence Briefing",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Joint threat intelligence briefing: National CERT liaison, Government Security Agency analyst, external forensics threat intelligence analyst. Threat actor attribution assessment presented. TTPs consistent with known APT group targeting critical infrastructure sector. Intelligence shared under TLP:RED protocol.",
+      "start_offset_min": 2160,
+      "duration_min": 90,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "SITREP 2 — End of Day 2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 2 SITREP. Forensic findings: APT dwell time confirmed at 9 weeks, UEFI firmware implant on 2 critical servers, data exfiltration via DNS tunnelling confirmed (estimated 45GB over 9 weeks). C2 infrastructure mapped. Threat actor TTPs match known APT group. Regulatory notification updated. Vendor patches being assessed.",
+      "start_offset_min": 2820,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Containment Strategy Decision",
+      "event_type": "decision",
+      "color": "#C0392B",
+      "description": "Senior Incident Commander, CISO, National CERT, and Government Security Agency agree on coordinated containment strategy. Decision: simultaneous eviction across all identified systems rather than incremental (to prevent threat actor re-seeding from undetected footholds). Full rebuild of UEFI-implanted servers required. Date and time of coordinated eviction set.",
+      "start_offset_min": 4320,
+      "duration_min": 120,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Coordinated Threat Actor Eviction",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Coordinated eviction executed simultaneously across all 12 compromised systems. CrowdStrike Real Time Response used for remote artefact removal. All persistence mechanisms removed. C2 blocked at DNS, firewall, and BGP levels. UEFI firmware reflashed on 2 affected servers using vendor-supplied firmware update tool. Post-eviction monitoring activated.",
+      "start_offset_min": 4440,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 3 — End of Day 4",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 4 SITREP. Eviction complete. No re-infection detected in first 24 hours. UEFI reflash successful on both critical servers. System rebuilds planned for Days 5-6. Regulatory body updated. Government Security Agency assessing attribution findings for national-level response consideration.",
+      "start_offset_min": 5700,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "System Rebuild Programme",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "IT Operations and System Vendors execute full rebuild programme for all compromised systems. Priority order: 1) Critical infrastructure servers (SCADA/ICS), 2) Domain Controllers, 3) Application servers, 4) User workstations. All systems built from clean vendor-provided images. Vendor patch levels verified. Hardware security modules re-keyed.",
+      "start_offset_min": 5760,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ICS/SCADA Vendor On-Site Support",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Industrial control system (ICS/SCADA) vendor dispatches on-site field engineer to supervise rebuild and security hardening of operational technology systems. Air-gap verification performed. Control system firmware updated. Engineering workstation rebuilt. Network segmentation between IT and OT networks enhanced per IEC 62443.",
+      "start_offset_min": 6240,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 4 — End of Day 6",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 6 SITREP. Rebuild progress: 8 of 12 systems complete. Critical infrastructure systems fully rebuilt and validated. Domain Controllers rebuilt. Application servers in progress. User workstations scheduled for Day 7. No re-infection detected. Enhanced monitoring reporting clean. Vendor patches applied to all rebuilt systems.",
+      "start_offset_min": 8580,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Comprehensive Security Validation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "External forensics firm and National CERT conduct joint security validation of all rebuilt systems. Vulnerability scan (Tenable Nessus) of entire environment. Penetration testing of critical systems. EDR telemetry review. Network traffic baselining. No IOCs or residual compromise detected. Systems cleared for return to production.",
+      "start_offset_min": 8640,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Return to Operations — Critical Systems",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Critical infrastructure and core business systems returned to full production operations. Enhanced security monitoring maintained for 90 days. SOC alert thresholds at maximum sensitivity. National CERT liaison continues for 30 days post-incident observation period. Vendor support contracts reviewed and upgraded.",
+      "start_offset_min": 10800,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Review Meeting",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Senior post-incident review: CISO, CEO, Board representative, National CERT, External Forensics lead, Regulatory Body liaison. Full incident timeline briefing. Attribution findings presented. Regulatory compliance status assessed. Board receives recommendations: cyber security programme investment, OT security programme, supply chain security review.",
+      "start_offset_min": 10800,
+      "duration_min": 180,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Final Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Comprehensive final incident report submitted to: CISO, CEO, Board, Regulatory Body, National CERT, Government Security Agency. Report: full forensic timeline, attribution assessment, data exfiltration scope, regulatory compliance assessment, 90-day remediation roadmap, 3-year cyber security programme recommendations. Classified annex for government distribution.",
+      "start_offset_min": 11520,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

@@ -1879,7 +1879,7 @@ func (app *App) handleGetLocks(w http.ResponseWriter, r *http.Request, user *Use
 }
 
 func (app *App) handleCreateLock(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleAdmin) && !user.CanLock {
+	if !hasRole(user.Role, RoleTeamLead) && !user.CanLock {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -2476,12 +2476,68 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		dayStartHour = tmpl.DayStartHour
 		dayEndHour = tmpl.DayEndHour
 	}
+	// Apply theme/size/language from template to user preferences
+	operationModeSet := ""
+	groupLabelSet := ""
+	userLabelSet := ""
+	if tmpl.Theme != "" || tmpl.Size != "" || tmpl.Language != "" {
+		prefs := app.store.GetPreferences(user.ID)
+		if tmpl.Theme != "" {
+			prefs.Theme = tmpl.Theme
+		}
+		if tmpl.Size != "" {
+			prefs.Size = tmpl.Size
+		}
+		if tmpl.Language != "" {
+			prefs.Language = tmpl.Language
+		}
+		app.store.SavePreferences(prefs) //nolint
+	}
+	// Apply operation mode / terminology settings to exercise settings
+	if tmpl.OperationMode != "" || tmpl.GroupLabel != "" || tmpl.UserLabel != "" {
+		ex := app.store.GetExerciseSettings()
+		if tmpl.OperationMode != "" {
+			ex.OperationMode = tmpl.OperationMode
+			operationModeSet = tmpl.OperationMode
+		}
+		if tmpl.GroupLabel != "" {
+			ex.GroupLabel = tmpl.GroupLabel
+			groupLabelSet = tmpl.GroupLabel
+		}
+		if tmpl.UserLabel != "" {
+			ex.UserLabel = tmpl.UserLabel
+			userLabelSet = tmpl.UserLabel
+		}
+		app.store.SaveExerciseSettings(ex) //nolint
+	}
+	// Create alarms for template items that carry alarm settings
+	for _, item := range tmpl.Items {
+		if item.AlarmLeadTime <= 0 {
+			continue
+		}
+		eventTime := req.BaseTime.Add(time.Duration(item.StartOffsetMin) * time.Minute)
+		alarm := Alarm{
+			UserID:     user.ID,
+			EventTitle: item.Title,
+			EventTime:  eventTime,
+			LeadTime:   item.AlarmLeadTime,
+			Sound:      item.AlarmSound,
+			IsActive:   true,
+		}
+		app.store.CreateAlarm(alarm) //nolint
+	}
 	jsonOK(w, map[string]interface{}{
 		"created":        count,
 		"exercise_name":  exerciseNameSet,
 		"day_start_hour": dayStartHour,
 		"day_end_hour":   dayEndHour,
 		"startex":        req.BaseTime.Format(time.RFC3339),
+		"operation_mode": operationModeSet,
+		"group_label":    groupLabelSet,
+		"user_label":     userLabelSet,
+		"theme":          tmpl.Theme,
+		"size":           tmpl.Size,
+		"language":       tmpl.Language,
 	})
 }
 

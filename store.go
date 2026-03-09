@@ -283,10 +283,11 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 	s.users = []User{adminUser}
 	s.nextUserID = adminUser.ID
 
-	// Keep admin preferences if present, clear others
+	// Keep admin preferences if present, clear others; clear extra_clocks
 	var adminPrefs []UserPreferences
 	for _, p := range s.preferences {
 		if p.UserID == adminUser.ID {
+			p.ExtraClocks = nil
 			adminPrefs = append(adminPrefs, p)
 			break
 		}
