@@ -477,6 +477,13 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Deny login for blocked accounts
+	if user.Blocked {
+		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
+			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, clientIP))
+		jsonError(w, "account is blocked", http.StatusForbidden)
+		return
+	}
 	// Deny login for unvetted accounts (pending admin approval)
 	if !user.Vetted && user.Role != RoleAdmin {
 		jsonError(w, "account pending approval", http.StatusForbidden)
@@ -521,9 +528,16 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	_, user := app.getSession(r)
 	if c, err := r.Cookie("session"); err == nil {
 		logDebug("logout: session=%s", c.Value[:min(8, len(c.Value))])
 		app.store.DeleteSession(c.Value) //nolint
+	}
+	if user != nil {
+		ip := clientIP(r)
+		app.audit(user.ID, user.DisplayName, "logout", "user", user.ID,
+			fmt.Sprintf("User %q logged out from %s", user.Username, ip))
+		logVerbose("logout: user=%q ip=%s", user.Username, ip)
 	}
 	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", Expires: time.Unix(0, 0)})
 	jsonOK(w, map[string]string{"status": "ok"})
@@ -612,6 +626,11 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	rs := app.store.GetRegistrationSettings()
 	if rs.Mode == "" || rs.Mode == "off" {
 		jsonError(w, "registration is disabled", http.StatusForbidden)
+		return
+	}
+	// oidc_auto_enroll: local registration disabled; users must authenticate via OIDC
+	if rs.Mode == "oidc_auto_enroll" {
+		jsonError(w, "local registration is disabled — please sign in via OIDC/SSO to get enrolled automatically", http.StatusForbidden)
 		return
 	}
 
@@ -940,6 +959,64 @@ func (app *App) handleVetUser(w http.ResponseWriter, r *http.Request, user *User
 		}
 	}()
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// handleBlockUser blocks a user account (admin only). Blocked users cannot login even via OIDC.
+func (app *App) handleBlockUser(w http.ResponseWriter, r *http.Request, admin *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 4 {
+		jsonError(w, "missing id", http.StatusBadRequest)
+		return
+	}
+	uid, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	target, ok := app.store.GetUserByID(uid)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if target.Role == RoleAdmin {
+		jsonError(w, "cannot block an admin account", http.StatusForbidden)
+		return
+	}
+	target.Blocked = true
+	if err := app.store.UpdateUser(*target); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	app.audit(admin.ID, admin.DisplayName, "blocked", "user", uid,
+		fmt.Sprintf("Admin %q blocked user %q (#%d)", admin.Username, target.Username, uid))
+	jsonOK(w, map[string]string{"status": "blocked"})
+}
+
+// handleUnblockUser removes a block from a user account (admin only).
+func (app *App) handleUnblockUser(w http.ResponseWriter, r *http.Request, admin *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 4 {
+		jsonError(w, "missing id", http.StatusBadRequest)
+		return
+	}
+	uid, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	target, ok := app.store.GetUserByID(uid)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	target.Blocked = false
+	if err := app.store.UpdateUser(*target); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	app.audit(admin.ID, admin.DisplayName, "unblocked", "user", uid,
+		fmt.Sprintf("Admin %q unblocked user %q (#%d)", admin.Username, target.Username, uid))
+	jsonOK(w, map[string]string{"status": "unblocked"})
 }
 
 // ── Password Reset handlers ────────────────────────────────────────────────────
@@ -2431,6 +2508,112 @@ func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *U
 	jsonOK(w, map[string]string{"status": "reset complete"})
 }
 
+// ── Admin Session Management ───────────────────────────────────────────────────
+
+func (app *App) handleAdminSessions(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	sessions := app.store.GetAllSessions()
+	if sessions == nil {
+		sessions = []SessionInfo{}
+	}
+	jsonOK(w, sessions)
+}
+
+func (app *App) handleAdminDeleteSession(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodDelete {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	// /api/admin/sessions/:id
+	if len(parts) < 4 {
+		jsonError(w, "missing session id", http.StatusBadRequest)
+		return
+	}
+	sessID := parts[3]
+	if err := app.store.DeleteSession(sessID); err != nil {
+		jsonError(w, "session not found", http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "deleted", "session", 0,
+		fmt.Sprintf("Admin %q terminated session %s…", user.Username, sessID[:min(8, len(sessID))]))
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// ── Admin Bulk Actions ─────────────────────────────────────────────────────────
+
+func (app *App) handleAdminBulkStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Filter string      `json:"filter"` // type | user | group | role
+		Value  string      `json:"value"`  // event type key | user id | group name | role name
+		Status EventStatus `json:"status"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	if !validFilters[req.Filter] {
+		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		return
+	}
+	if req.Status == "" {
+		jsonError(w, "status required", http.StatusBadRequest)
+		return
+	}
+	count, err := app.store.BulkSetEventStatus(req.Filter, req.Value, req.Status)
+	if err != nil {
+		jsonError(w, "bulk update failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "bulk_status", "event", 0,
+		fmt.Sprintf("Admin %q set %d events (filter=%s value=%q) to status %q", user.Username, count, req.Filter, req.Value, req.Status))
+	// Broadcast event change to all clients
+	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"status_updated"}`})
+	jsonOK(w, map[string]any{"updated": count})
+}
+
+func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Filter  string `json:"filter"` // type | user | group | role
+		Value   string `json:"value"`
+		Confirm string `json:"confirm"` // must be "DELETE"
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Confirm != "DELETE" {
+		jsonError(w, "confirmation required: send {\"confirm\":\"DELETE\"}", http.StatusBadRequest)
+		return
+	}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	if !validFilters[req.Filter] {
+		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		return
+	}
+	count, err := app.store.BulkDeleteEvents(req.Filter, req.Value)
+	if err != nil {
+		jsonError(w, "bulk delete failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "bulk_deleted", "event", 0,
+		fmt.Sprintf("Admin %q deleted %d events (filter=%s value=%q)", user.Username, count, req.Filter, req.Value))
+	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"events_deleted"}`})
+	jsonOK(w, map[string]any{"deleted": count})
+}
+
 // ── Event Comment handlers ─────────────────────────────────────────────────────
 
 func (app *App) handleGetComments(w http.ResponseWriter, r *http.Request, user *User) {
@@ -2498,8 +2681,65 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 	}
 	app.audit(user.ID, user.DisplayName, "commented", "event", eventID,
 		fmt.Sprintf("Comment on event %d", eventID))
+
+	// Notify @mentioned users via SSE
+	go app.notifyMentions(c, user.DisplayName, eventID)
+
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, c)
+}
+
+// notifyMentions parses @username mentions from a comment and sends SSE notifications.
+func (app *App) notifyMentions(c EventComment, authorName string, eventID int64) {
+	content := c.Content
+	// Find all @word tokens in the comment
+	words := strings.Fields(content)
+	seen := make(map[string]bool)
+	for _, w := range words {
+		if !strings.HasPrefix(w, "@") {
+			continue
+		}
+		// Strip trailing punctuation
+		mention := strings.TrimLeft(w, "@")
+		mention = strings.TrimRight(mention, ".,;:!?")
+		mention = strings.ToLower(mention)
+		if mention == "" || seen[mention] {
+			continue
+		}
+		seen[mention] = true
+		// Find user by username or display name (case insensitive)
+		users := app.store.GetUsers()
+		for _, u := range users {
+			if strings.ToLower(u.Username) == mention || strings.ToLower(u.DisplayName) == mention {
+				if u.ID == c.AuthorID {
+					break // don't notify self
+				}
+				// Send SSE mention notification
+				ev, ok := app.store.GetEventByID(eventID)
+				evTitle := ""
+				if ok {
+					evTitle = ev.Title
+				}
+				payload := map[string]any{
+					"type":        "mention",
+					"author":      authorName,
+					"comment":     content,
+					"event_id":    eventID,
+					"event_title": evTitle,
+				}
+				data, _ := json.Marshal(payload)
+				app.broker.Notify(u.ID, AlarmNotification{
+					AlarmID:    0,
+					EventID:    eventID,
+					EventTitle: evTitle,
+					Message:    fmt.Sprintf("%s mentioned you in a comment on %q", authorName, evTitle),
+				})
+				_ = data
+				logDebug("mention: @%s notified (user %d) in comment on event %d", mention, u.ID, eventID)
+				break
+			}
+		}
+	}
 }
 
 func (app *App) handleDeleteComment(w http.ResponseWriter, r *http.Request, user *User) {
@@ -3423,6 +3663,13 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/admin/invitations", app.requireAuth(app.handleInvitations))
 	mux.HandleFunc("/api/admin/invitations/", app.requireAuth(app.handleDeleteInvitation))
 	mux.HandleFunc("/api/admin/oidc", app.requireAuth(app.handleOIDCSettings))
+	mux.HandleFunc("/api/admin/sessions", app.requireRole(RoleAdmin, app.handleAdminSessions))
+	mux.HandleFunc("/api/admin/sessions/", app.requireRole(RoleAdmin, app.handleAdminDeleteSession))
+	mux.HandleFunc("/api/admin/bulk/status", app.requireRole(RoleAdmin, app.handleAdminBulkStatus))
+	mux.HandleFunc("/api/admin/bulk/delete", app.requireRole(RoleAdmin, app.handleAdminBulkDelete))
+	mux.HandleFunc("/api/export/xlsx", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleExportXLSX)(w, r)
+	})
 
 	// Auth
 	mux.HandleFunc("/api/auth/login", app.handleLogin)
@@ -3710,6 +3957,16 @@ func (app *App) routes() http.Handler {
 		// /api/users/:id/vet
 		if len(parts) == 4 && parts[3] == "vet" && r.Method == http.MethodPost {
 			app.requireAuth(app.handleVetUser)(w, r)
+			return
+		}
+		// /api/users/:id/block
+		if len(parts) == 4 && parts[3] == "block" && r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleBlockUser)(w, r)
+			return
+		}
+		// /api/users/:id/unblock
+		if len(parts) == 4 && parts[3] == "unblock" && r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleUnblockUser)(w, r)
 			return
 		}
 		switch r.Method {
@@ -4226,7 +4483,15 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 	now2 := time.Now()
 	events := app.store.GetEvents(now2.Add(-30*24*time.Hour), now2.Add(30*24*time.Hour), nil)
 	subject := fmt.Sprintf("Auto %s Report — %s", s.ReportType, time.Now().Format("2006-01-02"))
-	html := buildAutoReportHTML(s.ReportType, events)
+	// Build comments map for report
+	commentsMap := make(map[int64][]EventComment)
+	for _, ev := range events {
+		comments := app.store.GetCommentsByEvent(ev.ID)
+		if len(comments) > 0 {
+			commentsMap[ev.ID] = comments
+		}
+	}
+	html := buildAutoReportHTML(s.ReportType, events, commentsMap)
 	if err := app.sendMail(cfg, s.Recipient, subject, html); err != nil {
 		log.Printf("Auto-report: failed to send email for schedule %d: %v", s.ID, err)
 	} else {
@@ -4234,7 +4499,7 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 	}
 }
 
-func buildAutoReportHTML(reportType string, events []Event) string {
+func buildAutoReportHTML(reportType string, events []Event, commentsMap map[int64][]EventComment) string {
 	title := fmt.Sprintf("Auto %s Report — %s", reportType, time.Now().Format("2006-01-02 15:04"))
 	rows := ""
 	for _, ev := range events {
@@ -4243,13 +4508,21 @@ func buildAutoReportHTML(reportType string, events []Event) string {
 		if ev.EndTime != nil {
 			end = ev.EndTime.Format("2006-01-02 15:04")
 		}
-		rows += fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-			htmlEscape(ev.Title), htmlEscape(ev.EventType), htmlEscape(string(ev.Status)), start, end)
+		// Build comments cell
+		commentHTML := ""
+		if comments, ok := commentsMap[ev.ID]; ok && len(comments) > 0 {
+			for _, c := range comments {
+				commentHTML += fmt.Sprintf(`<div style="margin-bottom:4px"><span style="color:#666;font-size:11px">%s — %s</span><br>%s</div>`,
+					htmlEscape(c.AuthorName), c.CreatedAt.Format("2006-01-02 15:04"), htmlEscape(c.Content))
+			}
+		}
+		rows += fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+			htmlEscape(ev.Title), htmlEscape(ev.EventType), htmlEscape(string(ev.Status)), start, end, commentHTML)
 	}
 	return fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>
-<style>body{font-family:sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%%;font-size:13px}th,td{border:1px solid #ccc;padding:6px 10px}th{background:#f0f0f0}</style></head><body>
+<style>body{font-family:sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%%;font-size:13px}th,td{border:1px solid #ccc;padding:6px 10px;vertical-align:top}th{background:#f0f0f0}</style></head><body>
 <h1>%s</h1><p style="color:#666;font-size:13px">Auto-generated: %s</p>
-<table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th></tr></thead><tbody>%s</tbody></table>
+<table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Comments</th></tr></thead><tbody>%s</tbody></table>
 </body></html>`, htmlEscape(title), htmlEscape(title), time.Now().Format("2006-01-02 15:04:05"), rows)
 }
 
@@ -4259,6 +4532,194 @@ func htmlEscape(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	s = strings.ReplaceAll(s, `"`, "&#34;")
 	return s
+}
+
+// ── XLSX Export ────────────────────────────────────────────────────────────────
+
+// handleExportXLSX exports events as an Excel XLSX file.
+// XLSX is a ZIP archive containing XML files; we build it directly without
+// any external library using the archive/zip package (already imported).
+func (app *App) handleExportXLSX(w http.ResponseWriter, r *http.Request, user *User) {
+	from := time.Now().Add(-365 * 24 * time.Hour)
+	to := time.Now().Add(365 * 24 * time.Hour)
+	if q := r.URL.Query().Get("from"); q != "" {
+		if t, err := time.Parse(time.RFC3339, q); err == nil {
+			from = t
+		}
+	}
+	if q := r.URL.Query().Get("to"); q != "" {
+		if t, err := time.Parse(time.RFC3339, q); err == nil {
+			to = t
+		}
+	}
+	events := app.store.GetEvents(from, to, nil)
+
+	// Fetch comments for each event
+	commentsMap := make(map[int64][]EventComment)
+	for _, ev := range events {
+		comments := app.store.GetCommentsByEvent(ev.ID)
+		if len(comments) > 0 {
+			commentsMap[ev.ID] = comments
+		}
+	}
+
+	// Build the XLSX in memory
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	// Required XLSX files
+	xlsxWriteFile(zw, "[Content_Types].xml", xlsxContentTypes())
+	xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+	xlsxWriteFile(zw, "xl/workbook.xml", xlsxWorkbook())
+	xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels())
+	xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+	xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", xlsxSheet(events, commentsMap))
+
+	zw.Close()
+
+	app.audit(user.ID, user.DisplayName, "exported", "data", 0, "Exported XLSX")
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-%s.xlsx"`, time.Now().Format("2006-01-02")))
+	w.Write(buf.Bytes()) //nolint
+}
+
+func xlsxWriteFile(zw *zip.Writer, name, content string) {
+	f, _ := zw.Create(name)
+	f.Write([]byte(content)) //nolint
+}
+
+func xlsxContentTypes() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`
+}
+
+func xlsxRels() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+}
+
+func xlsxWorkbook() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Events" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+}
+
+func xlsxWorkbookRels() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+}
+
+func xlsxStyles() string {
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+  <fills><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/></patternFill></fill></fills>
+  <borders><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+  </cellXfs>
+</styleSheet>`
+}
+
+// xlsxEsc escapes a string for use in XML cell values.
+func xlsxEsc(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, `"`, "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	// Remove control characters that are invalid in XML 1.0
+	var b strings.Builder
+	for _, r := range s {
+		if r == 0x09 || r == 0x0A || r == 0x0D || (r >= 0x20 && r != 0xFFFE && r != 0xFFFF) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func xlsxCell(col, row int, value string, styleIdx int) string {
+	// Convert col index to letter (A, B, C, …)
+	colLetter := string(rune('A' + col))
+	if col >= 26 {
+		colLetter = string(rune('A'+col/26-1)) + string(rune('A'+col%26))
+	}
+	ref := fmt.Sprintf("%s%d", colLetter, row)
+	return fmt.Sprintf(`<c r="%s" t="inlineStr" s="%d"><is><t>%s</t></is></c>`, ref, styleIdx, xlsxEsc(value))
+}
+
+func xlsxSheet(events []Event, commentsMap map[int64][]EventComment) string {
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>`)
+
+	headers := []string{"ID", "Title", "Type", "Status", "Start", "End", "All Day", "Description", "Created By", "Location", "Address", "Comments"}
+	sb.WriteString(`<row r="1">`)
+	for i, h := range headers {
+		sb.WriteString(xlsxCell(i, 1, h, 1))
+	}
+	sb.WriteString(`</row>`)
+
+	for rowIdx, ev := range events {
+		r := rowIdx + 2
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		allDay := ""
+		if ev.AllDay {
+			allDay = "Yes"
+		}
+		// Build comments cell
+		commentText := ""
+		if comments, ok := commentsMap[ev.ID]; ok {
+			parts := make([]string, 0, len(comments))
+			for _, c := range comments {
+				parts = append(parts, fmt.Sprintf("[%s %s] %s", c.AuthorName, c.CreatedAt.Format("2006-01-02 15:04"), c.Content))
+			}
+			commentText = strings.Join(parts, " | ")
+		}
+		cells := []string{
+			fmt.Sprintf("%d", ev.ID),
+			ev.Title,
+			ev.EventType,
+			string(ev.Status),
+			ev.StartTime.Format("2006-01-02 15:04"),
+			end,
+			allDay,
+			ev.Description,
+			ev.CreatedByName,
+			ev.PhysicalLocation,
+			ev.LocationAddress,
+			commentText,
+		}
+		sb.WriteString(fmt.Sprintf(`<row r="%d">`, r))
+		for i, val := range cells {
+			sb.WriteString(xlsxCell(i, r, val, 0))
+		}
+		sb.WriteString(`</row>`)
+	}
+
+	sb.WriteString(`</sheetData></worksheet>`)
+	return sb.String()
 }
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
@@ -4916,6 +5377,14 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Deny login for blocked accounts (even via OIDC)
+	if user.Blocked {
+		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
+			fmt.Sprintf("Blocked OIDC user %q attempted login", username))
+		http.Redirect(w, r, "/login?error=account_blocked", http.StatusFound)
+		return
+	}
+
 	// Create session
 	sessID, err := generateID()
 	if err != nil {
@@ -5131,9 +5600,32 @@ func main() {
 	}
 
 	log.Printf("  Default credentials: admin / admin")
+
+	// Extra debug info: data counts
+	if debug {
+		users := app.store.GetUsers()
+		evs := app.store.GetEvents(time.Time{}, time.Now().Add(10*365*24*time.Hour), nil)
+		grps := app.store.GetGroups()
+		lyrs := app.store.GetLayersVisibleTo(0, nil)
+		log.Printf("  [DEBUG] Loaded data:")
+		log.Printf("    users    : %d", len(users))
+		log.Printf("    events   : %d", len(evs))
+		log.Printf("    groups   : %d", len(grps))
+		log.Printf("    layers   : %d", len(lyrs))
+		log.Printf("  [DEBUG] All registered API routes will be logged per request")
+	}
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	handler := app.routes()
+
+	// Wrap with debug request logger when --debug is enabled
+	if debug {
+		inner := handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("[DEBUG] %s %s from %s", r.Method, r.URL.Path, clientIP(r))
+			inner.ServeHTTP(w, r)
+		})
+	}
 
 	// Tuned HTTP server — explicit timeouts prevent resource leaks under high load.
 	// WriteTimeout is long (5 min) to allow SSE connections to stay open.

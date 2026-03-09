@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -775,7 +776,7 @@ func (s *Store) GetPreferences(userID int64) UserPreferences {
 	}
 	return UserPreferences{
 		UserID:       userID,
-		Theme:        "dark",
+		Theme:        "light",
 		Size:         "small",
 		Language:     "en",
 		DayStartHour: 0,
@@ -2480,4 +2481,157 @@ func (s *Store) GetAllEditingLocks() []EditingLock {
 		}
 	}
 	return out
+}
+
+// ── Session management (admin) ────────────────────────────────────────────────
+
+// SessionInfo is Session enriched with display name for admin UI
+type SessionInfo struct {
+	Session
+	DisplayName string `json:"display_name"`
+	Username    string `json:"username"`
+}
+
+// GetAllSessions returns all non-expired sessions with user info attached.
+func (s *Store) GetAllSessions() []SessionInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	out := make([]SessionInfo, 0)
+	for _, sess := range s.sessions {
+		if !sess.ExpiresAt.After(now) {
+			continue
+		}
+		si := SessionInfo{Session: sess}
+		for _, u := range s.users {
+			if u.ID == sess.UserID {
+				si.DisplayName = u.DisplayName
+				si.Username = u.Username
+				break
+			}
+		}
+		out = append(out, si)
+	}
+	return out
+}
+
+// ── Bulk admin actions ────────────────────────────────────────────────────────
+
+// BulkSetEventStatus sets the status on all events matching the filter.
+// filter: "type"/"user"/"group"/"role"  value: the key/id/name to match.
+// Returns the count of events updated.
+func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) (int, error) {
+	s.mu.Lock()
+
+	// Collect group members for group filter
+	var groupMemberIDs map[int64]bool
+	if filter == "group" {
+		groupMemberIDs = make(map[int64]bool)
+		for _, m := range s.memberships {
+			for _, g := range s.groups {
+				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+					if m.GroupID == g.ID {
+						groupMemberIDs[m.UserID] = true
+					}
+				}
+			}
+		}
+	}
+
+	count := 0
+	for i, ev := range s.events {
+		match := false
+		switch filter {
+		case "type":
+			match = ev.EventType == value
+		case "user":
+			uid, err := strconv.ParseInt(value, 10, 64)
+			if err == nil {
+				match = ev.CreatedBy == uid
+			}
+		case "group":
+			match = groupMemberIDs[ev.CreatedBy]
+		case "role":
+			for _, u := range s.users {
+				if u.ID == ev.CreatedBy && string(u.Role) == value {
+					match = true
+					break
+				}
+			}
+		}
+		if match {
+			s.events[i].Status = newStatus
+			s.events[i].UpdatedAt = time.Now()
+			count++
+		}
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	if count > 0 {
+		if err := s.persist("events.json", snap); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
+// BulkDeleteEvents deletes all events matching the filter.
+// Returns the count of events deleted.
+func (s *Store) BulkDeleteEvents(filter, value string) (int, error) {
+	s.mu.Lock()
+
+	var groupMemberIDs map[int64]bool
+	if filter == "group" {
+		groupMemberIDs = make(map[int64]bool)
+		for _, m := range s.memberships {
+			for _, g := range s.groups {
+				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+					if m.GroupID == g.ID {
+						groupMemberIDs[m.UserID] = true
+					}
+				}
+			}
+		}
+	}
+
+	var kept []Event
+	count := 0
+	for _, ev := range s.events {
+		match := false
+		switch filter {
+		case "type":
+			match = ev.EventType == value
+		case "user":
+			uid, err := strconv.ParseInt(value, 10, 64)
+			if err == nil {
+				match = ev.CreatedBy == uid
+			}
+		case "group":
+			match = groupMemberIDs[ev.CreatedBy]
+		case "role":
+			for _, u := range s.users {
+				if u.ID == ev.CreatedBy && string(u.Role) == value {
+					match = true
+					break
+				}
+			}
+		}
+		if match {
+			count++
+		} else {
+			kept = append(kept, ev)
+		}
+	}
+	if kept == nil {
+		kept = []Event{}
+	}
+	s.events = kept
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	if count > 0 {
+		if err := s.persist("events.json", snap); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
 }

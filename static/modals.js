@@ -229,6 +229,8 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   // Physical location and contact/communication fields
   document.getElementById('eventPhysicalLocation').value = ev ? (ev.physical_location||'') : '';
+  const locAddrEl = document.getElementById('eventLocationAddress');
+  if (locAddrEl) locAddrEl.value = ev ? (ev.location_address||'') : '';
   document.getElementById('eventContactType').value = ev ? (ev.contact_type||'') : '';
   document.getElementById('eventContactURL').value = ev ? (ev.contact_url||'') : '';
   document.getElementById('eventVirtualMeetingType').value = ev ? (ev.virtual_meeting_type||'') : '';
@@ -369,6 +371,7 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
                           ? new Date(document.getElementById('eventRecurrenceEnd').value).toISOString() : null,
     layer_id:           layerVal ? parseInt(layerVal, 10) : null,
     physical_location:  document.getElementById('eventPhysicalLocation')?.value || '',
+    location_address:   document.getElementById('eventLocationAddress')?.value || '',
     contact_type:       document.getElementById('eventContactType')?.value || '',
     contact_url:        document.getElementById('eventContactURL')?.value || '',
     virtual_meeting_type: document.getElementById('eventVirtualMeetingType')?.value || '',
@@ -668,7 +671,7 @@ function showEventDetail(ev) {
       <div style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${t('detail_comments')}</div>
       <div id="commentList"><span style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</span></div>
       <div class="comment-input-row" style="margin-top:8px">
-        <textarea id="commentText" placeholder="${t('comments_add')}"></textarea>
+        <textarea id="commentText" placeholder="${t('comments_add')} (use @username to mention someone)"></textarea>
         <button class="btn btn-primary btn-sm" onclick="submitComment(${ev.id})">${t('comments_submit')}</button>
       </div>
     </div>
@@ -727,7 +730,7 @@ function showEventDetail(ev) {
             ${c.pending_approval ? `<span class="comment-pending-badge">${t('comments_pending')}</span>` : ''}
             ${c.status_change ? `<span class="status-badge status-${c.status_change}" style="margin-left:4px">${t('status_'+c.status_change)}</span>` : ''}
           </div>
-          <div class="comment-text">${escHtml(c.content)}</div>
+          <div class="comment-text">${renderCommentContent(c.content)}</div>
           <div style="display:flex;gap:4px;margin-top:4px">
             ${state.user && (state.user.id===c.author_id || state.user.role==='admin') ?
               `<button class="btn btn-danger btn-sm" onclick="deleteComment(${c.id},${ev.id})">✕</button>` : ''}
@@ -823,6 +826,11 @@ function showEventDetail(ev) {
   footer.appendChild(closeBtn);
 
   openModal('detailModal');
+}
+
+// renderCommentContent highlights @mentions in comment text
+function renderCommentContent(text) {
+  return escHtml(text).replace(/@(\w+)/g, '<span style="color:var(--accent);font-weight:600">@$1</span>');
 }
 
 async function submitComment(eventId) {

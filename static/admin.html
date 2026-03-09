@@ -58,6 +58,7 @@
     <div class="config-row"><span class="config-key">Logged in as</span><span class="config-val" id="cfgUser">—</span></div>
     <div class="action-row">
       <a href="/api/export" class="btn btn-secondary btn-sm">⬇ Download Full Export (JSON)</a>
+      <a href="/api/export/xlsx" class="btn btn-secondary btn-sm">⬇ Download Export (Excel / XLSX)</a>
     </div>
   </div>
 
@@ -88,7 +89,7 @@
       Users marked <span class="pending-badge">Pending</span> have self-registered via vetted mode and must be approved before they can log in.
     </p>
     <table id="userTable">
-      <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Email</th><th>Role</th><th>Can Lock</th><th>Status</th><th>Created</th><th></th></tr></thead>
+      <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Email</th><th>Role</th><th>Can Lock</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
       <tbody id="userTbody"></tbody>
     </table>
   </div>
@@ -106,6 +107,7 @@
         <option value="vetted">Vetted (admin must approve before login)</option>
         <option value="generic_invitation">Generic Invitation (shared code required)</option>
         <option value="personal_invitation">Personal Invitation (unique per-person code)</option>
+        <option value="oidc_auto_enroll">OIDC Auto-Enrollment (OIDC users are enrolled automatically)</option>
       </select>
       <button class="btn btn-primary btn-sm" onclick="saveRegistrationMode()">Save</button>
     </div>
@@ -125,6 +127,49 @@
       </div>
       <div id="invitationsList"></div>
     </div>
+  </div>
+
+  <!-- Bulk Event Actions -->
+  <div class="admin-section">
+    <h2>🔧 Bulk Event Actions</h2>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:14px">Force-set status or remove events matching a filter. Use with care.</p>
+    <div class="form-inline" style="margin-bottom:10px">
+      <label>Filter by:</label>
+      <select class="admin-select" id="bulkFilter" onchange="updateBulkValueUI()">
+        <option value="type">Event Type</option>
+        <option value="user">User (ID)</option>
+        <option value="group">Group (name or ID)</option>
+        <option value="role">Role</option>
+      </select>
+      <input type="text" class="admin-input" id="bulkValue" placeholder="Value…" style="flex:1;min-width:120px">
+    </div>
+    <div id="bulkTypeHelper" style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Event type key, e.g. "event", "decision", "meeting"…</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;align-items:center">
+        <label style="font-size:var(--fs-sm);color:var(--text-dim)">Set status to:</label>
+        <select class="admin-select" id="bulkStatus">
+          <option value="planned">Planned</option>
+          <option value="active">Active</option>
+          <option value="responded_to">Responded To</option>
+          <option value="completed">Completed</option>
+          <option value="submitted">Submitted</option>
+          <option value="verified">Verified</option>
+          <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="bulkSetStatus()">Apply Status</button>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="bulkDeleteEvents()">🗑 Delete Matching Events…</button>
+    </div>
+    <div id="bulkResult" style="margin-top:10px;font-size:var(--fs-sm);display:none"></div>
+  </div>
+
+  <!-- Active Sessions -->
+  <div class="admin-section">
+    <h2>🔐 Active Sessions</h2>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:10px">All currently active user sessions. You can terminate any session.</p>
+    <button class="btn btn-secondary btn-sm" onclick="loadSessions()" style="margin-bottom:10px">↻ Refresh</button>
+    <div id="sessionsList"></div>
   </div>
 
   <div class="admin-section" style="border-color: rgba(231,76,60,.5);">
@@ -156,7 +201,7 @@
   <script src="/static/i18n.js"></script>
   <script>
   'use strict';
-  window.state = { preferences: { language: 'en', theme: 'dark', size: 'small' } };
+  window.state = { preferences: { language: 'en', theme: 'light', size: 'small' } };
 
   async function api(path, opts) {
     const r = await fetch(path, opts);
@@ -215,17 +260,25 @@
 
       // Users table
       const roleBadge = r => `<span class="badge badge-${r}">${r}</span>`;
-      document.getElementById('userTbody').innerHTML = (users||[]).map(u => `<tr>
-        <td>${u.id}</td>
-        <td>${u.username}</td>
-        <td>${u.display_name||''}</td>
-        <td style="font-size:11px">${u.email||'—'}</td>
-        <td>${roleBadge(u.role)}</td>
-        <td>${u.can_lock ? '✓' : ''}</td>
-        <td>${u.vetted ? '✓ Active' : '<span class="pending-badge">Pending</span>'}</td>
-        <td style="white-space:nowrap;font-size:11px">${fmtDT(u.created_at)}</td>
-        <td>${!u.vetted ? `<button class="btn btn-primary btn-sm" onclick="vetUser(${u.id}, this)">Approve</button>` : ''}</td>
-      </tr>`).join('');
+      document.getElementById('userTbody').innerHTML = (users||[]).map(u => {
+        let statusCell = u.vetted ? '✓ Active' : '<span class="pending-badge">Pending</span>';
+        if (u.blocked) statusCell = '<span class="badge" style="background:rgba(231,76,60,.2);color:#e74c3c">⛔ Blocked</span>';
+        let actions = '';
+        if (!u.vetted && !u.blocked) actions += `<button class="btn btn-primary btn-sm" onclick="vetUser(${u.id}, this)" style="margin-right:4px">Approve</button>`;
+        if (!u.blocked && u.role !== 'admin') actions += `<button class="btn btn-danger btn-sm" onclick="blockUser(${u.id}, '${u.username}', this)">Block</button>`;
+        if (u.blocked) actions += `<button class="btn btn-secondary btn-sm" onclick="unblockUser(${u.id}, this)">Unblock</button>`;
+        return `<tr>
+          <td>${u.id}</td>
+          <td>${u.username}${u.is_oidc ? ' <span title="OIDC user" style="font-size:10px;color:var(--accent)">SSO</span>' : ''}</td>
+          <td>${u.display_name||''}</td>
+          <td style="font-size:11px">${u.email||'—'}</td>
+          <td>${roleBadge(u.role)}</td>
+          <td>${u.can_lock ? '✓' : ''}</td>
+          <td>${statusCell}</td>
+          <td style="white-space:nowrap;font-size:11px">${fmtDT(u.created_at)}</td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join('');
 
       // Registration settings
       const mode = (regSettings && regSettings.mode) || 'off';
@@ -330,9 +383,12 @@
     } catch(e) { alert('Error: ' + e.message); }
   }
 
-  // Apply theme from localStorage/cookie if available
+  // Apply theme from localStorage/cookie if available; default to light
   const savedTheme = document.cookie.match(/theme=([^;]+)/);
-  if (savedTheme && savedTheme[1] === 'light') document.body.classList.add('light-mode');
+  const adminTheme = (savedTheme && savedTheme[1]) || 'light';
+  if (adminTheme === 'light') document.body.classList.add('light-mode');
+  else if (adminTheme === 'city-camo') document.body.classList.add('city-camo');
+  else if (adminTheme === 'urban-camo') document.body.classList.add('urban-camo');
 
   document.getElementById('btnResetToEmpty').addEventListener('click', () => {
     document.getElementById('resetConfirmBox').style.display = '';
@@ -365,7 +421,117 @@
     }
   });
 
+  // ── Block / Unblock User ──────────────────────────────────────────────────
+  async function blockUser(id, username, btn) {
+    if (!confirm(`Block user "${username}"? They will not be able to log in (even via OIDC).`)) return;
+    try {
+      const r = await api(`/api/users/${id}/block`, {method: 'POST'});
+      if (r.ok) { loadAdmin(); }
+      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function unblockUser(id, btn) {
+    try {
+      const r = await api(`/api/users/${id}/unblock`, {method: 'POST'});
+      if (r.ok) { loadAdmin(); }
+      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  // ── Bulk Event Actions ────────────────────────────────────────────────────
+  function updateBulkValueUI() {
+    const f = document.getElementById('bulkFilter').value;
+    const hints = {
+      type: 'Event type key, e.g. "event", "decision", "meeting"…',
+      user: 'User numeric ID (see Users table above)',
+      group: 'Group name or numeric ID',
+      role: 'Role name: observer, read, reporter, readwrite, teamlead, oplead, staffofficer, staffofficer_full, admin',
+    };
+    document.getElementById('bulkTypeHelper').textContent = hints[f] || '';
+  }
+
+  async function bulkSetStatus() {
+    const filter = document.getElementById('bulkFilter').value;
+    const value  = document.getElementById('bulkValue').value.trim();
+    const status = document.getElementById('bulkStatus').value;
+    if (!value) { alert('Please enter a filter value.'); return; }
+    if (!confirm(`Set all matching events (filter: ${filter}="${value}") to status "${status}"?`)) return;
+    try {
+      const r = await api('/api/admin/bulk/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filter, value, status}),
+      });
+      const data = await r.json();
+      if (r.ok) {
+        const el = document.getElementById('bulkResult');
+        el.style.display = '';
+        el.style.color = 'var(--green)';
+        el.textContent = `✓ Updated ${data.updated} event(s) to status "${status}".`;
+      } else {
+        alert('Error: ' + (data.error||'unknown'));
+      }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function bulkDeleteEvents() {
+    const filter = document.getElementById('bulkFilter').value;
+    const value  = document.getElementById('bulkValue').value.trim();
+    if (!value) { alert('Please enter a filter value.'); return; }
+    if (!confirm(`⚠ Delete ALL events matching ${filter}="${value}"? Type DELETE to confirm.`)) return;
+    const conf = prompt('Type DELETE to confirm permanent deletion:');
+    if (conf !== 'DELETE') { alert('Cancelled.'); return; }
+    try {
+      const r = await api('/api/admin/bulk/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filter, value, confirm: 'DELETE'}),
+      });
+      const data = await r.json();
+      if (r.ok) {
+        const el = document.getElementById('bulkResult');
+        el.style.display = '';
+        el.style.color = 'var(--red)';
+        el.textContent = `✓ Deleted ${data.deleted} event(s).`;
+      } else {
+        alert('Error: ' + (data.error||'unknown'));
+      }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  // ── Session Management ────────────────────────────────────────────────────
+  async function loadSessions() {
+    try {
+      const sessions = await apiJSON('/api/admin/sessions');
+      const el = document.getElementById('sessionsList');
+      if (!sessions || sessions.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm)">No active sessions.</div>';
+        return;
+      }
+      el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">User</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Session ID</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Expires</th><th></th></tr></thead>
+        <tbody>` + sessions.map(s => `
+          <tr>
+            <td style="padding:6px 8px;border-bottom:1px solid var(--border)">${s.display_name||s.username||s.user_id}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">${(s.id||'').substring(0,12)}…</td>
+            <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px">${fmtDT(s.expires_at)}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid var(--border)"><button class="btn btn-danger btn-sm" onclick="terminateSession('${s.id}', this)">Terminate</button></td>
+          </tr>`).join('') + `</tbody></table>`;
+    } catch(e) { console.error(e); }
+  }
+
+  async function terminateSession(id, btn) {
+    if (!confirm('Terminate this session? The user will be logged out immediately.')) return;
+    try {
+      const r = await api(`/api/admin/sessions/${encodeURIComponent(id)}`, {method: 'DELETE'});
+      if (r.ok) { loadSessions(); }
+      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
   loadAdmin();
+  loadSessions();
   </script>
 </body>
 </html>
