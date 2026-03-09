@@ -251,6 +251,12 @@ function renderEventBlocks(days, slotH) {
     const cells = container.querySelectorAll('.tl-cell');
     if (!cells.length) return;
 
+    // Use actual DOM measurements for precise event positioning so any CSS
+    // changes to the header height or slot height don't cause drift.
+    const firstCell = cells[0];
+    const realHeaderH = firstCell ? firstCell.offsetTop  : headerH;
+    const realSlotH   = firstCell ? firstCell.offsetHeight : slotH;
+
     const dayMeta = days.map((_, di) => {
       const cell = cells[di];
       return cell ? { left: cell.offsetLeft, width: cell.offsetWidth } : null;
@@ -273,8 +279,8 @@ function renderEventBlocks(days, slotH) {
           const vsMin = visStart.getHours()*60 + visStart.getMinutes();
           const veMin = Math.min(visEnd.getHours()*60 + visEnd.getMinutes() || 1440, 1440);
           if (veMin <= vsMin) return;
-          const topPx    = headerH + (vsMin / slotMin) * slotH;
-          const heightPx = Math.max(((veMin - vsMin) / slotMin) * slotH, 4);
+          const topPx    = realHeaderH + (vsMin / slotMin) * realSlotH;
+          const heightPx = Math.max(((veMin - vsMin) / slotMin) * realSlotH, 4);
           const el = document.createElement('div');
           el.className = 'phase-overlay';
           el.style.cssText = `top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:${ph.color};border-color:${ph.color};`;
@@ -376,8 +382,8 @@ function renderEventBlocks(days, slotH) {
         const veOff = Math.min(veMin === 0 && visEnd >= dayEnd ? 1440 : veMin, endOff);
         if (veOff <= vsOff) return;
 
-        const topPx    = headerH + ((vsOff - startOff) / slotMin) * slotH;
-        const heightPx = Math.max(((veOff - vsOff) / slotMin) * slotH - 2, 14);
+        const topPx    = realHeaderH + ((vsOff - startOff) / slotMin) * realSlotH;
+        const heightPx = Math.max(((veOff - vsOff) / slotMin) * realSlotH - 2, 14);
         evsByDay[di].push({ ev, evStart, evEnd, vsOff, veOff, topPx, heightPx });
       });
     });
@@ -466,7 +472,7 @@ function renderEventBlocks(days, slotH) {
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${instantIcon}${escHtml(ev.title)}${typeIcon}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
+          <div class="ev-title">${statusDot}${typeIcon}${escHtml(ev.title)}${instantIcon}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>
@@ -508,8 +514,8 @@ function renderEventBlocks(days, slotH) {
         const vsMin = Math.max(visStart.getHours()*60+visStart.getMinutes(), startOff);
         const veMin = Math.min(visEnd.getHours()*60+visEnd.getMinutes() || 24*60, endOff);
         if (veMin <= vsMin) return;
-        const topPx    = headerH + ((vsMin-startOff)/slotMin)*slotH;
-        const heightPx = Math.max(((veMin-vsMin)/slotMin)*slotH, 14);
+        const topPx    = realHeaderH + ((vsMin-startOff)/slotMin)*realSlotH;
+        const heightPx = Math.max(((veMin-vsMin)/slotMin)*realSlotH, 14);
         const scopeColor  = (lk.scope||'all') === 'layer'
           ? 'rgba(74,144,217,.12),rgba(74,144,217,.12) 5px,rgba(74,144,217,.04) 5px,rgba(74,144,217,.04) 12px'
           : 'rgba(231,76,60,.12),rgba(231,76,60,.12) 5px,rgba(231,76,60,.04) 5px,rgba(231,76,60,.04) 12px';
@@ -566,7 +572,10 @@ function updateCurrentTimeLine(days, slotH) {
       line.style.display = 'none'; return;
     }
   }
-  const topPx = 44 + ((nowMin - startOff) / getSlotMinutes()) * slotH;
+  const _firstCell = document.getElementById('timeline')?.querySelector('.tl-cell');
+  const _headerH = _firstCell ? _firstCell.offsetTop : 44;
+  const _slotH   = _firstCell ? _firstCell.offsetHeight : slotH;
+  const topPx = _headerH + ((nowMin - startOff) / getSlotMinutes()) * _slotH;
   line.style.display = 'block';
   line.style.top = topPx+'px';
 
@@ -612,19 +621,23 @@ function zoomToNow() {
   }
 }
 function scrollToNow() {
-  const slotH  = getSlotHeight();
-  const now    = getNow();
-  const nowMin = now.getHours()*60 + now.getMinutes();
-  const topPx  = 44 + (nowMin / getSlotMinutes()) * slotH;
-  const tc     = document.getElementById('timeline-container');
-  tc.scrollTop = Math.max(0, topPx - tc.clientHeight/2);
+  const slotH    = getSlotHeight();
+  const fc       = document.getElementById('timeline')?.querySelector('.tl-cell');
+  const headerH  = fc ? fc.offsetTop : 44;
+  const now      = getNow();
+  const nowMin   = now.getHours()*60 + now.getMinutes();
+  const topPx    = headerH + (nowMin / getSlotMinutes()) * slotH;
+  const tc       = document.getElementById('timeline-container');
+  tc.scrollTop   = Math.max(0, topPx - tc.clientHeight/2);
 }
 function scrollToDayStart() {
-  const slotH  = getSlotHeight();
-  const startH = (state.preferences.day_start_hour || 0) * 60;
-  const topPx  = 44 + (startH / getSlotMinutes()) * slotH;
-  const tc     = document.getElementById('timeline-container');
-  tc.scrollTop = Math.max(0, topPx);
+  const slotH   = getSlotHeight();
+  const fc      = document.getElementById('timeline')?.querySelector('.tl-cell');
+  const headerH = fc ? fc.offsetTop : 44;
+  const startH  = (state.preferences.day_start_hour || 0) * 60;
+  const topPx   = headerH + (startH / getSlotMinutes()) * slotH;
+  const tc      = document.getElementById('timeline-container');
+  tc.scrollTop  = Math.max(0, topPx);
 }
 
 // ── Layer quick-toggle popover ──────────────────────────────────────────────

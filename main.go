@@ -2887,13 +2887,13 @@ func (app *App) handleGetUserGroups(w http.ResponseWriter, r *http.Request, user
 // ── Background tasks ───────────────────────────────────────────────────────────
 
 func (app *App) runAlarmScheduler() {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
 		for _, alarm := range app.store.GetActiveAlarms() {
 			fireAt := alarm.EventTime.Add(-time.Duration(alarm.LeadTime) * time.Minute)
-			if now.After(fireAt) || now.Equal(fireAt) {
+			if !now.Before(fireAt) { // fires when now >= fireAt
 				app.store.MarkAlarmFired(alarm.ID) //nolint
 				msg := fmt.Sprintf("Reminder: \"%s\" starts in %d minutes", alarm.EventTitle, alarm.LeadTime)
 				if alarm.LeadTime == 0 {
