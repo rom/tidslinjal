@@ -114,18 +114,24 @@
         </div>
       </div>
       <!-- Add Clock popover -->
-      <div id="addClockPopover" class="popover" style="display:none;position:fixed;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-width:240px;box-shadow:var(--shadow-lg)">
+      <div id="addClockPopover" class="popover" style="display:none;position:fixed;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-width:260px;box-shadow:var(--shadow-lg)">
         <div style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-bright)">Add timezone clock</div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Label</label>
-          <input type="text" id="newClockLabel" placeholder="e.g. Tallinn" maxlength="20"
+        <div class="form-group" style="margin-bottom:6px;position:relative">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">City, country or timezone</label>
+          <input type="text" id="newClockSearch" placeholder="e.g. London, Paris, UTC…" maxlength="40" autocomplete="off"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)"
+            oninput="filterTzSuggestions(this.value)" onkeydown="tzSuggestionsKey(event)">
+          <div id="tzSuggestions" style="display:none;position:absolute;left:0;right:0;top:100%;max-height:180px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:201;box-shadow:var(--shadow-lg)"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:4px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Label <span style="opacity:.6">(auto-filled from selection)</span></label>
+          <input type="text" id="newClockLabel" placeholder="Short display name" maxlength="20"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:8px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Timezone</label>
-          <select id="newClockTZ"
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Timezone <span style="opacity:.6">(auto-filled from selection)</span></label>
+          <input type="text" id="newClockTZ" placeholder="e.g. Europe/London" maxlength="50"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
-          </select>
         </div>
         <div style="display:flex;gap:6px;justify-content:flex-end">
           <button class="btn btn-secondary btn-sm" onclick="closeAddClockPopover()">Cancel</button>
