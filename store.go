@@ -44,6 +44,8 @@ type Store struct {
 	oidcSettings         OIDCPersistentConfig
 	mailConfig           MailConfig
 	syslogConfig         SyslogConfig
+	securitySettings     SecuritySettings
+	tlsConfig            TLSConfig
 	apiKeys              []APIKey
 	filterPresets        []FilterPreset
 	eventVersions        []EventVersion
@@ -114,6 +116,8 @@ func (s *Store) load() error {
 	s.loadFile("oidc.json", &s.oidcSettings)
 	s.loadFile("mail.json", &s.mailConfig)
 	s.loadFile("syslog.json", &s.syslogConfig)
+	s.loadFile("security.json", &s.securitySettings)
+	s.loadFile("tls.json", &s.tlsConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
 	s.loadFile("event_versions.json", &s.eventVersions)
@@ -2232,6 +2236,38 @@ func (s *Store) SaveSyslogConfig(cfg SyslogConfig) error {
 	snap := cfg
 	s.mu.Unlock()
 	return s.persist("syslog.json", snap)
+}
+
+// ── Security Settings ─────────────────────────────────────────────────────────
+
+func (s *Store) GetSecuritySettings() SecuritySettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.securitySettings
+}
+
+func (s *Store) SaveSecuritySettings(ss SecuritySettings) error {
+	s.mu.Lock()
+	s.securitySettings = ss
+	snap := ss
+	s.mu.Unlock()
+	return s.persist("security.json", snap)
+}
+
+// ── TLS Config ────────────────────────────────────────────────────────────────
+
+func (s *Store) GetTLSConfig() TLSConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.tlsConfig
+}
+
+func (s *Store) SaveTLSConfig(cfg TLSConfig) error {
+	s.mu.Lock()
+	s.tlsConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("tls.json", snap)
 }
 
 // ── API Keys ──────────────────────────────────────────────────────────────────

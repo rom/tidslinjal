@@ -941,18 +941,33 @@
 
       <hr style="border-color:var(--border);margin:14px 0">
       <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 Change Password</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Current Password</label>
-          <input type="password" id="profilePwdCurrent">
+      <!-- SSO banner shown for OIDC users -->
+      <div id="profilePwdSSOBanner" style="display:none;padding:12px 14px;border-radius:var(--radius);background:rgba(0,120,255,.1);border:1px solid var(--accent);margin-bottom:12px">
+        <div style="font-weight:600;color:var(--accent);margin-bottom:4px">🔗 SSO / Single Sign-On Account</div>
+        <p style="font-size:var(--fs-xs);margin:0;color:var(--text)">
+          Your account is managed by an external identity provider. Password changes must be made through your organisation's SSO portal.
+        </p>
+      </div>
+      <div id="profilePwdFields">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Current Password</label>
+            <input type="password" id="profilePwdCurrent" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label>New Password</label>
+            <input type="password" id="profilePwdNew" autocomplete="new-password" oninput="updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel')">
+          </div>
+          <div class="form-group">
+            <label>Confirm New Password</label>
+            <input type="password" id="profilePwdConfirm" autocomplete="new-password">
+          </div>
         </div>
-        <div class="form-group">
-          <label>New Password</label>
-          <input type="password" id="profilePwdNew">
-        </div>
-        <div class="form-group">
-          <label>Confirm New Password</label>
-          <input type="password" id="profilePwdConfirm">
+        <div style="margin-bottom:10px">
+          <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-bottom:4px">
+            <div id="profilePwdStrengthBar" style="height:100%;width:0%;transition:width .25s,background .25s;border-radius:3px;background:#ccc"></div>
+          </div>
+          <div id="profilePwdStrengthLabel" style="font-size:var(--fs-xs);color:var(--text-dim)"></div>
         </div>
       </div>
 
@@ -985,18 +1000,35 @@
       <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="password-form">
-        <div class="form-group">
-          <label id="lbl-pwd-current">Current password</label>
-          <input type="password" id="pwdCurrent">
-        </div>
-        <div class="form-group">
-          <label id="lbl-pwd-new">New password</label>
-          <input type="password" id="pwdNew">
-        </div>
-        <div class="form-group">
-          <label id="lbl-pwd-confirm">Confirm new password</label>
-          <input type="password" id="pwdConfirm">
+      <!-- SSO/OIDC accounts cannot change password here -->
+      <div id="pwdSSOBanner" style="display:none;padding:14px 16px;border-radius:var(--radius);background:rgba(0,120,255,.1);border:1px solid var(--accent);margin-bottom:14px">
+        <div style="font-weight:600;color:var(--accent);margin-bottom:6px">🔗 SSO / Single Sign-On Account</div>
+        <p style="font-size:var(--fs-sm);margin:0;color:var(--text)">
+          Your account is managed by an external identity provider (SSO/OIDC).
+          Passwords for SSO accounts cannot be changed here — please use your
+          organisation's identity provider portal to update your password.
+        </p>
+      </div>
+      <div id="pwdLocalForm">
+        <div class="password-form">
+          <div class="form-group">
+            <label id="lbl-pwd-current">Current password</label>
+            <input type="password" id="pwdCurrent" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label id="lbl-pwd-new">New password</label>
+            <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')">
+          </div>
+          <div id="pwdStrengthWrap" style="margin-bottom:10px">
+            <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-bottom:4px">
+              <div id="pwdStrengthBar" style="height:100%;width:0%;transition:width .25s,background .25s;border-radius:3px;background:#ccc"></div>
+            </div>
+            <div id="pwdStrengthLabel" style="font-size:var(--fs-xs);color:var(--text-dim)"></div>
+          </div>
+          <div class="form-group">
+            <label id="lbl-pwd-confirm">Confirm new password</label>
+            <input type="password" id="pwdConfirm" autocomplete="new-password">
+          </div>
         </div>
       </div>
     </div>

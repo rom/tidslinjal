@@ -25,8 +25,10 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModal('passwordModal');
         showNotification('success', t('password_saved')||'Password changed');
       } else {
-        const err = await res.json();
-        showError(err.error);
+        const err = await res.json().catch(() => ({}));
+        // Friendly display for policy / SSO errors (server prefixes with "password_quality:" or "oidc_account:")
+        const msg = (err.error || 'Failed to change password').replace(/^password_quality:\s*/,'').replace(/^oidc_account:\s*/,'');
+        showError(msg);
       }
     });
   }
@@ -331,6 +333,19 @@ async function init() {
       ['pwdCurrent','pwdNew','pwdConfirm'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
       });
+      // Reset strength indicator
+      const bar = document.getElementById('pwdStrengthBar');
+      const lbl = document.getElementById('pwdStrengthLabel');
+      if (bar) { bar.style.width = '0%'; bar.style.background = '#ccc'; }
+      if (lbl) lbl.textContent = '';
+      // Show SSO banner for OIDC accounts; hide form
+      const isSSO = state.user && state.user.is_oidc;
+      const banner = document.getElementById('pwdSSOBanner');
+      const form   = document.getElementById('pwdLocalForm');
+      const saveBtn = document.getElementById('btnSavePassword');
+      if (banner) banner.style.display = isSSO ? '' : 'none';
+      if (form)   form.style.display   = isSSO ? 'none' : '';
+      if (saveBtn) saveBtn.style.display = isSSO ? 'none' : '';
       openModal('passwordModal');
     });
   }
