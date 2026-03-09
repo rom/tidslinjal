@@ -398,6 +398,27 @@
 </div>
 
 <!-- Recurring Delete Dialog -->
+<!-- Recurring Event Edit Modal -->
+<div class="modal-overlay" id="recurEditModal" style="z-index:900">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>🔁 Edit Recurring Event</h2>
+      <button class="modal-close" onclick="closeModal('recurEditModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="recurEditMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to edit?</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-secondary" id="recurEditThis">Edit only this occurrence</button>
+        <button class="btn btn-secondary" id="recurEditFuture">Edit this and all future occurrences</button>
+        <button class="btn btn-primary"   id="recurEditAll">Edit all occurrences (entire series)</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('recurEditModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="recurDeleteModal" style="z-index:900">
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
@@ -1846,10 +1867,39 @@
   </div>
 </div>
 
+<!-- Bulk Status Change Modal -->
+<div class="modal-overlay" id="bulkStatusModal" style="z-index:1100">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>🔄 Change Status for Selected Events</h2>
+      <button class="modal-close" onclick="closeModal('bulkStatusModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="bulkStatusCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
+      <div class="form-group">
+        <label>New Status</label>
+        <select id="bulkStatusSelect" style="width:100%">
+          <option value="planned">Planned</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="responded_to">Responded To</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('bulkStatusModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmBulkStatus()">Apply Status</button>
+    </div>
+  </div>
+</div>
+
 <!-- Multi-select info bar -->
-<div id="multiselectBar" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:20px;z-index:500;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:var(--fs-sm)">
+<div id="multiselectBar" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:20px;z-index:500;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:var(--fs-sm)">
   <span id="multiselectCount"></span>
   <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openMoveSelectedDialog()">📅 Move</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openBulkStatusDialog()">🔄 Status</button>
+  <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none" onclick="bulkDeleteSelected()">🗑 Delete</button>
   <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="clearSelection()">✕ Clear</button>
 </div>
 

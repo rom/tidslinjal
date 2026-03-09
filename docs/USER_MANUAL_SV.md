@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 3.7.0**
+**Version 4.0.0**
 
 ---
 
@@ -462,9 +462,26 @@ Låsta tidsluckor visas som ett rödstreckigt överlägg. Händelser kan inte sk
 | **Gruppledare** | `teamlead` | + Skapa grupper; verifiera/avvisa inskickade händelser; visa granskningslogg; hantera faser |
 | **Operationsledare** | `oplead` | + Skapa/redigera/ta bort händelser på masterlinjen |
 | **Stabsassistent** | `staffofficer` | Samma rättigheter som operationsledare — alternativ beteckning för stabspersonal |
-| **Admin** | `admin` | Full åtkomst — hantera alla användare, roller, lås, övningsinställningar, registrering |
+| **Stabsofficer** | `staffofficer_full` | Samma som stabsassistent, men kräver minst en J-beteckning (J1–J9) |
+| **Admin** | `admin` | Full åtkomst — hantera alla användare, roller, lås, aktivitetsinställningar, registrering |
 
 Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
+
+### J-beteckningar (Stabsofficersrollen)
+
+**Stabsofficer** (`staffofficer_full`) kräver minst en NATO J-beteckning. Beteckningarna identifierar stabsgrenen:
+
+| Kod | Gren |
+|---|---|
+| J1 | Personal |
+| J2 | Underrättelser |
+| J3 | Operationer |
+| J4 | Logistik |
+| J5 | Planering |
+| J6 | Kommunikation |
+| J7 | Utbildning |
+| J8 | Finans |
+| J9 | Civil-militärt samarbete |
 
 ---
 
@@ -616,4 +633,4 @@ Navigera till `/admin-view` (kräver rollen **Admin**) för en dedikerad adminis
 
 ---
 
-*Tidslinjal v3.2.0 — Samarbetsbaserad operativ tidslinje*
+*Tidslinjal v4.0.0 — Samarbetsbaserad operativ tidslinje*

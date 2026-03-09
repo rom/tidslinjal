@@ -88,7 +88,7 @@ const TRANSLATIONS = {
     cap_manage_templates: 'Manage templates',
     cap_lock_slots: 'Lock time slots',
     cap_view_audit: 'View audit log',
-    cap_exercise: 'Exercise settings',
+    cap_exercise: 'Activity settings',
     cap_report: 'Generate reports',
     cap_auto_report: 'Auto-generate reports',
 
@@ -346,7 +346,7 @@ const TRANSLATIONS = {
     settings_oidc_status_none:   'Not configured',
 
     // Exercise / synthetic time
-    settings_exercise:       'Exercise Settings',
+    settings_exercise:       'Activity Settings',
     settings_exercise_label: 'Exercise name',
     settings_exercise_epoch: 'STARTEX (Day 1 T+0)',
     settings_exercise_endex: 'ENDEX (End of exercise)',
@@ -757,7 +757,7 @@ const TRANSLATIONS = {
     settings_oidc_status_none:   'Ej konfigurerat',
 
     // Exercise / synthetic time
-    settings_exercise:       'Övningsinställningar',
+    settings_exercise:       'Aktivitetsinställningar',
     settings_exercise_label: 'Övningsnamn',
     settings_exercise_epoch: 'STARTEX (Dag 1 T+0)',
     settings_exercise_endex: 'ENDEX (Övningens slut)',
@@ -976,7 +976,7 @@ const TRANSLATIONS = {
     cap_manage_templates: 'Hantera mallar',
     cap_lock_slots: 'Lås tidsluckor',
     cap_view_audit: 'Visa granskningslogg',
-    cap_exercise: 'Övningsinställningar',
+    cap_exercise: 'Aktivitetsinställningar',
     cap_report: 'Generera rapporter',
     cap_auto_report: 'Generera rapporter automatiskt',
 
@@ -1241,7 +1241,7 @@ const TRANSLATIONS = {
     settings_oidc_status_none:   'Non configuré',
 
     // Exercise / synthetic time
-    settings_exercise:       'Paramètres d\'exercice',
+    settings_exercise:       'Paramètres d\'activité',
     settings_exercise_label: 'Nom de l\'exercice',
     settings_exercise_epoch: 'STARTEX (Jour 1 T+0)',
     settings_exercise_endex: 'ENDEX (Fin de l\'exercice)',
@@ -1460,7 +1460,7 @@ const TRANSLATIONS = {
     cap_manage_templates: 'Gérer les modèles',
     cap_lock_slots: 'Verrouiller les créneaux',
     cap_view_audit: 'Voir le journal d\'audit',
-    cap_exercise: 'Paramètres d\'exercice',
+    cap_exercise: 'Paramètres d\'activité',
     cap_report: 'Générer des rapports',
     cap_auto_report: 'Générer des rapports automatiquement',
 

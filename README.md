@@ -1,126 +1,48 @@
-# Tidslinjal v4.0.0
+# Tidslinjal
 
-**Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web tool designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for cyber warfare training exercises.
-
----
-
-## What's New in v4.0.0 — Performance & Scalability
-
-- **O(1) session and user lookups** — sessions and users are indexed in hash maps; every authenticated HTTP request now resolves the session and user in constant time regardless of user count (was O(n) linear scan)
-- **Write-after-unlock** — all 35+ store mutation methods now release the global RWMutex before performing JSON file I/O; a dedicated write mutex serialises disk writes, so concurrent reads are never blocked by slow storage
-- **Per-user SSE index** — alarm notifications target specific users via an O(1) map lookup instead of scanning all connected clients (was O(connected_clients))
-- **SSE broker RWMutex upgrade** — Notify and Broadcast operations now use a read lock, allowing concurrent delivery to multiple users without serialising each other
-- **Bounded webhook worker pool** — 32 persistent worker goroutines replace unbounded `go func()` spawning; the pool handles bursts of 1 000 simultaneous alarm firings without file-descriptor exhaustion; jobs queue with drop-on-full back-pressure
-- **HTTP server timeouts** — explicit ReadTimeout (30 s), WriteTimeout (5 min for SSE), IdleTimeout (120 s), and MaxHeaderBytes (1 MB) prevent slow-client attacks and resource exhaustion under high concurrency
-- **CheckOverlaps O(1) user lookup** — overlap detection during event create/update now uses the hash index instead of a nested O(users) scan
-- Tested and tuned to sustain **1 000 concurrent users** (≈ 900 read-only + 100 privileged writers) with sub-10 ms median latency on commodity hardware
-- No breaking API or data-format changes — existing data directories and clients work unchanged
-
-## What's New in v3.7.0
-
-- **Toolbar redesign** — logical button groupings with separator lines, uniform 30 px height, icons + text labels on every button; 7 groups: Navigation, View, Search, Controls, Event Actions, Data, Language
-- **5-day view** — new "5 Days" option added to the range selector and to the Default View setting
-- **i18n coverage** — all new and existing toolbar elements fully translated to English, Swedish, and French
-- **Dynamic group terminology** — sidebar tab, filter button, and group headings now respect the "Group Terminology" setting (Group / Unit / Team) in real time
-- **Settings order** — Default View moved to appear directly after Timezone in the Settings panel
-- **Role editor** — 🛡 Role Editor button in the Users tab opens an authorization matrix; edit display names and capability flags for all roles except admin; saved to `roles.json` and loadable from `/api/roles`
-- **Roles saved with templates** — role configurations are optionally saved alongside template events when saving a template
-- **Import "Done" mode** — after a successful data import, the Cancel button is hidden and Import becomes ✓ Done (closes and resets the dialog)
-- **Larger template description** — "Save as Template" description field is now a resizable `<textarea>` (4 rows)
-- **Template date-range selection** — when saving a template, choose exactly which portion of the calendar to capture (from/to date range); phases and locks in range are included
-- **Phases and locks in templates** — templates now store `TemplatePhase` and `TemplateLock` entries; applying a template also creates the corresponding phases and locked slots
-- **Multi-select events** — Ctrl+click to select multiple events; selected events are highlighted with an accent-coloured outline; a floating bar shows the count with Move and Clear actions
-- **Right-click "Move to new time/date"** — context menu item opens a date/time dialog; works for single events and multi-select (all selected events move by the same offset)
-- **10 example exercise templates** — ready-made templates in `example-templates/` covering 1-day, 2-day, 3-day, and 5-day exercises across co-located and virtual modalities; see `example-templates/README.md`
-- **Event type icons** — each event type now has an emoji icon (🤝 ⚖️ ⏰ 🧍 📊 ⚡ 🔄 🏢 📌) displayed to the left of the event title in the grid, in the legend, and in the event type dropdown; custom types can have any emoji icon set via the type editor; a global toggle in Settings shows/hides all icons
-- **Physical Meeting event type** (🏢) — dedicated type for in-person meetings at a specific location; burnt orange colour
-- **Assigned Task event type** (📌) — already existed; now has an icon displayed left of title
-- **Standing Meeting event type** (🧍) — already existed; now has an icon displayed left of title
-- **Recurring / Instant icons left of title** — ↻ (recurring series) and ⚡ (instant) markers now appear to the left of the event title text (was right-side suffixes)
-- **Multi-timezone clocks** — click the **+** button left of the main clock to add extra real-time clocks for any IANA timezone; each shows a label, live time, and timezone abbreviation; remove with the × button; saved per user
-- **Alarm audit trail** — every alarm ACK is logged with who acknowledged it, the timestamp, and the originating IP address; visible in the Audit sidebar tab for Team Lead+
-- **"Show Event" button on alarm notifications** — alarm popups now include a 📋 Show Event button to open the relevant event detail directly from the notification
-- **Alarm precision improved** — alarm scheduler now polls every 5 s (was 30 s), reducing maximum alarm jitter by 6×
-- **Lock undo** — creating and deleting time slot locks is now undoable (Ctrl+Z)
-- **Report date/time format** — reports now use the user's locale-aware date/time format (was always browser default locale)
-- **Vertical alignment fix** — event block positions are computed from live DOM measurements instead of a hardcoded constant, eliminating drift at non-default zoom levels
+**Tidslinjal** ("timeline" in Swedish) is a collaborative operational timeline web application designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for military exercises, cyber incident response, and crisis management.
 
 ---
 
-## What's New in v3.6.0
+## Table of Contents
 
-- **New roles** — Observer, Reporter, Staff Officer; fine-grained permission model
-- **Self-registration modes** — off / open / vetted / generic invitation / personal invitation
-- **Overlap warnings** — event creation warns when a responsible person or invited user has a scheduling conflict
-- **i18n foundation** — English, Swedish, and French translations; language preference saved per user
-- **Improved docs** — this README and in-app help updated
-
----
-
-## What's New in v3.4.0
-
-- **Prettier error messages** — browser `alert()` dialogs replaced with styled in-app error modals that match the app visual language
-- **Inline alarm on event creation/editing** — set a personal alarm directly in the Add/Edit Event modal; choose lead time and whether the alarm is for yourself only or all invited persons (Ops Lead+)
-- **Long-press nav buttons** — short click on ‹/› steps by the current view span as before; hold the button for >400 ms to open a jump-size dropdown (1 day / 2 days / 3 days / 1 week / 2 weeks)
-- **Center Today button** — new ⊙ Center button centers the current date in the view so days before and after today are visible
-- **Templates** — save the current view's events as a named, reusable template (private or public). Apply any template to a chosen base date to create events with offset times. Accessible via the 📋 Templates toolbar button
-- **Layer toggle is now instant** — clicking layers in the 🗂 popover immediately updates the timeline; preferences save in the background
-- **Prettier Help popup** — redesigned help modal with sectioned cards, color-coded icons, styled keyboard shortcut pills, and a version line in the footer
-- **Remove duplicate "goto now" button** — the ⏱ scroll-to-now button has been replaced by ⊙ Center (more useful); the Today button already handles jumping to now
-- **Version bump to 3.4.0**
-
-## What's New in v3.3.0
-
-- **Responsive design overhaul** — mobile bottom nav, tablet overlay sidebar, improved out-of-hours contrast
-- **Assigned Task event type** — orange #E67E22; Swedish/French translations included
-- **Responsible field** — per-event responsible user (dropdown, defaults to creator)
-- **Recurring events hidden outside day hours** — recurring instances are not shown in grayed slots
-- **Print/report improvements** — layer selection checkboxes, duration column, Responsible column in all report types
-- **Layer exclusion model** — `hidden_layers` array replaces `active_layers`; unselected layers hide immediately
-- **Invited field on events** — multi-select users + groups; invited persons receive SSE in-app notifications
-- **Ops Lead can pause/unpause timeline** (was admin-only)
-- **Phase layer assignment** — phases can be attached to specific layers
-- **Synthetic time day-hours-only** — H+N count skips out-of-hours periods; red line hidden outside day hours
-- **Full-width events** — events with no overlapping neighbours span the full column width
-- **Export/import selection** — select which categories to include (events/groups/layers/alarms; users/phases for admins)
-- **Import modal** — JSON file import with category checkboxes, reassign-ownership option, result counts
-- **Auto-create layer on group creation** — a layer with the same name/description is created automatically
-- **Recurring delete dialog** — three-option modal: delete this occurrence / this + all future / entire series
-
-## What's New in v3.1.0
-
-- **STARTEX / ENDEX** — Exercise epoch renamed to "STARTEX"; new "ENDEX" field for end-of-exercise datetime in Settings
-- **Instant event type** — single-point-in-time marker (no end time); rendered as a thin vertical bar with a ◆ diamond
-- **Möte (Meeting) event type** — dedicated meeting type with a distinct color
-- **Intern / Extern attribute** — new per-event participant field; shown as colored badge on event blocks
-- **Unified Export modal** — single ⬇ Export button opens a modal to select ICS, JSON, or CSV format
-- **CSV export** — export current view events to a spreadsheet-ready CSV file
-- **Date/time format preference** — select ISO 8601, UK, FR, or SV format in Settings
+- [Features Overview](#features-overview)
+- [Getting Started](#getting-started)
+- [Usage Guide](#usage-guide)
+- [Configuration](#configuration)
+- [Access Control](#access-control)
+- [Data Files](#data-files)
+- [API Reference](#api-reference)
+- [Architecture](#architecture)
+- [Example Templates](#example-templates)
+- [Changelog](#changelog)
 
 ---
 
-## Features
+## Features Overview
 
 ### Timeline Visualization
+
 - **Graphical grid view** — days left to right, time-of-day top to bottom (24-hour)
 - **Configurable resolution** — 10-minute, 15-minute, hourly, or full-day slots
 - **Drag-to-zoom** — drag on the time column to scale slot heights; double-click to reset
 - **Drag-to-reschedule** — drag event blocks to move them to a new time
-- **Configurable display range** — Day, 2–4 Days, Week, Month, 2–3 Months
-- **Live current-time indicator** — red line across the grid updated every 30 s
-- **Synthetic exercise time** — optional "Day N / T+Xh" display with configurable epoch
-- **Event search** — live filter by title, description, or creator
-- **Long-press navigation** — hold ‹/› for jump-size menu; short click steps by current view
+- **Display range options** — Day, 2 Days, 3 Days, 4 Days, 5 Days, Week, 2 Weeks, 3 Weeks, Month, 2–3 Months
+- **Live current-time indicator** — red line across the grid, updated every 30 s
+- **List / table view** — alternative to the grid view; sortable columns and full-text search
+- **Multi-select events** — Ctrl+click to select multiple events; a floating bar shows count with Move and Clear actions
+- **Right-click context menu** — "Move to new time/date" for single or multi-selected events
 
 ### Event Management & Status Workflow
-Eleven built-in event types (plus custom types):
+
+Twelve built-in event types (plus custom types created via the type editor):
 
 | Icon | Type | Description | Default Color |
 |---|---|---|---|
 | — | **Event** | General occurrence | Blue |
 | ⚡ | **Instant** | Single-point-in-time marker (no end time) | Orange |
 | 🤝 | **Meeting** | Scheduled meeting | Grey |
-| 🏢 | **Physical Meeting** | In-person meeting at a specific location | Burnt Orange |
+| 🏢 | **Physical Meeting** | In-person meeting at a specific location; stores lat/lng for map view | Burnt Orange |
 | ⚖️ | **Decision** | Decision point | Green |
 | ⏰ | **Deadline** | Hard deadline | Red |
 | — | **Activity** | Planned work | Light Green |
@@ -130,106 +52,189 @@ Eleven built-in event types (plus custom types):
 | 🧍 | **Standing Meeting** | Short daily stand-up meeting | Cyan |
 
 Each event carries:
+
 - Title, description, type, custom color
 - Start time and optional end time; optional recurrence
 - **Participant** — intern, extern, or none
 - **Responsible** — assigned user (defaults to creator)
 - **Invited** — multi-select users and groups (notified on creation)
-- **Inline alarm** — set alarm at creation/edit time for yourself or all invited
-- **Day-only** — no specific time (shown in all-day area)
-- Layer assignment (master timeline or named layer)
+- **Inline alarm** — set alarm at creation/edit time for yourself or all invited persons
+- **Day-only** — no specific time (shown in the all-day area)
+- Layer assignment (master timeline or a named layer)
 - **Status** — planned / active / responded_to / completed / submitted / verified / rejected / cancelled
-- File attachments (up to 25 MB)
+- File attachments (up to 25 MB per file)
+- **Dependencies** — link events so rescheduling one cascades to dependants (BFS propagation)
+- **Location coordinates** (Physical Meeting) — latitude/longitude stored and shown on an interactive map modal
 
-### Templates
-Save and reuse sets of events, phases, and locks:
-- Click **📋 Templates** in the toolbar to manage templates
-- **Save**: choose a date range — events, phases, and locks within that range are stored with relative time offsets from the earliest event; role configurations are optionally included
-- **Apply**: enter the **Exercise start date & time (STARTEX / T=0)** — all events, phases, and locks are re-created offset from that moment
-- **Import from file**: load `.json` template files exported by Tidslinjal or from the `example-templates/` directory
-- **Private** templates are yours only; **Public** templates are visible to all users
-- Only Ops Lead+ may create public templates with master-timeline events
-- Delete your own templates (admins can delete any)
+### Event Versioning & History
 
-### Example Templates
-The `example-templates/` directory contains **10 ready-made exercise templates**:
+Every save creates a snapshot of the event before the edit. Users can open the **Version History** modal on any event to browse and compare previous states. Versions are stored in `event_versions.json`.
 
-| Template | Duration | Hours |
-|---|---|---|
-| EX-01 Quick Reaction Force | 1 day | 0800–1700 |
-| EX-02 Cyber Defence Sprint | 1 day | 0800–1700 |
-| EX-03 Joint Command Post — Co-located | 2 days | 24/7 |
-| EX-04 Urban Defence — Co-located | 2 days | 0800–1700 |
-| EX-05 Distributed Command — Virtual | 2 days | 24/7 |
-| EX-06 Staff Training — Virtual | 2 days | 0800–1700 |
-| EX-07 Combined Arms Manoeuvre | 3 days | 24/7 + working hours |
-| EX-08 Crisis Management Simulation | 3 days | 0800–1800 |
-| EX-09 NATO Integration Exercise | 5 days | 24/7 + working hours |
-| EX-10 Full Spectrum Warfare | 5 days | Mixed intensity |
+### Real-Time Collaborative Editing
 
-See `example-templates/README.md` for detailed descriptions, design principles, and loading instructions.
+When a user opens an event for editing, an in-memory editing lock (2-minute TTL) is acquired and broadcast via SSE so other users see who is currently editing. The lock is released automatically on save, cancel, or TTL expiry.
+
+### Planned vs. Actual (PVA)
+
+On the first edit of an event, its original start/end times are captured as `planned_start` / `planned_end`. The **PVA modal** shows the difference between planned and actual times side by side, including slip duration. Available as a report type.
+
+### Critical Path Analysis
+
+Client-side computation of the longest dependency chain across all events. Highlighted on the timeline and available as a dedicated report. Uses memoised longest-path over the `depends_on` DAG.
+
+### Map Integration
+
+Physical Meeting events with a latitude/longitude can be opened in an interactive **Leaflet.js map modal**, showing the event location on an OpenStreetMap tile layer.
 
 ### Layers
+
 Named overlays on top of the master timeline:
+
 - **Private** — owner only
 - **Groups** — shared with specific user groups (read or read/write)
 - **Public** — visible to all authenticated users
 
-Toggle layers on/off with the **🗂 Layers** toolbar button; changes are instant.
+Toggle layers on/off with the **🗂 Layers** toolbar button; changes are instant and saved per user.
 
-### Access Control
+### Templates
 
-| Role | Capabilities |
-|---|---|
-| **Read** | View timeline, events, layers; set personal alarms; comment on events |
-| **Reporter** | + Set event status to Responded To / Completed (requires Team Lead approval) |
-| **Read/Write** | + Create/edit own events on accessible layers; create event types and layers |
-| **Team Lead** | + Create groups; verify/reject events; manage phases; approve reporter status changes; view audit log |
-| **Operations Lead** | + Create/edit/delete master-timeline events; manage exercise settings; pause timeline; create public templates; create alarms for other users |
-| **Admin** | Full access — manage users, roles, locks, exercise settings; export all data |
+Save and reuse sets of events, phases, locks, groups, and layers:
+
+- **Save** — choose a date range; events, phases, and locks within that range are stored with relative offsets from the earliest event; groups and layers are optionally included; role configurations, theme, size, language, operation mode, and terminology labels are optionally saved
+- **Apply** — enter the **STARTEX / T=0** datetime; all events, phases, and locks re-created offset from that moment; groups and layers re-created; user preferences (theme, size, language) and exercise settings (operation mode, terminology) applied automatically
+- **Import from file** — load `.json` files from disk or from the `example-templates/` directory
+- **Scope** — Private (your eyes only) or Public (visible to all users)
+- Only Ops Lead+ may create public templates with master-timeline events
 
 ### Personal Alarms & Webhooks
-- Per-user reminder on any event (lead times: at time, 5/10/15/30/60/120 min before)
-- Set alarm **inline** while creating/editing an event, or from the Detail view
-- When setting inline alarm with invited users, Ops Lead+ can notify all invited persons
+
+- Per-user reminder on any event (lead times: at time, 5 / 10 / 15 / 30 / 60 / 120 min before)
+- Set alarm **inline** while creating/editing an event, or from the event Detail view
+- Ops Lead+ can notify all invited persons when setting an inline alarm
 - Delivered via **SSE** in real time; optional browser push notification
-- Alarm notifications include **Dismiss**, **📋 Show Event**, and **ACK** buttons
-- Unacknowledged alarms escalate (orange → pulsing red every 60 s)
-- **Alarm audit trail** — every ACK records who acknowledged, when, and from which IP address
+- Notification popup shows **Dismiss**, **📋 Show Event**, and **ACK** buttons
+- Unacknowledged alarms escalate (orange → pulsing red every 60 s); a live seconds-since counter is shown in the notification
 - Alarm scheduler polls every **5 s** for precise trigger timing
+- **Alarm audit trail** — every ACK records who acknowledged it, when, and from which IP address
 - **Webhook integration** — per-user webhook URL fires on alarm trigger
   - Supports Mattermost, Slack (`{"text":"..."}`) or generic JSON POST
 
+### Reports
+
+Generate printable or exportable reports via the **Reports** toolbar button:
+
+| Report Type | Description |
+|---|---|
+| **Overview** | All events in the current view range |
+| **Status Summary** | Event counts grouped by status |
+| **Daily Briefing** | Events grouped by day |
+| **Type Breakdown** | Event counts grouped by type |
+| **Responsible** | Events grouped by responsible user |
+| **Planned vs. Actual** | Slip analysis for all events with a planning baseline |
+| **Critical Path** | Longest dependency chain, highlighted |
+
+Roles with the `report` or `auto_report` capability can generate and schedule automatic reports. Auto-report scheduling runs every 5 minutes in the background (stored per user in localStorage).
+
+### SMTP Mail
+
+Configure outgoing email for alarms, report delivery, invitations, and password-reset tokens in the **Integrations** sidebar tab. Supports STARTTLS and TLS modes. Fields:
+
+- SMTP host, port, username, password
+- From address, display name
+- TLS mode (none / STARTTLS / TLS)
+- Test button to send a verification email
+
+### API Keys
+
+Generate bearer tokens for external tool integration in the **Integrations** sidebar tab. Tokens are passed as `Authorization: Bearer <token>` and grant the same access level as the generating user.
+
+### WebCal Subscription
+
+Each user can generate a personal WebCal token from their **Profile** modal. External calendar clients (Outlook, Apple Calendar, Google Calendar) can subscribe to the feed at:
+
+```
+/webcal/<token>.ics
+```
+
+The feed returns all events the user can see in iCalendar format, updated on every request.
+
+### Backup & Restore
+
+Admins can download a ZIP archive of all JSON data files via **Admin → Backup**. A backup ZIP can be uploaded to **Admin → Restore** to overwrite the current data (requires confirmation).
+
 ### Audit Log
-- Every create, update, delete, verify, reject, and alarm-acknowledge action is logged
-- Accessible by Team Leads and above in the **Audit** sidebar tab
-- Capped at 10,000 most-recent entries
+
+Every create, update, delete, verify, reject, and alarm-acknowledge action is logged. Accessible by Team Leads and above in the **Audit** sidebar tab. Capped at 10,000 most-recent entries.
 
 ### Synthetic / Exercise Time
-- Ops Lead+ sets an **exercise epoch** (real datetime = Day 1 T+0) and an optional exercise name
-- Users toggle "exercise time mode" with the 🕐 T+ toolbar button
-- Day headers display "Day N" (Day -1, Day 0, Day 1 … all supported)
+
+- Ops Lead+ sets an **exercise epoch** (real datetime = Day 1 T+0), an optional exercise name, and an optional ENDEX
+- Users toggle "exercise time mode" with the **🕐 T+** toolbar button
+- Day headers display "Day N" (Day −1, Day 0, Day 1 … all supported)
 - **Day-hours-only** option counts H+N only within configured day hours
+- **Include weekends** option — when disabled, weekend days are skipped in H+N counting; weekend columns are dimmed with a hatched pattern
 - **Freeze / pause** timeline progression for planning reviews
 
----
+### Operation Modes & Terminology
 
-## Technology Stack
+The application adapts its labels based on the configured mode (set in Settings by Ops Lead+):
 
-| Component | Technology |
+| Setting | Options |
 |---|---|
-| Backend | Go 1.21+ (standard library + `golang.org/x/crypto`) |
-| Persistence | JSON file store (no external database required) |
-| Frontend | Vanilla HTML5 / CSS3 / JavaScript — no frameworks |
-| Auth | Cookie-based sessions, bcrypt passwords; optional OIDC SSO |
-| Real-time | Server-Sent Events (SSE) |
-| i18n | Client-side translation dictionary (EN / SV / FR) |
+| **Operation mode** | Exercise / Incident / Operation |
+| **Group label** | Group / Unit / Team |
+| **User label** | Users / Soldiers / Personnel |
+
+Labels affect STARTEX/ENDEX field names, sidebar tabs, filter headings, and report headers. Templates carry these settings so they apply automatically on template import.
+
+### Integrations
+
+The **Integrations** sidebar tab (Admin / Ops Lead) contains:
+
+- **OIDC SSO** — configure issuer URL, client ID/secret, redirect URL, exclusive mode, default role (see [OIDC/SSO](#oidc--sso))
+- **SMTP Mail** — outgoing email settings
+- **Microsoft Teams** — tenant / channel webhook; generates deep-link join buttons on Meeting-type events
+- **Zoom** — meeting link pattern; generates deep-link join buttons on Meeting-type events
+- **API Keys** — generate and revoke bearer tokens
+
+### User Profile
+
+Each user can open their **Profile** modal to:
+
+- Update display name and email
+- Change password
+- View last login time, IP address, and resolved hostname
+- View account type (local or OIDC SSO)
+- View group memberships and J-level designation
+- Set social handles (Mattermost username, Discord tag, Signal number)
+- Generate / regenerate their personal WebCal token
+
+### Filter Presets
+
+Save named filter combinations (event type, status, layer, responsible user, search text) as presets stored server-side per user. Load any preset with one click from the filter bar.
+
+### Multi-Timezone Clocks
+
+Click the **+** button left of the main clock to add extra real-time clocks for any IANA timezone. Each shows a label, live time, and timezone abbreviation. Remove with **×**. Saved per user. Timezone is picked via a searchable city/country autocomplete input.
+
+### Phases
+
+Visual colored bands overlaid on the timeline marking exercise phases (e.g. STARTEX → ENDEX). Team Lead+ can create and edit phases; phases can be attached to specific layers. Phases are included when saving/applying templates.
+
+### Locks
+
+Ops Lead+ (and Team Lead, with the `can_lock` capability) can lock time slots to prevent event creation or editing during that period. Lock creation and deletion are undoable (Ctrl+Z).
+
+### Internationalization
+
+Full UI translation in **English (EN)**, **Swedish (SV)**, and **French (FR)**. Language preference saved per user. All new features are translated in all three languages.
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
+
 - Go 1.21 or newer
 
 ### Build & Run
@@ -252,117 +257,275 @@ Password: admin
 
 **Change the admin password after first login** (Admin → Users tab → edit admin).
 
+---
+
+## Configuration
+
 ### Command-Line Flags & Environment Variables
 
 | Flag | Env Var | Default | Description |
 |---|---|---|---|
-| `--port` | `PORT` | `8080` | TCP listen port |
+| `--port` | `PORT` | `8080` (HTTP) / `8443` (HTTPS) | TCP listen port |
 | `--host` | `HOST` | `` (all interfaces) | Listen interface/address |
 | `--data` | `DATA_DIR` | `data` | Data directory for JSON files and attachments |
 | `--verbose` | — | `false` | Enable verbose log output |
-| `--debug` | — | `false` | Enable debug log output |
+| `--debug` | — | `false` | Enable debug log output (implies verbose) |
+| `--tls-cert` | `TLS_CERT` | — | Path to TLS certificate file (enables HTTPS) |
+| `--tls-key` | `TLS_KEY` | — | Path to TLS private key file |
+| `--oidc-issuer` | `OIDC_ISSUER` | — | OIDC provider issuer URL |
+| `--oidc-client-id` | `OIDC_CLIENT_ID` | — | OIDC client ID |
+| `--oidc-client-secret` | `OIDC_CLIENT_SECRET` | — | OIDC client secret |
+| `--oidc-redirect-url` | `OIDC_REDIRECT_URL` | — | OIDC redirect URL |
+| `--oidc-exclusive` | `OIDC_EXCLUSIVE` | `false` | Disable local login for all users except admin |
+| `--oidc-default-role` | `OIDC_DEFAULT_ROLE` | `readwrite` | Default role for auto-created OIDC users |
+
+### TLS / HTTPS
+
+Provide `--tls-cert` and `--tls-key` to enable HTTPS. When TLS is active, the server listens on port 8443 by default (override with `--port`).
+
+```bash
+./tidslinjal --tls-cert /etc/ssl/certs/server.crt --tls-key /etc/ssl/private/server.key
+```
+
+### OIDC / SSO
+
+Pass OIDC flags at startup **or** configure via the Integrations tab at runtime (Admin only). Runtime settings are saved to `oidc.json` and take effect immediately; CLI flags override `oidc.json` at startup.
+
+**Exclusive mode** (`--oidc-exclusive`) blocks username/password login for all non-admin accounts and auto-redirects the login page to the SSO provider.
+
+Auto-created OIDC users receive the role set by `--oidc-default-role` (default: `readwrite`). Display names are synced from the IDP on every login.
 
 ---
 
-## Data Files
+## Access Control
 
-All data is stored in `DATA_DIR`:
+### Roles
 
-```
-data/
-├── event_types.json   # Dynamic event type definitions
-├── users.json         # User accounts
-├── preferences.json   # Per-user UI preferences
-├── groups.json        # User groups
-├── memberships.json   # Group memberships
-├── layers.json        # Timeline layers
-├── events.json        # Timeline events
-├── attachments.json   # Attachment metadata
-├── alarms.json        # Personal alarms
-├── locks.json         # Locked time slots
-├── sessions.json      # Active login sessions
-├── audit.json         # Audit log (max 10 000 entries)
-├── exercise.json      # Exercise / synthetic time settings
-├── comments.json      # Event comments
-├── phases.json        # Exercise phases
-├── templates.json     # Event templates
-└── attachments/       # Uploaded files
-```
+| Role | Key | Capabilities |
+|---|---|---|
+| **Observer** | `observer` | Read-only access to timeline and events — cannot edit, comment, set alarms, or lock slots |
+| **Read** | `read` | View timeline, events, layers; set personal alarms; comment on events |
+| **Reporter** | `reporter` | + Set event status to Responded To / Completed (requires Team Lead approval) |
+| **Read/Write** | `readwrite` | + Create/edit own events on accessible layers; create event types and layers |
+| **Staff Officer Assistant** | `staffofficer` | + Can lock time slots; access to reports; same authority level as Operations Lead |
+| **Staff Officer** | `staffofficer_full` | Same as Staff Officer Assistant, requires at least one J-designation (J1–J9) to be assigned |
+| **Team Lead** | `teamlead` | + Create groups; verify/reject events; manage phases and locks; approve reporter status changes; view audit log; auto-report scheduling |
+| **Operations Lead** | `oplead` | + Create/edit/delete master-timeline events; manage activity settings; pause timeline; create public templates; create alarms for other users; configure integrations |
+| **Admin** | `admin` | Full access — manage users, roles, locks, activity settings; backup/restore; OIDC configuration; export all data |
 
-Back up by copying the `data/` directory.
+### J-Designations (Staff Officer role)
+
+The **Staff Officer** (`staffofficer_full`) role requires at least one NATO J-designation to be assigned. Designations identify the staff branch:
+
+| Code | Branch |
+|---|---|
+| J1 | Personnel |
+| J2 | Intelligence |
+| J3 | Operations |
+| J4 | Logistics |
+| J5 | Plans |
+| J6 | Communications |
+| J7 | Training |
+| J8 | Finance |
+| J9 | Civil-Military Cooperation |
+
+J-designations are assigned via Admin → Users → edit user. They are stored in the user profile and displayed on the user badge.
+
+### Role Editor
+
+The **Role Editor** (Admin → Users tab → 🛡 Role Editor) lets admins customise display names and capability flags for every role except Admin. Role configurations are saved to `roles.json` and served from `/api/roles`. Role configs are optionally included when saving a template.
+
+### Self-Registration Modes
+
+Configured by Admin in the Users tab:
+
+| Mode | Description |
+|---|---|
+| **Off** | Admin creates all accounts |
+| **Open** | Anyone can register; account is immediately active |
+| **Vetted** | Anyone can register; account must be approved by Admin |
+| **Generic invitation** | A single invitation link grants registration |
+| **Personal invitation** | Admin generates per-user invitation links |
 
 ---
 
 ## Usage Guide
 
 ### Navigating the Timeline
-- **‹ / ›** — short click: step back/forward by current view; long press: choose jump size
+
+- **‹ / ›** — short click: step back/forward by current view span; long press (>400 ms): choose jump size (1 day / 2 days / 3 days / 1 week / 2 weeks)
 - **Today** — jump to current date
 - **⊙ Center** — center today in the view so dates before and after are visible
-- **Show** dropdown — select date range
-- **Resolution** dropdown — select slot granularity
-- **🕐 T+** button (when exercise is enabled) — toggle synthetic time display
+- **Show** dropdown — select date range (Day through 3 Months, plus 2-week and 3-week options)
+- **Resolution** dropdown — select slot granularity (10 min / 15 min / 1 hr / Full day)
+- **🕐 T+** button — toggle synthetic exercise time display (visible when an exercise is configured)
+- **List view** button — switch between grid and table/list view
 
-### Adding Events
-1. Click any empty cell in the grid, or use **+ Add Event**
-2. Choose type, times, status, layer, responsible user, and optional invited persons
+### Adding & Editing Events
+
+1. Click any empty cell in the grid, or click **+ Add Event** in the toolbar
+2. Fill in type, times, status, layer, responsible user, and optional invited persons
 3. Enable **🔔 Set alarm** if you want a reminder; choose lead time and notify scope
-4. Attach a file if needed, then click **Save**
+4. Optionally add file attachments, event dependencies, or map coordinates
+5. Click **Save**
+
+To edit: click an existing event to open the Detail view, then click **Edit**. Collaborative editing awareness shows if another user is already editing the event.
+
+### Event Dependencies
+
+In the Edit modal, use the **Dependencies** field to link events. When you reschedule a parent event, a cascade dialog offers to shift all dependent events by the same offset (BFS traversal). The **Critical Path** report highlights the longest chain.
+
+### Multi-Select & Bulk Move
+
+- **Ctrl+click** events to add to selection
+- A floating action bar shows the count; click **Move** to reposition all selected events by a chosen offset, or **Clear** to deselect
+
+### Right-Click Context Menu
+
+Right-click any event block for quick actions:
+
+- **Move to new time/date** — opens a date/time dialog; works for single or multi-select (all selected events move by the same offset)
+- **View history** — open the Version History modal
+- **Delete** / **Edit**
+
+### Version History
+
+Click the **History** button in the event Detail view (or right-click → View history) to browse all previous snapshots. Each version shows who saved it and when.
+
+### Map View (Physical Meeting)
+
+Events of type "Physical Meeting" show a **🗺 Map** button in the Detail view. Click it to open a Leaflet map modal where you can view or set the event's latitude/longitude.
 
 ### Templates
+
 1. Navigate to the date range with the events you want to template
 2. Click **📋 Templates** → **💾 Save current events as template…**
-3. Name the template, optionally add a description, choose Private or Public
-4. To apply: click **▶ Apply** next to any template, choose a base date, and click Create Events
+3. Choose the date range, name the template, optionally add a description, choose Private or Public
+4. To apply: click **▶ Apply** next to any template, choose a STARTEX base date/time, and click **Create Events**
+5. To import from file: click **📂 Import from file** and select a `.json` template file
 
 ### Layers
+
 1. Click **🗂 Layers** in the toolbar — popover shows all layers with checkboxes
 2. Click any layer to instantly show/hide it on the timeline
-3. Manage layers (create, edit, share) in the **Layers** sidebar tab
+3. Manage layers (create, edit, share with groups) in the **Layers** sidebar tab
 
-### Audit Log (Team Lead+)
-Open the **Audit** sidebar tab to see a timestamped list of all actions.
+### Filter Presets
 
-### Webhook Notifications
+1. Apply filters using the filter bar (event type, status, layer, responsible user, search text)
+2. Click **💾 Save preset** to name and save the combination
+3. Load any preset from the preset dropdown — presets are stored per user on the server
+
+### Alarm & Webhook Notifications
+
 1. Open the **Settings** sidebar tab
-2. Enter a webhook URL and select the format type
+2. Enter a **Webhook URL** and select the format type (Mattermost/Slack or generic JSON)
 3. Click **Test** to verify, then **Save**
+4. Alarms fire via SSE in-app and via webhook simultaneously
+
+### Reports
+
+1. Click **Reports** in the toolbar
+2. Select the report type from the dropdown
+3. Choose date range and any filters
+4. Click **Generate** to view; use the print/export button to save
 
 ### Exercise / Synthetic Time (Ops Lead+)
+
 1. Open the **Settings** sidebar tab → Exercise Settings section
-2. Enter the exercise name, STARTEX (epoch), and optional ENDEX
-3. Check **Enable synthetic time display** and click **Save**
-4. Users see the 🕐 T+ button appear; click to toggle
+2. Enter the operation name, STARTEX (epoch), optional ENDEX, operation mode, and terminology labels
+3. Check **Enable synthetic time display** and optionally configure day hours and weekend exclusion
+4. Click **Save** — users see the **🕐 T+** button appear; click to toggle
+5. Use **⏸ Pause** to freeze progression during planning reviews
+
+### Backup & Restore (Admin)
+
+- **Backup**: Admin → ⬇ Download backup — downloads a ZIP of all JSON data files
+- **Restore**: Admin → ⬆ Restore from backup — upload a ZIP to overwrite all data (confirmation required)
+
+### API Keys
+
+1. Open the **Integrations** sidebar tab
+2. Click **Generate new API key**
+3. Copy the token and use it as `Authorization: Bearer <token>` in HTTP requests
+
+### WebCal Subscription
+
+1. Open your **Profile** modal (click your name in the header)
+2. Click **Generate WebCal token**
+3. Copy the subscription URL and add it to your external calendar client
+
+### Audit Log (Team Lead+)
+
+Open the **Audit** sidebar tab to see a timestamped list of all actions (creates, edits, deletes, status changes, alarm ACKs).
+
+### Integrations (Admin / Ops Lead)
+
+Open the **Integrations** sidebar tab to configure:
+
+- **OIDC SSO** — live configuration without restart
+- **SMTP mail** — enable email delivery for alarms, reports, invitations, and password resets
+- **Microsoft Teams** — webhook URL for team notifications; generates join-link buttons on Meeting events
+- **Zoom** — meeting link pattern; generates join-link buttons on Meeting events
 
 ---
 
-## Architecture
+## Data Files
+
+All data is stored in `DATA_DIR` (default: `data/`):
 
 ```
-tidslinjal/
-├── main.go          # Server, routing, all HTTP handlers, SSE, alarm scheduler
-├── models.go        # All data types, roles, event status, audit, exercise, templates
-├── store.go         # Thread-safe JSON file store; all CRUD methods
-├── go.mod / go.sum
-├── data/            # Runtime data (auto-created)
-└── static/
-    ├── index.html   # App shell with all modals
-    ├── login.html   # Login page
-    ├── i18n.js      # EN / SV / FR translation strings
-    ├── app.js       # Timeline engine, all UI logic
-    └── style.css    # Dark + light themes, 4 size variants, mobile CSS
+data/
+├── event_types.json      # Dynamic event type definitions
+├── users.json            # User accounts
+├── preferences.json      # Per-user UI preferences
+├── groups.json           # User groups
+├── memberships.json      # Group memberships
+├── layers.json           # Timeline layers
+├── events.json           # Timeline events
+├── event_versions.json   # Event version snapshots (history)
+├── attachments.json      # Attachment metadata
+├── alarms.json           # Personal alarms
+├── locks.json            # Locked time slots
+├── sessions.json         # Active login sessions
+├── audit.json            # Audit log (max 10 000 entries)
+├── exercise.json         # Exercise / synthetic time settings
+├── comments.json         # Event comments
+├── phases.json           # Exercise phases
+├── templates.json        # Event templates
+├── roles.json            # Custom role configurations
+├── registration.json     # Self-registration settings
+├── invitations.json      # Pending user invitations
+├── oidc.json             # OIDC SSO runtime configuration
+├── mail.json             # SMTP mail configuration
+├── apikeys.json          # API bearer tokens
+├── filter_presets.json   # Per-user saved filter presets
+└── attachments/          # Uploaded files
 ```
 
-### API Endpoints
+Back up by copying the entire `data/` directory, or use the **Admin → Backup** ZIP download.
 
-| Method | Path | Auth | Description |
+---
+
+## API Reference
+
+### Authentication
+
+All endpoints (except `/api/version` and `/api/auth/login`) require an authenticated session cookie **or** an `Authorization: Bearer <api-key>` header.
+
+### Endpoints
+
+| Method | Path | Min Role | Description |
 |---|---|---|---|
 | `POST` | `/api/auth/login` | Public | Log in |
 | `POST` | `/api/auth/logout` | Any | Log out |
-| `GET` | `/api/auth/me` | Any | Current user |
+| `GET` | `/api/auth/me` | Any | Current user info |
 | `POST` | `/api/auth/change-password` | Any | Change own password |
+| `POST` | `/api/auth/update-email` | Any | Update own email |
+| `GET` | `/api/auth/oidc-config` | Public | OIDC provider info |
 | `GET` | `/api/version` | Public | App version |
 | `GET/PUT` | `/api/preferences` | Any | User preferences |
+| `GET/PUT` | `/api/auth/profile` | Any | Social handles / profile fields |
 | `GET` | `/api/event-types` | Public | List event types |
 | `POST` | `/api/event-types` | RW+ | Create event type |
 | `PUT` | `/api/event-types/:id` | Owner/Admin | Update event type |
@@ -372,6 +535,8 @@ tidslinjal/
 | `PUT` | `/api/events/:id` | Creator/RW+ | Update event |
 | `PATCH` | `/api/events/:id/status` | Various | Change status / verify / reject |
 | `DELETE` | `/api/events/:id` | Creator/Admin | Delete event |
+| `POST` | `/api/events/cascade` | RW+ | Cascade reschedule via dependency BFS |
+| `GET` | `/api/events/:id/versions` | Any | Event version history |
 | `GET/POST` | `/api/events/:id/attachments` | Any/Auth | List / upload attachment |
 | `GET` | `/api/attachments/:id` | Any | Download attachment |
 | `DELETE` | `/api/attachments/:id` | Owner/Admin | Delete attachment |
@@ -387,7 +552,7 @@ tidslinjal/
 | `GET/POST` | `/api/alarms` | Any | List / create alarms |
 | `DELETE` | `/api/alarms/:id` | Owner | Delete alarm |
 | `POST` | `/api/alarms/:id/ack` | Owner | Acknowledge alarm |
-| `GET` | `/api/notifications/stream` | Any | SSE alarm stream |
+| `GET` | `/api/notifications/stream` | Any | SSE alarm + editing-lock stream |
 | `GET/POST` | `/api/locks` | Any | List / create locks |
 | `DELETE` | `/api/locks/:id` | Admin/CanLock | Delete lock |
 | `GET/POST` | `/api/users` | Read+/Admin | List / create users |
@@ -405,6 +570,153 @@ tidslinjal/
 | `POST` | `/api/templates` | Any | Create template |
 | `DELETE` | `/api/templates/:id` | Owner/Admin | Delete template |
 | `POST` | `/api/templates/:id/apply` | Any | Apply template to base time |
+| `GET` | `/api/roles` | Any | List role configurations |
+| `GET/PUT` | `/api/admin/oidc` | Admin | OIDC runtime configuration |
+| `GET/POST` | `/api/integrations/mail` | Admin/OpLead | Mail configuration |
+| `POST` | `/api/integrations/mail/test` | Admin/OpLead | Send test email |
+| `GET/POST` | `/api/apikeys` | Any | List / create API keys |
+| `DELETE` | `/api/apikeys/:id` | Owner | Delete API key |
+| `GET/POST` | `/api/filter-presets` | Any | List / save filter presets |
+| `DELETE` | `/api/filter-presets/:id` | Owner | Delete filter preset |
+| `GET/POST` | `/api/editing-locks` | Any | Active collaborative editing locks |
+| `GET` | `/api/backup` | Admin | Download data ZIP |
+| `POST` | `/api/restore` | Admin | Restore from ZIP |
+| `GET` | `/webcal/:token.ics` | Token | WebCal iCalendar feed |
+
+---
+
+## Architecture
+
+```
+tidslinjal/
+├── main.go           # Server, routing, all HTTP handlers, SSE broker, alarm scheduler
+├── models.go         # All data types, roles, event status, audit, exercise, templates
+├── store.go          # Thread-safe JSON file store; all CRUD methods
+├── go.mod / go.sum
+├── example-templates/  # Ready-made exercise and incident response templates
+├── data/             # Runtime data (auto-created)
+└── static/
+    ├── index.html    # App shell with all modals
+    ├── login.html    # Login page
+    ├── i18n.js       # EN / SV / FR translation strings
+    ├── app.js        # Timeline engine, all UI logic
+    ├── modals.js     # Modal dialogs (settings, templates, profile, map, PVA…)
+    └── style.css     # Dark + light themes, 4 size variants, mobile CSS
+```
+
+### Performance Characteristics
+
+- **O(1) session and user lookups** — sessions and users indexed in hash maps
+- **Write-after-unlock** — all store mutation methods release the global RWMutex before JSON I/O; a dedicated write mutex serialises disk writes
+- **Per-user SSE index** — alarm notifications target specific users via O(1) map lookup
+- **Bounded webhook worker pool** — 32 persistent goroutines handle alarm webhooks with drop-on-full back-pressure
+- **HTTP server timeouts** — ReadTimeout 30 s, WriteTimeout 5 min (SSE), IdleTimeout 120 s, MaxHeaderBytes 1 MB
+- Tested to sustain **1,000 concurrent users** (≈ 900 read-only + 100 writers) with sub-10 ms median latency on commodity hardware
+
+---
+
+## Example Templates
+
+The `example-templates/` directory contains **16 ready-made templates**:
+
+### Exercise Templates (10)
+
+| Template | Duration | Hours |
+|---|---|---|
+| EX-01 Quick Reaction Force | 1 day | 0800–1700 |
+| EX-02 Cyber Defence Sprint | 1 day | 0800–1700 |
+| EX-03 Joint Command Post — Co-located | 2 days | 24/7 |
+| EX-04 Urban Defence — Co-located | 2 days | 0800–1700 |
+| EX-05 Distributed Command — Virtual | 2 days | 24/7 |
+| EX-06 Staff Training — Virtual | 2 days | 0800–1700 |
+| EX-07 Combined Arms Manoeuvre | 3 days | 24/7 + working hours |
+| EX-08 Crisis Management Simulation | 3 days | 0800–1800 |
+| EX-09 NATO Integration Exercise | 5 days | 24/7 + working hours |
+| EX-10 Full Spectrum Warfare | 5 days | Mixed intensity |
+
+### Incident Response Templates (6)
+
+| Template | Duration | Scenario |
+|---|---|---|
+| INC-01 DDoS Attack | 2 days | Volumetric DDoS response |
+| INC-02 Targeted Hacker Attack | 4 days | Cyber intrusion response |
+| INC-03 Large Hacker / APT Attack | 8 days | Nation-state intrusion, full IR |
+| INC-04 Ransomware Attack | 2 weeks | Ransomware with negotiation decision point |
+| INC-05 Wiper Malware Attack | 4 weeks | Destructive malware, full rebuild |
+| INC-06 Datacenter Fire | 12 weeks | Physical disaster, DR activation, full recovery |
+
+Incident templates use `operation_mode=incident`, include phases, automatic alarms on critical events, external stakeholder notifications, and PIR events.
+
+See `example-templates/README.md` for detailed descriptions and loading instructions.
+
+---
+
+## Changelog
+
+### Latest
+
+- **Event versioning** — full snapshot history per event; browse and compare previous states
+- **Event dependencies** — link events; BFS cascade reschedule propagates offsets to all dependants
+- **Map integration** — Leaflet.js map modal for Physical Meeting events with lat/lng storage
+- **Backup/restore UI** — admin ZIP download of all JSON data files; restore via upload
+- **WebCal subscription** — token-based iCalendar feed at `/webcal/:token.ics`
+- **Real-time collaborative editing** — editing-lock awareness via SSE; 2-minute TTL
+- **Planned vs. actual (PVA)** — planning baseline captured on first edit; PVA modal and report
+- **Critical path analysis** — client-side longest-path computation over the dependency graph
+- **New report types** — status summary, daily briefing, type breakdown, responsible, PVA, critical path
+- **Profile improvements** — social handles, last login details, account type, WebCal token generation
+- **Incident response templates** (6) — cybersecurity and physical disaster scenarios
+- **Terminology settings** — operation mode (exercise/incident/operation), group label, user label
+- **Template enhancements** — carry theme, size, language, operation mode, and terminology on apply
+- **2-week and 3-week view options**
+- **List / table view** — sortable alternative to the grid
+- **SMTP mail** — alarms, reports, invitations, password-reset delivery
+- **API keys / bearer token auth**
+- **Microsoft Teams and Zoom deep-link integration** for Meeting-type events
+- **Auto-report scheduling** — periodic report generation configured per user
+- **Saved filter presets** — server-side storage, one-click load
+- **OIDC SSO runtime configuration** — configure SSO without restart; exclusive mode; configurable default role
+- **Include weekends toggle** — exclude weekend days from synthetic H+N counting
+- **Searchable timezone picker** — city/country autocomplete for extra clocks
+- **Alarm live counter** — seconds-since display in alarm notifications
+- **Templates include groups and layers**
+- **Team Lead can create/delete locks** (previously Admin-only)
+- **TLS / HTTPS support** via `--tls-cert` / `--tls-key` flags
+
+### v4.0.0 — Performance & Scalability
+
+- O(1) session/user lookups; write-after-unlock store; per-user SSE index
+- Bounded webhook worker pool (32 goroutines); HTTP server timeouts
+- Tested at 1,000 concurrent users with sub-10 ms median latency
+
+### v3.7.0
+
+- Toolbar redesign with logical groupings; 5-day view; full i18n coverage
+- Role editor with capability matrix; roles saved with templates
+- Multi-select events (Ctrl+click); right-click "Move to new time/date"
+- Multi-timezone clocks; alarm audit trail; "Show Event" button on alarm popups
+- Alarm scheduler precision improved to 5 s polling; lock undo (Ctrl+Z)
+- 10 example exercise templates
+
+### v3.6.0
+
+- New roles: Observer, Reporter, Staff Officer
+- Self-registration modes; overlap warnings; i18n foundation (EN/SV/FR)
+
+### v3.4.0
+
+- Styled error modals; inline alarm on event creation; long-press navigation
+- ⊙ Center Today button; templates (save & apply); layer toggle instant
+
+### v3.3.0
+
+- Responsive design; Assigned Task event type; Responsible field; recurring events
+- Print/report improvements; invited field; Ops Lead can pause timeline
+
+### v3.1.0
+
+- STARTEX/ENDEX; Instant event type; Meeting event type; Intern/Extern attribute
+- Unified Export modal; CSV export; date/time format preference
 
 ---
 
