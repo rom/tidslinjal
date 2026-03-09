@@ -1707,147 +1707,278 @@ function renderSidebar() {
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔔 ${t('settings_webhook')||'Notifications / Webhook'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure a webhook to receive alarm notifications. Changes are audited.</p>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure a webhook to receive real-time alarm notifications from Tidslinjal.
+          When an alarm fires, a JSON payload is POST-ed to this URL. Changes are audited.
+        </p>
         <div class="form-group" style="margin-bottom:6px">
-          <select id="prefWebhookType" style="width:100%;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)" title="Choose the payload format that matches your target service">
+            Format
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— how the notification is structured</span>
+          </label>
+          <select id="prefWebhookType" style="width:100%;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)"
+            title="Generic JSON: raw payload with all alarm fields. Mattermost/Slack: formatted text message compatible with Mattermost and Slack incoming webhooks.">
             <option value="generic"${p.webhook_type==='generic'||!p.webhook_type?' selected':''}>Generic JSON</option>
             <option value="mattermost"${p.webhook_type==='mattermost'?' selected':''}>Mattermost / Slack</option>
           </select>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)" title="The URL that will receive the notification POST request">
+            Webhook URL
+          </label>
           <input type="url" id="prefWebhookURL" placeholder="https://…/webhook" value="${escHtml(p.webhook_url||'')}"
+            title="Paste the full HTTPS URL of your webhook endpoint. It must respond with HTTP 2xx to acknowledge receipt."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()">${t('btn_save')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()" title="Save the webhook URL and format. Changes take effect immediately.">${t('btn_save')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="testWebhook()" title="Send a test notification to the configured URL and check if it responds correctly.">${t('settings_webhook_test')}</button>
         </div>
       </div>
+
       <div class="sidebar-section" id="oidcSettingsSection">
         <div class="sidebar-section-title">🔐 ${t('settings_oidc')||'Single Sign-On (OIDC)'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          Configure OpenID Connect for SSO. Leave Client Secret blank to keep the existing one.
-          Status: <span id="oidcStatusBadge" style="font-weight:600"></span>
+
+        <!-- Status bar -->
+        <div id="oidcStatusBar" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:var(--bg3);border:1px solid var(--border)">
+          <span id="oidcStatusDot" style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:#888"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:var(--fs-xs);font-weight:600" id="oidcStatusLabel">Checking…</div>
+            <div style="font-size:10px;color:var(--text-dim);word-break:break-all" id="oidcStatusDetail"></div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="runOIDCTest()"
+            title="Run a live connectivity check: verifies discovery document, credentials, and route registration."
+            style="flex-shrink:0;white-space:nowrap">🔍 Test</button>
+        </div>
+
+        <!-- OIDC test result panel -->
+        <div id="oidcTestResult" style="display:none;margin-bottom:10px;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
+          <div style="padding:8px 10px;font-size:var(--fs-xs);font-weight:600;background:var(--bg3)">
+            OIDC Diagnostics
+            <button onclick="document.getElementById('oidcTestResult').style.display='none'"
+              style="float:right;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:12px">✕</button>
+          </div>
+          <div id="oidcTestSteps" style="padding:8px 10px;font-size:11px;line-height:1.7"></div>
+          <div id="oidcTestSummary" style="padding:8px 10px;font-size:var(--fs-xs);font-weight:600;border-top:1px solid var(--border)"></div>
+        </div>
+
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">
+          OpenID Connect (OIDC) enables Single Sign-On: users are authenticated by an external
+          Identity Provider (IdP) such as Keycloak, Azure AD, Okta, or Google Workspace, and
+          automatically provisioned in Tidslinjal on first login.
         </p>
+
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_issuer')||'Issuer URL'}</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_oidc_issuer')||'Issuer URL'}
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— the base URL of your identity provider</span>
+          </label>
           <input type="url" id="oidcIssuer" placeholder="https://accounts.example.com"
+            title="The Issuer URL (also called the Realm URL in Keycloak). Tidslinjal appends /.well-known/openid-configuration to discover all endpoints automatically. Example: https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">
+            e.g. <code style="opacity:.7">https://login.microsoftonline.com/&lt;tenant&gt;/v2.0</code> (Azure AD),
+            <code style="opacity:.7">https://accounts.google.com</code> (Google),
+            <code style="opacity:.7">https://keycloak.example.com/realms/myrealm</code> (Keycloak)
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_oidc_client_id')||'Client ID'}
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— provided by your IdP when you registered the application</span>
+          </label>
+          <input type="text" id="oidcClientID" placeholder="tidslinjal-client"
+            title="The client ID (also called Application ID in Azure AD) assigned to Tidslinjal by your identity provider."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
+
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_client_id')||'Client ID'}</label>
-          <input type="text" id="oidcClientID" placeholder="client-id"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_client_secret')||'Client Secret'} <span style="opacity:.6">(leave blank to keep current)</span></label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_oidc_client_secret')||'Client Secret'}
+            <span style="opacity:.6;margin-left:4px">(leave blank to keep current)</span>
+          </label>
           <input type="password" id="oidcClientSecret" placeholder="••••••••"
+            title="The client secret issued by your identity provider. This is stored encrypted. Leave blank to keep the existing secret unchanged."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <div id="oidcSecretHint" style="font-size:10px;color:var(--text-dim);margin-top:2px"></div>
         </div>
+
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_redirect_url')||'Redirect URL'} <span style="opacity:.6">(leave blank for auto)</span></label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_oidc_redirect_url')||'Redirect URL'}
+            <span style="opacity:.6;margin-left:4px">(leave blank for auto)</span>
+          </label>
           <input type="url" id="oidcRedirectURL" placeholder="https://your-server/auth/oidc/callback"
+            title="The URL that the identity provider redirects back to after authentication. Must exactly match a redirect URI registered in your IdP. Usually: https://your-server/auth/oidc/callback. If blank, defaults to http://localhost:8080/auth/oidc/callback."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">
+            Register this exact URL in your IdP's allowed redirect URIs list.
+          </div>
         </div>
+
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_default_role')||'Default role for new users'}</label>
-          <select id="oidcDefaultRole" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <option value="readwrite">Read/Write</option>
-            <option value="teamlead">Team Lead</option>
-            <option value="oplead">Op Lead</option>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_oidc_default_role')||'Default role for new users'}
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— applied when an SSO user is auto-created</span>
+          </label>
+          <select id="oidcDefaultRole"
+            title="When a user logs in via SSO for the first time and no local account exists, they are automatically created with this role."
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="readwrite">Read/Write — can create and edit events</option>
+            <option value="teamlead">Team Lead — can manage events for their group</option>
+            <option value="oplead">Op Lead — operational leadership role</option>
           </select>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px"
+          title="When enabled, only the built-in admin account can use local username/password login. All other users must authenticate via SSO.">
           <input type="checkbox" id="oidcExclusive" style="width:14px;height:14px;accent-color:var(--accent)">
-          ${t('settings_oidc_exclusive')||'Exclusive mode (disable local login)'}
+          <span>
+            ${t('settings_oidc_exclusive')||'Exclusive mode (disable local login)'}
+            <span style="font-size:10px;color:var(--text-dim);display:block;margin-top:1px">
+              ⚠ The built-in <code>admin</code> account is always exempt so you can recover if SSO breaks.
+            </span>
+          </span>
         </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:10px"
+          title="Master switch — must be checked for OIDC SSO to be active. Saved settings are preserved when disabled.">
           <input type="checkbox" id="oidcEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
-          Enable OIDC SSO
+          <span>Enable OIDC SSO</span>
         </label>
-        <button class="btn btn-primary btn-sm" onclick="saveOIDCSettings()">${t('settings_oidc_save')||'Save & Apply'}</button>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="saveOIDCSettings()"
+            title="Save configuration and immediately apply it. If the settings are invalid, an error will be shown."
+            >${t('settings_oidc_save')||'Save & Apply'}</button>
+          <button class="btn btn-secondary btn-sm" onclick="runOIDCTest()"
+            title="Run a live diagnostic check against the configured OIDC provider to verify connectivity and configuration."
+            >🔍 Test Connection</button>
+          <a href="/auth/oidc/login" target="_blank" class="btn btn-secondary btn-sm"
+            title="Open the SSO login flow in a new tab to verify the end-to-end login experience."
+            >↗ Try SSO Login</a>
+        </div>
       </div>
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">📧 Mail Setup</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure SMTP for alarm notifications, reports, and user invitations.</p>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure SMTP to send alarm notifications, scheduled reports, and user invitation emails.
+          Without mail, password reset tokens are shown inline and must be copied manually.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"
+          title="Master switch. When off, email delivery is disabled but settings are preserved.">
           <input type="checkbox" id="mailEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
           Enable Email Delivery
         </label>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">SMTP Host</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Hostname or IP address of your SMTP server. Must be reachable from the Tidslinjal server.">SMTP Host</label>
           <input type="text" id="mailHost" placeholder="smtp.example.com"
+            title="Examples: smtp.gmail.com, smtp.office365.com, mail.company.internal"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-row" style="gap:8px">
           <div class="form-group" style="flex:1;margin-bottom:6px">
-            <label style="font-size:var(--fs-xs);color:var(--text-dim)">Port</label>
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="SMTP port. Common values: 587 (STARTTLS), 465 (TLS/SSL), 25 (legacy/no TLS)">Port</label>
             <input type="number" id="mailPort" placeholder="587" value="587"
               style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
           </div>
           <div class="form-group" style="flex:2;margin-bottom:6px">
-            <label style="font-size:var(--fs-xs);color:var(--text-dim)">TLS Mode</label>
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Encryption method. STARTTLS upgrades a plain connection to encrypted (port 587). TLS uses encryption from the start (port 465). None sends in plain text — not recommended.">TLS Mode</label>
             <select id="mailTLS" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-              <option value="starttls">STARTTLS (recommended)</option>
-              <option value="tls">TLS</option>
-              <option value="none">None</option>
+              <option value="starttls">STARTTLS (recommended, port 587)</option>
+              <option value="tls">TLS / SSL (port 465)</option>
+              <option value="none">None (plain, not recommended)</option>
             </select>
           </div>
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Username</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="SMTP authentication username — usually your email address.">Username</label>
           <input type="text" id="mailUsername" placeholder="user@example.com"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Password <span style="opacity:.6">(leave blank to keep)</span></label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            Password <span style="opacity:.6">(leave blank to keep)</span>
+          </label>
           <input type="password" id="mailPassword" placeholder="••••••••"
+            title="SMTP authentication password. Leave blank to keep the currently saved password."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">From Address</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="The email address that appears in the From field of outgoing messages.">From Address</label>
           <input type="email" id="mailFrom" placeholder="tidslinjal@example.com"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">From Name</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="The human-readable name shown in the From field (e.g. 'Tidslinjal Notifications').">From Name</label>
           <input type="text" id="mailFromName" placeholder="Tidslinjal"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveMailConfig()">Save</button>
-          <button class="btn btn-secondary btn-sm" onclick="testMailConfig()">Test</button>
+          <button class="btn btn-secondary btn-sm" onclick="saveMailConfig()"
+            title="Save SMTP settings.">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="testMailConfig()"
+            title="Send a test email to the From address to verify that SMTP settings are correct.">Send Test Email</button>
         </div>
       </div>
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">💼 Microsoft Teams Integration</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure Teams to auto-generate meeting links for Meeting-type events.</p>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure Teams and Zoom to automatically attach meeting links to Meeting-type events.
+          Notifications can also be sent to a Teams channel via an Incoming Webhook.
+        </p>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Teams Webhook URL (for notifications)</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Paste the Incoming Webhook URL from your Teams channel connector settings. Alarm and event notifications will be posted there.">
+            Teams Webhook URL
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— for channel notifications</span>
+          </label>
           <input type="url" id="teamsWebhookURL" placeholder="https://…/IncomingWebhook/…"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Teams Meeting URL Template</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="A base Teams meeting URL. Event title and time will be appended as query parameters when a meeting link is generated.">
+            Teams Meeting URL Template
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— base URL for auto-generated meeting links</span>
+          </label>
           <input type="url" id="teamsMeetingTemplate" placeholder="https://teams.microsoft.com/l/meetup-join/…"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Provide a base URL; event details will be appended as query params.</p>
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Zoom Meeting Base URL / User</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="A Zoom meeting URL to attach to Meeting-type events.">
+            Zoom Meeting URL
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— for Meeting-type events</span>
+          </label>
           <input type="text" id="zoomMeetingBase" placeholder="https://zoom.us/j/1234567890"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveTeamsConfig()">Save Teams/Zoom Config</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveTeamsConfig()"
+          title="Save Teams and Zoom integration settings.">Save Teams/Zoom Config</button>
       </div>
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔑 API Keys</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Generate API keys for external tool integration (Bearer token auth).</p>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          API keys allow external tools (scripts, monitoring systems, integrations) to access
+          Tidslinjal without a user session. Use <code>Authorization: Bearer &lt;key&gt;</code> in HTTP requests.
+          Keys are shown only once after creation — store them securely.
+        </p>
         <div id="apiKeyList" style="margin-bottom:8px">Loading…</div>
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" id="newAPIKeyName" placeholder="Key name / description" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          <button class="btn btn-primary btn-sm" onclick="createAPIKey()">+ Create</button>
+          <input type="text" id="newAPIKeyName" placeholder="Key name / description"
+            title="Give the key a descriptive name so you can identify which system uses it (e.g. 'Monitoring Script', 'CI Pipeline')."
+            style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <button class="btn btn-primary btn-sm" onclick="createAPIKey()"
+            title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
         </div>
       </div>
     `;
@@ -2261,6 +2392,29 @@ async function saveExercise() {
 }
 
 // ── OIDC settings helpers ──────────────────────────────────────────────────
+
+function _setOIDCStatusBar(enabled, issuer, active) {
+  const dot   = document.getElementById('oidcStatusDot');
+  const label = document.getElementById('oidcStatusLabel');
+  const detail = document.getElementById('oidcStatusDetail');
+  if (!dot || !label) return;
+  if (active) {
+    dot.style.background = '#2ECC71';
+    label.textContent = 'SSO Active';
+    try {
+      detail.textContent = 'Provider: ' + new URL(issuer).hostname;
+    } catch { detail.textContent = 'Provider: ' + (issuer || ''); }
+  } else if (enabled && issuer) {
+    dot.style.background = '#E67E22';
+    label.textContent = 'Configured but not yet active';
+    detail.textContent = issuer;
+  } else {
+    dot.style.background = '#888';
+    label.textContent = 'Not configured';
+    detail.textContent = 'Fill in Issuer URL, Client ID, and Client Secret, then save.';
+  }
+}
+
 async function _initOIDCSettingsUI() {
   const data = await apiGet('/api/admin/oidc');
   if (!data) return;
@@ -2272,44 +2426,96 @@ async function _initOIDCSettingsUI() {
   setVal('oidcDefaultRole', data.default_role || 'readwrite');
   setChk('oidcExclusive', data.exclusive);
   setChk('oidcEnabled', data.enabled);
-  // Clear password field; show placeholder hint if secret exists
-  const secretEl = document.getElementById('oidcClientSecret');
+
+  // Clear password field; show hint if secret exists
+  const secretEl  = document.getElementById('oidcClientSecret');
+  const secretHint = document.getElementById('oidcSecretHint');
   if (secretEl) {
     secretEl.value = '';
     secretEl.placeholder = data.has_secret ? '(secret saved — leave blank to keep)' : '••••••••';
   }
-  const badge = document.getElementById('oidcStatusBadge');
-  if (badge) {
-    if (data.enabled && data.issuer) {
-      badge.textContent = t('settings_oidc_status_active') || 'SSO active';
-      badge.style.color = 'var(--success, #2ecc71)';
-    } else {
-      badge.textContent = t('settings_oidc_status_none') || 'Not configured';
-      badge.style.color = 'var(--text-dim)';
-    }
+  if (secretHint) {
+    secretHint.textContent = data.has_secret
+      ? '✓ A client secret is currently saved.'
+      : 'No client secret saved yet.';
+    secretHint.style.color = data.has_secret ? 'var(--success, #2ecc71)' : 'var(--text-dim)';
   }
+
+  // Determine if OIDC is currently active in-memory (check public config endpoint)
+  let active = false;
+  try {
+    const r = await fetch('/api/auth/oidc-config');
+    active = r.ok;
+  } catch { /* ok */ }
+
+  _setOIDCStatusBar(data.enabled, data.issuer, active);
 }
 
 async function saveOIDCSettings() {
   const getVal = id => document.getElementById(id)?.value?.trim() || '';
   const getChk = id => document.getElementById(id)?.checked || false;
   const payload = {
-    enabled:      getChk('oidcEnabled'),
-    issuer:       getVal('oidcIssuer'),
-    client_id:    getVal('oidcClientID'),
+    enabled:       getChk('oidcEnabled'),
+    issuer:        getVal('oidcIssuer'),
+    client_id:     getVal('oidcClientID'),
     client_secret: getVal('oidcClientSecret'),
-    redirect_url: getVal('oidcRedirectURL'),
-    exclusive:    getChk('oidcExclusive'),
-    default_role: getVal('oidcDefaultRole'),
+    redirect_url:  getVal('oidcRedirectURL'),
+    exclusive:     getChk('oidcExclusive'),
+    default_role:  getVal('oidcDefaultRole'),
   };
   const res = await api('PUT', '/api/admin/oidc', payload);
   if (res.ok) {
     showNotification('success', t('notif_saved') || 'Saved');
-    // Re-init to reflect current state (e.g. clear secret field)
     setTimeout(_initOIDCSettingsUI, 0);
+    // After save, auto-run test so admin sees immediate feedback
+    setTimeout(runOIDCTest, 300);
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to save OIDC settings');
+  }
+}
+
+// runOIDCTest — calls the backend diagnostic endpoint and renders step-by-step results
+async function runOIDCTest() {
+  const panel  = document.getElementById('oidcTestResult');
+  const steps  = document.getElementById('oidcTestSteps');
+  const summary = document.getElementById('oidcTestSummary');
+  if (!panel) return;
+
+  panel.style.display = '';
+  steps.innerHTML = '<em style="color:var(--text-dim)">Running diagnostics…</em>';
+  summary.textContent = '';
+
+  try {
+    const res  = await api('POST', '/api/admin/oidc/test', {});
+    const data = await res.json().catch(() => ({}));
+
+    if (!data.steps || !Array.isArray(data.steps)) {
+      steps.innerHTML = '<span style="color:#E74C3C">Unexpected response from server.</span>';
+      return;
+    }
+
+    steps.innerHTML = data.steps.map(s => {
+      const icon   = s.ok ? '✅' : '❌';
+      const color  = s.ok ? '#2ECC71' : '#E74C3C';
+      const detail = s.detail ? `<div style="color:var(--text-dim);margin-left:20px;word-break:break-all">${escHtml(s.detail)}</div>` : '';
+      return `<div style="margin-bottom:4px">
+        ${icon} <span style="color:${color};font-weight:600">${escHtml(s.step)}</span>
+        — <span>${escHtml(s.message)}</span>
+        ${detail}
+      </div>`;
+    }).join('');
+
+    const ok = data.overall;
+    summary.style.background = ok ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)';
+    summary.style.color       = ok ? '#2ECC71' : '#E74C3C';
+    summary.textContent       = (ok ? '✅ ' : '❌ ') + (data.summary || (ok ? 'All checks passed.' : 'Some checks failed.'));
+
+    // Update the status bar to reflect test results
+    const issuerEl = document.getElementById('oidcIssuer');
+    _setOIDCStatusBar(true, issuerEl?.value || '', ok);
+  } catch (err) {
+    steps.innerHTML = `<span style="color:#E74C3C">Test failed: ${escHtml(String(err))}</span>`;
   }
 }
 
