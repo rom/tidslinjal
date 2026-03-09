@@ -770,12 +770,28 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "user not found", http.StatusNotFound)
 		return
 	}
+
+	// Block OIDC/SSO users — their identity is managed by the external provider
+	if fullUser.IsOIDC {
+		jsonError(w, "oidc_account: Password cannot be changed here — this account uses Single Sign-On (SSO/OIDC). Manage your password through your identity provider.", http.StatusForbidden)
+		return
+	}
+
 	if req.CurrentPassword != "" {
 		if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
 			jsonError(w, "current password incorrect", http.StatusUnauthorized)
 			return
 		}
 	}
+
+	// Enforce password quality policy if enabled
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.NewPassword, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
@@ -792,6 +808,43 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		Summary: "changed own password",
 	})
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// validatePasswordQuality checks a candidate password against the active policy.
+func validatePasswordQuality(password string, policy SecuritySettings) error {
+	minLen := policy.MinLength
+	if minLen == 0 {
+		minLen = 8
+	}
+	if len(password) < minLen {
+		return fmt.Errorf("password_quality: Password must be at least %d characters long", minLen)
+	}
+	var hasUpper, hasLower, hasDigit, hasSymbol bool
+	for _, r := range password {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			hasUpper = true
+		case r >= 'a' && r <= 'z':
+			hasLower = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		default:
+			hasSymbol = true
+		}
+	}
+	if policy.RequireUppercase && !hasUpper {
+		return fmt.Errorf("password_quality: Password must contain at least one uppercase letter (A–Z)")
+	}
+	if policy.RequireLowercase && !hasLower {
+		return fmt.Errorf("password_quality: Password must contain at least one lowercase letter (a–z)")
+	}
+	if policy.RequireNumbers && !hasDigit {
+		return fmt.Errorf("password_quality: Password must contain at least one number (0–9)")
+	}
+	if policy.RequireSymbols && !hasSymbol {
+		return fmt.Errorf("password_quality: Password must contain at least one symbol (e.g. !@#$%%^&*)")
+	}
+	return nil
 }
 
 // ── Registration handler ───────────────────────────────────────────────────────
@@ -4494,6 +4547,30 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Security settings (password policy) — admin only
+	mux.HandleFunc("/api/admin/security", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetSecuritySettings)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveSecuritySettings)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// TLS configuration — admin only (takes effect on next server restart)
+	mux.HandleFunc("/api/integrations/tls", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetTLSConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveTLSConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Reports: on-demand download in specific format
 	mux.HandleFunc("/api/reports/download", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -4789,6 +4866,67 @@ func (app *App) handleTestSyslog(w http.ResponseWriter, r *http.Request, user *U
 	sw := &syslogWriter{cfg: cfg, hostname: hn}
 	sw.send(6, fmt.Sprintf("Tidslinjal syslog test from %s (user: %s)", hn, user.Username))
 	jsonOK(w, map[string]string{"status": "ok", "transport": cfg.Transport, "host": cfg.Host})
+}
+
+// ── Security Settings Handlers ────────────────────────────────────────────────
+
+func (app *App) handleGetSecuritySettings(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetSecuritySettings())
+}
+
+func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Request, user *User) {
+	var ss SecuritySettings
+	if err := json.NewDecoder(r.Body).Decode(&ss); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if ss.MinLength == 0 {
+		ss.MinLength = 8
+	}
+	if err := app.store.SaveSecuritySettings(ss); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "security_settings", 0, "Updated password policy")
+	jsonOK(w, ss)
+}
+
+// ── TLS Config Handlers ───────────────────────────────────────────────────────
+
+func (app *App) handleGetTLSConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetTLSConfig())
+}
+
+func (app *App) handleSaveTLSConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg TLSConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	// Validate paths exist if provided
+	if cfg.CertFile != "" {
+		if _, err := os.Stat(cfg.CertFile); err != nil {
+			jsonError(w, fmt.Sprintf("cert file not accessible: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	if cfg.KeyFile != "" {
+		if _, err := os.Stat(cfg.KeyFile); err != nil {
+			jsonError(w, fmt.Sprintf("key file not accessible: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	if err := app.store.SaveTLSConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "tls_config", 0,
+		fmt.Sprintf("Updated TLS config: cert=%s key=%s", cfg.CertFile, cfg.KeyFile))
+	jsonOK(w, map[string]any{
+		"cert_file":       cfg.CertFile,
+		"key_file":        cfg.KeyFile,
+		"restart_required": true,
+	})
 }
 
 // ── Report Download Handler ────────────────────────────────────────────────────
@@ -6289,6 +6427,16 @@ func main() {
 	app, err := NewApp(dataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// TLS config: CLI flags / env vars take priority; fall back to persistent admin UI settings
+	if tlsCert == "" && tlsKey == "" {
+		persisted := app.store.GetTLSConfig()
+		if persisted.CertFile != "" && persisted.KeyFile != "" {
+			tlsCert = persisted.CertFile
+			tlsKey = persisted.KeyFile
+			log.Printf("[INFO] TLS config loaded from persistent settings: cert=%s key=%s", tlsCert, tlsKey)
+		}
 	}
 
 	// Configure OIDC — CLI flags take priority; fall back to persistent settings stored in DB

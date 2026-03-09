@@ -580,6 +580,24 @@ type SyslogConfig struct {
 	TLSVerify bool   `json:"tls_verify,omitempty"` // verify TLS certificate (default true)
 }
 
+// SecuritySettings controls server-side password quality enforcement
+type SecuritySettings struct {
+	PasswordPolicyEnabled bool `json:"password_policy_enabled"`
+	MinLength             int  `json:"min_length,omitempty"`      // minimum password length (default 8)
+	RequireUppercase      bool `json:"require_uppercase,omitempty"` // at least one A-Z
+	RequireLowercase      bool `json:"require_lowercase,omitempty"` // at least one a-z
+	RequireNumbers        bool `json:"require_numbers,omitempty"`   // at least one 0-9
+	RequireSymbols        bool `json:"require_symbols,omitempty"`   // at least one symbol
+}
+
+// TLSConfig stores TLS certificate and key file paths for persistent server configuration.
+// CLI flags --tls-cert / --tls-key always override values stored here.
+// Changes take effect on next server restart.
+type TLSConfig struct {
+	CertFile string `json:"cert_file,omitempty"` // path to PEM certificate file
+	KeyFile  string `json:"key_file,omitempty"`  // path to PEM private key file
+}
+
 // EventVersion records a historical snapshot of an event at a point in time
 type EventVersion struct {
 	ID        int64     `json:"id"`

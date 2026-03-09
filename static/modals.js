@@ -2053,6 +2053,71 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🔐 Password Policy</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Enforce password quality requirements for all local accounts.
+          OIDC/SSO accounts are always excluded — their passwords are managed by the identity provider.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"
+          title="When enabled, password changes are validated against the rules below.">
+          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Password Quality Policy
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Passwords shorter than this will be rejected. Default: 8 characters.">Minimum Length</label>
+          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> Require uppercase (A–Z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> Require lowercase (a–z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> Require numbers (0–9)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
+          </label>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveSecuritySettings()"
+          title="Save the password policy. Takes effect immediately for all subsequent password changes.">Save Policy</button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 TLS / HTTPS Configuration</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure TLS certificate and key file paths for HTTPS.
+          CLI flags <code>--tls-cert</code> / <code>--tls-key</code> and environment variables
+          <code>TLS_CERT</code> / <code>TLS_KEY</code> always take priority over settings stored here.
+        </p>
+        <div id="tlsCurrentStatus" style="margin-bottom:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
+          Checking TLS status…
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Absolute path to the PEM-encoded TLS certificate file on the server.">Certificate File (cert.pem)</label>
+          <input type="text" id="tlsCertFile" placeholder="/etc/ssl/certs/tidslinjal.crt"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Absolute path to the PEM-encoded private key file on the server.">Private Key File (key.pem)</label>
+          <input type="text" id="tlsKeyFile" placeholder="/etc/ssl/private/tidslinjal.key"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="padding:8px 10px;border-radius:var(--radius);background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ⚠️ Changes to TLS configuration require a <strong>server restart</strong> to take effect.
+          The server validates that both file paths are accessible before saving.
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveTLSConfig()"
+          title="Save TLS file paths. The server will use them on next restart.">Save TLS Config</button>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">🔑 API Keys</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           API keys allow external tools (scripts, monitoring systems, integrations) to access
@@ -2073,6 +2138,8 @@ function renderSidebar() {
     setTimeout(_initOIDCSettingsUI, 0);
     setTimeout(_initMailSettingsUI, 0);
     setTimeout(_initSyslogSettingsUI, 0);
+    setTimeout(_initSecuritySettingsUI, 0);
+    setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
   } else if (tab === 'settings') {
@@ -2713,6 +2780,17 @@ async function openProfileModal() {
   ['profilePwdCurrent', 'profilePwdNew', 'profilePwdConfirm'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  // Reset strength indicator
+  const profBar = document.getElementById('profilePwdStrengthBar');
+  const profLbl = document.getElementById('profilePwdStrengthLabel');
+  if (profBar) { profBar.style.width = '0%'; profBar.style.background = '#ccc'; }
+  if (profLbl) profLbl.textContent = '';
+  // Show SSO banner for OIDC accounts
+  const isSSO = u.is_oidc;
+  const ssoBanner   = document.getElementById('profilePwdSSOBanner');
+  const pwdFields   = document.getElementById('profilePwdFields');
+  if (ssoBanner) ssoBanner.style.display = isSSO ? '' : 'none';
+  if (pwdFields) pwdFields.style.display  = isSSO ? 'none' : '';
 
   // Account info section
   const info = document.getElementById('profileInfo');
@@ -2815,13 +2893,43 @@ async function saveProfile() {
     const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      showError(err.error || 'Failed to change password');
+      const msg = (err.error || 'Failed to change password').replace(/^password_quality:\s*/,'').replace(/^oidc_account:\s*/,'');
+      showError(msg);
       return;
     }
   }
 
   closeModal('profileModal');
   showNotification('success', 'Profile updated');
+}
+
+// ── Password Strength Meter ───────────────────────────────────────────────────
+// updatePwdStrength(inputId, barId, labelId) — call from oninput on password fields.
+// Computes a 0–4 score and updates the visual bar + label.
+function updatePwdStrength(inputId, barId, labelId) {
+  const pw  = document.getElementById(inputId)?.value || '';
+  const bar = document.getElementById(barId);
+  const lbl = document.getElementById(labelId);
+  if (!bar || !lbl) return;
+
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  // clamp to 4
+  score = Math.min(score, 4);
+
+  const pct   = pw.length === 0 ? 0 : Math.max(10, score * 25);
+  const color = ['#ccc','#e74c3c','#e67e22','#f1c40f','#27ae60'][score];
+  const label = ['','Very weak','Weak','Fair','Strong','Very strong'][pw.length === 0 ? 0 : score + (score === 4 ? 0 : 0)];
+  // Simpler label map
+  const labels = {0:'',1:'Very weak',2:'Weak',3:'Fair',4:'Strong'};
+  bar.style.width = pct + '%';
+  bar.style.background = color;
+  lbl.textContent = pw.length === 0 ? '' : (labels[score] || '');
+  lbl.style.color = color;
 }
 
 // ── Mail Config UI ─────────────────────────────────────────────────────────
@@ -2923,6 +3031,78 @@ async function testSyslogConfig() {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Syslog test failed');
+  }
+}
+
+// ── Security Settings UI ──────────────────────────────────────────────────────
+async function _initSecuritySettingsUI() {
+  try {
+    const ss = await apiGet('/api/admin/security');
+    if (!ss) return;
+    const setCb  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setCb('secPolicyEnabled', ss.password_policy_enabled);
+    setVal('secMinLength',    ss.min_length || 8);
+    setCb('secReqUpper',    ss.require_uppercase);
+    setCb('secReqLower',    ss.require_lowercase);
+    setCb('secReqNumbers',  ss.require_numbers);
+    setCb('secReqSymbols',  ss.require_symbols);
+  } catch { /* not configured yet */ }
+}
+
+async function saveSecuritySettings() {
+  const cb  = id => document.getElementById(id)?.checked || false;
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const ss = {
+    password_policy_enabled: cb('secPolicyEnabled'),
+    min_length:       parseInt(val('secMinLength'), 10) || 8,
+    require_uppercase: cb('secReqUpper'),
+    require_lowercase: cb('secReqLower'),
+    require_numbers:   cb('secReqNumbers'),
+    require_symbols:   cb('secReqSymbols'),
+  };
+  const res = await api('PUT', '/api/admin/security', ss);
+  if (res.ok) {
+    showNotification('success', 'Password policy saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save password policy');
+  }
+}
+
+// ── TLS Config UI ─────────────────────────────────────────────────────────────
+async function _initTLSConfigUI() {
+  const statusEl = document.getElementById('tlsCurrentStatus');
+  try {
+    const cfg = await apiGet('/api/integrations/tls');
+    if (!cfg) return;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setVal('tlsCertFile', cfg.cert_file);
+    setVal('tlsKeyFile',  cfg.key_file);
+    if (statusEl) {
+      const active = cfg.cert_file && cfg.key_file;
+      statusEl.innerHTML = active
+        ? `<span style="color:#27ae60">✓ TLS configured</span> — cert: <code>${escHtml(cfg.cert_file)}</code>`
+        : `<span style="color:var(--text-dim)">TLS not configured (server running on HTTP)</span>`;
+    }
+  } catch {
+    if (statusEl) statusEl.textContent = 'Could not load TLS status.';
+  }
+}
+
+async function saveTLSConfig() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const cfg = {
+    cert_file: val('tlsCertFile'),
+    key_file:  val('tlsKeyFile'),
+  };
+  const res = await api('PUT', '/api/integrations/tls', cfg);
+  if (res.ok) {
+    showNotification('success', 'TLS config saved — restart the server to apply');
+    _initTLSConfigUI();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save TLS config');
   }
 }
 
