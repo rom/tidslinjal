@@ -3887,12 +3887,69 @@ func main() {
 		scheme = "https"
 	}
 
-	log.Printf("Tidslinjal v%s — listening on %s://%s", AppVersion, scheme, listenAddr)
-	log.Printf("Default credentials: admin / admin")
-	if verbose {
-		log.Printf("[VERBOSE] data dir: %s", dataDir)
-		log.Printf("[VERBOSE] verbose=%v debug=%v tls=%v", verbose, debug, useTLS)
+	// ── Startup summary ──────────────────────────────────────────────────────
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	log.Printf("  Tidslinjal v%s", AppVersion)
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Network / TLS
+	log.Printf("  URL        : %s://%s", scheme, listenAddr)
+	log.Printf("  Bind addr  : %s (host=%q port=%s)", addr, func() string { if host == "" { return "0.0.0.0 (all interfaces)" }; return host }(), port)
+	if useTLS {
+		log.Printf("  TLS        : ENABLED")
+		log.Printf("    cert     : %s", tlsCert)
+		log.Printf("    key      : %s", tlsKey)
+		// Verify cert/key files are readable
+		if _, err := os.Stat(tlsCert); err != nil {
+			log.Printf("    [WARN] cert file not accessible: %v", err)
+		}
+		if _, err := os.Stat(tlsKey); err != nil {
+			log.Printf("    [WARN] key file not accessible: %v", err)
+		}
+	} else {
+		log.Printf("  TLS        : disabled (plain HTTP)")
 	}
+
+	// Data / debug
+	absData, _ := filepath.Abs(dataDir)
+	log.Printf("  Data dir   : %s", absData)
+	log.Printf("  Debug      : %v   Verbose: %v", debug, verbose)
+
+	// Authentication — registration
+	rs := app.store.GetRegistrationSettings()
+	log.Printf("  Auth")
+	log.Printf("    local login    : enabled (admin always allowed)")
+	log.Printf("    registration   : mode=%s", rs.Mode)
+
+	// Authentication — OIDC
+	if app.oidc != nil {
+		log.Printf("    OIDC/SSO       : ENABLED")
+		log.Printf("      issuer       : %s", app.oidc.Issuer)
+		log.Printf("      client_id    : %s", app.oidc.ClientID)
+		log.Printf("      redirect_url : %s", app.oidc.RedirectURL)
+		log.Printf("      exclusive    : %v  (local login %s)", app.oidcExclusive, func() string {
+			if app.oidcExclusive { return "BLOCKED for non-admin" }
+			return "still allowed"
+		}())
+		dr := app.oidcDefaultRole
+		if dr == "" { dr = RoleReadWrite }
+		log.Printf("      default_role : %s", dr)
+	} else {
+		log.Printf("    OIDC/SSO       : disabled")
+	}
+
+	// Exercise / operation mode
+	ex := app.store.GetExerciseSettings()
+	log.Printf("  Exercise")
+	log.Printf("    enabled        : %v", ex.Enabled)
+	if ex.Enabled {
+		log.Printf("    mode           : %s", func() string { if ex.OperationMode != "" { return ex.OperationMode }; return "exercise" }())
+		log.Printf("    label          : %q", ex.Label)
+		log.Printf("    epoch (STARTEX): %s", ex.Epoch)
+	}
+
+	log.Printf("  Default credentials: admin / admin")
+	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	handler := app.routes()
 
