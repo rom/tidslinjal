@@ -3516,6 +3516,25 @@ func (app *App) routes() http.Handler {
 			return
 		}
 
+		// /api/events/:id/history
+		if len(parts) == 4 && parts[3] == "history" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetEventHistory)(w, r)
+			return
+		}
+
+		// /api/events/:id/lock (editing lock)
+		if len(parts) == 4 && parts[3] == "lock" {
+			switch r.Method {
+			case http.MethodPost:
+				app.requireAuth(app.handleAcquireEditingLock)(w, r)
+			case http.MethodDelete:
+				app.requireAuth(app.handleReleaseEditingLock)(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
 		// /api/events/:id
 		switch r.Method {
 		case http.MethodPut:
@@ -3928,30 +3947,6 @@ func (app *App) routes() http.Handler {
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
-	})
-
-	// Event history (versioning)
-	mux.HandleFunc("/api/events/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.Trim(r.URL.Path, "/")
-		parts := strings.Split(path, "/")
-		// /api/events/:id/history
-		if len(parts) == 4 && parts[3] == "history" && r.Method == http.MethodGet {
-			app.requireAuth(app.handleGetEventHistory)(w, r)
-			return
-		}
-		// /api/events/:id/lock (editing lock)
-		if len(parts) == 4 && parts[3] == "lock" {
-			switch r.Method {
-			case http.MethodPost:
-				app.requireAuth(app.handleAcquireEditingLock)(w, r)
-			case http.MethodDelete:
-				app.requireAuth(app.handleReleaseEditingLock)(w, r)
-			default:
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			}
-			return
-		}
-		http.NotFound(w, r)
 	})
 
 	// Editing locks (all active locks for collaborative editing awareness)
