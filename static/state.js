@@ -15,7 +15,7 @@ window.state = {
   eventTypes:  [],
   phases:      [],
   preferences: {
-    theme:           'dark',
+    theme:           'light',
     size:            'small',
     language:        'en',
     day_start_hour:  0,

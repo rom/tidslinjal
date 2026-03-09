@@ -106,6 +106,8 @@ type User struct {
 	IsOIDC          bool       `json:"is_oidc,omitempty"` // true if this account was created via OIDC
 	// WebCal subscription token (unique per user, for calendar sync)
 	WebCalToken string `json:"webcal_token,omitempty"`
+	// Blocked: admin can block a user from logging in (even via OIDC)
+	Blocked bool `json:"blocked,omitempty"`
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
@@ -127,6 +129,7 @@ type UserPublic struct {
 	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
 	IsOIDC           bool       `json:"is_oidc,omitempty"`
 	WebCalToken      string     `json:"webcal_token,omitempty"`
+	Blocked          bool       `json:"blocked,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -148,6 +151,7 @@ func (u *User) Public() UserPublic {
 		LastLoginDomain:  u.LastLoginDomain,
 		IsOIDC:           u.IsOIDC,
 		WebCalToken:      u.WebCalToken,
+		Blocked:          u.Blocked,
 	}
 }
 
@@ -244,7 +248,8 @@ type Event struct {
 	EndTime           *time.Time  `json:"end_time,omitempty"`
 	AllDay            bool        `json:"all_day"`               // day-only activity (no specific time)
 	Participant       string      `json:"participant,omitempty"` // "" | "intern" | "extern"
-	PhysicalLocation  string      `json:"physical_location,omitempty"` // for physical_meeting type
+	PhysicalLocation  string      `json:"physical_location,omitempty"`  // for physical_meeting type
+	LocationAddress   string      `json:"location_address,omitempty"`   // human-readable address (fallback/alternative to coordinates)
 	ContactURL        string      `json:"contact_url,omitempty"`       // URL, IP address, or phone number
 	ContactType       string      `json:"contact_type,omitempty"`      // url | ip | phone
 	VirtualMeetingType string     `json:"virtual_meeting_type,omitempty"` // mattermost|teams|signal|discord|teleconf|other

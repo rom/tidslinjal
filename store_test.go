@@ -250,8 +250,8 @@ func TestUser_Public(t *testing.T) {
 func TestPreferences_DefaultsForUnknownUser(t *testing.T) {
 	s := newTestStore(t)
 	p := s.GetPreferences(9999)
-	if p.Theme != "dark" {
-		t.Errorf("expected default theme 'dark', got %q", p.Theme)
+	if p.Theme != "light" {
+		t.Errorf("expected default theme 'light', got %q", p.Theme)
 	}
 	if p.Language != "en" {
 		t.Errorf("expected default language 'en', got %q", p.Language)
