@@ -433,17 +433,30 @@ type OIDCConfig struct {
 	RedirectURL           string `json:"-"`
 }
 
+// OIDCPersistentConfig stores OIDC settings that can be configured via the UI.
+// Client secret is stored but never sent to the frontend.
+type OIDCPersistentConfig struct {
+	Enabled      bool   `json:"enabled"`
+	Issuer       string `json:"issuer"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret,omitempty"`
+	RedirectURL  string `json:"redirect_url,omitempty"`
+	Exclusive    bool   `json:"exclusive"`
+	DefaultRole  string `json:"default_role,omitempty"` // readwrite | teamlead | oplead
+}
+
 // ExerciseSettings controls synthetic time display across the application
 type ExerciseSettings struct {
-	Enabled       bool   `json:"enabled"`
-	Epoch         string `json:"epoch"`                     // ISO8601: STARTEX / OPSTART / Incident start
-	Endex         string `json:"endex,omitempty"`           // ISO8601: ENDEX / OPEND / Incident end
-	Label         string `json:"label"`                     // exercise/incident/operation name shown in header
-	Paused        bool   `json:"paused"`                    // freeze timeline progression
-	PausedAt      string `json:"paused_at,omitempty"`       // ISO8601: when it was paused
-	DayHoursOnly  bool   `json:"day_hours_only"`            // synthetic time only advances during day hours
-	GroupLabel    string `json:"group_label,omitempty"`     // "group" | "unit" | "team"
-	UserLabel     string `json:"user_label,omitempty"`      // "users" | "soldiers" | "personnel"
-	OperationMode string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
-	ExIndex       int    `json:"ex_index,omitempty"`        // exercise/incident index number
+	Enabled         bool   `json:"enabled"`
+	Epoch           string `json:"epoch"`                     // ISO8601: STARTEX / OPSTART / Incident start
+	Endex           string `json:"endex,omitempty"`           // ISO8601: ENDEX / OPEND / Incident end
+	Label           string `json:"label"`                     // exercise/incident/operation name shown in header
+	Paused          bool   `json:"paused"`                    // freeze timeline progression
+	PausedAt        string `json:"paused_at,omitempty"`       // ISO8601: when it was paused
+	DayHoursOnly    bool   `json:"day_hours_only"`            // synthetic time only advances during day hours
+	IncludeWeekends bool   `json:"include_weekends"`          // show weekends and count them in synthetic time (default true)
+	GroupLabel      string `json:"group_label,omitempty"`     // "group" | "unit" | "team"
+	UserLabel       string `json:"user_label,omitempty"`      // "users" | "soldiers" | "personnel"
+	OperationMode   string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
+	ExIndex         int    `json:"ex_index,omitempty"`        // exercise/incident index number
 }

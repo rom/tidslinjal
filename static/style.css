@@ -646,6 +646,24 @@ textarea { resize: vertical; min-height: 70px; }
 .tl-time-label.out-of-hours { opacity: 0.45; }
 body.light-mode .tl-cell.out-of-hours { background: repeating-linear-gradient(135deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 8px, rgba(0,0,0,.04) 8px, rgba(0,0,0,.04) 9px); }
 
+/* ── Weekend column styling ───────────────────────────────────────────────── */
+.tl-day-header.weekend { background: rgba(255,255,255,.03); }
+.tl-cell.weekend { background: rgba(255,255,255,.015); }
+.tl-day-header.weekend-excluded { background: rgba(128,128,128,.08); opacity: 0.7; }
+.tl-cell.weekend-excluded {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0,0,0,0) 0px, rgba(0,0,0,0) 6px,
+    rgba(128,128,128,.06) 6px, rgba(128,128,128,.06) 7px
+  );
+  opacity: 0.6;
+  cursor: default !important;
+}
+.tl-cell.weekend-excluded:hover { background: rgba(128,128,128,.04) !important; }
+body.light-mode .tl-day-header.weekend { background: rgba(0,0,0,.03); }
+body.light-mode .tl-day-header.weekend-excluded { background: rgba(0,0,0,.06); opacity: 0.7; }
+body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradient(135deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 6px, rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 7px); }
+
 /* ── Event block icons ────────────────────────────────────────────────────── */
 .ev-icon {
   display: inline-block; font-style: normal; font-size: 10px;

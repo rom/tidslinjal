@@ -1561,7 +1561,53 @@ function renderSidebar() {
           <button class="btn btn-secondary btn-sm" onclick="testWebhook()">${t('settings_webhook_test')}</button>
         </div>
       </div>
+      <div class="sidebar-section" id="oidcSettingsSection">
+        <div class="sidebar-section-title">🔐 ${t('settings_oidc')||'Single Sign-On (OIDC)'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure OpenID Connect for SSO. Leave Client Secret blank to keep the existing one.
+          Status: <span id="oidcStatusBadge" style="font-weight:600"></span>
+        </p>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_issuer')||'Issuer URL'}</label>
+          <input type="url" id="oidcIssuer" placeholder="https://accounts.example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_client_id')||'Client ID'}</label>
+          <input type="text" id="oidcClientID" placeholder="client-id"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_client_secret')||'Client Secret'} <span style="opacity:.6">(leave blank to keep current)</span></label>
+          <input type="password" id="oidcClientSecret" placeholder="••••••••"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_redirect_url')||'Redirect URL'} <span style="opacity:.6">(leave blank for auto)</span></label>
+          <input type="url" id="oidcRedirectURL" placeholder="https://your-server/auth/oidc/callback"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_oidc_default_role')||'Default role for new users'}</label>
+          <select id="oidcDefaultRole" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="readwrite">Read/Write</option>
+            <option value="teamlead">Team Lead</option>
+            <option value="oplead">Op Lead</option>
+          </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="oidcExclusive" style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_oidc_exclusive')||'Exclusive mode (disable local login)'}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="oidcEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable OIDC SSO
+        </label>
+        <button class="btn btn-primary btn-sm" onclick="saveOIDCSettings()">${t('settings_oidc_save')||'Save & Apply'}</button>
+      </div>
     `;
+    // Load current OIDC settings into the form
+    setTimeout(_initOIDCSettingsUI, 0);
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -1751,6 +1797,10 @@ function renderSidebar() {
           <input type="checkbox" id="exDayHoursOnly" ${ex.day_hours_only?'checked':''}>
           <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
         </div>
+        <div class="form-check" style="margin-bottom:8px">
+          <input type="checkbox" id="exIncludeWeekends" ${ex.include_weekends!==false?'checked':''}>
+          <label for="exIncludeWeekends" style="font-size:var(--fs-sm)" title="${t('settings_include_weekends_desc')||'Show weekends on the timeline and count them in synthetic time'}">${t('settings_include_weekends')||'Include weekends'}</label>
+        </div>
         <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
@@ -1919,15 +1969,17 @@ async function saveExercise() {
   const epoch       = document.getElementById('exEpoch')?.value;
   const endex       = document.getElementById('exEndex')?.value;
   const label       = document.getElementById('exLabel')?.value?.trim() || '';
-  const enabled     = document.getElementById('exEnabled')?.checked || false;
-  const dayHrsOnly  = document.getElementById('exDayHoursOnly')?.checked || false;
-  const exIndex     = parseInt(document.getElementById('exIndex')?.value || '0', 10);
+  const enabled          = document.getElementById('exEnabled')?.checked || false;
+  const dayHrsOnly       = document.getElementById('exDayHoursOnly')?.checked || false;
+  const includeWeekends  = document.getElementById('exIncludeWeekends')?.checked !== false;
+  const exIndex          = parseInt(document.getElementById('exIndex')?.value || '0', 10);
   const payload = {
     enabled,
     epoch: epoch ? new Date(epoch).toISOString() : '',
     endex: endex ? new Date(endex).toISOString() : '',
     label,
     day_hours_only: dayHrsOnly,
+    include_weekends: includeWeekends,
     group_label: state.exercise?.group_label || 'group',
     ex_index: exIndex,
   };
@@ -1940,6 +1992,59 @@ async function saveExercise() {
   } else {
     const err = await res.json();
     showError(err.error);
+  }
+}
+
+// ── OIDC settings helpers ──────────────────────────────────────────────────
+async function _initOIDCSettingsUI() {
+  const data = await apiGet('/api/admin/oidc');
+  if (!data) return;
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+  setVal('oidcIssuer', data.issuer);
+  setVal('oidcClientID', data.client_id);
+  setVal('oidcRedirectURL', data.redirect_url);
+  setVal('oidcDefaultRole', data.default_role || 'readwrite');
+  setChk('oidcExclusive', data.exclusive);
+  setChk('oidcEnabled', data.enabled);
+  // Clear password field; show placeholder hint if secret exists
+  const secretEl = document.getElementById('oidcClientSecret');
+  if (secretEl) {
+    secretEl.value = '';
+    secretEl.placeholder = data.has_secret ? '(secret saved — leave blank to keep)' : '••••••••';
+  }
+  const badge = document.getElementById('oidcStatusBadge');
+  if (badge) {
+    if (data.enabled && data.issuer) {
+      badge.textContent = t('settings_oidc_status_active') || 'SSO active';
+      badge.style.color = 'var(--success, #2ecc71)';
+    } else {
+      badge.textContent = t('settings_oidc_status_none') || 'Not configured';
+      badge.style.color = 'var(--text-dim)';
+    }
+  }
+}
+
+async function saveOIDCSettings() {
+  const getVal = id => document.getElementById(id)?.value?.trim() || '';
+  const getChk = id => document.getElementById(id)?.checked || false;
+  const payload = {
+    enabled:      getChk('oidcEnabled'),
+    issuer:       getVal('oidcIssuer'),
+    client_id:    getVal('oidcClientID'),
+    client_secret: getVal('oidcClientSecret'),
+    redirect_url: getVal('oidcRedirectURL'),
+    exclusive:    getChk('oidcExclusive'),
+    default_role: getVal('oidcDefaultRole'),
+  };
+  const res = await api('PUT', '/api/admin/oidc', payload);
+  if (res.ok) {
+    showNotification('success', t('notif_saved') || 'Saved');
+    // Re-init to reflect current state (e.g. clear secret field)
+    setTimeout(_initOIDCSettingsUI, 0);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save OIDC settings');
   }
 }
 

@@ -95,9 +95,15 @@ function synthActive() {
   return state.syntheticOn && state.exercise && state.exercise.enabled && state.exercise.epoch;
 }
 
+function isWeekendDay(date) {
+  const dow = date.getDay(); // 0=Sun, 6=Sat
+  return dow === 0 || dow === 6;
+}
+
 function synthElapsedHours(epochMs, nowMs) {
   const ex = state.exercise;
-  if (!ex || !ex.day_hours_only) {
+  const skipWeekends = ex && ex.include_weekends === false;
+  if (!ex || (!ex.day_hours_only && !skipWeekends)) {
     return Math.floor((nowMs - epochMs) / 3600000);
   }
   const dayStartH = state.preferences.day_start_hour || 0;
@@ -106,12 +112,23 @@ function synthElapsedHours(epochMs, nowMs) {
   let cur = epochMs;
   while (cur < nowMs) {
     const d = new Date(cur);
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayStartH, 0, 0).getTime();
-    const dayEnd   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayEndH, 0, 0).getTime();
-    const segStart = Math.max(cur, dayStart);
-    const segEnd   = Math.min(nowMs, dayEnd);
-    if (segEnd > segStart) elapsed += segEnd - segStart;
-    cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, dayStartH, 0, 0).getTime();
+    // Skip entire weekends if include_weekends is false
+    if (skipWeekends && isWeekendDay(d)) {
+      cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, dayStartH, 0, 0).getTime();
+      continue;
+    }
+    if (ex.day_hours_only) {
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayStartH, 0, 0).getTime();
+      const dayEnd   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), dayEndH, 0, 0).getTime();
+      const segStart = Math.max(cur, dayStart);
+      const segEnd   = Math.min(nowMs, dayEnd);
+      if (segEnd > segStart) elapsed += segEnd - segStart;
+    } else {
+      // Count the whole day (but not the weekend — already handled above)
+      const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0).getTime();
+      elapsed += Math.min(nowMs, dayEnd) - cur;
+    }
+    cur = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, ex.day_hours_only ? dayStartH : 0, 0, 0).getTime();
   }
   return Math.floor(elapsed / 3600000);
 }
@@ -166,15 +183,18 @@ function renderTimeline() {
   let html = '';
 
   // ── Header row ─────────────────────────────────────────────────────────────
+  const excludeWeekends = state.exercise && state.exercise.include_weekends === false;
   html += `<div class="tl-corner" style="height:44px;width:${timeColW}px"></div>`;
   days.forEach(day => {
-    const isToday = isSameDay(day, today);
-    const useSync = synthActive();
-    const dayName = useSync ? synthDayHeader(day) : localDayName(day);
-    const dayDate = useSync
+    const isToday   = isSameDay(day, today);
+    const isWeekend = isWeekendDay(day);
+    const useSync   = synthActive();
+    const dayName   = useSync ? synthDayHeader(day) : localDayName(day);
+    const dayDate   = useSync
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);
-    html += `<div class="tl-day-header${isToday?' today':''}" data-date="${day.toISOString()}" onclick="centerDay(new Date('${day.toISOString()}'))" title="Click to center this day" style="cursor:pointer">
+    const weekendCls = (excludeWeekends && isWeekend) ? ' weekend-excluded' : (isWeekend ? ' weekend' : '');
+    html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" onclick="centerDay(new Date('${day.toISOString()}'))" title="Click to center this day" style="cursor:pointer">
       <div class="tl-day-name">${dayName}</div>
       <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}</div>
     </div>`;
@@ -224,11 +244,13 @@ function renderTimeline() {
       const isCur  = isCurrentSlot(slotStart, slotEnd);
 
       const ooh = isOutOfHours(s);
-      html += `<div class="tl-cell${locked?' locked':''}${lockedLayer?' locked-layer':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}${ooh?' out-of-hours':''}"
+      const isWeekend = isWeekendDay(day);
+      const weekendExcludedCell = excludeWeekends && isWeekend;
+      html += `<div class="tl-cell${locked?' locked':''}${lockedLayer?' locked-layer':''}${isHalf?' half-hour':''}${isCur?' tl-row-current':''}${ooh?' out-of-hours':''}${weekendExcludedCell?' weekend-excluded':isWeekend?' weekend':''}"
         style="height:${slotH}px"
         data-day="${di}" data-slot="${s}"
         data-start="${slotStart.toISOString()}"
-        ${(locked || ooh) ? `title="${locked?'Locked: (master/all) — no events can be added or edited':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
+        ${(locked || ooh || weekendExcludedCell) ? `title="${locked?'Locked: (master/all) — no events can be added or edited':weekendExcludedCell?'Weekend (excluded from synthetic time)':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
       ></div>`;
     });
   }
