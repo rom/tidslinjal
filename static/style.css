@@ -1338,3 +1338,54 @@ body.light-mode { --danger: #c0392b; }
   background: rgba(243, 156, 18, .15);
   border-left: 4px solid #F39C12;
 }
+
+/* ── Map Modal ──────────────────────────────────────────────────────────── */
+#mapContainer {
+  height: 400px;
+  width: 100%;
+  border-radius: 0;
+}
+#mapContainer .leaflet-container {
+  font-family: inherit;
+}
+
+/* ── Collaborative Editing Indicator ───────────────────────────────────── */
+#editingLockIndicator {
+  font-size: var(--fs-xs);
+  color: var(--warning, #f39c12);
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: rgba(243, 156, 18, 0.1);
+  border: 1px solid rgba(243, 156, 18, 0.3);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ── Event History Modal ────────────────────────────────────────────────── */
+#eventHistoryList .version-entry {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--bg2);
+}
+
+/* ── Dependency Search Results ──────────────────────────────────────────── */
+#depSearchResults div,
+#dependencyList div {
+  transition: background 0.1s;
+}
+#depSearchResults div:hover {
+  background: var(--bg4, var(--bg3)) !important;
+}
+
+/* ── Planned vs Actual Modal ────────────────────────────────────────────── */
+#pvaContent table {
+  width: 100%;
+  border-collapse: collapse;
+}
+#pvaContent td, #pvaContent th {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}

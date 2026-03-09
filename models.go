@@ -95,19 +95,38 @@ type User struct {
 	PasswordResetToken  string    `json:"password_reset_token,omitempty"`
 	PasswordResetExpiry *time.Time `json:"password_reset_expiry,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
+	// Social/communication handles
+	MattermostHandle string `json:"mattermost_handle,omitempty"`
+	DiscordHandle    string `json:"discord_handle,omitempty"`
+	SignalHandle     string `json:"signal_handle,omitempty"`
+	// Login tracking
+	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
+	LastLoginIP     string     `json:"last_login_ip,omitempty"`
+	LastLoginDomain string     `json:"last_login_domain,omitempty"`
+	IsOIDC          bool       `json:"is_oidc,omitempty"` // true if this account was created via OIDC
+	// WebCal subscription token (unique per user, for calendar sync)
+	WebCalToken string `json:"webcal_token,omitempty"`
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
 type UserPublic struct {
-	ID               int64     `json:"id"`
-	Username         string    `json:"username"`
-	DisplayName      string    `json:"display_name"`
-	Email            string    `json:"email,omitempty"`
-	Role             Role      `json:"role"`
-	CanLock          bool      `json:"can_lock"`
-	Vetted           bool      `json:"vetted"`
-	NATODesignations []string  `json:"nato_designations,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID               int64      `json:"id"`
+	Username         string     `json:"username"`
+	DisplayName      string     `json:"display_name"`
+	Email            string     `json:"email,omitempty"`
+	Role             Role       `json:"role"`
+	CanLock          bool       `json:"can_lock"`
+	Vetted           bool       `json:"vetted"`
+	NATODesignations []string   `json:"nato_designations,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	MattermostHandle string     `json:"mattermost_handle,omitempty"`
+	DiscordHandle    string     `json:"discord_handle,omitempty"`
+	SignalHandle     string     `json:"signal_handle,omitempty"`
+	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
+	LastLoginIP      string     `json:"last_login_ip,omitempty"`
+	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
+	IsOIDC           bool       `json:"is_oidc,omitempty"`
+	WebCalToken      string     `json:"webcal_token,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -121,6 +140,14 @@ func (u *User) Public() UserPublic {
 		Vetted:           u.Vetted,
 		NATODesignations: u.NATODesignations,
 		CreatedAt:        u.CreatedAt,
+		MattermostHandle: u.MattermostHandle,
+		DiscordHandle:    u.DiscordHandle,
+		SignalHandle:     u.SignalHandle,
+		LastLoginAt:      u.LastLoginAt,
+		LastLoginIP:      u.LastLoginIP,
+		LastLoginDomain:  u.LastLoginDomain,
+		IsOIDC:           u.IsOIDC,
+		WebCalToken:      u.WebCalToken,
 	}
 }
 
@@ -242,6 +269,14 @@ type Event struct {
 	VerifiedByName  string     `json:"verified_by_name,omitempty"`
 	VerifiedAt      *time.Time `json:"verified_at,omitempty"`
 	RejectionReason string     `json:"rejection_reason,omitempty"`
+	// Dependencies: list of event IDs this event depends on (must finish before this starts)
+	DependsOn []int64 `json:"depends_on,omitempty"`
+	// Planned vs. actual: original planned times (set once, then tracked against actual)
+	PlannedStart *time.Time `json:"planned_start,omitempty"`
+	PlannedEnd   *time.Time `json:"planned_end,omitempty"`
+	// Latitude/Longitude for physical events with map location
+	Latitude  *float64 `json:"latitude,omitempty"`
+	Longitude *float64 `json:"longitude,omitempty"`
 }
 
 // EventComment is a comment on an event
@@ -511,4 +546,25 @@ type ExerciseSettings struct {
 	UserLabel       string `json:"user_label,omitempty"`      // "users" | "soldiers" | "personnel"
 	OperationMode   string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
 	ExIndex         int    `json:"ex_index,omitempty"`        // exercise/incident index number
+}
+
+// EventVersion records a historical snapshot of an event at a point in time
+type EventVersion struct {
+	ID        int64     `json:"id"`
+	EventID   int64     `json:"event_id"`
+	Version   int       `json:"version"` // monotonically increasing per event
+	ChangedBy int64     `json:"changed_by"`
+	ChangedByName string `json:"changed_by_name"`
+	ChangedAt time.Time `json:"changed_at"`
+	ChangeNote string   `json:"change_note,omitempty"` // summary of what changed
+	Snapshot  Event     `json:"snapshot"`              // full event state before this change
+}
+
+// EditingLock tracks which user is currently editing an event (for collaborative editing)
+type EditingLock struct {
+	EventID   int64     `json:"event_id"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	LockedAt  time.Time `json:"locked_at"`
+	ExpiresAt time.Time `json:"expires_at"` // auto-release after 2 minutes of inactivity
 }

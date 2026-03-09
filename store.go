@@ -44,6 +44,8 @@ type Store struct {
 	mailConfig           MailConfig
 	apiKeys              []APIKey
 	filterPresets        []FilterPreset
+	eventVersions        []EventVersion
+	editingLocks         []EditingLock // in-memory only; not persisted
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -60,6 +62,7 @@ type Store struct {
 	nextInvitationID    int64
 	nextAPIKeyID        int64
 	nextFilterPresetID  int64
+	nextEventVersionID  int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -108,6 +111,7 @@ func (s *Store) load() error {
 	s.loadFile("mail.json", &s.mailConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
+	s.loadFile("event_versions.json", &s.eventVersions)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -182,6 +186,11 @@ func (s *Store) load() error {
 	for _, x := range s.filterPresets {
 		if x.ID > s.nextFilterPresetID {
 			s.nextFilterPresetID = x.ID
+		}
+	}
+	for _, x := range s.eventVersions {
+		if x.ID > s.nextEventVersionID {
+			s.nextEventVersionID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -264,6 +273,11 @@ func (s *Store) SaveExerciseSettings(es ExerciseSettings) error {
 	s.exercise = es
 	s.mu.Unlock()
 	return s.persist("exercise.json", es)
+}
+
+// DataDir returns the path to the data directory.
+func (s *Store) DataDir() string {
+	return s.dataDir
 }
 
 func (s *Store) loadFile(filename string, v interface{}) {
@@ -2285,4 +2299,127 @@ func (s *Store) DeleteFilterPreset(id, userID int64) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("preset not found")
+}
+
+// ── Event Versioning ──────────────────────────────────────────────────────────
+
+// CreateEventVersion saves a snapshot of the event before a change.
+func (s *Store) CreateEventVersion(v EventVersion) (EventVersion, error) {
+	s.mu.Lock()
+	s.nextEventVersionID++
+	v.ID = s.nextEventVersionID
+	v.ChangedAt = time.Now()
+	// Compute version number for this event
+	vNum := 1
+	for _, ev := range s.eventVersions {
+		if ev.EventID == v.EventID && ev.Version >= vNum {
+			vNum = ev.Version + 1
+		}
+	}
+	v.Version = vNum
+	s.eventVersions = append(s.eventVersions, v)
+	// Cap at 5000 versions total (prune oldest)
+	if len(s.eventVersions) > 5000 {
+		s.eventVersions = s.eventVersions[len(s.eventVersions)-5000:]
+	}
+	snap := append([]EventVersion(nil), s.eventVersions...)
+	s.mu.Unlock()
+	return v, s.persist("event_versions.json", snap)
+}
+
+// GetEventVersions returns all versions for a given event ID, newest first.
+func (s *Store) GetEventVersions(eventID int64) []EventVersion {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []EventVersion
+	for _, v := range s.eventVersions {
+		if v.EventID == eventID {
+			out = append(out, v)
+		}
+	}
+	// Reverse so newest first
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
+}
+
+// ── Editing Locks (collaborative editing) ────────────────────────────────────
+
+// AcquireEditingLock tries to lock an event for editing by userID.
+// Returns true if the lock was acquired; false if another user holds it.
+func (s *Store) AcquireEditingLock(eventID, userID int64, userName string) (EditingLock, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	// Remove any expired locks first
+	active := s.editingLocks[:0]
+	for _, l := range s.editingLocks {
+		if l.ExpiresAt.After(now) {
+			active = append(active, l)
+		}
+	}
+	s.editingLocks = active
+	// Check if another user holds the lock
+	for i, l := range s.editingLocks {
+		if l.EventID == eventID {
+			if l.UserID == userID {
+				// Refresh own lock
+				s.editingLocks[i].ExpiresAt = now.Add(2 * time.Minute)
+				return s.editingLocks[i], true
+			}
+			// Another user holds it
+			return l, false
+		}
+	}
+	lock := EditingLock{
+		EventID:   eventID,
+		UserID:    userID,
+		UserName:  userName,
+		LockedAt:  now,
+		ExpiresAt: now.Add(2 * time.Minute),
+	}
+	s.editingLocks = append(s.editingLocks, lock)
+	return lock, true
+}
+
+// ReleaseEditingLock releases the editing lock for an event.
+func (s *Store) ReleaseEditingLock(eventID, userID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, l := range s.editingLocks {
+		if l.EventID == eventID && l.UserID == userID {
+			s.editingLocks = append(s.editingLocks[:i], s.editingLocks[i+1:]...)
+			return
+		}
+	}
+}
+
+// GetEditingLock returns the current editing lock for an event (if any).
+func (s *Store) GetEditingLock(eventID int64) (*EditingLock, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	for i, l := range s.editingLocks {
+		if l.EventID == eventID && l.ExpiresAt.After(now) {
+			_ = i
+			cp := l
+			return &cp, true
+		}
+	}
+	return nil, false
+}
+
+// GetAllEditingLocks returns all active editing locks.
+func (s *Store) GetAllEditingLocks() []EditingLock {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	var out []EditingLock
+	for _, l := range s.editingLocks {
+		if l.ExpiresAt.After(now) {
+			out = append(out, l)
+		}
+	}
+	return out
 }

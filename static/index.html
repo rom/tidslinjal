@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidslinjal</title>
   <link rel="stylesheet" href="/static/style.css">
+  <!-- Leaflet.js for map integration (loaded from CDN, used only when map modal is opened) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
 <div id="app">
@@ -90,6 +92,8 @@
         <button class="btn btn-secondary toolbar-btn" id="btnImport">⬆ Import</button>
         <button class="btn btn-secondary toolbar-btn" id="btnReport">📄 Report</button>
         <button class="btn btn-secondary toolbar-btn" id="btnAutoReport" style="display:none" title="Configure automatic scheduled reports">⏰ Auto Report</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnPVA" style="display:none" title="Planned vs. Actual comparison">📊 Plan vs Actual</button>
+        <button class="btn btn-secondary toolbar-btn" id="btnBackup" style="display:none" title="Backup & Restore data">💾 Backup</button>
         <button class="btn btn-secondary toolbar-btn" id="btnPrint" title="Print day/week sheet">🖨 Print</button>
       </div>
 
@@ -631,10 +635,36 @@
           </div>
         </div>
       </div>
+      <!-- Map button for physical meetings -->
+      <div id="physicalMapGroup" style="display:none;margin-top:8px">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openMapForEvent()">🗺️ Set Map Location</button>
+        <span id="physicalMapCoords" style="font-size:var(--fs-xs);color:var(--text-dim);margin-left:8px"></span>
+        <input type="hidden" id="eventLatitude">
+        <input type="hidden" id="eventLongitude">
+      </div>
+
+      <!-- Planned times (shown only for existing events) -->
+      <div id="plannedTimesGroup" style="display:none">
+        <hr style="border-color:var(--border);margin:10px 0">
+        <div class="form-row">
+          <div class="form-group">
+            <label style="color:var(--text-dim);font-size:var(--fs-sm)">📅 Planned Start</label>
+            <input type="text" id="eventPlannedStart" readonly style="opacity:0.6;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group">
+            <label style="color:var(--text-dim);font-size:var(--fs-sm)">📅 Planned End</label>
+            <input type="text" id="eventPlannedEnd" readonly style="opacity:0.6;font-size:var(--fs-sm)">
+          </div>
+        </div>
+      </div>
+
       <div id="eventCreator" style="display:none; font-size:var(--fs-xs); color:var(--text-dim);"></div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-danger btn-sm" id="btnDeleteEvent" style="display:none">Delete</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none" onclick="openEventHistory()">🕐 History</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none" onclick="openDependenciesModal()">🔗 Dependencies</button>
+      <span style="flex:1"></span>
       <button class="btn btn-secondary" onclick="closeModal('eventModal')" id="lbl-btn-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEvent">Save</button>
     </div>
@@ -835,6 +865,7 @@
       <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
     </div>
     <div class="modal-body">
+      <!-- Identity section -->
       <div class="form-row">
         <div class="form-group">
           <label>Username</label>
@@ -844,17 +875,49 @@
           <label>Role</label>
           <input type="text" id="profileRole" readonly style="opacity:0.6">
         </div>
+        <div class="form-group" id="profileJLevelGroup" style="display:none">
+          <label>J-Level / NATO</label>
+          <input type="text" id="profileJLevel" readonly style="opacity:0.6">
+        </div>
       </div>
-      <div class="form-group">
-        <label>Display Name</label>
-        <input type="text" id="profileDisplayName" placeholder="Your display name">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Display Name</label>
+          <input type="text" id="profileDisplayName" placeholder="Your display name">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="profileEmail" placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>Preferred Language</label>
+          <select id="profileLanguage">
+            <option value="en">English</option>
+            <option value="sv">Svenska</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
       </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="profileEmail" placeholder="your@email.com">
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">💬 Communication Handles</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Mattermost</label>
+          <input type="text" id="profileMattermost" placeholder="@username">
+        </div>
+        <div class="form-group">
+          <label>Discord</label>
+          <input type="text" id="profileDiscord" placeholder="username#1234">
+        </div>
+        <div class="form-group">
+          <label>Signal</label>
+          <input type="text" id="profileSignal" placeholder="+12345678900">
+        </div>
       </div>
-      <hr style="border-color:var(--border);margin:16px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">Change Password</h3>
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 Change Password</h3>
       <div class="form-row">
         <div class="form-group">
           <label>Current Password</label>
@@ -869,9 +932,20 @@
           <input type="password" id="profilePwdConfirm">
         </div>
       </div>
-      <hr style="border-color:var(--border);margin:16px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:6px">Account Info</h3>
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📋 Account Info</h3>
       <div id="profileInfo" style="font-size:var(--fs-sm);color:var(--text-dim)"></div>
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📅 Calendar Subscription</h3>
+      <div id="profileWebCalSection" style="font-size:var(--fs-sm)">
+        <p style="color:var(--text-dim);margin-bottom:8px">Subscribe to your events in any calendar app (CalDAV/WebCal compatible).</p>
+        <div id="profileWebCalURL" style="display:none;margin-bottom:8px">
+          <input type="text" id="profileWebCalLink" readonly style="width:100%;font-size:var(--fs-xs);opacity:0.8">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="generateWebCalToken()">🔗 Generate Calendar Link</button>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
@@ -973,6 +1047,12 @@
             <option value="aar" id="lbl-report-aar">After Action Report (AAR)</option>
             <option value="timeline" id="lbl-report-timeline">Timeline Snapshot</option>
             <option value="per_layer" id="lbl-report-perlayer">Per-Layer Activity</option>
+            <option value="status_summary" id="lbl-report-status">Status Summary</option>
+            <option value="daily_briefing" id="lbl-report-daily">Daily Briefing</option>
+            <option value="type_breakdown" id="lbl-report-type">Event Type Breakdown</option>
+            <option value="responsible" id="lbl-report-responsible">Responsible / Resource Report</option>
+            <option value="planned_vs_actual" id="lbl-report-pva">Planned vs. Actual</option>
+            <option value="critical_path" id="lbl-report-cp">Critical Path Analysis</option>
           </select>
         </div>
         <div class="form-group">
@@ -1028,6 +1108,11 @@
             <option value="aar">After Action Report (AAR)</option>
             <option value="timeline">Timeline Snapshot</option>
             <option value="per_layer">Per-Layer Activity</option>
+            <option value="status_summary">Status Summary</option>
+            <option value="daily_briefing">Daily Briefing</option>
+            <option value="type_breakdown">Event Type Breakdown</option>
+            <option value="responsible">Responsible / Resource Report</option>
+            <option value="planned_vs_actual">Planned vs. Actual</option>
           </select>
         </div>
         <div class="form-group">
@@ -1057,6 +1142,139 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('autoReportModal')">Cancel</button>
       <button class="btn btn-primary" onclick="addAutoReport()">➕ Add Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event History Modal -->
+<div class="modal-overlay" id="eventHistoryModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>🕐 Event Change History</h2>
+      <button class="modal-close" onclick="closeModal('eventHistoryModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="eventHistoryList">
+        <p style="color:var(--text-dim);font-size:var(--fs-sm)">Loading history…</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('eventHistoryModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Dependencies Modal -->
+<div class="modal-overlay" id="dependenciesModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>🔗 Event Dependencies</h2>
+      <button class="modal-close" onclick="closeModal('dependenciesModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">
+        Set which events must complete before this event can start. Changes cascade automatically.
+      </p>
+      <div id="dependencyEventTitle" style="font-weight:600;margin-bottom:12px"></div>
+      <div class="form-group">
+        <label>Depends on (must finish first)</label>
+        <div id="dependencyList" class="group-picker" style="max-height:200px;overflow-y:auto;margin-top:4px"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Add dependency — search events</label>
+        <input type="text" id="depSearch" placeholder="Search by event title…" oninput="filterDepSearch()" style="width:100%">
+        <div id="depSearchResults" class="group-picker" style="margin-top:4px;max-height:150px;overflow-y:auto"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('dependenciesModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDependencies()">Save Dependencies</button>
+    </div>
+  </div>
+</div>
+
+<!-- Map Modal -->
+<div class="modal-overlay" id="mapModal">
+  <div class="modal modal-wide" style="max-width:800px">
+    <div class="modal-header">
+      <h2>🗺️ Event Location</h2>
+      <button class="modal-close" onclick="closeModal('mapModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div id="mapContainer" style="height:400px;width:100%"></div>
+      <div style="padding:12px 16px;background:var(--bg2)">
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group">
+            <label>Location name</label>
+            <input type="text" id="mapLocationName" placeholder="Building 4, Room 201…" style="width:100%">
+          </div>
+          <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" id="mapLat" step="0.000001" placeholder="59.334591">
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" id="mapLng" step="0.000001" placeholder="18.063240">
+          </div>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:6px">Click on the map to set coordinates, or type them manually.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('mapModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMapLocation()">Use this location</button>
+    </div>
+  </div>
+</div>
+
+<!-- Backup & Restore Modal -->
+<div class="modal-overlay" id="backupModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>💾 Backup &amp; Restore</h2>
+      <button class="modal-close" onclick="closeModal('backupModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">Backup</h3>
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:10px">
+        Download a complete backup of all timeline data as a ZIP archive.
+      </p>
+      <button class="btn btn-primary" onclick="downloadBackup()">⬇️ Download Backup</button>
+
+      <hr style="border-color:var(--border);margin:16px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">Restore</h3>
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:10px">
+        Upload a previously downloaded backup ZIP. User accounts, API keys, and OIDC settings are preserved for security.
+        A server restart is required after restore.
+      </p>
+      <div class="form-group">
+        <label>Backup ZIP file</label>
+        <input type="file" id="restoreFile" accept=".zip" style="width:100%">
+      </div>
+      <div id="restoreStatus" style="font-size:var(--fs-sm);margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('backupModal')">Close</button>
+      <button class="btn btn-danger" onclick="uploadRestore()">⬆️ Restore from Backup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Planned vs Actual Modal -->
+<div class="modal-overlay" id="pvaModal">
+  <div class="modal modal-wide" style="max-width:900px">
+    <div class="modal-header">
+      <h2>📊 Planned vs. Actual Comparison</h2>
+      <button class="modal-close" onclick="closeModal('pvaModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="pvaContent">
+        <p style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('pvaModal')">Close</button>
+      <button class="btn btn-primary" onclick="exportPVAReport()">📄 Export Report</button>
     </div>
   </div>
 </div>
@@ -1642,5 +1860,24 @@
 <script src="/static/timeline.js"></script>
 <script src="/static/modals.js"></script>
 <script src="/static/app.js"></script>
+<!-- Leaflet.js for map integration (lazy loaded) -->
+<script>
+  window._leafletLoaded = false;
+  function loadLeaflet(cb) {
+    if (window._leafletLoaded && window.L) { cb(); return; }
+    if (document.getElementById('leaflet-script')) {
+      // Already loading - wait for it
+      const check = setInterval(() => { if (window.L) { clearInterval(check); window._leafletLoaded = true; cb(); } }, 100);
+      return;
+    }
+    const s = document.createElement('script');
+    s.id = 'leaflet-script';
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=';
+    s.crossOrigin = '';
+    s.onload = () => { window._leafletLoaded = true; cb(); };
+    document.head.appendChild(s);
+  }
+</script>
 </body>
 </html>
