@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 3.7.0**
+**Version 4.0.0**
 
 ---
 
@@ -456,10 +456,27 @@ Les créneaux verrouillés apparaissent avec un motif hachuré rouge. Les évén
 | **Lecture/Écriture** | `readwrite` | + Créer/modifier ses propres événements ; créer des types d'événements et des couches |
 | **Chef d'équipe** | `teamlead` | + Créer des groupes ; vérifier/rejeter les événements soumis ; voir le journal d'audit ; gérer les phases |
 | **Chef des opérations** | `oplead` | + Créer/modifier/supprimer des événements sur la chronologie principale |
-| **Officier de renseignement adjoint** | `staffofficer` | Mêmes droits que le chef des opérations — désignation alternative pour le personnel d'état-major |
-| **Admin** | `admin` | Accès complet — gérer tous les utilisateurs, rôles, verrous, paramètres d'exercice, inscription |
+| **Officier d'état-major adjoint** | `staffofficer` | Mêmes droits que le chef des opérations — désignation alternative pour le personnel d'état-major |
+| **Officier d'état-major** | `staffofficer_full` | Identique à l'officier adjoint, mais nécessite au moins une désignation J (J1–J9) |
+| **Admin** | `admin` | Accès complet — gérer tous les utilisateurs, rôles, verrous, paramètres d'activité, inscription |
 
 Le drapeau `peut_verrouiller` peut être accordé à n'importe quel utilisateur quel que soit son rôle.
+
+### Désignations J (rôle Officier d'état-major)
+
+**L'officier d'état-major** (`staffofficer_full`) nécessite au moins une désignation J de l'OTAN. Les désignations identifient la branche d'état-major :
+
+| Code | Branche |
+|---|---|
+| J1 | Personnel |
+| J2 | Renseignement |
+| J3 | Opérations |
+| J4 | Logistique |
+| J5 | Plans |
+| J6 | Communications |
+| J7 | Formation |
+| J8 | Finance |
+| J9 | Coopération civilo-militaire |
 
 ---
 
@@ -634,4 +651,4 @@ Naviguez vers `/admin-view` (nécessite le rôle **Admin**) pour un tableau de b
 
 ---
 
-*Tidslinjal v3.7.0 — Chronologie opérationnelle collaborative*
+*Tidslinjal v4.0.0 — Chronologie opérationnelle collaborative*

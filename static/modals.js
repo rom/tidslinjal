@@ -382,6 +382,16 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     if (oldEv) pushUndo('update_event', { id: parseInt(id, 10), old: { ...oldEv } });
   }
 
+  // For recurring events being edited, show choice dialog
+  if (id) {
+    const masterEv = state.events.find(e => e.id === parseInt(id, 10));
+    const occTime = state._currentOccurrenceTime;
+    if (masterEv && masterEv.is_recurring && occTime) {
+      await _saveRecurringEventWithChoice(id, payload, masterEv, occTime);
+      return;
+    }
+  }
+
   const res = id ? await apiPut(`/api/events/${id}`, payload) : await apiPost('/api/events', payload);
   if (res.ok) {
     const saved    = await res.json();
@@ -524,6 +534,80 @@ function showRecurDeleteDialog(ev) {
   };
 
   openModal('recurDeleteModal');
+}
+
+// ── Recurring Event Edit Dialog ────────────────────────────────────────────
+
+async function _saveRecurringEventWithChoice(id, payload, masterEv, occTime) {
+  return new Promise((resolve) => {
+    const msg = `"${masterEv.title}" — occurrence on ${fmtDateTime(occTime)}`;
+    const msgEl = document.getElementById('recurEditMsg');
+    if (msgEl) msgEl.textContent = `This is a recurring event. What would you like to edit?\n${msg}`;
+
+    const thisBtn   = document.getElementById('recurEditThis');
+    const futureBtn = document.getElementById('recurEditFuture');
+    const allBtn    = document.getElementById('recurEditAll');
+
+    const cleanup = () => {
+      thisBtn.onclick   = null;
+      futureBtn.onclick = null;
+      allBtn.onclick    = null;
+    };
+
+    // Edit only this occurrence: exclude this occurrence from series, create a new one-off event
+    thisBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      // 1. Add this occurrence to exclusion list of master
+      const excl = [...(masterEv.recurrence_excl || []), occTime.toISOString()];
+      await apiPut(`/api/events/${masterEv.id}`, { ...masterEv, recurrence_excl: excl });
+      // 2. Create a new non-recurring event for this occurrence with the edited payload
+      const oneOff = { ...payload, is_recurring: false, recurrence_pattern: '', recurrence_end: null };
+      const res = await apiPost('/api/events', oneOff);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'This occurrence updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    // Edit this and future: truncate master series before this occurrence, create new series from here
+    futureBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      // 1. Truncate master series to end just before this occurrence
+      const newEnd = new Date(occTime.getTime() - 60000);
+      await apiPut(`/api/events/${masterEv.id}`, { ...masterEv, recurrence_end: newEnd.toISOString() });
+      // 2. Create a new series starting from this occurrence with the edited payload
+      const newSeries = { ...payload, start_time: occTime.toISOString() };
+      const res = await apiPost('/api/events', newSeries);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'This and future occurrences updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    // Edit all occurrences: just update the master event
+    allBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      const res = await apiPut(`/api/events/${masterEv.id}`, payload);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'All occurrences updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    openModal('recurEditModal');
+  });
 }
 
 // ── Event Detail Modal ─────────────────────────────────────────────────────
@@ -1585,23 +1669,31 @@ function renderSidebar() {
       </div>
     `;
   } else if (tab === 'audit' && state.user && hasRole2(state.user.role, 'teamlead')) {
-    el.innerHTML = `<div class="sidebar-section"><div class="sidebar-section-title">${t('tab_audit')}</div><div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div></div>`;
-    apiGet('/api/audit?limit=200').then(entries => {
-      const container = document.getElementById('auditLog');
-      if (!container) return;
-      if (!entries || entries.length === 0) {
-        container.innerHTML = `<em style="color:var(--text-dim)">${t('audit_empty')}</em>`;
-        return;
-      }
-      container.innerHTML = `<div class="audit-list">${entries.map(e => `
-        <div class="audit-item">
-          <span class="audit-ts">${fmtDateTime(new Date(e.timestamp))}</span>
-          <span class="audit-user">${escHtml(e.user_name)}</span>
-          <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
-          <span class="audit-summary">${escHtml(e.summary)}</span>
-        </div>`).join('')}
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('tab_audit')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" oninput="refreshAuditLog()">
+          <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
+            <option value="">All actions</option>
+            <option value="created">created</option>
+            <option value="updated">updated</option>
+            <option value="deleted">deleted</option>
+            <option value="status_changed">status_changed</option>
+            <option value="login">login</option>
+            <option value="login_failed">login_failed</option>
+            <option value="reset">reset</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+          <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
+          <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
+          <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
+          <button class="btn btn-secondary btn-sm" onclick="exportAuditCSV()" title="Export to CSV">⬇ CSV</button>
+        </div>
+        <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
       </div>`;
-    });
+    refreshAuditLog();
   } else if (tab === 'integrations' && state.user && state.user.role === 'admin') {
     const p = state.preferences;
     el.innerHTML = `
@@ -1763,8 +1855,8 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
           <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')||'Light'}</button>
+          <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
           <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Camouflage (greens/grays)">🏕 Camo</button>
           <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" onclick="setPref('theme','urban-camo')" title="Urban warfare (blues)">🌆 Urban Camo</button>
         </div>
@@ -1884,6 +1976,23 @@ function renderSidebar() {
             <option value="dotted" ${p.red_line_style==='dotted'?'selected':''}>Dotted</option>
           </select>
         </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔔 ${t('settings_push_notifications')||'Browser Notifications'}</div>
+        <div id="pushNotifStatus" style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${Notification.permission === 'granted' ? '✅ Notifications are enabled' : Notification.permission === 'denied' ? '🚫 Blocked — allow in browser settings' : '⚠️ Permission not granted yet'}
+        </div>
+        ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" onclick="requestPushPermission()">${Notification.permission === 'granted' ? '✓ Granted' : 'Enable Notifications'}</button>` : ''}
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:4px">
+          <input type="checkbox" ${p.push_alarms!==false?'checked':''} onchange="setPref('push_alarms',this.checked)"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_push_alarms')||'Alarm notifications'}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.push_event_changes!==false?'checked':''} onchange="setPref('push_event_changes',this.checked)"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_push_event_changes')||'Event changes by other users'}
+        </label>
       </div>
       ${synthActive() ? `
       <div class="sidebar-section">
@@ -2887,6 +2996,13 @@ function connectSSE() {
     const data = JSON.parse(e.data);
     if (data.action === 'deleted' || data.action === 'created' || data.action === 'updated' || data.action === 'status_changed') {
       refreshAll();
+      // Browser push notification for event changes by others
+      if (Notification.permission === 'granted' && state.preferences.push_event_changes !== false && data.user_id !== (state.user && state.user.id)) {
+        const actionLabel = { created: 'New event', updated: 'Event updated', deleted: 'Event deleted', status_changed: 'Event status changed' }[data.action] || data.action;
+        const title = data.title ? `${actionLabel}: ${data.title}` : actionLabel;
+        const body  = data.user_name ? `by ${data.user_name}` : '';
+        try { new Notification('Tidslinjal', { body: body ? `${title}\n${body}` : title, icon: '/static/favicon.ico', tag: `event-${data.id}-${data.action}` }); } catch { /* ignore */ }
+      }
     }
   });
   // Listen for collaborative editing lock events
@@ -2944,8 +3060,8 @@ function showAlarmNotification(data, level) {
   }, 1000);
 
   // Browser notification on first fire
-  if (level === 0 && Notification.permission === 'granted') {
-    new Notification('Tidslinjal — ' + t('notif_alarm_title'), {body: data.message});
+  if (level === 0 && Notification.permission === 'granted' && state.preferences.push_alarms !== false) {
+    try { new Notification('Tidslinjal — ' + t('notif_alarm_title'), { body: data.message, icon: '/static/favicon.ico', tag: 'alarm-' + data.alarm_id }); } catch { /* ignore */ }
   }
 
   // Escalate after 60 s if not acked, as long as we're before the event time
@@ -4045,93 +4161,89 @@ async function generateReport() {
 }
 
 // ── Auto Report ─────────────────────────────────────────────────────────────
-// Auto-report schedules stored in localStorage (client-side scheduling)
-function _getAutoReports() {
-  try { return JSON.parse(localStorage.getItem('autoReports') || '[]'); } catch { return []; }
-}
-function _saveAutoReports(list) {
-  localStorage.setItem('autoReports', JSON.stringify(list));
-}
+// Auto-report schedules — stored server-side; localStorage is used as fallback for client-only delivery
 
 function openAutoReportModal() {
   _renderAutoReportList();
   openModal('autoReportModal');
 }
 
-function _renderAutoReportList() {
-  const list = _getAutoReports();
-  const el   = document.getElementById('autoReportList');
+async function _renderAutoReportList() {
+  const el = document.getElementById('autoReportList');
   if (!el) return;
-  if (!list.length) {
+  el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</p>';
+  let list = [];
+  try { list = await apiGet('/api/auto-report-schedules'); } catch { list = []; }
+  if (!list || !list.length) {
     el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No schedules configured yet.</p>';
     return;
   }
-  el.innerHTML = list.map((r, i) => `
+  el.innerHTML = list.map(r => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px">
       <div>
-        <strong>${escHtml(r.type)}</strong> — ${escHtml(r.frequency)}
+        <strong>${escHtml(r.report_type)}</strong> — ${escHtml(r.frequency)}
+        <span style="color:var(--accent);margin-left:6px">${escHtml(r.delivery)}</span>
         ${r.recipient ? `<span style="color:var(--text-dim);margin-left:8px">→ ${escHtml(r.recipient)}</span>` : ''}
-        <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:8px">Next: ${_nextRunLabel(r)}</span>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Next: ${r.next_run ? new Date(r.next_run).toLocaleString() : 'soon'}</div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteAutoReport(${i})">Remove</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteAutoReport(${r.id})">Remove</button>
     </div>
   `).join('');
 }
 
-function _nextRunLabel(r) {
-  if (!r.nextRun) return 'soon';
-  const d = new Date(r.nextRun);
-  return d.toLocaleString();
-}
+async function addAutoReport() {
+  const report_type = document.getElementById('arType')?.value || 'timeline';
+  const frequency   = document.getElementById('arFrequency')?.value || 'daily';
+  const delivery    = document.getElementById('arDelivery')?.value || 'download';
+  const recipient   = document.getElementById('arRecipient')?.value?.trim() || '';
 
-function _calcNextRun(frequency) {
-  const now = Date.now();
-  switch (frequency) {
-    case 'hourly': return now + 3600000;
-    case 'daily':  return now + 86400000;
-    case 'weekly': return now + 7 * 86400000;
-    default:       return now + 86400000;
+  if (delivery === 'email' && !recipient) {
+    showError('Please enter a recipient email address for email delivery.', 'Validation');
+    return;
+  }
+  if (delivery === 'webhook' && !recipient) {
+    showError('Please enter a webhook URL for webhook delivery.', 'Validation');
+    return;
+  }
+
+  const res = await apiPost('/api/auto-report-schedules', { report_type, frequency, delivery, recipient });
+  if (res && res.ok !== false) {
+    showNotification('success', 'Auto-report schedule added');
+    const rec = document.getElementById('arRecipient');
+    if (rec) rec.value = '';
+    _renderAutoReportList();
+  } else {
+    showError('Failed to create schedule.', 'Auto-Report');
   }
 }
 
-function addAutoReport() {
-  const type      = document.getElementById('arType')?.value || 'timeline';
-  const frequency = document.getElementById('arFrequency')?.value || 'daily';
-  const delivery  = document.getElementById('arDelivery')?.value || 'download';
-  const recipient = document.getElementById('arRecipient')?.value?.trim() || '';
-
-  const list = _getAutoReports();
-  list.push({ type, frequency, delivery, recipient, nextRun: _calcNextRun(frequency), created: Date.now() });
-  _saveAutoReports(list);
-  _renderAutoReportList();
-  showNotification('success', 'Auto-report schedule added');
-
-  // Clear recipient field
-  const rec = document.getElementById('arRecipient');
-  if (rec) rec.value = '';
+async function deleteAutoReport(id) {
+  const res = await api('DELETE', `/api/auto-report-schedules/${id}`, null);
+  if (res && res.ok) {
+    showNotification('success', 'Schedule removed');
+    _renderAutoReportList();
+  }
 }
 
-function deleteAutoReport(idx) {
-  const list = _getAutoReports();
-  list.splice(idx, 1);
-  _saveAutoReports(list);
-  _renderAutoReportList();
-}
-
-// Check and fire auto-reports that are due (called on page load and periodically)
+// checkAutoReports — server-side schedules are handled by the Go scheduler.
+// This client-side check handles legacy localStorage download-only schedules.
 function checkAutoReports() {
-  const list = _getAutoReports();
-  const now  = Date.now();
-  let changed = false;
-  list.forEach((r, i) => {
-    if (r.nextRun && r.nextRun <= now) {
-      // Generate and deliver the report
-      _runAutoReport(r);
-      list[i].nextRun = _calcNextRun(r.frequency);
-      changed = true;
-    }
-  });
-  if (changed) _saveAutoReports(list);
+  // No-op: server-side scheduling handles email/webhook delivery.
+  // Download-only schedules created before server-side support remain in localStorage.
+  try {
+    const list = JSON.parse(localStorage.getItem('autoReports') || '[]');
+    const now  = Date.now();
+    let changed = false;
+    list.forEach((r, i) => {
+      if (r.nextRun && r.nextRun <= now) {
+        if (r.delivery === 'download') _runAutoReport(r);
+        const msBack = r.frequency === 'hourly' ? 3600000 : r.frequency === 'weekly' ? 7*86400000 : 86400000;
+        list[i].nextRun = now + msBack;
+        changed = true;
+      }
+    });
+    if (changed) localStorage.setItem('autoReports', JSON.stringify(list));
+  } catch { /* ignore */ }
 }
 
 async function _runAutoReport(r) {
@@ -4145,7 +4257,8 @@ async function _runAutoReport(r) {
     return evStart >= from && evStart < to;
   });
 
-  const title = `Auto ${r.type.toUpperCase()} Report — ${from.toLocaleDateString()} to ${to.toLocaleDateString()}`;
+  const rtype = r.report_type || r.type || 'timeline';
+  const title = `Auto ${rtype.toUpperCase()} Report — ${from.toLocaleDateString()} to ${to.toLocaleDateString()}`;
   let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
   <style>body{font-family:sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #ccc;padding:6px 10px}th{background:#f0f0f0}</style></head><body>
   <h1>${escHtml(title)}</h1><p style="color:#666;font-size:13px">Auto-generated: ${new Date().toLocaleString()}</p>
@@ -4164,7 +4277,7 @@ async function _runAutoReport(r) {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `auto-report-${r.type}-${new Date().toISOString().slice(0,10)}.html`;
+    a.download = `auto-report-${rtype}-${new Date().toISOString().slice(0,10)}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -5425,6 +5538,114 @@ async function releaseEditingLock(eventId) {
 
 // Expose for SSE event handler in app.js
 window._handleEditingLockEvent = handleEditingLockEvent;
+
+// ── Bulk Operations ───────────────────────────────────────────────────────
+
+function openBulkStatusDialog() {
+  const count = (state.selectedEventIds || []).length;
+  if (!count) return;
+  const countEl = document.getElementById('bulkStatusCount');
+  if (countEl) countEl.textContent = `${count} event${count !== 1 ? 's' : ''} selected`;
+  openModal('bulkStatusModal');
+}
+
+async function confirmBulkStatus() {
+  const newStatus = document.getElementById('bulkStatusSelect')?.value;
+  if (!newStatus) return;
+  const ids = state.selectedEventIds || [];
+  if (!ids.length) { closeModal('bulkStatusModal'); return; }
+  const selectedEvs = state.events.filter(e => ids.includes(e.id));
+  try {
+    await Promise.all(selectedEvs.map(ev => {
+      pushUndo('update_event', { id: ev.id, old: { ...ev } });
+      return api('PATCH', `/api/events/${ev.id}/status`, { status: newStatus });
+    }));
+    closeModal('bulkStatusModal');
+    clearSelection();
+    await refreshAll();
+    showNotification('success', `Status changed to ${newStatus} for ${selectedEvs.length} event${selectedEvs.length !== 1 ? 's' : ''}`);
+  } catch {
+    showError('Failed to change status for some events.', 'Bulk Status');
+  }
+}
+
+async function bulkDeleteSelected() {
+  const ids = state.selectedEventIds || [];
+  if (!ids.length) return;
+  const selectedEvs = state.events.filter(e => ids.includes(e.id));
+  if (!confirm(`Delete ${selectedEvs.length} selected event${selectedEvs.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+  try {
+    await Promise.all(selectedEvs.map(ev => apiDel(`/api/events/${ev.id}`)));
+    clearSelection();
+    await refreshAll();
+    showNotification('success', `Deleted ${selectedEvs.length} event${selectedEvs.length !== 1 ? 's' : ''}`);
+  } catch {
+    showError('Failed to delete some events.', 'Bulk Delete');
+  }
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────
+async function refreshAuditLog() {
+  const container = document.getElementById('auditLog');
+  if (!container) return;
+  const search     = document.getElementById('auditSearch')?.value?.trim() || '';
+  const action     = document.getElementById('auditFilterAction')?.value || '';
+  const dateFrom   = document.getElementById('auditDateFrom')?.value || '';
+  const dateTo     = document.getElementById('auditDateTo')?.value || '';
+  let url = '/api/audit?limit=500';
+  if (search)   url += `&search=${encodeURIComponent(search)}`;
+  if (action)   url += `&action=${encodeURIComponent(action)}`;
+  if (dateFrom) url += `&date_from=${encodeURIComponent(dateFrom)}`;
+  if (dateTo)   url += `&date_to=${encodeURIComponent(dateTo)}`;
+  container.innerHTML = `<em style="color:var(--text-dim)">Loading…</em>`;
+  const entries = await apiGet(url);
+  if (!entries || entries.length === 0) {
+    container.innerHTML = `<em style="color:var(--text-dim)">${t('audit_empty')||'No entries found.'}</em>`;
+    return;
+  }
+  container.innerHTML = `<div class="audit-list">${entries.map(e => `
+    <div class="audit-item">
+      <span class="audit-ts">${fmtDateTime(new Date(e.timestamp))}</span>
+      <span class="audit-user">${escHtml(e.user_name)}</span>
+      <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
+      <span class="audit-summary">${escHtml(e.summary)}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function exportAuditCSV() {
+  const search     = document.getElementById('auditSearch')?.value?.trim() || '';
+  const action     = document.getElementById('auditFilterAction')?.value || '';
+  const dateFrom   = document.getElementById('auditDateFrom')?.value || '';
+  const dateTo     = document.getElementById('auditDateTo')?.value || '';
+  let url = '/api/audit?limit=5000&format=csv';
+  if (search)   url += `&search=${encodeURIComponent(search)}`;
+  if (action)   url += `&action=${encodeURIComponent(action)}`;
+  if (dateFrom) url += `&date_from=${encodeURIComponent(dateFrom)}`;
+  if (dateTo)   url += `&date_to=${encodeURIComponent(dateTo)}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `audit-log-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ── Push Notification Permission ──────────────────────────────────────────
+async function requestPushPermission() {
+  if (!('Notification' in window)) {
+    showError('Browser notifications are not supported in this browser.', 'Push Notifications');
+    return;
+  }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') {
+    showNotification('success', 'Browser notifications enabled');
+    // Re-render settings to update status display
+    if (state.sidebarTab === 'settings') renderSidebar();
+  } else if (result === 'denied') {
+    showError('Notifications blocked. Please allow them in your browser settings and reload.', 'Push Notifications');
+  }
+}
 
 // ── Event Modal Close Hook (for editing lock release) ─────────────────────────
 // Observe when the eventModal is closed and release editing lock

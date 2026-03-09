@@ -821,7 +821,8 @@ func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *
 		jsonOK(w, app.store.GetInvitations())
 	case http.MethodPost:
 		var req struct {
-			Note string `json:"note"`
+			Note  string `json:"note"`
+			Email string `json:"email"` // optional: send invitation link via email
 		}
 		if err := decode(r, &req); err != nil {
 			jsonError(w, "invalid request", http.StatusBadRequest)
@@ -842,6 +843,23 @@ func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *
 		if err != nil {
 			jsonError(w, "failed to create invitation", http.StatusInternalServerError)
 			return
+		}
+		// Send invitation email if SMTP is configured and email provided
+		if req.Email != "" {
+			cfg := app.store.GetMailConfig()
+			if cfg.Enabled && cfg.SMTPHost != "" {
+				invURL := fmt.Sprintf("/register?code=%s", code)
+				body := fmt.Sprintf(`<p>You have been invited to join Tidslinjal.</p>
+<p>Click the link below to create your account:</p>
+<p><a href="%s">%s</a></p>
+<p>Invitation code: <strong>%s</strong></p>`,
+					invURL, invURL, htmlEscape(code))
+				if err := app.sendMail(cfg, req.Email, "Tidslinjal — Invitation", body); err != nil {
+					log.Printf("Failed to send invitation email to %s: %v", req.Email, err)
+				} else {
+					log.Printf("Invitation email sent to %s (code: %s)", req.Email, code)
+				}
+			}
 		}
 		jsonOK(w, inv)
 	default:
@@ -903,6 +921,24 @@ func (app *App) handleVetUser(w http.ResponseWriter, r *http.Request, user *User
 	}
 	app.audit(user.ID, user.DisplayName, "updated", "user", uid,
 		fmt.Sprintf("Admin %q vetted user #%d", user.Username, uid))
+	// Send approval email if SMTP configured and user has email
+	go func() {
+		users := app.store.GetUsers()
+		for _, u := range users {
+			if u.ID == uid && u.Email != "" {
+				cfg := app.store.GetMailConfig()
+				if cfg.Enabled && cfg.SMTPHost != "" {
+					body := fmt.Sprintf(`<p>Hello %s,</p>
+<p>Your Tidslinjal account has been approved. You can now log in at <a href="/login">/login</a>.</p>`,
+						htmlEscape(u.DisplayName))
+					if err := app.sendMail(cfg, u.Email, "Tidslinjal — Account Approved", body); err != nil {
+						log.Printf("Failed to send approval email to %s: %v", u.Email, err)
+					}
+				}
+				break
+			}
+		}
+	}()
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -954,10 +990,26 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	expiry := time.Now().Add(2 * time.Hour)
 	app.store.SetPasswordResetToken(targetUser.ID, token, expiry) //nolint
 
-	// Log token for admin visibility (no email sending without SMTP config)
 	log.Printf("Password reset requested for user %q — token: %s (valid 2h)", targetUser.Username, token)
 
-	jsonOK(w, map[string]string{"status": "ok", "token": token})
+	// Send reset email if SMTP is configured and user has an email
+	cfg := app.store.GetMailConfig()
+	if cfg.Enabled && cfg.SMTPHost != "" && targetUser.Email != "" {
+		resetURL := fmt.Sprintf("/login?reset_token=%s", token)
+		body := fmt.Sprintf(`<p>Hello %s,</p>
+<p>A password reset was requested for your Tidslinjal account.</p>
+<p>Click the link below to reset your password (valid for 2 hours):</p>
+<p><a href="%s">%s</a></p>
+<p>If you did not request this, you can ignore this email.</p>`,
+			htmlEscape(targetUser.DisplayName), resetURL, resetURL)
+		if err := app.sendMail(cfg, targetUser.Email, "Tidslinjal — Password Reset", body); err != nil {
+			log.Printf("Failed to send password reset email to %s: %v", targetUser.Email, err)
+		}
+		jsonOK(w, map[string]string{"status": "ok"})
+	} else {
+		// Return token directly (admin will see it in logs, or no SMTP configured)
+		jsonOK(w, map[string]string{"status": "ok", "token": token})
+	}
 }
 
 func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -2242,17 +2294,85 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 // ── Audit log handler ──────────────────────────────────────────────────────────
 
 func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *User) {
+	q := r.URL.Query()
 	limit := 500
-	if l := r.URL.Query().Get("limit"); l != "" {
+	if l := q.Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n
 		}
 	}
+	// Optional CSV export
+	exportCSV := q.Get("format") == "csv"
+
+	// Filtering params
+	filterUser   := strings.ToLower(q.Get("user"))
+	filterAction := strings.ToLower(q.Get("action"))
+	filterSearch := strings.ToLower(q.Get("search"))
+	var dateFrom, dateTo time.Time
+	if df := q.Get("date_from"); df != "" {
+		dateFrom, _ = time.Parse("2006-01-02", df)
+	}
+	if dt := q.Get("date_to"); dt != "" {
+		dateTo, _ = time.Parse("2006-01-02", dt)
+		dateTo = dateTo.Add(24*time.Hour - time.Second) // end of day
+	}
+
 	entries := app.store.GetAudit(limit)
 	if entries == nil {
 		entries = []AuditEntry{}
 	}
+
+	// Apply filters
+	if filterUser != "" || filterAction != "" || filterSearch != "" || !dateFrom.IsZero() || !dateTo.IsZero() {
+		filtered := entries[:0]
+		for _, e := range entries {
+			if filterUser != "" && !strings.Contains(strings.ToLower(e.UserName), filterUser) {
+				continue
+			}
+			if filterAction != "" && !strings.Contains(strings.ToLower(e.Action), filterAction) {
+				continue
+			}
+			if filterSearch != "" && !strings.Contains(strings.ToLower(e.Summary), filterSearch) &&
+				!strings.Contains(strings.ToLower(e.UserName), filterSearch) &&
+				!strings.Contains(strings.ToLower(e.Action), filterSearch) {
+				continue
+			}
+			if !dateFrom.IsZero() && e.Timestamp.Before(dateFrom) {
+				continue
+			}
+			if !dateTo.IsZero() && e.Timestamp.After(dateTo) {
+				continue
+			}
+			filtered = append(filtered, e)
+		}
+		entries = filtered
+	}
+
+	if exportCSV {
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.csv\"")
+		fmt.Fprintf(w, "ID,Timestamp,User,Action,EntityType,EntityID,Summary\n")
+		for _, e := range entries {
+			fmt.Fprintf(w, "%d,%s,%s,%s,%s,%d,%s\n",
+				e.ID,
+				e.Timestamp.Format(time.RFC3339),
+				csvEscape(e.UserName),
+				csvEscape(e.Action),
+				csvEscape(e.EntityType),
+				e.EntityID,
+				csvEscape(e.Summary),
+			)
+		}
+		return
+	}
 	jsonOK(w, entries)
+}
+
+func csvEscape(s string) string {
+	if strings.ContainsAny(s, ",\"\n\r") {
+		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+	}
+	return s
 }
 
 // ── Exercise settings handlers ─────────────────────────────────────────────────
@@ -3220,6 +3340,25 @@ func (app *App) runAlarmScheduler() {
 						fmt.Sprintf("Alarm notification posted to user webhook for %q", alarm.EventTitle))
 				}
 				app.callWebhook(alarm.UserID, msg, notif)
+				// Send alarm email if user has email and SMTP is configured
+				go func(uID int64, aMsg, aTitle string, aTime time.Time) {
+					users := app.store.GetUsers()
+					for _, u := range users {
+						if u.ID == uID && u.Email != "" {
+							cfg := app.store.GetMailConfig()
+							if cfg.Enabled && cfg.SMTPHost != "" {
+								body := fmt.Sprintf(`<p><strong>Alarm:</strong> %s</p>
+<p><strong>Event:</strong> %s</p><p><strong>Time:</strong> %s</p>
+<p>Log in to Tidslinjal to acknowledge this alarm.</p>`,
+									htmlEscape(aMsg), htmlEscape(aTitle), aTime.Format("2006-01-02 15:04 MST"))
+								if err := app.sendMail(cfg, u.Email, "Tidslinjal — Alarm: "+aTitle, body); err != nil {
+									log.Printf("alarm email failed for user %d: %v", uID, err)
+								}
+							}
+							break
+						}
+					}
+				}(alarm.UserID, msg, alarm.EventTitle, alarm.EventTime)
 			}
 		}
 	}
@@ -3734,6 +3873,25 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Auto-report schedules (server-side)
+	mux.HandleFunc("/api/auto-report-schedules", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleTeamLead, app.handleListAutoReportSchedules)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleCreateAutoReportSchedule)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/auto-report-schedules/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleTeamLead, app.handleDeleteAutoReportSchedule)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// API Keys
 	mux.HandleFunc("/api/apikeys", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -3979,6 +4137,133 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 		return smtp.SendMail(addr, auth.(smtp.Auth), from, []string{to}, msg)
 	}
 	return smtp.SendMail(addr, nil, from, []string{to}, msg)
+}
+
+// ── Auto-Report Schedule Handlers ─────────────────────────────────────────────
+
+func (app *App) handleListAutoReportSchedules(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetAutoReportSchedules())
+}
+
+func (app *App) handleCreateAutoReportSchedule(w http.ResponseWriter, r *http.Request, user *User) {
+	var sched AutoReportSchedule
+	if err := decode(r, &sched); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	sched.CreatedBy = user.ID
+	sched.NextRun = calcNextRun(sched.Frequency, time.Now())
+	created, err := app.store.CreateAutoReportSchedule(sched)
+	if err != nil {
+		jsonError(w, "failed to create schedule", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "created", "auto_report_schedule", created.ID,
+		fmt.Sprintf("Auto-report schedule created: %s %s → %s", created.ReportType, created.Frequency, created.Delivery))
+	jsonOK(w, created)
+}
+
+func (app *App) handleDeleteAutoReportSchedule(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "missing id", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteAutoReportSchedule(id); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "deleted", "auto_report_schedule", id, "Auto-report schedule removed")
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func calcNextRun(frequency string, from time.Time) time.Time {
+	switch frequency {
+	case "hourly":
+		return from.Add(time.Hour)
+	case "weekly":
+		return from.Add(7 * 24 * time.Hour)
+	default: // daily
+		return from.Add(24 * time.Hour)
+	}
+}
+
+// startAutoReportScheduler runs a background goroutine that fires scheduled reports
+func (app *App) startAutoReportScheduler() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			app.runDueAutoReports()
+		}
+	}()
+}
+
+func (app *App) runDueAutoReports() {
+	now := time.Now()
+	schedules := app.store.GetAutoReportSchedules()
+	for _, s := range schedules {
+		if !s.Enabled || s.NextRun.After(now) {
+			continue
+		}
+		// Deliver the report
+		if s.Delivery == "email" && s.Recipient != "" {
+			app.sendAutoReportEmail(s)
+		}
+		// Update last run and next run
+		s.LastRun = &now
+		s.NextRun = calcNextRun(s.Frequency, now)
+		app.store.UpdateAutoReportSchedule(s) //nolint
+	}
+}
+
+func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
+	cfg := app.store.GetMailConfig()
+	if !cfg.Enabled || cfg.SMTPHost == "" {
+		log.Printf("Auto-report: mail not configured, skipping schedule %d", s.ID)
+		return
+	}
+	now2 := time.Now()
+	events := app.store.GetEvents(now2.Add(-30*24*time.Hour), now2.Add(30*24*time.Hour), nil)
+	subject := fmt.Sprintf("Auto %s Report — %s", s.ReportType, time.Now().Format("2006-01-02"))
+	html := buildAutoReportHTML(s.ReportType, events)
+	if err := app.sendMail(cfg, s.Recipient, subject, html); err != nil {
+		log.Printf("Auto-report: failed to send email for schedule %d: %v", s.ID, err)
+	} else {
+		log.Printf("Auto-report: sent %s report to %s (schedule %d)", s.ReportType, s.Recipient, s.ID)
+	}
+}
+
+func buildAutoReportHTML(reportType string, events []Event) string {
+	title := fmt.Sprintf("Auto %s Report — %s", reportType, time.Now().Format("2006-01-02 15:04"))
+	rows := ""
+	for _, ev := range events {
+		start := ev.StartTime.Format("2006-01-02 15:04")
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		rows += fmt.Sprintf("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+			htmlEscape(ev.Title), htmlEscape(ev.EventType), htmlEscape(string(ev.Status)), start, end)
+	}
+	return fmt.Sprintf(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>%s</title>
+<style>body{font-family:sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%%;font-size:13px}th,td{border:1px solid #ccc;padding:6px 10px}th{background:#f0f0f0}</style></head><body>
+<h1>%s</h1><p style="color:#666;font-size:13px">Auto-generated: %s</p>
+<table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th></tr></thead><tbody>%s</tbody></table>
+</body></html>`, htmlEscape(title), htmlEscape(title), time.Now().Format("2006-01-02 15:04:05"), rows)
+}
+
+func htmlEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, `"`, "&#34;")
+	return s
 }
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
@@ -4775,6 +5060,7 @@ func main() {
 
 	go app.runAlarmScheduler()
 	go app.runSessionCleaner()
+	app.startAutoReportScheduler()
 
 	addr := host + ":" + port
 	listenAddr := addr

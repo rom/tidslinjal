@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 3.7.0**
+**Version 4.0.0**
 
 ---
 
@@ -491,8 +491,9 @@ Locked slots appear as a red hatched overlay. Events cannot be created in locked
 | **Read/Write** | `readwrite` | + Create/edit own events; create event types and layers |
 | **Team Lead** | `teamlead` | + Create groups; verify/reject submitted events; view audit log; manage phases |
 | **Operations Lead** | `oplead` | + Create/edit/delete master-timeline events |
-| **Staff Officer Assistant** | `staffofficer` | Same rights as Operations Lead — alternative command-staff designation |
-| **Admin** | `admin` | Full access — manage all users, roles, locks, exercise settings, registration |
+| **Staff Officer Assistant** | `staffofficer` | Same rights as Operations Lead — alternative command-staff designation for specialist staff |
+| **Staff Officer** | `staffofficer_full` | Full staff officer — same rights as Operations Lead plus J-designation assignment |
+| **Admin** | `admin` | Full access — manage all users, roles, locks, activity settings, registration |
 
 The `can_lock` flag can be granted to any user regardless of role.
 
@@ -500,9 +501,28 @@ The `can_lock` flag can be granted to any user regardless of role.
 
 **Observer** accounts are intended for passive monitoring — stakeholders, liaison officers, or external parties who should only see the timeline. Unlike **Read**, they cannot set alarms or post comments.
 
-### Staff Officer Assistant
+### Staff Officer Assistant vs Staff Officer
 
-The **Staff Officer Assistant** role is functionally identical to Operations Lead. It exists as a distinct label for organizations that differentiate between operations staff and planning staff at the same authority level.
+- **Staff Officer Assistant** (`staffofficer`) — functionally identical to Operations Lead. Used for staff who share the same authority as operations staff.
+- **Staff Officer** (`staffofficer_full`) — same capabilities as Staff Officer Assistant, but additionally requires at least one **J-designation** to be assigned (see below).
+
+### J-Designations
+
+J-designations are NATO-standard staff branch codes assigned to **Staff Officer** (`staffofficer_full`) users. They describe which branch of the joint staff a user belongs to:
+
+| Code | Branch |
+|---|---|
+| J1 | Personnel |
+| J2 | Intelligence |
+| J3 | Operations |
+| J4 | Logistics |
+| J5 | Plans |
+| J6 | Communications |
+| J7 | Training |
+| J8 | Finance |
+| J9 | Civil-Military Cooperation |
+
+J-designations are assigned in the **Users** tab (Admin or Operations Lead). A Staff Officer user must have at least one J-designation assigned before the role can be saved. Designations appear on the user badge and in the user list.
 
 ---
 
@@ -728,4 +748,4 @@ The **Legend** sidebar tab includes a **System** info panel showing language, us
 
 ---
 
-*Tidslinjal v3.6.0 — Collaborative Operational Timeline*
+*Tidslinjal v4.0.0 — Collaborative Operational Timeline*

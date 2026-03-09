@@ -118,9 +118,10 @@
     </div>
     <div id="personalInvSection" style="display:none">
       <h3 style="font-size:var(--fs-sm);color:var(--text-bright);margin:10px 0 8px">Personal Invitations</h3>
-      <div class="form-inline" style="margin-bottom:10px">
-        <input type="text" class="admin-input" id="invNote" placeholder="Note (e.g. recipient name/email)">
-        <button class="btn btn-primary btn-sm" onclick="createInvitation()">+ Generate Code</button>
+      <div class="form-inline" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <input type="text" class="admin-input" id="invNote" placeholder="Note (e.g. recipient name)">
+        <input type="email" class="admin-input" id="invEmail" placeholder="Email to send invite (optional)" style="min-width:180px">
+        <button class="btn btn-primary btn-sm" onclick="createInvitation()">+ Generate &amp; Send</button>
       </div>
       <div id="invitationsList"></div>
     </div>
@@ -288,15 +289,18 @@
   }
 
   async function createInvitation() {
-    const note = document.getElementById('invNote').value.trim();
+    const note  = document.getElementById('invNote').value.trim();
+    const email = document.getElementById('invEmail')?.value?.trim() || '';
     try {
       const r = await api('/api/admin/invitations', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({note}),
+        body: JSON.stringify({note, email}),
       });
       if (r.ok) {
         document.getElementById('invNote').value = '';
+        if (document.getElementById('invEmail')) document.getElementById('invEmail').value = '';
+        if (email) alert('Invitation created and email sent to ' + email);
         loadInvitations();
       } else {
         const e = await r.json(); alert('Error: ' + (e.error||'unknown'));

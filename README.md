@@ -301,15 +301,35 @@ Auto-created OIDC users receive the role set by `--oidc-default-role` (default: 
 
 ### Roles
 
-| Role | Capabilities |
+| Role | Key | Capabilities |
+|---|---|---|
+| **Observer** | `observer` | Read-only access to timeline and events — cannot edit, comment, set alarms, or lock slots |
+| **Read** | `read` | View timeline, events, layers; set personal alarms; comment on events |
+| **Reporter** | `reporter` | + Set event status to Responded To / Completed (requires Team Lead approval) |
+| **Read/Write** | `readwrite` | + Create/edit own events on accessible layers; create event types and layers |
+| **Staff Officer Assistant** | `staffofficer` | + Can lock time slots; access to reports; same authority level as Operations Lead |
+| **Staff Officer** | `staffofficer_full` | Same as Staff Officer Assistant, requires at least one J-designation (J1–J9) to be assigned |
+| **Team Lead** | `teamlead` | + Create groups; verify/reject events; manage phases and locks; approve reporter status changes; view audit log; auto-report scheduling |
+| **Operations Lead** | `oplead` | + Create/edit/delete master-timeline events; manage activity settings; pause timeline; create public templates; create alarms for other users; configure integrations |
+| **Admin** | `admin` | Full access — manage users, roles, locks, activity settings; backup/restore; OIDC configuration; export all data |
+
+### J-Designations (Staff Officer role)
+
+The **Staff Officer** (`staffofficer_full`) role requires at least one NATO J-designation to be assigned. Designations identify the staff branch:
+
+| Code | Branch |
 |---|---|
-| **Read** | View timeline, events, layers; set personal alarms; comment on events |
-| **Reporter** | + Set event status to Responded To / Completed (requires Team Lead approval) |
-| **Read/Write** | + Create/edit own events on accessible layers; create event types and layers |
-| **Staff Officer** | + Can lock time slots; access to reports |
-| **Team Lead** | + Create groups; verify/reject events; manage phases and locks; approve reporter status changes; view audit log; auto-report scheduling |
-| **Operations Lead** | + Create/edit/delete master-timeline events; manage exercise settings; pause timeline; create public templates; create alarms for other users; configure integrations |
-| **Admin** | Full access — manage users, roles, locks, exercise settings; backup/restore; OIDC configuration; export all data |
+| J1 | Personnel |
+| J2 | Intelligence |
+| J3 | Operations |
+| J4 | Logistics |
+| J5 | Plans |
+| J6 | Communications |
+| J7 | Training |
+| J8 | Finance |
+| J9 | Civil-Military Cooperation |
+
+J-designations are assigned via Admin → Users → edit user. They are stored in the user profile and displayed on the user badge.
 
 ### Role Editor
 

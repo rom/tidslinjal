@@ -306,8 +306,11 @@ async function init() {
   // SSE
   connectSSE();
 
-  // Browser notifications
-  if (Notification.permission === 'default') Notification.requestPermission();
+  // Browser notifications — permission requested via Settings panel
+  // Auto-request on first visit if not yet decided
+  if (Notification.permission === 'default') {
+    setTimeout(() => { if (Notification.permission === 'default') Notification.requestPermission(); }, 3000);
+  }
 
   // Initial data load
   await refreshAll();

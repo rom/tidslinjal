@@ -45,6 +45,7 @@ type Store struct {
 	apiKeys              []APIKey
 	filterPresets        []FilterPreset
 	eventVersions        []EventVersion
+	autoReportSchedules  []AutoReportSchedule
 	editingLocks         []EditingLock // in-memory only; not persisted
 
 	nextEventTypeID  int64
@@ -62,7 +63,8 @@ type Store struct {
 	nextInvitationID    int64
 	nextAPIKeyID        int64
 	nextFilterPresetID  int64
-	nextEventVersionID  int64
+	nextEventVersionID      int64
+	nextAutoReportScheduleID int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -112,6 +114,7 @@ func (s *Store) load() error {
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
 	s.loadFile("event_versions.json", &s.eventVersions)
+	s.loadFile("auto_report_schedules.json", &s.autoReportSchedules)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -191,6 +194,11 @@ func (s *Store) load() error {
 	for _, x := range s.eventVersions {
 		if x.ID > s.nextEventVersionID {
 			s.nextEventVersionID = x.ID
+		}
+	}
+	for _, x := range s.autoReportSchedules {
+		if x.ID > s.nextAutoReportScheduleID {
+			s.nextAutoReportScheduleID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2342,6 +2350,56 @@ func (s *Store) GetEventVersions(eventID int64) []EventVersion {
 		out[i], out[j] = out[j], out[i]
 	}
 	return out
+}
+
+// ── Auto-Report Schedules ─────────────────────────────────────────────────────
+
+func (s *Store) GetAutoReportSchedules() []AutoReportSchedule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]AutoReportSchedule, len(s.autoReportSchedules))
+	copy(out, s.autoReportSchedules)
+	return out
+}
+
+func (s *Store) CreateAutoReportSchedule(sched AutoReportSchedule) (AutoReportSchedule, error) {
+	s.mu.Lock()
+	s.nextAutoReportScheduleID++
+	sched.ID = s.nextAutoReportScheduleID
+	sched.CreatedAt = time.Now()
+	sched.Enabled = true
+	s.autoReportSchedules = append(s.autoReportSchedules, sched)
+	snap := append([]AutoReportSchedule(nil), s.autoReportSchedules...)
+	s.mu.Unlock()
+	return sched, s.persist("auto_report_schedules.json", snap)
+}
+
+func (s *Store) UpdateAutoReportSchedule(sched AutoReportSchedule) error {
+	s.mu.Lock()
+	for i, rs := range s.autoReportSchedules {
+		if rs.ID == sched.ID {
+			s.autoReportSchedules[i] = sched
+			snap := append([]AutoReportSchedule(nil), s.autoReportSchedules...)
+			s.mu.Unlock()
+			return s.persist("auto_report_schedules.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("schedule not found")
+}
+
+func (s *Store) DeleteAutoReportSchedule(id int64) error {
+	s.mu.Lock()
+	for i, rs := range s.autoReportSchedules {
+		if rs.ID == id {
+			s.autoReportSchedules = append(s.autoReportSchedules[:i], s.autoReportSchedules[i+1:]...)
+			snap := append([]AutoReportSchedule(nil), s.autoReportSchedules...)
+			s.mu.Unlock()
+			return s.persist("auto_report_schedules.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("schedule not found")
 }
 
 // ── Editing Locks (collaborative editing) ────────────────────────────────────
