@@ -1055,6 +1055,24 @@ async function openUserModal(user) {
   delBtn.style.display = isEdit ? '' : 'none';
   delBtn.onclick = isEdit ? () => deleteUser(user.id) : null;
 
+  // User info panel (created_at + SSO badge)
+  const uUserInfo = document.getElementById('uUserInfo');
+  if (uUserInfo) {
+    if (isEdit && user) {
+      const createdStr = user.created_at
+        ? new Date(user.created_at).toLocaleString()
+        : '—';
+      const ssoNote = user.is_oidc
+        ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:3px;background:var(--accent-muted,rgba(0,120,255,.12));color:var(--accent);border:1px solid var(--accent);font-weight:600">🔗 SSO / OIDC — auto enrolled</span><br>This account was automatically created via Single Sign-On (OIDC). The identity is managed by the external identity provider.`
+        : '';
+      uUserInfo.innerHTML = `<strong>Created:</strong> ${escHtml(createdStr)}${ssoNote ? '<br>' + ssoNote : ''}`;
+      uUserInfo.style.display = '';
+    } else {
+      uUserInfo.style.display = 'none';
+      uUserInfo.innerHTML = '';
+    }
+  }
+
   // Populate group picker
   const picker = document.getElementById('uGroupPicker');
   if (picker && state.groups.length > 0) {
@@ -1615,7 +1633,7 @@ function renderSidebar() {
             ${(users||[]).map(u => `
               <div class="user-item">
                 <div class="user-name">
-                  <div>${escHtml(u.display_name||u.username)}</div>
+                  <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                   <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}</div>
                 </div>
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
