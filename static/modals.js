@@ -96,10 +96,12 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     const lb = (lang==='sv' && b.label_sv ? b.label_sv : lang==='fr' && b.label_fr ? b.label_fr : b.label).toLowerCase();
     return la < lb ? -1 : la > lb ? 1 : 0;
   });
+  const _typeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
   typeSelect.innerHTML = sortedTypes.map(et => {
     const lbl = lang==='sv' && et.label_sv ? et.label_sv :
                 lang==='fr' && et.label_fr ? et.label_fr : et.label;
-    return `<option value="${et.key}" ${ev && ev.event_type===et.key?'selected':''}>${lbl}</option>`;
+    const ico = et.icon || _typeIcons[et.key] || '';
+    return `<option value="${et.key}" ${ev && ev.event_type===et.key?'selected':''}>${ico ? ico+' ' : ''}${lbl}</option>`;
   }).join('');
   typeSelect.onchange = () => {
     const found = state.eventTypes.find(x => x.key === typeSelect.value);
@@ -1324,8 +1326,11 @@ function renderSidebar() {
           }).map(et => {
             const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
             const hidden = isTypeHidden(et.key);
+            const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
+            const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
             return `<div class="legend-item${hidden?' hidden-type':''}" onclick="toggleType('${et.key}')">
               <div class="legend-swatch" style="background:${et.color}"></div>
+              ${etIcon ? `<span class="legend-type-icon">${etIcon}</span>` : ''}
               <span class="legend-label">${escHtml(lbl)}</span>
               <span class="legend-eye">${hidden?'👁‍🗨':'👁'}</span>
               ${state.user&&(state.user.role==='admin'||(et.created_by&&et.created_by===state.user.id)) ?
@@ -2294,8 +2299,9 @@ function showAlarmNotification(data, level) {
   el.innerHTML = `
     <div class="notification-title">${t('notif_alarm_title')}${escHtml(warnings)}</div>
     <div class="notification-msg">${escHtml(data.message)}</div>
-    <div style="margin-top:8px;display:flex;gap:6px;justify-content:flex-end">
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm notification-close-btn" onclick="dismissAlarmNotif(${data.alarm_id})">Dismiss</button>
+      <button class="btn btn-secondary btn-sm" onclick="openAlarmEvent(${data.event_id})">📋 Show event</button>
       <button class="btn btn-primary btn-sm" onclick="ackAlarm(${data.alarm_id}, this.closest('.notification'))">✓ ${t('alarm_ack')}</button>
     </div>
   `;
@@ -2322,6 +2328,16 @@ function dismissAlarmNotif(alarmID) {
     unackedAlarms.delete(alarmID);
     if (entry.element && entry.element.parentNode) entry.element.remove();
   }
+}
+
+async function openAlarmEvent(eventId) {
+  let ev = state.events.find(x => x.id === eventId);
+  if (!ev) {
+    // Event might not be in current view — fetch it
+    const data = await apiGet(`/api/events/${eventId}`);
+    if (data && data.id) ev = data;
+  }
+  if (ev) showEventDetail(ev);
 }
 
 async function ackAlarm(alarmID, notifEl) {

@@ -395,8 +395,9 @@ select.ctrl-select:focus { border-color: var(--accent); }
 .legend-item:hover { background: var(--bg3); }
 .legend-item.hidden-type { opacity: .4; }
 .legend-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
-.legend-label  { font-size: var(--fs-sm); color: var(--text); flex: 1; }
-.legend-eye    { font-size: var(--fs-xs); color: var(--text-dim); }
+.legend-label      { font-size: var(--fs-sm); color: var(--text); flex: 1; }
+.legend-eye        { font-size: var(--fs-xs); color: var(--text-dim); }
+.legend-type-icon  { font-size: 13px; line-height: 1; flex-shrink: 0; }
 
 /* Layer list */
 .layer-list { display: flex; flex-direction: column; gap: 6px; }
@@ -642,6 +643,7 @@ body.light-mode .tl-cell.out-of-hours { background: repeating-linear-gradient(13
   transition: background .15s, border-color .15s;
 }
 .icon-pick-btn:hover, .icon-pick-btn.selected { background: var(--accent); border-color: var(--accent); }
+.ev-type-icon { opacity: 1 !important; margin-left: 0; margin-right: 2px; font-size: 11px; }
 
 /* ── Event status badges ──────────────────────────────────────────────────── */
 .status-badge {
