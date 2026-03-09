@@ -233,6 +233,59 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventContactURL').value = ev ? (ev.contact_url||'') : '';
   document.getElementById('eventVirtualMeetingType').value = ev ? (ev.virtual_meeting_type||'') : '';
 
+  // Map / coordinates for physical events
+  const latEl = document.getElementById('eventLatitude');
+  const lngEl = document.getElementById('eventLongitude');
+  const mapCoords = document.getElementById('physicalMapCoords');
+  if (latEl) latEl.value = ev?.latitude != null ? ev.latitude : '';
+  if (lngEl) lngEl.value = ev?.longitude != null ? ev.longitude : '';
+  if (mapCoords) {
+    mapCoords.textContent = (ev?.latitude != null && ev?.longitude != null)
+      ? `${Number(ev.latitude).toFixed(4)}, ${Number(ev.longitude).toFixed(4)}` : '';
+  }
+
+  // Show/hide map button for physical_meeting type
+  const physMapGroup = document.getElementById('physicalMapGroup');
+  if (physMapGroup) {
+    const isPhys = (ev?.event_type === 'physical_meeting') || (typeSelect.value === 'physical_meeting');
+    physMapGroup.style.display = isPhys ? '' : 'none';
+  }
+
+  // Planned times section (only for editing existing events)
+  const plannedGroup = document.getElementById('plannedTimesGroup');
+  const plannedStartEl = document.getElementById('eventPlannedStart');
+  const plannedEndEl = document.getElementById('eventPlannedEnd');
+  if (plannedGroup) {
+    if (isEdit && ev.planned_start) {
+      plannedGroup.style.display = '';
+      if (plannedStartEl) plannedStartEl.value = new Date(ev.planned_start).toLocaleString();
+      if (plannedEndEl) plannedEndEl.value = ev.planned_end ? new Date(ev.planned_end).toLocaleString() : '—';
+    } else {
+      plannedGroup.style.display = 'none';
+    }
+  }
+
+  // History and dependencies buttons (only for existing events)
+  const btnHist = document.getElementById('btnEventHistory');
+  const btnDeps = document.getElementById('btnEventDeps');
+  if (btnHist) btnHist.style.display = isEdit ? '' : 'none';
+  if (btnDeps) btnDeps.style.display = isEdit ? '' : 'none';
+
+  // Acquire editing lock for collaborative editing
+  if (isEdit && ev.id) {
+    acquireEditingLock(ev.id);
+    _updateEditingLockIndicator();
+  }
+
+  // Wire typeSelect change to show/hide map button
+  const origOnchange = typeSelect.onchange;
+  typeSelect.onchange = function() {
+    if (origOnchange) origOnchange.call(this);
+    const isPhys2 = typeSelect.value === 'physical_meeting';
+    const pg = document.getElementById('physicalMapGroup');
+    if (pg) pg.style.display = isPhys2 ? '' : 'none';
+  };
+
   // Update field visibility for type/allday
   updateEventModalTimeVisibility();
   updateEventModalContactVisibility();
@@ -319,6 +372,8 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     contact_type:       document.getElementById('eventContactType')?.value || '',
     contact_url:        document.getElementById('eventContactURL')?.value || '',
     virtual_meeting_type: document.getElementById('eventVirtualMeetingType')?.value || '',
+    latitude:           document.getElementById('eventLatitude')?.value ? parseFloat(document.getElementById('eventLatitude').value) : null,
+    longitude:          document.getElementById('eventLongitude')?.value ? parseFloat(document.getElementById('eventLongitude').value) : null,
   };
 
   // Track undo for updates
@@ -510,6 +565,10 @@ function showEventDetail(ev) {
           <b>${t('event_status')}:</b><span><span class="status-badge status-${ev.status||'planned'}">${t('status_'+(ev.status||'planned'))}</span></span>
           ${ev.status==='verified' ? `<b>${t('status_verified_by')}:</b><span>${escHtml(ev.verified_by_name||'')} — ${ev.verified_at?fmtDateTime(new Date(ev.verified_at)):''}</span>` : ''}
           ${ev.status==='rejected' ? `<b>${t('status_rejection_reason')}:</b><span style="color:var(--red)">${escHtml(ev.rejection_reason||'')}</span>` : ''}
+          ${ev.physical_location ? `<b>📍 Location:</b><span>${escHtml(ev.physical_location)}</span>` : ''}
+          ${(ev.latitude != null && ev.longitude != null) ? `<b>🗺️ Coords:</b><span>${Number(ev.latitude).toFixed(4)}, ${Number(ev.longitude).toFixed(4)} <a href="https://www.openstreetmap.org/?mlat=${ev.latitude}&mlon=${ev.longitude}#map=15/${ev.latitude}/${ev.longitude}" target="_blank" style="color:var(--accent)">View on map ↗</a></span>` : ''}
+          ${ev.depends_on && ev.depends_on.length ? `<b>🔗 Depends on:</b><span>${ev.depends_on.map(id => { const dep = state.events.find(e => e.id === id); return dep ? escHtml(dep.title) : 'Event #'+id; }).join(', ')}</span>` : ''}
+          ${ev.planned_start ? `<b>📅 Planned:</b><span>${new Date(ev.planned_start).toLocaleString()}${ev.planned_end ? ' → ' + new Date(ev.planned_end).toLocaleString() : ''}</span>` : ''}
         </div>
       </div>
     </div>
@@ -2204,35 +2263,107 @@ function generateMeetingLink() {
 }
 
 // ── User Profile ───────────────────────────────────────────────────────────
-function openProfileModal() {
+async function openProfileModal() {
   const u = state.user;
   if (!u) return;
+
+  // Refresh user data from server to get latest info
+  try {
+    const fresh = await apiGet('/api/auth/me');
+    if (fresh) Object.assign(state.user, fresh);
+  } catch { /* use cached */ }
+
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
   setVal('profileUsername',    u.username);
   setVal('profileRole',        t('role_' + u.role) || u.role);
   setVal('profileDisplayName', u.display_name);
   setVal('profileEmail',       u.email);
+  setVal('profileMattermost',  u.mattermost_handle || '');
+  setVal('profileDiscord',     u.discord_handle || '');
+  setVal('profileSignal',      u.signal_handle || '');
+
+  // Language select
+  const langSel = document.getElementById('profileLanguage');
+  if (langSel) {
+    const prefs = state.preferences || {};
+    langSel.value = prefs.language || u.language || 'en';
+  }
+
+  // J-Level / NATO designations
+  const jGroup = document.getElementById('profileJLevelGroup');
+  const jLevel = document.getElementById('profileJLevel');
+  if (u.nato_designations && u.nato_designations.length) {
+    if (jGroup) jGroup.style.display = '';
+    if (jLevel) jLevel.value = u.nato_designations.join(', ');
+  } else {
+    if (jGroup) jGroup.style.display = 'none';
+  }
+
   ['profilePwdCurrent', 'profilePwdNew', 'profilePwdConfirm'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+
+  // Account info section
   const info = document.getElementById('profileInfo');
   if (info) {
+    const groups = u.groups || [];
+    const groupList = groups.length
+      ? `<p>Groups/Units: ${groups.map(g => `<strong>${escHtml(g.name)}</strong> (${g.role})`).join(', ')}</p>`
+      : '';
+    const lastLogin = u.last_login_at
+      ? `<p>Last login: ${new Date(u.last_login_at).toLocaleString()}${u.last_login_domain ? ` from <em>${escHtml(u.last_login_domain)}</em>` : u.last_login_ip ? ` from ${escHtml(u.last_login_ip)}` : ''}</p>`
+      : '';
+    const accountType = u.is_oidc
+      ? `<p>Account type: <span style="color:var(--accent)">SSO / OIDC</span></p>`
+      : `<p>Account type: Local account</p>`;
     info.innerHTML = `
       <p>Member since: ${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</p>
       ${u.nato_designations && u.nato_designations.length ? `<p>NATO Designations: ${u.nato_designations.join(', ')}</p>` : ''}
+      ${groupList}
+      ${lastLogin}
+      ${accountType}
     `;
   }
+
+  // WebCal section
+  const webCalURL = document.getElementById('profileWebCalURL');
+  const webCalLink = document.getElementById('profileWebCalLink');
+  if (u.webcal_token) {
+    const url = `${location.protocol}//${location.host}/webcal/${u.webcal_token}.ics`;
+    if (webCalURL) webCalURL.style.display = '';
+    if (webCalLink) webCalLink.value = url;
+  } else {
+    if (webCalURL) webCalURL.style.display = 'none';
+  }
+
   openModal('profileModal');
+}
+
+async function generateWebCalToken() {
+  try {
+    const res = await api('PUT', '/api/auth/profile', { generate_webcal: true });
+    if (!res.ok) { showError('Failed to generate calendar link'); return; }
+    const updated = await res.json();
+    Object.assign(state.user, updated);
+    const url = `${location.protocol}//${location.host}/webcal/${updated.webcal_token}.ics`;
+    const webCalURL = document.getElementById('profileWebCalURL');
+    const webCalLink = document.getElementById('profileWebCalLink');
+    if (webCalURL) webCalURL.style.display = '';
+    if (webCalLink) webCalLink.value = url;
+    showNotification('success', 'Calendar subscription link generated');
+  } catch { showError('Failed to generate calendar link'); }
 }
 
 async function saveProfile() {
   const val = id => document.getElementById(id)?.value?.trim() || '';
   const displayName = val('profileDisplayName');
   const email       = val('profileEmail');
+  const lang        = document.getElementById('profileLanguage')?.value || 'en';
   const curPw       = val('profilePwdCurrent');
   const newPw       = val('profilePwdNew');
   const conPw       = val('profilePwdConfirm');
 
+  // Save display name + email
   if (displayName || email !== undefined) {
     const res = await api('PUT', `/api/users/${state.user.id}`, {
       display_name: displayName || state.user.display_name,
@@ -2252,6 +2383,22 @@ async function saveProfile() {
     }
   }
 
+  // Save social handles
+  const mattermostHandle = val('profileMattermost');
+  const discordHandle    = val('profileDiscord');
+  const signalHandle     = val('profileSignal');
+  await api('PUT', '/api/auth/profile', {
+    mattermost_handle: mattermostHandle,
+    discord_handle:    discordHandle,
+    signal_handle:     signalHandle,
+  }).catch(() => {});
+
+  // Save language preference
+  if (lang) {
+    await setPref('language', lang);
+  }
+
+  // Change password if provided
   if (newPw) {
     if (newPw !== conPw) { showError(t('password_mismatch') || 'Passwords do not match'); return; }
     const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
@@ -2606,7 +2753,17 @@ function updateUILabels() {
   setElText('lbl-report-generate', t('report_generate'));
   const rType = document.getElementById('reportType');
   if (rType) {
-    const typeMap = {aar: t('report_type_aar'), timeline: t('report_type_timeline'), per_layer: t('report_type_perlayer') || 'Per-Layer Activity'};
+    const typeMap = {
+      aar: t('report_type_aar'),
+      timeline: t('report_type_timeline'),
+      per_layer: t('report_type_perlayer') || 'Per-Layer Activity',
+      status_summary: t('report_type_status') || 'Status Summary',
+      daily_briefing: t('report_type_daily') || 'Daily Briefing',
+      type_breakdown: t('report_type_type') || 'Event Type Breakdown',
+      responsible: t('report_type_responsible') || 'Responsible / Resource Report',
+      planned_vs_actual: t('report_type_pva') || 'Planned vs. Actual',
+      critical_path: t('report_type_cp') || 'Critical Path Analysis',
+    };
     [...rType.options].forEach(opt => { opt.text = typeMap[opt.value] || opt.text; });
   }
   const rFmt = document.getElementById('reportFormat');
@@ -2731,6 +2888,13 @@ function connectSSE() {
     if (data.action === 'deleted' || data.action === 'created' || data.action === 'updated' || data.action === 'status_changed') {
       refreshAll();
     }
+  });
+  // Listen for collaborative editing lock events
+  es.addEventListener('editing_lock', e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (window._handleEditingLockEvent) window._handleEditingLockEvent(data);
+    } catch { /* ignore parse errors */ }
   });
   es.onerror = () => setTimeout(connectSSE, 5000);
 }
@@ -3634,6 +3798,7 @@ async function generateReport() {
       </tr>`).join('')}
       </tbody></table>`;
     });
+
   } else if (type === 'per_layer') {
     const byLayer = {};
     state.layers.forEach(l => { byLayer[l.id] = {name: l.name, events: []}; });
@@ -3657,6 +3822,179 @@ async function generateReport() {
       </tr>`).join('')}
       </tbody></table>`;
     });
+
+  } else if (type === 'status_summary') {
+    // Status summary: pie-chart-style table with counts per status
+    const byStatus = {};
+    statusOrder.forEach(s => { byStatus[s] = 0; });
+    events.forEach(ev => { const s = ev.status||'planned'; if (byStatus[s] !== undefined) byStatus[s]++; });
+    const total = events.length;
+    html += `<h2>Status Summary — ${total} events total</h2>
+    <table><thead><tr><th>Status</th><th>Count</th><th>Percentage</th></tr></thead><tbody>
+    ${statusOrder.filter(s => byStatus[s] > 0).map(s => `<tr>
+      <td><strong>${t('status_'+s)||s}</strong></td>
+      <td>${byStatus[s]}</td>
+      <td>${total ? Math.round(byStatus[s]/total*100) : 0}%</td>
+    </tr>`).join('')}
+    </tbody></table>`;
+
+  } else if (type === 'daily_briefing') {
+    // Daily briefing: events grouped by day, chronological
+    const byDay = {};
+    events.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).forEach(ev => {
+      const day = new Date(ev.start_time).toLocaleDateString();
+      if (!byDay[day]) byDay[day] = [];
+      byDay[day].push(ev);
+    });
+    Object.entries(byDay).forEach(([day, evs]) => {
+      html += `<h2>📅 ${day} (${evs.length} events)</h2>
+      <table><thead><tr><th>Time</th><th>Title</th><th>Type</th><th>Status</th><th>Responsible</th><th>Location</th></tr></thead><tbody>
+      ${evs.map(ev => `<tr>
+        <td>${ev.all_day ? 'All day' : new Date(ev.start_time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+        <td><strong>${escHtml(ev.title)}</strong></td>
+        <td>${escHtml(ev.event_type)}</td>
+        <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
+        <td>${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
+        <td>${escHtml(ev.physical_location || '')}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    });
+    if (!Object.keys(byDay).length) html += '<p style="color:#888">No events in this period.</p>';
+
+  } else if (type === 'type_breakdown') {
+    // Event type breakdown
+    const byType = {};
+    events.forEach(ev => {
+      const k = ev.event_type || 'event';
+      if (!byType[k]) byType[k] = [];
+      byType[k].push(ev);
+    });
+    const sorted = Object.entries(byType).sort((a,b) => b[1].length - a[1].length);
+    html += `<h2>Event Type Breakdown — ${events.length} events total</h2>
+    <table><thead><tr><th>Type</th><th>Count</th><th>%</th><th>Avg Duration</th></tr></thead><tbody>
+    ${sorted.map(([typ, evs]) => {
+      const avgMs = evs.reduce((acc, ev) => {
+        if (!ev.end_time) return acc;
+        return acc + (new Date(ev.end_time) - new Date(ev.start_time));
+      }, 0) / (evs.filter(e => e.end_time).length || 1);
+      const avgMin = Math.round(avgMs / 60000);
+      return `<tr>
+        <td><strong>${escHtml(typ)}</strong></td>
+        <td>${evs.length}</td>
+        <td>${events.length ? Math.round(evs.length/events.length*100) : 0}%</td>
+        <td>${avgMin > 0 ? (avgMin >= 60 ? Math.round(avgMin/60)+'h '+(avgMin%60)+'m' : avgMin+'m') : '—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+
+  } else if (type === 'responsible') {
+    // Responsible / resource report: events grouped by responsible person
+    const byResp = {};
+    events.forEach(ev => {
+      const k = ev.responsible_name || ev.created_by_name || 'Unassigned';
+      if (!byResp[k]) byResp[k] = [];
+      byResp[k].push(ev);
+    });
+    const sorted = Object.entries(byResp).sort((a,b) => b[1].length - a[1].length);
+    sorted.forEach(([name, evs]) => {
+      const totalMins = evs.reduce((acc, ev) => {
+        if (!ev.end_time) return acc;
+        return acc + (new Date(ev.end_time) - new Date(ev.start_time)) / 60000;
+      }, 0);
+      html += `<h2>${escHtml(name)} — ${evs.length} events (${Math.round(totalMins/60*10)/10}h)</h2>
+      <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>Duration</th></tr></thead><tbody>
+      ${evs.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).map(ev => `<tr>
+        <td>${escHtml(ev.title)}</td>
+        <td>${escHtml(ev.event_type)}</td>
+        <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
+        <td>${fmtDateTime(new Date(ev.start_time))}</td>
+        <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+    });
+
+  } else if (type === 'planned_vs_actual') {
+    // Planned vs Actual: compare planned_start/planned_end vs actual
+    const withPlanned = events.filter(ev => ev.planned_start);
+    html += `<h2>Planned vs. Actual — ${withPlanned.length} events with planned times</h2>
+    <table><thead><tr><th>Title</th><th>Planned Start</th><th>Actual Start</th><th>Start Δ</th><th>Planned End</th><th>Actual End</th><th>End Δ</th><th>Status</th></tr></thead><tbody>
+    ${withPlanned.sort((a,b)=>new Date(a.planned_start)-new Date(b.planned_start)).map(ev => {
+      const pStart = new Date(ev.planned_start);
+      const aStart = new Date(ev.start_time);
+      const deltaStart = Math.round((aStart - pStart) / 60000);
+      const pEnd = ev.planned_end ? new Date(ev.planned_end) : null;
+      const aEnd = ev.end_time ? new Date(ev.end_time) : null;
+      const deltaEnd = (pEnd && aEnd) ? Math.round((aEnd - pEnd) / 60000) : null;
+      const fmtDelta = d => d === null ? '—' : (d > 0 ? `<span style="color:#c00">+${d}m</span>` : d < 0 ? `<span style="color:#0a0">${d}m</span>` : '<span style="color:#888">On time</span>');
+      return `<tr>
+        <td>${escHtml(ev.title)}</td>
+        <td>${fmtDateTime(pStart)}</td>
+        <td>${fmtDateTime(aStart)}</td>
+        <td>${fmtDelta(deltaStart)}</td>
+        <td>${pEnd ? fmtDateTime(pEnd) : '—'}</td>
+        <td>${aEnd ? fmtDateTime(aEnd) : '—'}</td>
+        <td>${fmtDelta(deltaEnd)}</td>
+        <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    ${withPlanned.length === 0 ? '<p style="color:#888;margin-top:8px">No events have planned times recorded yet. Planned times are captured automatically on the first edit of an event.</p>' : ''}`;
+
+  } else if (type === 'critical_path') {
+    // Critical path analysis: find longest dependency chain
+    const idMap = {};
+    events.forEach(ev => { idMap[ev.id] = ev; });
+    const longestPath = [];
+    const memo = {};
+
+    function calcPath(evId) {
+      if (memo[evId] !== undefined) return memo[evId];
+      const ev = idMap[evId];
+      if (!ev || !ev.depends_on || !ev.depends_on.length) {
+        memo[evId] = {len: 0, path: [evId]};
+        return memo[evId];
+      }
+      let best = {len: -1, path: []};
+      for (const dep of ev.depends_on) {
+        const sub = calcPath(dep);
+        if (sub.len > best.len) best = sub;
+      }
+      memo[evId] = {len: best.len + 1, path: [...best.path, evId]};
+      return memo[evId];
+    }
+
+    events.forEach(ev => { if (!memo[ev.id]) calcPath(ev.id); });
+    let maxPath = {len: 0, path: []};
+    Object.values(memo).forEach(r => { if (r.len > maxPath.len) maxPath = r; });
+
+    const cpIds = new Set(maxPath.path);
+    html += `<h2>Critical Path Analysis</h2>
+    <p style="color:#666;font-size:13px">The critical path is the longest chain of dependent events. Delays on the critical path delay the entire timeline.</p>
+    <h3 style="font-size:14px;margin-top:16px">Critical Path (${maxPath.path.length} events):</h3>
+    <table><thead><tr><th>#</th><th>Event</th><th>Start</th><th>End</th><th>Duration</th><th>Status</th></tr></thead><tbody>
+    ${maxPath.path.map((id, i) => {
+      const ev = idMap[id];
+      if (!ev) return '';
+      return `<tr style="background:${i%2===0?'#fff9e6':'#fff'}">
+        <td>${i+1}</td>
+        <td><strong>${escHtml(ev.title)}</strong></td>
+        <td>${fmtDateTime(new Date(ev.start_time))}</td>
+        <td>${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
+        <td>${fmtDuration(ev.start_time, ev.end_time)}</td>
+        <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    <h3 style="font-size:14px;margin-top:16px">All events with dependencies:</h3>
+    <table><thead><tr><th>Event</th><th>Depends On</th><th>On Critical Path</th></tr></thead><tbody>
+    ${events.filter(ev => ev.depends_on && ev.depends_on.length).map(ev => `<tr>
+      <td>${escHtml(ev.title)}</td>
+      <td>${ev.depends_on.map(d => idMap[d] ? escHtml(idMap[d].title) : d).join(', ')}</td>
+      <td>${cpIds.has(ev.id) ? '⚠️ Yes' : '—'}</td>
+    </tr>`).join('')}
+    </tbody></table>
+    ${!events.some(ev => ev.depends_on && ev.depends_on.length) ? '<p style="color:#888;margin-top:8px">No event dependencies defined yet. Add dependencies via the event editor.</p>' : ''}`;
+
   } else {
     // timeline snapshot
     html += `<h2>Timeline Snapshot</h2>
@@ -4738,3 +5076,373 @@ async function confirmMoveSingleEvent(evId) {
   }
 }
 
+
+// ── Event History ──────────────────────────────────────────────────────────────
+
+let _currentHistoryEventId = null;
+
+async function openEventHistory() {
+  const evId = document.getElementById('eventId')?.value;
+  if (!evId) return;
+  _currentHistoryEventId = evId;
+
+  const listEl = document.getElementById('eventHistoryList');
+  if (listEl) listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</p>';
+
+  closeModal('eventModal');
+  openModal('eventHistoryModal');
+
+  try {
+    const versions = await apiGet(`/api/events/${evId}/history`);
+    if (!listEl) return;
+    if (!versions || !versions.length) {
+      listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No history available yet. History is recorded whenever the event is edited.</p>';
+      return;
+    }
+    listEl.innerHTML = versions.map((v, i) => `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>Version ${v.version}</strong>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${new Date(v.changed_at).toLocaleString()}</span>
+        </div>
+        <div style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:6px">
+          Changed by: <strong>${escHtml(v.changed_by_name || '—')}</strong>
+          ${v.change_note ? ` — ${escHtml(v.change_note)}` : ''}
+        </div>
+        <div style="font-size:var(--fs-xs);display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
+          <span><em>Title:</em> ${escHtml(v.snapshot.title||'')}</span>
+          <span><em>Status:</em> ${v.snapshot.status||'planned'}</span>
+          <span><em>Start:</em> ${v.snapshot.start_time ? new Date(v.snapshot.start_time).toLocaleString() : '—'}</span>
+          <span><em>End:</em> ${v.snapshot.end_time ? new Date(v.snapshot.end_time).toLocaleString() : '—'}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    if (listEl) listEl.innerHTML = '<p style="color:var(--danger);font-size:var(--fs-sm)">Failed to load history.</p>';
+  }
+}
+
+// ── Event Dependencies ─────────────────────────────────────────────────────────
+
+let _depsEventId = null;
+let _currentDeps = []; // array of event IDs
+
+function openDependenciesModal() {
+  const evId = parseInt(document.getElementById('eventId')?.value, 10);
+  if (!evId) return;
+  _depsEventId = evId;
+
+  const ev = state.events.find(e => e.id === evId);
+  _currentDeps = ev?.depends_on ? [...ev.depends_on] : [];
+
+  const titleEl = document.getElementById('dependencyEventTitle');
+  if (titleEl) titleEl.textContent = ev ? ev.title : `Event #${evId}`;
+
+  renderDependencyList();
+  filterDepSearch();
+  openModal('dependenciesModal');
+}
+
+function renderDependencyList() {
+  const el = document.getElementById('dependencyList');
+  if (!el) return;
+  if (!_currentDeps.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm);padding:8px">No dependencies set.</p>';
+    return;
+  }
+  el.innerHTML = _currentDeps.map(id => {
+    const dep = state.events.find(e => e.id === id);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px">
+      <span>${dep ? escHtml(dep.title) : `Event #${id}`}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeDependency(${id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeDependency(id) {
+  _currentDeps = _currentDeps.filter(d => d !== id);
+  renderDependencyList();
+}
+
+function filterDepSearch() {
+  const q = (document.getElementById('depSearch')?.value || '').toLowerCase();
+  const el = document.getElementById('depSearchResults');
+  if (!el) return;
+  const candidates = state.events.filter(ev =>
+    ev.id !== _depsEventId &&
+    !_currentDeps.includes(ev.id) &&
+    (q === '' || ev.title.toLowerCase().includes(q))
+  ).slice(0, 20);
+  if (!candidates.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs);padding:6px">No matching events.</p>';
+    return;
+  }
+  el.innerHTML = candidates.map(ev => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px;cursor:pointer" onclick="addDependency(${ev.id})">
+      <span>${escHtml(ev.title)}</span>
+      <span style="font-size:var(--fs-xs);color:var(--text-dim)">${new Date(ev.start_time).toLocaleDateString()}</span>
+    </div>
+  `).join('');
+}
+
+function addDependency(id) {
+  if (!_currentDeps.includes(id)) {
+    _currentDeps.push(id);
+    renderDependencyList();
+    filterDepSearch();
+  }
+}
+
+async function saveDependencies() {
+  const evId = _depsEventId;
+  if (!evId) return;
+  const ev = state.events.find(e => e.id === evId);
+  if (!ev) return;
+
+  const payload = {...ev, depends_on: _currentDeps};
+  delete payload.attachment_count; delete payload.comment_count;
+  const res = await apiPut(`/api/events/${evId}`, payload);
+  if (res.ok) {
+    const updated = await res.json();
+    const idx = state.events.findIndex(e => e.id === evId);
+    if (idx >= 0) state.events[idx] = updated;
+    closeModal('dependenciesModal');
+    showNotification('success', 'Dependencies saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save dependencies');
+  }
+}
+
+// ── Map Integration ────────────────────────────────────────────────────────────
+
+let _map = null;
+let _mapMarker = null;
+let _mapCallback = null; // function(lat, lng, locationName) called on save
+
+function openMapForEvent() {
+  const lat = parseFloat(document.getElementById('eventLatitude')?.value) || null;
+  const lng = parseFloat(document.getElementById('eventLongitude')?.value) || null;
+  const loc = document.getElementById('eventPhysicalLocation')?.value || '';
+
+  _mapCallback = (lat, lng, locationName) => {
+    const latEl = document.getElementById('eventLatitude');
+    const lngEl = document.getElementById('eventLongitude');
+    const coordEl = document.getElementById('physicalMapCoords');
+    const locEl = document.getElementById('eventPhysicalLocation');
+    if (latEl) latEl.value = lat.toFixed(6);
+    if (lngEl) lngEl.value = lng.toFixed(6);
+    if (coordEl) coordEl.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    if (locEl && locationName) locEl.value = locationName;
+  };
+
+  openModal('mapModal');
+  document.getElementById('mapLocationName').value = loc;
+  document.getElementById('mapLat').value = lat || '';
+  document.getElementById('mapLng').value = lng || '';
+
+  // Initialize map after modal is visible
+  setTimeout(() => initMap(lat, lng), 100);
+}
+
+function initMap(lat, lng) {
+  loadLeaflet(() => {
+    const container = document.getElementById('mapContainer');
+    if (!container) return;
+
+    if (_map) { _map.remove(); _map = null; _mapMarker = null; }
+
+    const center = (lat && lng) ? [lat, lng] : [51.505, -0.09];
+    _map = L.map('mapContainer').setView(center, lat ? 13 : 4);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(_map);
+
+    if (lat && lng) {
+      _mapMarker = L.marker([lat, lng]).addTo(_map);
+    }
+
+    _map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      document.getElementById('mapLat').value = lat.toFixed(6);
+      document.getElementById('mapLng').value = lng.toFixed(6);
+      if (_mapMarker) { _mapMarker.setLatLng(e.latlng); }
+      else { _mapMarker = L.marker(e.latlng).addTo(_map); }
+    });
+  });
+}
+
+function saveMapLocation() {
+  const lat = parseFloat(document.getElementById('mapLat')?.value);
+  const lng = parseFloat(document.getElementById('mapLng')?.value);
+  const name = document.getElementById('mapLocationName')?.value?.trim() || '';
+  if (isNaN(lat) || isNaN(lng)) { showError('Please select a location on the map or enter coordinates'); return; }
+  if (_mapCallback) _mapCallback(lat, lng, name);
+  closeModal('mapModal');
+}
+
+// ── Backup & Restore ──────────────────────────────────────────────────────────
+
+function openBackupModal() {
+  openModal('backupModal');
+  const status = document.getElementById('restoreStatus');
+  if (status) status.textContent = '';
+}
+
+function downloadBackup() {
+  window.location.href = '/api/backup';
+}
+
+async function uploadRestore() {
+  const fileEl = document.getElementById('restoreFile');
+  const statusEl = document.getElementById('restoreStatus');
+  if (!fileEl || !fileEl.files.length) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">Please select a backup ZIP file first.</span>';
+    return;
+  }
+  if (!confirm('Are you sure you want to restore from this backup? Current data will be overwritten. A server restart is required after restore.')) return;
+
+  const formData = new FormData();
+  formData.append('backup', fileEl.files[0]);
+
+  try {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-dim)">Uploading and restoring…</span>';
+    const res = await fetch('/api/restore', { method: 'POST', body: formData });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--success,#2ecc71)">✅ ${escHtml(data.message || 'Restored successfully')}</span>`;
+      showNotification('success', 'Backup restored. Please restart the server.');
+    } else {
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--danger)">❌ ${escHtml(data.error || 'Restore failed')}</span>`;
+    }
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">❌ Upload failed. Check server connection.</span>';
+  }
+}
+
+// ── Planned vs. Actual Modal ──────────────────────────────────────────────────
+
+function openPVAModal() {
+  const el = document.getElementById('pvaContent');
+  if (el) {
+    const withPlanned = state.events.filter(ev => ev.planned_start);
+    if (!withPlanned.length) {
+      el.innerHTML = '<p style="color:var(--text-dim)">No events have planned times recorded yet.<br>Planned times are automatically captured on the first edit of an event.</p>';
+    } else {
+      el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:6px 8px;text-align:left">Event</th>
+          <th style="padding:6px 8px;text-align:left">Planned Start</th>
+          <th style="padding:6px 8px;text-align:left">Actual Start</th>
+          <th style="padding:6px 8px;text-align:center">Δ Start</th>
+          <th style="padding:6px 8px;text-align:center">Status</th>
+        </tr></thead><tbody>
+        ${withPlanned.sort((a,b)=>new Date(a.planned_start)-new Date(b.planned_start)).map((ev,i) => {
+          const pStart = new Date(ev.planned_start);
+          const aStart = new Date(ev.start_time);
+          const deltaMins = Math.round((aStart - pStart) / 60000);
+          const deltaStr = deltaMins === 0 ? '<span style="color:#2ecc71">On time</span>'
+            : deltaMins > 0 ? `<span style="color:#e74c3c">+${deltaMins}m late</span>`
+            : `<span style="color:#2ecc71">${deltaMins}m early</span>`;
+          return `<tr style="background:${i%2===0?'var(--bg1)':'var(--bg2)'}">
+            <td style="padding:6px 8px">${escHtml(ev.title)}</td>
+            <td style="padding:6px 8px">${pStart.toLocaleString()}</td>
+            <td style="padding:6px 8px">${aStart.toLocaleString()}</td>
+            <td style="padding:6px 8px;text-align:center">${deltaStr}</td>
+            <td style="padding:6px 8px;text-align:center">${ev.status||'planned'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table>`;
+    }
+  }
+  openModal('pvaModal');
+}
+
+function exportPVAReport() {
+  // Re-use the report generator with planned_vs_actual type
+  const typeEl = document.getElementById('reportType');
+  if (typeEl) typeEl.value = 'planned_vs_actual';
+  closeModal('pvaModal');
+  generateReport();
+}
+
+// ── Collaborative Editing ─────────────────────────────────────────────────────
+
+// Track which events are being edited by other users
+const _editingLocks = {};
+
+// Called by SSE handler when an editing_lock event arrives
+function handleEditingLockEvent(data) {
+  if (data.type === 'editing_lock') {
+    _editingLocks[data.event_id] = { user_name: data.user_name, user_id: data.user_id, expires_at: data.expires_at };
+  } else if (data.type === 'editing_unlock') {
+    delete _editingLocks[data.event_id];
+  }
+  // Update any open event modal to show lock indicator
+  _updateEditingLockIndicator();
+}
+
+function _updateEditingLockIndicator() {
+  const evIdEl = document.getElementById('eventId');
+  if (!evIdEl || !evIdEl.value) return;
+  const evId = parseInt(evIdEl.value, 10);
+  const lock = _editingLocks[evId];
+  const userId = state.user?.id;
+  let indicator = document.getElementById('editingLockIndicator');
+  if (!indicator) {
+    // Create it if it doesn't exist
+    const footer = document.querySelector('#eventModal .modal-footer');
+    if (!footer) return;
+    indicator = document.createElement('span');
+    indicator.id = 'editingLockIndicator';
+    indicator.style.cssText = 'font-size:var(--fs-xs);color:var(--warning,#f39c12);margin-right:auto;';
+    footer.insertBefore(indicator, footer.firstChild);
+  }
+  if (lock && lock.user_id !== userId) {
+    indicator.textContent = `✏️ ${escHtml(lock.user_name)} is also editing`;
+  } else {
+    indicator.textContent = '';
+  }
+}
+
+// Acquire editing lock when event modal opens for editing
+async function acquireEditingLock(eventId) {
+  if (!eventId) return;
+  try {
+    await api('POST', `/api/events/${eventId}/lock`, {});
+  } catch { /* non-critical */ }
+}
+
+// Release editing lock when event modal closes
+async function releaseEditingLock(eventId) {
+  if (!eventId) return;
+  try {
+    await api('DELETE', `/api/events/${eventId}/lock`, null);
+  } catch { /* non-critical */ }
+}
+
+// Expose for SSE event handler in app.js
+window._handleEditingLockEvent = handleEditingLockEvent;
+
+// ── Event Modal Close Hook (for editing lock release) ─────────────────────────
+// Observe when the eventModal is closed and release editing lock
+(function() {
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      if (m.target.id === 'eventModal' && m.attributeName === 'class') {
+        const isOpen = m.target.classList.contains('open');
+        if (!isOpen) {
+          const evIdEl = document.getElementById('eventId');
+          const evId = evIdEl ? parseInt(evIdEl.value, 10) : null;
+          if (evId && state.user) releaseEditingLock(evId);
+        }
+      }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('eventModal');
+    if (modal) observer.observe(modal, { attributes: true });
+  });
+})();

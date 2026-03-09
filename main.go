@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/rand"
 	"crypto/tls"
@@ -498,6 +499,24 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
 		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
 	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, clientIP)
+
+	// Record last login time, IP, and domain (async to avoid blocking login response)
+	go func(u User, ip string) {
+		now := time.Now()
+		u.LastLoginAt = &now
+		u.LastLoginIP = ip
+		// Best-effort reverse DNS lookup
+		if names, err := net.LookupAddr(ip); err == nil && len(names) > 0 {
+			u.LastLoginDomain = strings.TrimSuffix(names[0], ".")
+		}
+		if fullUser, ok := app.store.GetUserByID(u.ID); ok {
+			fullUser.LastLoginAt = u.LastLoginAt
+			fullUser.LastLoginIP = u.LastLoginIP
+			fullUser.LastLoginDomain = u.LastLoginDomain
+			app.store.UpdateUser(*fullUser) //nolint
+		}
+	}(*user, clientIP)
+
 	jsonOK(w, user.Public())
 }
 
@@ -511,7 +530,29 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
-	jsonOK(w, user.Public())
+	pub := user.Public()
+	// Enrich with group memberships
+	memberships := app.store.GetUserGroups(user.ID)
+	allGroups := app.store.GetGroups()
+	type groupInfo struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+		Role string `json:"role"`
+	}
+	groups := make([]groupInfo, 0, len(memberships))
+	for _, m := range memberships {
+		for _, g := range allGroups {
+			if g.ID == m.GroupID {
+				groups = append(groups, groupInfo{ID: g.ID, Name: g.Name, Role: m.Role})
+				break
+			}
+		}
+	}
+	type meResponse struct {
+		UserPublic
+		Groups []groupInfo `json:"groups"`
+	}
+	jsonOK(w, meResponse{UserPublic: pub, Groups: groups})
 }
 
 func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, user *User) {
@@ -1294,6 +1335,30 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 	// Check for scheduling overlaps (non-blocking: returns warnings)
 	overlaps := app.store.CheckOverlaps(e.StartTime, e.EndTime, e.ResponsibleID, e.InvitedUserIDs, id)
+
+	// Save version snapshot before updating
+	app.store.CreateEventVersion(EventVersion{ //nolint
+		EventID:       id,
+		ChangedBy:     user.ID,
+		ChangedByName: user.DisplayName,
+		ChangeNote:    fmt.Sprintf("Updated by %s", user.DisplayName),
+		Snapshot:      *existing,
+	})
+
+	// Preserve planned start/end: only set them if not already set (first update after creation)
+	if e.PlannedStart == nil && existing.PlannedStart == nil {
+		e.PlannedStart = &existing.StartTime
+	} else if existing.PlannedStart != nil {
+		e.PlannedStart = existing.PlannedStart
+	}
+	if e.PlannedEnd == nil && existing.PlannedEnd == nil {
+		e.PlannedEnd = existing.EndTime
+	} else if existing.PlannedEnd != nil {
+		e.PlannedEnd = existing.PlannedEnd
+	}
+
+	// Release any editing lock held by this user
+	app.store.ReleaseEditingLock(id, user.ID)
 
 	if err := app.store.UpdateEvent(e); err != nil {
 		jsonError(w, "failed to update", http.StatusInternalServerError)
@@ -3707,6 +3772,76 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Event history (versioning)
+	mux.HandleFunc("/api/events/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/events/:id/history
+		if len(parts) == 4 && parts[3] == "history" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetEventHistory)(w, r)
+			return
+		}
+		// /api/events/:id/lock (editing lock)
+		if len(parts) == 4 && parts[3] == "lock" {
+			switch r.Method {
+			case http.MethodPost:
+				app.requireAuth(app.handleAcquireEditingLock)(w, r)
+			case http.MethodDelete:
+				app.requireAuth(app.handleReleaseEditingLock)(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	// Editing locks (all active locks for collaborative editing awareness)
+	mux.HandleFunc("/api/editing-locks", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetEditingLocks)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Backup & Restore (admin only)
+	mux.HandleFunc("/api/backup", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, app.handleBackup)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/restore", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleRestore)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// WebCal subscription (token-based, no session cookie required)
+	mux.HandleFunc("/webcal/", app.handleWebCal)
+
+	// Update user profile handles (social handles, etc.)
+	mux.HandleFunc("/api/auth/profile", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			app.requireAuth(app.handleUpdateProfile)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Cascade reschedule for event dependencies
+	mux.HandleFunc("/api/events/cascade", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleReadWrite, app.handleCascadeReschedule)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	return mux
 }
 
@@ -3991,6 +4126,309 @@ func (app *App) handleDeleteFilterPreset(w http.ResponseWriter, r *http.Request,
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// ── Event History ──────────────────────────────────────────────────────────────
+
+func (app *App) handleGetEventHistory(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		// Try parsing from /api/events/:id/history
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) >= 3 {
+			id, err = strconv.ParseInt(parts[2], 10, 64)
+		}
+		if err != nil {
+			jsonError(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+	}
+	if _, ok := app.store.GetEventByID(id); !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	versions := app.store.GetEventVersions(id)
+	jsonOK(w, versions)
+}
+
+// ── Editing Locks ──────────────────────────────────────────────────────────────
+
+func (app *App) handleAcquireEditingLock(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	lock, ok := app.store.AcquireEditingLock(id, user.ID, user.DisplayName)
+	if !ok {
+		jsonError(w, fmt.Sprintf("Event is being edited by %s", lock.UserName), http.StatusConflict)
+		return
+	}
+	// Broadcast editing lock acquisition to all users
+	lockData, _ := json.Marshal(map[string]interface{}{
+		"type":       "editing_lock",
+		"event_id":   id,
+		"user_id":    user.ID,
+		"user_name":  user.DisplayName,
+		"expires_at": lock.ExpiresAt,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "editing_lock", Data: string(lockData)})
+	jsonOK(w, lock)
+}
+
+func (app *App) handleReleaseEditingLock(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	app.store.ReleaseEditingLock(id, user.ID)
+	unlockData, _ := json.Marshal(map[string]interface{}{
+		"type":     "editing_unlock",
+		"event_id": id,
+		"user_id":  user.ID,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "editing_lock", Data: string(unlockData)})
+	jsonOK(w, map[string]string{"status": "released"})
+}
+
+func (app *App) handleGetEditingLocks(w http.ResponseWriter, r *http.Request, user *User) {
+	locks := app.store.GetAllEditingLocks()
+	jsonOK(w, locks)
+}
+
+// ── Backup & Restore ──────────────────────────────────────────────────────────
+
+func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
+	// Create a zip archive of all JSON data files
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-backup-%s.zip"`, time.Now().Format("2006-01-02T150405")))
+
+	zw := zip.NewWriter(w)
+	dataDir := app.store.DataDir()
+	files := []string{
+		"event_types.json", "users.json", "preferences.json", "groups.json",
+		"memberships.json", "layers.json", "events.json", "attachments.json",
+		"alarms.json", "locks.json", "audit.json", "exercise.json",
+		"comments.json", "phases.json", "templates.json", "roles.json",
+		"registration.json", "invitations.json", "oidc.json", "mail.json",
+		"apikeys.json", "filter_presets.json", "event_versions.json",
+	}
+	for _, f := range files {
+		path := filepath.Join(dataDir, f)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // skip missing files
+		}
+		fw, err := zw.Create(f)
+		if err != nil {
+			continue
+		}
+		fw.Write(data) //nolint
+	}
+	zw.Close() //nolint
+	app.store.LogAudit(AuditEntry{ //nolint
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "backup", EntityType: "system", EntityID: 0,
+		Summary: "Admin downloaded data backup",
+	})
+}
+
+func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User) {
+	// Parse the uploaded zip file and restore JSON data files
+	if err := r.ParseMultipartForm(64 << 20); err != nil { // 64 MB
+		jsonError(w, "failed to parse upload", http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("backup")
+	if err != nil {
+		jsonError(w, "backup file required", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Read the entire zip into memory to get its size
+	buf := new(bytes.Buffer)
+	size, err := io.Copy(buf, file)
+	if err != nil {
+		jsonError(w, "failed to read backup", http.StatusInternalServerError)
+		return
+	}
+	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), size)
+	if err != nil {
+		jsonError(w, "invalid zip file", http.StatusBadRequest)
+		return
+	}
+
+	dataDir := app.store.DataDir()
+	allowed := map[string]bool{
+		"event_types.json": true, "preferences.json": true, "groups.json": true,
+		"memberships.json": true, "layers.json": true, "events.json": true,
+		"attachments.json": true, "alarms.json": true, "locks.json": true,
+		"exercise.json": true, "comments.json": true, "phases.json": true,
+		"templates.json": true, "roles.json": true, "registration.json": true,
+		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
+	}
+	// Note: users.json, sessions.json, apikeys.json, oidc.json, mail.json excluded for security
+	restored := 0
+	for _, f := range zr.File {
+		if !allowed[f.Name] {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(dataDir, f.Name), data, 0644); err != nil {
+			continue
+		}
+		restored++
+	}
+	app.store.LogAudit(AuditEntry{ //nolint
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "restore", EntityType: "system", EntityID: 0,
+		Summary: fmt.Sprintf("Admin restored %d data files from backup", restored),
+	})
+	jsonOK(w, map[string]interface{}{
+		"status":   "restored",
+		"files":    restored,
+		"message":  "Backup restored successfully. Please restart the server for changes to take full effect.",
+	})
+}
+
+// ── WebCal Subscription ───────────────────────────────────────────────────────
+
+func (app *App) handleWebCal(w http.ResponseWriter, r *http.Request) {
+	// /webcal/:token.ics
+	token := strings.TrimPrefix(r.URL.Path, "/webcal/")
+	token = strings.TrimSuffix(token, ".ics")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+	// Find user by WebCal token
+	users := app.store.GetUsers()
+	var calUser *User
+	for i := range users {
+		if users[i].WebCalToken == token {
+			calUser = &users[i]
+			break
+		}
+	}
+	if calUser == nil {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+	// Re-use existing ICS export handler with the found user
+	r2 := r.WithContext(r.Context())
+	app.handleExportICS(w, r2, calUser)
+}
+
+// ── Update User Profile (handles + webcal token) ──────────────────────────────
+
+func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		MattermostHandle string `json:"mattermost_handle"`
+		DiscordHandle    string `json:"discord_handle"`
+		SignalHandle     string `json:"signal_handle"`
+		GenerateWebCal   bool   `json:"generate_webcal"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	fullUser, ok := app.store.GetUserByID(user.ID)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	fullUser.MattermostHandle = req.MattermostHandle
+	fullUser.DiscordHandle = req.DiscordHandle
+	fullUser.SignalHandle = req.SignalHandle
+	if req.GenerateWebCal && fullUser.WebCalToken == "" {
+		// Generate a new WebCal subscription token
+		tokBytes := make([]byte, 16)
+		rand.Read(tokBytes) //nolint
+		fullUser.WebCalToken = hex.EncodeToString(tokBytes)
+	}
+	if err := app.store.UpdateUser(*fullUser); err != nil {
+		jsonError(w, "failed to update profile", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, fullUser.Public())
+}
+
+// ── Cascade Reschedule ─────────────────────────────────────────────────────────
+
+func (app *App) handleCascadeReschedule(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		EventID   int64         `json:"event_id"`
+		ShiftMins int           `json:"shift_minutes"` // positive = forward, negative = backward
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.ShiftMins == 0 {
+		jsonError(w, "shift_minutes must not be zero", http.StatusBadRequest)
+		return
+	}
+	shift := time.Duration(req.ShiftMins) * time.Minute
+
+	// Gather all events and find dependents (BFS/DFS cascade)
+	allEvents := app.store.GetEventsInRange(time.Now().Add(-365*24*time.Hour), time.Now().Add(365*24*time.Hour))
+	// Build dependency map: eventID -> list of events that depend on it
+	dependents := map[int64][]Event{}
+	for _, ev := range allEvents {
+		for _, dep := range ev.DependsOn {
+			dependents[dep] = append(dependents[dep], ev)
+		}
+	}
+
+	// BFS
+	visited := map[int64]bool{req.EventID: true}
+	queue := []int64{req.EventID}
+	updated := []Event{}
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, dep := range dependents[cur] {
+			if !visited[dep.ID] {
+				visited[dep.ID] = true
+				dep.StartTime = dep.StartTime.Add(shift)
+				if dep.EndTime != nil {
+					t := dep.EndTime.Add(shift)
+					dep.EndTime = &t
+				}
+				if err := app.store.UpdateEvent(dep); err == nil {
+					updated = append(updated, dep)
+					app.broadcastEventChange(user.ID, "updated", &dep)
+				}
+				queue = append(queue, dep.ID)
+			}
+		}
+	}
+
+	jsonOK(w, map[string]interface{}{
+		"rescheduled": len(updated),
+		"events":      updated,
+	})
+}
+
 // ── OIDC SSO ─────────────────────────────────────────────────────────────────
 
 // configureOIDC discovers the OIDC provider endpoints from the issuer's well-known URL.
@@ -4170,6 +4608,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			DisplayName: displayName,
 			Role:        defaultRole,
 			Vetted:      true, // SSO users are pre-authenticated by the IDP
+			IsOIDC:      true,
 		}
 		// No password — OIDC-only login
 		created, err := app.store.CreateUser(newUser)
@@ -4216,6 +4655,24 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Expires:  sess.ExpiresAt,
 		SameSite: http.SameSiteLaxMode,
 	})
+	// Track last login and ensure IsOIDC is set
+	go func(u User, ip string) {
+		now := time.Now()
+		u.LastLoginAt = &now
+		u.LastLoginIP = ip
+		u.IsOIDC = true
+		if names, err := net.LookupAddr(ip); err == nil && len(names) > 0 {
+			u.LastLoginDomain = strings.TrimSuffix(names[0], ".")
+		}
+		if fullUser, ok := app.store.GetUserByID(u.ID); ok {
+			fullUser.LastLoginAt = u.LastLoginAt
+			fullUser.LastLoginIP = u.LastLoginIP
+			fullUser.LastLoginDomain = u.LastLoginDomain
+			fullUser.IsOIDC = true
+			app.store.UpdateUser(*fullUser) //nolint
+		}
+	}(*user, r.RemoteAddr)
+
 	logVerbose("OIDC login success: user=%s role=%s", username, user.Role)
 	logDebug("OIDC: session created id=%s expires=%s", sessID, sess.ExpiresAt.Format(time.RFC3339))
 	http.Redirect(w, r, "/", http.StatusFound)

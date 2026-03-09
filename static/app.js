@@ -79,6 +79,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnAutoReport) {
     btnAutoReport.addEventListener('click', () => openAutoReportModal());
   }
+
+  const btnPVA = document.getElementById('btnPVA');
+  if (btnPVA) {
+    btnPVA.addEventListener('click', () => openPVAModal());
+  }
+
+  const btnBackup = document.getElementById('btnBackup');
+  if (btnBackup) {
+    btnBackup.addEventListener('click', () => openBackupModal());
+  }
 });
 
 // ── Init ────────────────────────────────────────────────────────────────────
@@ -186,6 +196,12 @@ async function init() {
       userHasCapability('auto_report');
     btnAutoReport.style.display = canAutoReport ? '' : 'none';
   }
+  // Planned vs Actual button (team lead and above)
+  const btnPVA = document.getElementById('btnPVA');
+  if (btnPVA) btnPVA.style.display = isTeamLead || isAdminOrOplead ? '' : 'none';
+  // Backup button (admin only)
+  const btnBackup = document.getElementById('btnBackup');
+  if (btnBackup) btnBackup.style.display = state.user.role === 'admin' ? '' : 'none';
 
   if (state.user.role==='admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
