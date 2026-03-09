@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/smtp"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -3637,7 +3639,356 @@ func (app *App) routes() http.Handler {
 		mux.HandleFunc("/api/auth/oidc-config", app.handleOIDCInfo)
 	}
 
+	// Mail configuration (admin only)
+	mux.HandleFunc("/api/integrations/mail", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetMailConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveMailConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Mail send (for reports / alarm notifications)
+	mux.HandleFunc("/api/mail/send", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleTeamLead, app.handleSendMail)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Mail: test connection
+	mux.HandleFunc("/api/integrations/mail/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleTestMail)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// API Keys
+	mux.HandleFunc("/api/apikeys", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleListAPIKeys)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleAdmin, app.handleCreateAPIKey)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/apikeys/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleDeleteAPIKey)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Filter presets
+	mux.HandleFunc("/api/filter-presets", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListFilterPresets)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleCreateFilterPreset)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/filter-presets/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireAuth(app.handleDeleteFilterPreset)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	return mux
+}
+
+// ── Mail Config ────────────────────────────────────────────────────────────────
+
+func (app *App) handleGetMailConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	cfg := app.store.GetMailConfig()
+	cfg.Password = "" // never expose password
+	jsonOK(w, cfg)
+}
+
+func (app *App) handleSaveMailConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg MailConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	// Preserve existing password if not provided in request
+	if cfg.Password == "" {
+		existing := app.store.GetMailConfig()
+		cfg.Password = existing.Password
+	}
+	if err := app.store.SaveMailConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "mail_config", 0, "Updated mail configuration")
+	resp := cfg
+	resp.Password = ""
+	jsonOK(w, resp)
+}
+
+func (app *App) handleTestMail(w http.ResponseWriter, r *http.Request, user *User) {
+	cfg := app.store.GetMailConfig()
+	if !cfg.Enabled || cfg.SMTPHost == "" {
+		jsonError(w, "Mail is not configured", http.StatusBadRequest)
+		return
+	}
+	to := user.Email
+	if to == "" {
+		to = user.Username + "@example.com"
+	}
+	if err := app.sendMail(cfg, to, "Tidslinjal — Mail Test", "<p>Mail configuration is working correctly.</p>"); err != nil {
+		jsonError(w, "Mail test failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok", "sent_to": to})
+}
+
+func (app *App) handleSendMail(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		To       string `json:"to"`
+		Subject  string `json:"subject"`
+		BodyHTML string `json:"body_html"`
+		BodyText string `json:"body_text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	cfg := app.store.GetMailConfig()
+	if !cfg.Enabled || cfg.SMTPHost == "" {
+		jsonError(w, "mail not configured", http.StatusServiceUnavailable)
+		return
+	}
+	body := req.BodyHTML
+	if body == "" {
+		body = "<pre>" + req.BodyText + "</pre>"
+	}
+	if err := app.sendMail(cfg, req.To, req.Subject, body); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "sent"})
+}
+
+// sendMail sends a plain HTML email via configured SMTP
+func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
+	port := cfg.SMTPPort
+	if port == 0 {
+		port = 587
+	}
+	from := cfg.FromAddr
+	if from == "" {
+		from = "tidslinjal@localhost"
+	}
+	fromName := cfg.FromName
+	if fromName == "" {
+		fromName = "Tidslinjal"
+	}
+
+	msg := []byte(fmt.Sprintf("From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
+		fromName, from, to, subject, bodyHTML))
+
+	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, port)
+	var auth interface{ Start(*smtp.ServerInfo) (string, []byte, error) }
+	if cfg.Username != "" && cfg.Password != "" {
+		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.SMTPHost)
+	}
+
+	if cfg.TLSMode == "tls" {
+		tlsCfg := &tls.Config{ServerName: cfg.SMTPHost}
+		conn, err := tls.Dial("tcp", addr, tlsCfg)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		client, err := smtp.NewClient(conn, cfg.SMTPHost)
+		if err != nil {
+			return err
+		}
+		defer client.Quit()
+		if auth != nil {
+			if err := client.Auth(auth.(smtp.Auth)); err != nil {
+				return err
+			}
+		}
+		if err := client.Mail(from); err != nil {
+			return err
+		}
+		if err := client.Rcpt(to); err != nil {
+			return err
+		}
+		wc, err := client.Data()
+		if err != nil {
+			return err
+		}
+		_, err = wc.Write(msg)
+		wc.Close()
+		return err
+	}
+
+	// STARTTLS or plain
+	if auth != nil {
+		return smtp.SendMail(addr, auth.(smtp.Auth), from, []string{to}, msg)
+	}
+	return smtp.SendMail(addr, nil, from, []string{to}, msg)
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+func (app *App) handleListAPIKeys(w http.ResponseWriter, r *http.Request, user *User) {
+	keys := app.store.GetAPIKeys()
+	if keys == nil {
+		keys = []APIKey{}
+	}
+	jsonOK(w, keys)
+}
+
+func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate a random API key
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		jsonError(w, "failed to generate key", http.StatusInternalServerError)
+		return
+	}
+	rawKey := "tlk_" + hex.EncodeToString(raw)
+	hash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcrypt.MinCost)
+	if err != nil {
+		jsonError(w, "failed to hash key", http.StatusInternalServerError)
+		return
+	}
+
+	k := APIKey{
+		Name:        req.Name,
+		Description: req.Description,
+		KeyHash:     string(hash),
+		CreatedBy:   user.ID,
+	}
+	created, err := app.store.CreateAPIKey(k)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "created", "api_key", created.ID,
+		fmt.Sprintf("Created API key %q", req.Name))
+	// Return the raw key once (never stored in plain text)
+	created.Key = rawKey
+	created.KeyHash = ""
+	jsonOK(w, created)
+}
+
+func (app *App) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/apikeys/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteAPIKey(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "deleted", "api_key", id, fmt.Sprintf("Deleted API key #%d", id))
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// ── API Key auth middleware ────────────────────────────────────────────────────
+
+// requireAPIKeyOrAuth allows requests authenticated with either a session cookie
+// or an Authorization: Bearer <api-key> header.
+func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request, *User)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Try bearer token first
+		authHdr := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHdr, "Bearer ") {
+			raw := strings.TrimPrefix(authHdr, "Bearer ")
+			if raw != "" {
+				// Check API keys
+				if k := app.store.ValidateAPIKey(raw); k != nil {
+					// API key auth: fabricate a synthetic admin-like user context
+					u := &User{
+						ID:          k.CreatedBy,
+						Username:    "apikey:" + k.Name,
+						DisplayName: k.Name,
+						Role:        RoleReadWrite, // conservative default
+					}
+					next(w, r, u)
+					return
+				}
+				// Also check regular bearer (JWT or session token) — pass through
+			}
+		}
+		// Fall back to session-based auth
+		app.requireAuth(next)(w, r)
+	}
+}
+
+// ── Filter Presets ────────────────────────────────────────────────────────────
+
+func (app *App) handleListFilterPresets(w http.ResponseWriter, r *http.Request, user *User) {
+	presets := app.store.GetFilterPresets(user.ID)
+	if presets == nil {
+		presets = []FilterPreset{}
+	}
+	jsonOK(w, presets)
+}
+
+func (app *App) handleCreateFilterPreset(w http.ResponseWriter, r *http.Request, user *User) {
+	var p FilterPreset
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if p.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	p.UserID = user.ID
+	created, err := app.store.CreateFilterPreset(p)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, created)
+}
+
+func (app *App) handleDeleteFilterPreset(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/filter-presets/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteFilterPreset(id, user.ID); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
 // ── OIDC SSO ─────────────────────────────────────────────────────────────────

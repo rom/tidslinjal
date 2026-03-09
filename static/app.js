@@ -74,6 +74,11 @@ document.addEventListener('DOMContentLoaded', () => {
       openModal('reportModal');
     });
   }
+
+  const btnAutoReport = document.getElementById('btnAutoReport');
+  if (btnAutoReport) {
+    btnAutoReport.addEventListener('click', () => openAutoReportModal());
+  }
 });
 
 // ── Init ────────────────────────────────────────────────────────────────────
@@ -169,9 +174,18 @@ async function init() {
   if (btnExport) btnExport.style.display = isAdminOrOplead ? '' : 'none';
   const btnImport = document.getElementById('btnImport');
   if (btnImport) btnImport.style.display = isAdminOrOplead ? '' : 'none';
-  // Report: teamlead+
+  // Report: based on 'report' capability (admin, oplead, staffofficer both, teamlead by default)
+  const canReport = state.user.role === 'admin' || isAdminOrOplead || isTeamLead ||
+    userHasCapability('report');
   const btnReport = document.getElementById('btnReport');
-  if (btnReport) btnReport.style.display = isTeamLead ? '' : 'none';
+  if (btnReport) btnReport.style.display = canReport ? '' : 'none';
+  // Auto-report button
+  const btnAutoReport = document.getElementById('btnAutoReport');
+  if (btnAutoReport) {
+    const canAutoReport = state.user.role === 'admin' || isAdminOrOplead ||
+      userHasCapability('auto_report');
+    btnAutoReport.style.display = canAutoReport ? '' : 'none';
+  }
 
   if (state.user.role==='admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
@@ -205,6 +219,7 @@ async function init() {
   document.getElementById('btnTemplates')?.addEventListener('click', openTemplatesModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('btnFilter')?.addEventListener('click', e => openFilterPopover(e.currentTarget));
+  document.getElementById('btnViewToggle')?.addEventListener('click', toggleListView);
   document.getElementById('btnUndo')?.addEventListener('click', performUndo);
   document.getElementById('btnPrint')?.addEventListener('click', printTimeline);
   document.getElementById('searchInput').addEventListener('input', e => {
@@ -257,6 +272,9 @@ async function init() {
     });
   });
 
+  // Load filter presets
+  _loadFilterPresets();
+
   // Clock
   updateClock();
   setInterval(updateClock, 1000);
@@ -264,6 +282,10 @@ async function init() {
   // Auto-refresh
   setInterval(refreshAll, 60000);
   setInterval(() => updateCurrentTimeLine(getDays(), getSlotHeight()), 30000);
+
+  // Auto-report checker (every 5 minutes)
+  checkAutoReports();
+  setInterval(checkAutoReports, 300000);
 
   // SSE
   connectSSE();
@@ -324,3 +346,109 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ── List / Table View ───────────────────────────────────────────────────────
+let _listViewActive = false;
+let _listSortKey    = 'start_time';
+let _listSortAsc    = true;
+
+function toggleListView() {
+  _listViewActive = !_listViewActive;
+  const timeline  = document.getElementById('timeline-container');
+  const listView  = document.getElementById('list-view');
+  const btn       = document.getElementById('btnViewToggle');
+  if (_listViewActive) {
+    if (timeline) timeline.style.display = 'none';
+    if (listView)  listView.style.display = '';
+    if (btn)       { btn.textContent = '📅 Calendar'; btn.classList.add('active'); }
+    // Populate type filter
+    const typeEl = document.getElementById('listTypeFilter');
+    if (typeEl && typeEl.options.length <= 1) {
+      (state.eventTypes || []).forEach(et => {
+        const opt = document.createElement('option');
+        opt.value = et.key;
+        opt.textContent = et.label;
+        typeEl.appendChild(opt);
+      });
+    }
+    renderListView();
+  } else {
+    if (timeline) timeline.style.display = '';
+    if (listView)  listView.style.display = 'none';
+    if (btn)       { btn.textContent = '📋 List'; btn.classList.remove('active'); }
+    renderTimeline();
+  }
+}
+
+function listSortBy(key) {
+  if (_listSortKey === key) {
+    _listSortAsc = !_listSortAsc;
+  } else {
+    _listSortKey = key;
+    _listSortAsc = true;
+  }
+  // Update sort indicators
+  document.querySelectorAll('[id^="listSort-"]').forEach(el => el.textContent = '');
+  const ind = document.getElementById('listSort-' + key);
+  if (ind) ind.textContent = _listSortAsc ? '▲' : '▼';
+  renderListView();
+}
+
+function renderListView() {
+  if (!_listViewActive) return;
+  const tbody  = document.getElementById('list-view-tbody');
+  const countEl = document.getElementById('listCount');
+  if (!tbody) return;
+
+  const search     = (document.getElementById('listSearch')?.value || '').toLowerCase();
+  const statusFil  = document.getElementById('listStatusFilter')?.value || '';
+  const typeFil    = document.getElementById('listTypeFilter')?.value || '';
+
+  let events = (state.events || []).filter(ev => {
+    if (statusFil && ev.status !== statusFil) return false;
+    if (typeFil   && ev.event_type !== typeFil) return false;
+    if (search) {
+      const hay = (ev.title + ' ' + (ev.description||'') + ' ' + (ev.responsible_name||'')).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  events.sort((a, b) => {
+    let va = a[_listSortKey] || '';
+    let vb = b[_listSortKey] || '';
+    if (_listSortKey === 'start_time') { va = new Date(va); vb = new Date(vb); }
+    if (va < vb) return _listSortAsc ? -1 : 1;
+    if (va > vb) return _listSortAsc ?  1 : -1;
+    return 0;
+  });
+
+  if (countEl) countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
+
+  const statusColors = {
+    planned:'var(--text-dim)', active:'var(--accent)', completed:'var(--green)',
+    verified:'var(--green)', cancelled:'var(--red)', submitted:'var(--yellow)',
+    responded_to:'var(--yellow)', rejected:'var(--red)'
+  };
+
+  tbody.innerHTML = events.map(ev => `
+    <tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="showEventDetail(state.events.find(e=>e.id===${ev.id}))"
+        onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+      <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
+        ${escHtml(ev.title)}
+      </td>
+      <td style="padding:8px 10px">${escHtml(ev.event_type)}</td>
+      <td style="padding:8px 10px"><span style="color:${statusColors[ev.status]||'var(--text)'}">${t('status_'+(ev.status||'planned'))||ev.status}</span></td>
+      <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}</td>
+      <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
+      <td style="padding:8px 10px">${escHtml(ev.responsible_name||'')}</td>
+      <td style="padding:8px 10px">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showEventDetail(state.events.find(e=>e.id===${ev.id}))">View</button>
+        ${state.user && hasRole2(state.user.role, 'readwrite') ?
+          `<button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="event.stopPropagation();openEventModal(state.events.find(e=>e.id===${ev.id}))">Edit</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}

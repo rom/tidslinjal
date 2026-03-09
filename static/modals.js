@@ -64,6 +64,7 @@ function onContactTypeChange() {
   const vmGroup  = document.getElementById('virtualMeetingTypeGroup');
   if (urlGroup) urlGroup.style.display = ct ? '' : 'none';
   if (vmGroup)  vmGroup.style.display  = ct === 'url' ? '' : 'none';
+  onVirtualMeetingTypeChange();
 }
 
 function updateEventModalTimeVisibility() {
@@ -1605,9 +1606,97 @@ function renderSidebar() {
         </label>
         <button class="btn btn-primary btn-sm" onclick="saveOIDCSettings()">${t('settings_oidc_save')||'Save & Apply'}</button>
       </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📧 Mail Setup</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure SMTP for alarm notifications, reports, and user invitations.</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="mailEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Email Delivery
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">SMTP Host</label>
+          <input type="text" id="mailHost" placeholder="smtp.example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:1;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">Port</label>
+            <input type="number" id="mailPort" placeholder="587" value="587"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="flex:2;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">TLS Mode</label>
+            <select id="mailTLS" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+              <option value="starttls">STARTTLS (recommended)</option>
+              <option value="tls">TLS</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Username</label>
+          <input type="text" id="mailUsername" placeholder="user@example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Password <span style="opacity:.6">(leave blank to keep)</span></label>
+          <input type="password" id="mailPassword" placeholder="••••••••"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">From Address</label>
+          <input type="email" id="mailFrom" placeholder="tidslinjal@example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">From Name</label>
+          <input type="text" id="mailFromName" placeholder="Tidslinjal"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveMailConfig()">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="testMailConfig()">Test</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">💼 Microsoft Teams Integration</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Configure Teams to auto-generate meeting links for Meeting-type events.</p>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Teams Webhook URL (for notifications)</label>
+          <input type="url" id="teamsWebhookURL" placeholder="https://…/IncomingWebhook/…"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Teams Meeting URL Template</label>
+          <input type="url" id="teamsMeetingTemplate" placeholder="https://teams.microsoft.com/l/meetup-join/…"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Provide a base URL; event details will be appended as query params.</p>
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Zoom Meeting Base URL / User</label>
+          <input type="text" id="zoomMeetingBase" placeholder="https://zoom.us/j/1234567890"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveTeamsConfig()">Save Teams/Zoom Config</button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔑 API Keys</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">Generate API keys for external tool integration (Bearer token auth).</p>
+        <div id="apiKeyList" style="margin-bottom:8px">Loading…</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="newAPIKeyName" placeholder="Key name / description" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <button class="btn btn-primary btn-sm" onclick="createAPIKey()">+ Create</button>
+        </div>
+      </div>
     `;
     // Load current OIDC settings into the form
     setTimeout(_initOIDCSettingsUI, 0);
+    setTimeout(_initMailSettingsUI, 0);
+    setTimeout(_loadAPIKeys, 0);
+    setTimeout(_loadTeamsConfigUI, 0);
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -1687,7 +1776,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
-          ${['day','2days','3days','4days','5days','week'].map(v =>
+          ${['day','2days','3days','4days','5days','week','2weeks','3weeks'].map(v =>
             `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setDefaultView('${v}')">${t('range_'+v)||v}</button>`
           ).join('')}
         </div>
@@ -2048,6 +2137,239 @@ async function saveOIDCSettings() {
   }
 }
 
+// ── Teams / Zoom Integration ───────────────────────────────────────────────
+function _getTeamsConfig() {
+  try { return JSON.parse(localStorage.getItem('teamsConfig') || '{}'); } catch { return {}; }
+}
+
+function saveTeamsConfig() {
+  const cfg = {
+    webhook:     document.getElementById('teamsWebhookURL')?.value?.trim()      || '',
+    teamsBase:   document.getElementById('teamsMeetingTemplate')?.value?.trim() || '',
+    zoomBase:    document.getElementById('zoomMeetingBase')?.value?.trim()      || '',
+  };
+  localStorage.setItem('teamsConfig', JSON.stringify(cfg));
+  showNotification('success', 'Teams/Zoom config saved');
+}
+
+function _loadTeamsConfigUI() {
+  const cfg = _getTeamsConfig();
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('teamsWebhookURL',       cfg.webhook);
+  setVal('teamsMeetingTemplate',  cfg.teamsBase);
+  setVal('zoomMeetingBase',       cfg.zoomBase);
+}
+
+// Called from event modal when virtual meeting type changes
+function onVirtualMeetingTypeChange() {
+  const vmType = document.getElementById('eventVirtualMeetingType')?.value;
+  const btn    = document.getElementById('btnGenerateMeetingLink');
+  if (btn) btn.style.display = (vmType === 'teams' || vmType === 'zoom') ? '' : 'none';
+}
+
+function generateMeetingLink() {
+  const vmType  = document.getElementById('eventVirtualMeetingType')?.value;
+  const cfg     = _getTeamsConfig();
+  const title   = document.getElementById('eventTitle')?.value || 'Meeting';
+  const start   = document.getElementById('eventStart')?.value || new Date().toISOString();
+  let url = '';
+
+  if (vmType === 'teams') {
+    const base = cfg.teamsBase;
+    if (base) {
+      url = base + (base.includes('?') ? '&' : '?') +
+        'subject=' + encodeURIComponent(title) +
+        '&startTime=' + encodeURIComponent(start);
+    } else {
+      // Generate a "new meeting" deep link
+      url = 'https://teams.microsoft.com/l/meeting/new?subject=' +
+        encodeURIComponent(title) + '&startTime=' + encodeURIComponent(start);
+    }
+  } else if (vmType === 'zoom') {
+    const base = cfg.zoomBase;
+    if (base) {
+      url = base;
+    } else {
+      url = 'https://zoom.us/start/videomeeting';
+    }
+  }
+
+  if (url) {
+    const urlEl = document.getElementById('eventContactURL');
+    if (urlEl) urlEl.value = url;
+    showNotification('success', `${vmType === 'teams' ? 'Teams' : 'Zoom'} link generated`);
+  } else {
+    showError(`Configure ${vmType} URL in Integrations first`);
+  }
+}
+
+// ── User Profile ───────────────────────────────────────────────────────────
+function openProfileModal() {
+  const u = state.user;
+  if (!u) return;
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('profileUsername',    u.username);
+  setVal('profileRole',        t('role_' + u.role) || u.role);
+  setVal('profileDisplayName', u.display_name);
+  setVal('profileEmail',       u.email);
+  ['profilePwdCurrent', 'profilePwdNew', 'profilePwdConfirm'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const info = document.getElementById('profileInfo');
+  if (info) {
+    info.innerHTML = `
+      <p>Member since: ${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</p>
+      ${u.nato_designations && u.nato_designations.length ? `<p>NATO Designations: ${u.nato_designations.join(', ')}</p>` : ''}
+    `;
+  }
+  openModal('profileModal');
+}
+
+async function saveProfile() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const displayName = val('profileDisplayName');
+  const email       = val('profileEmail');
+  const curPw       = val('profilePwdCurrent');
+  const newPw       = val('profilePwdNew');
+  const conPw       = val('profilePwdConfirm');
+
+  if (displayName || email !== undefined) {
+    const res = await api('PUT', `/api/users/${state.user.id}`, {
+      display_name: displayName || state.user.display_name,
+      email,
+      role: state.user.role,
+      can_lock: state.user.can_lock,
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      state.user.display_name = updated.display_name || displayName;
+      state.user.email = updated.email || email;
+      document.getElementById('userDisplayName').textContent = state.user.display_name || state.user.username;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to update profile');
+      return;
+    }
+  }
+
+  if (newPw) {
+    if (newPw !== conPw) { showError(t('password_mismatch') || 'Passwords do not match'); return; }
+    const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to change password');
+      return;
+    }
+  }
+
+  closeModal('profileModal');
+  showNotification('success', 'Profile updated');
+}
+
+// ── Mail Config UI ─────────────────────────────────────────────────────────
+async function _initMailSettingsUI() {
+  try {
+    const cfg = await apiGet('/api/integrations/mail');
+    if (!cfg) return;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    const setCb  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    setCb('mailEnabled', cfg.enabled);
+    setVal('mailHost',     cfg.smtp_host);
+    setVal('mailPort',     cfg.smtp_port || 587);
+    setVal('mailTLS',      cfg.tls_mode || 'starttls');
+    setVal('mailUsername', cfg.username);
+    setVal('mailFrom',     cfg.from_addr);
+    setVal('mailFromName', cfg.from_name);
+  } catch { /* mail not configured yet */ }
+}
+
+async function saveMailConfig() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const cfg = {
+    enabled:   document.getElementById('mailEnabled')?.checked || false,
+    smtp_host: val('mailHost'),
+    smtp_port: parseInt(val('mailPort'), 10) || 587,
+    tls_mode:  val('mailTLS'),
+    username:  val('mailUsername'),
+    password:  val('mailPassword'),
+    from_addr: val('mailFrom'),
+    from_name: val('mailFromName'),
+  };
+  const res = await api('PUT', '/api/integrations/mail', cfg);
+  if (res.ok) {
+    showNotification('success', 'Mail settings saved');
+    // Clear password field
+    const pw = document.getElementById('mailPassword');
+    if (pw) pw.value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save mail settings');
+  }
+}
+
+async function testMailConfig() {
+  const res = await api('POST', '/api/integrations/mail/test', {});
+  if (res.ok) {
+    const d = await res.json();
+    showNotification('success', `Test email sent to ${d.sent_to}`);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Mail test failed');
+  }
+}
+
+// ── API Keys UI ─────────────────────────────────────────────────────────────
+async function _loadAPIKeys() {
+  const listEl = document.getElementById('apiKeyList');
+  if (!listEl) return;
+  try {
+    const keys = await apiGet('/api/apikeys');
+    if (!keys || !keys.length) {
+      listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No API keys yet.</p>';
+      return;
+    }
+    listEl.innerHTML = keys.map(k => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+        <div>
+          <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
+          ${k.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${escHtml(k.description)}</span>` : ''}
+          ${k.last_used_at ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Last used: ${new Date(k.last_used_at).toLocaleString()}</span>` : ''}
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="deleteAPIKey(${k.id})">Delete</button>
+      </div>
+    `).join('');
+  } catch {
+    listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
+  }
+}
+
+async function createAPIKey() {
+  const name = document.getElementById('newAPIKeyName')?.value?.trim();
+  if (!name) { showError('Key name is required'); return; }
+  const res = await apiPost('/api/apikeys', {name, description: ''});
+  if (res.ok) {
+    const key = await res.json();
+    // Show the key once (will not be shown again)
+    alert(`New API key created!\n\nKey: ${key.key}\n\nCopy it now — it won't be shown again.`);
+    document.getElementById('newAPIKeyName').value = '';
+    await _loadAPIKeys();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to create API key');
+  }
+}
+
+async function deleteAPIKey(id) {
+  if (!confirm('Delete this API key? It will stop working immediately.')) return;
+  const res = await api('DELETE', `/api/apikeys/${id}`, null);
+  if (res.ok) {
+    showNotification('success', 'API key deleted');
+    await _loadAPIKeys();
+  } else {
+    showError('Failed to delete API key');
+  }
+}
+
 async function setDefaultView(view) {
   state.preferences.default_view = view;
   state.range = view;
@@ -2142,7 +2464,7 @@ function updateUILabels() {
 
   // Range select options
   const rs = document.getElementById('rangeSelect');
-  const rangeKeys = ['day','2days','3days','4days','5days','week','month','2months','3months'];
+  const rangeKeys = ['day','2days','3days','4days','5days','week','2weeks','3weeks','month','2months','3months'];
   [...rs.options].forEach(opt => { opt.text = t('range_'+opt.value) || opt.text; });
 
   // Resolution select
@@ -2421,6 +2743,7 @@ function showAlarmNotification(data, level) {
   const existing = unackedAlarms.get(data.alarm_id);
   if (existing) {
     clearTimeout(existing.timerID);
+    clearInterval(existing.counterID);
     if (existing.element && existing.element.parentNode) existing.element.remove();
   }
 
@@ -2429,9 +2752,11 @@ function showAlarmNotification(data, level) {
   el.className = `notification alarm alarm-level-${Math.min(level, 2)}`;
 
   const warnings = level > 0 ? ' ' + '⚠️'.repeat(Math.min(level, 3)) : '';
+  const shownAt  = Date.now();
   el.innerHTML = `
     <div class="notification-title">${t('notif_alarm_title')}${escHtml(warnings)}</div>
     <div class="notification-msg">${escHtml(data.message)}</div>
+    <div class="alarm-since" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">⏱ 0s ago</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm notification-close-btn" onclick="dismissAlarmNotif(${data.alarm_id})">Dismiss</button>
       <button class="btn btn-secondary btn-sm" onclick="openAlarmEvent(${data.event_id})">📋 Show event</button>
@@ -2439,6 +2764,20 @@ function showAlarmNotification(data, level) {
     </div>
   `;
   area.appendChild(el);
+
+  // Update "X seconds/minutes ago" counter every second
+  const sinceEl = el.querySelector('.alarm-since');
+  const counterID = setInterval(() => {
+    if (!el.parentNode) { clearInterval(counterID); return; }
+    const secs = Math.floor((Date.now() - shownAt) / 1000);
+    if (secs < 60) {
+      sinceEl.textContent = `⏱ ${secs}s ago`;
+    } else {
+      const mins = Math.floor(secs / 60);
+      const rem  = secs % 60;
+      sinceEl.textContent = `⏱ ${mins}m ${rem}s ago`;
+    }
+  }, 1000);
 
   // Browser notification on first fire
   if (level === 0 && Notification.permission === 'granted') {
@@ -2451,13 +2790,14 @@ function showAlarmNotification(data, level) {
     ? setTimeout(() => showAlarmNotification(data, level + 1), 60000)
     : null;
 
-  unackedAlarms.set(data.alarm_id, {data, level, timerID, element: el});
+  unackedAlarms.set(data.alarm_id, {data, level, timerID, counterID, element: el});
 }
 
 function dismissAlarmNotif(alarmID) {
   const entry = unackedAlarms.get(alarmID);
   if (entry) {
     clearTimeout(entry.timerID);
+    clearInterval(entry.counterID);
     unackedAlarms.delete(alarmID);
     if (entry.element && entry.element.parentNode) entry.element.remove();
   }
@@ -3366,6 +3706,152 @@ async function generateReport() {
   showNotification('success', t('report_ready')||'Report downloaded');
 }
 
+// ── Auto Report ─────────────────────────────────────────────────────────────
+// Auto-report schedules stored in localStorage (client-side scheduling)
+function _getAutoReports() {
+  try { return JSON.parse(localStorage.getItem('autoReports') || '[]'); } catch { return []; }
+}
+function _saveAutoReports(list) {
+  localStorage.setItem('autoReports', JSON.stringify(list));
+}
+
+function openAutoReportModal() {
+  _renderAutoReportList();
+  openModal('autoReportModal');
+}
+
+function _renderAutoReportList() {
+  const list = _getAutoReports();
+  const el   = document.getElementById('autoReportList');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No schedules configured yet.</p>';
+    return;
+  }
+  el.innerHTML = list.map((r, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px">
+      <div>
+        <strong>${escHtml(r.type)}</strong> — ${escHtml(r.frequency)}
+        ${r.recipient ? `<span style="color:var(--text-dim);margin-left:8px">→ ${escHtml(r.recipient)}</span>` : ''}
+        <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:8px">Next: ${_nextRunLabel(r)}</span>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteAutoReport(${i})">Remove</button>
+    </div>
+  `).join('');
+}
+
+function _nextRunLabel(r) {
+  if (!r.nextRun) return 'soon';
+  const d = new Date(r.nextRun);
+  return d.toLocaleString();
+}
+
+function _calcNextRun(frequency) {
+  const now = Date.now();
+  switch (frequency) {
+    case 'hourly': return now + 3600000;
+    case 'daily':  return now + 86400000;
+    case 'weekly': return now + 7 * 86400000;
+    default:       return now + 86400000;
+  }
+}
+
+function addAutoReport() {
+  const type      = document.getElementById('arType')?.value || 'timeline';
+  const frequency = document.getElementById('arFrequency')?.value || 'daily';
+  const delivery  = document.getElementById('arDelivery')?.value || 'download';
+  const recipient = document.getElementById('arRecipient')?.value?.trim() || '';
+
+  const list = _getAutoReports();
+  list.push({ type, frequency, delivery, recipient, nextRun: _calcNextRun(frequency), created: Date.now() });
+  _saveAutoReports(list);
+  _renderAutoReportList();
+  showNotification('success', 'Auto-report schedule added');
+
+  // Clear recipient field
+  const rec = document.getElementById('arRecipient');
+  if (rec) rec.value = '';
+}
+
+function deleteAutoReport(idx) {
+  const list = _getAutoReports();
+  list.splice(idx, 1);
+  _saveAutoReports(list);
+  _renderAutoReportList();
+}
+
+// Check and fire auto-reports that are due (called on page load and periodically)
+function checkAutoReports() {
+  const list = _getAutoReports();
+  const now  = Date.now();
+  let changed = false;
+  list.forEach((r, i) => {
+    if (r.nextRun && r.nextRun <= now) {
+      // Generate and deliver the report
+      _runAutoReport(r);
+      list[i].nextRun = _calcNextRun(r.frequency);
+      changed = true;
+    }
+  });
+  if (changed) _saveAutoReports(list);
+}
+
+async function _runAutoReport(r) {
+  // Build events for last period
+  const to   = new Date();
+  const msBack = r.frequency === 'hourly' ? 3600000 : r.frequency === 'weekly' ? 7*86400000 : 86400000;
+  const from  = new Date(Date.now() - msBack);
+
+  const events = state.events.filter(ev => {
+    const evStart = new Date(ev.start_time);
+    return evStart >= from && evStart < to;
+  });
+
+  const title = `Auto ${r.type.toUpperCase()} Report — ${from.toLocaleDateString()} to ${to.toLocaleDateString()}`;
+  let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+  <style>body{font-family:sans-serif;margin:32px;color:#111}h1{font-size:22px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #ccc;padding:6px 10px}th{background:#f0f0f0}</style></head><body>
+  <h1>${escHtml(title)}</h1><p style="color:#666;font-size:13px">Auto-generated: ${new Date().toLocaleString()}</p>
+  <table><thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Start</th><th>End</th></tr></thead><tbody>
+  ${events.sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).map(ev => `<tr>
+    <td>${escHtml(ev.title)}</td>
+    <td>${escHtml(ev.event_type)}</td>
+    <td>${t('status_'+(ev.status||'planned'))||ev.status}</td>
+    <td>${new Date(ev.start_time).toLocaleString()}</td>
+    <td>${ev.end_time ? new Date(ev.end_time).toLocaleString() : '—'}</td>
+  </tr>`).join('')}
+  </tbody></table></body></html>`;
+
+  if (r.delivery === 'download') {
+    const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `auto-report-${r.type}-${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else if (r.delivery === 'webhook' && r.recipient) {
+    try {
+      await fetch(r.recipient, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: `Auto report ready: ${title}`, html})
+      });
+    } catch { /* silent fail */ }
+  } else if (r.delivery === 'email' && r.recipient) {
+    // Send via server-side mail API if available
+    try {
+      await apiPost('/api/mail/send', {
+        to: r.recipient,
+        subject: title,
+        body_html: html
+      });
+    } catch { /* silent fail */ }
+  }
+  showNotification('success', `Auto report generated: ${title}`);
+}
+
 // ── Mobile nav ─────────────────────────────────────────────────────────────
 function mobileNavTab(tab) {
   const sidebar = document.getElementById('sidebar');
@@ -3642,6 +4128,9 @@ function openFilterPopover(btn) {
     '<option value="0"' + (state.filters.layerId===0?' selected':'') + '>Master Timeline</option>' +
     state.layers.map(l => `<option value="${l.id}"${state.filters.layerId==l.id?' selected':''}>${escHtml(l.name)}</option>`).join('');
 
+  // Load presets
+  _renderFilterPresets();
+
   const rect = btn.getBoundingClientRect();
   pop.style.top  = (rect.bottom + 4) + 'px';
   pop.style.left = Math.max(4, rect.left - 100) + 'px';
@@ -3669,6 +4158,66 @@ function clearFilters() {
   const btn = document.getElementById('btnFilter');
   if (btn) btn.classList.remove('btn-active-filter');
   renderTimeline();
+}
+
+// ── Filter Presets ─────────────────────────────────────────────────────────
+async function _loadFilterPresets() {
+  try {
+    const presets = await apiGet('/api/filter-presets');
+    state.filterPresets = presets || [];
+    _renderFilterPresets();
+  } catch { state.filterPresets = []; }
+}
+
+function _renderFilterPresets() {
+  const listEl = document.getElementById('filterPresetList');
+  if (!listEl) return;
+  const presets = state.filterPresets || [];
+  if (!presets.length) {
+    listEl.innerHTML = '<span style="color:var(--text-dim);font-size:var(--fs-xs)">None saved</span>';
+    return;
+  }
+  listEl.innerHTML = presets.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+      <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-xs);padding:2px 6px;text-align:left" onclick="loadFilterPreset(${p.id})">${escHtml(p.name)}</button>
+      <button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="deleteFilterPreset(${p.id})">×</button>
+    </div>
+  `).join('');
+}
+
+async function saveFilterPreset() {
+  const name = document.getElementById('filterPresetName')?.value?.trim();
+  if (!name) { showError('Enter a preset name'); return; }
+  const filters = { ...state.filters };
+  const res = await apiPost('/api/filter-presets', { name, filters });
+  if (res.ok) {
+    const preset = await res.json();
+    state.filterPresets = [...(state.filterPresets || []), preset];
+    _renderFilterPresets();
+    document.getElementById('filterPresetName').value = '';
+    showNotification('success', 'Filter preset saved');
+  } else {
+    showError('Failed to save preset');
+  }
+}
+
+async function deleteFilterPreset(id) {
+  const res = await api('DELETE', `/api/filter-presets/${id}`, null);
+  if (res.ok) {
+    state.filterPresets = (state.filterPresets || []).filter(p => p.id !== id);
+    _renderFilterPresets();
+  }
+}
+
+function loadFilterPreset(id) {
+  const preset = (state.filterPresets || []).find(p => p.id === id);
+  if (!preset || !preset.filters) return;
+  state.filters = { status: [], responsibleId: null, layerId: null, ...preset.filters };
+  // Re-open popover to reflect the loaded preset
+  const btn = document.getElementById('btnFilter');
+  if (btn) openFilterPopover(btn);
+  applyFilters();
+  showNotification('success', `Preset "${preset.name}" loaded`);
 }
 
 // ── Context Menu System ─────────────────────────────────────────────────────
@@ -3872,16 +4421,17 @@ const DEFAULT_ROLE_CONFIGS = [
   { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
   { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
   { key: 'readwrite',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
-  { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true } },
-  { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
-  { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
-  { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true } },
+  { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true } },
+  { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
+  { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
+  { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
 ];
 
 // Ordered list of all capabilities shown in role editor
 const ALL_CAPABILITIES = [
   'see_groups', 'see_users', 'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
-  'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise'
+  'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise',
+  'report', 'auto_report'
 ];
 
 async function openRoleEditor() {

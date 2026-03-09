@@ -61,6 +61,8 @@ window.state = {
   selectedEventIds: [],
   // Role configs (loaded from /api/roles)
   roleConfigs:   [],
+  // Saved filter presets
+  filterPresets: [],
 };
 
 // ── UI state helpers ────────────────────────────────────────────────────────

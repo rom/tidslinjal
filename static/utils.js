@@ -74,6 +74,8 @@ function getRangeDays() {
     case '4days':   return 4;
     case '5days':   return 5;
     case 'week':    return 7;
+    case '2weeks':  return 14;
+    case '3weeks':  return 21;
     case 'month':   return daysInMonth(state.startDate);
     case '2months': return daysInMonth(state.startDate) + daysInMonth(addMonths(state.startDate,1));
     case '3months': return daysInMonth(state.startDate) + daysInMonth(addMonths(state.startDate,1)) + daysInMonth(addMonths(state.startDate,2));
@@ -149,6 +151,17 @@ function escHtml(s) {
 function hasRole2(userRole, required) {
   const order = {read:0, reporter:1, readwrite:2, teamlead:3, oplead:4, admin:5};
   return (order[userRole]||0) >= (order[required]||0);
+}
+
+// Check if the current user has a named capability via role config override
+function userHasCapability(cap) {
+  if (!state.user) return false;
+  if (state.user.role === 'admin') return true;
+  const roleKey = state.user.role;
+  const configs = state.roleConfigs || [];
+  const cfg = configs.find(c => c.key === roleKey);
+  if (cfg && cfg.capabilities) return !!cfg.capabilities[cap];
+  return false;
 }
 
 // ── DOM helpers ─────────────────────────────────────────────────────────────

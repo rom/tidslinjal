@@ -345,6 +345,23 @@ type AuditEntry struct {
 	Summary    string    `json:"summary"`
 }
 
+// TemplateGroup defines a group to create when the template is applied
+type TemplateGroup struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Members     []string `json:"members,omitempty"` // usernames (best-effort match on apply)
+}
+
+// TemplateLayer defines a layer to create when the template is applied
+type TemplateLayer struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	Color       string  `json:"color,omitempty"`
+	Visibility  string  `json:"visibility,omitempty"` // private | groups | public
+	Permission  string  `json:"permission,omitempty"` // read | readwrite
+	GroupIndex  []int   `json:"group_index,omitempty"` // indices into template Groups slice
+}
+
 // Template is a named, reusable set of events (with relative time offsets)
 type Template struct {
 	ID            int64           `json:"id"`
@@ -362,6 +379,8 @@ type Template struct {
 	Phases        []TemplatePhase `json:"phases,omitempty"` // optional phase blocks
 	Locks         []TemplateLock  `json:"locks,omitempty"`  // optional time locks
 	Roles         []RoleConfig    `json:"roles,omitempty"`  // optional role configs
+	Groups        []TemplateGroup `json:"groups,omitempty"` // groups to create when applied
+	Layers        []TemplateLayer `json:"layers,omitempty"` // layers to create when applied
 	// Theme / UX settings applied when the template is loaded
 	Theme         string          `json:"theme,omitempty"`          // dark | light
 	Size          string          `json:"size,omitempty"`           // small | normal | large | huge
@@ -431,6 +450,39 @@ type OIDCConfig struct {
 	ClientID              string `json:"-"`
 	ClientSecret          string `json:"-"`
 	RedirectURL           string `json:"-"`
+}
+
+// MailConfig stores SMTP settings for outgoing email
+type MailConfig struct {
+	Enabled    bool   `json:"enabled"`
+	SMTPHost   string `json:"smtp_host"`
+	SMTPPort   int    `json:"smtp_port"`   // default 587
+	Username   string `json:"username"`
+	Password   string `json:"password,omitempty"` // never sent to frontend
+	FromAddr   string `json:"from_addr"`
+	FromName   string `json:"from_name,omitempty"`
+	TLSMode    string `json:"tls_mode,omitempty"` // starttls | tls | none
+}
+
+// APIKey represents an API key for external tool integration
+type APIKey struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Key         string    `json:"key,omitempty"` // only shown on creation
+	KeyHash     string    `json:"key_hash,omitempty"`
+	Description string    `json:"description,omitempty"`
+	CreatedBy   int64     `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
+}
+
+// FilterPreset is a saved filter configuration
+type FilterPreset struct {
+	ID          int64             `json:"id"`
+	Name        string            `json:"name"`
+	UserID      int64             `json:"user_id"`
+	Filters     map[string]interface{} `json:"filters"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 // OIDCPersistentConfig stores OIDC settings that can be configured via the UI.

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Store is a thread-safe in-memory store backed by JSON files.
@@ -39,6 +41,9 @@ type Store struct {
 	registrationSettings RegistrationSettings
 	invitations          []PersonalInvitation
 	oidcSettings         OIDCPersistentConfig
+	mailConfig           MailConfig
+	apiKeys              []APIKey
+	filterPresets        []FilterPreset
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -52,7 +57,9 @@ type Store struct {
 	nextCommentID    int64
 	nextPhaseID      int64
 	nextTemplateID   int64
-	nextInvitationID int64
+	nextInvitationID    int64
+	nextAPIKeyID        int64
+	nextFilterPresetID  int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -98,6 +105,9 @@ func (s *Store) load() error {
 	s.loadFile("registration.json", &s.registrationSettings)
 	s.loadFile("invitations.json", &s.invitations)
 	s.loadFile("oidc.json", &s.oidcSettings)
+	s.loadFile("mail.json", &s.mailConfig)
+	s.loadFile("apikeys.json", &s.apiKeys)
+	s.loadFile("filter_presets.json", &s.filterPresets)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -162,6 +172,16 @@ func (s *Store) load() error {
 	for _, x := range s.invitations {
 		if x.ID > s.nextInvitationID {
 			s.nextInvitationID = x.ID
+		}
+	}
+	for _, x := range s.apiKeys {
+		if x.ID > s.nextAPIKeyID {
+			s.nextAPIKeyID = x.ID
+		}
+	}
+	for _, x := range s.filterPresets {
+		if x.ID > s.nextFilterPresetID {
+			s.nextFilterPresetID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2033,6 +2053,66 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 		}
 		s.CreateLock(lk) //nolint
 	}
+	// Create groups from template
+	groupIDMap := make(map[int]int64) // template group index -> real group ID
+	for idx, tg := range tmpl.Groups {
+		grp := Group{
+			Name:        tg.Name,
+			Description: tg.Description,
+			CreatedBy:   createdBy,
+		}
+		created, err := s.CreateGroup(grp)
+		if err == nil {
+			groupIDMap[idx] = created.ID
+			// Add members by username (best-effort)
+			if len(tg.Members) > 0 {
+				s.mu.RLock()
+				usernameMap := make(map[string]int64, len(s.users))
+				for _, u := range s.users {
+					usernameMap[u.Username] = u.ID
+				}
+				s.mu.RUnlock()
+				for _, uname := range tg.Members {
+					if uid, ok := usernameMap[uname]; ok {
+						s.AddGroupMember(GroupMembership{GroupID: created.ID, UserID: uid, Role: "member"}) //nolint
+					}
+				}
+			}
+		}
+	}
+	// Create layers from template
+	for _, tl := range tmpl.Layers {
+		vis := tl.Visibility
+		if vis == "" {
+			vis = "private"
+		}
+		perm := tl.Permission
+		if perm == "" {
+			perm = "read"
+		}
+		color := tl.Color
+		if color == "" {
+			color = "#4A90D9"
+		}
+		// Resolve group IDs from template group indices
+		var gids []int64
+		for _, gi := range tl.GroupIndex {
+			if realID, ok := groupIDMap[gi]; ok {
+				gids = append(gids, realID)
+			}
+		}
+		layer := Layer{
+			Name:        tl.Name,
+			Description: tl.Description,
+			Color:       color,
+			OwnerID:     createdBy,
+			OwnerName:   createdByName,
+			Visibility:  vis,
+			Permission:  perm,
+			GroupIDs:    gids,
+		}
+		s.CreateLayer(layer) //nolint
+	}
 	return count, nil
 }
 
@@ -2095,4 +2175,114 @@ func (s *Store) ResetDatabase() error {
 	}
 
 	return nil
+}
+
+// ── Mail Config ────────────────────────────────────────────────────────────────
+
+func (s *Store) GetMailConfig() MailConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mailConfig
+}
+
+func (s *Store) SaveMailConfig(cfg MailConfig) error {
+	s.mu.Lock()
+	s.mailConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("mail.json", snap)
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+func (s *Store) GetAPIKeys() []APIKey {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]APIKey, len(s.apiKeys))
+	for i, k := range s.apiKeys {
+		cp := k
+		cp.KeyHash = "" // never expose hash
+		cp.Key = ""
+		out[i] = cp
+	}
+	return out
+}
+
+func (s *Store) CreateAPIKey(k APIKey) (APIKey, error) {
+	s.mu.Lock()
+	s.nextAPIKeyID++
+	k.ID = s.nextAPIKeyID
+	k.CreatedAt = time.Now()
+	s.apiKeys = append(s.apiKeys, k)
+	snap := append([]APIKey(nil), s.apiKeys...)
+	s.mu.Unlock()
+	return k, s.persist("apikeys.json", snap)
+}
+
+func (s *Store) DeleteAPIKey(id int64) error {
+	s.mu.Lock()
+	for i, k := range s.apiKeys {
+		if k.ID == id {
+			s.apiKeys = append(s.apiKeys[:i], s.apiKeys[i+1:]...)
+			snap := append([]APIKey(nil), s.apiKeys...)
+			s.mu.Unlock()
+			return s.persist("apikeys.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("api key not found")
+}
+
+// ValidateAPIKey checks a raw key string against stored hashes; returns the key record or nil.
+func (s *Store) ValidateAPIKey(raw string) *APIKey {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, k := range s.apiKeys {
+		if bcrypt.CompareHashAndPassword([]byte(k.KeyHash), []byte(raw)) == nil {
+			// Update last used
+			now := time.Now()
+			s.apiKeys[i].LastUsedAt = &now
+			return &s.apiKeys[i]
+		}
+	}
+	return nil
+}
+
+// ── Filter Presets ────────────────────────────────────────────────────────────
+
+func (s *Store) GetFilterPresets(userID int64) []FilterPreset {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []FilterPreset
+	for _, p := range s.filterPresets {
+		if p.UserID == userID {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (s *Store) CreateFilterPreset(p FilterPreset) (FilterPreset, error) {
+	s.mu.Lock()
+	s.nextFilterPresetID++
+	p.ID = s.nextFilterPresetID
+	p.CreatedAt = time.Now()
+	s.filterPresets = append(s.filterPresets, p)
+	snap := append([]FilterPreset(nil), s.filterPresets...)
+	s.mu.Unlock()
+	return p, s.persist("filter_presets.json", snap)
+}
+
+func (s *Store) DeleteFilterPreset(id, userID int64) error {
+	s.mu.Lock()
+	for i, p := range s.filterPresets {
+		if p.ID == id && p.UserID == userID {
+			s.filterPresets = append(s.filterPresets[:i], s.filterPresets[i+1:]...)
+			snap := append([]FilterPreset(nil), s.filterPresets...)
+			s.mu.Unlock()
+			return s.persist("filter_presets.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("preset not found")
 }

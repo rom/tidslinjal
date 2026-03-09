@@ -35,6 +35,46 @@
       "order": 3
     }
   ],
+  "groups": [
+    {
+      "name": "QRF Alpha",
+      "description": "Quick Reaction Force — Team Alpha"
+    },
+    {
+      "name": "QRF Bravo",
+      "description": "Quick Reaction Force — Team Bravo"
+    },
+    {
+      "name": "Intelligence Cell",
+      "description": "Intel and threat assessment team"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Alpha Ops",
+      "description": "QRF Alpha operational layer",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Bravo Ops",
+      "description": "QRF Bravo operational layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Intel",
+      "description": "Intelligence and threat tracking layer",
+      "color": "#1ABC9C",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [2]
+    }
+  ],
   "locks": [
     {
       "start_offset_min": 240,

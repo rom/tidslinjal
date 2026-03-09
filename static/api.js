@@ -42,7 +42,11 @@ async function fetchExercise() {
 // ── Refresh all ─────────────────────────────────────────────────────────────
 async function refreshAll() {
   await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases()]);
-  renderTimeline();
+  if (typeof _listViewActive !== 'undefined' && _listViewActive) {
+    renderListView();
+  } else {
+    renderTimeline();
+  }
   renderSidebar();
   updateSyntheticUI();
 }

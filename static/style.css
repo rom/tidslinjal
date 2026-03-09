@@ -289,6 +289,14 @@ select.ctrl-select:focus { border-color: var(--accent); }
 #timeline-container {
   flex: 1; overflow: auto; position: relative; background: var(--bg);
 }
+#list-view {
+  flex: 1; overflow: auto; background: var(--bg);
+}
+#list-view-table th, #list-view-table td {
+  border: 1px solid var(--border);
+}
+#list-view-table thead th { background: var(--bg2); font-weight: 600; }
+#list-view-table tbody tr:hover { background: var(--bg3); }
 
 /* ── Timeline grid ───────────────────────────────────────────────────────── */
 #timeline { display: grid; position: relative; min-width: max-content; }
@@ -1163,14 +1171,30 @@ body.light-mode { --danger: #c0392b; }
   bottom: 0;
   left: 0;
   right: 0;
-  height: 6px;
+  height: 8px;
   cursor: ns-resize;
   background: transparent;
   border-radius: 0 0 var(--radius) var(--radius);
   transition: background .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ev-resize-handle::after {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.35);
+  transition: background .15s, width .15s;
 }
 .ev-resize-handle:hover {
-  background: rgba(255,255,255,.3);
+  background: rgba(255,255,255,.15);
+}
+.ev-resize-handle:hover::after {
+  background: rgba(255,255,255,.7);
+  width: 36px;
 }
 .event-block { position: absolute; }
 
