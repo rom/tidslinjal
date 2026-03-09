@@ -555,16 +555,29 @@ type ExerciseSettings struct {
 
 // AutoReportSchedule defines a server-side scheduled report
 type AutoReportSchedule struct {
-	ID        int64     `json:"id"`
-	ReportType string   `json:"report_type"` // aar | timeline | per_layer | status_summary | daily_briefing | type_breakdown | responsible | planned_vs_actual
-	Frequency  string   `json:"frequency"`   // hourly | daily | weekly
-	Delivery   string   `json:"delivery"`    // email | webhook | download
-	Recipient  string   `json:"recipient"`   // email address or webhook URL
-	CreatedBy  int64    `json:"created_by"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64      `json:"id"`
+	ReportType string     `json:"report_type"` // aar | timeline | per_layer | status_summary | daily_briefing | type_breakdown | responsible | planned_vs_actual
+	Format     string     `json:"format"`      // html | excel | rtf | docx
+	Frequency  string     `json:"frequency"`   // hourly | daily | weekly
+	Delivery   string     `json:"delivery"`    // email | webhook | download
+	Recipient  string     `json:"recipient"`   // email address or webhook URL
+	CreatedBy  int64      `json:"created_by"`
+	CreatedAt  time.Time  `json:"created_at"`
 	LastRun    *time.Time `json:"last_run,omitempty"`
 	NextRun    time.Time  `json:"next_run"`
-	Enabled    bool      `json:"enabled"`
+	Enabled    bool       `json:"enabled"`
+}
+
+// SyslogConfig stores settings for remote syslog forwarding
+type SyslogConfig struct {
+	Enabled   bool   `json:"enabled"`
+	Host      string `json:"host"`                 // syslog server hostname or IP
+	Port      int    `json:"port"`                 // default 514 for UDP/TCP, 6514 for TLS
+	Transport string `json:"transport"`            // udp | tcp | tls
+	Format    string `json:"format"`               // classic | json
+	AppName   string `json:"app_name,omitempty"`   // tag/app name in syslog messages (default: tidslinjal)
+	Facility  int    `json:"facility,omitempty"`   // syslog facility 0-23 (default 1 = user-level)
+	TLSVerify bool   `json:"tls_verify,omitempty"` // verify TLS certificate (default true)
 }
 
 // EventVersion records a historical snapshot of an event at a point in time

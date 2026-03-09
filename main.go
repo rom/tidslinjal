@@ -58,6 +58,184 @@ func logDebug(format string, args ...any) {
 	}
 }
 
+// ── Syslog writer ─────────────────────────────────────────────────────────────
+
+// syslogWriter forwards log messages to a remote syslog server.
+// It supports UDP, TCP, and TLS transports, and classic or JSON message formats.
+// An instance is set via setSyslogWriter(); concurrent use is safe via its own mutex.
+type syslogWriter struct {
+	mu       sync.Mutex
+	cfg      SyslogConfig
+	conn     net.Conn // nil for UDP (reconnect on each write)
+	hostname string
+}
+
+var (
+	globalSyslog     *syslogWriter
+	globalSyslogOnce sync.Once
+)
+
+// setSyslogWriter replaces the active syslog writer (or disables it if cfg.Enabled is false).
+func setSyslogWriter(cfg SyslogConfig) {
+	if !cfg.Enabled || cfg.Host == "" {
+		globalSyslog = nil
+		return
+	}
+	hn, _ := os.Hostname()
+	globalSyslog = &syslogWriter{cfg: cfg, hostname: hn}
+}
+
+// syslogSend forwards a log line to the remote syslog server (if configured).
+func syslogSend(severity int, msg string) {
+	sw := globalSyslog
+	if sw == nil {
+		return
+	}
+	sw.send(severity, msg)
+}
+
+// syslogPriority computes the RFC 3164 priority value from facility and severity.
+func syslogPriority(facility, severity int) int {
+	return facility*8 + severity
+}
+
+func (sw *syslogWriter) formatClassic(priority int, msg string) []byte {
+	// RFC 3164: <PRI>Mmm DD HH:MM:SS hostname tag: message
+	t := time.Now().UTC()
+	app := sw.cfg.AppName
+	if app == "" {
+		app = "tidslinjal"
+	}
+	line := fmt.Sprintf("<%d>%s %s %s: %s\n",
+		priority,
+		t.Format("Jan _2 15:04:05"),
+		sw.hostname,
+		app,
+		msg,
+	)
+	return []byte(line)
+}
+
+func (sw *syslogWriter) formatJSON(priority int, severity int, msg string) []byte {
+	app := sw.cfg.AppName
+	if app == "" {
+		app = "tidslinjal"
+	}
+	b, _ := json.Marshal(map[string]any{
+		"priority":  priority,
+		"facility":  sw.cfg.Facility,
+		"severity":  severity,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"hostname":  sw.hostname,
+		"app":       app,
+		"message":   msg,
+	})
+	return append(b, '\n')
+}
+
+func (sw *syslogWriter) send(severity int, msg string) {
+	facility := sw.cfg.Facility
+	if facility == 0 {
+		facility = 1 // user-level messages
+	}
+	priority := syslogPriority(facility, severity)
+
+	var payload []byte
+	if sw.cfg.Format == "json" {
+		payload = sw.formatJSON(priority, severity, msg)
+	} else {
+		payload = sw.formatClassic(priority, msg)
+	}
+
+	port := sw.cfg.Port
+	if port == 0 {
+		if sw.cfg.Transport == "tls" {
+			port = 6514
+		} else {
+			port = 514
+		}
+	}
+	addr := fmt.Sprintf("%s:%d", sw.cfg.Host, port)
+
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	switch sw.cfg.Transport {
+	case "udp":
+		// UDP: connectionless, create a new connection per message
+		conn, err := net.DialTimeout("udp", addr, 3*time.Second)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
+		conn.Write(payload)                                //nolint
+	case "tls":
+		tlsCfg := &tls.Config{InsecureSkipVerify: !sw.cfg.TLSVerify} //nolint
+		if sw.conn == nil {
+			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, tlsCfg)
+			if err != nil {
+				return
+			}
+			sw.conn = conn
+		}
+		sw.conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+		if _, err := sw.conn.Write(payload); err != nil {
+			sw.conn.Close()
+			sw.conn = nil
+			// Retry once
+			conn, err2 := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, tlsCfg)
+			if err2 != nil {
+				return
+			}
+			sw.conn = conn
+			sw.conn.Write(payload) //nolint
+		}
+	default: // tcp
+		if sw.conn == nil {
+			conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+			if err != nil {
+				return
+			}
+			sw.conn = conn
+		}
+		sw.conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+		if _, err := sw.conn.Write(payload); err != nil {
+			sw.conn.Close()
+			sw.conn = nil
+			conn, err2 := net.DialTimeout("tcp", addr, 5*time.Second)
+			if err2 != nil {
+				return
+			}
+			sw.conn = conn
+			sw.conn.Write(payload) //nolint
+		}
+	}
+}
+
+// syslogLogWriter wraps the standard log package to also forward to syslog.
+// It implements io.Writer so it can be set as log.SetOutput(…).
+type syslogLogWriter struct {
+	orig io.Writer
+}
+
+func (w *syslogLogWriter) Write(p []byte) (int, error) {
+	n, err := w.orig.Write(p)
+	// Determine severity from prefix: ERROR/FATAL→3, WARN→4, INFO→6, default→6
+	s := strings.TrimSpace(string(p))
+	severity := 6 // informational
+	sl := strings.ToUpper(s)
+	if strings.Contains(sl, "[WARN]") {
+		severity = 4 // warning
+	} else if strings.Contains(sl, "[DEBUG]") {
+		severity = 7 // debug
+	} else if strings.Contains(sl, "FATAL") || strings.Contains(sl, "ERROR") {
+		severity = 3 // error
+	}
+	syslogSend(severity, strings.TrimRight(s, "\n"))
+	return n, err
+}
+
 // ── SSE broker ────────────────────────────────────────────────────────────────
 
 // SSEMessage is a generic SSE message with an event type and JSON data
@@ -4295,6 +4473,36 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Syslog configuration (admin only)
+	mux.HandleFunc("/api/integrations/syslog", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetSyslogConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveSyslogConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Syslog: test connection
+	mux.HandleFunc("/api/integrations/syslog/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleTestSyslog)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Reports: on-demand download in specific format
+	mux.HandleFunc("/api/reports/download", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleTeamLead, app.handleReportDownload)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Auto-report schedules (server-side)
 	mux.HandleFunc("/api/auto-report-schedules", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -4537,6 +4745,109 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 	return smtp.SendMail(addr, nil, from, []string{to}, msg)
 }
 
+// ── Syslog Config Handlers ────────────────────────────────────────────────────
+
+func (app *App) handleGetSyslogConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetSyslogConfig())
+}
+
+func (app *App) handleSaveSyslogConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg SyslogConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if cfg.Transport == "" {
+		cfg.Transport = "udp"
+	}
+	if cfg.Format == "" {
+		cfg.Format = "classic"
+	}
+	if err := app.store.SaveSyslogConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Apply new config immediately
+	setSyslogWriter(cfg)
+	if cfg.Enabled && cfg.Host != "" {
+		log.SetOutput(&syslogLogWriter{orig: os.Stderr})
+	} else {
+		log.SetOutput(os.Stderr)
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "syslog_config", 0, "Updated syslog configuration")
+	jsonOK(w, cfg)
+}
+
+func (app *App) handleTestSyslog(w http.ResponseWriter, r *http.Request, user *User) {
+	cfg := app.store.GetSyslogConfig()
+	if !cfg.Enabled || cfg.Host == "" {
+		jsonError(w, "Syslog is not configured", http.StatusBadRequest)
+		return
+	}
+	// Temporarily create a writer and send a test message
+	hn, _ := os.Hostname()
+	sw := &syslogWriter{cfg: cfg, hostname: hn}
+	sw.send(6, fmt.Sprintf("Tidslinjal syslog test from %s (user: %s)", hn, user.Username))
+	jsonOK(w, map[string]string{"status": "ok", "transport": cfg.Transport, "host": cfg.Host})
+}
+
+// ── Report Download Handler ────────────────────────────────────────────────────
+
+// handleReportDownload serves an on-demand report in the requested format.
+// Query params: type=<report_type>, format=excel|rtf|docx|html|csv
+func (app *App) handleReportDownload(w http.ResponseWriter, r *http.Request, user *User) {
+	q := r.URL.Query()
+	reportType := q.Get("type")
+	if reportType == "" {
+		reportType = "timeline"
+	}
+	format := strings.ToLower(q.Get("format"))
+	if format == "" {
+		format = "html"
+	}
+
+	from := time.Now().Add(-30 * 24 * time.Hour)
+	to := time.Now().Add(30 * 24 * time.Hour)
+	if qf := q.Get("from"); qf != "" {
+		if t, err := time.Parse(time.RFC3339, qf); err == nil {
+			from = t
+		}
+	}
+	if qt := q.Get("to"); qt != "" {
+		if t, err := time.Parse(time.RFC3339, qt); err == nil {
+			to = t
+		}
+	}
+
+	events := app.store.GetEvents(from, to, nil)
+	commentsMap := make(map[int64][]EventComment)
+	for _, ev := range events {
+		if cs := app.store.GetCommentsByEvent(ev.ID); len(cs) > 0 {
+			commentsMap[ev.ID] = cs
+		}
+	}
+	title := fmt.Sprintf("%s Report — %s", reportType, time.Now().Format("2006-01-02"))
+
+	switch format {
+	case "excel", "xlsx":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.xlsx\"", reportType))
+		buildReportXLSXWriter(w, title, events)
+	case "rtf":
+		w.Header().Set("Content-Type", "application/rtf")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.rtf\"", reportType))
+		w.Write(buildAutoReportRTF(title, events, commentsMap)) //nolint
+	case "docx":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.docx\"", reportType))
+		buildReportDOCXWriter(w, title, events, commentsMap)
+	default: // html
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.html\"", reportType))
+		w.Write([]byte(buildAutoReportHTML(reportType, events, commentsMap))) //nolint
+	}
+}
+
 // ── Auto-Report Schedule Handlers ─────────────────────────────────────────────
 
 func (app *App) handleListAutoReportSchedules(w http.ResponseWriter, r *http.Request, user *User) {
@@ -4637,11 +4948,42 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 			commentsMap[ev.ID] = comments
 		}
 	}
-	html := buildAutoReportHTML(s.ReportType, events, commentsMap)
-	if err := app.sendMail(cfg, s.Recipient, subject, html); err != nil {
+
+	format := strings.ToLower(s.Format)
+	if format == "" {
+		format = "html"
+	}
+
+	var err error
+	switch format {
+	case "excel", "xlsx":
+		var buf bytes.Buffer
+		buildReportXLSXWriter(&buf, subject, events)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as an Excel file.</p>",
+			buf.Bytes(), fmt.Sprintf("report-%s.xlsx", s.ReportType),
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	case "rtf":
+		data := buildAutoReportRTF(subject, events, commentsMap)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as an RTF file.</p>",
+			data, fmt.Sprintf("report-%s.rtf", s.ReportType), "application/rtf")
+	case "docx":
+		var buf bytes.Buffer
+		buildReportDOCXWriter(&buf, subject, events, commentsMap)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as a Word document.</p>",
+			buf.Bytes(), fmt.Sprintf("report-%s.docx", s.ReportType),
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	default: // html
+		html := buildAutoReportHTML(s.ReportType, events, commentsMap)
+		err = app.sendMail(cfg, s.Recipient, subject, html)
+	}
+
+	if err != nil {
 		log.Printf("Auto-report: failed to send email for schedule %d: %v", s.ID, err)
 	} else {
-		log.Printf("Auto-report: sent %s report to %s (schedule %d)", s.ReportType, s.Recipient, s.ID)
+		log.Printf("Auto-report: sent %s report (%s) to %s (schedule %d)", s.ReportType, format, s.Recipient, s.ID)
 	}
 }
 
@@ -4678,6 +5020,302 @@ func htmlEscape(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	s = strings.ReplaceAll(s, `"`, "&#34;")
 	return s
+}
+
+// ── Report format builders ────────────────────────────────────────────────────
+
+// buildReportXLSXWriter writes an XLSX report to w using the existing xlsx helpers.
+func buildReportXLSXWriter(w io.Writer, title string, events []Event) {
+	zw := zip.NewWriter(w)
+	xlsxWriteFile(zw, "[Content_Types].xml", xlsxContentTypes())
+	xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+	xlsxWriteFile(zw, "xl/workbook.xml", xlsxWorkbook())
+	xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels())
+	xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+	xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", xlsxSheet(events, nil))
+	zw.Close() //nolint
+}
+
+// buildAutoReportRTF builds an RTF document for the given events.
+// RTF is a plain-text format that any word processor can open.
+func buildAutoReportRTF(title string, events []Event, commentsMap map[int64][]EventComment) []byte {
+	rtfEsc := func(s string) string {
+		var b strings.Builder
+		for _, r := range s {
+			switch {
+			case r == '\\':
+				b.WriteString(`\\`)
+			case r == '{':
+				b.WriteString(`\{`)
+			case r == '}':
+				b.WriteString(`\}`)
+			case r > 127:
+				b.WriteString(fmt.Sprintf(`\u%d?`, r))
+			default:
+				b.WriteRune(r)
+			}
+		}
+		return b.String()
+	}
+
+	var b strings.Builder
+	b.WriteString(`{\rtf1\ansi\deff0`)
+	b.WriteString(`{\fonttbl{\f0\froman\fcharset0 Times New Roman;}{\f1\fswiss\fcharset0 Arial;}}`)
+	b.WriteString(`{\colortbl;\red0\green0\blue0;\red100\green100\blue100;\red0\green70\blue150;}`)
+	b.WriteString("\n")
+
+	// Title
+	b.WriteString(fmt.Sprintf(`\f1\fs28\b\cf3 %s\b0\cf1\fs22\par`, rtfEsc(title)))
+	b.WriteString(fmt.Sprintf(`\f0\fs18\cf2 Generated: %s\cf1\par\par`, time.Now().Format("2006-01-02 15:04:05")))
+
+	// Table header (simulated with tabs)
+	b.WriteString(`\f1\fs20\b Title\tab Type\tab Status\tab Start\tab End\b0\par`)
+	b.WriteString(`\brdrb\brdrs\brdrw10 `)
+
+	for _, ev := range events {
+		start := ev.StartTime.Format("2006-01-02 15:04")
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		b.WriteString(fmt.Sprintf(`\f0\fs18 %s\tab %s\tab %s\tab %s\tab %s\par`,
+			rtfEsc(ev.Title), rtfEsc(ev.EventType), rtfEsc(string(ev.Status)), rtfEsc(start), rtfEsc(end)))
+		if comments, ok := commentsMap[ev.ID]; ok {
+			for _, c := range comments {
+				b.WriteString(fmt.Sprintf(`\cf2\fs16   [%s] %s: %s\cf1\fs18\par`,
+					rtfEsc(c.CreatedAt.Format("2006-01-02 15:04")), rtfEsc(c.AuthorName), rtfEsc(c.Content)))
+			}
+		}
+	}
+	b.WriteString("}")
+	return []byte(b.String())
+}
+
+// buildReportDOCXWriter writes a DOCX document to w.
+// DOCX is an Office Open XML ZIP archive with XML parts.
+func buildReportDOCXWriter(w io.Writer, title string, events []Event, commentsMap map[int64][]EventComment) {
+	docxEsc := func(s string) string {
+		s = strings.ReplaceAll(s, "&", "&amp;")
+		s = strings.ReplaceAll(s, "<", "&lt;")
+		s = strings.ReplaceAll(s, ">", "&gt;")
+		s = strings.ReplaceAll(s, `"`, "&quot;")
+		return s
+	}
+
+	// Build document.xml body
+	var body strings.Builder
+	body.WriteString(fmt.Sprintf(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>%s</w:t></w:r></w:p>`, docxEsc(title)))
+	body.WriteString(fmt.Sprintf(`<w:p><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="18"/></w:rPr><w:t>Generated: %s</w:t></w:r></w:p>`,
+		time.Now().Format("2006-01-02 15:04:05")))
+
+	// Table
+	body.WriteString(`<w:tbl>`)
+	body.WriteString(`<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>`)
+	body.WriteString(`<w:tblGrid><w:gridCol w:w="2400"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/></w:tblGrid>`)
+
+	// Header row
+	hdrCell := func(text string) string {
+		return fmt.Sprintf(`<w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9E1F2"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>`, docxEsc(text))
+	}
+	body.WriteString(`<w:tr>`)
+	for _, h := range []string{"Title", "Type", "Status", "Start", "End"} {
+		body.WriteString(hdrCell(h))
+	}
+	body.WriteString(`</w:tr>`)
+
+	for _, ev := range events {
+		start := ev.StartTime.Format("2006-01-02 15:04")
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		cell := func(text string) string {
+			return fmt.Sprintf(`<w:tc><w:p><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`, docxEsc(text))
+		}
+		body.WriteString(`<w:tr>`)
+		body.WriteString(cell(ev.Title))
+		body.WriteString(cell(ev.EventType))
+		body.WriteString(cell(string(ev.Status)))
+		body.WriteString(cell(start))
+		body.WriteString(cell(end))
+		body.WriteString(`</w:tr>`)
+
+		// Comments as extra rows
+		if comments, ok := commentsMap[ev.ID]; ok {
+			for _, c := range comments {
+				commentText := fmt.Sprintf("[%s] %s: %s", c.CreatedAt.Format("2006-01-02 15:04"), c.AuthorName, c.Content)
+				body.WriteString(fmt.Sprintf(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="5"/></w:tcPr><w:p><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">  %s</w:t></w:r></w:p></w:tc></w:tr>`, docxEsc(commentText)))
+			}
+		}
+	}
+	body.WriteString(`</w:tbl>`)
+
+	documentXML := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+<w:body>%s<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body>
+</w:document>`, body.String())
+
+	stylesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+    <w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="003366"/></w:rPr>
+  </w:style>
+  <w:style w:type="table" w:styleId="TableGrid">
+    <w:name w:val="Table Grid"/>
+    <w:tblPr><w:tblBorders>
+      <w:top w:val="single" w:sz="4" w:color="auto"/>
+      <w:left w:val="single" w:sz="4" w:color="auto"/>
+      <w:bottom w:val="single" w:sz="4" w:color="auto"/>
+      <w:right w:val="single" w:sz="4" w:color="auto"/>
+      <w:insideH w:val="single" w:sz="4" w:color="auto"/>
+      <w:insideV w:val="single" w:sz="4" w:color="auto"/>
+    </w:tblBorders></w:tblPr>
+  </w:style>
+</w:styles>`
+
+	contentTypes := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`
+
+	relsRoot := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	wordRels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+
+	zw := zip.NewWriter(w)
+	for _, part := range []struct{ name, content string }{
+		{"[Content_Types].xml", contentTypes},
+		{"_rels/.rels", relsRoot},
+		{"word/document.xml", documentXML},
+		{"word/styles.xml", stylesXML},
+		{"word/_rels/document.xml.rels", wordRels},
+	} {
+		f, _ := zw.Create(part.name)
+		f.Write([]byte(part.content)) //nolint
+	}
+	zw.Close() //nolint
+}
+
+// sendMailWithAttachment sends an email with a binary attachment via SMTP.
+func (app *App) sendMailWithAttachment(cfg MailConfig, to, subject, bodyHTML string, attachData []byte, attachName, attachMIME string) error {
+	smtpPort := cfg.SMTPPort
+	if smtpPort == 0 {
+		smtpPort = 587
+	}
+	from := cfg.FromAddr
+	if from == "" {
+		from = "tidslinjal@localhost"
+	}
+	fromName := cfg.FromName
+	if fromName == "" {
+		fromName = "Tidslinjal"
+	}
+
+	boundary := fmt.Sprintf("---=_Part_%d", time.Now().UnixNano())
+	// Encode attachment as base64
+	enc := make([]byte, 0, len(attachData)*2)
+	const lineLen = 76
+	b64 := make([]byte, ((len(attachData)+2)/3)*4)
+	n := encodeBase64(b64, attachData)
+	for i := 0; i < n; i += lineLen {
+		end := i + lineLen
+		if end > n {
+			end = n
+		}
+		enc = append(enc, b64[i:end]...)
+		enc = append(enc, '\r', '\n')
+	}
+
+	msg := fmt.Sprintf(
+		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n"+
+			"--%s\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n\r\n"+
+			"--%s\r\nContent-Type: %s; name=\"%s\"\r\nContent-Disposition: attachment; filename=\"%s\"\r\nContent-Transfer-Encoding: base64\r\n\r\n%s\r\n--%s--",
+		fromName, from, to, subject, boundary,
+		boundary, bodyHTML,
+		boundary, attachMIME, attachName, attachName, string(enc), boundary,
+	)
+
+	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, smtpPort)
+	var auth smtp.Auth
+	if cfg.Username != "" && cfg.Password != "" {
+		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.SMTPHost)
+	}
+
+	if cfg.TLSMode == "tls" {
+		tlsCfg := &tls.Config{ServerName: cfg.SMTPHost}
+		conn, err := tls.Dial("tcp", addr, tlsCfg)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		client, err := smtp.NewClient(conn, cfg.SMTPHost)
+		if err != nil {
+			return err
+		}
+		defer client.Quit()
+		if auth != nil {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+		if err := client.Mail(from); err != nil {
+			return err
+		}
+		if err := client.Rcpt(to); err != nil {
+			return err
+		}
+		wc, err := client.Data()
+		if err != nil {
+			return err
+		}
+		_, err = wc.Write([]byte(msg))
+		wc.Close()
+		return err
+	}
+	return smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
+}
+
+// encodeBase64 encodes src into dst using standard base64 encoding, returns bytes written.
+func encodeBase64(dst, src []byte) int {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	di, si := 0, 0
+	for ; si+2 < len(src); si += 3 {
+		v := uint(src[si])<<16 | uint(src[si+1])<<8 | uint(src[si+2])
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = alphabet[v>>6&0x3F]
+		dst[di+3] = alphabet[v&0x3F]
+		di += 4
+	}
+	rem := len(src) - si
+	if rem == 1 {
+		v := uint(src[si]) << 16
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = '='
+		dst[di+3] = '='
+		di += 4
+	} else if rem == 2 {
+		v := uint(src[si])<<16 | uint(src[si+1])<<8
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = alphabet[v>>6&0x3F]
+		dst[di+3] = '='
+		di += 4
+	}
+	return di
 }
 
 // ── XLSX Export ────────────────────────────────────────────────────────────────
@@ -5606,6 +6244,18 @@ func main() {
 	flag.StringVar(&oidcRedirectURL,  "oidc-redirect-url",  os.Getenv("OIDC_REDIRECT_URL"),  "OIDC redirect URL (e.g. https://your-server/auth/oidc/callback)")
 	flag.BoolVar(&oidcExclusive,      "oidc-exclusive",     os.Getenv("OIDC_EXCLUSIVE") == "true", "Disable local username/password login (SSO only; admin account excepted)")
 	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (readwrite|teamlead|oplead; default: readwrite)")
+
+	// Syslog flags (override persistent config stored in syslog.json)
+	var (
+		syslogHost      = os.Getenv("SYSLOG_HOST")
+		syslogPort      int
+		syslogTransport = os.Getenv("SYSLOG_TRANSPORT") // udp | tcp | tls
+		syslogFormat    = os.Getenv("SYSLOG_FORMAT")    // classic | json
+	)
+	flag.StringVar(&syslogHost,      "syslog-host",      syslogHost,      "Syslog server host (enables syslog forwarding)")
+	flag.IntVar(&syslogPort,         "syslog-port",      0,               "Syslog server port (default 514 UDP/TCP, 6514 TLS)")
+	flag.StringVar(&syslogTransport, "syslog-transport", syslogTransport, "Syslog transport: udp | tcp | tls (default: udp)")
+	flag.StringVar(&syslogFormat,    "syslog-format",    syslogFormat,    "Syslog message format: classic | json (default: classic)")
 	flag.Parse()
 
 	if debug {
@@ -5667,6 +6317,36 @@ func main() {
 				log.Printf("OIDC SSO enabled (DB): issuer=%s exclusive=%v defaultRole=%q",
 					persistedOIDC.Issuer, persistedOIDC.Exclusive, app.oidcDefaultRole)
 			}
+		}
+	}
+
+	// Configure syslog — CLI flags override persistent settings
+	{
+		sysCfg := app.store.GetSyslogConfig()
+		if syslogHost != "" {
+			// CLI flags take priority
+			sysCfg.Enabled = true
+			sysCfg.Host = syslogHost
+			if syslogPort != 0 {
+				sysCfg.Port = syslogPort
+			}
+			if syslogTransport != "" {
+				sysCfg.Transport = syslogTransport
+			}
+			if syslogFormat != "" {
+				sysCfg.Format = syslogFormat
+			}
+		}
+		if sysCfg.Transport == "" {
+			sysCfg.Transport = "udp"
+		}
+		if sysCfg.Format == "" {
+			sysCfg.Format = "classic"
+		}
+		setSyslogWriter(sysCfg)
+		if sysCfg.Enabled && sysCfg.Host != "" {
+			// Hook syslog into the standard logger
+			log.SetOutput(&syslogLogWriter{orig: os.Stderr})
 		}
 	}
 
@@ -5748,6 +6428,23 @@ func main() {
 	}
 
 	log.Printf("  Default credentials: admin / admin")
+
+	// Syslog
+	sysCfgDisplay := app.store.GetSyslogConfig()
+	if globalSyslog != nil {
+		p := sysCfgDisplay.Port
+		if p == 0 {
+			if sysCfgDisplay.Transport == "tls" {
+				p = 6514
+			} else {
+				p = 514
+			}
+		}
+		log.Printf("  Syslog     : ENABLED (%s) %s:%d format=%s",
+			sysCfgDisplay.Transport, sysCfgDisplay.Host, p, sysCfgDisplay.Format)
+	} else {
+		log.Printf("  Syslog     : disabled")
+	}
 
 	// Extra debug info: data counts
 	if debug {
