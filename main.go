@@ -5506,6 +5506,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		user = &created
 		log.Printf("OIDC: auto-created user %q (role=%s, vetted=true)", username, defaultRole)
+		app.audit(0, "system", "created", "user", created.ID,
+			fmt.Sprintf("SSO auto enrollment: user %q auto-created via OIDC (role=%s)", username, defaultRole))
 	} else {
 		// Sync display name from IDP on every login
 		if displayName != "" && displayName != user.DisplayName {
