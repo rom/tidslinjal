@@ -689,6 +689,83 @@ func (app *App) handleRegistrationSettings(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// ── OIDC settings handler ───────────────────────────────────────────────────────
+
+func (app *App) handleOIDCSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	if user.Role != RoleAdmin {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		cfg := app.store.GetOIDCSettings()
+		// Never expose client secret to the frontend; send a placeholder if set
+		out := map[string]interface{}{
+			"enabled":      cfg.Enabled,
+			"issuer":       cfg.Issuer,
+			"client_id":    cfg.ClientID,
+			"redirect_url": cfg.RedirectURL,
+			"exclusive":    cfg.Exclusive,
+			"default_role": cfg.DefaultRole,
+			"has_secret":   cfg.ClientSecret != "",
+		}
+		jsonOK(w, out)
+	case http.MethodPut:
+		var req struct {
+			Enabled      bool   `json:"enabled"`
+			Issuer       string `json:"issuer"`
+			ClientID     string `json:"client_id"`
+			ClientSecret string `json:"client_secret"`
+			RedirectURL  string `json:"redirect_url"`
+			Exclusive    bool   `json:"exclusive"`
+			DefaultRole  string `json:"default_role"`
+		}
+		if err := decode(r, &req); err != nil {
+			jsonError(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		existing := app.store.GetOIDCSettings()
+		// Preserve existing secret if a blank value is submitted (means "keep it")
+		secret := req.ClientSecret
+		if secret == "" {
+			secret = existing.ClientSecret
+		}
+		cfg := OIDCPersistentConfig{
+			Enabled:      req.Enabled,
+			Issuer:       req.Issuer,
+			ClientID:     req.ClientID,
+			ClientSecret: secret,
+			RedirectURL:  req.RedirectURL,
+			Exclusive:    req.Exclusive,
+			DefaultRole:  req.DefaultRole,
+		}
+		if err := app.store.SaveOIDCSettings(cfg); err != nil {
+			jsonError(w, "failed to save", http.StatusInternalServerError)
+			return
+		}
+		// Apply the new config immediately if enabled, clear it if not
+		if cfg.Enabled && cfg.Issuer != "" && cfg.ClientID != "" {
+			if err := app.configureOIDC(cfg.Issuer, cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL); err != nil {
+				log.Printf("[WARN] OIDC reconfiguration failed: %v", err)
+				jsonError(w, "OIDC configuration error: "+err.Error(), http.StatusBadGateway)
+				return
+			}
+			app.oidcExclusive = cfg.Exclusive
+			if cfg.DefaultRole != "" {
+				app.oidcDefaultRole = Role(cfg.DefaultRole)
+			} else {
+				app.oidcDefaultRole = RoleReadWrite
+			}
+		} else if !cfg.Enabled {
+			app.oidc = nil
+			app.oidcExclusive = false
+		}
+		jsonOK(w, map[string]string{"status": "ok"})
+	default:
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // ── Invitation handlers ─────────────────────────────────────────────────────────
 
 func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *User) {
@@ -3139,6 +3216,7 @@ func (app *App) routes() http.Handler {
 	})
 	mux.HandleFunc("/api/admin/invitations", app.requireAuth(app.handleInvitations))
 	mux.HandleFunc("/api/admin/invitations/", app.requireAuth(app.handleDeleteInvitation))
+	mux.HandleFunc("/api/admin/oidc", app.requireAuth(app.handleOIDCSettings))
 
 	// Auth
 	mux.HandleFunc("/api/auth/login", app.handleLogin)
@@ -3858,7 +3936,7 @@ func main() {
 		log.Fatalf("Failed to initialize: %v", err)
 	}
 
-	// Configure OIDC if issuer is set
+	// Configure OIDC — CLI flags take priority; fall back to persistent settings stored in DB
 	if oidcIssuer != "" {
 		if err := app.configureOIDC(oidcIssuer, oidcClientID, oidcClientSecret, oidcRedirectURL); err != nil {
 			log.Printf("[WARN] OIDC configuration failed: %v — SSO will be unavailable", err)
@@ -3867,8 +3945,23 @@ func main() {
 			if oidcDefaultRole != "" {
 				app.oidcDefaultRole = Role(oidcDefaultRole)
 			}
-			log.Printf("OIDC SSO enabled: issuer=%s exclusive=%v defaultRole=%q",
+			log.Printf("OIDC SSO enabled (CLI): issuer=%s exclusive=%v defaultRole=%q",
 				oidcIssuer, oidcExclusive, app.oidcDefaultRole)
+		}
+	} else {
+		// No CLI flags — try persistent settings saved via the admin UI
+		persistedOIDC := app.store.GetOIDCSettings()
+		if persistedOIDC.Enabled && persistedOIDC.Issuer != "" && persistedOIDC.ClientID != "" {
+			if err := app.configureOIDC(persistedOIDC.Issuer, persistedOIDC.ClientID, persistedOIDC.ClientSecret, persistedOIDC.RedirectURL); err != nil {
+				log.Printf("[WARN] OIDC configuration (from DB) failed: %v — SSO will be unavailable", err)
+			} else {
+				app.oidcExclusive = persistedOIDC.Exclusive
+				if persistedOIDC.DefaultRole != "" {
+					app.oidcDefaultRole = Role(persistedOIDC.DefaultRole)
+				}
+				log.Printf("OIDC SSO enabled (DB): issuer=%s exclusive=%v defaultRole=%q",
+					persistedOIDC.Issuer, persistedOIDC.Exclusive, app.oidcDefaultRole)
+			}
 		}
 	}
 

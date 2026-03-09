@@ -38,6 +38,7 @@ type Store struct {
 	roleConfigs          []RoleConfig
 	registrationSettings RegistrationSettings
 	invitations          []PersonalInvitation
+	oidcSettings         OIDCPersistentConfig
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -96,6 +97,7 @@ func (s *Store) load() error {
 	s.loadFile("roles.json", &s.roleConfigs)
 	s.loadFile("registration.json", &s.registrationSettings)
 	s.loadFile("invitations.json", &s.invitations)
+	s.loadFile("oidc.json", &s.oidcSettings)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -373,6 +375,21 @@ func (s *Store) SaveRegistrationSettings(rs RegistrationSettings) error {
 	s.registrationSettings = rs
 	s.mu.Unlock()
 	return s.persist("registration.json", rs)
+}
+
+// ── OIDC Settings ─────────────────────────────────────────────────────────────
+
+func (s *Store) GetOIDCSettings() OIDCPersistentConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.oidcSettings
+}
+
+func (s *Store) SaveOIDCSettings(cfg OIDCPersistentConfig) error {
+	s.mu.Lock()
+	s.oidcSettings = cfg
+	s.mu.Unlock()
+	return s.persist("oidc.json", cfg)
 }
 
 // ── Personal Invitations ───────────────────────────────────────────────────────

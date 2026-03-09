@@ -49,6 +49,7 @@ const TRANSLATIONS = {
     tab_users: 'Users',
     tab_groups: 'Groups',
     tab_activity: 'Activity',
+    tab_integrations: 'Integrations',
     tab_settings: 'Settings',
 
     // New v4.0 strings
@@ -328,6 +329,18 @@ const TRANSLATIONS = {
     settings_webhook_test:     'Test',
     settings_webhook_url_required: 'Please enter a webhook URL first.',
 
+    // OIDC / SSO
+    settings_oidc:             'Single Sign-On (OIDC)',
+    settings_oidc_issuer:      'Issuer URL',
+    settings_oidc_client_id:   'Client ID',
+    settings_oidc_client_secret: 'Client Secret',
+    settings_oidc_redirect_url:  'Redirect URL',
+    settings_oidc_exclusive:     'Exclusive mode (disable local login)',
+    settings_oidc_default_role:  'Default role for new users',
+    settings_oidc_save:          'Save & Apply',
+    settings_oidc_status_active: 'SSO active',
+    settings_oidc_status_none:   'Not configured',
+
     // Exercise / synthetic time
     settings_exercise:       'Exercise Settings',
     settings_exercise_label: 'Exercise name',
@@ -444,7 +457,9 @@ const TRANSLATIONS = {
     assigned_task_label:   'Assigned Task',
     standup_label:         'Standup Meeting',
     phase_layer_lbl:       'Layer (empty = master timeline)',
-    synth_day_hours_only:  'Synthetic time: day hours only',
+    synth_day_hours_only:       'Synthetic time: day hours only',
+    settings_include_weekends:  'Include weekends',
+    settings_include_weekends_desc: 'Show weekends on the timeline and count them in synthetic time',
 
     // v3.6.0 — new roles
     role_observer:            'Observer',
@@ -517,6 +532,7 @@ const TRANSLATIONS = {
     tab_users: 'Användare',
     tab_groups: 'Grupper',
     tab_activity: 'Aktivitet',
+    tab_integrations: 'Integrationer',
     tab_settings: 'Inställningar',
     settings_theme: 'Tema',
     settings_size: 'Storlek',
@@ -704,6 +720,18 @@ const TRANSLATIONS = {
     settings_webhook_test:     'Testa',
     settings_webhook_url_required: 'Ange en webhook-URL först.',
 
+    // OIDC / SSO
+    settings_oidc:             'Enkel inloggning (OIDC)',
+    settings_oidc_issuer:      'Utfärdar-URL',
+    settings_oidc_client_id:   'Klient-ID',
+    settings_oidc_client_secret: 'Klienthemlighet',
+    settings_oidc_redirect_url:  'Omdirigerings-URL',
+    settings_oidc_exclusive:     'Exklusivt läge (inaktivera lokal inloggning)',
+    settings_oidc_default_role:  'Standardroll för nya användare',
+    settings_oidc_save:          'Spara & Tillämpa',
+    settings_oidc_status_active: 'SSO aktivt',
+    settings_oidc_status_none:   'Ej konfigurerat',
+
     // Exercise / synthetic time
     settings_exercise:       'Övningsinställningar',
     settings_exercise_label: 'Övningsnamn',
@@ -831,7 +859,9 @@ const TRANSLATIONS = {
     assigned_task_label:   'Tilldelad uppgift',
     standup_label:         'Daglig standup',
     phase_layer_lbl:       'Lager (tomt = mastertidslinje)',
-    synth_day_hours_only:  'Syntetisk tid: endast dagtimmar',
+    synth_day_hours_only:       'Syntetisk tid: endast dagtimmar',
+    settings_include_weekends:  'Inkludera helger',
+    settings_include_weekends_desc: 'Visa helger i tidslinjen och räkna dem i syntetisk tid',
 
     // v3.6.0 — nya roller
     role_observer:            'Observatör',
@@ -964,6 +994,7 @@ const TRANSLATIONS = {
     tab_users: 'Utilisateurs',
     tab_groups: 'Groupes',
     tab_activity: 'Activité',
+    tab_integrations: 'Intégrations',
     tab_settings: 'Paramètres',
     settings_theme: 'Thème',
     settings_size: 'Taille',
@@ -1151,6 +1182,18 @@ const TRANSLATIONS = {
     settings_webhook_test:     'Tester',
     settings_webhook_url_required: 'Veuillez saisir une URL webhook.',
 
+    // OIDC / SSO
+    settings_oidc:             'Authentification unique (OIDC)',
+    settings_oidc_issuer:      'URL de l\'émetteur',
+    settings_oidc_client_id:   'ID client',
+    settings_oidc_client_secret: 'Secret client',
+    settings_oidc_redirect_url:  'URL de redirection',
+    settings_oidc_exclusive:     'Mode exclusif (désactiver connexion locale)',
+    settings_oidc_default_role:  'Rôle par défaut pour les nouveaux utilisateurs',
+    settings_oidc_save:          'Enregistrer & Appliquer',
+    settings_oidc_status_active: 'SSO actif',
+    settings_oidc_status_none:   'Non configuré',
+
     // Exercise / synthetic time
     settings_exercise:       'Paramètres d\'exercice',
     settings_exercise_label: 'Nom de l\'exercice',
@@ -1278,7 +1321,9 @@ const TRANSLATIONS = {
     assigned_task_label:   'Tâche assignée',
     standup_label:         'Réunion debout',
     phase_layer_lbl:       'Couche (vide = chronologie maîtresse)',
-    synth_day_hours_only:  'Temps synthétique : heures de journée uniquement',
+    synth_day_hours_only:       'Temps synthétique : heures de journée uniquement',
+    settings_include_weekends:  'Inclure les week-ends',
+    settings_include_weekends_desc: 'Afficher les week-ends sur la timeline et les comptabiliser dans le temps synthétique',
 
     // v3.6.0 — nouveaux rôles
     role_observer:            'Observateur',
