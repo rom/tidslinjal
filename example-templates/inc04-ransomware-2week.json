@@ -1,0 +1,373 @@
+{
+  "name": "INC-04 Ransomware Attack — 2 Weeks",
+  "description": "14-day ransomware incident response. Ransomware encrypts critical company systems causing major business disruption. Week 1 is 24/7 operations; Week 2 transitions to working-hours as recovery normalises. Involves ransomware negotiation specialists, cyber insurance, law enforcement (FBI/police), backup solution vendor, and application vendors.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Discovery & Declaration",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Initial Response",
+      "color": "#C0392B",
+      "start_offset_min": 480,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Business Continuity",
+      "color": "#E67E22",
+      "start_offset_min": 2880,
+      "end_offset_min": 5760,
+      "order": 2
+    },
+    {
+      "name": "Negotiation & Decision",
+      "color": "#8E44AD",
+      "start_offset_min": 5760,
+      "end_offset_min": 8640,
+      "order": 3
+    },
+    {
+      "name": "Recovery — Stage 1",
+      "color": "#F39C12",
+      "start_offset_min": 8640,
+      "end_offset_min": 11520,
+      "order": 4
+    },
+    {
+      "name": "Recovery — Stage 2",
+      "color": "#F1C40F",
+      "start_offset_min": 11520,
+      "end_offset_min": 14400,
+      "order": 5
+    },
+    {
+      "name": "Recovery — Stage 3",
+      "color": "#2ECC71",
+      "start_offset_min": 14400,
+      "end_offset_min": 17280,
+      "order": 6
+    },
+    {
+      "name": "Validation & Return to Normal",
+      "color": "#27AE60",
+      "start_offset_min": 17280,
+      "end_offset_min": 20160,
+      "order": 7
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 480,
+      "end_offset_min": 540,
+      "reason": "Day 1 management crisis briefing — all senior staff required. No recovery actions during this window.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1500,
+      "reason": "Day 2 morning management briefing — ransomware status and decision point.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2880,
+      "end_offset_min": 2940,
+      "reason": "Day 3 management briefing — business continuity and negotiation update.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 4320,
+      "end_offset_min": 4380,
+      "reason": "Day 4 management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 5760,
+      "end_offset_min": 5820,
+      "reason": "Day 5 negotiation strategy briefing — legal, insurance, and negotiation specialist required.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 7200,
+      "end_offset_min": 7260,
+      "reason": "Day 6 management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 8640,
+      "end_offset_min": 8700,
+      "reason": "Day 7 final negotiation decision and recovery kickoff — board-level decision required.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 10440,
+      "end_offset_min": 10500,
+      "reason": "Week 2, Day 1 (Day 8) morning briefing — recovery team standup.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 11880,
+      "end_offset_min": 11940,
+      "reason": "Week 2, Day 2 (Day 9) morning briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 13320,
+      "end_offset_min": 13380,
+      "reason": "Week 2, Day 3 (Day 10) morning briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 14760,
+      "end_offset_min": 14820,
+      "reason": "Week 2, Day 4 (Day 11) morning briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 16200,
+      "end_offset_min": 16260,
+      "reason": "Week 2, Day 5 (Day 12) morning briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 17640,
+      "end_offset_min": 17700,
+      "reason": "Week 2, Day 6 (Day 13) validation briefing.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "Ransomware Detonation Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Ransomware detonation detected across multiple systems simultaneously. Users report files encrypted with .LOCKED extension and ransom note displayed on screens. SOC Team confirms ransomware propagation via CrowdStrike Falcon alerts — hundreds of endpoints in 15 minutes. Network Team confirms file servers and backup systems targeted. T=0 declared. All IT staff mobilised immediately.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Emergency Network Isolation",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "Network Team executes emergency full network isolation: core switches disabled on corporate LAN, VPN connections terminated, cloud sync (OneDrive, SharePoint) paused to prevent cloud encryption, backup replication halted. SOC Team uses CrowdStrike to contain endpoints where possible. Estimated 40% of systems encrypted before containment achieved.",
+      "start_offset_min": 5,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Ransomware Variant Identification",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "SOC Team identifies ransomware variant from ransom note, file extension, and malware sample submitted to ID Ransomware and VirusTotal. Variant identified: LockBit 3.0. Checks leak site for data exfiltration claims. SOC begins documenting affected systems inventory. Estimated 250 endpoints and 15 servers encrypted.",
+      "start_offset_min": 30,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Cyber Insurance Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "CISO and Legal notify Cyber Insurance company via 24/7 breach hotline. Policy number and coverage limits confirmed. Insurance assigns dedicated incident response coordinator. Insurance-approved vendor panel for: forensics firm, legal counsel, ransomware negotiation specialist, and public relations firm provided. Pre-authorisation for emergency IR spend obtained.",
+      "start_offset_min": 60,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Law Enforcement Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal team submits ransomware notification to FBI Cyber Division (IC3 complaint) and national police cybercrime unit. Case reference numbers obtained. Law enforcement advises on negotiation posture and potential decryption key recovery from prior takedowns. Intelligence sharing on ransomware group activity provided.",
+      "start_offset_min": 90,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Ransomware Negotiation Specialist Engaged",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Insurance-approved ransomware negotiation specialist firm engaged via retainer activation. Lead negotiator on call within 1 hour. Briefed on: ransomware group (LockBit 3.0), ransom demand amount, data exfiltration risk, business impact, and insurance coverage. Negotiation strategy assessment initiated. Ransom demand: $4.2M USD in Monero.",
+      "start_offset_min": 120,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Crisis Management Briefing — Day 1",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Crisis management briefing for C-suite and Board (CEO, CFO, CISO, Legal, Communications, key Board members). Topics: attack scope, encrypted systems inventory, business impact (estimated $500K/day revenue loss), insurance coverage confirmed, law enforcement engaged, negotiation specialist briefed. Board authorises negotiation while parallel recovery is pursued. Communications team prepares customer notification draft.",
+      "start_offset_min": 480,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Backup Integrity Assessment",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "IT Operations and Backup Solution Vendor (Veeam/Commvault) specialist conduct emergency backup integrity assessment. Findings: primary backup repository encrypted (backup server compromised). Immutable backup copy in offsite location (Azure Blob/Wasabi) intact and verified. Tape backups from last Thursday confirmed clean. Recovery Point Objective: 5 days of data loss for some systems.",
+      "start_offset_min": 480,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Business Continuity Plan Activated",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Business Continuity Manager activates BCP. Manual workarounds implemented: paper-based processes for critical operations, email via personal hotspots, phone trees for customer communications. Critical business functions identified: payroll (manual), order processing (manual), customer support (phone only). Clean laptops from DR stock deployed to critical staff.",
+      "start_offset_min": 720,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 1 — End of Day 1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 1 SITREP to Board, CISO, Insurance, Legal. Affected systems: 250 workstations, 15 servers encrypted. Backup status: immutable backups intact, 5-day data gap. Negotiation specialist assessing ransom demand. Business continuity plan active. Law enforcement engaged. Estimated recovery timeline without decryption: 10-12 days. With decryption: 5-7 days.",
+      "start_offset_min": 1380,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Forensic Investigation — Intrusion Path",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Insurance-engaged forensics firm investigates ransomware intrusion path. Forensic timeline: initial access via RDP brute force on internet-exposed server 3 weeks prior. Lateral movement using stolen credentials. Data exfiltration: 180GB over 2 weeks via Rclone to Mega.nz. Ransomware deployment from compromised Domain Controller. Full TTPs documented.",
+      "start_offset_min": 1440,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Ransom Negotiation — Initial Contact",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Ransomware negotiation specialist initiates contact with LockBit 3.0 operators via Tor negotiation portal. Opening position: requests proof of decryption (decrypts 3 test files). Counters ransom demand to $800K citing limited insurance coverage. Negotiation specialist coordinates all communications through legal counsel to maintain attorney-client privilege.",
+      "start_offset_min": 2880,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Application Vendor Recovery Assessment",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "IT Operations contacts all critical Application Vendors for recovery support. ERP vendor (SAP/Microsoft) provides emergency reinstallation support and license reset. CRM vendor (Salesforce) confirms cloud data unaffected. Financial system vendor provides database recovery specialist. Vendors submit recovery time estimates and resource requirements.",
+      "start_offset_min": 2880,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 2 — End of Day 3",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 3 SITREP. Negotiation in progress — counter-offer sent ($800K vs $4.2M demand). Forensics: RDP brute force initial access confirmed, 180GB exfiltrated. Backup restoration plan finalised with Veeam specialist. Infrastructure for recovery identified (clean servers sourced). Application vendors engaged for reinstallation support. Business continuity holding.",
+      "start_offset_min": 4260,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Negotiation Final Decision",
+      "event_type": "decision",
+      "color": "#C0392B",
+      "description": "Board-level decision meeting: CEO, CFO, CISO, Legal, Insurance coordinator, Negotiation specialist. Options: (A) Pay negotiated ransom ($1.1M agreed) for decryption keys + delete pledge, (B) Restore from backup (10-12 day timeline, 5-day data loss). Decision: Pursue backup restoration (Option B) — ransom payment paused but negotiation maintained as fallback. Insurance covers backup restoration costs.",
+      "start_offset_min": 8640,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Recovery Stage 1 — Core Infrastructure",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Recovery Stage 1 begins: rebuild core infrastructure. Priority: Active Directory Domain Controllers, DNS, DHCP, file services. IT Operations and Backup Solution Vendor (Veeam) restore from immutable backup. New servers provisioned from clean hardware. Servers built in isolated VLAN before joining clean network segment. Target: core services by end of Day 9.",
+      "start_offset_min": 8760,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Recovery Stage 2 — Application Servers",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "Recovery Stage 2: application server restoration. ERP system (SAP) reinstalled from vendor media, database restored from clean backup, tested and validated with Finance team. CRM integration restored. Financial system recovered with vendor specialist on-site. Email system (Exchange/Microsoft 365) confirmed clean — hybrid configuration reviewed. Application Vendors supporting each stream.",
+      "start_offset_min": 11520,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 3 — End of Day 9 (Week 2 Day 2)",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 9 SITREP. Core infrastructure fully restored. Active Directory clean. File servers 70% restored. ERP system back online — Finance team validating. Email operational. 120 of 250 workstations rebuilt and returned to users. Negotiation: threat actors accepted $1.1M offer — on hold pending backup restoration progress. Insurance claims process progressing.",
+      "start_offset_min": 11880,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Recovery Stage 3 — Endpoint Rebuild",
+      "event_type": "activity",
+      "color": "#2ECC71",
+      "description": "Recovery Stage 3: mass endpoint rebuild. IT Operations executes automated reimaging of 250 workstations using Microsoft Deployment Toolkit / SCCM OSD. Batch rebuilding: 30 laptops/day. Users receive rebuilt systems with fresh credentials, MFA enrolled, EDR agent verified. Critical staff prioritised: Finance, Customer Support, Operations.",
+      "start_offset_min": 14400,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Security Hardening Implementation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "SOC Team and IT Operations implement emergency security hardening measures on all rebuilt systems: RDP disabled on internet-facing systems, privileged access workstations introduced, network segmentation enhanced, MFA enforced for all accounts, immutable backup solution upgraded, endpoint detection and response coverage verified at 100%.",
+      "start_offset_min": 15840,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Full System Validation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "Forensics firm and SOC Team conduct final validation: full vulnerability scan of all restored systems (Tenable Nessus), EDR coverage audit, network traffic baseline established, authentication log review, backup restoration tested. No IOCs detected. Environment declared clean by forensics firm. Insurance sign-off obtained for return to operations.",
+      "start_offset_min": 17280,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Return to Normal Operations",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "All 250 workstations and 15 servers restored. Business systems fully operational. All Application Vendor integrations tested and confirmed. Business Continuity Plan stood down. Enhanced monitoring maintained for 90 days. Customer communications: incident notification with remediation steps sent. Staff security awareness training initiated.",
+      "start_offset_min": 18720,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Insurance Claim Submission",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Legal and Finance submit comprehensive cyber insurance claim: forensics costs, recovery vendor costs (Veeam specialist, application vendors), business interruption loss ($500K/day x 13 days), IT staff overtime, hardware replacement, enhanced security tooling. Total claim estimated at $8.5M. Insurance company claim handler assigned.",
+      "start_offset_min": 19440,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Post-Incident Lessons Learned",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Board-level post-incident review. Attendees: CEO, CFO, CISO, Board members, Insurance coordinator, Forensics lead, Legal. Topics: full incident timeline, root cause (RDP exposure), total financial impact, insurance settlement, regulatory notifications, lessons learned: immutable backup investment justified, security awareness programme required, MFA enforcement critical. 12-month security roadmap presented.",
+      "start_offset_min": 19440,
+      "duration_min": 180,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Final Post-Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Comprehensive Post-Incident Report submitted to Board, Regulatory Body, and Insurance company. Report includes: full forensic timeline, root cause analysis, financial impact assessment, regulatory compliance evaluation (GDPR, sector regulations), insurance claim supporting documentation, 3-year cyber resilience investment roadmap with board-level recommendations.",
+      "start_offset_min": 20160,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

@@ -362,6 +362,13 @@ type Template struct {
 	Phases        []TemplatePhase `json:"phases,omitempty"` // optional phase blocks
 	Locks         []TemplateLock  `json:"locks,omitempty"`  // optional time locks
 	Roles         []RoleConfig    `json:"roles,omitempty"`  // optional role configs
+	// Theme / UX settings applied when the template is loaded
+	Theme         string          `json:"theme,omitempty"`          // dark | light
+	Size          string          `json:"size,omitempty"`           // small | normal | large | huge
+	Language      string          `json:"language,omitempty"`       // en | sv | fr
+	OperationMode string          `json:"operation_mode,omitempty"` // exercise | incident | operation
+	GroupLabel    string          `json:"group_label,omitempty"`    // group | unit | team
+	UserLabel     string          `json:"user_label,omitempty"`     // users | soldiers | personnel
 }
 
 // TemplateAttachment stores attachment metadata within a template item
@@ -385,6 +392,9 @@ type TemplateItem struct {
 	RecurrencePattern string               `json:"recurrence_pattern"`
 	Participant       string               `json:"participant"`
 	Attachments       []TemplateAttachment `json:"attachments,omitempty"`
+	// Alarm settings: if AlarmLeadTime > 0, an alarm is created for the applying user
+	AlarmLeadTime     int                  `json:"alarm_lead_time,omitempty"`  // minutes before event; 0 = no alarm
+	AlarmSound        string               `json:"alarm_sound,omitempty"`      // optional sound name
 }
 
 // TemplatePhase is a phase block stored relative to T=0 for use in templates
@@ -425,13 +435,15 @@ type OIDCConfig struct {
 
 // ExerciseSettings controls synthetic time display across the application
 type ExerciseSettings struct {
-	Enabled      bool   `json:"enabled"`
-	Epoch        string `json:"epoch"`                    // ISO8601: STARTEX — real datetime = Day 1 T+0
-	Endex        string `json:"endex,omitempty"`          // ISO8601: ENDEX — end of exercise
-	Label        string `json:"label"`                    // exercise name shown in header
-	Paused       bool   `json:"paused"`                   // freeze timeline progression
-	PausedAt     string `json:"paused_at,omitempty"`      // ISO8601: when it was paused
-	DayHoursOnly bool   `json:"day_hours_only"`           // synthetic time only advances during day hours
-	GroupLabel   string `json:"group_label,omitempty"`    // "group" | "unit" | "team"
-	ExIndex      int    `json:"ex_index,omitempty"`       // exercise index number
+	Enabled       bool   `json:"enabled"`
+	Epoch         string `json:"epoch"`                     // ISO8601: STARTEX / OPSTART / Incident start
+	Endex         string `json:"endex,omitempty"`           // ISO8601: ENDEX / OPEND / Incident end
+	Label         string `json:"label"`                     // exercise/incident/operation name shown in header
+	Paused        bool   `json:"paused"`                    // freeze timeline progression
+	PausedAt      string `json:"paused_at,omitempty"`       // ISO8601: when it was paused
+	DayHoursOnly  bool   `json:"day_hours_only"`            // synthetic time only advances during day hours
+	GroupLabel    string `json:"group_label,omitempty"`     // "group" | "unit" | "team"
+	UserLabel     string `json:"user_label,omitempty"`      // "users" | "soldiers" | "personnel"
+	OperationMode string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
+	ExIndex       int    `json:"ex_index,omitempty"`        // exercise/incident index number
 }

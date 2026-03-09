@@ -1,0 +1,256 @@
+{
+  "name": "INC-02 Hacker Attack — 4 Days",
+  "description": "96-hour around-the-clock incident response for a targeted intrusion detected on corporate systems. Covers breach detection, isolation of compromised systems, forensic analysis, threat actor eviction, system restoration, and legal reporting. Involves internal SOC, external CERT consultants, Law enforcement, and System vendors.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Initial Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Containment",
+      "color": "#E67E22",
+      "start_offset_min": 480,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Eradication & Forensics",
+      "color": "#8E44AD",
+      "start_offset_min": 2880,
+      "end_offset_min": 4320,
+      "order": 2
+    },
+    {
+      "name": "Recovery",
+      "color": "#27AE60",
+      "start_offset_min": 4320,
+      "end_offset_min": 5520,
+      "order": 3
+    },
+    {
+      "name": "Lessons Learned",
+      "color": "#3498DB",
+      "start_offset_min": 5520,
+      "end_offset_min": 5760,
+      "order": 4
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1470,
+      "reason": "Day 2 shift handover — CERT team night shift briefing. No system changes during transition.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2880,
+      "end_offset_min": 2910,
+      "reason": "Day 3 shift handover — forensic team progress briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 4320,
+      "end_offset_min": 4350,
+      "reason": "Day 4 shift handover — recovery team morning briefing.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "Intrusion Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "SOC Team analyst detects anomalous behaviour in Microsoft Sentinel SIEM — lateral movement alerts from a corporate workstation to Domain Controller. CrowdStrike Falcon EDR raises critical alert: malicious PowerShell execution and credential dumping via Mimikatz detected. T=0 established. Incident declared.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Incident Declaration & War Room Activation",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Incident Commander activates Cyber Incident War Room. CISO, SOC Lead, IT Operations, and Legal notified. Incident Response Plan IRP-SEC-002 invoked. All actions to be logged in Jira Service Management incident ticket #INC-2024-XXXX.",
+      "start_offset_min": 15,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "External CERT Consultants Engaged",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "CISO activates retainer with external Cyber Incident Response Team (CERT consultants). Lead forensic analyst and IR specialist on-site within 4 hours. Remote access established for initial assessment. Evidence preservation protocols communicated.",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Initial Scope Assessment",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "SOC Team performs rapid scope assessment using Microsoft Defender for Endpoint and CrowdStrike. Identifies 3 compromised workstations and 1 server showing IOCs. Network segmentation status reviewed. VPN logs analysed for suspicious remote access patterns.",
+      "start_offset_min": 30,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Compromised Systems Isolated",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Network Team isolates 3 affected workstations and 1 server from the corporate network via VLAN quarantine. CrowdStrike network containment feature activated on all identified endpoints. VPN access for associated user accounts revoked. Active Directory accounts suspended pending investigation.",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "alarm_lead_time": 5
+    },
+    {
+      "title": "Management Briefing — Hour 2",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Incident Commander briefs Management (CEO, CISO, Legal, Communications). Confirmed intrusion scope, containment actions taken, external CERT engaged, estimated business impact. Decision: Law enforcement notification threshold assessment. Communications team put on standby for potential disclosure.",
+      "start_offset_min": 120,
+      "duration_min": 45,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Law Enforcement Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal team and CISO submit notification to national law enforcement cybercrime unit and relevant regulatory body. Provides incident summary, affected system inventory, and preliminary IOC data. Law enforcement case reference number obtained. Evidence chain-of-custody procedures activated.",
+      "start_offset_min": 240,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "CERT Team On-Site Arrival",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "External CERT consultants arrive on-site. Briefed by SOC Lead and Incident Commander. Forensic laptops and write-blockers deployed. Evidence collection begins: memory dumps from isolated systems, network packet captures, Windows event log extraction, Active Directory audit logs.",
+      "start_offset_min": 240,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Forensic Investigation — Phase 1",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "CERT forensic team conducts deep-dive analysis of compromised systems. Timeline reconstruction using Windows Event Logs, Prefetch, ShimCache, and AmCache artefacts. Identifies initial access vector: phishing email with malicious macro delivered via vendor email account. Threat actor TTPs documented against MITRE ATT&CK framework.",
+      "start_offset_min": 480,
+      "duration_min": 960,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 1 — End of Day 1",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "End-of-Day 1 Situation Report. Confirmed: 3 workstations and 1 file server compromised. Initial access via phishing — vendor account potentially compromised. Lateral movement observed to Domain Controller attempted (blocked by EDR). Forensic investigation ongoing. Systems remain isolated. Law enforcement notified.",
+      "start_offset_min": 1380,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Vendor Account Investigation",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "SOC Team contacts System Vendor (source of phishing email origin) to investigate compromise of their email system. Vendor security team engaged. Vendor access to corporate systems suspended pending investigation. Supply chain compromise assessment initiated.",
+      "start_offset_min": 1440,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Password Reset — All Privileged Accounts",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations resets passwords for all Domain Administrator, service accounts, and privileged user accounts as precautionary measure. Multi-factor authentication enforcement reviewed. Conditional access policies tightened in Azure AD / Entra ID.",
+      "start_offset_min": 1560,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Forensic Investigation — Phase 2 (Day 2-3)",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "CERT team expands investigation: network traffic analysis (Zeek/Wireshark), C2 communication identification, data exfiltration assessment. Cloud environment (Microsoft 365, SharePoint, Teams) reviewed for suspicious activity. Email gateway logs analysed. External threat intelligence feeds checked for associated IOCs.",
+      "start_offset_min": 1680,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 2 — End of Day 2",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 2 Situation Report. CERT has identified C2 communication to attacker infrastructure. No confirmed data exfiltration detected at this stage. Vendor email compromise confirmed — vendor notified and cooperating. Threat actor TTPs consistent with financially motivated group. All compromised systems remain isolated.",
+      "start_offset_min": 2820,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Threat Actor Eviction",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "CERT team and SOC execute coordinated threat actor eviction. All identified persistence mechanisms removed (scheduled tasks, registry run keys, WMI subscriptions). Malware samples quarantined. C2 infrastructure blocked at perimeter firewall and DNS. Compromised credentials revoked. Eviction verified via EDR telemetry.",
+      "start_offset_min": 2880,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "System Rebuilds Initiated",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "IT Operations begins clean rebuild of 3 compromised workstations from golden image. File server restored from verified clean backup (pre-incident snapshot confirmed clean by CERT). System Vendor provides updated, patched software versions for reinstallation.",
+      "start_offset_min": 4320,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 3 — End of Day 3",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Day 3 Situation Report. Threat actor evicted. All persistence mechanisms removed. Data exfiltration assessment: approximately 2GB of documents accessed on file server — content analysis ongoing. System rebuilds in progress. Expected return to operations: Day 4 afternoon.",
+      "start_offset_min": 4260,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Restored Systems Validation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "CERT team and IT Operations validate rebuilt systems before returning to production. Security baseline checks: EDR agent installed and reporting, patching status verified, no residual IOCs detected, network connectivity restored to isolated segment, user accounts re-enabled with new credentials and MFA enrolled.",
+      "start_offset_min": 4800,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Return to Operations",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "All rebuilt systems returned to production network. Enhanced monitoring maintained for 30 days post-incident. SOC increases alert sensitivity for environment. CERT team transitions to 24/7 remote monitoring for 72-hour post-eviction observation period.",
+      "start_offset_min": 5280,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Lessons Learned Meeting",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Structured lessons learned meeting with all stakeholders: CISO, SOC Lead, IT Operations, CERT consultants, Legal, Management. Review of incident timeline, response effectiveness, gaps identified. Recommendations: enhanced phishing protection, vendor access review, network segmentation improvements, IR playbook updates.",
+      "start_offset_min": 5520,
+      "duration_min": 120,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Final Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "CERT consultants and Incident Commander submit comprehensive final incident report to Management and Legal. Report covers: full attack timeline, forensic findings, data impact assessment, threat actor attribution assessment, regulatory notification requirements, and remediation roadmap with prioritised security improvements.",
+      "start_offset_min": 5760,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

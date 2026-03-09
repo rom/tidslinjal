@@ -1,0 +1,254 @@
+{
+  "name": "INC-01 DDoS Attack — 2 Days",
+  "description": "48-hour around-the-clock incident response for a major volumetric DDoS attack targeting the organisation's internet-facing services. Covers initial detection through ISP and CDN coordination, traffic scrubbing activation, shift handovers, service restoration, and post-incident reporting. Suitable for SOC, Network, and Management teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Alert",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Initial Mitigation",
+      "color": "#E67E22",
+      "start_offset_min": 120,
+      "end_offset_min": 480,
+      "order": 1
+    },
+    {
+      "name": "Active Mitigation",
+      "color": "#F39C12",
+      "start_offset_min": 480,
+      "end_offset_min": 1440,
+      "order": 2
+    },
+    {
+      "name": "Sustained Defence (Day 2)",
+      "color": "#8E44AD",
+      "start_offset_min": 1440,
+      "end_offset_min": 2400,
+      "order": 3
+    },
+    {
+      "name": "Recovery",
+      "color": "#27AE60",
+      "start_offset_min": 2400,
+      "end_offset_min": 2760,
+      "order": 4
+    },
+    {
+      "name": "Post-Incident",
+      "color": "#3498DB",
+      "start_offset_min": 2760,
+      "end_offset_min": 2880,
+      "order": 5
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 720,
+      "end_offset_min": 750,
+      "reason": "Day 1 shift handover — SOC Team A hands over to Team B. No major changes during transition.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1470,
+      "reason": "Day 2 start — morning shift handover briefing. Incident Commander updates all teams.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2160,
+      "end_offset_min": 2190,
+      "reason": "Day 2 evening shift handover — SOC Team A resumes.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "DDoS Attack Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "SOC Team monitoring tools (Darktrace / Splunk SIEM) trigger high-severity alert. Inbound traffic volume exceeds 50 Gbps threshold. Internet-facing web portal and API gateway experiencing severe degradation. T=0 established.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SOC Incident Triage",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "SOC Team conducts initial triage. Confirms volumetric DDoS attack — not internal misconfiguration. Identifies attack vectors: UDP flood and HTTP GET flood. Activates Incident Response Plan IRP-NET-001. Incident Commander designated.",
+      "start_offset_min": 0,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Management Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Incident Commander notifies Management (CISO, IT Director) via secure messaging. Initial impact assessment: public-facing services degraded, customer-facing portal unreachable. Estimated service impact communicated.",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ISP Emergency Contact",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Network Team contacts ISP (Tier-1 upstream carrier) via 24/7 NOC hotline. Requests upstream traffic filtering and null-routing of attack source prefixes. Provides attack traffic samples and BGP prefix information. Reference: ISP Incident Ticket #AUTO-OPEN.",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "CDN DDoS Protection Activated",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Network Team activates Cloudflare Under Attack Mode via API. DNS records updated to route all traffic through Cloudflare scrubbing centres. Rate limiting rules applied. Magic Transit BGP announcement initiated for full network-layer protection.",
+      "start_offset_min": 45,
+      "duration_min": 45,
+      "alarm_lead_time": 5
+    },
+    {
+      "title": "Internal Traffic Scrubbing — WAF Rules",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "SOC Team deploys emergency WAF rules on F5 BIG-IP and Palo Alto NGFW. Blocks identified attack source ASNs. Implements challenge pages for suspicious IP ranges. Enables geo-blocking for high-volume attack origin countries.",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ISP Upstream Filtering Confirmed",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "ISP NOC confirms upstream null-routing applied. Attack traffic reduced by approximately 60% at ingress. Residual traffic still impacting services. ISP escalating to upstream carrier (Tier-0) for additional filtering capacity.",
+      "start_offset_min": 90,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Management Briefing — Hour 2",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Incident Commander briefs Management team (CISO, CTO, Communications). Topics: attack profile, current mitigation status, customer impact, estimated restoration timeline, public communications decision. Management authorises continued CDN spend and ISP escalation.",
+      "start_offset_min": 120,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Service Partial Restoration",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "CDN scrubbing and ISP filtering combination reduces attack to manageable levels. Web portal partially restored. API gateway responding at degraded capacity. SOC Team continues monitoring. Network Team adjusts BGP routing to distribute remaining load.",
+      "start_offset_min": 240,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SITREP 1 — 4h Mark",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "SOC Team submits Situation Report 1 to Management and stakeholders. Contents: attack vector analysis, mitigation effectiveness (traffic volume before/after), service availability metrics, resource consumption, next steps. Distribution: CISO, CTO, IT Director, Communications team.",
+      "start_offset_min": 240,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Akamai Prolexic Escalation",
+      "event_type": "decision",
+      "color": "#8E44AD",
+      "description": "Network Team and Incident Commander decide to escalate to Akamai Prolexic for additional scrubbing capacity. Attack sustained at 80 Gbps — Cloudflare capacity approaching limits. Akamai emergency onboarding initiated. BGP re-announcement to Akamai scrubbing centres.",
+      "start_offset_min": 360,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Day 1 Evening SITREP",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Situation Report 2 issued at Day 1 evening. Attack ongoing but fully mitigated at network edge. Services running at normal capacity behind scrubbing infrastructure. SOC Team maintaining 24/7 watch. Management informed of extended monitoring period.",
+      "start_offset_min": 720,
+      "duration_min": 0,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Shift Handover — SOC Night Team",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "SOC Team A formally hands over to Night Team B. Handover brief covers: current attack status, active mitigations in place, escalation contacts, Cloudflare and Akamai dashboard credentials, ISP ticket reference numbers, and Management notification protocol.",
+      "start_offset_min": 720,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Overnight Monitoring — Automated Watch",
+      "event_type": "activity",
+      "color": "#95A5A6",
+      "description": "SOC Night Team B monitors automated dashboards (Splunk, Cloudflare Analytics, Akamai Control Centre). Alerting thresholds set for attack re-surge. On-call Network Team available within 15 minutes for escalation.",
+      "start_offset_min": 750,
+      "duration_min": 690,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Day 2 Morning Shift Handover",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "SOC Night Team B hands over to Day Team A. Overnight summary: attack volume reduced significantly, no re-surge events. ISP upstream filtering still active. Akamai Prolexic routing maintained. Management morning briefing scheduled.",
+      "start_offset_min": 1440,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Management Morning Briefing — Day 2",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Incident Commander briefs Management on overnight developments. Decision point: maintain full scrubbing infrastructure or begin phased reduction. Communications team updates on customer notifications sent. Management authorises incremental mitigation reduction with monitoring.",
+      "start_offset_min": 1500,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Phased Mitigation Reduction",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Network Team begins phased reduction of emergency mitigations. Step 1: Remove geo-blocking rules. Step 2: Reduce ISP null-routing scope. Cloudflare and Akamai scrubbing maintained. SOC monitors for attack re-surge at each step.",
+      "start_offset_min": 2160,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Full Service Restoration",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "All internet-facing services confirmed fully operational. CDN routing returned to normal. ISP upstream null-routing lifted. WAF rules reverted to standard configuration. SOC Team confirms no residual attack traffic. Customer portal and API gateway operating at normal capacity.",
+      "start_offset_min": 2400,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Data Collection",
+      "event_type": "activity",
+      "color": "#3498DB",
+      "description": "SOC Team and Network Team collect all incident data: Splunk logs, Cloudflare and Akamai traffic reports, ISP communications, timeline of events, resource costs (CDN overage, ISP fees). Forensic capture of attack traffic samples for analysis.",
+      "start_offset_min": 2520,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Incident Commander submits formal Post-Incident Report to Management and CISO. Report includes: executive summary, attack timeline, technical analysis, mitigation effectiveness, financial impact, recommendations for DDoS resilience improvements (anycast infrastructure, permanent Akamai contract, ISP SLA review).",
+      "start_offset_min": 2880,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

@@ -1700,28 +1700,41 @@ function renderSidebar() {
         </button>
       </div>` : ''}
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_group_label')||'Group Terminology'}</div>
-        <div class="toggle-btn-group">
+        <div class="sidebar-section-title">${t('settings_terminology')||'Terminology'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_group_label')||'Group label'}</div>
+        <div class="toggle-btn-group" style="margin-bottom:8px">
           <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" onclick="setGroupLabel('group')">Group</button>
           <button class="toggle-btn${ex.group_label==='unit'?' active':''}" onclick="setGroupLabel('unit')">Unit</button>
           <button class="toggle-btn${ex.group_label==='team'?' active':''}" onclick="setGroupLabel('team')">Team</button>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_user_label')||'User label'}</div>
+        <div class="toggle-btn-group" style="margin-bottom:8px">
+          <button class="toggle-btn${(ex.user_label||'users')==='users'?' active':''}" onclick="setUserLabel('users')">Users</button>
+          <button class="toggle-btn${ex.user_label==='soldiers'?' active':''}" onclick="setUserLabel('soldiers')">Soldiers</button>
+          <button class="toggle-btn${ex.user_label==='personnel'?' active':''}" onclick="setUserLabel('personnel')">Personnel</button>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_operation_mode')||'Operation mode'}</div>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(ex.operation_mode||'exercise')==='exercise'?' active':''}" onclick="setOperationMode('exercise')">Exercise</button>
+          <button class="toggle-btn${ex.operation_mode==='incident'?' active':''}" onclick="setOperationMode('incident')">Incident</button>
+          <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" onclick="setOperationMode('operation')">Operation</button>
         </div>
       </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_exercise')}</div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_exercise_label')}</label>
-          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="${t('settings_exercise_label_ph')||'Exercise name…'}"
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${getOperationNameLabel(ex)}</label>
+          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="${getOperationNameLabel(ex)}…"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">STARTEX — ${t('settings_exercise_epoch')}</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getStartexLabel(ex)}</label>
           <input type="datetime-local" id="exEpoch" value="${ex.epoch ? fmtDateInput(new Date(ex.epoch)) : ''}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">ENDEX — ${t('settings_exercise_endex')||'End of exercise'}</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getEndexLabel(ex)}</label>
           <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
@@ -2690,6 +2703,8 @@ async function confirmSaveTemplate() {
       reason:           l.reason || '',
       scope:            l.scope  || 'all',
     }));
+  // Capture current theme/terminology settings
+  const ex = state.exercise || {};
   const payload = {
     name,
     description: document.getElementById('tmplDescription').value.trim(),
@@ -2698,6 +2713,12 @@ async function confirmSaveTemplate() {
     phases: phases.length ? phases : undefined,
     locks:  locks.length  ? locks  : undefined,
     roles:  (state.roleConfigs && state.roleConfigs.length) ? state.roleConfigs : undefined,
+    theme:          state.preferences.theme    || undefined,
+    size:           state.preferences.size     || undefined,
+    language:       state.preferences.language || undefined,
+    operation_mode: ex.operation_mode          || undefined,
+    group_label:    ex.group_label             || undefined,
+    user_label:     ex.user_label              || undefined,
   };
   const res = await apiPost('/api/templates', payload);
   if (res.ok) {
@@ -2771,6 +2792,18 @@ async function confirmApplyTemplate(id) {
       state.preferences.day_start_hour = r.day_start_hour;
       state.preferences.day_end_hour   = r.day_end_hour;
     }
+    // Apply theme/size/language if returned from template
+    if (r.theme) { state.preferences.theme = r.theme; }
+    if (r.size)  { state.preferences.size  = r.size;  }
+    if (r.language) { state.preferences.language = r.language; }
+    if (r.theme || r.size || r.language) { applyPreferences(); }
+    // Apply operation mode / terminology settings
+    if (r.operation_mode || r.group_label || r.user_label) {
+      state.exercise = state.exercise || {};
+      if (r.operation_mode) state.exercise.operation_mode = r.operation_mode;
+      if (r.group_label)    state.exercise.group_label    = r.group_label;
+      if (r.user_label)     state.exercise.user_label     = r.user_label;
+    }
     await refreshAll();
     const nameSuffix = r.exercise_name ? ` — exercise: ${r.exercise_name}` : '';
     showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template${nameSuffix}`);
@@ -2833,16 +2866,22 @@ async function handleTemplateFileLoad(input) {
     }
     const scope = (tmpl.scope === 'public' && canPublic) ? 'public' : 'private';
     const payload = {
-      name:          tmpl.name,
-      description:   tmpl.description || '',
-      exercise_name: tmpl.exercise_name || undefined,
+      name:           tmpl.name,
+      description:    tmpl.description || '',
+      exercise_name:  tmpl.exercise_name  || undefined,
       day_start_hour: tmpl.day_start_hour || undefined,
-      day_end_hour:  tmpl.day_end_hour  || undefined,
+      day_end_hour:   tmpl.day_end_hour   || undefined,
       scope,
-      items:         tmpl.items,
-      phases:        tmpl.phases  || undefined,
-      locks:         tmpl.locks   || undefined,
-      roles:         tmpl.roles   || undefined,
+      items:          tmpl.items,
+      phases:         tmpl.phases  || undefined,
+      locks:          tmpl.locks   || undefined,
+      roles:          tmpl.roles   || undefined,
+      theme:          tmpl.theme          || undefined,
+      size:           tmpl.size           || undefined,
+      language:       tmpl.language       || undefined,
+      operation_mode: tmpl.operation_mode || undefined,
+      group_label:    tmpl.group_label    || undefined,
+      user_label:     tmpl.user_label     || undefined,
     };
     dbg('[template] importing %o: items=%o phases=%o locks=%o scope=%o',
       tmpl.name, tmpl.items.length, (tmpl.phases||[]).length, (tmpl.locks||[]).length, scope);
@@ -3323,12 +3362,34 @@ async function resetDatabase() {
   const res = await apiPost('/api/reset', {});
   if (res.ok) {
     showNotification('success', 'Database has been reset to empty.');
+    // Clear extra clocks from local state
+    if (state.preferences) state.preferences.extra_clocks = [];
     await refreshAll();
     renderSidebar();
   } else {
     const err = await res.json();
     showError(err.error || 'Reset failed');
   }
+}
+
+// ── Operation mode label helpers ───────────────────────────────────────────
+function getStartexLabel(ex) {
+  const mode = ex && ex.operation_mode;
+  if (mode === 'incident') return 'Incident start';
+  if (mode === 'operation') return 'OPSTART';
+  return 'STARTEX';
+}
+function getEndexLabel(ex) {
+  const mode = ex && ex.operation_mode;
+  if (mode === 'incident') return 'Incident end';
+  if (mode === 'operation') return 'OPEND';
+  return 'ENDEX';
+}
+function getOperationNameLabel(ex) {
+  const mode = ex && ex.operation_mode;
+  if (mode === 'incident') return 'Incident name / ticket';
+  if (mode === 'operation') return 'Operation name';
+  return t('settings_exercise_label') || 'Exercise name';
 }
 
 // ── Group Label Switching ──────────────────────────────────────────────────
@@ -3342,6 +3403,32 @@ async function setGroupLabel(label) {
     renderSidebar();
     updateUILabels();
     showNotification('success', 'Group terminology updated to: ' + label);
+  }
+}
+
+async function setUserLabel(label) {
+  state.exercise = state.exercise || {};
+  state.exercise.user_label = label;
+  const payload = { ...state.exercise };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    renderSidebar();
+    updateUILabels();
+    showNotification('success', 'User terminology updated to: ' + label);
+  }
+}
+
+async function setOperationMode(mode) {
+  state.exercise = state.exercise || {};
+  state.exercise.operation_mode = mode;
+  const payload = { ...state.exercise };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    renderSidebar();
+    updateUILabels();
+    showNotification('success', 'Operation mode updated to: ' + mode);
   }
 }
 

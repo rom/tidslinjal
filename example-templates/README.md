@@ -1,6 +1,8 @@
 # Example Templates for Tidslinjal
 
-This directory contains **10 ready-made exercise templates** for the Tidslinjal collaborative timeline tool. They serve as both working starting points for real exercise planning and as learning material for understanding how to structure exercises of different types and durations.
+This directory contains **16 ready-made templates** for the Tidslinjal collaborative timeline tool:
+- **10 exercise templates** (`ex01`–`ex10`): military and civilian exercise planning, from 1-day QRF to 5-day NATO coalition exercises
+- **6 incident response templates** (`inc01`–`inc06`): real-world cybersecurity and physical disaster response plans
 
 ---
 
@@ -11,15 +13,15 @@ This directory contains **10 ready-made exercise templates** for the Tidslinjal 
 3. Select one or more `.json` files from this directory.
 4. The template(s) will appear in the Templates list.
 5. Click **▶ Apply** next to a template.
-6. In the dialog, enter the **Exercise start date & time (STARTEX / T=0)**. All events, phases, and locks will be scheduled relative to this moment.
+6. In the dialog, enter the **Incident start / STARTEX date & time (T=0)**. All events, phases, and locks will be scheduled relative to this moment.
 7. Optionally select a target layer.
 8. Click **Load Template**.
 
-You can import all 10 templates at once by selecting multiple files.
+You can import multiple templates at once by selecting multiple files.
 
 ---
 
-## Template Overview
+## Exercise Template Overview
 
 | # | File | Duration | Hours | Location | Key Theme |
 |---|------|----------|-------|----------|-----------|
@@ -33,6 +35,19 @@ You can import all 10 templates at once by selecting multiple files.
 | 08 | `ex08-crisis-management-3day-hours.json` | 3 days | 0800–1800 | Multi-agency | Civil crisis response |
 | 09 | `ex09-nato-integration-5day-24h.json` | 5 days | Around the clock (D1–D4) + working hours D5 | Coalition | Multinational operations |
 | 10 | `ex10-full-spectrum-warfare-5day.json` | 5 days | Working hours D1–D2, 24h D3–D4, working hours D5 | Mixed | Full spectrum, all phases |
+
+## Incident Response Template Overview
+
+All incident response templates set **operation mode = "incident"**, `group_label = "team"`, and `user_label = "personnel"` automatically when applied. They include alarms for critical events.
+
+| # | File | Duration | Scenario | Key stakeholders |
+|---|------|----------|----------|-----------------|
+| INC-01 | `inc01-ddos-attack-2day.json` | 2 days | DDoS attack | NOC, Security, ISP |
+| INC-02 | `inc02-hacker-attack-4day.json` | 4 days | Targeted cyber intrusion | CIRT, Legal, Forensics |
+| INC-03 | `inc03-large-hacker-attack-8day.json` | 8 days | APT / nation-state intrusion | CIRT, Board, CERT, External Forensics |
+| INC-04 | `inc04-ransomware-2week.json` | 2 weeks | Ransomware attack | CIRT, Legal, Insurance, Law Enforcement |
+| INC-05 | `inc05-wiper-attack-4week.json` | 4 weeks | Destructive wiper malware | CIRT, Board, Government, Insurance |
+| INC-06 | `inc06-datacenter-fire-12week.json` | 12 weeks | Datacenter fire / physical disaster | IT, Facilities, Insurance, Legal, PR |
 
 ---
 
