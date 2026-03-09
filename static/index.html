@@ -1149,6 +1149,15 @@
       </div>
       <div class="form-row">
         <div class="form-group">
+          <label>Format</label>
+          <select id="arFormat">
+            <option value="html">HTML (inline email)</option>
+            <option value="excel">Excel (XLSX attachment)</option>
+            <option value="rtf">RTF (Word-compatible attachment)</option>
+            <option value="docx">Word Document (DOCX attachment)</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Delivery</label>
           <select id="arDelivery">
             <option value="webhook">Webhook</option>
@@ -1156,7 +1165,9 @@
             <option value="download">Download only</option>
           </select>
         </div>
-        <div class="form-group">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
           <label>Recipient / URL</label>
           <input type="text" id="arRecipient" placeholder="email@example.com or webhook URL" style="width:100%">
         </div>

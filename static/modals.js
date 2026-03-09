@@ -1947,6 +1947,75 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">📡 Syslog Forwarding</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Forward application log messages to a remote syslog server.
+          Supports UDP, TCP, and TLS transports with classic (RFC 3164) or JSON formats.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"
+          title="Enable syslog forwarding. When off, logs are written to stderr only.">
+          <input type="checkbox" id="syslogEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Syslog Forwarding
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Hostname or IP of the remote syslog server.">Syslog Host</label>
+          <input type="text" id="syslogHost" placeholder="syslog.example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:1;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Port: default 514 for UDP/TCP, 6514 for TLS.">Port</label>
+            <input type="number" id="syslogPort" placeholder="514"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="flex:2;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Transport protocol. UDP is fire-and-forget. TCP guarantees delivery. TLS encrypts the channel.">Transport</label>
+            <select id="syslogTransport" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+              <option value="udp">UDP (RFC 3164, port 514)</option>
+              <option value="tcp">TCP (RFC 6587, port 514)</option>
+              <option value="tls">TLS (RFC 5425, port 6514)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Message format. Classic uses RFC 3164 syslog format. JSON sends structured JSON objects.">Log Format</label>
+          <select id="syslogFormat" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="classic">Classic (RFC 3164)</option>
+            <option value="json">JSON (structured)</option>
+          </select>
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:2;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Application name / tag appearing in syslog messages. Defaults to 'tidslinjal'.">App Name / Tag</label>
+            <input type="text" id="syslogAppName" placeholder="tidslinjal"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Syslog facility (0–23). Default 1 = user-level. 16–23 = local0–local7.">Facility</label>
+            <input type="number" id="syslogFacility" placeholder="1" min="0" max="23" value="1"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px"
+          title="When enabled, the TLS server certificate must be signed by a trusted CA. Disable only for self-signed certs in private networks.">
+          <input type="checkbox" id="syslogTLSVerify" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          Verify TLS certificate
+        </label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveSyslogConfig()"
+            title="Save syslog settings and apply immediately.">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="testSyslogConfig()"
+            title="Send a test message to the syslog server.">Send Test Message</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">💼 Microsoft Teams Integration</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           Configure Teams and Zoom to automatically attach meeting links to Meeting-type events.
@@ -2003,6 +2072,7 @@ function renderSidebar() {
     // Load current OIDC settings into the form
     setTimeout(_initOIDCSettingsUI, 0);
     setTimeout(_initMailSettingsUI, 0);
+    setTimeout(_initSyslogSettingsUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
   } else if (tab === 'settings') {
@@ -2803,6 +2873,56 @@ async function testMailConfig() {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Mail test failed');
+  }
+}
+
+// ── Syslog Config UI ─────────────────────────────────────────────────────────
+async function _initSyslogSettingsUI() {
+  try {
+    const cfg = await apiGet('/api/integrations/syslog');
+    if (!cfg) return;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    const setCb  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    setCb('syslogEnabled', cfg.enabled);
+    setVal('syslogHost',      cfg.host);
+    setVal('syslogPort',      cfg.port || '');
+    setVal('syslogTransport', cfg.transport || 'udp');
+    setVal('syslogFormat',    cfg.format || 'classic');
+    setVal('syslogAppName',   cfg.app_name);
+    setVal('syslogFacility',  cfg.facility ?? 1);
+    setCb('syslogTLSVerify',  cfg.tls_verify !== false);
+  } catch { /* syslog not configured yet */ }
+}
+
+async function saveSyslogConfig() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const cfg = {
+    enabled:    document.getElementById('syslogEnabled')?.checked || false,
+    host:       val('syslogHost'),
+    port:       parseInt(val('syslogPort'), 10) || 0,
+    transport:  val('syslogTransport') || 'udp',
+    format:     val('syslogFormat') || 'classic',
+    app_name:   val('syslogAppName'),
+    facility:   parseInt(val('syslogFacility'), 10) || 1,
+    tls_verify: document.getElementById('syslogTLSVerify')?.checked !== false,
+  };
+  const res = await api('PUT', '/api/integrations/syslog', cfg);
+  if (res.ok) {
+    showNotification('success', 'Syslog settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save syslog settings');
+  }
+}
+
+async function testSyslogConfig() {
+  const res = await api('POST', '/api/integrations/syslog/test', {});
+  if (res.ok) {
+    const d = await res.json();
+    showNotification('success', `Syslog test message sent via ${d.transport} to ${d.host}`);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Syslog test failed');
   }
 }
 
@@ -4410,11 +4530,13 @@ async function _renderAutoReportList() {
     el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No schedules configured yet.</p>';
     return;
   }
+  const fmtLabel = {html:'HTML', excel:'Excel', rtf:'RTF', docx:'DOCX'};
   el.innerHTML = list.map(r => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px">
       <div>
         <strong>${escHtml(r.report_type)}</strong> — ${escHtml(r.frequency)}
         <span style="color:var(--accent);margin-left:6px">${escHtml(r.delivery)}</span>
+        <span style="color:var(--text-dim);margin-left:6px;font-size:var(--fs-xs)">[${fmtLabel[r.format||'html']||escHtml(r.format||'html')}]</span>
         ${r.recipient ? `<span style="color:var(--text-dim);margin-left:8px">→ ${escHtml(r.recipient)}</span>` : ''}
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Next: ${r.next_run ? new Date(r.next_run).toLocaleString() : 'soon'}</div>
       </div>
@@ -4426,6 +4548,7 @@ async function _renderAutoReportList() {
 async function addAutoReport() {
   const report_type = document.getElementById('arType')?.value || 'timeline';
   const frequency   = document.getElementById('arFrequency')?.value || 'daily';
+  const format      = document.getElementById('arFormat')?.value || 'html';
   const delivery    = document.getElementById('arDelivery')?.value || 'download';
   const recipient   = document.getElementById('arRecipient')?.value?.trim() || '';
 
@@ -4438,7 +4561,7 @@ async function addAutoReport() {
     return;
   }
 
-  const res = await apiPost('/api/auto-report-schedules', { report_type, frequency, delivery, recipient });
+  const res = await apiPost('/api/auto-report-schedules', { report_type, frequency, format, delivery, recipient });
   if (res && res.ok !== false) {
     showNotification('success', 'Auto-report schedule added');
     const rec = document.getElementById('arRecipient');

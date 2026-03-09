@@ -43,6 +43,7 @@ type Store struct {
 	invitations          []PersonalInvitation
 	oidcSettings         OIDCPersistentConfig
 	mailConfig           MailConfig
+	syslogConfig         SyslogConfig
 	apiKeys              []APIKey
 	filterPresets        []FilterPreset
 	eventVersions        []EventVersion
@@ -112,6 +113,7 @@ func (s *Store) load() error {
 	s.loadFile("invitations.json", &s.invitations)
 	s.loadFile("oidc.json", &s.oidcSettings)
 	s.loadFile("mail.json", &s.mailConfig)
+	s.loadFile("syslog.json", &s.syslogConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
 	s.loadFile("event_versions.json", &s.eventVersions)
@@ -2214,6 +2216,22 @@ func (s *Store) SaveMailConfig(cfg MailConfig) error {
 	snap := cfg
 	s.mu.Unlock()
 	return s.persist("mail.json", snap)
+}
+
+// ── Syslog Config ──────────────────────────────────────────────────────────────
+
+func (s *Store) GetSyslogConfig() SyslogConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.syslogConfig
+}
+
+func (s *Store) SaveSyslogConfig(cfg SyslogConfig) error {
+	s.mu.Lock()
+	s.syslogConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("syslog.json", snap)
 }
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
