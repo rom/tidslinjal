@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 3.6.0**
+**Version 3.7.0**
 
 ---
 
@@ -216,16 +216,25 @@ Warning: the following persons are already scheduled in overlapping events:
 
 ### Event Types
 
-| Type | Icon color | Notes |
-|---|---|---|
-| **Event** | Blue | General occurrence |
-| **Instant** | Orange | Single point in time — no end time. Renders as a ◆ diamond marker. |
-| **Meeting (Möte)** | Blue | Scheduled meeting |
-| **Decision** | Orange | Decision point |
-| **Deadline** | Red | Hard deadline |
-| **Activity** | Green | Work block |
-| **Repeated** | Purple | Recurring activity |
-| **Reporting** | Teal | Report or briefing |
+Each event type has a coloured block and an icon displayed to the **left** of the event title for quick visual identification.
+
+| Icon | Type | Colour | Notes |
+|---|---|---|---|
+| — | **Event** | Blue | General occurrence |
+| ⚡ | **Instant** | Orange | Single point in time — no end time. Renders as a ◆ diamond marker. |
+| 🤝 | **Meeting** | Grey-blue | Scheduled meeting or coordination session |
+| 🏢 | **Physical Meeting** | Burnt orange | In-person meeting at a specific venue |
+| ⚖️ | **Decision** | Green | Decision point requiring action |
+| ⏰ | **Deadline** | Red | Hard deadline / due date |
+| — | **Activity** | Green | General work block |
+| 🔄 | **Repeated** | Purple | Template for recurring activities |
+| 📊 | **Reporting** | Teal | Situation report or briefing |
+| 📌 | **Assigned Task** | Orange | Task assigned to a specific person or team |
+| 🧍 | **Standup** | Cyan | Short daily standup meeting |
+
+The ↻ icon (to the left of the title) indicates that the event is part of a **recurring series**, regardless of its type. Custom event types can have their own emoji icon set via **Settings → Event Types → Edit**.
+
+Toggle all icons on or off globally in **Settings → Event Icons**.
 
 Custom types can be added by Read/Write+ users from the Settings sidebar.
 
@@ -388,12 +397,24 @@ Click an item to toggle it. When the Master Timeline is selected (all layers vis
 When an alarm fires, a notification bar appears at the top of the screen:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 🔔 Alarm — "ENDEX Brief" in 15 minutes (10:45)     [ACK] │
-└──────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ 🔔 Alarm — "ENDEX Brief" in 15 minutes (10:45)                       │
+│                         [Dismiss] [📋 Show event] [✓ ACK]           │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Click **ACK** to acknowledge. Unacknowledged alarms escalate — they turn orange, then pulse red every 60 seconds.
+- **Dismiss** — removes the notification without acknowledging.
+- **📋 Show event** — opens the full event detail view directly from the alarm.
+- **✓ ACK** — acknowledges the alarm and stops escalation.
+
+Unacknowledged alarms escalate — they turn orange, then pulse red every 60 seconds.
+
+### Alarm Audit Trail
+
+Every alarm acknowledgement is recorded in the **Audit** log (accessible by Team Lead and above). Each entry includes:
+- Who acknowledged the alarm (user name and ID)
+- When it was acknowledged (timestamp)
+- The IP address from which the system was accessed at the time
 
 ### Webhook Notifications
 
@@ -511,6 +532,21 @@ The **Date/Time Format** section groups both format selection and day-hours conf
 | **Day End** | Last hour of the working day |
 
 Slots outside the Day Start–End window appear grayed/striped. Toggle **Show time outside day hours** to show or hide those slots.
+
+### Multi-Timezone Clocks
+
+The header displays the primary real-time clock showing your local or UTC/Zulu time. You can add any number of additional timezone clocks for parallel visibility — useful for geographically distributed teams.
+
+**Adding a clock:**
+1. Click the **+** button to the left of the main clock in the header.
+2. Enter a short label (e.g. *Tallinn*, *Kyiv*, *Kabul*).
+3. Select the IANA timezone from the dropdown (all world time zones are supported).
+4. Click **Add**. The clock appears immediately left of the main clock.
+
+**Removing a clock:**
+Click **×** on the clock widget, or go to **Settings → Date/Time Format → Additional timezone clocks → Remove**.
+
+Extra clocks are saved per user and persist across sessions and browser restarts.
 
 ### Default View
 

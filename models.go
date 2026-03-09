@@ -59,12 +59,12 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Upprepande", LabelFR: "Récurrent"},
 	{Key: "reporting", Label: "Reporting", Color: "#1ABC9C", IsSystem: true,
 		LabelSV: "Rapportering", LabelFR: "Rapport"},
-	{Key: "assigned_task", Label: "Assigned Task", Color: "#E67E22", IsSystem: true,
+	{Key: "assigned_task", Label: "Assigned Task", Color: "#E67E22", IsSystem: true, Icon: "📌",
 		LabelSV: "Tilldelad uppgift", LabelFR: "Tâche assignée"},
 	{Key: "standup", Label: "Standup Meeting", Color: "#00ACC1", IsSystem: true,
 		LabelSV: "Daglig standup", LabelFR: "Réunion debout"},
 	{Key: "physical_meeting", Label: "Physical Meeting", Color: "#D35400", IsSystem: true,
-		LabelSV: "Fysiskt möte", LabelFR: "Réunion physique"},
+		LabelSV: "Fysiskt möte", LabelFR: "Réunion physique", Icon: "🏢"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -143,6 +143,13 @@ type PersonalInvitation struct {
 	UsedAt    *time.Time `json:"used_at,omitempty"`
 }
 
+// ExtraClock is an additional timezone clock shown in the header
+type ExtraClock struct {
+	ID       int    `json:"id"`
+	Timezone string `json:"timezone"` // IANA timezone, e.g. "Europe/Tallinn"
+	Label    string `json:"label"`    // Short display name, e.g. "Tallinn"
+}
+
 // UserPreferences stores per-user UI settings
 type UserPreferences struct {
 	UserID          int64    `json:"user_id"`
@@ -162,8 +169,10 @@ type UserPreferences struct {
 	RedLineColor    string   `json:"red_line_color,omitempty"`
 	RedLineWidth    int      `json:"red_line_width,omitempty"`
 	RedLineStyle    string   `json:"red_line_style,omitempty"` // solid | dashed | dotted
-	SynthLabel      bool     `json:"synth_label"`              // show H+N label on red line
-	DateFormat      string   `json:"date_format,omitempty"`    // iso | uk | fr | sv
+	SynthLabel      bool         `json:"synth_label"`              // show H+N label on red line
+	DateFormat      string       `json:"date_format,omitempty"`    // iso | uk | fr | sv
+	ExtraClocks     []ExtraClock `json:"extra_clocks,omitempty"`   // additional timezone clocks
+	ShowEventIcons  *bool        `json:"show_event_icons,omitempty"` // nil = true (default on)
 }
 
 // Group is a named set of users used for layer sharing

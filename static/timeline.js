@@ -440,8 +440,9 @@ function renderEventBlocks(days, slotH) {
         const showIcons = state.preferences.show_event_icons !== false;
         const statusDot  = ev.status && ev.status !== 'planned'
           ? `<span class="ev-status-dot ev-status-${ev.status}" title="${ev.status}"></span>` : '';
+        // recurring icon — LEFT of title
         const recurIcon  = showIcons && ev.is_recurring
-          ? `<span class="ev-icon" title="Recurring">↻</span>` : '';
+          ? `<span class="ev-icon ev-left-icon" title="Recurring">↻</span>` : '';
         const createdAt  = ev.created_at ? new Date(ev.created_at) : null;
         const updatedAt  = ev.updated_at ? new Date(ev.updated_at) : null;
         const editedIcon = showIcons && (createdAt && updatedAt && (updatedAt - createdAt) > 10000)
@@ -452,12 +453,14 @@ function renderEventBlocks(days, slotH) {
           ? `<span class="ev-icon" title="${ev.comment_count} comment(s)">💬</span>` : '';
         const allDayIcon = showIcons && ev.all_day
           ? `<span class="ev-icon" title="Day-only">📅</span>` : '';
-        const instantIcon = showIcons && isInstant
-          ? `<span class="ev-icon" title="Instant">⚡</span>` : '';
+        // instant icon — LEFT of title; suppressed if type icon already covers it
+        const instantIcon = showIcons && isInstant && ev.event_type !== 'instant'
+          ? `<span class="ev-icon ev-left-icon" title="Instant">⚡</span>` : '';
 
         // Event-type icon: custom icon from type def, or built-in defaults
         const evTypeDef = state.eventTypes ? state.eventTypes.find(x => x.key === ev.event_type) : null;
-        const builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
+        const builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
+          instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
         const typeIconChar = showIcons
           ? (evTypeDef && evTypeDef.icon ? evTypeDef.icon : (builtinTypeIcons[ev.event_type] || ''))
           : '';
@@ -472,7 +475,7 @@ function renderEventBlocks(days, slotH) {
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${typeIcon}${escHtml(ev.title)}${instantIcon}${recurIcon}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
+          <div class="ev-title">${statusDot}${recurIcon}${instantIcon}${typeIcon}${escHtml(ev.title)}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>

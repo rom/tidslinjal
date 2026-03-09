@@ -1040,6 +1040,17 @@ func (s *Store) MarkAlarmFired(id int64) error {
 	return nil
 }
 
+func (s *Store) GetAlarmByID(id int64) (Alarm, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, a := range s.alarms {
+		if a.ID == id {
+			return a, true
+		}
+	}
+	return Alarm{}, false
+}
+
 func (s *Store) AckAlarm(id, userID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

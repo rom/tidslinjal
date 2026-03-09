@@ -20,6 +20,18 @@
 - **Multi-select events** — Ctrl+click to select multiple events; selected events are highlighted with an accent-coloured outline; a floating bar shows the count with Move and Clear actions
 - **Right-click "Move to new time/date"** — context menu item opens a date/time dialog; works for single events and multi-select (all selected events move by the same offset)
 - **10 example exercise templates** — ready-made templates in `example-templates/` covering 1-day, 2-day, 3-day, and 5-day exercises across co-located and virtual modalities; see `example-templates/README.md`
+- **Event type icons** — each event type now has an emoji icon (🤝 ⚖️ ⏰ 🧍 📊 ⚡ 🔄 🏢 📌) displayed to the left of the event title in the grid, in the legend, and in the event type dropdown; custom types can have any emoji icon set via the type editor; a global toggle in Settings shows/hides all icons
+- **Physical Meeting event type** (🏢) — dedicated type for in-person meetings at a specific location; burnt orange colour
+- **Assigned Task event type** (📌) — already existed; now has an icon displayed left of title
+- **Standing Meeting event type** (🧍) — already existed; now has an icon displayed left of title
+- **Recurring / Instant icons left of title** — ↻ (recurring series) and ⚡ (instant) markers now appear to the left of the event title text (was right-side suffixes)
+- **Multi-timezone clocks** — click the **+** button left of the main clock to add extra real-time clocks for any IANA timezone; each shows a label, live time, and timezone abbreviation; remove with the × button; saved per user
+- **Alarm audit trail** — every alarm ACK is logged with who acknowledged it, the timestamp, and the originating IP address; visible in the Audit sidebar tab for Team Lead+
+- **"Show Event" button on alarm notifications** — alarm popups now include a 📋 Show Event button to open the relevant event detail directly from the notification
+- **Alarm precision improved** — alarm scheduler now polls every 5 s (was 30 s), reducing maximum alarm jitter by 6×
+- **Lock undo** — creating and deleting time slot locks is now undoable (Ctrl+Z)
+- **Report date/time format** — reports now use the user's locale-aware date/time format (was always browser default locale)
+- **Vertical alignment fix** — event block positions are computed from live DOM measurements instead of a hardcoded constant, eliminating drift at non-default zoom levels
 
 ---
 
@@ -89,19 +101,21 @@
 - **Long-press navigation** — hold ‹/› for jump-size menu; short click steps by current view
 
 ### Event Management & Status Workflow
-Nine built-in event types (plus custom types):
+Eleven built-in event types (plus custom types):
 
-| Type | Description | Default Color |
-|---|---|---|
-| **Event** | General occurrence | Blue |
-| **Instant** | Single-point-in-time marker (no end time) | Orange |
-| **Meeting (Möte)** | Scheduled meeting | Grey |
-| **Decision** | Decision point | Green |
-| **Deadline** | Hard deadline | Red |
-| **Activity** | Planned work | Light Green |
-| **Repeated** | Recurring activity | Purple |
-| **Reporting** | Report / briefing | Teal |
-| **Assigned Task** | Delegated task | Orange |
+| Icon | Type | Description | Default Color |
+|---|---|---|---|
+| — | **Event** | General occurrence | Blue |
+| ⚡ | **Instant** | Single-point-in-time marker (no end time) | Orange |
+| 🤝 | **Meeting** | Scheduled meeting | Grey |
+| 🏢 | **Physical Meeting** | In-person meeting at a specific location | Burnt Orange |
+| ⚖️ | **Decision** | Decision point | Green |
+| ⏰ | **Deadline** | Hard deadline | Red |
+| — | **Activity** | Planned work | Light Green |
+| 🔄 | **Repeated** | Recurring activity template | Purple |
+| 📊 | **Reporting** | Report / briefing | Teal |
+| 📌 | **Assigned Task** | Delegated task | Orange |
+| 🧍 | **Standing Meeting** | Short daily stand-up meeting | Cyan |
 
 Each event carries:
 - Title, description, type, custom color
@@ -167,12 +181,15 @@ Toggle layers on/off with the **🗂 Layers** toolbar button; changes are instan
 - Set alarm **inline** while creating/editing an event, or from the Detail view
 - When setting inline alarm with invited users, Ops Lead+ can notify all invited persons
 - Delivered via **SSE** in real time; optional browser push notification
-- ACK button on notifications — unacknowledged alarms escalate (orange → pulsing red)
+- Alarm notifications include **Dismiss**, **📋 Show Event**, and **ACK** buttons
+- Unacknowledged alarms escalate (orange → pulsing red every 60 s)
+- **Alarm audit trail** — every ACK records who acknowledged, when, and from which IP address
+- Alarm scheduler polls every **5 s** for precise trigger timing
 - **Webhook integration** — per-user webhook URL fires on alarm trigger
   - Supports Mattermost, Slack (`{"text":"..."}`) or generic JSON POST
 
 ### Audit Log
-- Every create, update, delete, verify, and reject action is logged
+- Every create, update, delete, verify, reject, and alarm-acknowledge action is logged
 - Accessible by Team Leads and above in the **Audit** sidebar tab
 - Capped at 10,000 most-recent entries
 

@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 3.6.0**
+**Version 3.7.0**
 
 ---
 
@@ -201,16 +201,25 @@ Cliquez sur une cellule vide dans la grille ou cliquez sur **+ Ajouter événeme
 
 ### Types d'événements
 
-| Type | Couleur | Notes |
-|---|---|---|
-| **Événement** | Bleu | Occurrence générale |
-| **Instant** | Orange | Point unique dans le temps — pas de durée. Rendu comme un marqueur ◆ losange. |
-| **Réunion (Möte)** | Gris | Réunion planifiée |
-| **Décision** | Vert | Point de décision |
-| **Échéance** | Rouge vif | Date limite ferme |
-| **Activité** | Vert | Bloc de travail |
-| **Récurrent** | Violet | Activité récurrente |
-| **Rapport** | Bleu-vert | Rapport ou briefing |
+Chaque type d'événement possède un bloc coloré et une icône affichée à **gauche** du titre.
+
+| Icône | Type | Couleur | Notes |
+|---|---|---|---|
+| — | **Événement** | Bleu | Occurrence générale |
+| ⚡ | **Instant** | Orange | Point unique dans le temps — pas de durée. Rendu comme un marqueur ◆. |
+| 🤝 | **Réunion** | Gris | Réunion planifiée |
+| 🏢 | **Réunion physique** | Orange brûlé | Réunion en personne sur un lieu précis |
+| ⚖️ | **Décision** | Vert | Point de décision |
+| ⏰ | **Échéance** | Rouge | Date limite ferme |
+| — | **Activité** | Vert | Bloc de travail |
+| 🔄 | **Récurrent** | Violet | Modèle pour activités répétées |
+| 📊 | **Rapport** | Bleu-vert | Rapport ou briefing |
+| 📌 | **Tâche assignée** | Orange | Tâche attribuée à une personne ou une équipe |
+| 🧍 | **Réunion debout** | Cyan | Courte réunion quotidienne debout |
+
+L'icône ↻ (à gauche du titre) indique que l'événement fait partie d'une **série récurrente**. Les types personnalisés peuvent avoir leur propre icône emoji définie via **Paramètres → Types d'événements → Modifier**.
+
+Activez/désactivez toutes les icônes globalement dans **Paramètres → Icônes d'événements**.
 
 Des types personnalisés peuvent être ajoutés par les utilisateurs Lecture/Écriture+ depuis le panneau Paramètres.
 
@@ -353,12 +362,35 @@ Cliquez sur **🗂 Couches** dans la barre d'outils pour ouvrir le menu de bascu
 Lorsqu'une alarme se déclenche, une barre de notification apparaît en haut de l'écran :
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 🔔 Alarme — "Briefing ENDEX" dans 15 minutes (10:45) [ACK]│
-└──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 🔔 Alarme — "Briefing ENDEX" dans 15 minutes (10:45)                    │
+│                  [Ignorer]  [📋 Afficher événement]  [ACK]              │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-Cliquez sur **ACK** pour acquitter. Les alarmes non acquittées s'intensifient — elles deviennent orange, puis clignotent en rouge toutes les 60 secondes.
+| Bouton | Action |
+|---|---|
+| **Ignorer** | Ferme la notification pour cette session ; l'alarme reste active |
+| **📋 Afficher événement** | Ouvre le panneau de détails de l'événement directement depuis la notification |
+| **ACK** | Acquitte définitivement l'alarme |
+
+Les alarmes non acquittées s'intensifient — elles deviennent orange, puis clignotent en rouge toutes les 60 secondes.
+
+### Journal d'audit des alarmes
+
+Chaque acquittement d'alarme est automatiquement enregistré dans le **journal d'audit** avec :
+
+- **Qui** a acquitté l'alarme (nom d'affichage de l'utilisateur)
+- **Quand** l'acquittement a eu lieu (horodatage UTC)
+- **Adresse IP** depuis laquelle l'acquittement a été effectué
+
+Les Chefs d'équipe et rôles supérieurs peuvent consulter ces entrées dans l'onglet **Journal** du panneau latéral. Exemple d'entrée :
+
+```
+[2025-06-03 10:32:15] alice  acknowledged  alarm  #42
+  → Alarm acknowledged: "Briefing ENDEX" (event: 2025-06-03 11:00 UTC,
+    lead time: 15 min) from IP 192.168.1.42
+```
 
 ### Notifications webhook
 
@@ -476,6 +508,29 @@ Activez/désactivez les types d'événements individuels. Les types masqués son
 | Style | Solide / Pointillé / Tirets |
 | Étiquette H+N | Afficher l'étiquette heure d'exercice sur la ligne |
 
+### Icônes d'événements
+
+Activez **Icônes d'événements** pour afficher les icônes emoji à gauche du titre dans chaque bloc d'événement et dans la légende. Désactivez pour une présentation épurée sans icônes.
+
+Les types d'événements système ont des icônes prédéfinies (🤝 ⚖️ ⏰ 🧍 📊 ⚡ 🔄 🏢 📌). Pour les types personnalisés, choisissez une icône via **Paramètres → Types d'événements → Modifier** et utilisez le sélecteur d'emoji.
+
+### Horloges multi-fuseaux horaires
+
+Ajoutez des horloges supplémentaires pour suivre plusieurs fuseaux horaires simultanément :
+
+1. Cliquez sur le bouton **+** à gauche de l'horloge principale dans l'en-tête
+2. Saisissez un libellé descriptif (p. ex. « Bruxelles », « Quartier général »)
+3. Sélectionnez le fuseau horaire IANA depuis la liste déroulante
+4. Cliquez sur **Ajouter**
+
+Chaque horloge supplémentaire affiche :
+- Le libellé descriptif
+- L'heure en temps réel dans ce fuseau
+- L'abréviation du fuseau horaire (p. ex. CET, EST)
+- Un bouton **×** pour la supprimer
+
+Les préférences d'horloge sont enregistrées par utilisateur et restaurées à chaque connexion.
+
 ### Webhook / Notifications
 
 Saisissez une URL webhook pour recevoir des notifications d'alarme en tant que requêtes HTTP POST :
@@ -579,4 +634,4 @@ Naviguez vers `/admin-view` (nécessite le rôle **Admin**) pour un tableau de b
 
 ---
 
-*Tidslinjal v3.2.0 — Chronologie opérationnelle collaborative*
+*Tidslinjal v3.7.0 — Chronologie opérationnelle collaborative*

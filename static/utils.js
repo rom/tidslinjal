@@ -227,4 +227,112 @@ function updateClock() {
   if (dateEl) dateEl.textContent = dateStr;
   const tzEl = document.getElementById('clockTZ');
   if (tzEl) tzEl.textContent = tzLabel;
+  updateExtraClocks(now);
+}
+
+// ── Extra timezone clocks ───────────────────────────────────────────────────
+function updateExtraClocks(now) {
+  const clocks = (state.preferences && state.preferences.extra_clocks) || [];
+  const container = document.getElementById('extraClocksContainer');
+  if (!container) return;
+  // Create/update one widget per configured extra clock
+  clocks.forEach(ec => {
+    const id = `extra-clock-${ec.id}`;
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('div');
+      el.id = id;
+      el.className = 'clock-extra';
+      el.innerHTML = `
+        <div class="clock-extra-inner">
+          <div class="clock-extra-label">${escHtml(ec.label)}</div>
+          <div class="clock-extra-time" id="${id}-time">--:--:--</div>
+          <div class="clock-extra-tz" id="${id}-tz"></div>
+        </div>
+        <button class="clock-extra-remove" title="Remove clock" onclick="removeExtraClock(${ec.id})">×</button>`;
+      container.appendChild(el);
+    }
+    const n = now || new Date();
+    const pad = x => String(x).padStart(2,'0');
+    try {
+      const timeStr = n.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone: ec.timezone});
+      const tzAbbr  = n.toLocaleTimeString('en-GB', {timeZoneName:'short', timeZone: ec.timezone}).split(' ').pop();
+      const tEl = document.getElementById(`${id}-time`);
+      const zEl = document.getElementById(`${id}-tz`);
+      if (tEl) tEl.textContent = timeStr;
+      if (zEl) zEl.textContent = tzAbbr || ec.timezone;
+    } catch (e) {
+      const tEl = document.getElementById(`${id}-time`);
+      if (tEl) tEl.textContent = '??:??:??';
+    }
+  });
+  // Remove stale widgets
+  container.querySelectorAll('.clock-extra').forEach(el => {
+    const elId = parseInt(el.id.replace('extra-clock-', ''), 10);
+    if (!clocks.find(c => c.id === elId)) el.remove();
+  });
+}
+
+function removeExtraClock(id) {
+  const clocks = state.preferences.extra_clocks || [];
+  state.preferences.extra_clocks = clocks.filter(c => c.id !== id);
+  const el = document.getElementById(`extra-clock-${id}`);
+  if (el) el.remove();
+  savePreferences();
+  if (typeof renderSidebar === 'function') renderSidebar();
+}
+
+function openAddClockPopover(btn) {
+  const pop = document.getElementById('addClockPopover');
+  if (!pop) return;
+  // Populate timezone selector with all IANA zones
+  const tzSel = document.getElementById('newClockTZ');
+  if (tzSel && !tzSel.options.length) {
+    const zones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf)
+      ? Intl.supportedValuesOf('timeZone')
+      : ['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin',
+         'Europe/Helsinki','Europe/Tallinn','Europe/Riga','Europe/Vilnius',
+         'America/New_York','America/Chicago','America/Los_Angeles',
+         'Asia/Tokyo','Asia/Shanghai','Asia/Dubai','Australia/Sydney'];
+    zones.forEach(tz => {
+      const opt = document.createElement('option');
+      opt.value = tz; opt.textContent = tz;
+      tzSel.appendChild(opt);
+    });
+  }
+  document.getElementById('newClockLabel').value = '';
+  const rect = btn.getBoundingClientRect();
+  pop.style.display = 'block';
+  pop.style.top  = (rect.bottom + 6) + 'px';
+  pop.style.left = Math.max(4, rect.left - pop.offsetWidth + btn.offsetWidth) + 'px';
+  document.getElementById('newClockLabel').focus();
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', _closeClockPopoverOnOutside, { once: true });
+  }, 10);
+}
+
+function _closeClockPopoverOnOutside(e) {
+  const pop = document.getElementById('addClockPopover');
+  if (pop && !pop.contains(e.target) && e.target.id !== 'btnAddClock') {
+    pop.style.display = 'none';
+  }
+}
+
+function closeAddClockPopover() {
+  const pop = document.getElementById('addClockPopover');
+  if (pop) pop.style.display = 'none';
+}
+
+function confirmAddClock() {
+  const label = (document.getElementById('newClockLabel')?.value || '').trim();
+  const tz    = document.getElementById('newClockTZ')?.value || '';
+  if (!tz) { showError('Please select a timezone'); return; }
+  const clocks = state.preferences.extra_clocks || [];
+  const nextId = clocks.length ? Math.max(...clocks.map(c => c.id)) + 1 : 1;
+  state.preferences.extra_clocks = [...clocks, { id: nextId, timezone: tz, label: label || tz }];
+  closeAddClockPopover();
+  updateExtraClocks(new Date());
+  savePreferences();
+  if (typeof renderSidebar === 'function') renderSidebar();
 }

@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -276,6 +277,21 @@ func hasRole(userRole, required Role) bool {
 
 func canEditMasterTimeline(role Role) bool {
 	return hasRole(role, RoleOpLead)
+}
+
+// clientIP extracts the real client IP from the request, respecting forwarding headers.
+func clientIP(r *http.Request) string {
+	if ff := r.Header.Get("X-Forwarded-For"); ff != "" {
+		return strings.TrimSpace(strings.SplitN(ff, ",", 2)[0])
+	}
+	if ri := r.Header.Get("X-Real-IP"); ri != "" {
+		return ri
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // audit is a fire-and-forget convenience wrapper
@@ -1743,10 +1759,17 @@ func (app *App) handleAckAlarm(w http.ResponseWriter, r *http.Request, user *Use
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// Capture alarm details before marking it acknowledged
+	alarm, _ := app.store.GetAlarmByID(id)
 	if err := app.store.AckAlarm(id, user.ID); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// Audit the acknowledgement with who, when (implicit in AuditEntry.Timestamp), and IP
+	ip := clientIP(r)
+	summary := fmt.Sprintf("Alarm acknowledged: %q (event: %s, lead time: %d min) from IP %s",
+		alarm.EventTitle, alarm.EventTime.Format("2006-01-02 15:04 UTC"), alarm.LeadTime, ip)
+	app.audit(user.ID, user.DisplayName, "acknowledged", "alarm", id, summary)
 	jsonOK(w, map[string]string{"status": "acknowledged"})
 }
 
