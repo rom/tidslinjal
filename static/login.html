@@ -173,9 +173,20 @@
       document.getElementById('resetForm').style.display = '';
     }
 
-    // Check if OIDC is configured and show SSO button
-    fetch('/api/auth/oidc-config').then(r => {
-      if (r.ok) document.getElementById('oidcSection').style.display = '';
+    // Check if OIDC is configured and show SSO button; in exclusive mode hide local form
+    fetch('/api/auth/oidc-config').then(async r => {
+      if (!r.ok) return;
+      document.getElementById('oidcSection').style.display = '';
+      const cfg = await r.json();
+      if (cfg.exclusive === 'true') {
+        // Hide local login form; SSO is the only option
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('forgotLink').style.display = 'none';
+        // Auto-redirect to SSO if no error in URL
+        if (!urlError && !resetToken) {
+          window.location.href = '/auth/oidc/login';
+        }
+      }
     }).catch(() => {});
 
     // Check if registration is enabled

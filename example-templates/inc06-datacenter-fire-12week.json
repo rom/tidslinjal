@@ -1,273 +1,550 @@
-[
-  {
-    "name": "Datacenter Fire Response — 12 Weeks",
-    "description": "Catastrophic datacenter fire or major physical disaster response. Covers immediate life safety, emergency DR activation, insurance, regulatory, customer management, full infrastructure rebuild at alternative site, and systematic return to normal operations over 12 weeks. Involves IT, Facilities, Legal, Insurance, PR, and executive leadership.",
-    "exercise_name": "Datacenter Disaster",
-    "scope": "public",
-    "operation_mode": "incident",
-    "group_label": "team",
-    "user_label": "personnel",
-    "day_start_hour": 6,
-    "day_end_hour": 22,
-    "phases": [
-      {
-        "name": "Immediate Emergency Response",
-        "color": "#e74c3c",
-        "start_offset_min": 0,
-        "end_offset_min": 480,
-        "order": 1
-      },
-      {
-        "name": "Emergency DR Operations",
-        "color": "#e67e22",
-        "start_offset_min": 480,
-        "end_offset_min": 10080,
-        "order": 2
-      },
-      {
-        "name": "Damage Assessment & Insurance",
-        "color": "#f39c12",
-        "start_offset_min": 480,
-        "end_offset_min": 20160,
-        "order": 3
-      },
-      {
-        "name": "Infrastructure Rebuild",
-        "color": "#f1c40f",
-        "start_offset_min": 10080,
-        "end_offset_min": 80640,
-        "order": 4
-      },
-      {
-        "name": "Return to Normal Operations",
-        "color": "#27ae60",
-        "start_offset_min": 80640,
-        "end_offset_min": 120960,
-        "order": 5
-      }
-    ],
-    "items": [
-      {
-        "title": "🔥 Datacenter fire alarm triggered — evacuation",
-        "event_type": "alarm",
-        "color": "#e74c3c",
-        "description": "Fire alarm in datacenter. IMMEDIATE: evacuate all staff. Do NOT attempt to save equipment. Safety first.",
-        "start_offset_min": 0,
-        "duration_min": 0,
-        "alarm_lead_time": 0,
-        "alarm_sound": "klaxon"
-      },
-      {
-        "title": "🚒 Fire brigade called — site evacuated",
-        "event_type": "task",
-        "color": "#e74c3c",
-        "description": "Fire services called. All personnel evacuated and accounted for. Automated halon/suppression system triggered.",
-        "start_offset_min": 5,
-        "duration_min": 60
-      },
-      {
-        "title": "📋 Incident Commander and Crisis Team assembled",
-        "event_type": "meeting",
-        "color": "#e74c3c",
-        "description": "CTO, CISO, CEO, CFO, Facilities Director, Legal assembled. Incident Commander designated. DR plan activated.",
-        "start_offset_min": 30,
-        "duration_min": 60,
-        "alarm_lead_time": 10,
-        "alarm_sound": "siren"
-      },
-      {
-        "title": "⚡ DR site activation — emergency failover",
-        "event_type": "task",
-        "color": "#e74c3c",
-        "description": "Activate Disaster Recovery site. Failover critical systems to DR. Verify backups are intact and services are coming up.",
-        "start_offset_min": 60,
-        "duration_min": 240,
-        "alarm_lead_time": 15,
-        "alarm_sound": "alert"
-      },
-      {
-        "title": "📞 Insurance company notified",
-        "event_type": "task",
-        "color": "#9b59b6",
-        "description": "Notify property and business interruption insurance carriers. Open claim. Do NOT touch or move anything until insurer approves.",
-        "start_offset_min": 60,
-        "duration_min": 60,
-        "participant": "Insurance",
-        "alarm_lead_time": 15,
-        "alarm_sound": "beep"
-      },
-      {
-        "title": "📢 Customer emergency communication",
-        "event_type": "task",
-        "color": "#9b59b6",
-        "description": "Status page updated. Customer emergency email sent. Avoid speculation — acknowledge impact, state you are working to restore.",
-        "start_offset_min": 120,
-        "duration_min": 60,
-        "participant": "PR / Customer Relations"
-      },
-      {
-        "title": "⚖️ Legal: regulatory notification assessment",
-        "event_type": "meeting",
-        "color": "#9b59b6",
-        "description": "Assess notification obligations: GDPR (if data affected), sector regulators, stock exchange (if listed). Define notification timeline.",
-        "start_offset_min": 120,
-        "duration_min": 60,
-        "participant": "Legal / DPO",
-        "alarm_lead_time": 15,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "✅ DR services confirmed operational",
-        "event_type": "status",
-        "color": "#27ae60",
-        "description": "Priority services running from DR site. Service levels degraded but operational. Communicate status to customers.",
-        "start_offset_min": 300,
-        "duration_min": 60
-      },
-      {
-        "title": "📊 End of Day 1 — management briefing",
-        "event_type": "briefing",
-        "color": "#9b59b6",
-        "description": "Full situation report: life safety, DR status, estimated damage, insurance status, regulatory requirements, media queries.",
-        "start_offset_min": 720,
-        "duration_min": 60,
-        "alarm_lead_time": 30,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "🔍 Week 1 — Site access and damage assessment",
-        "event_type": "task",
-        "color": "#f39c12",
-        "description": "Fire brigade clears site. Insurance loss adjuster and structural engineers assess damage. Document everything with photos/video for claim.",
-        "start_offset_min": 1440,
-        "duration_min": 7200
-      },
-      {
-        "title": "📋 Week 1 — GDPR notification (if required)",
-        "event_type": "task",
-        "color": "#e74c3c",
-        "description": "If personal data affected or inaccessible, notify supervisory authority within 72h. Coordinate with DPO.",
-        "start_offset_min": 1440,
-        "duration_min": 120,
-        "participant": "DPO / Legal",
-        "alarm_lead_time": 60,
-        "alarm_sound": "siren"
-      },
-      {
-        "title": "📊 Daily status briefing — during emergency DR",
-        "event_type": "briefing",
-        "color": "#9b59b6",
-        "description": "Daily update to management on DR capacity, customer impact, insurance progress, rebuild planning.",
-        "start_offset_min": 1440,
-        "duration_min": 30,
-        "is_recurring": true,
-        "recurrence_pattern": "daily",
-        "alarm_lead_time": 20,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "🏗️ Week 2 — Engage datacenter provider / colocation",
-        "event_type": "meeting",
-        "color": "#3498db",
-        "description": "Procure replacement datacenter capacity: colocation, cloud expansion, or new hosted facility. Emergency procurement process.",
-        "start_offset_min": 10080,
-        "duration_min": 480,
-        "participant": "Procurement / Facilities / Cloud Provider",
-        "alarm_lead_time": 60,
-        "alarm_sound": "beep"
-      },
-      {
-        "title": "🔧 Weeks 2–4 — Hardware procurement (emergency)",
-        "event_type": "task",
-        "color": "#f1c40f",
-        "description": "Emergency hardware procurement: servers, networking, storage. Use insurance advance payment if available. Consider cloud-first approach for speed.",
-        "start_offset_min": 10080,
-        "duration_min": 20160
-      },
-      {
-        "title": "📋 Week 2 — Insurance loss assessment submitted",
-        "event_type": "task",
-        "color": "#9b59b6",
-        "description": "Submit initial loss assessment to insurer: hardware value, data loss, business interruption costs, recovery expenses.",
-        "start_offset_min": 10080,
-        "duration_min": 480,
-        "participant": "Finance / Insurance"
-      },
-      {
-        "title": "🔧 Weeks 4–8 — Infrastructure build at new site",
-        "event_type": "task",
-        "color": "#f1c40f",
-        "description": "Rack, stack, cable, and configure new infrastructure at alternative site. Deploy from configuration management / IaC where available.",
-        "start_offset_min": 40320,
-        "duration_min": 40320
-      },
-      {
-        "title": "📊 Weekly management update — rebuild progress",
-        "event_type": "briefing",
-        "color": "#9b59b6",
-        "description": "Weekly progress report to board: timeline, budget, risks, insurance updates.",
-        "start_offset_min": 10080,
-        "duration_min": 60,
-        "is_recurring": true,
-        "recurrence_pattern": "weekly",
-        "alarm_lead_time": 60,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "🔧 Weeks 8–10 — Application migration and testing",
-        "event_type": "task",
-        "color": "#f1c40f",
-        "description": "Migrate applications to new infrastructure. Test each system thoroughly. Validate data integrity and functionality before cutover.",
-        "start_offset_min": 80640,
-        "duration_min": 20160
-      },
-      {
-        "title": "✅ Week 10 — Planned cutover from DR to new production",
-        "event_type": "meeting",
-        "color": "#27ae60",
-        "description": "Formal cutover from DR site to new production infrastructure. Stakeholder sign-off. Planned maintenance window with customer notification.",
-        "start_offset_min": 100800,
-        "duration_min": 480,
-        "participant": "All Teams / Customer Relations",
-        "alarm_lead_time": 120,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "🔐 Weeks 10–11 — Security hardening and compliance",
-        "event_type": "task",
-        "color": "#3498db",
-        "description": "Enhanced security baseline on new infrastructure: segmentation, PAM, SIEM, backup hardening, DR plan update.",
-        "start_offset_min": 100800,
-        "duration_min": 10080
-      },
-      {
-        "title": "📝 Week 12 — Post-Incident Review",
-        "event_type": "meeting",
-        "color": "#27ae60",
-        "description": "Comprehensive PIR: incident timeline, DR effectiveness, total financial impact, insurance settlement, lessons learned, resilience improvements.",
-        "start_offset_min": 117600,
-        "duration_min": 240,
-        "participant": "Board / Executive / Legal / Insurance / Facilities",
-        "alarm_lead_time": 120,
-        "alarm_sound": "chime"
-      },
-      {
-        "title": "📄 Week 12 — Final insurance claim submitted",
-        "event_type": "task",
-        "color": "#9b59b6",
-        "description": "Submit comprehensive final insurance claim with all documented costs, losses, and recovery expenses.",
-        "start_offset_min": 118080,
-        "duration_min": 480,
-        "participant": "Finance / Insurance / Legal"
-      },
-      {
-        "title": "🏁 Normal operations resumed at new site",
-        "event_type": "status",
-        "color": "#27ae60",
-        "description": "All systems operational at new production site. DR plan updated for new configuration. Resilience audit scheduled.",
-        "start_offset_min": 120960,
-        "duration_min": 0
-      }
-    ]
-  }
-]
+{
+  "name": "INC-06 Major Data Centre Fire — 12 Weeks",
+  "description": "84-day disaster recovery incident following a catastrophic fire that destroys the primary data centre. Full IT infrastructure must be rebuilt or migrated to cloud. Involves fire department investigation, insurance company, data centre recovery specialists, hardware vendors (Dell/HPE), cloud providers (AWS/Azure), system vendors, application vendors, and regulatory body. Covers emergency response through complete infrastructure reconstruction and return to normal.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Emergency Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 2880,
+      "order": 0
+    },
+    {
+      "name": "Damage Assessment",
+      "color": "#C0392B",
+      "start_offset_min": 2880,
+      "end_offset_min": 7200,
+      "order": 1
+    },
+    {
+      "name": "Business Continuity — Cloud",
+      "color": "#E67E22",
+      "start_offset_min": 7200,
+      "end_offset_min": 20160,
+      "order": 2
+    },
+    {
+      "name": "Infrastructure Rebuild",
+      "color": "#F39C12",
+      "start_offset_min": 20160,
+      "end_offset_min": 50400,
+      "order": 3
+    },
+    {
+      "name": "Application Migration",
+      "color": "#F1C40F",
+      "start_offset_min": 50400,
+      "end_offset_min": 80640,
+      "order": 4
+    },
+    {
+      "name": "Testing & Validation",
+      "color": "#27AE60",
+      "start_offset_min": 80640,
+      "end_offset_min": 100800,
+      "order": 5
+    },
+    {
+      "name": "Return to Normal",
+      "color": "#3498DB",
+      "start_offset_min": 100800,
+      "end_offset_min": 115200,
+      "order": 6
+    },
+    {
+      "name": "Post-Incident Review",
+      "color": "#9B59B6",
+      "start_offset_min": 115200,
+      "end_offset_min": 120960,
+      "order": 7
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 480,
+      "end_offset_min": 540,
+      "reason": "Day 1 — Executive crisis briefing. All C-suite and Board required. No operational changes during meeting.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 1440,
+      "end_offset_min": 1500,
+      "reason": "Day 2 morning — emergency response team standup.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 2880,
+      "end_offset_min": 2940,
+      "reason": "Day 3 — damage assessment kickoff briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 10080,
+      "end_offset_min": 10140,
+      "reason": "Week 2 — weekly management briefing (Monday).",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 20160,
+      "end_offset_min": 20220,
+      "reason": "Week 3 — weekly management briefing. Infrastructure rebuild kickoff.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 30240,
+      "end_offset_min": 30300,
+      "reason": "Week 4 — weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 40320,
+      "end_offset_min": 40380,
+      "reason": "Week 5 — weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 50400,
+      "end_offset_min": 50460,
+      "reason": "Week 6 — weekly management briefing. Application migration kickoff.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 60480,
+      "end_offset_min": 60540,
+      "reason": "Week 7 — weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 70560,
+      "end_offset_min": 70620,
+      "reason": "Week 8 — weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 80640,
+      "end_offset_min": 80700,
+      "reason": "Week 9 — weekly management briefing. Testing and validation kickoff.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 90720,
+      "end_offset_min": 90780,
+      "reason": "Week 10 — weekly management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 100800,
+      "end_offset_min": 100860,
+      "reason": "Week 11 — weekly management briefing. Return to normal operations planning.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 110880,
+      "end_offset_min": 110940,
+      "reason": "Week 12 — weekly management briefing. Final recovery status.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "Fire Alarm — Data Centre Evacuated",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Fire alarm activated in primary data centre at 02:15. Data centre staff evacuate. Fire suppression system (FM-200) activates but fire spreads beyond suppression zone. Fire department dispatched. All IT services begin failing as systems lose power or are damaged. T=0 established at point of alarm. NOC team observes cascading service alerts.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Fire Department Response",
+      "event_type": "event",
+      "color": "#E74C3C",
+      "description": "Fire department arrives and gains control of the fire after 3 hours. Data centre building structure intact but significant smoke, water, and heat damage to all equipment in main computer hall. Fire investigation officer declares scene as active investigation scene pending arson assessment. Access prohibited until investigation clearance. Fire department investigation team to remain on site for 72 hours.",
+      "start_offset_min": 30,
+      "duration_min": 180,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "On-Call IT Leadership Notified",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "NOC activates on-call escalation tree. CISO, CTO, IT Director, and key IT staff notified. Disaster Recovery Plan (DRP) declared. Business Continuity Plan (BCP) activated. All key personnel mobilised to emergency command centre. DR runbooks distributed. DR site status checked — DR site has partial infrastructure but not sized for full failover.",
+      "start_offset_min": 30,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Insurance Company Emergency Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "CISO and Legal notify Insurance Company (property and cyber) via 24/7 emergency claims line. Property damage claim opened. Business interruption coverage activated. Insurance Loss Adjuster assigned and will attend site within 24 hours. Insurance company engages Data Centre Recovery Specialists (DRS) from approved vendor panel. IT forensics and salvage assessment authorised.",
+      "start_offset_min": 60,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Executive Crisis Briefing",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Executive crisis briefing: CEO, CFO, CISO, CTO, COO, General Counsel, Board Chairman. Confirmed: primary data centre destroyed, DR site insufficient for full recovery, estimated 12-week full recovery. Decisions: (1) Activate emergency cloud migration (AWS/Azure), (2) Engage Data Centre Recovery Specialists, (3) Commission new colocation contract, (4) Notify regulators and key customers. Emergency budget: $20M approved.",
+      "start_offset_min": 480,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Regulatory Body Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal team notifies Regulatory Body of major infrastructure incident affecting service availability. Preliminary notification with: incident description, affected services, business continuity measures activated, expected recovery timeline (12 weeks), contact point for regulatory liaison. Sector regulator requests daily updates during first week and weekly updates thereafter.",
+      "start_offset_min": 480,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Data Centre Recovery Specialists Engaged",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Insurance-approved Data Centre Recovery Specialists (DRS) mobilised. DRS deploys disaster recovery assessment team on-site as soon as fire investigation clears access. DRS scope: equipment salvage assessment, data recovery from surviving media, temporary portable data centre facility (delivery within 5 days), critical equipment replacement procurement coordination with Hardware Vendors.",
+      "start_offset_min": 720,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Cloud Migration Emergency Project Launch",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "CTO launches emergency cloud migration project. Cloud Providers (AWS and Azure) contacted via enterprise account teams — both activated emergency response programmes. AWS Disaster Recovery team and Microsoft FastTrack engineers engaged. Emergency cloud capacity reserved: 500 virtual machines, 200TB storage, emergency Express Route and Direct Connect circuits ordered. Target: critical applications in cloud within 14 days.",
+      "start_offset_min": 720,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "DR Site Assessment",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "IT Operations assesses DR site capacity. DR site has 20 servers covering 15% of production load, networking infrastructure intact, and backup connectivity. Plan: DR site handles critical Priority 1 systems immediately. Cloud handles Priority 2-3 systems. DR site servers prioritised for core business and customer-facing portal. DR site hardware augmented with emergency leased servers from Hardware Vendors (Dell leasing programme).",
+      "start_offset_min": 480,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Fire Investigation — Site Access Granted",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Fire investigation team completes initial scene assessment. Cause: electrical fault in UPS room — accidental, not arson. Site access partially granted for DRS salvage team under fire department supervision. CCTV footage of fire progression secured by fire investigation team. Insurance Loss Adjuster completes initial site survey. Salvage operation authorised to begin.",
+      "start_offset_min": 2880,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Equipment Salvage Assessment",
+      "event_type": "activity",
+      "color": "#C0392B",
+      "description": "DRS salvage team and Insurance Loss Adjuster conduct equipment inventory. Findings: 95% of server hardware total loss (heat damage and firefighting water). 8 tape library cartridges potentially recoverable — DRS specialist media recovery lab engaged. SAN storage controllers destroyed — data potentially recoverable via platters if media survived. Networking equipment: 100% loss. Total replacement value estimate: $12M hardware.",
+      "start_offset_min": 2880,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Hardware Vendors Engaged — Emergency Procurement",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "CTO and IT Director engage Hardware Vendors (Dell Technologies, HPE, Cisco) via emergency procurement channels. Emergency POs issued for full data centre rebuild: 80 rack servers (Dell PowerEdge), core networking (Cisco Catalyst and Nexus), storage (Dell PowerStore and NetApp), UPS and power distribution units. Vendors commit emergency allocation. Phased delivery: first batch within 3 weeks, full delivery by Week 8.",
+      "start_offset_min": 4320,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Colocation Facility Contract Signed",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Emergency colocation contract signed with Tier-3 colocation provider for immediate cage space. Facility: 40 server racks, fully redundant power (2N), diverse fibre connectivity, 24/7 remote hands support, physical security compliant with ISO 27001. First racks available for equipment installation in 5 days. DRS portable data centre modules also ordered as interim bridge capacity.",
+      "start_offset_min": 4320,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 2",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 2 management briefing. Status: DR site handling critical applications at reduced capacity, cloud migration 30% complete for Priority 2 systems, salvage assessment complete ($12M hardware loss), colocation contract signed, hardware vendors committed, insurance claim progressing with interim payment approved. Business continuity: 40% of normal operations maintained. Customer communications sent.",
+      "start_offset_min": 10080,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Media Recovery — Tape Data Extraction",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "DRS media recovery lab processes recovered tape cartridges. 6 of 8 tapes yielded readable data. Recovered: last-good database backups (3 weeks old), application configuration data, archive data. SAN platter recovery: specialist clean-room recovery attempted on 4 drive arrays — partial success, 60% of data potentially recoverable. Data recovery lab processing will take 10 days.",
+      "start_offset_min": 7200,
+      "duration_min": 14400,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Cloud Migration — Critical Applications",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "AWS and Azure emergency migration teams work with IT Operations to lift-and-shift critical applications to cloud. Microsoft Azure: ERP system (SAP on Azure — emergency lift), Active Directory extended to Azure AD, Exchange Online migration completed. AWS: web-facing applications, customer portal, API services. Cloud Provider engineers on-site and remote. Target: all Priority 1-2 apps in cloud by end of Week 3.",
+      "start_offset_min": 7200,
+      "duration_min": 12960,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "System Vendors Engaged for Cloud Migration",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations contacts all System and Application Vendors for cloud migration support. SAP provides cloud migration team for SAP S/4HANA on Azure. Oracle provides DBA team for Oracle DB cloud migration. Cisco provides SD-WAN configuration for cloud connectivity. All major application vendors engaged — vendor support contracts activated. License migration to cloud SKUs processed with each vendor.",
+      "start_offset_min": 8640,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "DRS Portable Data Centre Deployed",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "DRS portable data centre modules delivered and deployed at alternative site. 3 x 20-foot containerised data centre units installed. Power connected, cooling operational, network connected via temporary fibre. Provides 30 server slots as bridge capacity while colocation facility is being fitted out. Facilitates faster recovery of DR-site overflow applications.",
+      "start_offset_min": 10080,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Infrastructure Rebuild Kickoff — Colocation",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Colocation facility infrastructure rebuild kickoff. Attendees: IT Operations, Hardware Vendors (Dell and HPE field engineers), Cisco network team, colocation facility management. Plan: structured cabling installation Days 15-17, rack and stack servers Days 18-21, network configuration Days 19-23, storage SAN configuration Days 22-25. Parallel cloud operations continue throughout rebuild. Target: first production systems in colocation by Week 5.",
+      "start_offset_min": 20160,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Weekly Management Briefing — Week 3",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 3 management briefing. All Priority 1-2 applications operational in cloud. Business operations at 70% normal capacity. DR site handling core systems. Colocation facility build commenced. Hardware first batch delivered to colocation. Insurance: Loss Adjuster submitted interim report, $12M hardware claim approved in principle. Regulatory update submitted. Customer retention programme initiated.",
+      "start_offset_min": 20160,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Structured Cabling — Colocation",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Structured cabling installation in colocation facility. Certified cabling contractor installs CAT6A copper and OM4 fibre throughout 40 racks. Top-of-rack and end-of-row switch positions cabled. Fibre patch panels installed. Out-of-band management network cabled. Labelling and documentation complete. Cabling certified and test results recorded. Dell and HPE rack installation begins immediately after.",
+      "start_offset_min": 21600,
+      "duration_min": 4320,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Server Rack and Stack — Colocation",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Dell and HPE field engineers rack and stack first server batch at colocation facility: 30 rack servers installed and cabled, iDRAC and iLO out-of-band management configured, firmware updated to latest versions, hardware diagnostics passed. Cisco network team installs and configures: 4 x Cisco Nexus 93180 switches (spine and leaf topology), 2 x Cisco Firepower firewalls, 2 x Cisco Catalyst 9300 access switches.",
+      "start_offset_min": 25920,
+      "duration_min": 4320,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 4",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 4 management briefing. Colocation: cabling complete, 30 servers installed, network active. Cloud: all applications stable, performance acceptable, cloud costs running at $180K/month as expected. Media recovery: 60% data recovered from salvaged media — some data loss confirmed. Insurance adjusters completed site survey — total claim estimate $18M (hardware plus business interruption). Regulatory update submitted.",
+      "start_offset_min": 30240,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Second Hardware Batch Delivered",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Dell and HPE deliver second hardware batch: remaining 50 servers, additional NetApp storage arrays, replacement UPS units. HPE Pointnext field engineers on-site for installation. Colocation facility now at full planned capacity (80 servers, full storage). Cisco final networking equipment batch also delivered. Data centre build nearing completion. Storage SAN configuration begins.",
+      "start_offset_min": 36000,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 5",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 5 management briefing. All 80 servers installed in colocation. Storage SAN active. OS baseline build ongoing (VMware vSphere and ESXi cluster). Cloud operations: costs being optimised, Reserved Instances purchased. Application migration planning for colocation ongoing. Application Vendors finalising migration plans. Target: begin application migration to colocation in Week 6.",
+      "start_offset_min": 40320,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "VMware vSphere Cluster Configured",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "VMware (Broadcom) engineers and IT Operations configure virtualisation platform on colocation servers: VMware vSphere 8 cluster (80 nodes), vSAN with replication to cloud via Azure Site Recovery, NSX-T software-defined networking for micro-segmentation, vCenter Server deployed, Veeam backup solution installed and configured. Platform ready for application onboarding.",
+      "start_offset_min": 40320,
+      "duration_min": 10080,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Application Migration Kickoff — Colocation",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Application migration kickoff for colocation infrastructure. Meeting: CTO, IT Operations, all Application Vendors (SAP, Oracle, internal dev team, ISV vendors). Migration priority: (1) Core business applications (SAP, Oracle DB), (2) Customer-facing systems, (3) Internal productivity systems. Each Application Vendor provides migration runbook and lead engineer. Target: all applications migrated to colocation by end of Week 10.",
+      "start_offset_min": 50400,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Weekly Management Briefing — Week 6",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 6 management briefing. Colocation: VMware platform complete. Application migration from cloud to colocation begins this week. Cloud costs: $180K/month — CFO applying pressure to migrate quickly. Insurance: formal property claim submitted ($12M hardware plus $6M fit-out). Business interruption claim ongoing at $45M. Customer retention: 3 key accounts at risk — account management team engaged.",
+      "start_offset_min": 50400,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "SAP Migration — Cloud to Colocation",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "SAP Application Vendor engineers execute SAP S/4HANA migration from Azure to colocation using SAP System Copy methodology. SAP HANA database migrated and performance validated against pre-incident baseline. Finance and Operations business teams conduct user acceptance testing. SAP goes live in colocation after 72-hour parallel run. Azure SAP instance decommissioned after successful cutover.",
+      "start_offset_min": 55440,
+      "duration_min": 10080,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 7",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 7 management briefing. SAP migration to colocation on track. Oracle DB migration in progress. Customer portal (AWS) migration planning underway. DR site: Priority 1 systems still there, plan to decommission DR site hosting once colocation stable. Cloud cost reduction: 30% reduction as SAP Azure decommissioned. Regulatory: weekly update submitted as required.",
+      "start_offset_min": 60480,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Oracle DB Migration — Cloud to Colocation",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "Oracle Application Vendor DBA team executes Oracle Database migration from AWS RDS to on-premises Oracle Exadata X9M in colocation. Data Guard replication established for migration. Switchover executed during maintenance window. Performance verified. DR to cloud (Oracle Data Guard to Azure) re-established. Applications reconnected and integration tested.",
+      "start_offset_min": 65520,
+      "duration_min": 7200,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Customer-Facing Systems Migration",
+      "event_type": "activity",
+      "color": "#F1C40F",
+      "description": "Customer portal and API services migrated from AWS to colocation. AWS CloudFront CDN retained for global content delivery. Application Vendor (internal dev team and ISV) executes migration. Load testing performed — colocation performance exceeds pre-incident levels due to upgraded hardware. Zero-downtime migration achieved using blue-green deployment. AWS services progressively decommissioned.",
+      "start_offset_min": 70560,
+      "duration_min": 10080,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 8",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 8 management briefing. SAP and Oracle live in colocation. Customer portal migration complete. Cloud costs: reduced to $60K/month (residual services). DR site: decommissioning planned for Week 9. 85% of applications now in colocation. Testing and validation phase begins Week 9. Insurance: adjusters accept preliminary claim values. Business operations: 90% of pre-incident capacity.",
+      "start_offset_min": 70560,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "DR Site Decommission",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "DR site temporary hosting decommissioned as colocation takes over all production workloads. DR site servers returned to vendor lease pool. New DR strategy: Cloud-based DR using Azure Site Recovery and AWS Backup for the colocation environment. DR runbooks rewritten for cloud-based failover. RTO/RPO targets validated: RTO 4h, RPO 1h.",
+      "start_offset_min": 75600,
+      "duration_min": 5040,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 9",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 9 management briefing. All applications in colocation or retained cloud services. DR site decommissioned. Full testing and validation phase begins. System and Application Vendors conducting acceptance testing. Cloud costs: final residual at $25K/month. Insurance: interim payment of $10M received. Business operations: 95% of pre-incident capacity.",
+      "start_offset_min": 80640,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Comprehensive System Testing",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "All System and Application Vendors conduct formal acceptance testing in colocation environment. IT Operations coordinates: performance testing (infrastructure at 150% pre-incident capacity), load testing of customer-facing systems, DR failover test (Azure Site Recovery), backup restoration test (Veeam), security testing (vulnerability scan via Tenable Nessus), and integration testing between all business systems.",
+      "start_offset_min": 80640,
+      "duration_min": 14400,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Security Validation",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "External security firm conducts full security validation of new colocation environment: penetration test (infrastructure and application layer), network architecture review, identity and access management review (Zero Trust validation), CrowdStrike EDR coverage verification (100% endpoint coverage), Splunk SIEM coverage check, regulatory compliance assessment (ISO 27001 and sector-specific requirements).",
+      "start_offset_min": 90720,
+      "duration_min": 7200,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 10",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 10 management briefing. Testing 80% complete. Performance exceeds pre-incident baseline by 40% due to new hardware. DR failover test successful (RTO 3.5h). Security penetration test complete — 3 medium findings remediated. Business operations: 98% capacity. Insurance final settlement discussions ongoing. Regulatory: weekly updates continuing. Return to normal operations target: end of Week 11.",
+      "start_offset_min": 90720,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Full Disaster Recovery Test",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "Full disaster recovery test performed: Azure Site Recovery failover of all critical systems. Test simulates colocation facility failure. All critical services fail over to Azure within RTO target (3.5 hours). Failback to colocation tested and executed successfully. DR runbooks validated. RTO and RPO targets formally signed off by CISO and CTO. Cloud Providers (AWS and Azure) participate in validation exercise.",
+      "start_offset_min": 95760,
+      "duration_min": 1440,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Weekly Management Briefing — Week 11",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 11 management briefing. All testing complete and passed. Security validation signed off. DR test successful. Return to normal operations confirmed for this week. Insurance final claim settlement: $18M property plus $48M business interruption — total $66M claim. Regulatory: incident formally closed pending final report. Staff commendations and lessons learned programme announced.",
+      "start_offset_min": 100800,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Return to Normal Operations",
+      "event_type": "event",
+      "color": "#27AE60",
+      "description": "Formal declaration of return to normal operations. All systems fully operational in new colocation facility with cloud-based DR. Performance exceeds pre-incident baseline. All Application Vendor support contracts updated to colocation specifications. Business operations: 100% capacity. DRS portable data centre units removed from site. Staff fully re-integrated. Incident formally closed from operational perspective.",
+      "start_offset_min": 107280,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Weekly Management Briefing — Week 12",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Week 12 management briefing — final weekly briefing of incident period. Return to operations confirmed and stable for 1 week. Insurance settlement finalised. Regulatory report drafted and under review. Post-incident review meeting scheduled. 5-year IT resilience investment roadmap presented for board approval. Incident formally entering post-incident review phase.",
+      "start_offset_min": 110880,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Board and Stakeholder Post-Incident Review",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Comprehensive post-incident review meeting. Attendees: CEO, CFO, CISO, CTO, COO, Board, Insurance representatives, Regulatory Body liaison. Full incident presentation: 84-day timeline, $66M financial impact, lessons learned across all phases, vendor performance assessment, BCP and DRP gaps identified and remediated, new resilience posture (colocation plus cloud DR). Board adopts new IT resilience policy and approves 5-year roadmap.",
+      "start_offset_min": 115200,
+      "duration_min": 240,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Final Post-Incident Report Deadline",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Final Post-Incident Report submitted to all stakeholders: Board, CEO, Insurance Company (supports final claim settlement), Regulatory Body (mandatory submission), Fire Investigation Authority, Colocation Facility management. Report contents: full 84-day incident timeline, root cause analysis (UPS electrical fault), financial impact quantification, recovery methodology, new resilience architecture, lessons learned, 5-year IT resilience investment roadmap.",
+      "start_offset_min": 120960,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    }
+  ]
+}

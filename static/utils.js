@@ -282,30 +282,145 @@ function removeExtraClock(id) {
   if (typeof renderSidebar === 'function') renderSidebar();
 }
 
+// City → IANA timezone hint table (supplement to IANA search)
+const _TZ_CITY_MAP = [
+  ['London','Europe/London'],['Paris','Europe/Paris'],['Berlin','Europe/Berlin'],
+  ['Madrid','Europe/Madrid'],['Rome','Europe/Rome'],['Amsterdam','Europe/Amsterdam'],
+  ['Brussels','Europe/Brussels'],['Zurich','Europe/Zurich'],['Vienna','Europe/Vienna'],
+  ['Warsaw','Europe/Warsaw'],['Prague','Europe/Prague'],['Budapest','Europe/Budapest'],
+  ['Bucharest','Europe/Bucharest'],['Athens','Europe/Athens'],['Istanbul','Europe/Istanbul'],
+  ['Helsinki','Europe/Helsinki'],['Stockholm','Europe/Stockholm'],['Oslo','Europe/Oslo'],
+  ['Copenhagen','Europe/Copenhagen'],['Tallinn','Europe/Tallinn'],['Riga','Europe/Riga'],
+  ['Vilnius','Europe/Vilnius'],['Minsk','Europe/Minsk'],['Kiev','Europe/Kyiv'],
+  ['Kyiv','Europe/Kyiv'],['Moscow','Europe/Moscow'],['Dubai','Asia/Dubai'],
+  ['Riyadh','Asia/Riyadh'],['Karachi','Asia/Karachi'],['Mumbai','Asia/Kolkata'],
+  ['Delhi','Asia/Kolkata'],['Kolkata','Asia/Kolkata'],['Dhaka','Asia/Dhaka'],
+  ['Colombo','Asia/Colombo'],['Bangkok','Asia/Bangkok'],['Jakarta','Asia/Jakarta'],
+  ['Singapore','Asia/Singapore'],['Kuala Lumpur','Asia/Kuala_Lumpur'],
+  ['Manila','Asia/Manila'],['Hong Kong','Asia/Hong_Kong'],['Shanghai','Asia/Shanghai'],
+  ['Beijing','Asia/Shanghai'],['Seoul','Asia/Seoul'],['Tokyo','Asia/Tokyo'],
+  ['Sydney','Australia/Sydney'],['Melbourne','Australia/Melbourne'],
+  ['Brisbane','Australia/Brisbane'],['Auckland','Pacific/Auckland'],
+  ['New York','America/New_York'],['Boston','America/New_York'],
+  ['Washington','America/New_York'],['Miami','America/New_York'],
+  ['Chicago','America/Chicago'],['Dallas','America/Chicago'],
+  ['Houston','America/Chicago'],['Denver','America/Denver'],
+  ['Phoenix','America/Phoenix'],['Los Angeles','America/Los_Angeles'],
+  ['San Francisco','America/Los_Angeles'],['Seattle','America/Los_Angeles'],
+  ['Vancouver','America/Vancouver'],['Toronto','America/Toronto'],
+  ['Montreal','America/Toronto'],['Mexico City','America/Mexico_City'],
+  ['Sao Paulo','America/Sao_Paulo'],['Buenos Aires','America/Argentina/Buenos_Aires'],
+  ['Lima','America/Lima'],['Bogota','America/Bogota'],['Santiago','America/Santiago'],
+  ['Johannesburg','Africa/Johannesburg'],['Cairo','Africa/Cairo'],
+  ['Lagos','Africa/Lagos'],['Nairobi','Africa/Nairobi'],
+  ['UTC','UTC'],['GMT','Etc/GMT'],
+];
+
+// Build a combined list: city entries + all IANA zones
+function _getTzCandidates() {
+  const zones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf)
+    ? Intl.supportedValuesOf('timeZone') : [];
+  const seen = new Set();
+  const list = [];
+  // City entries first (higher relevance)
+  for (const [city, tz] of _TZ_CITY_MAP) {
+    const key = city + '|' + tz;
+    if (!seen.has(key)) { seen.add(key); list.push({ label: city, tz }); }
+  }
+  // Then raw IANA zone names
+  for (const tz of zones) {
+    const key = tz + '|' + tz;
+    if (!seen.has(key)) { seen.add(key); list.push({ label: tz, tz }); }
+  }
+  return list;
+}
+
+let _tzCandidates = null;
+let _tzHighlightIdx = -1;
+
+function filterTzSuggestions(query) {
+  const box = document.getElementById('tzSuggestions');
+  if (!box) return;
+  const q = query.trim().toLowerCase();
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; _tzHighlightIdx = -1; return; }
+  if (!_tzCandidates) _tzCandidates = _getTzCandidates();
+  const matches = _tzCandidates.filter(c =>
+    c.label.toLowerCase().includes(q) || c.tz.toLowerCase().includes(q)
+  ).slice(0, 12);
+  if (!matches.length) { box.style.display = 'none'; box.innerHTML = ''; _tzHighlightIdx = -1; return; }
+  _tzHighlightIdx = -1;
+  box.innerHTML = matches.map((c, i) =>
+    `<div class="tz-suggestion" data-idx="${i}" data-tz="${c.tz}" data-label="${c.label}"
+      style="padding:5px 10px;cursor:pointer;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+      onmousedown="selectTzSuggestion(this)" onmouseenter="highlightTzSuggestion(${i})">
+      <span style="color:var(--text)">${c.label}</span>
+      ${c.label !== c.tz ? `<span style="opacity:.5;font-size:var(--fs-xs);margin-left:6px">${c.tz}</span>` : ''}
+    </div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function highlightTzSuggestion(idx) {
+  _tzHighlightIdx = idx;
+  const box = document.getElementById('tzSuggestions');
+  if (!box) return;
+  box.querySelectorAll('.tz-suggestion').forEach((el, i) => {
+    el.style.background = i === idx ? 'var(--accent)' : '';
+    el.style.color = i === idx ? '#fff' : '';
+  });
+}
+
+function selectTzSuggestion(el) {
+  const tz    = el.dataset.tz;
+  const label = el.dataset.label;
+  document.getElementById('newClockTZ').value    = tz;
+  document.getElementById('newClockLabel').value = label !== tz ? label : '';
+  document.getElementById('newClockSearch').value = label;
+  const box = document.getElementById('tzSuggestions');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  _tzHighlightIdx = -1;
+}
+
+function tzSuggestionsKey(e) {
+  const box = document.getElementById('tzSuggestions');
+  if (!box || box.style.display === 'none') return;
+  const items = box.querySelectorAll('.tz-suggestion');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _tzHighlightIdx = Math.min(_tzHighlightIdx + 1, items.length - 1);
+    highlightTzSuggestion(_tzHighlightIdx);
+    items[_tzHighlightIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _tzHighlightIdx = Math.max(_tzHighlightIdx - 1, 0);
+    highlightTzSuggestion(_tzHighlightIdx);
+    items[_tzHighlightIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const target = _tzHighlightIdx >= 0 ? items[_tzHighlightIdx] : items[0];
+    if (target) selectTzSuggestion(target);
+  } else if (e.key === 'Escape') {
+    box.style.display = 'none'; box.innerHTML = ''; _tzHighlightIdx = -1;
+  }
+}
+
 function openAddClockPopover(btn) {
   const pop = document.getElementById('addClockPopover');
   if (!pop) return;
-  // Populate timezone selector with all IANA zones
-  const tzSel = document.getElementById('newClockTZ');
-  if (tzSel && !tzSel.options.length) {
-    const zones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf)
-      ? Intl.supportedValuesOf('timeZone')
-      : ['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin',
-         'Europe/Helsinki','Europe/Tallinn','Europe/Riga','Europe/Vilnius',
-         'America/New_York','America/Chicago','America/Los_Angeles',
-         'Asia/Tokyo','Asia/Shanghai','Asia/Dubai','Australia/Sydney'];
-    zones.forEach(tz => {
-      const opt = document.createElement('option');
-      opt.value = tz; opt.textContent = tz;
-      tzSel.appendChild(opt);
-    });
-  }
+  // Clear all inputs
+  const searchEl = document.getElementById('newClockSearch');
+  if (searchEl) searchEl.value = '';
   document.getElementById('newClockLabel').value = '';
+  document.getElementById('newClockTZ').value = '';
+  const box = document.getElementById('tzSuggestions');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  _tzHighlightIdx = -1;
   const rect = btn.getBoundingClientRect();
   pop.style.display = 'block';
   pop.style.top  = (rect.bottom + 6) + 'px';
   pop.style.left = Math.max(4, rect.left - pop.offsetWidth + btn.offsetWidth) + 'px';
-  document.getElementById('newClockLabel').focus();
+  if (searchEl) searchEl.focus();
   // Close on outside click
   setTimeout(() => {
     document.addEventListener('click', _closeClockPopoverOnOutside, { once: true });
@@ -327,7 +442,11 @@ function closeAddClockPopover() {
 function confirmAddClock() {
   const label = (document.getElementById('newClockLabel')?.value || '').trim();
   const tz    = document.getElementById('newClockTZ')?.value || '';
-  if (!tz) { showError('Please select a timezone'); return; }
+  if (!tz) { showError('Please select a timezone from the suggestions'); return; }
+  // Basic validation: must be a known IANA zone
+  try { new Intl.DateTimeFormat(undefined, { timeZone: tz }); } catch(e) {
+    showError('Invalid timezone: ' + tz); return;
+  }
   const clocks = state.preferences.extra_clocks || [];
   const nextId = clocks.length ? Math.max(...clocks.map(c => c.id)) + 1 : 1;
   state.preferences.extra_clocks = [...clocks, { id: nextId, timezone: tz, label: label || tz }];

@@ -172,10 +172,12 @@ type webhookJob struct {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 type App struct {
-	store      *Store
-	broker     *SSEBroker
-	oidc       *OIDCConfig // nil if OIDC not configured
-	webhookCh  chan webhookJob
+	store           *Store
+	broker          *SSEBroker
+	oidc            *OIDCConfig // nil if OIDC not configured
+	oidcExclusive   bool        // when true, disable local username/password login
+	oidcDefaultRole Role        // role assigned to auto-created OIDC users (default: RoleReadWrite)
+	webhookCh       chan webhookJob
 }
 
 // broadcastEventChange sends an SSE notification to all clients about an event change
@@ -290,6 +292,7 @@ func (app *App) getSession(r *http.Request) (*Session, *User) {
 	}
 	sess, ok := app.store.GetSession(cookie.Value)
 	if !ok {
+		logDebug("session not found or expired: cookie=%s", cookie.Value[:min(8, len(cookie.Value))])
 		return nil, nil
 	}
 	user, ok := app.store.GetUserByID(sess.UserID)
@@ -447,6 +450,13 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// Deny local login when OIDC exclusive mode is enabled.
+	// The built-in admin account is exempted so admins can recover if OIDC breaks.
+	if app.oidcExclusive && app.oidc != nil && req.Username != "admin" {
+		logVerbose("local login blocked for %q — OIDC exclusive mode", req.Username)
+		jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
+		return
+	}
 	clientIP := r.RemoteAddr
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		clientIP = strings.SplitN(fwd, ",", 2)[0]
@@ -485,11 +495,13 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
 		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
+	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, clientIP)
 	jsonOK(w, user.Public())
 }
 
 func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie("session"); err == nil {
+		logDebug("logout: session=%s", c.Value[:min(8, len(c.Value))])
 		app.store.DeleteSession(c.Value) //nolint
 	}
 	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", Expires: time.Unix(0, 0)})
@@ -935,6 +947,7 @@ func (app *App) handleSavePreferences(w http.ResponseWriter, r *http.Request, us
 				fmt.Sprintf("Webhook integration updated: type=%s", p.WebhookType))
 		}
 	}
+	logDebug("preferences saved: user=%s theme=%s lang=%s", user.Username, p.Theme, p.Language)
 	jsonOK(w, p)
 }
 
@@ -1147,6 +1160,7 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 
 	app.broadcastEventChange(user.ID, "created", &created)
+	logDebug("event created: id=%d title=%q user=%s", created.ID, created.Title, user.Username)
 	w.WriteHeader(http.StatusCreated)
 	// Include overlap_warnings alongside event fields for non-breaking backward compat
 	type createResp struct {
@@ -1210,6 +1224,7 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		fmt.Sprintf("Updated event %q", existing.Title))
 	updated, _ := app.store.GetEventByID(id)
 	app.broadcastEventChange(user.ID, "updated", updated)
+	logDebug("event updated: id=%d title=%q user=%s", updated.ID, updated.Title, user.Username)
 	type updateResp struct {
 		Event
 		OverlapWarnings []OverlapWarning `json:"overlap_warnings,omitempty"`
@@ -1309,6 +1324,7 @@ func (app *App) handleDeleteEvent(w http.ResponseWriter, r *http.Request, user *
 	// Broadcast deletion to other clients
 	deletedEv := &Event{ID: id, Title: title}
 	app.broadcastEventChange(user.ID, "deleted", deletedEv)
+	logDebug("event deleted: id=%d title=%q user=%s", id, title, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1504,6 +1520,7 @@ func (app *App) handleCreateLayer(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logDebug("layer created: id=%d name=%q user=%s", created.ID, created.Name, user.Username)
 	jsonOK(w, created)
 }
 
@@ -1563,6 +1580,7 @@ func (app *App) handleDeleteLayer(w http.ResponseWriter, r *http.Request, user *
 	}
 	app.audit(user.ID, user.DisplayName, "deleted", "layer", id,
 		fmt.Sprintf("Deleted layer %q", existing.Name))
+	logDebug("layer deleted: id=%d user=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1618,6 +1636,7 @@ func (app *App) handleCreateGroup(w http.ResponseWriter, r *http.Request, user *
 	}
 	app.store.CreateLayer(autoLayer) //nolint
 	w.WriteHeader(http.StatusCreated)
+	logDebug("group created: id=%d name=%q user=%s", created.ID, created.Name, user.Username)
 	jsonOK(w, created)
 }
 
@@ -1823,6 +1842,7 @@ func (app *App) handleAckAlarm(w http.ResponseWriter, r *http.Request, user *Use
 	summary := fmt.Sprintf("Alarm acknowledged: %q (event: %s, lead time: %d min) from IP %s",
 		alarm.EventTitle, alarm.EventTime.Format("2006-01-02 15:04 UTC"), alarm.LeadTime, ip)
 	app.audit(user.ID, user.DisplayName, "acknowledged", "alarm", id, summary)
+	logDebug("alarm acked: id=%d user=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "acknowledged"})
 }
 
@@ -1896,6 +1916,7 @@ func (app *App) handleCreateLock(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	logVerbose("lock created: id=%d user=%s", created.ID, user.Username)
 	jsonOK(w, created)
 }
 
@@ -1910,6 +1931,7 @@ func (app *App) handleDeleteLock(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, err.Error(), http.StatusForbidden)
 		return
 	}
+	logVerbose("lock deleted: id=%d user=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -1976,6 +1998,7 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 	app.audit(user.ID, user.DisplayName, "created", "user", created.ID,
 		fmt.Sprintf("Created user %q (role: %s)", created.Username, created.Role))
 	w.WriteHeader(http.StatusCreated)
+	logVerbose("user created: id=%d username=%q role=%s by=%s", created.ID, created.Username, created.Role, user.Username)
 	jsonOK(w, created.Public())
 }
 
@@ -2068,6 +2091,7 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 		app.audit(user.ID, user.DisplayName, "deleted", "user", id,
 			fmt.Sprintf("Deleted user %q", target.Username))
 	}
+	logVerbose("user deleted: id=%d by=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -3023,7 +3047,9 @@ func (app *App) runAlarmScheduler() {
 	defer ticker.Stop()
 	for range ticker.C {
 		now := time.Now()
-		for _, alarm := range app.store.GetActiveAlarms() {
+		active := app.store.GetActiveAlarms()
+		logDebug("alarm scheduler tick: checking %d alarms", len(active))
+		for _, alarm := range active {
 			fireAt := alarm.EventTime.Add(-time.Duration(alarm.LeadTime) * time.Minute)
 			if !now.Before(fireAt) { // fires when now >= fireAt
 				app.store.MarkAlarmFired(alarm.ID) //nolint
@@ -3573,10 +3599,15 @@ func (app *App) handleOIDCInfo(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "OIDC not configured", http.StatusNotFound)
 		return
 	}
+	exclusive := "false"
+	if app.oidcExclusive {
+		exclusive = "true"
+	}
 	jsonOK(w, map[string]string{
-		"enabled":     "true",
-		"issuer":      app.oidc.Issuer,
-		"client_id":   app.oidc.ClientID,
+		"enabled":      "true",
+		"exclusive":    exclusive,
+		"issuer":       app.oidc.Issuer,
+		"client_id":    app.oidc.ClientID,
 		"redirect_url": app.oidc.RedirectURL,
 	})
 }
@@ -3587,6 +3618,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=oidc_not_configured", http.StatusFound)
 		return
 	}
+	logDebug("OIDC: login initiated from %s", r.RemoteAddr)
 	// Generate a random state token and store it in a short-lived cookie
 	stateTok := make([]byte, 16)
 	if _, err := rand.Read(stateTok); err != nil {
@@ -3697,15 +3729,20 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		displayName = username
 	}
 
-	// Find or auto-create the local user (SSO users get readwrite role by default)
+	// Find or auto-create the local user
 	user, found := app.store.GetUserByUsername(username)
 	if !found {
+		defaultRole := app.oidcDefaultRole
+		if defaultRole == "" {
+			defaultRole = RoleReadWrite
+		}
 		newUser := User{
 			Username:    username,
 			DisplayName: displayName,
-			Role:        RoleReadWrite,
+			Role:        defaultRole,
+			Vetted:      true, // SSO users are pre-authenticated by the IDP
 		}
-		// No password — OIDC-only login; store empty bcrypt hash placeholder
+		// No password — OIDC-only login
 		created, err := app.store.CreateUser(newUser)
 		if err != nil {
 			logVerbose("OIDC: failed to create user %s: %v", username, err)
@@ -3713,7 +3750,22 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		user = &created
-		log.Printf("OIDC: auto-created user %q (role=readwrite)", username)
+		log.Printf("OIDC: auto-created user %q (role=%s, vetted=true)", username, defaultRole)
+	} else {
+		// Sync display name from IDP on every login
+		if displayName != "" && displayName != user.DisplayName {
+			logVerbose("OIDC: updating display name for %q: %q → %q", username, user.DisplayName, displayName)
+			user.DisplayName = displayName
+			if err := app.store.UpdateUser(*user); err != nil {
+				logVerbose("OIDC: failed to update display name for %q: %v", username, err)
+			}
+		}
+		// Ensure existing OIDC users are vetted
+		if !user.Vetted {
+			user.Vetted = true
+			app.store.UpdateUser(*user) //nolint
+			logVerbose("OIDC: auto-vetted existing user %q", username)
+		}
 	}
 
 	// Create session
@@ -3735,7 +3787,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Expires:  sess.ExpiresAt,
 		SameSite: http.SameSiteLaxMode,
 	})
-	logVerbose("OIDC login: user=%s", username)
+	logVerbose("OIDC login success: user=%s role=%s", username, user.Role)
+	logDebug("OIDC: session created id=%s expires=%s", sessID, sess.ExpiresAt.Format(time.RFC3339))
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
@@ -3754,6 +3807,8 @@ func main() {
 		oidcClientID     string
 		oidcClientSecret string
 		oidcRedirectURL  string
+		oidcExclusive    bool
+		oidcDefaultRole  string
 	)
 	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
 	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 8443 for HTTPS, or $PORT env)")
@@ -3766,6 +3821,8 @@ func main() {
 	flag.StringVar(&oidcClientID,     "oidc-client-id",     os.Getenv("OIDC_CLIENT_ID"),     "OIDC client ID")
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", os.Getenv("OIDC_CLIENT_SECRET"), "OIDC client secret")
 	flag.StringVar(&oidcRedirectURL,  "oidc-redirect-url",  os.Getenv("OIDC_REDIRECT_URL"),  "OIDC redirect URL (e.g. https://your-server/auth/oidc/callback)")
+	flag.BoolVar(&oidcExclusive,      "oidc-exclusive",     os.Getenv("OIDC_EXCLUSIVE") == "true", "Disable local username/password login (SSO only; admin account excepted)")
+	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (readwrite|teamlead|oplead; default: readwrite)")
 	flag.Parse()
 
 	if debug {
@@ -3806,7 +3863,12 @@ func main() {
 		if err := app.configureOIDC(oidcIssuer, oidcClientID, oidcClientSecret, oidcRedirectURL); err != nil {
 			log.Printf("[WARN] OIDC configuration failed: %v — SSO will be unavailable", err)
 		} else {
-			log.Printf("OIDC SSO enabled: issuer=%s", oidcIssuer)
+			app.oidcExclusive = oidcExclusive
+			if oidcDefaultRole != "" {
+				app.oidcDefaultRole = Role(oidcDefaultRole)
+			}
+			log.Printf("OIDC SSO enabled: issuer=%s exclusive=%v defaultRole=%q",
+				oidcIssuer, oidcExclusive, app.oidcDefaultRole)
 		}
 	}
 

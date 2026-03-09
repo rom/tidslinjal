@@ -555,10 +555,11 @@ function updateCurrentTimeLine(days, slotH) {
 
   if (!p.red_line_enabled) { line.style.display='none'; return; }
 
-  const root = document.documentElement;
-  root.style.setProperty('--line-color', p.red_line_color || '#E74C3C');
-  root.style.setProperty('--line-width', (p.red_line_width || 2) + 'px');
-  root.style.setProperty('--line-style', p.red_line_style || 'solid');
+  // Set CSS variables directly on the element — overrides the CSS-rule defaults
+  // (setting them on :root is overridden by the element-level CSS rule specificity)
+  line.style.setProperty('--line-color', p.red_line_color || '#E74C3C');
+  line.style.setProperty('--line-width', (p.red_line_width || 2) + 'px');
+  line.style.setProperty('--line-style', p.red_line_style || 'solid');
 
   const now    = getNow();
   const today  = days.find(d => isSameDay(d, now));
