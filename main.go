@@ -64,18 +64,28 @@ type SSEMessage struct {
 }
 
 type SSEClient struct {
-	userID   int64
-	ch       chan AlarmNotification
+	userID    int64
+	ch        chan AlarmNotification
 	broadcast chan SSEMessage
 }
 
+// SSEBroker manages all connected SSE clients.
+//
+// Performance notes (v4.0):
+//   - byUser index gives O(1) targeted alarm delivery instead of O(n) scan.
+//   - mu is an RWMutex so Notify/Broadcast/BroadcastAll can run concurrently.
+//     Only Subscribe/Unsubscribe need an exclusive lock.
 type SSEBroker struct {
-	mu      sync.Mutex
-	clients map[*SSEClient]struct{}
+	mu      sync.RWMutex
+	clients map[*SSEClient]struct{}  // all clients (for broadcast)
+	byUser  map[int64][]*SSEClient   // index: userID → clients
 }
 
 func NewSSEBroker() *SSEBroker {
-	return &SSEBroker{clients: make(map[*SSEClient]struct{})}
+	return &SSEBroker{
+		clients: make(map[*SSEClient]struct{}),
+		byUser:  make(map[int64][]*SSEClient),
+	}
 }
 
 func (b *SSEBroker) Subscribe(userID int64) *SSEClient {
@@ -87,6 +97,7 @@ func (b *SSEBroker) Subscribe(userID int64) *SSEClient {
 		broadcast: make(chan SSEMessage, 16),
 	}
 	b.clients[c] = struct{}{}
+	b.byUser[userID] = append(b.byUser[userID], c)
 	return c
 }
 
@@ -94,25 +105,36 @@ func (b *SSEBroker) Unsubscribe(c *SSEClient) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.clients, c)
+	// Remove from byUser index
+	list := b.byUser[c.userID]
+	for i, ec := range list {
+		if ec == c {
+			b.byUser[c.userID] = append(list[:i], list[i+1:]...)
+			break
+		}
+	}
+	if len(b.byUser[c.userID]) == 0 {
+		delete(b.byUser, c.userID)
+	}
 }
 
+// Notify delivers an alarm to a specific user — O(1) via byUser index.
 func (b *SSEBroker) Notify(userID int64, n AlarmNotification) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	for c := range b.clients {
-		if c.userID == userID {
-			select {
-			case c.ch <- n:
-			default:
-			}
+	b.mu.RLock()
+	clients := b.byUser[userID]
+	b.mu.RUnlock()
+	for _, c := range clients {
+		select {
+		case c.ch <- n:
+		default:
 		}
 	}
 }
 
-// Broadcast sends an SSE message to all connected clients except the sender
+// Broadcast sends an SSE message to all connected clients except the sender.
 func (b *SSEBroker) Broadcast(senderID int64, msg SSEMessage) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	for c := range b.clients {
 		if c.userID != senderID {
 			select {
@@ -123,10 +145,10 @@ func (b *SSEBroker) Broadcast(senderID int64, msg SSEMessage) {
 	}
 }
 
-// BroadcastAll sends an SSE message to ALL connected clients including sender
+// BroadcastAll sends an SSE message to ALL connected clients including sender.
 func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 	for c := range b.clients {
 		select {
 		case c.broadcast <- msg:
@@ -135,12 +157,25 @@ func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
 	}
 }
 
+// ── Webhook worker pool ───────────────────────────────────────────────────────
+
+// webhookConcurrency limits simultaneous outbound HTTP webhook calls so a burst
+// of alarm firings or event changes cannot exhaust file descriptors or goroutines.
+const webhookConcurrency = 32
+
+type webhookJob struct {
+	url     string
+	wtype   string
+	body    []byte
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 type App struct {
-	store  *Store
-	broker *SSEBroker
-	oidc   *OIDCConfig // nil if OIDC not configured
+	store      *Store
+	broker     *SSEBroker
+	oidc       *OIDCConfig // nil if OIDC not configured
+	webhookCh  chan webhookJob
 }
 
 // broadcastEventChange sends an SSE notification to all clients about an event change
@@ -156,43 +191,31 @@ func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
 	go app.fireWebhooks(action, ev)
 }
 
-// fireWebhooks sends outbound webhook notifications for event state transitions
+// fireWebhooks enqueues outbound webhook notifications for event state transitions.
+// All HTTP calls go through the bounded worker pool — no goroutine spawning here.
 func (app *App) fireWebhooks(action string, ev *Event) {
-	// Get all users' preferences and fire webhooks for those who have them configured
 	prefs := app.store.GetAllPreferences()
 	for _, p := range prefs {
 		if p.WebhookURL == "" {
 			continue
 		}
 		payload := map[string]interface{}{
-			"type":       "event_" + action,
-			"event_id":   ev.ID,
+			"type":        "event_" + action,
+			"event_id":    ev.ID,
 			"event_title": ev.Title,
-			"status":     string(ev.Status),
-			"event_type": ev.EventType,
-			"start_time": ev.StartTime.Format(time.RFC3339),
-			"updated_by": ev.CreatedByName,
+			"status":      string(ev.Status),
+			"event_type":  ev.EventType,
+			"start_time":  ev.StartTime.Format(time.RFC3339),
+			"updated_by":  ev.CreatedByName,
 		}
 		var body []byte
 		if p.WebhookType == "mattermost" || p.WebhookType == "slack" {
 			text := fmt.Sprintf("[%s] **%s** — %s (%s)", action, ev.Title, ev.Status, ev.EventType)
-			slackPayload := map[string]string{"text": text}
-			body, _ = json.Marshal(slackPayload)
+			body, _ = json.Marshal(map[string]string{"text": text})
 		} else {
 			body, _ = json.Marshal(payload)
 		}
-		req, err := http.NewRequest("POST", p.WebhookURL, bytes.NewReader(body))
-		if err != nil {
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			logVerbose("webhook error for user %d: %v", p.UserID, err)
-			continue
-		}
-		resp.Body.Close()
+		app.enqueueWebhook(p.WebhookType, p.WebhookURL, body)
 	}
 }
 
@@ -204,7 +227,15 @@ func NewApp(dataDir string) (*App, error) {
 	if err := store.SeedEventTypes(); err != nil {
 		return nil, err
 	}
-	app := &App{store: store, broker: NewSSEBroker()}
+	app := &App{
+		store:     store,
+		broker:    NewSSEBroker(),
+		webhookCh: make(chan webhookJob, 256),
+	}
+	// Start bounded webhook worker pool — prevents goroutine explosion under load.
+	for i := 0; i < webhookConcurrency; i++ {
+		go app.runWebhookWorker()
+	}
 
 	if len(store.GetUsers()) == 0 {
 		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
@@ -219,6 +250,35 @@ func NewApp(dataDir string) (*App, error) {
 		log.Println("Created default admin (username: admin, password: admin)")
 	}
 	return app, nil
+}
+
+// runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
+func (app *App) runWebhookWorker() {
+	client := &http.Client{Timeout: 10 * time.Second}
+	for job := range app.webhookCh {
+		req, err := http.NewRequest("POST", job.url, bytes.NewReader(job.body))
+		if err != nil {
+			logVerbose("webhook: invalid URL %q: %v", job.url, err)
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			logVerbose("webhook: POST %q failed: %v", job.url, err)
+			continue
+		}
+		resp.Body.Close()
+	}
+}
+
+// enqueueWebhook submits a webhook call to the worker pool.
+// If the queue is full the call is silently dropped rather than blocking.
+func (app *App) enqueueWebhook(wtype, webhookURL string, body []byte) {
+	select {
+	case app.webhookCh <- webhookJob{url: webhookURL, wtype: wtype, body: body}:
+	default:
+		logVerbose("webhook queue full; dropping call to %q", webhookURL)
+	}
 }
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
@@ -303,9 +363,9 @@ func (app *App) audit(userID int64, userName, action, entityType string, entityI
 	})
 }
 
-// callWebhookURL fires an arbitrary webhook URL asynchronously
-func (app *App) callWebhookURL(url, webhookType, msg string, notif AlarmNotification) {
-	if url == "" {
+// callWebhookURL enqueues an alarm webhook call through the bounded worker pool.
+func (app *App) callWebhookURL(webhookURL, webhookType, msg string, notif AlarmNotification) {
+	if webhookURL == "" {
 		return
 	}
 	var payload []byte
@@ -320,17 +380,10 @@ func (app *App) callWebhookURL(url, webhookType, msg string, notif AlarmNotifica
 			"alarm_id":    notif.AlarmID,
 		})
 	}
-	go func() {
-		resp, err := http.Post(url, "application/json", bytes.NewReader(payload))
-		if err != nil {
-			log.Printf("webhook to %s failed: %v", url, err)
-			return
-		}
-		resp.Body.Close()
-	}()
+	app.enqueueWebhook(webhookType, webhookURL, payload)
 }
 
-// callWebhook fires a user's configured webhook (if any) asynchronously
+// callWebhook enqueues the user's configured webhook (if any).
 func (app *App) callWebhook(userID int64, msg string, notif AlarmNotification) {
 	prefs := app.store.GetPreferences(userID)
 	app.callWebhookURL(prefs.WebhookURL, prefs.WebhookType, msg, notif)
@@ -3724,13 +3777,25 @@ func main() {
 	}
 
 	handler := app.routes()
+
+	// Tuned HTTP server — explicit timeouts prevent resource leaks under high load.
+	// WriteTimeout is long (5 min) to allow SSE connections to stay open.
+	srv := &http.Server{
+		Addr:           addr,
+		Handler:        handler,
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   5 * time.Minute,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
+	}
+
 	if useTLS {
 		log.Printf("TLS enabled — cert=%s key=%s", tlsCert, tlsKey)
-		if err := http.ListenAndServeTLS(addr, tlsCert, tlsKey, handler); err != nil {
+		if err := srv.ListenAndServeTLS(tlsCert, tlsKey); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
 	} else {
-		if err := http.ListenAndServe(addr, handler); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
 	}

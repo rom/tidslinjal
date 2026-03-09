@@ -9,7 +9,12 @@ import (
 	"time"
 )
 
-// Store is a thread-safe in-memory store backed by JSON files
+// Store is a thread-safe in-memory store backed by JSON files.
+//
+// Performance notes (v4.0):
+//   - s.mu (RWMutex) protects only in-memory data; disk I/O happens outside it.
+//   - s.writeMu (Mutex) serialises file writes so snapshots are never interleaved.
+//   - userByID / sessionByID are O(1) lookup indexes maintained in parallel with slices.
 type Store struct {
 	mu      sync.RWMutex
 	dataDir string
@@ -47,6 +52,14 @@ type Store struct {
 	nextPhaseID      int64
 	nextTemplateID   int64
 	nextInvitationID int64
+
+	// O(1) lookup indexes — kept in sync with the underlying slices.
+	userByID    map[int64]User
+	sessionByID map[string]Session
+
+	// writeMu serialises JSON file writes so they never race each other.
+	// It is acquired AFTER s.mu has been released, keeping s.mu hold-time minimal.
+	writeMu sync.Mutex
 }
 
 func NewStore(dataDir string) (*Store, error) {
@@ -149,14 +162,44 @@ func (s *Store) load() error {
 			s.nextInvitationID = x.ID
 		}
 	}
+	// Build O(1) lookup indexes.
+	s.rebuildUserIdx()
+	s.rebuildSessionIdx()
 	return nil
+}
+
+// ── Index helpers ──────────────────────────────────────────────────────────────
+
+// rebuildUserIdx rebuilds the O(1) user lookup maps from the users slice.
+// Caller must hold s.mu (at least write lock, or be in single-threaded load).
+func (s *Store) rebuildUserIdx() {
+	s.userByID = make(map[int64]User, len(s.users))
+	for _, u := range s.users {
+		s.userByID[u.ID] = u
+	}
+}
+
+// rebuildSessionIdx rebuilds the O(1) session lookup map from the sessions slice.
+func (s *Store) rebuildSessionIdx() {
+	s.sessionByID = make(map[string]Session, len(s.sessions))
+	for _, sess := range s.sessions {
+		s.sessionByID[sess.ID] = sess
+	}
+}
+
+// persist serialises v to filename. It uses a dedicated write mutex so that
+// the main RWMutex need not be held during disk I/O.
+// Callers must release s.mu BEFORE calling persist.
+func (s *Store) persist(filename string, v interface{}) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return s.saveFile(filename, v)
 }
 
 // ── Audit log ──────────────────────────────────────────────────────────────────
 
 func (s *Store) LogAudit(entry AuditEntry) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextAuditID++
 	entry.ID = s.nextAuditID
 	entry.Timestamp = time.Now()
@@ -165,7 +208,9 @@ func (s *Store) LogAudit(entry AuditEntry) error {
 	if len(s.audit) > 10000 {
 		s.audit = s.audit[len(s.audit)-10000:]
 	}
-	return s.saveFile("audit.json", s.audit)
+	snap := append([]AuditEntry(nil), s.audit...)
+	s.mu.Unlock()
+	return s.persist("audit.json", snap)
 }
 
 func (s *Store) GetAudit(limit int) []AuditEntry {
@@ -194,9 +239,9 @@ func (s *Store) GetExerciseSettings() ExerciseSettings {
 
 func (s *Store) SaveExerciseSettings(es ExerciseSettings) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.exercise = es
-	return s.saveFile("exercise.json", es)
+	s.mu.Unlock()
+	return s.persist("exercise.json", es)
 }
 
 func (s *Store) loadFile(filename string, v interface{}) {
@@ -324,9 +369,9 @@ func (s *Store) GetRegistrationSettings() RegistrationSettings {
 
 func (s *Store) SaveRegistrationSettings(rs RegistrationSettings) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.registrationSettings = rs
-	return s.saveFile("registration.json", rs)
+	s.mu.Unlock()
+	return s.persist("registration.json", rs)
 }
 
 // ── Personal Invitations ───────────────────────────────────────────────────────
@@ -341,12 +386,13 @@ func (s *Store) GetInvitations() []PersonalInvitation {
 
 func (s *Store) CreateInvitation(inv PersonalInvitation) (PersonalInvitation, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextInvitationID++
 	inv.ID = s.nextInvitationID
 	inv.CreatedAt = time.Now()
 	s.invitations = append(s.invitations, inv)
-	return inv, s.saveFile("invitations.json", s.invitations)
+	snap := append([]PersonalInvitation(nil), s.invitations...)
+	s.mu.Unlock()
+	return inv, s.persist("invitations.json", snap)
 }
 
 func (s *Store) GetInvitationByCode(code string) (*PersonalInvitation, bool) {
@@ -363,44 +409,66 @@ func (s *Store) GetInvitationByCode(code string) (*PersonalInvitation, bool) {
 
 func (s *Store) MarkInvitationUsed(id int64, usedBy string) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	now := time.Now()
+	found := false
 	for i := range s.invitations {
 		if s.invitations[i].ID == id {
 			s.invitations[i].Used = true
 			s.invitations[i].UsedBy = usedBy
 			s.invitations[i].UsedAt = &now
-			return s.saveFile("invitations.json", s.invitations)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("invitation not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("invitation not found")
+	}
+	snap := append([]PersonalInvitation(nil), s.invitations...)
+	s.mu.Unlock()
+	return s.persist("invitations.json", snap)
 }
 
 func (s *Store) DeleteInvitation(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, inv := range s.invitations {
 		if inv.ID == id {
 			s.invitations = append(s.invitations[:i], s.invitations[i+1:]...)
-			return s.saveFile("invitations.json", s.invitations)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("invitation not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("invitation not found")
+	}
+	snap := append([]PersonalInvitation(nil), s.invitations...)
+	s.mu.Unlock()
+	return s.persist("invitations.json", snap)
 }
 
 // ── Password Reset ─────────────────────────────────────────────────────────────
 
 func (s *Store) SetPasswordResetToken(userID int64, token string, expiry time.Time) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.users {
 		if s.users[i].ID == userID {
 			s.users[i].PasswordResetToken = token
 			s.users[i].PasswordResetExpiry = &expiry
-			return s.saveFile("users.json", s.users)
+			s.userByID[userID] = s.users[i]
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("user not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("user not found")
+	}
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return s.persist("users.json", snap)
 }
 
 func (s *Store) GetUserByResetToken(token string) (*User, bool) {
@@ -420,14 +488,22 @@ func (s *Store) GetUserByResetToken(token string) (*User, bool) {
 // VetUser approves a pending (unvetted) user registration
 func (s *Store) VetUser(userID int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.users {
 		if s.users[i].ID == userID {
 			s.users[i].Vetted = true
-			return s.saveFile("users.json", s.users)
+			s.userByID[userID] = s.users[i]
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("user not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("user not found")
+	}
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return s.persist("users.json", snap)
 }
 
 // ── Event Types ───────────────────────────────────────────────────────────────
@@ -466,45 +542,55 @@ func (s *Store) GetEventTypeByID(id int64) (*EventTypeDef, bool) {
 
 func (s *Store) CreateEventType(et EventTypeDef) (EventTypeDef, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextEventTypeID++
 	et.ID = s.nextEventTypeID
 	et.CreatedAt = time.Now()
 	s.eventTypes = append(s.eventTypes, et)
-	return et, s.saveFile("event_types.json", s.eventTypes)
+	snap := append([]EventTypeDef(nil), s.eventTypes...)
+	s.mu.Unlock()
+	return et, s.persist("event_types.json", snap)
 }
 
 func (s *Store) UpdateEventType(et EventTypeDef) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.eventTypes {
 		if s.eventTypes[i].ID == et.ID {
 			s.eventTypes[i] = et
-			return s.saveFile("event_types.json", s.eventTypes)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("event type not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("event type not found")
+	}
+	snap := append([]EventTypeDef(nil), s.eventTypes...)
+	s.mu.Unlock()
+	return s.persist("event_types.json", snap)
 }
 
 func (s *Store) DeleteEventType(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, et := range s.eventTypes {
 		if et.ID == id {
 			if et.IsSystem {
+				s.mu.Unlock()
 				return fmt.Errorf("cannot delete system event type")
 			}
 			s.eventTypes = append(s.eventTypes[:i], s.eventTypes[i+1:]...)
-			return s.saveFile("event_types.json", s.eventTypes)
+			snap := append([]EventTypeDef(nil), s.eventTypes...)
+			s.mu.Unlock()
+			return s.persist("event_types.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return fmt.Errorf("event type not found")
 }
 
 // SeedEventTypes inserts the default system types if they don't exist yet
 func (s *Store) SeedEventTypes() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	changed := false
 	for _, def := range SystemEventTypes {
 		found := false
@@ -522,10 +608,13 @@ func (s *Store) SeedEventTypes() error {
 			changed = true
 		}
 	}
-	if changed {
-		return s.saveFile("event_types.json", s.eventTypes)
+	if !changed {
+		s.mu.Unlock()
+		return nil
 	}
-	return nil
+	snap := append([]EventTypeDef(nil), s.eventTypes...)
+	s.mu.Unlock()
+	return s.persist("event_types.json", snap)
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -538,18 +627,18 @@ func (s *Store) GetUsers() []User {
 	return result
 }
 
+// GetUserByID is O(1) via index map.
 func (s *Store) GetUserByID(id int64) (*User, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for i := range s.users {
-		if s.users[i].ID == id {
-			u := s.users[i]
-			return &u, true
-		}
+	u, ok := s.userByID[id]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, false
 	}
-	return nil, false
+	return &u, true
 }
 
+// GetUserByUsername is O(n) but username lookups are rare (login only).
 func (s *Store) GetUserByUsername(username string) (*User, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -564,36 +653,54 @@ func (s *Store) GetUserByUsername(username string) (*User, bool) {
 
 func (s *Store) CreateUser(u User) (User, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextUserID++
 	u.ID = s.nextUserID
 	u.CreatedAt = time.Now()
 	s.users = append(s.users, u)
-	return u, s.saveFile("users.json", s.users)
+	s.userByID[u.ID] = u
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return u, s.persist("users.json", snap)
 }
 
 func (s *Store) UpdateUser(u User) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.users {
 		if s.users[i].ID == u.ID {
 			s.users[i] = u
-			return s.saveFile("users.json", s.users)
+			s.userByID[u.ID] = u
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("user not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("user not found")
+	}
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return s.persist("users.json", snap)
 }
 
 func (s *Store) DeleteUser(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, u := range s.users {
 		if u.ID == id {
 			s.users = append(s.users[:i], s.users[i+1:]...)
-			return s.saveFile("users.json", s.users)
+			delete(s.userByID, id)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("user not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("user not found")
+	}
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return s.persist("users.json", snap)
 }
 
 // ── Preferences ───────────────────────────────────────────────────────────────
@@ -628,15 +735,20 @@ func (s *Store) GetAllPreferences() []UserPreferences {
 
 func (s *Store) SavePreferences(p UserPreferences) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.preferences {
 		if s.preferences[i].UserID == p.UserID {
 			s.preferences[i] = p
-			return s.saveFile("preferences.json", s.preferences)
+			found = true
+			break
 		}
 	}
-	s.preferences = append(s.preferences, p)
-	return s.saveFile("preferences.json", s.preferences)
+	if !found {
+		s.preferences = append(s.preferences, p)
+	}
+	snap := append([]UserPreferences(nil), s.preferences...)
+	s.mu.Unlock()
+	return s.persist("preferences.json", snap)
 }
 
 // ── Groups ────────────────────────────────────────────────────────────────────
@@ -663,33 +775,40 @@ func (s *Store) GetGroupByID(id int64) (*Group, bool) {
 
 func (s *Store) CreateGroup(g Group) (Group, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextGroupID++
 	g.ID = s.nextGroupID
 	g.CreatedAt = time.Now()
 	s.groups = append(s.groups, g)
-	return g, s.saveFile("groups.json", s.groups)
+	snap := append([]Group(nil), s.groups...)
+	s.mu.Unlock()
+	return g, s.persist("groups.json", snap)
 }
 
 func (s *Store) UpdateGroup(g Group) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.groups {
 		if s.groups[i].ID == g.ID {
 			s.groups[i] = g
-			return s.saveFile("groups.json", s.groups)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("group not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("group not found")
+	}
+	snap := append([]Group(nil), s.groups...)
+	s.mu.Unlock()
+	return s.persist("groups.json", snap)
 }
 
 func (s *Store) DeleteGroup(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, g := range s.groups {
 		if g.ID == id {
 			s.groups = append(s.groups[:i], s.groups[i+1:]...)
-			// Also remove memberships
 			var ms []GroupMembership
 			for _, m := range s.memberships {
 				if m.GroupID != id {
@@ -697,11 +816,19 @@ func (s *Store) DeleteGroup(id int64) error {
 				}
 			}
 			s.memberships = ms
-			s.saveFile("memberships.json", s.memberships) //nolint
-			return s.saveFile("groups.json", s.groups)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("group not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("group not found")
+	}
+	groupSnap := append([]Group(nil), s.groups...)
+	memberSnap := append([]GroupMembership(nil), s.memberships...)
+	s.mu.Unlock()
+	s.persist("memberships.json", memberSnap) //nolint
+	return s.persist("groups.json", groupSnap)
 }
 
 func (s *Store) GetGroupMembers(groupID int64) []GroupMembership {
@@ -730,25 +857,29 @@ func (s *Store) GetUserGroups(userID int64) []GroupMembership {
 
 func (s *Store) AddGroupMember(m GroupMembership) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for _, existing := range s.memberships {
 		if existing.GroupID == m.GroupID && existing.UserID == m.UserID {
+			s.mu.Unlock()
 			return nil // already member
 		}
 	}
 	s.memberships = append(s.memberships, m)
-	return s.saveFile("memberships.json", s.memberships)
+	snap := append([]GroupMembership(nil), s.memberships...)
+	s.mu.Unlock()
+	return s.persist("memberships.json", snap)
 }
 
 func (s *Store) RemoveGroupMember(groupID, userID int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, m := range s.memberships {
 		if m.GroupID == groupID && m.UserID == userID {
 			s.memberships = append(s.memberships[:i], s.memberships[i+1:]...)
-			return s.saveFile("memberships.json", s.memberships)
+			snap := append([]GroupMembership(nil), s.memberships...)
+			s.mu.Unlock()
+			return s.persist("memberships.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return nil
 }
 
@@ -805,7 +936,6 @@ func (s *Store) GetLayerByID(id int64) (*Layer, bool) {
 
 func (s *Store) CreateLayer(l Layer) (Layer, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextLayerID++
 	l.ID = s.nextLayerID
 	l.CreatedAt = time.Now()
@@ -813,31 +943,47 @@ func (s *Store) CreateLayer(l Layer) (Layer, error) {
 		l.GroupIDs = []int64{}
 	}
 	s.layers = append(s.layers, l)
-	return l, s.saveFile("layers.json", s.layers)
+	snap := append([]Layer(nil), s.layers...)
+	s.mu.Unlock()
+	return l, s.persist("layers.json", snap)
 }
 
 func (s *Store) UpdateLayer(l Layer) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.layers {
 		if s.layers[i].ID == l.ID {
 			s.layers[i] = l
-			return s.saveFile("layers.json", s.layers)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("layer not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("layer not found")
+	}
+	snap := append([]Layer(nil), s.layers...)
+	s.mu.Unlock()
+	return s.persist("layers.json", snap)
 }
 
 func (s *Store) DeleteLayer(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, l := range s.layers {
 		if l.ID == id {
 			s.layers = append(s.layers[:i], s.layers[i+1:]...)
-			return s.saveFile("layers.json", s.layers)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("layer not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("layer not found")
+	}
+	snap := append([]Layer(nil), s.layers...)
+	s.mu.Unlock()
+	return s.persist("layers.json", snap)
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -892,39 +1038,54 @@ func (s *Store) GetEventByID(id int64) (*Event, bool) {
 
 func (s *Store) CreateEvent(e Event) (Event, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextEventID++
 	e.ID = s.nextEventID
 	now := time.Now()
 	e.CreatedAt = now
 	e.UpdatedAt = now
 	s.events = append(s.events, e)
-	return e, s.saveFile("events.json", s.events)
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	return e, s.persist("events.json", snap)
 }
 
 func (s *Store) UpdateEvent(e Event) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.events {
 		if s.events[i].ID == e.ID {
 			e.UpdatedAt = time.Now()
 			s.events[i] = e
-			return s.saveFile("events.json", s.events)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("event not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("event not found")
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	return s.persist("events.json", snap)
 }
 
 func (s *Store) DeleteEvent(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, e := range s.events {
 		if e.ID == id {
 			s.events = append(s.events[:i], s.events[i+1:]...)
-			return s.saveFile("events.json", s.events)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("event not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("event not found")
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	return s.persist("events.json", snap)
 }
 
 // ── Attachments ───────────────────────────────────────────────────────────────
@@ -966,24 +1127,32 @@ func (s *Store) GetAttachmentByID(id int64) (*Attachment, bool) {
 
 func (s *Store) CreateAttachment(a Attachment) (Attachment, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextAttachID++
 	a.ID = s.nextAttachID
 	a.CreatedAt = time.Now()
 	s.attachments = append(s.attachments, a)
-	return a, s.saveFile("attachments.json", s.attachments)
+	snap := append([]Attachment(nil), s.attachments...)
+	s.mu.Unlock()
+	return a, s.persist("attachments.json", snap)
 }
 
 func (s *Store) DeleteAttachment(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, a := range s.attachments {
 		if a.ID == id {
 			s.attachments = append(s.attachments[:i], s.attachments[i+1:]...)
-			return s.saveFile("attachments.json", s.attachments)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("attachment not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("attachment not found")
+	}
+	snap := append([]Attachment(nil), s.attachments...)
+	s.mu.Unlock()
+	return s.persist("attachments.json", snap)
 }
 
 func (s *Store) AttachmentDir() string {
@@ -1018,25 +1187,28 @@ func (s *Store) GetActiveAlarms() []Alarm {
 
 func (s *Store) CreateAlarm(a Alarm) (Alarm, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextAlarmID++
 	a.ID = s.nextAlarmID
 	a.CreatedAt = time.Now()
 	a.IsActive = true
 	a.Fired = false
 	s.alarms = append(s.alarms, a)
-	return a, s.saveFile("alarms.json", s.alarms)
+	snap := append([]Alarm(nil), s.alarms...)
+	s.mu.Unlock()
+	return a, s.persist("alarms.json", snap)
 }
 
 func (s *Store) MarkAlarmFired(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i := range s.alarms {
 		if s.alarms[i].ID == id {
 			s.alarms[i].Fired = true
-			return s.saveFile("alarms.json", s.alarms)
+			snap := append([]Alarm(nil), s.alarms...)
+			s.mu.Unlock()
+			return s.persist("alarms.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return nil
 }
 
@@ -1053,28 +1225,42 @@ func (s *Store) GetAlarmByID(id int64) (Alarm, bool) {
 
 func (s *Store) AckAlarm(id, userID int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.alarms {
 		if s.alarms[i].ID == id && s.alarms[i].UserID == userID {
 			now := time.Now()
 			s.alarms[i].AcknowledgedAt = &now
 			s.alarms[i].IsActive = false
-			return s.saveFile("alarms.json", s.alarms)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("alarm not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("alarm not found")
+	}
+	snap := append([]Alarm(nil), s.alarms...)
+	s.mu.Unlock()
+	return s.persist("alarms.json", snap)
 }
 
 func (s *Store) DeleteAlarm(id, userID int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, a := range s.alarms {
 		if a.ID == id && a.UserID == userID {
 			s.alarms = append(s.alarms[:i], s.alarms[i+1:]...)
-			return s.saveFile("alarms.json", s.alarms)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("alarm not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("alarm not found")
+	}
+	snap := append([]Alarm(nil), s.alarms...)
+	s.mu.Unlock()
+	return s.persist("alarms.json", snap)
 }
 
 // ── Locks ─────────────────────────────────────────────────────────────────────
@@ -1089,78 +1275,92 @@ func (s *Store) GetLocks() []LockedSlot {
 
 func (s *Store) CreateLock(l LockedSlot) (LockedSlot, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextLockID++
 	l.ID = s.nextLockID
 	l.CreatedAt = time.Now()
 	s.locks = append(s.locks, l)
-	return l, s.saveFile("locks.json", s.locks)
+	snap := append([]LockedSlot(nil), s.locks...)
+	s.mu.Unlock()
+	return l, s.persist("locks.json", snap)
 }
 
 func (s *Store) DeleteLock(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, l := range s.locks {
 		if l.ID == id {
 			s.locks = append(s.locks[:i], s.locks[i+1:]...)
-			return s.saveFile("locks.json", s.locks)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("lock not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("lock not found")
+	}
+	snap := append([]LockedSlot(nil), s.locks...)
+	s.mu.Unlock()
+	return s.persist("locks.json", snap)
 }
 
 // DeleteLockAuthorized deletes a lock if the user is authorized (admin or creator).
 func (s *Store) DeleteLockAuthorized(id, userID int64, isAdmin bool) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, l := range s.locks {
 		if l.ID == id {
 			if !isAdmin && l.LockedBy != userID {
+				s.mu.Unlock()
 				return fmt.Errorf("not authorized to delete this lock")
 			}
 			s.locks = append(s.locks[:i], s.locks[i+1:]...)
-			return s.saveFile("locks.json", s.locks)
+			snap := append([]LockedSlot(nil), s.locks...)
+			s.mu.Unlock()
+			return s.persist("locks.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return fmt.Errorf("lock not found")
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
+// GetSession is O(1) via index map. Also validates expiry.
 func (s *Store) GetSession(id string) (*Session, bool) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for i := range s.sessions {
-		if s.sessions[i].ID == id && s.sessions[i].ExpiresAt.After(time.Now()) {
-			sess := s.sessions[i]
-			return &sess, true
-		}
+	sess, ok := s.sessionByID[id]
+	s.mu.RUnlock()
+	if !ok || !sess.ExpiresAt.After(time.Now()) {
+		return nil, false
 	}
-	return nil, false
+	return &sess, true
 }
 
 func (s *Store) CreateSession(sess Session) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.sessions = append(s.sessions, sess)
-	return s.saveFile("sessions.json", s.sessions)
+	s.sessionByID[sess.ID] = sess
+	snap := append([]Session(nil), s.sessions...)
+	s.mu.Unlock()
+	return s.persist("sessions.json", snap)
 }
 
 func (s *Store) DeleteSession(id string) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, sess := range s.sessions {
 		if sess.ID == id {
 			s.sessions = append(s.sessions[:i], s.sessions[i+1:]...)
-			return s.saveFile("sessions.json", s.sessions)
+			delete(s.sessionByID, id)
+			snap := append([]Session(nil), s.sessions...)
+			s.mu.Unlock()
+			return s.persist("sessions.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return nil
 }
 
 func (s *Store) CleanExpiredSessions() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	now := time.Now()
 	var active []Session
 	for _, sess := range s.sessions {
@@ -1168,9 +1368,15 @@ func (s *Store) CleanExpiredSessions() {
 			active = append(active, sess)
 		}
 	}
-	if len(active) != len(s.sessions) {
+	changed := len(active) != len(s.sessions)
+	if changed {
 		s.sessions = active
-		s.saveFile("sessions.json", s.sessions) //nolint
+		s.rebuildSessionIdx()
+	}
+	s.mu.Unlock()
+	if changed {
+		snap := append([]Session(nil), active...)
+		s.persist("sessions.json", snap) //nolint
 	}
 }
 
@@ -1190,42 +1396,53 @@ func (s *Store) GetCommentsByEvent(eventID int64) []EventComment {
 
 func (s *Store) CreateComment(c EventComment) (EventComment, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextCommentID++
 	c.ID = s.nextCommentID
 	c.CreatedAt = time.Now()
 	s.comments = append(s.comments, c)
-	return c, s.saveFile("comments.json", s.comments)
+	snap := append([]EventComment(nil), s.comments...)
+	s.mu.Unlock()
+	return c, s.persist("comments.json", snap)
 }
 
 func (s *Store) DeleteComment(id, userID int64, isAdmin bool) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, c := range s.comments {
 		if c.ID == id {
 			if !isAdmin && c.AuthorID != userID {
+				s.mu.Unlock()
 				return fmt.Errorf("forbidden")
 			}
 			s.comments = append(s.comments[:i], s.comments[i+1:]...)
-			return s.saveFile("comments.json", s.comments)
+			snap := append([]EventComment(nil), s.comments...)
+			s.mu.Unlock()
+			return s.persist("comments.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return fmt.Errorf("comment not found")
 }
 
 func (s *Store) ApproveComment(id, approverID int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.comments {
 		if s.comments[i].ID == id {
 			now := time.Now()
 			s.comments[i].PendingApproval = false
 			s.comments[i].ApprovedBy = approverID
 			s.comments[i].ApprovedAt = &now
-			return s.saveFile("comments.json", s.comments)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("comment not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("comment not found")
+	}
+	snap := append([]EventComment(nil), s.comments...)
+	s.mu.Unlock()
+	return s.persist("comments.json", snap)
 }
 
 // commentCounts returns map[eventID]count. Caller must not hold lock.
@@ -1263,36 +1480,51 @@ func (s *Store) GetPhaseByID(id int64) (*ExercisePhase, bool) {
 
 func (s *Store) CreatePhase(p ExercisePhase) (ExercisePhase, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextPhaseID++
 	p.ID = s.nextPhaseID
 	p.CreatedAt = time.Now()
 	s.phases = append(s.phases, p)
-	return p, s.saveFile("phases.json", s.phases)
+	snap := append([]ExercisePhase(nil), s.phases...)
+	s.mu.Unlock()
+	return p, s.persist("phases.json", snap)
 }
 
 func (s *Store) UpdatePhase(p ExercisePhase) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i := range s.phases {
 		if s.phases[i].ID == p.ID {
 			s.phases[i] = p
-			return s.saveFile("phases.json", s.phases)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("phase not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("phase not found")
+	}
+	snap := append([]ExercisePhase(nil), s.phases...)
+	s.mu.Unlock()
+	return s.persist("phases.json", snap)
 }
 
 func (s *Store) DeletePhase(id int64) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	found := false
 	for i, p := range s.phases {
 		if p.ID == id {
 			s.phases = append(s.phases[:i], s.phases[i+1:]...)
-			return s.saveFile("phases.json", s.phases)
+			found = true
+			break
 		}
 	}
-	return fmt.Errorf("phase not found")
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("phase not found")
+	}
+	snap := append([]ExercisePhase(nil), s.phases...)
+	s.mu.Unlock()
+	return s.persist("phases.json", snap)
 }
 
 // ── Full export ────────────────────────────────────────────────────────────
@@ -1546,27 +1778,31 @@ func (s *Store) GetTemplate(id int64) (Template, bool) {
 
 func (s *Store) CreateTemplate(tmpl Template) (Template, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.nextTemplateID++
 	tmpl.ID = s.nextTemplateID
 	tmpl.CreatedAt = time.Now()
 	tmpl.ItemCount = len(tmpl.Items)
 	s.templates = append(s.templates, tmpl)
-	return tmpl, s.saveFile("templates.json", s.templates)
+	snap := append([]Template(nil), s.templates...)
+	s.mu.Unlock()
+	return tmpl, s.persist("templates.json", snap)
 }
 
 func (s *Store) DeleteTemplate(id, userID int64, isAdmin bool) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for i, tmpl := range s.templates {
 		if tmpl.ID == id {
 			if tmpl.CreatedBy != userID && !isAdmin {
+				s.mu.Unlock()
 				return fmt.Errorf("not authorized")
 			}
 			s.templates = append(s.templates[:i], s.templates[i+1:]...)
-			return s.saveFile("templates.json", s.templates)
+			snap := append([]Template(nil), s.templates...)
+			s.mu.Unlock()
+			return s.persist("templates.json", snap)
 		}
 	}
+	s.mu.Unlock()
 	return fmt.Errorf("template not found")
 }
 
@@ -1582,9 +1818,10 @@ func (s *Store) GetRoleConfigs() []RoleConfig {
 
 func (s *Store) SaveRoleConfigs(configs []RoleConfig) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.roleConfigs = configs
-	return s.saveFile("roles.json", configs)
+	snap := append([]RoleConfig(nil), configs...)
+	s.mu.Unlock()
+	return s.persist("roles.json", snap)
 }
 
 // ── Overlap detection ──────────────────────────────────────────────────────────
@@ -1660,15 +1897,12 @@ func (s *Store) CheckOverlaps(start time.Time, end *time.Time, responsibleID *in
 				key := fmt.Sprintf("%d-%d", uid, ev.ID)
 				if !seen[key] {
 					seen[key] = true
-					// Find user name
+					// Find user name via O(1) index
 					userName := fmt.Sprintf("user#%d", uid)
-					for _, u := range s.users {
-						if u.ID == uid {
-							userName = u.DisplayName
-							if userName == "" {
-								userName = u.Username
-							}
-							break
+					if u, ok := s.userByID[uid]; ok {
+						userName = u.DisplayName
+						if userName == "" {
+							userName = u.Username
 						}
 					}
 					warnings = append(warnings, OverlapWarning{
