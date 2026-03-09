@@ -96,7 +96,8 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     const lb = (lang==='sv' && b.label_sv ? b.label_sv : lang==='fr' && b.label_fr ? b.label_fr : b.label).toLowerCase();
     return la < lb ? -1 : la > lb ? 1 : 0;
   });
-  const _typeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
+  const _typeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
+    instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
   typeSelect.innerHTML = sortedTypes.map(et => {
     const lbl = lang==='sv' && et.label_sv ? et.label_sv :
                 lang==='fr' && et.label_fr ? et.label_fr : et.label;
@@ -1326,7 +1327,8 @@ function renderSidebar() {
           }).map(et => {
             const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
             const hidden = isTypeHidden(et.key);
-            const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊' };
+            const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
+              instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
             const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
             return `<div class="legend-item${hidden?' hidden-type':''}" onclick="toggleType('${et.key}')">
               <div class="legend-swatch" style="background:${et.color}"></div>
@@ -1620,6 +1622,19 @@ function renderSidebar() {
           <div class="toggle-btn-group" style="margin-top:4px">
             <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" onclick="setClockFormat('local')">Local time</button>
             <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  onclick="setClockFormat('zulu')">ZULU / UTC</button>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">Additional timezone clocks:</span>
+          <div style="margin-top:4px">
+            ${(p.extra_clocks||[]).length === 0
+              ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">No extra clocks. Use the + button next to the clock to add one.</div>`
+              : (p.extra_clocks||[]).map(ec => `
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:var(--fs-xs)">
+                  <span style="flex:1;color:var(--text)">${escHtml(ec.label)} <span style="color:var(--text-dim)">(${escHtml(ec.timezone)})</span></span>
+                  <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" onclick="removeExtraClock(${ec.id})">× Remove</button>
+                </div>`).join('')
+            }
           </div>
         </div>
       </div>

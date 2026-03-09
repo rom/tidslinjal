@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 3.6.0**
+**Version 3.7.0**
 
 ---
 
@@ -201,16 +201,25 @@ Klicka på en tom cell i tidslinjegriden eller klicka **+ Lägg till händelse**
 
 ### Händelsetyper
 
-| Typ | Färg | Anteckningar |
-|---|---|---|
-| **Händelse** | Blå | Allmän förekomst |
-| **Ögonblick** | Orange | Enstaka tidpunkt — ingen sluttid. Renderas som en ◆ diamantmarkör. |
-| **Möte** | Grå | Schemalagt möte |
-| **Beslut** | Grön | Beslutspunkt |
-| **Tidsgräns** | Starkt röd | Hård deadline |
-| **Aktivitet** | Grön | Arbetsblock |
-| **Upprepande** | Lila | Återkommande aktivitet |
-| **Rapportering** | Blågrön | Rapport eller genomgång |
+Varje händelsetyp har ett färgat block och en ikon som visas till **vänster** om händelsetiteln.
+
+| Ikon | Typ | Färg | Anteckningar |
+|---|---|---|---|
+| — | **Händelse** | Blå | Allmän förekomst |
+| ⚡ | **Ögonblick** | Orange | Enstaka tidpunkt — ingen sluttid. Renderas som en ◆ diamantmarkör. |
+| 🤝 | **Möte** | Grå | Schemalagt möte |
+| 🏢 | **Fysiskt möte** | Bränt orange | Fysiskt möte på en specifik plats |
+| ⚖️ | **Beslut** | Grön | Beslutspunkt |
+| ⏰ | **Tidsgräns** | Röd | Hård deadline |
+| — | **Aktivitet** | Grön | Arbetsblock |
+| 🔄 | **Upprepande** | Lila | Mall för återkommande aktiviteter |
+| 📊 | **Rapportering** | Blågrön | Rapport eller genomgång |
+| 📌 | **Tilldelad uppgift** | Orange | Uppgift tilldelad en person eller ett team |
+| 🧍 | **Daglig standup** | Cyan | Kort dagligt statusmöte |
+
+Ikonen ↻ (till vänster om titeln) anger att händelsen är del av en **återkommande serie**. Anpassade typer kan ha en egen emoji-ikon inställd via **Inställningar → Händelsetyper → Redigera**.
+
+Slå på/av alla ikoner globalt i **Inställningar → Händelseikoner**.
 
 Anpassade typer kan läggas till av användare med Läs/Skriv+ från inställningspanelen.
 
@@ -353,12 +362,36 @@ Klicka **🗂 Lager** i verktygsfältet för att öppna snabbväxlingsrutan. Kli
 När ett larm utlöses visas en notifieringspanel överst på skärmen:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 🔔 Larm — "ENDEX genomgång" om 15 minuter (10:45)  [ACK] │
-└──────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ 🔔 Larm — "ENDEX genomgång" om 15 minuter (10:45)                    │
+│                    [Stäng] [📋 Visa händelse] [✓ ACK]               │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Klicka **ACK** för att kvittera. Okvitterade larm eskalerar — de blir orange, sedan pulserande röda var 60:e sekund.
+- **Stäng** — tar bort notifieringen utan kvittering.
+- **📋 Visa händelse** — öppnar händelsens detaljvy direkt från larmet.
+- **✓ ACK** — kvitterar larmet och stoppar eskalering.
+
+Okvitterade larm eskalerar — de blir orange, sedan pulserande röda var 60:e sekund.
+
+### Larmgranskningslogg
+
+Varje larmkvittering registreras i **Granskningsloggen** (tillgänglig för Gruppledare och högre). Varje post inkluderar:
+- Vem som kvitterade larmet (användarnamn och ID)
+- När kvitteringen skedde (tidsstämpel)
+- IP-adressen som systemet nåddes från vid tillfället
+
+### Klockor för flera tidszoner
+
+Rubriken visar den primära realtidsklockan. Du kan lägga till valfritt antal klockor för andra tidszoner.
+
+**Lägga till en klocka:**
+1. Klicka på **+**-knappen till vänster om huvudklockan i rubriken.
+2. Ange en kort etikett (t.ex. *Tallinn*, *Kyiv*, *Kabul*).
+3. Välj IANA-tidszon i rullgardinsmenyn.
+4. Klicka **Lägg till**. Klockan visas omedelbart till vänster om huvudklockan.
+
+**Ta bort en klocka:** Klicka **×** på klockwidgeten, eller gå till **Inställningar → Datum/tid-format → Ytterligare tidszoner → Ta bort**.
 
 ### Webhook-notifieringar
 

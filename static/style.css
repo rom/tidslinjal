@@ -252,6 +252,20 @@ select.ctrl-select:focus { border-color: var(--accent); }
   box-shadow: 0 0 0 2px var(--accent), 0 2px 8px var(--shadow);
 }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.clock-area { display: flex; align-items: center; gap: 8px; }
+.clock-add-btn { font-size: 18px; font-weight: 700; line-height: 1; padding: 2px 7px; opacity: .65; }
+.clock-add-btn:hover { opacity: 1; }
+.clock-extra {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 3px 6px; text-align: right;
+}
+.clock-extra-inner { text-align: right; }
+.clock-extra-label { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.1; }
+.clock-extra-time  { font-size: var(--fs-md); font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: .04em; line-height: 1.1; }
+.clock-extra-tz    { font-size: 10px; color: var(--accent); font-weight: 600; letter-spacing: .05em; }
+.clock-extra-remove { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 14px; padding: 0 2px; line-height: 1; opacity: .5; }
+.clock-extra-remove:hover { opacity: 1; color: var(--red); }
 .clock-display { text-align: right; }
 .clock-time {
   font-size: var(--fs-2xl); font-weight: 700; color: var(--text-bright);
@@ -644,6 +658,7 @@ body.light-mode .tl-cell.out-of-hours { background: repeating-linear-gradient(13
 }
 .icon-pick-btn:hover, .icon-pick-btn.selected { background: var(--accent); border-color: var(--accent); }
 .ev-type-icon { opacity: 1 !important; margin-left: 0; margin-right: 2px; font-size: 11px; }
+.ev-left-icon { opacity: 1 !important; margin-left: 0; margin-right: 2px; font-size: 10px; }
 
 /* ── Event status badges ──────────────────────────────────────────────────── */
 .status-badge {

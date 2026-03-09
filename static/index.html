@@ -102,11 +102,34 @@
 
     <div class="header-right">
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
-      <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
-        <div class="clock-time" id="clockTime">00:00:00</div>
-        <div style="display:flex;align-items:center;gap:4px">
-          <div class="clock-date" id="clockDate">—</div>
-          <span id="clockTZ" style="font-size:12px;font-weight:700;letter-spacing:.07em;color:var(--accent)"></span>
+      <div class="clock-area" id="clockArea">
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
+        <div id="extraClocksContainer" style="display:contents"></div>
+        <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
+          <div class="clock-time" id="clockTime">00:00:00</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div class="clock-date" id="clockDate">—</div>
+            <span id="clockTZ" style="font-size:12px;font-weight:700;letter-spacing:.07em;color:var(--accent)"></span>
+          </div>
+        </div>
+      </div>
+      <!-- Add Clock popover -->
+      <div id="addClockPopover" class="popover" style="display:none;position:fixed;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-width:240px;box-shadow:var(--shadow-lg)">
+        <div style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-bright)">Add timezone clock</div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Label</label>
+          <input type="text" id="newClockLabel" placeholder="e.g. Tallinn" maxlength="20"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Timezone</label>
+          <select id="newClockTZ"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" onclick="closeAddClockPopover()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="confirmAddClock()">Add</button>
         </div>
       </div>
       <div class="user-info">
@@ -1058,6 +1081,8 @@
       <div class="help-toc">
         <a class="help-toc-link" href="#h-nav">🧭 Navigation</a>
         <a class="help-toc-link" href="#h-events">📅 Events</a>
+        <a class="help-toc-link" href="#h-icons">🏷 Event icons</a>
+        <a class="help-toc-link" href="#h-clocks">🕐 Multi-zone clocks</a>
         <a class="help-toc-link" href="#h-layers">🗂 Layers</a>
         <a class="help-toc-link" href="#h-templates">📋 Templates</a>
         <a class="help-toc-link" href="#h-roles">👥 Roles</a>
@@ -1065,6 +1090,8 @@
         <a class="help-toc-link" href="#h-status">🔄 Status</a>
         <a class="help-toc-link" href="#h-recur">↻ Recurrence</a>
         <a class="help-toc-link" href="#h-exercise">🕐 Exercise time</a>
+        <a class="help-toc-link" href="#h-locks">🔒 Time locks</a>
+        <a class="help-toc-link" href="#h-reports">📊 Reports</a>
         <a class="help-toc-link" href="#h-webhooks">🔗 Webhooks</a>
         <a class="help-toc-link" href="#h-shortcuts">⌨ Shortcuts</a>
       </div>
@@ -1243,6 +1270,75 @@
               <tr><td><b>Drag time column</b></td><td>Zoom slot height (double-click = reset)</td></tr>
               <tr><td><b>Horizontal drag</b></td><td>Pan to adjacent dates</td></tr>
             </table>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-icons">
+          <div class="help-section-icon">🏷</div>
+          <div class="help-section-body">
+            <h3>Event Type Icons</h3>
+            <p>Events display a small icon to the <b>left</b> of the title to identify their type at a glance:</p>
+            <table class="help-table">
+              <tr><th>Icon</th><th>Type</th><th>Description</th></tr>
+              <tr><td>🤝</td><td>Meeting</td><td>General meeting or coordination</td></tr>
+              <tr><td>🏢</td><td>Physical Meeting</td><td>In-person meeting at a specific location</td></tr>
+              <tr><td>⚖️</td><td>Decision</td><td>Decision point requiring action</td></tr>
+              <tr><td>⏰</td><td>Deadline</td><td>Hard deadline / due date</td></tr>
+              <tr><td>🧍</td><td>Standup</td><td>Short daily standup meeting</td></tr>
+              <tr><td>📊</td><td>Reporting</td><td>Situation report or briefing</td></tr>
+              <tr><td>📌</td><td>Assigned Task</td><td>Task assigned to a person or team</td></tr>
+              <tr><td>⚡</td><td>Instant</td><td>Zero-duration point-in-time event</td></tr>
+              <tr><td>🔄</td><td>Repeated</td><td>Template for recurring events</td></tr>
+              <tr><td>↻</td><td><i>Recurring flag</i></td><td>This specific event is part of a recurring series</td></tr>
+            </table>
+            <p>Custom event types can have their own emoji icon assigned in <b>Settings → Event Types → Edit</b>.</p>
+            <p>The icon strip can be toggled on/off globally from <b>Settings → Event Icons</b>.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-clocks">
+          <div class="help-section-icon">🕐</div>
+          <div class="help-section-body">
+            <h3>Multi-Timezone Clocks</h3>
+            <p>The header displays the primary real-time clock. You can add additional clocks for other time zones — useful for distributed teams or international exercises.</p>
+            <h4>Adding a clock</h4>
+            <ol>
+              <li>Click the <b>+</b> button to the left of the main clock in the header.</li>
+              <li>Enter a short label (e.g. <em>Tallinn</em>, <em>Kyiv</em>, <em>Kabul</em>).</li>
+              <li>Select the IANA timezone from the dropdown (supports all world time zones).</li>
+              <li>Click <b>Add</b>. The clock appears immediately to the left of the main clock.</li>
+            </ol>
+            <h4>Removing a clock</h4>
+            <p>Click the <b>×</b> button on the extra clock widget, or go to <b>Settings → Date/Time Format → Additional timezone clocks</b> and click <b>Remove</b>.</p>
+            <p>Additional clocks are saved per user and persist across sessions.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-locks">
+          <div class="help-section-icon">🔒</div>
+          <div class="help-section-body">
+            <h3>Time Slot Locking</h3>
+            <p>Operations leads and admins can lock time ranges to prevent editing of events in that window.</p>
+            <ul>
+              <li>Click <b>🔒 Lock</b> in the toolbar to open the lock manager.</li>
+              <li>Set start/end time, an optional reason, and scope (all layers, master only, or a single layer).</li>
+              <li>Locked slots are shaded with a diagonal stripe. Events inside cannot be moved, edited, or deleted.</li>
+              <li>Locks are fully undoable via the <b>Undo</b> button.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-reports">
+          <div class="help-section-icon">📊</div>
+          <div class="help-section-body">
+            <h3>Reports</h3>
+            <p>Click the <b>📄 Report</b> button in the toolbar to generate an HTML report of the current events.</p>
+            <ul>
+              <li><b>AAR</b> — After Action Report, grouped by event status.</li>
+              <li><b>Per Layer</b> — Events broken out by layer.</li>
+              <li><b>Timeline Snapshot</b> — Full chronological list.</li>
+            </ul>
+            <p>Filter by date range and visible layers. Times are formatted according to your language/locale setting. The report opens in a new browser tab for printing or saving.</p>
           </div>
         </div>
 
