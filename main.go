@@ -880,7 +880,13 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "username and password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.Password) < 6 {
+	// Apply password quality policy if enabled; otherwise enforce bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.Password, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.Password) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
@@ -1482,7 +1488,13 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token and new_password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.NewPassword) < 6 {
+	// Apply password quality policy if enabled; otherwise enforce a bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.NewPassword, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.NewPassword) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
