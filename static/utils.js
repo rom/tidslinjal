@@ -567,6 +567,8 @@ function detachHelp() {
 <head>
 <meta charset="UTF-8">
 <title>Tidslinjal — ${escHtml(t('help_title'))}</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="stylesheet" href="/static/style.css">
 <style>
   body { margin:0; padding:0; overflow:hidden; }
