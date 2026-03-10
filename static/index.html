@@ -309,7 +309,7 @@
         <button class="btn btn-primary btn-sm" id="btnSaveTemplate">💾 Save current events as template…</button>
         <button class="btn btn-secondary btn-sm" id="btnImportTemplate">📂 Load from file…</button>
         <button class="btn btn-secondary btn-sm" id="btnExportTemplates">⬇ Save to file…</button>
-        <input type="file" id="templateFileInput" accept=".json" style="display:none" onchange="handleTemplateFileLoad(this)">
+        <input type="file" id="templateFileInput" accept=".json" style="display:none">
       </div>
       <div id="templatesList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
@@ -522,7 +522,7 @@
         <div class="form-row">
           <div class="form-group">
             <label id="lbl-ev-contact-type">Contact type</label>
-            <select id="eventContactType" onchange="onContactTypeChange()">
+            <select id="eventContactType">
               <option value="">— None —</option>
               <option value="url">URL</option>
               <option value="ip">IP address</option>
@@ -536,7 +536,7 @@
         </div>
         <div class="form-group" id="virtualMeetingTypeGroup" style="display:none">
           <label id="lbl-ev-virtual-type">Virtual meeting platform</label>
-          <select id="eventVirtualMeetingType" onchange="onVirtualMeetingTypeChange()">
+          <select id="eventVirtualMeetingType">
             <option value="">— Not specified —</option>
             <option value="mattermost">Mattermost</option>
             <option value="teams">Microsoft Teams</option>
@@ -652,7 +652,7 @@
       </div>
       <!-- Map button for physical meetings -->
       <div id="physicalMapGroup" style="display:none;margin-top:8px">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openMapForEvent()">🗺️ Set Map Location</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btnOpenMapForEvent">🗺️ Set Map Location</button>
         <span id="physicalMapCoords" style="font-size:var(--fs-xs);color:var(--text-dim);margin-left:8px"></span>
         <input type="hidden" id="eventLatitude">
         <input type="hidden" id="eventLongitude">
@@ -677,8 +677,8 @@
     </div>
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-danger btn-sm" id="btnDeleteEvent" style="display:none">Delete</button>
-      <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none" onclick="openEventHistory()">🕐 History</button>
-      <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none" onclick="openDependenciesModal()">🔗 Dependencies</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none">🕐 History</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none">🔗 Dependencies</button>
       <span style="flex:1"></span>
       <button class="btn btn-secondary" data-close-modal="eventModal" id="lbl-btn-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEvent">Save</button>
@@ -775,7 +775,7 @@
       </div>
       <div class="form-group">
         <label id="lbl-lock-scope">Applies to</label>
-        <select id="lockScope" onchange="onLockScopeChange()">
+        <select id="lockScope">
           <option value="all">All layers and master timeline</option>
           <option value="master">Master timeline only</option>
           <option value="layer">Specific layer</option>
@@ -889,8 +889,8 @@
             <span id="profilePhotoPlaceholder" style="font-size:32px;color:var(--text-dim)">👤</span>
           </div>
           <label for="profilePhotoInput" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:var(--fs-xs)">📷 Photo</label>
-          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="loadProfilePhoto(this)">
-          <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)" onclick="removeProfilePhoto()">✕ Remove</button>
+          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none">
+          <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)">✕ Remove</button>
           <!-- Default avatar picker -->
           <div style="margin-top:8px">
             <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px" data-i18n="profile_default_avatars">Or choose a default:</div>
@@ -924,7 +924,7 @@
             </div>
             <div class="form-group">
               <label data-i18n="profile_language">Preferred Language</label>
-              <select id="profileLanguage" onchange="onProfileLanguageChange(this.value)">
+              <select id="profileLanguage">
                 <option value="en">English</option>
                 <option value="sv">Svenska</option>
                 <option value="fr">Français</option>
@@ -1004,9 +1004,9 @@
           <div class="form-group">
             <label data-i18n="new_password">New Password</label>
             <div style="position:relative;display:flex;gap:6px;align-items:center">
-              <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1" oninput="updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel')">
-              <button type="button" class="btn btn-ghost btn-icon" onclick="generateProfilePassword()" title="Auto-generate a strong password">🎲</button>
-              <button type="button" id="profilePwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyProfilePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+              <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1">
+              <button type="button" class="btn btn-ghost btn-icon" id="btnGenerateProfilePwd" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="btnCopyProfilePwd" class="btn btn-ghost btn-icon" title="Copy new password to clipboard" style="display:none">📋</button>
             </div>
           </div>
           <div class="form-group">
@@ -1033,12 +1033,12 @@
         <div id="profileWebCalURL" style="display:none;margin-bottom:8px">
           <input type="text" id="profileWebCalLink" readonly style="width:100%;font-size:var(--fs-xs);opacity:0.8">
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="generateWebCalToken()">🔗 Generate Calendar Link</button>
+        <button class="btn btn-secondary btn-sm" id="btnGenWebCalToken">🔗 Generate Calendar Link</button>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="profileModal" data-i18n="btn_cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="saveProfile()" data-i18n="profile_save">Save Profile</button>
+      <button class="btn btn-primary" id="btnSaveProfile" data-i18n="profile_save">Save Profile</button>
     </div>
   </div>
 </div>
@@ -1071,10 +1071,10 @@
           <div class="form-group">
             <label id="lbl-pwd-new">New password</label>
             <div style="position:relative;display:flex;gap:6px;align-items:center">
-              <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')" style="flex:1;padding-right:32px">
-              <button type="button" id="pwdNewEye" onclick="togglePwdVisibility('pwdNew','pwdNewEye')" style="position:absolute;right:60px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
-              <button type="button" class="btn btn-ghost btn-icon" onclick="generateStandalonePassword()" title="Auto-generate a strong password">🎲</button>
-              <button type="button" id="pwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyStandalonePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+              <input type="password" id="pwdNew" autocomplete="new-password" style="flex:1;padding-right:32px">
+              <button type="button" id="pwdNewEye" style="position:absolute;right:60px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+              <button type="button" class="btn btn-ghost btn-icon" id="btnGenStandalonePwd" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="btnCopyStandalonePwd" class="btn btn-ghost btn-icon" title="Copy new password to clipboard" style="display:none">📋</button>
             </div>
           </div>
           <div id="pwdStrengthWrap" style="margin-bottom:10px">
@@ -1087,7 +1087,7 @@
             <label id="lbl-pwd-confirm">Confirm new password</label>
             <div style="position:relative">
               <input type="password" id="pwdConfirm" autocomplete="new-password" style="padding-right:32px">
-              <button type="button" id="pwdConfirmEye" onclick="togglePwdVisibility('pwdConfirm','pwdConfirmEye')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+              <button type="button" id="pwdConfirmEye" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
             </div>
           </div>
         </div>
@@ -1201,7 +1201,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="reportModal" id="lbl-report-cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="generateReport()" id="lbl-report-generate">Generate</button>
+      <button class="btn btn-primary" id="lbl-report-generate">Generate</button>
     </div>
   </div>
 </div>
@@ -1271,7 +1271,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="autoReportModal">Cancel</button>
-      <button class="btn btn-primary" onclick="addAutoReport()">➕ Add Schedule</button>
+      <button class="btn btn-primary" id="btnAddAutoReport">➕ Add Schedule</button>
     </div>
   </div>
 </div>
@@ -1312,13 +1312,13 @@
       </div>
       <div class="form-group" style="margin-top:12px">
         <label>Add dependency — search events</label>
-        <input type="text" id="depSearch" placeholder="Search by event title…" oninput="filterDepSearch()" style="width:100%">
+        <input type="text" id="depSearch" placeholder="Search by event title…" style="width:100%">
         <div id="depSearchResults" class="group-picker" style="margin-top:4px;max-height:150px;overflow-y:auto"></div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="dependenciesModal">Cancel</button>
-      <button class="btn btn-primary" onclick="saveDependencies()">Save Dependencies</button>
+      <button class="btn btn-primary" id="btnSaveDeps">Save Dependencies</button>
     </div>
   </div>
 </div>
@@ -1352,7 +1352,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="mapModal">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMapLocation()">Use this location</button>
+      <button class="btn btn-primary" id="btnSaveMapLocation">Use this location</button>
     </div>
   </div>
 </div>
@@ -1369,7 +1369,7 @@
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:10px">
         Download a complete backup of all timeline data as a ZIP archive.
       </p>
-      <button class="btn btn-primary" onclick="downloadBackup()">⬇️ Download Backup</button>
+      <button class="btn btn-primary" id="btnDownloadBackup">⬇️ Download Backup</button>
 
       <hr style="border-color:var(--border);margin:16px 0">
       <h3 style="font-size:var(--fs-base);margin-bottom:8px">Restore</h3>
@@ -1385,7 +1385,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="backupModal">Close</button>
-      <button class="btn btn-danger" onclick="uploadRestore()">⬆️ Restore from Backup</button>
+      <button class="btn btn-danger" id="btnUploadRestore">⬆️ Restore from Backup</button>
     </div>
   </div>
 </div>
@@ -1426,8 +1426,8 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px">
-        <button class="btn btn-primary btn-sm" onclick="saveGradualBackupSettings()">💾 Save Settings</button>
-        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow" onclick="createGradualSnapshotNow()">📸 Snapshot Now</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveGradualSettings">💾 Save Settings</button>
+        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow">📸 Snapshot Now</button>
       </div>
       <h3 style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-dim)">Saved Snapshots</h3>
       <div id="gbSnapshotsList" style="max-height:320px;overflow-y:auto"></div>
@@ -1452,7 +1452,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="pvaModal">Close</button>
-      <button class="btn btn-primary" onclick="exportPVAReport()">📄 Export Report</button>
+      <button class="btn btn-primary" id="btnExportPVA">📄 Export Report</button>
     </div>
   </div>
 </div>
@@ -1631,14 +1631,14 @@
         <span class="help-modal-subtitle">Quick Reference Guide</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary btn-sm" onclick="detachHelp()" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
+        <button class="btn btn-secondary btn-sm" id="btnDetachHelp" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
         <button class="modal-close" data-close-modal="helpModal">&times;</button>
       </div>
     </div>
     <div style="padding:8px 20px 0;border-bottom:1px solid var(--border)">
       <input type="search" id="helpSearchInput" placeholder="Search help… (e.g. alarms, templates, backup)"
         style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)"
-        oninput="filterHelp(this.value)" autocomplete="off">
+        autocomplete="off">
       <div id="helpSearchStatus" style="font-size:var(--fs-xs);color:var(--text-dim);padding:4px 2px;min-height:18px"></div>
     </div>
     <div class="modal-body help-body">
@@ -2224,15 +2224,15 @@
           <label class="group-chip" id="exportUsersCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="users" style="margin-right:4px"> Users</label>
           <label class="group-chip" id="exportPhasesCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="phases" checked style="margin-right:4px"> Phases</label>
         </div>
-        <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="doExport('json')">⬇ Download JSON</button>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExportJSON">⬇ Download JSON</button>
       </div>
       <hr style="border-color:var(--border);margin:14px 0">
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('ics')">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" id="btnExportICS">
           <div style="font-weight:600">📅 ICS / iCalendar</div>
           <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Google Calendar, Outlook, Apple Calendar</div>
         </button>
-        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('csv')">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" id="btnExportCSV">
           <div style="font-weight:600">📊 CSV</div>
           <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Excel, LibreOffice Calc</div>
         </button>
@@ -2274,7 +2274,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btnImportCancel" data-close-modal="importModal">Cancel</button>
-      <button class="btn btn-primary" id="btnDoImport" onclick="doImport()">⬆ Import</button>
+      <button class="btn btn-primary" id="btnDoImport">⬆ Import</button>
     </div>
   </div>
 </div>
@@ -2291,10 +2291,10 @@
       <div id="roleEditorTable"></div>
     </div>
     <div class="modal-footer" style="justify-content:space-between">
-      <button class="btn btn-secondary" onclick="addNewRoleRow()">＋ Add Custom Role</button>
+      <button class="btn btn-secondary" id="btnAddNewRole">＋ Add Custom Role</button>
       <div style="display:flex;gap:8px">
         <button class="btn btn-secondary" data-close-modal="roleEditorModal">Cancel</button>
-        <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
+        <button class="btn btn-primary" id="btnSaveRoles">Save Roles</button>
       </div>
     </div>
   </div>
@@ -2316,7 +2316,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="moveEventModal">Cancel</button>
-      <button class="btn btn-primary" id="btnConfirmMove" onclick="confirmMoveEvents()">Move</button>
+      <button class="btn btn-primary" id="btnConfirmMove">Move</button>
     </div>
   </div>
 </div>
@@ -2343,7 +2343,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="bulkStatusModal">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmBulkStatus()">Apply Status</button>
+      <button class="btn btn-primary" id="btnConfirmBulkStatus">Apply Status</button>
     </div>
   </div>
 </div>
@@ -2362,7 +2362,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;align-items:flex-end">
         <div class="form-group" style="margin:0;min-width:140px">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">Filter by</label>
-          <select id="baFilter" onchange="updateBulkActionUI()" style="width:100%">
+          <select id="baFilter" style="width:100%">
             <option value="all">All events</option>
             <option value="type">Event Type</option>
             <option value="user">User (name or ID)</option>
@@ -2375,7 +2375,7 @@
         <div class="form-group" style="margin:0;flex:1;min-width:150px" id="baValueGroup">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">Value</label>
           <div style="position:relative">
-            <input type="text" id="baValue" placeholder="Value…" autocomplete="off" oninput="updateBulkUserAutocomplete()" style="width:100%">
+            <input type="text" id="baValue" placeholder="Value…" autocomplete="off" style="width:100%">
             <div id="baMentionDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:200;max-height:180px;overflow-y:auto"></div>
           </div>
         </div>
@@ -2398,9 +2398,9 @@
       <!-- Action tabs -->
       <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg3)">
-          <button class="ba-tab-btn active" data-tab="status" onclick="switchBulkTab('status',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Set Status</button>
-          <button class="ba-tab-btn" data-tab="type" onclick="switchBulkTab('type',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Change Type</button>
-          <button class="ba-tab-btn" data-tab="delete" onclick="switchBulkTab('delete',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--danger);font-size:var(--fs-sm)">Delete</button>
+          <button class="ba-tab-btn active" data-tab="status" data-bulk-tab="status" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Set Status</button>
+          <button class="ba-tab-btn" data-tab="type" data-bulk-tab="type" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Change Type</button>
+          <button class="ba-tab-btn" data-tab="delete" data-bulk-tab="delete" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--danger);font-size:var(--fs-sm)">Delete</button>
         </div>
 
         <!-- Status pane -->
@@ -2418,7 +2418,7 @@
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkStatus()">Apply Status</button>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExecBulkStatus">Apply Status</button>
         </div>
 
         <!-- Type pane -->
@@ -2429,14 +2429,14 @@
               <!-- populated dynamically -->
             </select>
           </div>
-          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkType()">Apply Type</button>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExecBulkType">Apply Type</button>
         </div>
 
         <!-- Delete pane -->
         <div id="baPane_delete" class="ba-pane" style="padding:12px;display:none">
           <p style="font-size:var(--fs-sm);color:var(--danger);margin-bottom:10px">⚠ This will permanently delete all matching events. Type <strong>DELETE</strong> to confirm.</p>
           <input type="text" id="baDeleteConfirm" placeholder="Type DELETE to confirm" style="width:100%;margin-bottom:10px">
-          <button class="btn btn-danger btn-sm" onclick="executeBulkDelete()">🗑 Delete Matching Events</button>
+          <button class="btn btn-danger btn-sm" id="btnExecBulkDelete">🗑 Delete Matching Events</button>
         </div>
       </div>
 
@@ -2452,10 +2452,10 @@
 <!-- Multi-select info bar -->
 <div id="multiselectBar" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:20px;z-index:500;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:var(--fs-sm)">
   <span id="multiselectCount"></span>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openMoveSelectedDialog()">📅 Move</button>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openBulkStatusDialog()">🔄 Status</button>
-  <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none" onclick="bulkDeleteSelected()">🗑 Delete</button>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="clearSelection()">✕ Clear</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnMoveSelected">📅 Move</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnBulkStatusSelected">🔄 Status</button>
+  <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none" id="btnBulkDeleteSelected">🗑 Delete</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnClearSelection">✕ Clear</button>
 </div>
 
 <script src="/static/i18n.js"></script>
