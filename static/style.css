@@ -1056,6 +1056,7 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .nav-jump-item:hover { background: var(--bg3); color: var(--accent); }
 
 /* ── Prettier help modal ─────────────────────────────────────────────────── */
+.help-modal { max-width: 1100px; width: 96vw; }
 .help-modal .modal-header { padding: 0; border-bottom: none; }
 .help-modal-header {
   background: linear-gradient(135deg, var(--bg3) 0%, var(--bg2) 100%);
@@ -1068,9 +1069,12 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .help-modal-logo span { color: var(--accent); }
 .help-modal-subtitle { font-size: var(--fs-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
 
+/* Help modal body: taller and two-column for wider screens */
+.help-body { max-height: 78vh; }
+
 /* Left-pane navigation for help modal (overrides the basic block above) */
 .help-toc {
-  width: 160px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;
+  width: 180px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px;
   padding: 12px 10px; border-right: 1px solid var(--border); overflow-y: auto;
   border-bottom: none; flex-wrap: nowrap; margin-bottom: 0;
 }
@@ -1082,16 +1086,33 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .help-toc-link:hover { color: var(--text); background: var(--bg3); border-color: var(--border); }
 .help-toc-link.active { color: var(--accent); background: rgba(74,144,217,.12); border-color: var(--accent); font-weight: 600; }
 
+/* Right-pane content: two-column layout on wide screens */
+.help-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+@media (min-width: 860px) {
+  .help-content {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+  }
+  .help-section.help-full-width { grid-column: 1 / -1; }
+}
+
 .help-section {
-  display: flex; gap: 14px; margin-bottom: 20px;
+  display: flex; gap: 14px; margin-bottom: 16px;
   padding: 14px 16px; background: var(--bg3); border-radius: var(--radius);
   border-left: 3px solid var(--accent);
   scroll-margin-top: 8px;
+  break-inside: avoid;
 }
 .help-section-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
 .help-section-body { flex: 1; min-width: 0; }
 .help-section-body h3 { font-size: var(--fs-base); color: var(--text-bright); margin-bottom: 8px; }
+.help-section-body h4 { font-size: var(--fs-sm); color: var(--text-dim); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
 .help-section-body p { font-size: var(--fs-sm); color: var(--text); line-height: 1.5; margin-bottom: 6px; }
+.help-section-body ol { font-size: var(--fs-sm); color: var(--text); line-height: 1.6; padding-left: 18px; margin: 4px 0 6px; }
 .help-list { font-size: var(--fs-sm); color: var(--text); line-height: 1.5; padding-left: 18px; }
 .help-list li { margin-bottom: 3px; }
 .help-badge { font-size: var(--fs-xs); background: var(--bg2); border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; }
@@ -1102,7 +1123,8 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .help-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); margin-top: 4px; }
 .help-table th { font-size: var(--fs-xs); text-transform: uppercase; color: var(--text-dim); padding: 4px 8px; text-align: left; background: var(--bg2); }
 .help-table td { padding: 5px 8px; border-bottom: 1px solid rgba(42,63,86,.4); vertical-align: top; }
-.help-table td:first-child { white-space: nowrap; color: var(--accent); min-width: 120px; }
+.help-table td:first-child { white-space: nowrap; color: var(--accent); min-width: 100px; }
+.help-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
 
 /* ── Templates modal ─────────────────────────────────────────────────────── */
 .tmpl-card {

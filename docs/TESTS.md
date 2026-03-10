@@ -2,7 +2,7 @@
 
 ## Overview
 
-The test suite is written in Go's standard `testing` package and covers both the storage layer (`store_test.go`) and the HTTP API layer (`api_test.go`). There are **77 tests** in total.
+The test suite is written in Go's standard `testing` package and covers the storage layer (`store_test.go`), the HTTP API layer (`api_test.go`), ICS/iCalendar export (`ics_test.go`), and JavaScript utility functions (`tests/js/test_utils.js`). There are **114 Go tests** and **123 JavaScript unit tests** in total.
 
 Run the full suite:
 
@@ -33,7 +33,15 @@ go test -run TestAPI_Login_Success ./...
 | File | Description |
 |---|---|
 | `store_test.go` | Unit tests for the `Store` data layer — CRUD, concurrency, role logic |
-| `api_test.go` | Integration tests for all HTTP API endpoints |
+| `api_test.go` | Integration tests for all HTTP API endpoints including integrations |
+| `ics_test.go` | Unit tests for ICS/iCalendar export formatting |
+| `tests/js/test_utils.js` | Node.js unit tests for pure JS utility functions (no DOM required) |
+
+Run JS unit tests:
+
+```bash
+node tests/js/test_utils.js
+```
 
 ---
 
@@ -292,6 +300,78 @@ The `api_test.go` file uses a shared `newTestApp` helper that creates an in-memo
 | `TestAPI_Locks_ReadRequiresAuth` | `GET /api/locks` requires authentication |
 | `TestAPI_CreateLock_RequiresCanLock` | Creating a lock requires the `can_lock` flag or admin role |
 
+### Integration Status
+
+| Test | Description |
+|---|---|
+| `TestAPI_Status_AdminOnly` | `GET /api/status` returns all integration keys (sso, tls, syslog, smtp, mattermost, api_keys) for admin |
+| `TestAPI_Status_RequiresAdmin` | Non-admin users receive 403 |
+| `TestAPI_Status_Unauthenticated` | Unauthenticated request returns 401 |
+| `TestAPI_IntegrationStatus_ReflectsMailConfig` | Status smtp.enabled reflects live mail config changes |
+| `TestAPI_IntegrationStatus_ReflectsAPIKeyCount` | Status api_keys.count increments when a key is created |
+
+### OIDC / SSO Settings
+
+| Test | Description |
+|---|---|
+| `TestAPI_OIDCSettings_GetDefault` | `GET /api/admin/oidc` returns default settings with `enabled` field |
+| `TestAPI_OIDCSettings_RequiresAdmin` | Non-admin users receive 403 |
+| `TestAPI_OIDCSettings_SaveAndRetrieve` | PUT persists issuer and client_id; client_secret is redacted on retrieval |
+
+### Mail / SMTP
+
+| Test | Description |
+|---|---|
+| `TestAPI_MailConfig_GetDefault` | `GET /api/integrations/mail` returns config with `enabled` field |
+| `TestAPI_MailConfig_SaveAndRetrieve` | PUT persists host, port, tls_mode; password is redacted |
+| `TestAPI_MailConfig_RequiresAdmin` | Non-admin users receive 403 |
+
+### Syslog
+
+| Test | Description |
+|---|---|
+| `TestAPI_SyslogConfig_GetDefault` | `GET /api/integrations/syslog` returns config with `enabled` field |
+| `TestAPI_SyslogConfig_SaveAndRetrieve` | PUT persists host and transport |
+| `TestAPI_SyslogConfig_RequiresAdmin` | Non-admin users receive 403 |
+
+### TLS Config
+
+| Test | Description |
+|---|---|
+| `TestAPI_TLSConfig_GetDefault` | `GET /api/integrations/tls` returns config; cert_file is empty on fresh store |
+| `TestAPI_TLSConfig_SaveAndRetrieve` | PUT with accessible cert/key paths persists the paths |
+| `TestAPI_TLSConfig_RequiresAdmin` | Non-admin users receive 403 |
+
+### API Keys
+
+| Test | Description |
+|---|---|
+| `TestAPI_APIKeys_ListEmpty` | Fresh app returns an empty API key list |
+| `TestAPI_APIKeys_CreateAndList` | POST creates a key; plain key appears only on creation, not in list |
+| `TestAPI_APIKeys_Delete` | DELETE removes the key; subsequent list is empty |
+| `TestAPI_APIKeys_RequiresAdmin` | Non-admin users receive 403 |
+
+---
+
+## JavaScript Unit Tests (`tests/js/test_utils.js`)
+
+Pure utility function tests that run under Node.js with no DOM or browser required.
+
+| Section | Tests | Functions covered |
+|---|---|---|
+| `escHtml` | 8 | HTML entity escaping, falsy inputs, special chars |
+| `fmtDuration` | 9 | Duration string formatting, zero/negative/multi-hour |
+| `fmtFileSize` | 8 | Bytes/KB/MB formatting, boundary values |
+| `hasRole2` | 12 | Role hierarchy comparison, unknown roles, edge cases |
+| `recurStepMs` | 11 | Recurrence pattern to milliseconds, null/unknown patterns |
+| Date utilities | 16 | `startOfDay`, `addDays`, `addMonths`, `addHours`, `isSameDay` |
+| `fmtDateInput` | 6 | datetime-local input formatting |
+| `daysInMonth` | 9 | Month length including leap years |
+| `toICSDate` | 4 | ICS date formatting (UTC) |
+| `escICS` | 9 | ICS special character escaping |
+
+Run: `node tests/js/test_utils.js`
+
 ---
 
 ## Notes
@@ -300,3 +380,5 @@ The `api_test.go` file uses a shared `newTestApp` helper that creates an in-memo
 - The test server uses `bcrypt.MinCost` for password hashing to keep tests fast.
 - `TestAuditLog_Cap` requires 10 001 disk writes and is excluded from `-short` runs.
 - All API tests go through the real HTTP handler stack including authentication middleware.
+- The TLS config test creates temporary placeholder cert/key files since the handler validates file accessibility.
+- A known Go testing cleanup warning (`TempDir RemoveAll: directory not empty`) can appear due to goroutine workers not stopping before cleanup — this is cosmetic and does not indicate test logic failures.

@@ -160,6 +160,13 @@ async function init() {
     state._versionInfo = vInfo;
   } catch { /* ignore */ }
 
+  // Load integration status for admin legend panel
+  if (state.user && state.user.role === 'admin') {
+    try {
+      state._integrationStatus = await apiGet('/api/status');
+    } catch { state._integrationStatus = null; }
+  }
+
   // User info in header
   document.getElementById('userDisplayName').textContent = state.user.display_name || state.user.username;
   const roleEl = document.getElementById('userRoleBadge');
