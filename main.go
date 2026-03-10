@@ -359,6 +359,7 @@ type App struct {
 	oidcExclusive   bool        // when true, disable local username/password login
 	oidcDefaultRole Role        // role assigned to auto-created OIDC users (default: RoleReadWrite)
 	webhookCh       chan webhookJob
+	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
 }
 
 // broadcastEventChange sends an SSE notification to all clients about an event change
@@ -638,27 +639,24 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
 		return
 	}
-	clientIP := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		clientIP = strings.SplitN(fwd, ",", 2)[0]
-	}
+	loginClientIP := clientIP(r)
 	user, ok := app.store.GetUserByUsername(req.Username)
 	if !ok {
 		app.audit(0, "system", "login_failed", "user", 0,
-			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, clientIP))
+			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		app.audit(0, "system", "login_failed", "user", user.ID,
-			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, clientIP))
+			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	// Deny login for blocked accounts
 	if user.Blocked {
 		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
-			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, clientIP))
+			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, loginClientIP))
 		jsonError(w, "account is blocked", http.StatusForbidden)
 		return
 	}
@@ -678,12 +676,17 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: "session", Value: sessID, Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: sess.ExpiresAt,
+		Name:     "session",
+		Value:    sessID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   app.secureMode,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  sess.ExpiresAt,
 	})
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
-		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
-	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, clientIP)
+		fmt.Sprintf("User %q logged in from %s", user.Username, loginClientIP))
+	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, loginClientIP)
 
 	// Record last login time, IP, and domain (async to avoid blocking login response)
 	go func(u User, ip string) {
@@ -700,7 +703,7 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			fullUser.LastLoginDomain = u.LastLoginDomain
 			app.store.UpdateUser(*fullUser) //nolint
 		}
-	}(*user, clientIP)
+	}(*user, loginClientIP)
 
 	jsonOK(w, user.Public())
 }
@@ -777,11 +780,9 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 
-	if req.CurrentPassword != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-			jsonError(w, "current password incorrect", http.StatusUnauthorized)
-			return
-		}
+	if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		jsonError(w, "current password incorrect", http.StatusUnauthorized)
+		return
 	}
 
 	// Enforce password quality policy if enabled
@@ -808,6 +809,25 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		Summary: "changed own password",
 	})
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// validateUsername checks that a username is non-empty, not too long, and only
+// contains safe characters (letters, digits, underscores, hyphens, dots).
+// This prevents log injection and other issues caused by unusual characters.
+func validateUsername(username string) error {
+	if username == "" {
+		return fmt.Errorf("username is required")
+	}
+	if len(username) > 64 {
+		return fmt.Errorf("username must be at most 64 characters")
+	}
+	for _, r := range username {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '_' || r == '-' || r == '.') {
+			return fmt.Errorf("username may only contain letters, digits, underscores, hyphens and dots")
+		}
+	}
+	return nil
 }
 
 // validatePasswordQuality checks a candidate password against the active policy.
@@ -876,8 +896,12 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		jsonError(w, "username and password required", http.StatusBadRequest)
+	if err := validateUsername(req.Username); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		jsonError(w, "password is required", http.StatusBadRequest)
 		return
 	}
 	// Apply password quality policy if enabled; otherwise enforce bare minimum of 6
@@ -1234,8 +1258,9 @@ func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		// Use a shorter, more readable code
-		code = code[:12]
+		// Use a 24-character code (96 bits of entropy) — short enough to share
+		// but long enough to be brute-force resistant.
+		code = code[:24]
 		inv, err := app.store.CreateInvitation(PersonalInvitation{
 			Code:      code,
 			Note:      req.Note,
@@ -1449,7 +1474,8 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	expiry := time.Now().Add(2 * time.Hour)
 	app.store.SetPasswordResetToken(targetUser.ID, token, expiry) //nolint
 
-	log.Printf("Password reset requested for user %q — token: %s (valid 2h)", targetUser.Username, token)
+	// Never log the token in plaintext — only note that a reset was initiated.
+	log.Printf("Password reset requested for user %q (valid 2h)", targetUser.Username)
 
 	// Send reset email if SMTP is configured and user has an email
 	cfg := app.store.GetMailConfig()
@@ -1464,11 +1490,16 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		if err := app.sendMail(cfg, targetUser.Email, "Tidslinjal — Password Reset", body); err != nil {
 			log.Printf("Failed to send password reset email to %s: %v", targetUser.Email, err)
 		}
-		jsonOK(w, map[string]string{"status": "ok"})
 	} else {
-		// Return token directly (admin will see it in logs, or no SMTP configured)
-		jsonOK(w, map[string]string{"status": "ok", "token": token})
+		// SMTP not configured and/or user has no email. Log the token to stderr
+		// (server console only, not the HTTP response) so an admin can relay it
+		// out-of-band. Never return it in the API response.
+		log.Printf("[SECURITY] No SMTP configured — password reset token for %q is available in server logs only. Deliver it out-of-band.", targetUser.Username)
+		log.Printf("[SECURITY] Reset token (copy and send to user): %s", token)
 	}
+	// Always return a generic "ok" regardless of whether email was sent,
+	// to avoid leaking whether the account/email exists or whether SMTP is set up.
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -2037,7 +2068,12 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 	}
 	defer file.Close()
 
-	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), header.Filename)
+	// Strip any path components from the filename to prevent path traversal attacks.
+	safeFilename := filepath.Base(header.Filename)
+	if safeFilename == "." || safeFilename == "/" {
+		safeFilename = "upload"
+	}
+	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeFilename)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
 	dst, err := os.Create(destPath)
 	if err != nil {
@@ -2086,7 +2122,15 @@ func (app *App) handleDownloadAttachment(w http.ResponseWriter, r *http.Request,
 	}
 	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
 	w.Header().Set("Content-Type", att.MimeType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, att.Filename))
+	// Sanitise filename for use in Content-Disposition to prevent header injection.
+	// Remove double-quotes, backslashes, and newline characters that could break the header.
+	safeDisp := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, att.Filename)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
 	http.ServeFile(w, r, path)
 }
 
@@ -2622,8 +2666,12 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		jsonError(w, "username and password required", http.StatusBadRequest)
+	if err := validateUsername(req.Username); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		jsonError(w, "password is required", http.StatusBadRequest)
 		return
 	}
 	if _, exists := app.store.GetUserByUsername(req.Username); exists {
@@ -2635,8 +2683,16 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	validRoles := map[Role]bool{
+		RoleObserver: true, RoleRead: true, RoleReporter: true,
+		RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
+		RoleStaffOfficer: true, RoleStaffOfficerFull: true, RoleAdmin: true,
+	}
 	if req.Role == "" {
 		req.Role = RoleRead
+	} else if !validRoles[req.Role] {
+		jsonError(w, "invalid role", http.StatusBadRequest)
+		return
 	}
 	if req.DisplayName == "" {
 		req.DisplayName = req.Username
@@ -2680,6 +2736,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	var req struct {
 		Password         string   `json:"password"`
+		CurrentPassword  string   `json:"current_password"` // required when non-admin changes own password
 		DisplayName      string   `json:"display_name"`
 		Email            string   `json:"email"`
 		Role             Role     `json:"role"`
@@ -2693,6 +2750,13 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	if req.Password != "" {
+		// Non-admin users must verify their current password before changing it
+		if !hasRole(user.Role, RoleAdmin) {
+			if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+				jsonError(w, "current password incorrect", http.StatusUnauthorized)
+				return
+			}
+		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			jsonError(w, "internal error", http.StatusInternalServerError)
@@ -4151,6 +4215,34 @@ func (app *App) runSessionCleaner() {
 	}
 }
 
+// securityHeaders wraps an http.Handler and injects security-related HTTP
+// response headers on every reply. This provides defence-in-depth against
+// clickjacking, MIME-sniffing, and other common web vulnerabilities.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		// Allow inline scripts/styles used by the SPA while blocking external scripts.
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// securityHeadersWithHSTS wraps securityHeaders and additionally sets HSTS
+// (HTTP Strict Transport Security) when the server is running over HTTPS.
+func securityHeadersWithHSTS(next http.Handler) http.Handler {
+	inner := securityHeaders(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// max-age=31536000 = 1 year; includeSubDomains is intentionally omitted
+		// to avoid breaking non-TLS subdomains that are outside our control.
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		inner.ServeHTTP(w, r)
+	})
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────────
 
 func (app *App) routes() http.Handler {
@@ -4882,7 +4974,11 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	return mux
+	// Wrap the entire mux with security headers.
+	if app.secureMode {
+		return securityHeadersWithHSTS(mux)
+	}
+	return securityHeaders(mux)
 }
 
 // ── Mail Config ────────────────────────────────────────────────────────────────
@@ -6361,10 +6457,20 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	// Limit photo size to 1 MB (base64 overhead ~1.33x → ~750 KB raw)
-	if len(req.PhotoDataURL) > 1_400_000 {
-		jsonError(w, "photo too large (max ~1 MB)", http.StatusRequestEntityTooLarge)
-		return
+	// Validate and limit photo data URL.
+	if req.PhotoDataURL != "" {
+		if len(req.PhotoDataURL) > 1_400_000 {
+			jsonError(w, "photo too large (max ~1 MB)", http.StatusRequestEntityTooLarge)
+			return
+		}
+		// Only accept image/* data URLs to prevent arbitrary content injection.
+		if !strings.HasPrefix(req.PhotoDataURL, "data:image/jpeg;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/png;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/gif;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/webp;base64,") {
+			jsonError(w, "photo must be a JPEG, PNG, GIF, or WebP image", http.StatusBadRequest)
+			return
+		}
 	}
 	fullUser, ok := app.store.GetUserByID(user.ID)
 	if !ok {
@@ -6686,6 +6792,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    sessID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   app.secureMode,
 		Expires:  sess.ExpiresAt,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -6974,6 +7081,9 @@ func main() {
 		log.Printf("  [DEBUG] All registered API routes will be logged per request")
 	}
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Enable secure-mode (HTTPS) features when TLS is configured.
+	app.secureMode = useTLS
 
 	handler := app.routes()
 
