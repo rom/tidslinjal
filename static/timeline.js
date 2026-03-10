@@ -194,7 +194,7 @@ function renderTimeline() {
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);
     const weekendCls = (excludeWeekends && isWeekend) ? ' weekend-excluded' : (isWeekend ? ' weekend' : '');
-    html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" onclick="centerDay(new Date('${day.toISOString()}'))" title="Click to center this day" style="cursor:pointer">
+    html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" data-center-day="${day.toISOString()}" title="Click to center this day" style="cursor:pointer">
       <div class="tl-day-name">${dayName}</div>
       <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}</div>
     </div>`;
@@ -250,12 +250,22 @@ function renderTimeline() {
         style="height:${slotH}px"
         data-day="${di}" data-slot="${s}"
         data-start="${slotStart.toISOString()}"
-        ${(locked || ooh || weekendExcludedCell) ? `title="${locked?'Locked: (master/all) — no events can be added or edited':weekendExcludedCell?'Weekend (excluded from synthetic time)':'Outside configured hours'}"` : `onclick="onCellClick(event,'${slotStart.toISOString()}','${slotEnd.toISOString()}',${ooh})"`}
+        ${(locked || ooh || weekendExcludedCell) ? `title="${locked?'Locked: (master/all) — no events can be added or edited':weekendExcludedCell?'Weekend (excluded from synthetic time)':'Outside configured hours'}"` : `data-cell-click="1" data-cell-start="${slotStart.toISOString()}" data-cell-end="${slotEnd.toISOString()}" data-cell-ooh="${ooh?1:0}"`}
       ></div>`;
     });
   }
 
   container.innerHTML = html;
+
+  // Attach day-header click listeners (CSP-safe)
+  container.querySelectorAll('[data-center-day]').forEach(el => {
+    el.addEventListener('click', () => centerDay(new Date(el.dataset.centerDay)));
+  });
+  // Attach cell click listeners (CSP-safe)
+  container.querySelectorAll('[data-cell-click]').forEach(el => {
+    el.addEventListener('click', e => onCellClick(e, el.dataset.cellStart, el.dataset.cellEnd, el.dataset.cellOoh === '1'));
+  });
+
   renderEventBlocks(days, slotH);
   updateCurrentTimeLine(days, slotH);
 }
@@ -673,24 +683,39 @@ function renderLayerPopover() {
   const allVisible  = hiddenCount === 0;
   list.innerHTML = `
     <div class="layer-pop-hint" style="font-size:10px;opacity:0.6;padding:4px 8px 2px">${t('layers_multi_hint')||'Click to show/hide layers.'}</div>
-    <div class="layer-pop-item${allVisible?' active':''}" onclick="toggleAllLayers()">
-      <input type="checkbox" class="layer-pop-cb" ${allVisible?'checked':''} onclick="event.stopPropagation()">
+    <div class="layer-pop-item${allVisible?' active':''}" data-toggle-all-layers>
+      <input type="checkbox" class="layer-pop-cb" ${allVisible?'checked':''} data-stop-prop>
       <div class="layer-pop-swatch" style="background:var(--accent)"></div>
       <span>${t('layers_master')||'All layers'}</span>
     </div>
     ${state.layers.map(l => {
       const visible = isLayerActive(l.id);
-      return `<div class="layer-pop-item${visible?' active':''}" onclick="toggleLayer(${l.id})">
-        <input type="checkbox" class="layer-pop-cb" ${visible?'checked':''} onclick="event.stopPropagation()">
+      return `<div class="layer-pop-item${visible?' active':''}" data-toggle-layer="${l.id}">
+        <input type="checkbox" class="layer-pop-cb" ${visible?'checked':''} data-stop-prop>
         <div class="layer-pop-swatch" style="background:${l.color||'#4A90D9'}"></div>
         <span>${escHtml(l.name)}</span>
       </div>`;
     }).join('')}
     ${hiddenCount > 0 ? `<div class="layer-pop-hint" style="font-size:10px;opacity:0.5;padding:2px 8px 4px;text-align:right">${hiddenCount} layer${hiddenCount>1?'s':''} hidden</div>` : ''}
     ${state.user && hasRole2(state.user.role, 'readwrite') ? `<div style="border-top:1px solid var(--border);padding:6px 8px 4px;margin-top:2px">
-      <button class="btn btn-primary btn-sm" style="width:100%" onclick="document.getElementById('layerPopover').style.display='none';openLayerModal(null)">+ ${t('layers_add')||'Create Layer'}</button>
+      <button class="btn btn-primary btn-sm" style="width:100%" data-add-layer>+ ${t('layers_add')||'Create Layer'}</button>
     </div>` : ''}
   `;
+
+  // Attach layer popover listeners (CSP-safe)
+  list.querySelectorAll('[data-stop-prop]').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+  });
+  const allBtn = list.querySelector('[data-toggle-all-layers]');
+  if (allBtn) allBtn.addEventListener('click', () => toggleAllLayers());
+  list.querySelectorAll('[data-toggle-layer]').forEach(el => {
+    el.addEventListener('click', () => toggleLayer(parseInt(el.dataset.toggleLayer, 10)));
+  });
+  const addBtn = list.querySelector('[data-add-layer]');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    document.getElementById('layerPopover').style.display = 'none';
+    openLayerModal(null);
+  });
 }
 
 function openLayerPopover(btn) {

@@ -3,6 +3,93 @@
    All modal open/save/close handlers, sidebar rendering,
    preferences UI, export/import, templates, alarms, SSE.
    ============================================================ */
+
+/**
+ * CSP-safe event binding helper. After setting innerHTML, call this to bind
+ * all elements with data-action="fnName" attributes to their handlers.
+ * Supports data-arg (single arg) and data-args (JSON array of args).
+ * Use data-stop-prop on elements that need event.stopPropagation().
+ * Use data-event="change|input" for non-click events (default is 'click').
+ */
+function _bindActions(root) {
+  // Resolve function name from local scope chain (works for non-global fns)
+  const _resolve = (name) => {
+    try { return eval(name); } catch { return undefined; }
+  };
+  root.querySelectorAll('[data-action]').forEach(el => {
+    const fnName = el.dataset.action;
+    const fn = _resolve(fnName);
+    if (typeof fn !== 'function') return;
+    const eventType = el.dataset.event || 'click';
+    el.addEventListener(eventType, e => {
+      if (el.hasAttribute('data-stop-prop')) e.stopPropagation();
+      const rawArgs = el.dataset.args;
+      const rawArg = el.dataset.arg;
+      if (rawArgs) {
+        fn(...JSON.parse(rawArgs));
+      } else if (el.hasAttribute('data-arg-checked')) {
+        fn(el.checked);
+      } else if (el.hasAttribute('data-pref-checked')) {
+        setPref(el.dataset.prefChecked, el.checked);
+      } else if (el.hasAttribute('data-arg-value')) {
+        fn(el.value);
+      } else if (el.hasAttribute('data-arg-el')) {
+        fn(el);
+      } else if (rawArg !== undefined) {
+        let arg = rawArg;
+        if (arg === 'null') arg = null;
+        else if (/^\d+$/.test(arg)) arg = parseInt(arg, 10);
+        else try { arg = JSON.parse(arg); } catch {}
+        fn(arg);
+      } else {
+        fn();
+      }
+    });
+  });
+  root.querySelectorAll('[data-stop-prop-only]').forEach(el => {
+    el.addEventListener('click', e => e.stopPropagation());
+  });
+  // Special: edit etype buttons (JSON in single-quoted data attr)
+  root.querySelectorAll('[data-edit-etype]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); openEtypeModal(JSON.parse(el.dataset.editEtype)); });
+  });
+  // Special: edit layer buttons
+  root.querySelectorAll('[data-edit-layer]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); openLayerModal(JSON.parse(el.dataset.editLayer)); });
+  });
+  // Special: close OIDC test panel
+  root.querySelectorAll('[data-close-oidc-test]').forEach(el => {
+    el.addEventListener('click', () => { document.getElementById('oidcTestResult').style.display = 'none'; });
+  });
+  // Special: user/group/phase modals with JSON arg in data-arg + data-arg-el
+  root.querySelectorAll('[data-action="openUserModal"][data-arg-el]').forEach(el => {
+    // Remove the generic handler and re-bind with JSON parse
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => openUserModal(JSON.parse(el.dataset.arg)));
+  });
+  root.querySelectorAll('[data-action="openGroupModal"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => openGroupModal(JSON.parse(el.dataset.arg)));
+  });
+  root.querySelectorAll('[data-action="openMemberModal"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => openMemberModal(JSON.parse(el.dataset.arg)));
+  });
+  root.querySelectorAll('[data-action="openPhaseModal"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => openPhaseModal(JSON.parse(el.dataset.arg)));
+  });
+  // Special: ackAlarm with closest notification element
+  root.querySelectorAll('[data-action="ackAlarm"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => ackAlarm(parseInt(el.dataset.arg, 10), el.closest('.notification')));
+  });
+  // Special: removeRoleRow(this)
+  root.querySelectorAll('[data-action="removeRoleRow"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => removeRoleRow(el));
+  });
+}
 'use strict';
 
 // ── Debug helper ────────────────────────────────────────────────────────────
@@ -676,10 +763,11 @@ function showEventDetail(ev) {
       <div id="commentList"><span style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</span></div>
       <div class="comment-input-row" style="margin-top:8px">
         <textarea id="commentText" placeholder="${t('comments_add')} (use @username to mention someone)"></textarea>
-        <button class="btn btn-primary btn-sm" onclick="submitComment(${ev.id})">${t('comments_submit')}</button>
+        <button class="btn btn-primary btn-sm" data-submit-comment="${ev.id}">${t('comments_submit')}</button>
       </div>
     </div>
   `;
+  body.querySelector('[data-submit-comment]')?.addEventListener('click', () => submitComment(ev.id));
 
   // Load attachments
   apiGet(`/api/events/${ev.id}/attachments`).then(atts => {
@@ -695,9 +783,12 @@ function showEventDetail(ev) {
           <span class="attachment-size">${fmtFileSize(a.size)}</span>
           <a href="/api/attachments/${a.id}" class="btn btn-secondary btn-sm" download="${escHtml(a.filename)}">${t('detail_download')}</a>
           ${state.user && (state.user.id===a.uploaded_by || state.user.role==='admin') ?
-            `<button class="btn btn-danger btn-sm" onclick="deleteAttachment(${a.id},${ev.id})">✕</button>` : ''}
+            `<button class="btn btn-danger btn-sm" data-del-attach="${a.id}" data-ev="${ev.id}">✕</button>` : ''}
         </div>
       `).join('')}</div>`;
+      listEl.querySelectorAll('[data-del-attach]').forEach(btn => {
+        btn.addEventListener('click', () => deleteAttachment(parseInt(btn.dataset.delAttach,10), parseInt(btn.dataset.ev,10)));
+      });
     }
   });
 
@@ -740,12 +831,18 @@ function showEventDetail(ev) {
           <div class="comment-text">${renderCommentContent(c.content)}</div>
           <div style="display:flex;gap:4px;margin-top:4px">
             ${state.user && (state.user.id===c.author_id || state.user.role==='admin') ?
-              `<button class="btn btn-danger btn-sm" onclick="deleteComment(${c.id},${ev.id})">✕</button>` : ''}
+              `<button class="btn btn-danger btn-sm" data-del-comment="${c.id}" data-ev="${ev.id}">✕</button>` : ''}
             ${c.pending_approval && state.user && hasRole2(state.user.role,'teamlead') ?
-              `<button class="btn btn-sm" style="background:var(--green)" onclick="approveComment(${c.id},${ev.id})">✓ ${t('comments_approve')}</button>` : ''}
+              `<button class="btn btn-sm" style="background:var(--green)" data-approve-comment="${c.id}" data-ev="${ev.id}">✓ ${t('comments_approve')}</button>` : ''}
           </div>
         </div>
       `).join('');
+      listEl.querySelectorAll('[data-del-comment]').forEach(btn => {
+        btn.addEventListener('click', () => deleteComment(parseInt(btn.dataset.delComment,10), parseInt(btn.dataset.ev,10)));
+      });
+      listEl.querySelectorAll('[data-approve-comment]').forEach(btn => {
+        btn.addEventListener('click', () => approveComment(parseInt(btn.dataset.approveComment,10), parseInt(btn.dataset.ev,10)));
+      });
     }
   });
 
@@ -1070,9 +1167,12 @@ function renderExistingLocks() {
         ${l.reason ? `<span style="color:var(--text-dim);margin-left:4px">"${escHtml(l.reason)}"</span>` : ''}
         <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">by ${escHtml(l.locked_by_name||'')}</span>
       </span>
-      ${canUnlock ? `<button class="btn btn-danger btn-sm" onclick="unlockFromModal(${l.id})">🔓 Unlock</button>` : ''}
+      ${canUnlock ? `<button class="btn btn-danger btn-sm" data-unlock="${l.id}">🔓 Unlock</button>` : ''}
     </div>`;
   }).join('');
+  listEl.querySelectorAll('[data-unlock]').forEach(btn => {
+    btn.addEventListener('click', () => unlockFromModal(parseInt(btn.dataset.unlock,10)));
+  });
 }
 
 async function unlockFromModal(id) {
@@ -1309,7 +1409,7 @@ async function openMemberModal(group) {
       <span class="member-name">${escHtml(name)}</span>
       <span class="role-badge role-${role}" style="font-size:var(--fs-xs)">${t('role_'+role)||role}</span>
       <span style="font-size:var(--fs-xs);color:var(--text-dim)">(${escHtml(m.role)})</span>
-      <button class="btn btn-danger btn-sm" onclick="removeGroupMember(${group.id},${m.user_id})" style="margin-left:auto">✕</button>
+      <button class="btn btn-danger btn-sm" data-rm-member="${m.user_id}" data-group="${group.id}" style="margin-left:auto">✕</button>
     </div>`;
   }).join('');
 
@@ -1330,7 +1430,7 @@ async function openMemberModal(group) {
             <option value="admin">Admin</option>
           </select>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="addGroupMember(${group.id})">${t('btn_add')}</button>
+        <button class="btn btn-primary btn-sm" data-add-member="${group.id}">${t('btn_add')}</button>
       </div>
     </div>` : '';
 
@@ -1345,6 +1445,11 @@ async function openMemberModal(group) {
     </div>
     ${addMemberForm}
   `;
+  body.querySelectorAll('[data-rm-member]').forEach(btn => {
+    btn.addEventListener('click', () => removeGroupMember(parseInt(btn.dataset.group,10), parseInt(btn.dataset.rmMember,10)));
+  });
+  const addBtn = body.querySelector('[data-add-member]');
+  if (addBtn) addBtn.addEventListener('click', () => addGroupMember(parseInt(addBtn.dataset.addMember,10)));
 }
 
 async function addGroupMember(groupID) {
@@ -1595,7 +1700,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">
           ${t('event_types_title')}
-          ${state.user&&hasRole2(state.user.role,'readwrite') ? `<button class="btn btn-primary btn-sm" onclick="openEtypeModal(null)">${t('event_types_add')}</button>` : ''}
+          ${state.user&&hasRole2(state.user.role,'readwrite') ? `<button class="btn btn-primary btn-sm" data-action="openEtypeModal" data-arg="null">${t('event_types_add')}</button>` : ''}
         </div>
         <div class="legend-list">
           ${[...state.eventTypes].sort((a,b) => {
@@ -1608,13 +1713,13 @@ function renderSidebar() {
             const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
               instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
             const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
-            return `<div class="legend-item${hidden?' hidden-type':''}" onclick="toggleType('${et.key}')">
+            return `<div class="legend-item${hidden?' hidden-type':''}" data-action="toggleType" data-arg="${et.key}">
               <div class="legend-swatch" style="background:${et.color}"></div>
               ${etIcon ? `<span class="legend-type-icon">${etIcon}</span>` : ''}
               <span class="legend-label">${escHtml(lbl)}</span>
               <span class="legend-eye">${hidden?'👁‍🗨':'👁'}</span>
               ${state.user&&(state.user.role==='admin'||(et.created_by&&et.created_by===state.user.id)) ?
-                `<button class="btn btn-ghost btn-icon" style="font-size:11px;padding:0 3px" onclick="event.stopPropagation();openEtypeModal(${JSON.stringify(et).replace(/"/g,'&quot;')})">✏️</button>` : ''}
+                `<button class="btn btn-ghost btn-icon" style="font-size:11px;padding:0 3px" data-edit-etype='${JSON.stringify(et)}' data-stop-prop-only>✏️</button>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -1708,7 +1813,7 @@ function renderSidebar() {
             <div class="alarm-item">
               <div class="alarm-title">${escHtml(a.event_title)}</div>
               <div class="alarm-meta">📅 ${fmtDateTime(new Date(a.event_time))}<br>🔔 ${a.lead_time>0?a.lead_time+' min before':'At event time'}</div>
-              <div class="alarm-actions"><button class="btn btn-danger btn-sm" onclick="deleteAlarm(${a.id})">${t('btn_remove')}</button></div>
+              <div class="alarm-actions"><button class="btn btn-danger btn-sm" data-action="deleteAlarm" data-arg="${a.id}">${t('btn_remove')}</button></div>
             </div>`).join('')}</div>`
         }
       </div>
@@ -1722,7 +1827,7 @@ function renderSidebar() {
           ${t('layers_master')}
         </div>
         <div class="layer-list">
-          <div class="layer-item${!(state.preferences.hidden_layers&&state.preferences.hidden_layers.length>0)?' active':''}" onclick="toggleAllLayers()">
+          <div class="layer-item${!(state.preferences.hidden_layers&&state.preferences.hidden_layers.length>0)?' active':''}" data-action="toggleAllLayers">
             <div class="layer-swatch" style="background:var(--accent)"></div>
             <span class="layer-name">${t('layers_master')}</span>
           </div>
@@ -1731,17 +1836,17 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">
           ${t('layers_my')}
-          <button class="btn btn-primary btn-sm" onclick="openLayerModal(null)">${t('layers_add')}</button>
+          <button class="btn btn-primary btn-sm" data-action="openLayerModal" data-arg="null">${t('layers_add')}</button>
         </div>
         <div class="layer-list">
           ${myLayers.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No layers yet.</div>` : ''}
           ${myLayers.map(l => {
             const active = isLayerActive(l.id);
-            return `<div class="layer-item${active?' active':''}" onclick="toggleLayer(${l.id})">
+            return `<div class="layer-item${active?' active':''}" data-action="toggleLayer" data-arg="${l.id}">
               <div class="layer-swatch" style="background:${l.color||'#4A90D9'}"></div>
               <span class="layer-name">${escHtml(l.name)}</span>
               <span class="layer-vis">${l.visibility}</span>
-              <button class="btn btn-ghost btn-icon" style="font-size:11px" onclick="event.stopPropagation();openLayerModal(${JSON.stringify(l).replace(/"/g,'&quot;')})">✏️</button>
+              <button class="btn btn-ghost btn-icon" style="font-size:11px" data-edit-layer='${JSON.stringify(l)}' data-stop-prop-only>✏️</button>
             </div>`;
           }).join('')}
         </div>
@@ -1752,7 +1857,7 @@ function renderSidebar() {
         <div class="layer-list">
           ${sharedLayers.map(l => {
             const active = isLayerActive(l.id);
-            return `<div class="layer-item${active?' active':''}" onclick="toggleLayer(${l.id})">
+            return `<div class="layer-item${active?' active':''}" data-action="toggleLayer" data-arg="${l.id}">
               <div class="layer-swatch" style="background:${l.color||'#4A90D9'}"></div>
               <span class="layer-name">${escHtml(l.name)}</span>
               <span class="layer-vis">${escHtml(l.owner_name||'')}</span>
@@ -1767,7 +1872,7 @@ function renderSidebar() {
         <div class="sidebar-section">
           <div class="sidebar-section-title">
             ${t('tab_users')}
-            <button class="btn btn-primary btn-sm" onclick="openUserModal(null)">${t('btn_add')}</button>
+            <button class="btn btn-primary btn-sm" data-action="openUserModal" data-arg="null">${t('btn_add')}</button>
           </div>
           <div class="user-list">
             ${(users||[]).map(u => `
@@ -1779,16 +1884,17 @@ function renderSidebar() {
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                 ${u.can_lock?'<span title="Can lock">🔒</span>':''}
                 ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
-                <button class="btn btn-ghost btn-icon" onclick='openUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️</button>
+                <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>✏️</button>
               </div>`).join('')}
           </div>
         </div>
         <div class="sidebar-section">
           <div class="sidebar-section-title">🛡 ${t('role_editor_title')||'Role Editor'}</div>
           <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('role_editor_desc')||'Edit role display names and capabilities.'}</p>
-          <button class="btn btn-secondary btn-sm" onclick="openRoleEditor()">🛡 ${t('role_editor_title')||'Role Editor'}…</button>
+          <button class="btn btn-secondary btn-sm" data-action="openRoleEditor">🛡 ${t('role_editor_title')||'Role Editor'}…</button>
         </div>
       `;
+      _bindActions(el);
     });
   } else if (tab === 'groups' && state.user && hasRole2(state.user.role,'teamlead')) {
     const gl = getGroupLabel();
@@ -1796,7 +1902,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">
           👥 ${gl.plural}
-          <button class="btn btn-primary btn-sm" onclick="openGroupModal(null)">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
+          <button class="btn btn-primary btn-sm" data-action="openGroupModal" data-arg="null">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
         </div>
         <div class="group-list">
           ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
@@ -1806,8 +1912,8 @@ function renderSidebar() {
                 <div>${escHtml(g.name)}</div>
                 ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
               </div>
-              <button class="btn btn-ghost btn-icon btn-sm" onclick='openMemberModal(${JSON.stringify(g).replace(/'/g,"&#39;")})' title="${t('groups_members')}">👥</button>
-              <button class="btn btn-ghost btn-icon" onclick='openGroupModal(${JSON.stringify(g).replace(/'/g,"&#39;")})' title="Edit">✏️</button>
+              <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}">👥</button>
+              <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit">✏️</button>
             </div>`).join('')}
         </div>
       </div>
@@ -1817,7 +1923,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">
           ${t('tab_phases')||'Exercise Phases'}
-          <button class="btn btn-primary btn-sm" onclick="openPhaseModal(null)">${t('btn_add')||'+ Add'}</button>
+          <button class="btn btn-primary btn-sm" data-action="openPhaseModal" data-arg="null">${t('btn_add')||'+ Add'}</button>
         </div>
         <div class="phase-list">
           ${state.phases.length === 0
@@ -1827,8 +1933,8 @@ function renderSidebar() {
                 <div style="font-size:var(--fs-sm);font-weight:600;color:var(--text)">${escHtml(ph.name)}</div>
                 <div style="font-size:var(--fs-xs);color:var(--text-dim)">${fmtDateTime(new Date(ph.start_time))} – ${fmtDateTime(new Date(ph.end_time))}</div>
                 <div style="display:flex;gap:4px;margin-top:4px">
-                  <button class="btn btn-ghost btn-sm" onclick='openPhaseModal(${JSON.stringify(ph).replace(/'/g,"&#39;")})'>✏️</button>
-                  <button class="btn btn-danger btn-sm" onclick="deletePhase(${ph.id})">✕</button>
+                  <button class="btn btn-ghost btn-sm" data-action="openPhaseModal" data-arg='${JSON.stringify(ph)}' data-arg-el>✏️</button>
+                  <button class="btn btn-danger btn-sm" data-action="deletePhase" data-arg="${ph.id}">✕</button>
                 </div>
               </div>`).join('')}
         </div>
@@ -1839,8 +1945,8 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('tab_audit')}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-          <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" oninput="refreshAuditLog()">
-          <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
+          <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="oninput">
+          <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
             <option value="">All actions</option>
             <option value="created">created</option>
             <option value="updated">updated</option>
@@ -1852,10 +1958,10 @@ function renderSidebar() {
           </select>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
-          <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
+          <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
           <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
-          <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" onchange="refreshAuditLog()">
-          <button class="btn btn-secondary btn-sm" onclick="exportAuditCSV()" title="Export to CSV">⬇ CSV</button>
+          <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
+          <button class="btn btn-secondary btn-sm" data-action="exportAuditCSV" title="Export to CSV">⬇ CSV</button>
         </div>
         <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
       </div>`;
@@ -1887,8 +1993,8 @@ function renderSidebar() {
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveWebhookPref()" title="Save the webhook URL and format. Changes take effect immediately.">${t('btn_save')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="testWebhook()" title="Send a test notification to the configured URL and check if it responds correctly.">${t('settings_webhook_test')}</button>
+          <button class="btn btn-secondary btn-sm" data-action="saveWebhookPref" title="Save the webhook URL and format. Changes take effect immediately.">${t('btn_save')}</button>
+          <button class="btn btn-secondary btn-sm" data-action="testWebhook" title="Send a test notification to the configured URL and check if it responds correctly.">${t('settings_webhook_test')}</button>
         </div>
       </div>
 
@@ -1902,7 +2008,7 @@ function renderSidebar() {
             <div style="font-size:var(--fs-xs);font-weight:600" id="oidcStatusLabel">Checking…</div>
             <div style="font-size:10px;color:var(--text-dim);word-break:break-all" id="oidcStatusDetail"></div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="runOIDCTest()"
+          <button class="btn btn-secondary btn-sm" data-action="runOIDCTest"
             title="Run a live connectivity check: verifies discovery document, credentials, and route registration."
             style="flex-shrink:0;white-space:nowrap">🔍 Test</button>
         </div>
@@ -1911,7 +2017,7 @@ function renderSidebar() {
         <div id="oidcTestResult" style="display:none;margin-bottom:10px;border-radius:6px;overflow:hidden;border:1px solid var(--border)">
           <div style="padding:8px 10px;font-size:var(--fs-xs);font-weight:600;background:var(--bg3)">
             OIDC Diagnostics
-            <button onclick="document.getElementById('oidcTestResult').style.display='none'"
+            <button data-close-oidc-test
               style="float:right;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:12px">✕</button>
           </div>
           <div id="oidcTestSteps" style="padding:8px 10px;font-size:11px;line-height:1.7"></div>
@@ -2005,10 +2111,10 @@ function renderSidebar() {
         </label>
 
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="saveOIDCSettings()"
+          <button class="btn btn-primary btn-sm" data-action="saveOIDCSettings"
             title="Save configuration and immediately apply it. If the settings are invalid, an error will be shown."
             >${t('settings_oidc_save')||'Save & Apply'}</button>
-          <button class="btn btn-secondary btn-sm" onclick="runOIDCTest()"
+          <button class="btn btn-secondary btn-sm" data-action="runOIDCTest"
             title="Run a live diagnostic check against the configured OIDC provider to verify connectivity and configuration."
             >🔍 Test Connection</button>
           <a href="/auth/oidc/login" target="_blank" class="btn btn-secondary btn-sm"
@@ -2079,9 +2185,9 @@ function renderSidebar() {
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveMailConfig()"
+          <button class="btn btn-secondary btn-sm" data-action="saveMailConfig"
             title="Save SMTP settings.">Save</button>
-          <button class="btn btn-secondary btn-sm" onclick="testMailConfig()"
+          <button class="btn btn-secondary btn-sm" data-action="testMailConfig"
             title="Send a test email to the From address to verify that SMTP settings are correct.">Send Test Email</button>
         </div>
       </div>
@@ -2148,9 +2254,9 @@ function renderSidebar() {
           Verify TLS certificate
         </label>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <button class="btn btn-secondary btn-sm" onclick="saveSyslogConfig()"
+          <button class="btn btn-secondary btn-sm" data-action="saveSyslogConfig"
             title="Save syslog settings and apply immediately.">Save</button>
-          <button class="btn btn-secondary btn-sm" onclick="testSyslogConfig()"
+          <button class="btn btn-secondary btn-sm" data-action="testSyslogConfig"
             title="Send a test message to the syslog server.">Send Test Message</button>
         </div>
       </div>
@@ -2188,7 +2294,7 @@ function renderSidebar() {
           <input type="text" id="zoomMeetingBase" placeholder="https://zoom.us/j/1234567890"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveTeamsConfig()"
+        <button class="btn btn-secondary btn-sm" data-action="saveTeamsConfig"
           title="Save Teams and Zoom integration settings.">Save Teams/Zoom Config</button>
       </div>
 
@@ -2218,7 +2324,7 @@ function renderSidebar() {
           ⚠️ Changes to TLS configuration require a <strong>server restart</strong> to take effect.
           The server validates that both file paths are accessible before saving.
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveTLSConfig()"
+        <button class="btn btn-secondary btn-sm" data-action="saveTLSConfig"
           title="Save TLS file paths. The server will use them on next restart.">Save TLS Config</button>
       </div>
 
@@ -2234,7 +2340,7 @@ function renderSidebar() {
           <input type="text" id="newAPIKeyName" placeholder="Key name / description"
             title="Give the key a descriptive name so you can identify which system uses it (e.g. 'Monitoring Script', 'CI Pipeline')."
             style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          <button class="btn btn-primary btn-sm" onclick="createAPIKey()"
+          <button class="btn btn-primary btn-sm" data-action="createAPIKey"
             title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
         </div>
       </div>
@@ -2252,8 +2358,8 @@ function renderSidebar() {
     const isTeamLead    = hasRole2(role, 'teamlead');
     const canReport     = role === 'admin' || isAdminOrOplead || isTeamLead || userHasCapability('report');
     const canAutoReport = role === 'admin' || isAdminOrOplead || userHasCapability('auto_report');
-    const toolBtn = (icon, label, onclick) =>
-      `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" onclick="${onclick}">${icon} ${label}</button>`;
+    const toolBtn = (icon, label, fnName) =>
+      `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="${fnName.replace(/\(\)/,'')}">${icon} ${label}</button>`;
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
@@ -2278,47 +2384,47 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.theme==='light'?' active':''}" onclick="setPref('theme','light')">${t('theme_light')||'Light'}</button>
-          <button class="toggle-btn${p.theme==='dark'?' active':''}" onclick="setPref('theme','dark')">${t('theme_dark')||'Dark'}</button>
-          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" onclick="setPref('theme','city-camo')" title="Camouflage (greens/grays)">🏕 Camo</button>
-          <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" onclick="setPref('theme','urban-camo')" title="Urban warfare (blues)">🌆 Urban Camo</button>
+          <button class="toggle-btn${p.theme==='light'?' active':''}" data-action="setPref" data-args='["theme","light"]' >${t('theme_light')||'Light'}</button>
+          <button class="toggle-btn${p.theme==='dark'?' active':''}" data-action="setPref" data-args='["theme","dark"]' >${t('theme_dark')||'Dark'}</button>
+          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" data-action="setPref" data-args='["theme","city-camo"]'  title="Camouflage (greens/grays)">🏕 Camo</button>
+          <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" data-action="setPref" data-args='["theme","urban-camo"]'  title="Urban warfare (blues)">🌆 Urban Camo</button>
         </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_size')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.size==='small'?' active':''}" onclick="setPref('size','small')">${t('size_small')}</button>
-          <button class="toggle-btn${p.size==='normal'?' active':''}" onclick="setPref('size','normal')">${t('size_normal')}</button>
-          <button class="toggle-btn${p.size==='large'?' active':''}" onclick="setPref('size','large')">${t('size_large')}</button>
-          <button class="toggle-btn${p.size==='huge'?' active':''}" onclick="setPref('size','huge')">${t('size_huge')}</button>
+          <button class="toggle-btn${p.size==='small'?' active':''}" data-action="setPref" data-args='["size","small"]' >${t('size_small')}</button>
+          <button class="toggle-btn${p.size==='normal'?' active':''}" data-action="setPref" data-args='["size","normal"]' >${t('size_normal')}</button>
+          <button class="toggle-btn${p.size==='large'?' active':''}" data-action="setPref" data-args='["size","large"]' >${t('size_large')}</button>
+          <button class="toggle-btn${p.size==='huge'?' active':''}" data-action="setPref" data-args='["size","huge"]' >${t('size_huge')}</button>
         </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_language')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.language==='en'?' active':''}" onclick="setPref('language','en')">EN</button>
-          <button class="toggle-btn${p.language==='sv'?' active':''}" onclick="setPref('language','sv')">SV</button>
-          <button class="toggle-btn${p.language==='fr'?' active':''}" onclick="setPref('language','fr')">FR</button>
+          <button class="toggle-btn${p.language==='en'?' active':''}" data-action="setPref" data-args='["language","en"]' >EN</button>
+          <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' >SV</button>
+          <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' >FR</button>
         </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
           ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV']].map(([v,l]) =>
-            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" onclick="setPref('date_format','${v}')">${l}</button>`
+            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" data-action="setPref" data-args='["date_format","${v}"]' >${l}</button>`
           ).join('')}
         </div>
         <div class="hour-range" style="margin-top:10px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_day_hours')}:</span>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
-          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH" style="width:52px" onchange="setHourPref()">
+          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH" style="width:52px" data-action="setHourPref" data-event="onchange">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">–</label>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_end')}</label>
-          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" onchange="setHourPref()">
+          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" data-action="setHourPref" data-event="onchange">
         </div>
         <div style="margin-top:10px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_timezone')||'Timezone'}:</span>
-          <select id="prefTimezone" onchange="setTimezonePref(this.value)"
+          <select id="prefTimezone" data-action="setTimezonePref" data-event="change" data-arg-value
             style="margin-top:4px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
             <option value=""${!state.timezone?' selected':''}>Browser Default</option>
             ${['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'].map(tz =>
@@ -2329,8 +2435,8 @@ function renderSidebar() {
         <div style="margin-top:10px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">Real time clock time format:</span>
           <div class="toggle-btn-group" style="margin-top:4px">
-            <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" onclick="setClockFormat('local')">Local time</button>
-            <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  onclick="setClockFormat('zulu')">ZULU / UTC</button>
+            <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" data-action="setClockFormat" data-arg="local">Local time</button>
+            <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  data-action="setClockFormat" data-arg="zulu">ZULU / UTC</button>
           </div>
         </div>
         <div style="margin-top:10px">
@@ -2341,7 +2447,7 @@ function renderSidebar() {
               : (p.extra_clocks||[]).map(ec => `
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:var(--fs-xs)">
                   <span style="flex:1;color:var(--text)">${escHtml(ec.label)} <span style="color:var(--text-dim)">(${escHtml(ec.timezone)})</span></span>
-                  <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" onclick="removeExtraClock(${ec.id})">× Remove</button>
+                  <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="removeExtraClock" data-arg="${ec.id}">× Remove</button>
                 </div>`).join('')
             }
           </div>
@@ -2351,14 +2457,14 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
           ${['day','2days','3days','4days','5days','week','2weeks','3weeks'].map(v =>
-            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" onclick="setDefaultView('${v}')">${t('range_'+v)||v}</button>`
+            `<button class="toggle-btn${(p.default_view||'week')===v?' active':''}" data-action="setDefaultView" data-arg="${v}">${t('range_'+v)||v}</button>`
           ).join('')}
         </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_out_of_hours')||'Out-of-Hours Area'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
-          <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} onchange="setOOHPref(this.checked)"
+          <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} data-action="setOOHPref" data-event="change" data-arg-checked
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_out_of_hours')||'Show ghosted area outside day hours'}
         </label>
@@ -2367,7 +2473,7 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('settings_event_icons')||'Event Icons'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefShowEventIcons" ${p.show_event_icons!==false?'checked':''}
-            onchange="setPref('show_event_icons', this.checked)"
+            data-action="setPref" data-event="change" data-pref-checked="show_event_icons"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_event_icons')||'Show icons on events (type, attachments, etc.)'}
         </label>
@@ -2375,24 +2481,24 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_red_line')||'Current-time Line'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
-          <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} onchange="setRedLinePref()"
+          <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} data-action="setRedLinePref" data-event="onchange"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_red_line_enabled')||'Show current-time line'}
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
-          <input type="checkbox" id="prefSynthLabel" ${p.synth_label?'checked':''} onchange="setSynthLabelPref(this.checked)"
+          <input type="checkbox" id="prefSynthLabel" ${p.synth_label?'checked':''} data-action="setSynthLabelPref" data-event="change" data-arg-checked
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_synth_label')||'Show H+N label on red line'}
         </label>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center;font-size:var(--fs-xs);color:var(--text-dim)">
           <span>${t('settings_red_line_color')||'Color'}:</span>
-          <input type="color" id="prefLineColor" value="${p.red_line_color||'#E74C3C'}" onchange="setRedLinePref()"
+          <input type="color" id="prefLineColor" value="${p.red_line_color||'#E74C3C'}" data-action="setRedLinePref" data-event="onchange"
             style="width:32px;height:22px;padding:0;border:none;background:transparent;cursor:pointer">
           <span>${t('settings_red_line_width')||'Width'}:</span>
-          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||2}" onchange="setRedLinePref()"
+          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||2}" data-action="setRedLinePref" data-event="onchange"
             style="width:52px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
           <span>${t('settings_red_line_style')||'Style'}:</span>
-          <select id="prefLineStyle" onchange="setRedLinePref()"
+          <select id="prefLineStyle" data-action="setRedLinePref" data-event="onchange"
             style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
             <option value="solid" ${(p.red_line_style||'solid')==='solid'?'selected':''}>Solid</option>
             <option value="dashed" ${p.red_line_style==='dashed'?'selected':''}>Dashed</option>
@@ -2405,14 +2511,14 @@ function renderSidebar() {
         <div id="pushNotifStatus" style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
           ${Notification.permission === 'granted' ? '✅ Notifications are enabled' : Notification.permission === 'denied' ? '🚫 Blocked — allow in browser settings' : '⚠️ Permission not granted yet'}
         </div>
-        ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" onclick="requestPushPermission()">${Notification.permission === 'granted' ? '✓ Granted' : 'Enable Notifications'}</button>` : ''}
+        ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" data-action="requestPushPermission">${Notification.permission === 'granted' ? '✓ Granted' : 'Enable Notifications'}</button>` : ''}
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:4px">
-          <input type="checkbox" ${p.push_alarms!==false?'checked':''} onchange="setPref('push_alarms',this.checked)"
+          <input type="checkbox" ${p.push_alarms!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_alarms"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_alarms')||'Alarm notifications'}
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
-          <input type="checkbox" ${p.push_event_changes!==false?'checked':''} onchange="setPref('push_event_changes',this.checked)"
+          <input type="checkbox" ${p.push_event_changes!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_event_changes"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_event_changes')||'Event changes by other users'}
         </label>
@@ -2421,7 +2527,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('freeze_label')||'Timeline Freeze'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin:0 0 8px">${state.timelinePaused ? (t('freeze_active')||'Timeline is frozen.') : (t('freeze_desc')||'Freeze progression for exercise review.')}</p>
-        <button class="btn btn-sm ${state.timelinePaused?'btn-danger':'btn-secondary'}" onclick="toggleFreeze()">
+        <button class="btn btn-sm ${state.timelinePaused?'btn-danger':'btn-secondary'}" data-action="toggleFreeze">
           ${state.timelinePaused ? ('▶ '+(t('btn_resume')||'Resume')) : ('⏸ '+(t('btn_freeze')||'Freeze'))}
         </button>
       </div>` : ''}
@@ -2429,21 +2535,21 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('settings_terminology')||'Terminology'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_group_label')||'Group label'}</div>
         <div class="toggle-btn-group" style="margin-bottom:8px">
-          <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" onclick="setGroupLabel('group')">Group</button>
-          <button class="toggle-btn${ex.group_label==='unit'?' active':''}" onclick="setGroupLabel('unit')">Unit</button>
-          <button class="toggle-btn${ex.group_label==='team'?' active':''}" onclick="setGroupLabel('team')">Team</button>
+          <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" data-action="setGroupLabel" data-arg="group">Group</button>
+          <button class="toggle-btn${ex.group_label==='unit'?' active':''}" data-action="setGroupLabel" data-arg="unit">Unit</button>
+          <button class="toggle-btn${ex.group_label==='team'?' active':''}" data-action="setGroupLabel" data-arg="team">Team</button>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_user_label')||'User label'}</div>
         <div class="toggle-btn-group" style="margin-bottom:8px">
-          <button class="toggle-btn${(ex.user_label||'users')==='users'?' active':''}" onclick="setUserLabel('users')">Users</button>
-          <button class="toggle-btn${ex.user_label==='soldiers'?' active':''}" onclick="setUserLabel('soldiers')">Soldiers</button>
-          <button class="toggle-btn${ex.user_label==='personnel'?' active':''}" onclick="setUserLabel('personnel')">Personnel</button>
+          <button class="toggle-btn${(ex.user_label||'users')==='users'?' active':''}" data-action="setUserLabel" data-arg="users">Users</button>
+          <button class="toggle-btn${ex.user_label==='soldiers'?' active':''}" data-action="setUserLabel" data-arg="soldiers">Soldiers</button>
+          <button class="toggle-btn${ex.user_label==='personnel'?' active':''}" data-action="setUserLabel" data-arg="personnel">Personnel</button>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_operation_mode')||'Operation mode'}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${(ex.operation_mode||'exercise')==='exercise'?' active':''}" onclick="setOperationMode('exercise')">Exercise</button>
-          <button class="toggle-btn${ex.operation_mode==='incident'?' active':''}" onclick="setOperationMode('incident')">Incident</button>
-          <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" onclick="setOperationMode('operation')">Operation</button>
+          <button class="toggle-btn${(ex.operation_mode||'exercise')==='exercise'?' active':''}" data-action="setOperationMode" data-arg="exercise">Exercise</button>
+          <button class="toggle-btn${ex.operation_mode==='incident'?' active':''}" data-action="setOperationMode" data-arg="incident">Incident</button>
+          <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" data-action="setOperationMode" data-arg="operation">Operation</button>
         </div>
       </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
@@ -2481,7 +2587,7 @@ function renderSidebar() {
           <input type="checkbox" id="exIncludeWeekends" ${ex.include_weekends!==false?'checked':''}>
           <label for="exIncludeWeekends" style="font-size:var(--fs-sm)" title="${t('settings_include_weekends_desc')||'Show weekends on the timeline and count them in synthetic time'}">${t('settings_include_weekends')||'Include weekends'}</label>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="saveExercise()">${t('btn_save')}</button>
+        <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
@@ -2490,7 +2596,7 @@ function renderSidebar() {
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>
         <div class="toggle-btn-group" style="flex-wrap:wrap;gap:4px" id="enrollModeGroup">
           ${[['off','🚫 Off'],['open','🌐 Open'],['vetted','🔍 Vetted'],['generic_invitation','📧 Invite Code'],['personal_invitation','🎫 Personal Invite']].map(([v,l]) =>
-            `<button class="toggle-btn" id="enrollBtn_${v}" onclick="setEnrollMode('${v}')">${l}</button>`
+            `<button class="toggle-btn" id="enrollBtn_${v}" data-action="setEnrollMode" data-arg="${v}">${l}</button>`
           ).join('')}
         </div>
         <div id="enrollCodeGroup" style="margin-top:8px;display:none">
@@ -2498,25 +2604,25 @@ function renderSidebar() {
           <div style="display:flex;gap:6px;margin-top:4px">
             <input type="text" id="enrollCodeInput" placeholder="Shared invite code"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+            <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
           </div>
         </div>
         <div id="enrollVettedInfo" style="margin-top:8px;display:none">
           <p style="font-size:var(--fs-xs);color:var(--text-dim)">Users self-register but cannot log in until an admin approves them. Pending users appear in the Users tab.</p>
-          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
         </div>
         <div id="enrollPersonalInfo" style="margin-top:8px;display:none">
           <p style="font-size:var(--fs-xs);color:var(--text-dim)">Each user needs a unique personal invitation code. Manage codes in the Admin panel.</p>
-          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
           <a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">Admin Panel…</a>
         </div>
         <div id="enrollOpenInfo" style="margin-top:8px;display:none">
           <p style="font-size:var(--fs-xs);color:var(--text-dim)">Anyone can register and immediately log in. Use with caution.</p>
-          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
         </div>
         <div id="enrollOffInfo" style="margin-top:8px;display:none">
           <p style="font-size:var(--fs-xs);color:var(--text-dim)">Self-registration is disabled. Only admins can create accounts.</p>
-          <button class="btn btn-secondary btn-sm" onclick="saveEnrollSettings()">Save</button>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
         </div>
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
@@ -2549,12 +2655,12 @@ function renderSidebar() {
             <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
           </label>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveSecuritySettings()">Save Policy</button>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">Save Policy</button>
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
-        <button class="btn btn-danger btn-sm" onclick="resetDatabase()">${t('settings_reset')||'Reset to Empty'}</button>
+        <button class="btn btn-danger btn-sm" data-action="resetDatabase">${t('settings_reset')||'Reset to Empty'}</button>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
       </div>` : ''}
     `;
@@ -2564,6 +2670,8 @@ function renderSidebar() {
       setTimeout(_initSecuritySettingsUI, 0);
     }
   }
+  // Bind all data-action handlers on the sidebar (CSP-safe)
+  _bindActions(el);
 }
 
 // ── Webhook helpers, preference setters: setOOHPref, setRedLinePref, setSynthLabelPref, toggleFreeze, saveExercise, setDefaultView, setPref, setHourPref, toggleType, toggleLayer, toggleAllLayers ──
@@ -3137,12 +3245,16 @@ function renderProfileAvatars() {
   const grid = document.getElementById('profileAvatarGrid');
   if (!grid) return;
   grid.innerHTML = _DEFAULT_AVATARS.map(a =>
-    `<div title="${escHtml(a.label)}" onclick="selectDefaultAvatar('${a.id}')"
+    `<div title="${escHtml(a.label)}" data-action="selectDefaultAvatar" data-arg="${a.id}"
+      class="avatar-pick"
       style="width:32px;height:32px;border-radius:50%;overflow:hidden;cursor:pointer;
-             border:2px solid var(--border);transition:border-color .15s,transform .15s;flex-shrink:0"
-      onmouseover="this.style.borderColor='var(--accent)';this.style.transform='scale(1.1)'"
-      onmouseout="this.style.borderColor='var(--border)';this.style.transform='scale(1)'">${a.svg}</div>`
+             border:2px solid var(--border);transition:border-color .15s,transform .15s;flex-shrink:0">${a.svg}</div>`
   ).join('');
+  grid.querySelectorAll('.avatar-pick').forEach(el => {
+    el.addEventListener('mouseover', () => { el.style.borderColor = 'var(--accent)'; el.style.transform = 'scale(1.1)'; });
+    el.addEventListener('mouseout', () => { el.style.borderColor = 'var(--border)'; el.style.transform = 'scale(1)'; });
+  });
+  _bindActions(grid);
 }
 
 function selectDefaultAvatar(id) {
@@ -3498,9 +3610,10 @@ async function _loadAPIKeys() {
           ${k.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${escHtml(k.description)}</span>` : ''}
           <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '—'}${k.last_used_at ? ` · Last used: ${new Date(k.last_used_at).toLocaleString()}` : ''}</span>
         </div>
-        <button class="btn btn-danger btn-sm" onclick="deleteAPIKey(${k.id})">Delete</button>
+        <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}">Delete</button>
       </div>
     `).join('');
+    _bindActions(listEl);
   } catch {
     listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
   }
@@ -3957,11 +4070,12 @@ function showAlarmNotification(data, level) {
     <div class="notification-msg">${escHtml(data.message)}</div>
     <div class="alarm-since" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">⏱ 0s ago</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm notification-close-btn" onclick="dismissAlarmNotif(${data.alarm_id})">Dismiss</button>
-      <button class="btn btn-secondary btn-sm" onclick="openAlarmEvent(${data.event_id})">📋 Show event</button>
-      <button class="btn btn-primary btn-sm" onclick="ackAlarm(${data.alarm_id}, this.closest('.notification'))">✓ ${t('alarm_ack')}</button>
+      <button class="btn btn-ghost btn-sm notification-close-btn" data-action="dismissAlarmNotif" data-arg="${data.alarm_id}">Dismiss</button>
+      <button class="btn btn-secondary btn-sm" data-action="openAlarmEvent" data-arg="${data.event_id}">📋 Show event</button>
+      <button class="btn btn-primary btn-sm" data-action="ackAlarm" data-arg="${data.alarm_id}" data-arg-el>✓ ${t('alarm_ack')}</button>
     </div>
   `;
+  _bindActions(el);
   area.appendChild(el);
 
   // Update "X seconds/minutes ago" counter every second
@@ -4203,13 +4317,14 @@ async function renderTemplatesList() {
         </div>
       </div>
       <div class="tmpl-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="openApplyTemplateDialog(${tmpl.id})">▶ Apply</button>
+        <button class="btn btn-primary btn-sm" data-action="openApplyTemplateDialog" data-arg="${tmpl.id}">▶ Apply</button>
         ${(state.user && (state.user.id === tmpl.created_by || hasRole2(state.user.role, 'admin')))
-          ? `<button class="btn btn-danger btn-sm" onclick="deleteTemplate(${tmpl.id})">Delete</button>`
+          ? `<button class="btn btn-danger btn-sm" data-action="deleteTemplate" data-arg="${tmpl.id}">Delete</button>`
           : ''}
       </div>
     </div>
   `).join('');
+  _bindActions(listEl);
 }
 
 function _fmtLocalDTInput(d) {
@@ -5135,9 +5250,10 @@ async function _renderAutoReportList() {
         ${r.recipient ? `<span style="color:var(--text-dim);margin-left:8px">→ ${escHtml(r.recipient)}</span>` : ''}
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Next: ${r.next_run ? new Date(r.next_run).toLocaleString() : 'soon'}</div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteAutoReport(${r.id})">Remove</button>
+      <button class="btn btn-danger btn-sm" data-action="deleteAutoReport" data-arg="${r.id}">Remove</button>
     </div>
   `).join('');
+  _bindActions(el);
 }
 
 async function addAutoReport() {
@@ -5586,10 +5702,11 @@ function _renderFilterPresets() {
   }
   listEl.innerHTML = presets.map(p => `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-      <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-xs);padding:2px 6px;text-align:left" onclick="loadFilterPreset(${p.id})">${escHtml(p.name)}</button>
-      <button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="deleteFilterPreset(${p.id})">×</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:var(--fs-xs);padding:2px 6px;text-align:left" data-action="loadFilterPreset" data-arg="${p.id}">${escHtml(p.name)}</button>
+      <button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" data-action="deleteFilterPreset" data-arg="${p.id}">×</button>
     </div>
   `).join('');
+  _bindActions(listEl);
 }
 
 async function saveFilterPreset() {
@@ -5909,6 +6026,8 @@ function _renderRoleEditorTable(roles) {
     </table>
     </div>
   `;
+  const body = document.getElementById('roleEditorBody');
+  if (body) _bindActions(body);
 }
 
 function _renderRoleRow(role, isBuiltin) {
@@ -5933,7 +6052,7 @@ function _renderRoleRow(role, isBuiltin) {
         return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''}></td>`;
       }).join('')}
       <td style="text-align:center;padding:4px">
-        ${isBuiltin ? '' : `<button class="btn btn-danger btn-xs" onclick="removeRoleRow(this)" title="Remove" style="padding:2px 7px;font-size:12px">✕</button>`}
+        ${isBuiltin ? '' : `<button class="btn btn-danger btn-xs" data-action="removeRoleRow" data-arg-el title="Remove" style="padding:2px 7px;font-size:12px">✕</button>`}
       </td>
     </tr>`;
 }
@@ -5949,6 +6068,7 @@ function addNewRoleRow() {
   const tmp = document.createElement('tbody');
   tmp.innerHTML = _renderRoleRow(role, false);
   const newRow = tmp.firstElementChild;
+  _bindActions(newRow);
   if (adminRow) tbody.insertBefore(newRow, adminRow);
   else tbody.appendChild(newRow);
 }
@@ -6226,9 +6346,10 @@ function renderDependencyList() {
     const dep = state.events.find(e => e.id === id);
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px">
       <span>${dep ? escHtml(dep.title) : `Event #${id}`}</span>
-      <button class="btn btn-danger btn-sm" onclick="removeDependency(${id})">✕</button>
+      <button class="btn btn-danger btn-sm" data-action="removeDependency" data-arg="${id}">✕</button>
     </div>`;
   }).join('');
+  _bindActions(el);
 }
 
 function removeDependency(id) {
@@ -6250,11 +6371,12 @@ function filterDepSearch() {
     return;
   }
   el.innerHTML = candidates.map(ev => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px;cursor:pointer" onclick="addDependency(${ev.id})">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px;cursor:pointer" data-action="addDependency" data-arg="${ev.id}">
       <span>${escHtml(ev.title)}</span>
       <span style="font-size:var(--fs-xs);color:var(--text-dim)">${new Date(ev.start_time).toLocaleDateString()}</span>
     </div>
   `).join('');
+  _bindActions(el);
 }
 
 function addDependency(id) {
@@ -6395,12 +6517,13 @@ function renderGradualBackupSnapshots(snaps) {
         <span style="color:var(--text-dim)">${new Date(s.created_at).toLocaleString()}</span></td>
       <td style="padding:4px 8px;text-align:right;white-space:nowrap">${fmtFileSize(s.size_bytes||0)}</td>
       <td style="padding:4px 8px;text-align:right;white-space:nowrap">
-        <button class="btn btn-secondary btn-sm" onclick="downloadGradualSnapshot('${escHtml(s.filename)}')" title="Download this snapshot as a ZIP file">⬇</button>
-        <button class="btn btn-secondary btn-sm" onclick="restoreGradualSnapshot('${escHtml(s.filename)}')" title="Restore data from this snapshot" style="color:var(--warning,#f39c12)">↩ Restore</button>
-        <button class="btn btn-secondary btn-sm" onclick="deleteGradualSnapshot('${escHtml(s.filename)}')" title="Delete this snapshot" style="color:var(--danger)">🗑</button>
+        <button class="btn btn-secondary btn-sm" data-action="downloadGradualSnapshot" data-arg="${escHtml(s.filename)}" title="Download this snapshot as a ZIP file">⬇</button>
+        <button class="btn btn-secondary btn-sm" data-action="restoreGradualSnapshot" data-arg="${escHtml(s.filename)}" title="Restore data from this snapshot" style="color:var(--warning,#f39c12)">↩ Restore</button>
+        <button class="btn btn-secondary btn-sm" data-action="deleteGradualSnapshot" data-arg="${escHtml(s.filename)}" title="Delete this snapshot" style="color:var(--danger)">🗑</button>
       </td>
     </tr>`).join('')}
     </tbody></table>`;
+  _bindActions(el);
 }
 
 async function saveGradualBackupSettings() {
@@ -6661,8 +6784,9 @@ function updateBulkUserAutocomplete() {
   if (!drop) return;
   if (!users.length) { drop.style.display = 'none'; return; }
   drop.innerHTML = users.map(u =>
-    `<div class="mention-item" onclick="_selectBulkUser('${escHtml(u.username)}')" style="padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)">${escHtml(u.display_name||u.username)} <span style="color:var(--text-dim);font-size:var(--fs-xs)">@${escHtml(u.username)}</span></div>`
+    `<div class="mention-item" data-action="_selectBulkUser" data-arg="${escHtml(u.username)}" style="padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)">${escHtml(u.display_name||u.username)} <span style="color:var(--text-dim);font-size:var(--fs-xs)">@${escHtml(u.username)}</span></div>`
   ).join('');
+  _bindActions(drop);
   drop.style.display = '';
 }
 

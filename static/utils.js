@@ -189,10 +189,11 @@ function showNotification(type, message, duration=4000) {
   el.className = `notification${type==='alarm'?' alarm':''}${type==='warning'?' warning':''}`;
   const title  = type==='alarm' ? t('notif_alarm_title') : type==='warning' ? 'Warning' : t('notif_done');
   el.innerHTML = `
-    <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
+    <button class="notification-close">&times;</button>
     <div class="notification-title">${title}</div>
     <div class="notification-msg">${escHtml(message)}</div>
   `;
+  el.querySelector('.notification-close').addEventListener('click', () => el.remove());
   area.appendChild(el);
   if (duration > 0) setTimeout(() => el.remove(), duration);
 }
@@ -285,7 +286,8 @@ function updateExtraClocks(now) {
           <div class="clock-extra-time" id="${id}-time">--:--:--</div>
           <div class="clock-extra-tz" id="${id}-tz"></div>
         </div>
-        <button class="clock-extra-remove" title="Remove clock" onclick="removeExtraClock(${ec.id})">×</button>`;
+        <button class="clock-extra-remove" title="Remove clock" data-remove-clock="${ec.id}">×</button>`;
+      el.querySelector('[data-remove-clock]').addEventListener('click', () => removeExtraClock(ec.id));
       container.appendChild(el);
     }
     const n = now || new Date();
@@ -415,17 +417,17 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 <p class="page-header">Tidslinjal — Clocks</p>
 <div class="toolbar" id="toolbar">
   <label>Style</label>
-  <select id="selStyle" onchange="applyStyle(this.value)">
+  <select id="selStyle">
     <option value="">Standard</option>
     <option value="style-minimal">Minimal</option>
     <option value="style-compact">Compact</option>
   </select>
   <label>Mode</label>
-  <button class="btn-tb active" id="btnDigital" onclick="setMode('digital')">Digital</button>
-  <button class="btn-tb" id="btnAnalog" onclick="setMode('analog')">Analog</button>
-  <button class="btn-tb" id="btnVCR" onclick="setMode('vcr')">VCR</button>
+  <button class="btn-tb active" id="btnDigital" data-mode="digital">Digital</button>
+  <button class="btn-tb" id="btnAnalog" data-mode="analog">Analog</button>
+  <button class="btn-tb" id="btnVCR" data-mode="vcr">VCR</button>
   <label>Size</label>
-  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1" oninput="applySize(this.value)" onchange="applySize(this.value)">
+  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
@@ -568,21 +570,21 @@ function rebuildClocks() {
   extra.forEach(ec => {
     if (clockMode === 'analog') {
       html += \`<div class="clock-card" id="card-\${ec.id}">
-        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <button class="clock-remove" title="Remove this clock" data-rm-clock="\${ec.id}">&times;</button>
         <div class="clock-label">\${escH(ec.label||ec.timezone)}</div>
         <div class="analog-wrap">\${buildAnalogSVG('svg-'+ec.id)}</div>
         <div class="clock-tz" id="ec-\${ec.id}-tz"></div>
       </div>\`;
     } else if (clockMode === 'vcr') {
       html += \`<div class="clock-card vcr-card" id="card-\${ec.id}">
-        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <button class="clock-remove" title="Remove this clock" data-rm-clock="\${ec.id}">&times;</button>
         <div class="clock-label vcr-label">\${escH(ec.label||ec.timezone)}</div>
         <div class="clock-time vcr-time"><span id="vcr-ec-\${ec.id}-h">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-m">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-s">--</span></div>
         <div class="clock-tz vcr-tz" id="ec-\${ec.id}-tz"></div>
       </div>\`;
     } else {
       html += \`<div class="clock-card" id="card-\${ec.id}">
-        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <button class="clock-remove" title="Remove this clock" data-rm-clock="\${ec.id}">&times;</button>
         <div class="clock-label">\${escH(ec.label||ec.timezone)}</div>
         <div class="clock-time" id="ec-\${ec.id}-time">--:--:--</div>
         <div class="clock-tz" id="ec-\${ec.id}-tz"></div>
@@ -590,6 +592,9 @@ function rebuildClocks() {
     }
   });
   wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-clock]').forEach(btn => {
+    btn.addEventListener('click', () => removeClock(parseInt(btn.dataset.rmClock, 10)));
+  });
 }
 
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -658,6 +663,15 @@ function tick() {
     }
   });
 }
+
+// Bind toolbar controls (CSP-safe, no inline handlers)
+document.getElementById('selStyle').addEventListener('change', function() { applyStyle(this.value); });
+document.querySelectorAll('[data-mode]').forEach(function(btn) {
+  btn.addEventListener('click', function() { setMode(btn.dataset.mode); });
+});
+var slider = document.getElementById('sizeSlider');
+slider.addEventListener('input', function() { applySize(this.value); });
+slider.addEventListener('change', function() { applySize(this.value); });
 
 // Initial build + start ticking
 rebuildClocks();
@@ -760,12 +774,15 @@ function filterTzSuggestions(query) {
   _tzHighlightIdx = -1;
   box.innerHTML = matches.map((c, i) =>
     `<div class="tz-suggestion" data-idx="${i}" data-tz="${c.tz}" data-label="${c.label}"
-      style="padding:5px 10px;cursor:pointer;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
-      onmousedown="selectTzSuggestion(this)" onmouseenter="highlightTzSuggestion(${i})">
+      style="padding:5px 10px;cursor:pointer;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
       <span style="color:var(--text)">${c.label}</span>
       ${c.label !== c.tz ? `<span style="opacity:.5;font-size:var(--fs-xs);margin-left:6px">${c.tz}</span>` : ''}
     </div>`
   ).join('');
+  box.querySelectorAll('.tz-suggestion').forEach(el => {
+    el.addEventListener('mousedown', () => selectTzSuggestion(el));
+    el.addEventListener('mouseenter', () => highlightTzSuggestion(parseInt(el.dataset.idx, 10)));
+  });
   box.style.display = 'block';
 }
 
@@ -926,7 +943,7 @@ function detachHelp() {
 <div class="help-window-wrap">
   <div class="help-win-header">
     <span class="help-win-title">Tidslinjal — Help</span>
-    <input type="search" class="help-win-search" id="helpWinSearch" placeholder="Search…" oninput="filterHelpWin(this.value)" autocomplete="off">
+    <input type="search" class="help-win-search" id="helpWinSearch" placeholder="Search…" autocomplete="off">
     <span id="helpWinStatus" style="font-size:11px;color:var(--text-dim,#888);min-width:60px"></span>
   </div>
   <div class="help-body">${helpContent}</div>
@@ -942,6 +959,9 @@ function syncTheme() {
 }
 syncTheme();
 setInterval(syncTheme, 2000);
+
+// Bind search input (CSP-safe)
+document.getElementById('helpWinSearch').addEventListener('input', function() { filterHelpWin(this.value); });
 
 function filterHelpWin(q) {
   const sections = document.querySelectorAll('.help-section');

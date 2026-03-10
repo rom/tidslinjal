@@ -432,8 +432,7 @@ function renderListView() {
   };
 
   tbody.innerHTML = events.map(ev => `
-    <tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="showEventDetail(state.events.find(e=>e.id===${ev.id}))"
-        onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background=''">
+    <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer">
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
@@ -444,10 +443,24 @@ function renderListView() {
       <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
       <td style="padding:8px 10px">${escHtml(ev.responsible_name||'')}</td>
       <td style="padding:8px 10px">
-        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showEventDetail(state.events.find(e=>e.id===${ev.id}))">View</button>
+        <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">View</button>
         ${state.user && hasRole2(state.user.role, 'readwrite') ?
-          `<button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="event.stopPropagation();openEventModal(state.events.find(e=>e.id===${ev.id}))">Edit</button>` : ''}
+          `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">Edit</button>` : ''}
       </td>
     </tr>
   `).join('');
+
+  // Attach event listeners for list view rows
+  tbody.querySelectorAll('tr[data-ev-row]').forEach(row => {
+    const evId = parseInt(row.dataset.evRow, 10);
+    row.addEventListener('click', () => { const ev = state.events.find(e => e.id === evId); if (ev) showEventDetail(ev); });
+    row.addEventListener('mouseenter', () => { row.style.background = 'var(--bg3)'; });
+    row.addEventListener('mouseleave', () => { row.style.background = ''; });
+  });
+  tbody.querySelectorAll('button[data-ev-view]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); const ev = state.events.find(x => x.id === parseInt(btn.dataset.evView, 10)); if (ev) showEventDetail(ev); });
+  });
+  tbody.querySelectorAll('button[data-ev-edit]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); const ev = state.events.find(x => x.id === parseInt(btn.dataset.evEdit, 10)); if (ev) openEventModal(ev); });
+  });
 }
