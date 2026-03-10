@@ -290,7 +290,7 @@ function updateExtraClocks(now) {
           <div class="clock-extra-time" id="${id}-time">--:--:--</div>
           <div class="clock-extra-tz" id="${id}-tz"></div>
         </div>
-        <button class="clock-extra-remove" title="Remove clock" data-remove-clock="${ec.id}">×</button>`;
+        <button class="clock-extra-remove" title="${escHtml(t('clock_remove'))}" data-remove-clock="${ec.id}">×</button>`;
       el.querySelector('[data-remove-clock]').addEventListener('click', () => removeExtraClock(ec.id));
       container.appendChild(el);
     }
@@ -555,7 +555,7 @@ function detachHelp() {
   const themeClass = theme === 'light' ? ' class="light-mode"' : theme === 'city-camo' ? ' class="city-camo"' : theme === 'urban-camo' ? ' class="urban-camo"' : '';
   // Grab the full help content from the current modal
   const helpBody = document.querySelector('#helpModal .modal-body');
-  const helpContent = helpBody ? helpBody.innerHTML : '<p>Help unavailable</p>';
+  const helpContent = helpBody ? helpBody.innerHTML : '<p>' + escHtml(t('help_unavailable')) + '</p>';
   const helpStyles = Array.from(document.styleSheets)
     .map(s => { try { return s.href || ''; } catch { return ''; } })
     .filter(h => h && h.includes('style'))
