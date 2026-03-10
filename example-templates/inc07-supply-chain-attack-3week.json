@@ -1,0 +1,241 @@
+{
+  "name": "INC-07 Supply Chain Attack — 3 Weeks",
+  "description": "21-day incident response for a software supply chain compromise where a trusted third-party vendor's update mechanism was used to deliver malware to the organisation. Covers initial detection via threat intelligence feed, forensic investigation of compromised software components, containment across hundreds of endpoints, coordination with the affected vendor, and regulatory notification. Suitable for SOC, Forensics, IT, Legal, and Communications teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Initial Assessment",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 1440,
+      "order": 0
+    },
+    {
+      "name": "Containment & Isolation",
+      "color": "#E67E22",
+      "start_offset_min": 1440,
+      "end_offset_min": 4320,
+      "order": 1
+    },
+    {
+      "name": "Forensic Investigation",
+      "color": "#8E44AD",
+      "start_offset_min": 4320,
+      "end_offset_min": 10080,
+      "order": 2
+    },
+    {
+      "name": "Eradication & Remediation",
+      "color": "#F39C12",
+      "start_offset_min": 10080,
+      "end_offset_min": 20160,
+      "order": 3
+    },
+    {
+      "name": "Recovery & Hardening",
+      "color": "#27AE60",
+      "start_offset_min": 20160,
+      "end_offset_min": 28800,
+      "order": 4
+    },
+    {
+      "name": "Post-Incident Review",
+      "color": "#3498DB",
+      "start_offset_min": 28800,
+      "end_offset_min": 30240,
+      "order": 5
+    }
+  ],
+  "groups": [
+    {
+      "name": "SOC Team",
+      "description": "Security Operations Centre — detection and monitoring"
+    },
+    {
+      "name": "Forensics Team",
+      "description": "Digital forensics and malware analysis"
+    },
+    {
+      "name": "IT Operations",
+      "description": "Endpoint management, patching, and remediation"
+    },
+    {
+      "name": "Legal & Compliance",
+      "description": "Legal counsel, regulatory notifications, vendor liaison"
+    },
+    {
+      "name": "Management",
+      "description": "Executive steering and communications"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOC Operations",
+      "description": "SOC detection and monitoring layer",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Forensics",
+      "description": "Forensic investigation timeline",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "IT Remediation",
+      "description": "IT remediation and patch rollout",
+      "color": "#F39C12",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Legal & Comms",
+      "description": "Legal and communications layer",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3, 4]
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 720,
+      "end_offset_min": 750,
+      "reason": "Day 1 Crisis meeting — all teams attend. No changes during management briefing.",
+      "scope": "all"
+    },
+    {
+      "start_offset_min": 4320,
+      "end_offset_min": 4350,
+      "reason": "Day 3 — forensic environment locked for imaging. No endpoint changes permitted.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "Threat Intel Alert — Vendor Compromise",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "ISAC (Information Sharing and Analysis Centre) threat intelligence feed publishes advisory: vendor XYZ Software update server compromised. Malicious payload embedded in versions 4.2.1–4.2.3 of the enterprise management agent. T=0 established. SOC begins cross-referencing installed software inventory.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Internal Software Inventory Audit",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "IT Operations runs automated SCCM/Intune query to identify all endpoints with affected vendor software versions installed. Initial count: 847 endpoints. SOC correlates with EDR (CrowdStrike) telemetry to identify any indicators of compromise (IoC) on those hosts.",
+      "start_offset_min": 30,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "First IoC Confirmed",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "EDR identifies beacon activity from 12 endpoints. Malicious DLL (dll_helper.dll, SHA256: confirmed against vendor advisory) loaded in memory. Attacker C2 domain resolving to 185.220.x.x range. Incident escalated to Priority 1. Incident Commander designated.",
+      "start_offset_min": 120,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Management Crisis Briefing",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Incident Commander briefs CISO, CTO, Legal. Topics: attack nature (supply chain), scope (847 exposed, 12 confirmed compromised), business impact assessment, regulatory notification obligations (GDPR 72h clock), communications strategy, vendor notification.",
+      "start_offset_min": 720,
+      "duration_min": 60,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Network Segmentation — Confirmed IoC Hosts",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "Network Team immediately isolates 12 confirmed compromised endpoints from corporate network via VLAN reassignment. Firewall rules updated to block C2 domain and associated IPs. DNS sinkholes deployed for malicious domains. Affected hosts moved to forensic VLAN.",
+      "start_offset_min": 1440,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Precautionary Software Removal — 835 Hosts",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Operations deploys silent uninstall package for affected vendor software (versions 4.2.1–4.2.3) across remaining 835 endpoints via SCCM. Completion tracking dashboard shows 97% success within 48h. Manual intervention required for 25 offline/unreachable endpoints.",
+      "start_offset_min": 2880,
+      "duration_min": 2880,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Forensic Imaging — Compromised Endpoints",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Forensics Team captures full memory dumps and disk images from all 12 confirmed compromised hosts using FTK Imager. Evidence handling procedures followed (chain of custody documented). Images transferred to isolated forensic workstation for analysis. Live network connections logged.",
+      "start_offset_min": 4320,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Malware Analysis — Implant Characterisation",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Forensics Team reverses the malicious DLL. Findings: persistent backdoor with keylogger capability, credential harvesting from browser stores and Windows Credential Manager, lateral movement via SMB using harvested credentials. Attribution indicators consistent with known APT group. Threat hunting scope expanded.",
+      "start_offset_min": 5760,
+      "duration_min": 4320,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "GDPR Supervisory Authority Notification",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Legal submits 72-hour preliminary GDPR Article 33 notification to Data Protection Authority. Contents: nature of breach, categories and approximate number of data subjects affected, likely consequences, preliminary measures taken. Full investigation findings to follow within 30 days.",
+      "start_offset_min": 4320,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    },
+    {
+      "title": "Expanded Threat Hunt — Lateral Movement",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "SOC Team and Forensics conduct organisation-wide threat hunt for lateral movement indicators: abnormal SMB authentications, unusual LDAP queries, new scheduled tasks, PowerShell encoded commands. Hunt uses Splunk queries against 90-day historical logs. 3 additional compromised servers identified.",
+      "start_offset_min": 7200,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Password Reset — All Domain Users",
+      "event_type": "assigned_task",
+      "color": "#F39C12",
+      "description": "IT Operations forces immediate password reset for all 2,400 domain user accounts following evidence of credential harvesting. Service accounts rotated manually with coordination from application teams. MFA re-enrolment initiated for all users. Help Desk surge capacity activated.",
+      "start_offset_min": 10080,
+      "duration_min": 1440,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Clean Vendor Software Deployment",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "Vendor releases emergency patched version 4.2.4 after root cause analysis of their build pipeline compromise. IT Operations deploys verified clean version to all endpoints after checksum verification against vendor-provided hashes published via out-of-band channel. Deployment tracked via SCCM compliance report.",
+      "start_offset_min": 20160,
+      "duration_min": 2880,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Final Post-Incident Report",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Incident Commander submits comprehensive Post-Incident Report. Contents: attack timeline, forensic findings, full scope of compromise, data exfiltration assessment, remediation actions, lessons learned, recommendations (vendor security assessment process, software update verification controls, enhanced EDR coverage). Report distributed to Board, CISO, Legal, and DPA as required.",
+      "start_offset_min": 30240,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    }
+  ]
+}

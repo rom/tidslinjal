@@ -6463,7 +6463,7 @@ func main() {
 		oidcDefaultRole  string
 	)
 	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
-	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 8443 for HTTPS, or $PORT env)")
+	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 443 for HTTPS, or $PORT env)")
 	flag.StringVar(&dataDir, "data",    "",      "Data directory (default: data, or $DATA_DIR env)")
 	flag.BoolVar(&verbose,   "verbose", false,   "Enable verbose logging")
 	flag.BoolVar(&debug,     "debug",   false,   "Enable debug logging (implies verbose)")
@@ -6493,16 +6493,10 @@ func main() {
 		verbose = true
 	}
 
-	// Fall back to environment variables, then defaults
+	// Fall back to environment variables
+	portEnv := os.Getenv("PORT")
 	if port == "" {
-		port = os.Getenv("PORT")
-		if port == "" {
-			if tlsCert != "" && tlsKey != "" {
-				port = "8443"
-			} else {
-				port = "8080"
-			}
-		}
+		port = portEnv // may still be "" — final default set after TLS is resolved
 	}
 	if dataDir == "" {
 		dataDir = os.Getenv("DATA_DIR")
@@ -6529,6 +6523,16 @@ func main() {
 			tlsCert = persisted.CertFile
 			tlsKey = persisted.KeyFile
 			log.Printf("[INFO] TLS config loaded from persistent settings: cert=%s key=%s", tlsCert, tlsKey)
+		}
+	}
+
+	// Set default port now that TLS is fully resolved:
+	// 443 when TLS is configured (saved or via flags/env), 8080 otherwise.
+	if port == "" {
+		if tlsCert != "" && tlsKey != "" {
+			port = "443"
+		} else {
+			port = "8080"
 		}
 	}
 

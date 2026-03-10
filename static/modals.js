@@ -715,6 +715,9 @@ function showEventDetail(ev) {
     };
   }
 
+  // Attach @mention autocomplete to comment textarea
+  _attachMentionAutocomplete(document.getElementById('commentText'));
+
   // Load comments
   apiGet(`/api/events/${ev.id}/comments`).then(comments => {
     const listEl = document.getElementById('commentList');
@@ -831,6 +834,106 @@ function showEventDetail(ev) {
 // renderCommentContent highlights @mentions in comment text
 function renderCommentContent(text) {
   return escHtml(text).replace(/@(\w+)/g, '<span style="color:var(--accent);font-weight:600">@$1</span>');
+}
+
+// ── @username autocomplete ───────────────────────────────────────────────────
+let _mentionDropdown = null;
+let _mentionStart = -1;
+
+function _attachMentionAutocomplete(textarea) {
+  if (!textarea || textarea._mentionBound) return;
+  textarea._mentionBound = true;
+
+  textarea.addEventListener('input', _onMentionInput);
+  textarea.addEventListener('keydown', _onMentionKey);
+  textarea.addEventListener('blur', () => { setTimeout(_closeMentionDropdown, 150); });
+}
+
+function _onMentionInput() {
+  const ta = document.getElementById('commentText');
+  if (!ta) return;
+  const val = ta.value;
+  const pos = ta.selectionStart;
+  // Find the @ that begins the current word
+  let start = pos - 1;
+  while (start >= 0 && /\w/.test(val[start])) start--;
+  if (start < 0 || val[start] !== '@') { _closeMentionDropdown(); return; }
+  _mentionStart = start;
+  const query = val.slice(start + 1, pos).toLowerCase();
+  const users = (state.users || []).filter(u =>
+    u.username && u.username.toLowerCase().includes(query) ||
+    u.display_name && u.display_name.toLowerCase().includes(query)
+  ).slice(0, 8);
+  if (!users.length) { _closeMentionDropdown(); return; }
+  _showMentionDropdown(ta, users, query);
+}
+
+function _onMentionKey(e) {
+  if (!_mentionDropdown) return;
+  const items = _mentionDropdown.querySelectorAll('.mention-item');
+  const active = _mentionDropdown.querySelector('.mention-item.active');
+  let idx = Array.from(items).indexOf(active);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _updateMentionActive(items, Math.min(idx + 1, items.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _updateMentionActive(items, Math.max(idx - 1, 0));
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (active) { e.preventDefault(); active.click(); }
+    else if (items.length === 1) { e.preventDefault(); items[0].click(); }
+  } else if (e.key === 'Escape') {
+    e.preventDefault(); _closeMentionDropdown();
+  }
+}
+
+function _updateMentionActive(items, idx) {
+  items.forEach((it, i) => it.classList.toggle('active', i === idx));
+  const el = items[idx]; if (el) el.scrollIntoView({block:'nearest'});
+}
+
+function _showMentionDropdown(ta, users, query) {
+  _closeMentionDropdown();
+  const rect = ta.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.id = 'mentionDropdown';
+  _mentionDropdown = dd;
+  Object.assign(dd.style, {
+    position: 'fixed', zIndex: '9999', background: 'var(--bg2)',
+    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+    boxShadow: 'var(--shadow-lg)', minWidth: '180px', maxHeight: '220px',
+    overflowY: 'auto', left: rect.left + 'px', top: (rect.bottom + 2) + 'px'
+  });
+  users.forEach((u, i) => {
+    const item = document.createElement('div');
+    item.className = 'mention-item' + (i === 0 ? ' active' : '');
+    item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
+    item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
+    item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
+    item.addEventListener('click', () => _insertMention(u.username));
+    dd.appendChild(item);
+  });
+  document.body.appendChild(dd);
+}
+
+function _closeMentionDropdown() {
+  if (_mentionDropdown) { _mentionDropdown.remove(); _mentionDropdown = null; }
+  _mentionStart = -1;
+}
+
+function _insertMention(username) {
+  const ta = document.getElementById('commentText');
+  if (!ta || _mentionStart < 0) return;
+  const pos = ta.selectionStart;
+  const val = ta.value;
+  const before = val.slice(0, _mentionStart);
+  const after = val.slice(pos);
+  const insert = '@' + username + ' ';
+  ta.value = before + insert + after;
+  const newPos = before.length + insert.length;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  _closeMentionDropdown();
 }
 
 async function submitComment(eventId) {
@@ -2189,7 +2292,7 @@ function renderSidebar() {
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
-          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto Report', 'openAutoReportModal()') : ''}
+          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
           ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
           ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}

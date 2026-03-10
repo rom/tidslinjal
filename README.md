@@ -217,6 +217,8 @@ Save named filter combinations (event type, status, layer, responsible user, sea
 
 Click the **+** button left of the main clock to add extra real-time clocks for any IANA timezone. Each shows a label, live time, and timezone abbreviation. Remove with **×**. Saved per user. Timezone is picked via a searchable city/country autocomplete input.
 
+Click the **⧉** button to **detach all clocks to a separate browser window** — useful for displaying the clock on a secondary monitor or a dedicated screen during exercises or incidents.
+
 ### Phases
 
 Visual colored bands overlaid on the timeline marking exercise phases (e.g. STARTEX → ENDEX). Team Lead+ can create and edit phases; phases can be attached to specific layers. Phases are included when saving/applying templates.
@@ -246,7 +248,7 @@ go build -o tidslinjal ./...
 ./tidslinjal
 ```
 
-Open `http://localhost:8080`.
+Open `http://localhost:8080` (or `https://localhost:443` if TLS is configured).
 
 ### Default Credentials
 
@@ -265,7 +267,7 @@ Password: admin
 
 | Flag | Env Var | Default | Description |
 |---|---|---|---|
-| `--port` | `PORT` | `8080` (HTTP) / `8443` (HTTPS) | TCP listen port |
+| `--port` | `PORT` | `8080` (HTTP) / `443` (HTTPS) | TCP listen port |
 | `--host` | `HOST` | `` (all interfaces) | Listen interface/address |
 | `--data` | `DATA_DIR` | `data` | Data directory for JSON files and attachments |
 | `--verbose` | — | `false` | Enable verbose log output |
@@ -281,7 +283,7 @@ Password: admin
 
 ### TLS / HTTPS
 
-Provide `--tls-cert` and `--tls-key` to enable HTTPS. When TLS is active, the server listens on port 8443 by default (override with `--port`).
+Provide `--tls-cert` and `--tls-key` to enable HTTPS. When TLS is active, the server listens on port **443** by default (override with `--port`). TLS settings can also be configured at runtime in the admin UI (Admin → System → TLS Settings) — saved settings are loaded automatically on startup and also trigger the port-443 default.
 
 ```bash
 ./tidslinjal --tls-cert /etc/ssl/certs/server.crt --tls-key /etc/ssl/private/server.key
@@ -593,7 +595,8 @@ tidslinjal/
 ├── models.go         # All data types, roles, event status, audit, exercise, templates
 ├── store.go          # Thread-safe JSON file store; all CRUD methods
 ├── go.mod / go.sum
-├── example-templates/  # Ready-made exercise and incident response templates
+├── example-templates/  # Ready-made exercise and incident response templates (31 total)
+├── training/           # Training guides and reference materials
 ├── data/             # Runtime data (auto-created)
 └── static/
     ├── index.html    # App shell with all modals
@@ -601,6 +604,10 @@ tidslinjal/
     ├── i18n.js       # EN / SV / FR translation strings
     ├── app.js        # Timeline engine, all UI logic
     ├── modals.js     # Modal dialogs (settings, templates, profile, map, PVA…)
+    ├── timeline.js   # Timeline rendering and event drawing
+    ├── state.js      # Shared application state
+    ├── api.js        # API client helpers
+    ├── utils.js      # Clock, timezone, @mention autocomplete, utilities
     └── style.css     # Dark + light themes, 4 size variants, mobile CSS
 ```
 
@@ -617,9 +624,9 @@ tidslinjal/
 
 ## Example Templates
 
-The `example-templates/` directory contains **16 ready-made templates**:
+The `example-templates/` directory contains **31 ready-made templates**:
 
-### Exercise Templates (10)
+### Exercise Templates (20)
 
 | Template | Duration | Hours |
 |---|---|---|
@@ -633,8 +640,18 @@ The `example-templates/` directory contains **16 ready-made templates**:
 | EX-08 Crisis Management Simulation | 3 days | 0800–1800 |
 | EX-09 NATO Integration Exercise | 5 days | 24/7 + working hours |
 | EX-10 Full Spectrum Warfare | 5 days | Mixed intensity |
+| EX-11 Border Security Operation | 2 days | 24/7 |
+| EX-12 Maritime Patrol & Interdiction | 3 days | 24/7 |
+| EX-13 Civil-Military Cooperation | 4 days | 0800–2000 |
+| EX-14 Logistics & Sustainment | 5 days | 0700–1900 |
+| EX-15 Hostage Rescue Operation | 1 day | 0600–2000 |
+| EX-16 CBRN / NBC Response | 2 days | 24/7 |
+| EX-17 Information Operations | 3 days | 0800–1800 |
+| EX-18 Air Defence Exercise | 2 days | 24/7 |
+| EX-19 Peacekeeping & Stabilisation | 5 days | 0700–1900 |
+| EX-20 Electronic Warfare | 3 days | 24/7 |
 
-### Incident Response Templates (6)
+### Incident Response Templates (11)
 
 | Template | Duration | Scenario |
 |---|---|---|
@@ -644,10 +661,29 @@ The `example-templates/` directory contains **16 ready-made templates**:
 | INC-04 Ransomware Attack | 2 weeks | Ransomware with negotiation decision point |
 | INC-05 Wiper Malware Attack | 4 weeks | Destructive malware, full rebuild |
 | INC-06 Datacenter Fire | 12 weeks | Physical disaster, DR activation, full recovery |
+| INC-07 Supply Chain Attack | 3 weeks | Third-party vendor compromise |
+| INC-08 Insider Threat | 2 weeks | Data exfiltration by departing employee |
+| INC-09 Targeted Phishing / BEC | 1 week | AiTM phishing, business email compromise |
+| INC-10 OT/ICS Cyber Attack | 10 days | SCADA/PLC attack on energy utility |
+| INC-11 Cloud Infrastructure Breach | 5 days | AWS breach, crypto mining, S3 data exposure |
 
-Incident templates use `operation_mode=incident`, include phases, automatic alarms on critical events, external stakeholder notifications, and PIR events.
+Incident templates use `operation_mode=incident`, include phases, automatic alarms on critical events, external stakeholder notifications, and post-incident review events.
 
 See `example-templates/README.md` for detailed descriptions and loading instructions.
+
+### Training Materials
+
+The `training/` directory contains step-by-step training guides and reference materials:
+
+| File | Contents |
+|------|---------|
+| `01-getting-started.md` | First login, navigation, creating events |
+| `02-working-with-templates.md` | Loading, customising, and saving templates |
+| `03-exercise-planning-guide.md` | Complete exercise planning workflow |
+| `04-incident-response-guide.md` | Using Tidslinjal during live incidents |
+| `05-collaboration-and-roles.md` | Roles, groups, layers, access control |
+| `06-template-reference.md` | Reference card for all 31 templates |
+| `07-quick-reference.md` | One-page cheat sheet |
 
 ---
 
@@ -655,6 +691,14 @@ See `example-templates/README.md` for detailed descriptions and loading instruct
 
 ### Latest
 
+- **Default port 443 for HTTPS** — when TLS is configured (via flags, env vars, or saved admin settings), port 443 is used by default instead of 8443
+- **Tools tab renamed and repositioned** — "Tools" tab is now second in the sidebar (after "Legend") for faster access
+- **Auto reports renamed** — "Auto reports" label in the Tools panel (was "Auto Report")
+- **Fixed double icons** — export/import/report buttons no longer show duplicate emoji symbols
+- **Detachable clock window** — click ⧉ next to the clock to open all clocks in a separate browser window; useful for secondary monitors
+- **@username autocomplete** — typing `@` in event comments shows a dropdown of matching usernames
+- **15 new example templates** — 10 new exercise templates (EX-11 through EX-20: border security, maritime, CIMIC, logistics, special ops, CBRN, info ops, air defence, peacekeeping, electronic warfare) and 5 new cyber incident templates (INC-07 through INC-11: supply chain, insider threat, phishing/BEC, OT/ICS attack, cloud breach)
+- **Training directory** — `training/` with 7 training guides: getting started, templates, exercise planning, incident response, collaboration/roles, full template reference, quick-reference card
 - **Event versioning** — full snapshot history per event; browse and compare previous states
 - **Event dependencies** — link events; BFS cascade reschedule propagates offsets to all dependants
 - **Map integration** — Leaflet.js map modal for Physical Meeting events with lat/lng storage

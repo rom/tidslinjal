@@ -1,0 +1,173 @@
+{
+  "name": "EX-14 Logistics & Sustainment — 5 Days",
+  "description": "5-day logistics and sustainment exercise for a brigade-sized force conducting prolonged operations. Focuses on supply chain management, fuel and ammunition resupply, maintenance operations, medical evacuation, and field logistics coordination under simulated operational conditions. Working-hours schedule (0700–1900). Suitable for logistics battalion and sustainment brigade staff exercises.",
+  "exercise_name": "EX-14 Logistics & Sustainment",
+  "day_start_hour": 7,
+  "day_end_hour": 19,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "INITEX & LOC Establishment",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 360,
+      "order": 0
+    },
+    {
+      "name": "Routine Sustainment",
+      "color": "#27AE60",
+      "start_offset_min": 360,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Surge Operations",
+      "color": "#E67E22",
+      "start_offset_min": 2880,
+      "end_offset_min": 4320,
+      "order": 2
+    },
+    {
+      "name": "Recovery & ENDEX",
+      "color": "#3498DB",
+      "start_offset_min": 4320,
+      "end_offset_min": 4800,
+      "order": 3
+    }
+  ],
+  "groups": [
+    {
+      "name": "Supply Company",
+      "description": "Class I–V supply operations"
+    },
+    {
+      "name": "Maintenance Company",
+      "description": "Vehicle and equipment maintenance"
+    },
+    {
+      "name": "Medical Platoon",
+      "description": "Role 1/2 medical support and MEDEVAC"
+    },
+    {
+      "name": "Brigade Logistics Staff",
+      "description": "G4 / S4 logistics staff officers"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Supply Operations",
+      "description": "Supply chain and distribution",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Maintenance",
+      "description": "Maintenance and recovery operations",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Medical",
+      "description": "Medical support and MEDEVAC",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Logistics Staff",
+      "description": "G4 planning and coordination",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "INITEX — Logistics Base Established",
+      "event_type": "instant",
+      "color": "#F39C12",
+      "description": "Exercise commenced. Main Supply Route (MSR) identified and patrolled. Forward Logistics Base (FLB) established at grid 6432. Supply company begins reception, staging, and onward movement of Day 1 supplies. Maintenance collection point established.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Morning Log Meeting — Day 1",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Daily logistics synchronisation meeting. Agenda: supply status (POL, ammo, rations, water), vehicle maintenance status, medical readiness, MSR security update, 48-hour requirements forecast.",
+      "start_offset_min": 60,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Fuel Resupply — Forward Units",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "Supply Company conducts bulk fuel resupply to forward units. 2x HEMTT tankers dispatched on MSR Echo. Total: 14,000 litres. Consumption tracking updated. Warning order issued for Day 2 resupply based on forecasted usage.",
+      "start_offset_min": 360,
+      "duration_min": 360,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "INJECT: Vehicle Breakdown — MSR Obstruction",
+      "event_type": "event",
+      "color": "#E67E22",
+      "description": "EXERCISE INJECT: Logistics vehicle (5-tonne truck) breaks down on MSR Echo — blocks single-lane section. Recovery vehicle tasked. Alternate routing coordinated. MSR traffic management activated. Estimated 2-hour recovery time. Supply schedule adjusted.",
+      "start_offset_min": 1440,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Ammunition Resupply — Class V",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Controlled ammunition resupply to forward units. Ammunition Holding Area procedures followed. Issue documentation completed. Unexploded ordnance (UXO) report from forward unit processed — EOD team tasked. Ammo tracking spreadsheet updated in BMS.",
+      "start_offset_min": 2160,
+      "duration_min": 480,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "INJECT: MEDEVAC Request",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: 9-liner MEDEVAC request received for 2 exercise casualties (simulated). Medical platoon dispatches ambulance. MEDEVAC helicopter tasked. Role 2 facility notified. Casualties triaged and transported within MEDEVAC time standard.",
+      "start_offset_min": 2880,
+      "duration_min": 60,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Surge: 24h Continuous Operations",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Operational tempo increases — surge logistics required. Supply company operates 24/7. Fuel consumption doubles. Ration pack resupply accelerated. Maintenance 2-hour response SLA implemented. All logistics sections on 12-hour shifts.",
+      "start_offset_min": 2880,
+      "duration_min": 1440,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#3498DB",
+      "description": "ENDEX declared. All forward logistics operations stood down. Equipment and vehicles returned to FLB. Final supply and maintenance status report submitted to G4.",
+      "start_offset_min": 4320,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Logistics AAR",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Logistics AAR. Metrics reviewed: supply delivery on-time percentage, vehicle availability rates, MEDEVAC response times, fuel consumption accuracy vs forecast. Lessons identified: MSR vulnerability, 24h operations staffing gaps, Class V accounting procedures.",
+      "start_offset_min": 4380,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    }
+  ]
+}

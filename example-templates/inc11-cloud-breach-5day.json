@@ -1,0 +1,174 @@
+{
+  "name": "INC-11 Cloud Infrastructure Breach — 5 Days",
+  "description": "5-day incident response for a cloud infrastructure breach where an attacker gained access to an AWS environment through a misconfigured IAM role and exposed S3 bucket. The attacker deployed crypto-mining instances and exfiltrated sensitive data from misconfigured storage. Covers cloud forensics, cost impact, data exposure assessment, and cloud security hardening. Suitable for Cloud/DevOps, SOC, Legal, and Management teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Initial Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Containment & Evidence Capture",
+      "color": "#E67E22",
+      "start_offset_min": 480,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Cloud Forensics & Scope",
+      "color": "#8E44AD",
+      "start_offset_min": 2880,
+      "end_offset_min": 5760,
+      "order": 2
+    },
+    {
+      "name": "Remediation & Hardening",
+      "color": "#27AE60",
+      "start_offset_min": 5760,
+      "end_offset_min": 7200,
+      "order": 3
+    }
+  ],
+  "groups": [
+    {
+      "name": "Cloud / DevOps Team",
+      "description": "Cloud operations and DevOps engineers"
+    },
+    {
+      "name": "SOC Team",
+      "description": "Security Operations — alert investigation"
+    },
+    {
+      "name": "Legal & Compliance",
+      "description": "Legal, data protection, compliance"
+    },
+    {
+      "name": "Management",
+      "description": "Executive oversight"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Cloud / DevOps",
+      "description": "Cloud operations layer",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "SOC",
+      "description": "SOC investigation layer",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Legal & Management",
+      "description": "Legal and management layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [2, 3]
+    }
+  ],
+  "items": [
+    {
+      "title": "AWS Cost Anomaly Alert",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "AWS Cost Anomaly Detection triggers alert: unexpected $4,800 spend in 6 hours on EC2 instances (us-east-1 and ap-southeast-1 regions) — account baseline is ~$200/day. Cloud team investigates. Finds 47 large EC2 instances (p3.16xlarge GPU instances) launched outside normal hours via API calls from unknown IP. T=0 established.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Compromised IAM Role Identified",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "CloudTrail analysis reveals attacker used IAM role 'ci-deploy-role' (assigned to a CI/CD pipeline) to launch instances. Role had overly broad permissions: AdministratorAccess. Access key exposed in public GitHub repository 48 hours ago. Key commit ID identified. GitHub security scanner alert was ignored.",
+      "start_offset_min": 30,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "IAM Key Revocation & Session Termination",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "Cloud Team immediately rotates all access keys for compromised IAM role. All active sessions using the compromised key terminated via IAM policy deny. Attacker-launched EC2 instances terminated. SCP (Service Control Policy) applied to block new instance launches in affected regions pending investigation.",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "S3 Bucket Exposure Assessment",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Cloud Team audits all S3 bucket permissions using AWS Trusted Advisor and S3 Block Public Access settings. Discovers 3 buckets with public read access — one containing customer data exports (PII of ~12,000 customers). S3 access logs analysed: 2.3 GB downloaded by attacker over 4-hour window using compromised IAM role.",
+      "start_offset_min": 480,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "CloudTrail Forensics — Full Attack Chain",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "SOC and Cloud Team reconstruct full attack timeline from CloudTrail, VPC Flow Logs, and GuardDuty findings. Attack chain: exposed GitHub key → S3 ListBuckets → S3 GetObject on PII bucket → EC2 RunInstances (crypto mining) → Route53 DNS changes attempted (blocked by SCP). Duration of access: 7 hours 23 minutes.",
+      "start_offset_min": 2880,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "GDPR Data Breach Notification Assessment",
+      "event_type": "decision",
+      "color": "#8E44AD",
+      "description": "Legal and DPO assess GDPR notification obligation. 12,000 customer records (name, email, purchase history) confirmed accessed. Decision: reportable breach under GDPR Article 33. DPA notification to be filed within 72 hours. Customer notification under Article 34 required given high risk to individuals. Communications team briefed.",
+      "start_offset_min": 5760,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "DPA Notification — GDPR 72h",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Legal files 72-hour GDPR notification with supervisory authority. Report includes: nature of breach, S3 data categories exposed, 12,000 data subjects, attack vector, technical measures implemented. Customer notifications to be issued within 7 days.",
+      "start_offset_min": 4320,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    },
+    {
+      "title": "IAM Least Privilege Remediation",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "Cloud Team remediates IAM permissions across all roles. CI/CD pipeline roles scoped to minimum required permissions. AdministratorAccess removed from all non-human accounts. IAM Access Analyser enabled in all regions. Git secrets scanning enabled with pre-commit hooks and GitHub Advanced Security secret scanning activated on all repositories.",
+      "start_offset_min": 5760,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "S3 Block Public Access — All Buckets",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "Cloud Team enables S3 Block Public Access at AWS account level (applies to all current and future buckets). All existing bucket ACLs audited and overly permissive ones corrected. S3 Object Ownership set to Bucket owner enforced on all buckets. AWS Config rule added to alert on any future public bucket creation.",
+      "start_offset_min": 6240,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Customer Breach Notification",
+      "event_type": "activity",
+      "color": "#1ABC9C",
+      "description": "Legal and Communications send individual notifications to all 12,000 affected customers per GDPR Article 34. Notification includes: what happened, what data was involved, what the organisation is doing, recommended customer actions (password reset if same credentials used elsewhere), dedicated helpline established.",
+      "start_offset_min": 7200,
+      "duration_min": 480,
+      "alarm_lead_time": 60
+    }
+  ]
+}

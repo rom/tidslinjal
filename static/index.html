@@ -98,6 +98,7 @@
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <div class="clock-area" id="clockArea">
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" onclick="detachClock()" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
         <div id="extraClocksContainer" style="display:contents"></div>
         <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
           <div class="clock-time" id="clockTime">00:00:00</div>
@@ -195,6 +196,7 @@
     <aside id="sidebar">
       <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-tab="legend" data-i18n="tab_legend">Legend</button>
+        <button class="sidebar-tab" data-tab="tools" data-i18n="tab_tools">Tools</button>
         <button class="sidebar-tab" data-tab="alarms" data-i18n="tab_alarms">Alarms</button>
         <button class="sidebar-tab" data-tab="layers" data-i18n="tab_layers">Layers</button>
         <button class="sidebar-tab admin-only" data-tab="users" style="display:none" data-i18n="tab_users">Users</button>
@@ -202,7 +204,6 @@
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
         <button class="sidebar-tab admin-only" data-tab="integrations" style="display:none" data-i18n="tab_integrations">🔌 Integrations</button>
-        <button class="sidebar-tab" data-tab="tools">🛠 Tools</button>
         <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
