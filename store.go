@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,10 +129,18 @@ func (s *Store) load() error {
 			s.nextEventTypeID = x.ID
 		}
 	}
-	for _, x := range s.users {
-		if x.ID > s.nextUserID {
+	// Migration: rename legacy "readwrite" role to "teammember"
+	for i, u := range s.users {
+		if u.Role == "readwrite" {
+			s.users[i].Role = RoleReadWrite // "teammember"
+		}
+		if x := s.users[i]; x.ID > s.nextUserID {
 			s.nextUserID = x.ID
 		}
+	}
+	// Migration: OIDC default_role "readwrite" → "teammember"
+	if s.oidcSettings.DefaultRole == "readwrite" {
+		s.oidcSettings.DefaultRole = string(RoleReadWrite)
 	}
 	for _, x := range s.groups {
 		if x.ID > s.nextGroupID {
@@ -2571,19 +2580,80 @@ func (s *Store) GetAllSessions() []SessionInfo {
 
 // ── Bulk admin actions ────────────────────────────────────────────────────────
 
+// BulkFilter holds criteria for bulk event operations.
+type BulkFilter struct {
+	Filter   string     // type | user | group | role | status | layer | all
+	Value    string     // filter value (event type key, user id/name, group name/id, role, status, layer id)
+	TimeFrom *time.Time // optional: only affect events starting at or after this time
+	TimeTo   *time.Time // optional: only affect events starting before or at this time
+}
+
+// matchesBulkFilter reports whether ev matches the given BulkFilter.
+// groupMemberIDs must be pre-computed when Filter=="group".
+func matchesBulkFilter(ev Event, f BulkFilter, groupMemberIDs map[int64]bool, users []User) bool {
+	filterMatch := false
+	switch f.Filter {
+	case "all":
+		filterMatch = true
+	case "type":
+		filterMatch = ev.EventType == f.Value
+	case "user":
+		// match by username or numeric id
+		uid, err := strconv.ParseInt(f.Value, 10, 64)
+		if err == nil {
+			filterMatch = ev.CreatedBy == uid || (ev.ResponsibleID != nil && *ev.ResponsibleID == uid)
+		} else {
+			// match by username
+			for _, u := range users {
+				if strings.EqualFold(u.Username, f.Value) || strings.EqualFold(u.DisplayName, f.Value) {
+					if ev.CreatedBy == u.ID || (ev.ResponsibleID != nil && *ev.ResponsibleID == u.ID) {
+						filterMatch = true
+						break
+					}
+				}
+			}
+		}
+	case "group":
+		filterMatch = groupMemberIDs[ev.CreatedBy]
+	case "role":
+		for _, u := range users {
+			if u.ID == ev.CreatedBy && (string(u.Role) == f.Value || (f.Value == "readwrite" && u.Role == RoleReadWrite)) {
+				filterMatch = true
+				break
+			}
+		}
+	case "status":
+		filterMatch = string(ev.Status) == f.Value
+	case "layer":
+		lid, err := strconv.ParseInt(f.Value, 10, 64)
+		if err == nil {
+			filterMatch = ev.LayerID != nil && *ev.LayerID == lid
+		}
+	}
+	if !filterMatch {
+		return false
+	}
+	// Time range filter
+	if f.TimeFrom != nil && ev.StartTime.Before(*f.TimeFrom) {
+		return false
+	}
+	if f.TimeTo != nil && ev.StartTime.After(*f.TimeTo) {
+		return false
+	}
+	return true
+}
+
 // BulkSetEventStatus sets the status on all events matching the filter.
-// filter: "type"/"user"/"group"/"role"  value: the key/id/name to match.
 // Returns the count of events updated.
-func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) (int, error) {
+func (s *Store) BulkSetEventStatus(f BulkFilter, newStatus EventStatus) (int, error) {
 	s.mu.Lock()
 
-	// Collect group members for group filter
 	var groupMemberIDs map[int64]bool
-	if filter == "group" {
+	if f.Filter == "group" {
 		groupMemberIDs = make(map[int64]bool)
 		for _, m := range s.memberships {
 			for _, g := range s.groups {
-				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
 					if m.GroupID == g.ID {
 						groupMemberIDs[m.UserID] = true
 					}
@@ -2594,27 +2664,45 @@ func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) 
 
 	count := 0
 	for i, ev := range s.events {
-		match := false
-		switch filter {
-		case "type":
-			match = ev.EventType == value
-		case "user":
-			uid, err := strconv.ParseInt(value, 10, 64)
-			if err == nil {
-				match = ev.CreatedBy == uid
-			}
-		case "group":
-			match = groupMemberIDs[ev.CreatedBy]
-		case "role":
-			for _, u := range s.users {
-				if u.ID == ev.CreatedBy && string(u.Role) == value {
-					match = true
-					break
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
+			s.events[i].Status = newStatus
+			s.events[i].UpdatedAt = time.Now()
+			count++
+		}
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	if count > 0 {
+		if err := s.persist("events.json", snap); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
+// BulkSetEventType sets the event type on all events matching the filter.
+// Returns the count of events updated.
+func (s *Store) BulkSetEventType(f BulkFilter, newType string) (int, error) {
+	s.mu.Lock()
+
+	var groupMemberIDs map[int64]bool
+	if f.Filter == "group" {
+		groupMemberIDs = make(map[int64]bool)
+		for _, m := range s.memberships {
+			for _, g := range s.groups {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
+					if m.GroupID == g.ID {
+						groupMemberIDs[m.UserID] = true
+					}
 				}
 			}
 		}
-		if match {
-			s.events[i].Status = newStatus
+	}
+
+	count := 0
+	for i, ev := range s.events {
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
+			s.events[i].EventType = newType
 			s.events[i].UpdatedAt = time.Now()
 			count++
 		}
@@ -2631,15 +2719,15 @@ func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) 
 
 // BulkDeleteEvents deletes all events matching the filter.
 // Returns the count of events deleted.
-func (s *Store) BulkDeleteEvents(filter, value string) (int, error) {
+func (s *Store) BulkDeleteEvents(f BulkFilter) (int, error) {
 	s.mu.Lock()
 
 	var groupMemberIDs map[int64]bool
-	if filter == "group" {
+	if f.Filter == "group" {
 		groupMemberIDs = make(map[int64]bool)
 		for _, m := range s.memberships {
 			for _, g := range s.groups {
-				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
 					if m.GroupID == g.ID {
 						groupMemberIDs[m.UserID] = true
 					}
@@ -2651,26 +2739,7 @@ func (s *Store) BulkDeleteEvents(filter, value string) (int, error) {
 	var kept []Event
 	count := 0
 	for _, ev := range s.events {
-		match := false
-		switch filter {
-		case "type":
-			match = ev.EventType == value
-		case "user":
-			uid, err := strconv.ParseInt(value, 10, 64)
-			if err == nil {
-				match = ev.CreatedBy == uid
-			}
-		case "group":
-			match = groupMemberIDs[ev.CreatedBy]
-		case "role":
-			for _, u := range s.users {
-				if u.ID == ev.CreatedBy && string(u.Role) == value {
-					match = true
-					break
-				}
-			}
-		}
-		if match {
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
 			count++
 		} else {
 			kept = append(kept, ev)

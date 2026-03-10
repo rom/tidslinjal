@@ -789,7 +789,7 @@ function showEventDetail(ev) {
   const isMaster = !ev.layer_id;
   const canEdit = !isEventLocked(ev) && state.user && (
     state.user.role === 'admin' ||
-    (!isMaster && (state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
+    (!isMaster && (state.user.role === 'teammember' || state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
     (isMaster && hasRole2(state.user.role, 'oplead'))
   );
   if (canEdit) {
@@ -1139,7 +1139,7 @@ async function openUserModal(user) {
   const roleSel = document.getElementById('uRole');
   const builtinRoles = [
     {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
-    {key:'reporter', label:'Reporter'}, {key:'readwrite', label:'Read/Write'},
+    {key:'reporter', label:'Reporter'}, {key:'teammember', label:'Team Member'},
     {key:'teamlead', label:'Team Lead'}, {key:'oplead', label:'Operations Lead'},
     {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
   ];
@@ -1630,7 +1630,7 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
         </div>
         ${(() => {
-          const roleOrder = ['admin','staffofficer_full','staffofficer','oplead','teamlead','readwrite','reporter','read','observer'];
+          const roleOrder = ['admin','staffofficer_full','staffofficer','oplead','teamlead','teammember','readwrite','reporter','read','observer'];
           const roleCounts = {};
           (state.users||[]).forEach(u => { roleCounts[u.role] = (roleCounts[u.role]||0)+1; });
           const rows = roleOrder.filter(r => roleCounts[r]).map(r =>
@@ -1975,7 +1975,7 @@ function renderSidebar() {
           <select id="oidcDefaultRole"
             title="When a user logs in via SSO for the first time and no local account exists, they are automatically created with this role."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <option value="readwrite">Read/Write — can create and edit events</option>
+            <option value="teammember">Team Member — can create and edit events</option>
             <option value="teamlead">Team Lead — can manage events for their group</option>
             <option value="oplead">Op Lead — operational leadership role</option>
           </select>
@@ -2187,41 +2187,6 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-section-title">🔐 Password Policy</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          Enforce password quality requirements for all local accounts.
-          OIDC/SSO accounts are always excluded — their passwords are managed by the identity provider.
-        </p>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"
-          title="When enabled, password changes are validated against the rules below.">
-          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
-          Enable Password Quality Policy
-        </label>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
-            title="Passwords shorter than this will be rejected. Default: 8 characters.">Minimum Length</label>
-          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
-            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> Require uppercase (A–Z)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> Require lowercase (a–z)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> Require numbers (0–9)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
-          </label>
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="saveSecuritySettings()"
-          title="Save the password policy. Takes effect immediately for all subsequent password changes.">Save Policy</button>
-      </div>
-
-      <div class="sidebar-section">
         <div class="sidebar-section-title">🔒 TLS / HTTPS Configuration</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           Configure TLS certificate and key file paths for HTTPS.
@@ -2272,7 +2237,6 @@ function renderSidebar() {
     setTimeout(_initOIDCSettingsUI, 0);
     setTimeout(_initMailSettingsUI, 0);
     setTimeout(_initSyslogSettingsUI, 0);
-    setTimeout(_initSecuritySettingsUI, 0);
     setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
@@ -2296,6 +2260,7 @@ function renderSidebar() {
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
           ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
           ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
+          ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
         </div>
       </div>
     `;
@@ -2549,6 +2514,38 @@ function renderSidebar() {
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🔐 Password Policy</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Enforce password quality requirements for all local accounts.
+          OIDC/SSO accounts are always excluded.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Password Quality Policy
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Minimum Length</label>
+          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> Require uppercase (A–Z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> Require lowercase (a–z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> Require numbers (0–9)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
+          </label>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveSecuritySettings()">Save Policy</button>
+      </div>` : ''}
+      ${state.user && state.user.role==='admin' ? `
+      <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
         <button class="btn btn-danger btn-sm" onclick="resetDatabase()">${t('settings_reset')||'Reset to Empty'}</button>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
@@ -2557,6 +2554,7 @@ function renderSidebar() {
     // After DOM injection, initialise dynamic state for enrollment settings
     if (state.user && state.user.role === 'admin') {
       setTimeout(_initEnrollmentUI, 0);
+      setTimeout(_initSecuritySettingsUI, 0);
     }
   }
 }
@@ -2735,7 +2733,7 @@ async function _initOIDCSettingsUI() {
   setVal('oidcIssuer', data.issuer);
   setVal('oidcClientID', data.client_id);
   setVal('oidcRedirectURL', data.redirect_url);
-  setVal('oidcDefaultRole', data.default_role || 'readwrite');
+  setVal('oidcDefaultRole', data.default_role || 'teammember');
   setChk('oidcExclusive', data.exclusive);
   setChk('oidcEnabled', data.enabled);
 
@@ -2916,6 +2914,27 @@ async function openProfileModal() {
   setVal('profileMattermost',  u.mattermost_handle || '');
   setVal('profileDiscord',     u.discord_handle || '');
   setVal('profileSignal',      u.signal_handle || '');
+  setVal('profileTelephone',   u.telephone || '');
+  setVal('profileCellular',    u.cellular || '');
+  setVal('profileTitle',       u.title || '');
+  setVal('profileRank',        u.rank || '');
+  setVal('profileJobRole',     u.job_role || '');
+  setVal('profileExpertise',   u.expertise || '');
+  // Profile photo
+  const preview = document.getElementById('profilePhotoPreview');
+  const placeholder = document.getElementById('profilePhotoPlaceholder');
+  const removeBtn = document.getElementById('profilePhotoRemove');
+  if (u.photo_data_url) {
+    if (preview) { preview.src = u.photo_data_url; preview.style.display = ''; }
+    if (placeholder) placeholder.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    if (preview) { preview.src = ''; preview.style.display = 'none'; }
+    if (placeholder) placeholder.style.display = '';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+  // Password policy
+  _loadProfilePwdPolicy();
 
   // Language select
   const langSel = document.getElementById('profileLanguage');
@@ -3029,14 +3048,20 @@ async function saveProfile() {
     }
   }
 
-  // Save social handles
-  const mattermostHandle = val('profileMattermost');
-  const discordHandle    = val('profileDiscord');
-  const signalHandle     = val('profileSignal');
+  // Save profile fields, communication handles, photo
+  const photoPreview = document.getElementById('profilePhotoPreview');
+  const photoDataURL = (photoPreview && photoPreview.style.display !== 'none') ? (photoPreview.src || '') : '';
   await api('PUT', '/api/auth/profile', {
-    mattermost_handle: mattermostHandle,
-    discord_handle:    discordHandle,
-    signal_handle:     signalHandle,
+    mattermost_handle: val('profileMattermost'),
+    discord_handle:    val('profileDiscord'),
+    signal_handle:     val('profileSignal'),
+    telephone:         val('profileTelephone'),
+    cellular:          val('profileCellular'),
+    title:             val('profileTitle'),
+    rank:              val('profileRank'),
+    job_role:          val('profileJobRole'),
+    expertise:         val('profileExpertise'),
+    photo_data_url:    photoDataURL,
   }).catch(() => {});
 
   // Save language preference
@@ -3058,6 +3083,142 @@ async function saveProfile() {
 
   closeModal('profileModal');
   showNotification('success', 'Profile updated');
+}
+
+// ── Profile Photo helpers ─────────────────────────────────────────────────────
+function loadProfilePhoto(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 1_000_000) { showError('Photo must be under 1 MB'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('profilePhotoPreview');
+    const placeholder = document.getElementById('profilePhotoPlaceholder');
+    const removeBtn = document.getElementById('profilePhotoRemove');
+    if (preview) { preview.src = e.target.result; preview.style.display = ''; }
+    if (placeholder) placeholder.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProfilePhoto() {
+  const preview = document.getElementById('profilePhotoPreview');
+  const placeholder = document.getElementById('profilePhotoPlaceholder');
+  const removeBtn = document.getElementById('profilePhotoRemove');
+  const input = document.getElementById('profilePhotoInput');
+  if (preview) { preview.src = ''; preview.style.display = 'none'; }
+  if (placeholder) placeholder.style.display = '';
+  if (removeBtn) removeBtn.style.display = 'none';
+  if (input) input.value = '';
+}
+
+// ── Password Policy helpers ───────────────────────────────────────────────────
+let _cachedPasswordPolicy = null;
+
+async function _loadProfilePwdPolicy() {
+  try {
+    if (!_cachedPasswordPolicy) {
+      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+    }
+    const ss = _cachedPasswordPolicy;
+    const infoEl = document.getElementById('profilePwdPolicyInfo');
+    if (!infoEl || !ss || !ss.password_policy_enabled) return;
+    const rules = [];
+    if (ss.min_length > 0) rules.push(`Min. ${ss.min_length} characters`);
+    if (ss.require_uppercase) rules.push('Uppercase (A–Z)');
+    if (ss.require_lowercase) rules.push('Lowercase (a–z)');
+    if (ss.require_numbers)   rules.push('Numbers (0–9)');
+    if (ss.require_symbols)   rules.push('Symbols (!@#…)');
+    if (rules.length) {
+      infoEl.style.display = '';
+      infoEl.textContent = '🔐 Password policy: ' + rules.join(' · ');
+    }
+  } catch { /* policy load is best-effort */ }
+}
+
+async function _loadStandalonePwdPolicy() {
+  try {
+    if (!_cachedPasswordPolicy) {
+      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+    }
+    const ss = _cachedPasswordPolicy;
+    const infoEl = document.getElementById('pwdPolicyInfo');
+    if (!infoEl || !ss || !ss.password_policy_enabled) return;
+    const rules = [];
+    if (ss.min_length > 0) rules.push(`Min. ${ss.min_length} characters`);
+    if (ss.require_uppercase) rules.push('Uppercase (A–Z)');
+    if (ss.require_lowercase) rules.push('Lowercase (a–z)');
+    if (ss.require_numbers)   rules.push('Numbers (0–9)');
+    if (ss.require_symbols)   rules.push('Symbols (!@#…)');
+    if (rules.length) {
+      infoEl.style.display = '';
+      infoEl.textContent = '🔐 Password policy: ' + rules.join(' · ');
+    }
+  } catch { /* best-effort */ }
+}
+
+function _generatePassword(policy) {
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower  = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const syms   = '!@#$%^&*-_=+?';
+  const minLen = (policy && policy.min_length > 0) ? Math.max(policy.min_length, 12) : 12;
+  let chars = lower + upper + digits;
+  let pwd = [];
+  if (!policy || policy.require_uppercase) { pwd.push(upper[Math.floor(Math.random()*upper.length)]); }
+  if (!policy || policy.require_lowercase) { pwd.push(lower[Math.floor(Math.random()*lower.length)]); }
+  if (!policy || policy.require_numbers)   { pwd.push(digits[Math.floor(Math.random()*digits.length)]); }
+  if (policy && policy.require_symbols)    { pwd.push(syms[Math.floor(Math.random()*syms.length)]); chars += syms; }
+  while (pwd.length < minLen) {
+    pwd.push(chars[Math.floor(Math.random()*chars.length)]);
+  }
+  // Shuffle
+  for (let i = pwd.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pwd[i], pwd[j]] = [pwd[j], pwd[i]];
+  }
+  return pwd.join('');
+}
+
+async function generateProfilePassword() {
+  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  _cachedPasswordPolicy = policy;
+  const pw = _generatePassword(policy);
+  const inp = document.getElementById('profilePwdNew');
+  const conf = document.getElementById('profilePwdConfirm');
+  const copyBtn = document.getElementById('profilePwdCopyBtn');
+  if (inp) { inp.value = pw; inp.type = 'text'; updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel'); }
+  if (conf) conf.value = pw;
+  if (copyBtn) copyBtn.style.display = '';
+}
+
+function copyProfilePassword() {
+  const inp = document.getElementById('profilePwdNew');
+  if (!inp || !inp.value) return;
+  navigator.clipboard.writeText(inp.value).then(() => showNotification('success', 'Password copied to clipboard')).catch(() => {
+    prompt('Copy this password:', inp.value);
+  });
+}
+
+async function generateStandalonePassword() {
+  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  _cachedPasswordPolicy = policy;
+  const pw = _generatePassword(policy);
+  const inp = document.getElementById('pwdNew');
+  const conf = document.getElementById('pwdConfirm');
+  const copyBtn = document.getElementById('pwdCopyBtn');
+  if (inp) { inp.value = pw; inp.type = 'text'; updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel'); }
+  if (conf) conf.value = pw;
+  if (copyBtn) copyBtn.style.display = '';
+}
+
+function copyStandalonePassword() {
+  const inp = document.getElementById('pwdNew');
+  if (!inp || !inp.value) return;
+  navigator.clipboard.writeText(inp.value).then(() => showNotification('success', 'Password copied to clipboard')).catch(() => {
+    prompt('Copy this password:', inp.value);
+  });
 }
 
 // ── Password Strength Meter ───────────────────────────────────────────────────
@@ -3278,7 +3439,7 @@ async function _loadAPIKeys() {
         <div>
           <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
           ${k.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${escHtml(k.description)}</span>` : ''}
-          ${k.last_used_at ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Last used: ${new Date(k.last_used_at).toLocaleString()}</span>` : ''}
+          <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '—'}${k.last_used_at ? ` · Last used: ${new Date(k.last_used_at).toLocaleString()}` : ''}</span>
         </div>
         <button class="btn btn-danger btn-sm" onclick="deleteAPIKey(${k.id})">Delete</button>
       </div>
@@ -3478,7 +3639,7 @@ function updateUILabels() {
   if (uRole) {
     const roleMap = {
       observer:'role_observer',read:'role_read',reporter:'role_reporter',
-      readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',
+      readwrite:'role_teammember',teammember:'role_teammember',teamlead:'role_teamlead',oplead:'role_oplead',
       staffofficer:'role_staffofficer',staffofficer_full:'role_staffofficer_full',admin:'role_admin'
     };
     [...uRole.options].forEach(opt => { const k = roleMap[opt.value]; if (k) opt.text = t(k) || opt.text; });
@@ -5611,7 +5772,7 @@ const DEFAULT_ROLE_CONFIGS = [
   { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
   { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
   { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
-  { key: 'readwrite',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
+  { key: 'teammember',        display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
   { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true } },
   { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
   { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
@@ -6279,7 +6440,157 @@ async function releaseEditingLock(eventId) {
 // Expose for SSE event handler in app.js
 window._handleEditingLockEvent = handleEditingLockEvent;
 
-// ── Bulk Operations ───────────────────────────────────────────────────────
+// ── Bulk Event Actions (Tools panel, admin) ────────────────────────────────
+
+function openBulkActionsModal() {
+  // Populate event type dropdown
+  const sel = document.getElementById('baNewType');
+  if (sel) {
+    sel.innerHTML = (state.eventTypes || []).map(et =>
+      `<option value="${escHtml(et.key)}">${escHtml(et.label || et.key)}</option>`
+    ).join('');
+  }
+  // Reset result
+  const res = document.getElementById('baResult');
+  if (res) { res.style.display = 'none'; res.textContent = ''; }
+  const delConf = document.getElementById('baDeleteConfirm');
+  if (delConf) delConf.value = '';
+  updateBulkActionUI();
+  openModal('bulkActionsModal');
+}
+
+function switchBulkTab(tab, btn) {
+  document.querySelectorAll('.ba-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ba-tab-btn').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('baPane_' + tab);
+  if (pane) pane.style.display = '';
+  if (btn) btn.classList.add('active');
+}
+
+function updateBulkActionUI() {
+  const f = document.getElementById('baFilter')?.value || 'all';
+  const hints = {
+    all:    'Applies to ALL events (use time range to narrow down)',
+    type:   'Event type key, e.g. "event", "decision", "activity"',
+    user:   'Username or display name (autocomplete available)',
+    group:  'Group name or numeric ID',
+    role:   'Role: observer, read, reporter, teammember, teamlead, oplead, admin',
+    status: 'Current status: planned, active, completed, cancelled…',
+    layer:  'Layer numeric ID (see Layers tab)',
+  };
+  const hintEl = document.getElementById('baFilterHint');
+  if (hintEl) hintEl.textContent = hints[f] || '';
+  const vg = document.getElementById('baValueGroup');
+  if (vg) vg.style.display = f === 'all' ? 'none' : '';
+}
+
+function updateBulkUserAutocomplete() {
+  const f = document.getElementById('baFilter')?.value || '';
+  if (f !== 'user') { _closeBulkDrop(); return; }
+  const q = (document.getElementById('baValue')?.value || '').toLowerCase();
+  if (!q) { _closeBulkDrop(); return; }
+  const users = (state.users || []).filter(u =>
+    (u.username && u.username.toLowerCase().includes(q)) ||
+    (u.display_name && u.display_name.toLowerCase().includes(q))
+  ).slice(0, 8);
+  const drop = document.getElementById('baMentionDrop');
+  if (!drop) return;
+  if (!users.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = users.map(u =>
+    `<div class="mention-item" onclick="_selectBulkUser('${escHtml(u.username)}')" style="padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)">${escHtml(u.display_name||u.username)} <span style="color:var(--text-dim);font-size:var(--fs-xs)">@${escHtml(u.username)}</span></div>`
+  ).join('');
+  drop.style.display = '';
+}
+
+function _selectBulkUser(username) {
+  const inp = document.getElementById('baValue');
+  if (inp) inp.value = username;
+  _closeBulkDrop();
+}
+
+function _closeBulkDrop() {
+  const drop = document.getElementById('baMentionDrop');
+  if (drop) drop.style.display = 'none';
+}
+
+function _getBulkFilterParams() {
+  const filter = document.getElementById('baFilter')?.value || 'all';
+  const value  = document.getElementById('baValue')?.value?.trim() || '';
+  const from   = document.getElementById('baTimeFrom')?.value || '';
+  const to     = document.getElementById('baTimeTo')?.value   || '';
+  const payload = { filter, value };
+  if (from) payload.time_from = new Date(from).toISOString();
+  if (to)   payload.time_to   = new Date(to).toISOString();
+  return payload;
+}
+
+function _showBulkResult(el, ok, text) {
+  if (!el) return;
+  el.style.display = '';
+  el.style.color = ok ? 'var(--green)' : 'var(--danger)';
+  el.style.background = ok ? 'rgba(39,174,96,.1)' : 'rgba(231,76,60,.1)';
+  el.style.border = `1px solid ${ok ? 'rgba(39,174,96,.3)' : 'rgba(231,76,60,.3)'}`;
+  el.textContent = text;
+}
+
+async function executeBulkStatus() {
+  const params = _getBulkFilterParams();
+  const status = document.getElementById('baNewStatus')?.value;
+  if (!status) return;
+  if (!confirm(`Set all matching events to status "${status}"?`)) return;
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/status', { ...params, status });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Updated ${d.updated} event(s) to status "${status}".`);
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+async function executeBulkType() {
+  const params = _getBulkFilterParams();
+  const eventType = document.getElementById('baNewType')?.value;
+  if (!eventType) return;
+  if (!confirm(`Change event type of all matching events to "${eventType}"?`)) return;
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/type', { ...params, event_type: eventType });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Changed type of ${d.updated} event(s) to "${eventType}".`);
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+async function executeBulkDelete() {
+  const params = _getBulkFilterParams();
+  const conf = document.getElementById('baDeleteConfirm')?.value;
+  if (conf !== 'DELETE') { showError('Type DELETE to confirm deletion.'); return; }
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/delete', { ...params, confirm: 'DELETE' });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Deleted ${d.deleted} event(s).`);
+      document.getElementById('baDeleteConfirm').value = '';
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+// ── Bulk Operations (legacy selection-based) ──────────────────────────────
 
 function openBulkStatusDialog() {
   const count = (state.selectedEventIds || []).length;

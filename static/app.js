@@ -292,6 +292,7 @@ async function init() {
       if (form)   form.style.display   = isSSO ? 'none' : '';
       if (saveBtn) saveBtn.style.display = isSSO ? 'none' : '';
       openModal('passwordModal');
+      setTimeout(_loadStandalonePwdPolicy, 0);
     });
   }
 
