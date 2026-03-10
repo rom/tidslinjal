@@ -212,6 +212,17 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventStart').value = fmtDateInput(start);
   document.getElementById('eventEnd').value   = fmtDateInput(end);
 
+  // Show browser timezone hint next to time labels
+  try {
+    const tzAbbr = new Date().toLocaleTimeString(undefined, {timeZoneName:'short'}).split(' ').pop() || '';
+    const startTZ = document.getElementById('eventStartTZ');
+    const endTZ = document.getElementById('eventEndTZ');
+    const recEndTZ = document.getElementById('eventRecEndTZ');
+    if (startTZ) startTZ.textContent = tzAbbr ? '(' + tzAbbr + ')' : '';
+    if (endTZ) endTZ.textContent = tzAbbr ? '(' + tzAbbr + ')' : '';
+    if (recEndTZ) recEndTZ.textContent = tzAbbr ? '(' + tzAbbr + ')' : '';
+  } catch(e) {}
+
   // All-day checkbox
   const allDayChk = document.getElementById('eventAllDay');
   if (allDayChk) allDayChk.checked = ev ? !!ev.all_day : false;

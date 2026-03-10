@@ -4,6 +4,7 @@ let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
 const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
 const sizeLabels  = ['XS','S','M','L','XL'];
 let currentStyle = '';
+let showDigits = false;
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
@@ -43,6 +44,14 @@ function setMode(m) {
   rebuildClocks();
 }
 
+/* ── Toggle hour digits on analog face ── */
+function toggleDigits() {
+  showDigits = !showDigits;
+  const btn = document.getElementById('btnDigits');
+  if (btn) btn.classList.toggle('active', showDigits);
+  if (clockMode === 'analog') rebuildClocks();
+}
+
 /* ── SVG analog face builder ── */
 function buildAnalogSVG(id) {
   const ticks = Array.from({length:60},(_,i)=>{
@@ -52,9 +61,22 @@ function buildAnalogSVG(id) {
     const w = i%5===0 ? 2 : 0.8;
     return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="currentColor" stroke-opacity=".5" stroke-width="${w}"/>`;
   }).join('');
+  // Hour digits (1-12) placed inside the tick ring
+  let digits = '';
+  if (showDigits) {
+    for (let i = 1; i <= 12; i++) {
+      const a = (i * 30 - 90) * Math.PI / 180;
+      const r = 33;
+      const x = 50 + r * Math.cos(a);
+      const y = 50 + r * Math.sin(a);
+      digits += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" text-anchor="middle" dominant-baseline="central" fill="var(--text-dim)" font-size="8" font-weight="600" font-family="sans-serif">${i}</text>`;
+    }
+  }
   return `<svg viewBox="0 0 100 100" class="analog-face" id="${id}">
   <circle cx="50" cy="50" r="49" fill="var(--bg3)" stroke="var(--border)" stroke-width="1.5"/>
   ${ticks}
+  ${digits}
+  <g id="${id}-deadlines"></g>
   <line id="${id}-h"  x1="50" y1="50" x2="50" y2="22" stroke="var(--text)"   stroke-width="3.5" stroke-linecap="round"/>
   <line id="${id}-m"  x1="50" y1="50" x2="50" y2="14" stroke="var(--text)"   stroke-width="2.5" stroke-linecap="round"/>
   <line id="${id}-s"  x1="50" y1="50" x2="50" y2="10" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
@@ -75,6 +97,43 @@ function updateAnalog(svgId, h, m, s) {
   sEl.setAttribute('transform',`rotate(${sDeg+90},50,50)`);
 }
 
+/* ── Deadline indicator on analog clock ── */
+function updateDeadlineIndicators(svgId, isUTC) {
+  const g = document.getElementById(svgId + '-deadlines');
+  if (!g) return;
+  let deadlines = [];
+  try {
+    const events = window.opener?.state?.events || [];
+    const now = new Date();
+    const today = isUTC
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 86400000);
+    deadlines = events.filter(ev => {
+      if (ev.event_type !== 'deadline') return false;
+      const t = new Date(ev.end_time || ev.start_time);
+      return t >= today && t < tomorrow;
+    });
+  } catch(e) {}
+  if (!deadlines.length) { g.innerHTML = ''; return; }
+  let svg = '';
+  deadlines.forEach(ev => {
+    const t = new Date(ev.end_time || ev.start_time);
+    const dh = isUTC ? t.getUTCHours() : t.getHours();
+    const dm = isUTC ? t.getUTCMinutes() : t.getMinutes();
+    const deg = ((dh % 12) * 30 + dm * 0.5);
+    const a = (deg - 90) * Math.PI / 180;
+    const r1 = 16, r2 = 46;
+    const x1 = (50 + r1 * Math.cos(a)).toFixed(2);
+    const y1 = (50 + r1 * Math.sin(a)).toFixed(2);
+    const x2 = (50 + r2 * Math.cos(a)).toFixed(2);
+    const y2 = (50 + r2 * Math.sin(a)).toFixed(2);
+    const title = escH(ev.title || 'Deadline') + ' ' + pad(dh) + ':' + pad(dm);
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--danger)" stroke-width="2" stroke-opacity=".7" stroke-dasharray="3,2"><title>${title}</title></line>`;
+  });
+  g.innerHTML = svg;
+}
+
 /* ── Read clock data from opener ── */
 function getClockData() {
   try {
@@ -83,6 +142,17 @@ function getClockData() {
     const extra = op?.state?.preferences?.extra_clocks || [];
     return { isUTC, extra };
   } catch(e) { return { isUTC:false, extra:[] }; }
+}
+
+/* ── Toggle local/Zulu time via opener ── */
+function toggleUTC() {
+  try {
+    if (typeof window.opener?.toggleClockTZ === 'function') {
+      window.opener.toggleClockTZ();
+    }
+  } catch(e) {}
+  // Force immediate UI update
+  tick();
 }
 
 /* ── Remove a clock by calling parent ── */
@@ -103,23 +173,24 @@ function rebuildClocks() {
   _lastMode = clockMode;
   let html = '';
   // Main clock
+  const mainLabel = isUTC ? 'UTC/Z' : 'Local Time';
   if (clockMode === 'analog') {
     html += `<div class="clock-card" id="card-main">
-      <div class="clock-label" id="main-label">${isUTC?'UTC/Z':'Local Time'}</div>
+      <div class="clock-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${mainLabel}</div>
       <div class="analog-wrap">${buildAnalogSVG('svg-main')}</div>
       <div class="clock-date" id="main-date"></div>
       <div class="clock-tz" id="main-tz"></div>
     </div>`;
   } else if (clockMode === 'vcr') {
     html += `<div class="clock-card vcr-card" id="card-main">
-      <div class="clock-label vcr-label" id="main-label">${isUTC?'UTC/Z':'LOCAL'}</div>
+      <div class="clock-label vcr-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${isUTC?'UTC/Z':'LOCAL'}</div>
       <div class="clock-time vcr-time"><span id="vcr-main-h">--</span><span class="vcr-colon">:</span><span id="vcr-main-m">--</span><span class="vcr-colon">:</span><span id="vcr-main-s">--</span></div>
       <div class="clock-date vcr-date" id="main-date"></div>
       <div class="clock-tz vcr-tz" id="main-tz"></div>
     </div>`;
   } else {
     html += `<div class="clock-card" id="card-main">
-      <div class="clock-label" id="main-label">${isUTC?'UTC/Z':'Local Time'}</div>
+      <div class="clock-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${mainLabel}</div>
       <div class="clock-time" id="main-time">--:--:--</div>
       <div class="clock-date" id="main-date"></div>
       <div class="clock-tz" id="main-tz"></div>
@@ -154,6 +225,9 @@ function rebuildClocks() {
   wrap.querySelectorAll('[data-rm-clock]').forEach(btn => {
     btn.addEventListener('click', () => removeClock(parseInt(btn.dataset.rmClock, 10)));
   });
+  // Bind click-to-toggle on main clock label
+  const mainLbl = document.getElementById('main-label');
+  if (mainLbl) mainLbl.addEventListener('click', toggleUTC);
 }
 
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -188,6 +262,7 @@ function tick() {
 
   if (clockMode === 'analog') {
     updateAnalog('svg-main', h, m, s);
+    updateDeadlineIndicators('svg-main', isUTC);
   } else if (clockMode === 'vcr') {
     const vh=document.getElementById('vcr-main-h'); if(vh)vh.textContent=pad(h);
     const vm=document.getElementById('vcr-main-m'); if(vm)vm.textContent=pad(m);
@@ -231,6 +306,7 @@ document.querySelectorAll('[data-mode]').forEach(function(btn) {
 var slider = document.getElementById('sizeSlider');
 slider.addEventListener('input', function() { applySize(this.value); });
 slider.addEventListener('change', function() { applySize(this.value); });
+document.getElementById('btnDigits').addEventListener('click', toggleDigits);
 
 // Initial build + start ticking
 rebuildClocks();

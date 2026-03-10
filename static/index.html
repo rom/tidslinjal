@@ -480,11 +480,11 @@
       </div>
       <div class="form-row" id="eventTimeRow">
         <div class="form-group">
-          <label id="lbl-ev-start">Start *</label>
+          <label id="lbl-ev-start">Start * <span class="tz-hint" id="eventStartTZ"></span></label>
           <input type="datetime-local" id="eventStart">
         </div>
         <div class="form-group" id="eventEndGroup">
-          <label id="lbl-ev-end">End</label>
+          <label id="lbl-ev-end">End <span class="tz-hint" id="eventEndTZ"></span></label>
           <input type="datetime-local" id="eventEnd">
         </div>
       </div>
@@ -589,7 +589,7 @@
         </div>
       </div>
       <div class="form-group recurrence-row" id="recurrenceEndGroup" style="display:none">
-        <label id="lbl-ev-recend">Recurrence End</label>
+        <label id="lbl-ev-recend">Recurrence End <span class="tz-hint" id="eventRecEndTZ"></span></label>
         <input type="datetime-local" id="eventRecurrenceEnd">
       </div>
       <div class="form-row">
