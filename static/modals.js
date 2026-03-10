@@ -2173,6 +2173,29 @@ function renderSidebar() {
     setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
+  } else if (tab === 'tools') {
+    const role          = state.user?.role || '';
+    const isAdminOrOplead = hasRole2(role, 'oplead');
+    const isTeamLead    = hasRole2(role, 'teamlead');
+    const canReport     = role === 'admin' || isAdminOrOplead || isTeamLead || userHasCapability('report');
+    const canAutoReport = role === 'admin' || isAdminOrOplead || userHasCapability('auto_report');
+    const toolBtn = (icon, label, onclick) =>
+      `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" onclick="${onclick}">${icon} ${label}</button>`;
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
+          ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
+          ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
+          ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
+          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto Report', 'openAutoReportModal()') : ''}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
+          ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
+          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
+        </div>
+      </div>
+    `;
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -4347,73 +4370,29 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Password change ────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const btnSavePw = document.getElementById('btnSavePassword');
-  if (btnSavePw) {
-    btnSavePw.addEventListener('click', async () => {
-      const curPw  = document.getElementById('pwdCurrent')?.value || '';
-      const newPw  = document.getElementById('pwdNew')?.value?.trim()    || '';
-      const conPw  = document.getElementById('pwdConfirm')?.value?.trim() || '';
-      if (!newPw || newPw !== conPw) {
-        showError(t('password_mismatch') || 'Passwords do not match', 'Validation'); return;
-      }
-      const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
-      if (res.ok) {
-        closeModal('passwordModal');
-        showNotification('success', t('password_saved')||'Password changed');
-      } else {
-        const err = await res.json();
-        showError(err.error);
-      }
+function openReportModal() {
+  const layerList = document.getElementById('reportLayerList');
+  if (layerList) {
+    layerList.innerHTML = `
+      <label class="group-chip selected" style="cursor:pointer">
+        <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
+        ${t('layers_master')||'Master'}
+      </label>
+      ${state.layers.map(l => `
+        <label class="group-chip selected" style="cursor:pointer">
+          <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
+          ${escHtml(l.name)}
+        </label>
+      `).join('')}
+    `;
+    layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+      });
     });
   }
-
-  const btnExport = document.getElementById('btnExportData');
-  if (btnExport) {
-    btnExport.addEventListener('click', async () => {
-      const res = await api('GET', '/api/export');
-      if (!res.ok) { showError('Export failed'); return; }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `tidslinjal-export-${new Date().toISOString().slice(0,10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  }
-
-  const btnReport = document.getElementById('btnReport');
-  if (btnReport) {
-    btnReport.addEventListener('click', () => {
-      // Populate layer checkboxes in report modal
-      const layerList = document.getElementById('reportLayerList');
-      if (layerList) {
-        layerList.innerHTML = `
-          <label class="group-chip selected" style="cursor:pointer">
-            <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
-            ${t('layers_master')||'Master'}
-          </label>
-          ${state.layers.map(l => `
-            <label class="group-chip selected" style="cursor:pointer">
-              <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
-              ${escHtml(l.name)}
-            </label>
-          `).join('')}
-        `;
-        // Toggle chip selected class on change
-        layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
-          cb.addEventListener('change', () => {
-            cb.closest('.group-chip').classList.toggle('selected', cb.checked);
-          });
-        });
-      }
-      openModal('reportModal');
-    });
-  }
-});
+  openModal('reportModal');
+}
 
 
 // ── generateReport, mobileNavTab, closeMobileSidebar ─────────────────────
@@ -4694,33 +4673,125 @@ async function generateReport() {
   html += '</body></html>';
 
   const format = document.getElementById('reportFormat')?.value || 'html';
-  const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
-  const url  = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().slice(0,10);
 
   if (format === 'print') {
-    // Open in new window and trigger print dialog (user can save as PDF)
     const printWin = window.open('', '_blank');
     if (printWin) {
       printWin.document.write(html);
       printWin.document.close();
       printWin.focus();
-      // Delay print to allow rendering
-      setTimeout(() => {
-        printWin.print();
-      }, 500);
+      setTimeout(() => { printWin.print(); }, 500);
     }
+  } else if (format === 'docx') {
+    const content = _reportToWordXML(html);
+    _downloadBlob(content, 'application/msword', `report-${type}-${dateStr}.doc`);
+  } else if (format === 'rtf') {
+    const content = _reportToRTF(html);
+    _downloadBlob(content, 'application/rtf', `report-${type}-${dateStr}.rtf`);
+  } else if (format === 'excel') {
+    const content = _reportToSpreadsheetML(html);
+    _downloadBlob(content, 'application/vnd.ms-excel', `report-${type}-${dateStr}.xls`);
   } else {
-    // Download as HTML
-    const a = document.createElement('a');
-    a.href     = url;
-    a.download = `report-${type}-${new Date().toISOString().slice(0,10)}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // HTML download
+    _downloadBlob(html, 'text/html;charset=utf-8', `report-${type}-${dateStr}.html`);
   }
-  URL.revokeObjectURL(url);
   closeModal('reportModal');
   showNotification('success', t('report_ready')||'Report downloaded');
+}
+
+// ── Report format helpers ────────────────────────────────────────────────────
+
+function _downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], {type: mimeType});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function _parseReportHTML(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const title = doc.querySelector('h1')?.textContent?.trim() || 'Report';
+  const sections = [];
+  let cur = null;
+  doc.body.childNodes.forEach(node => {
+    if (!node.tagName) return;
+    if (node.tagName === 'H1') return;
+    if (node.tagName === 'H2') {
+      cur = { heading: node.textContent.trim(), headers: [], rows: [] };
+      sections.push(cur);
+    } else if (node.tagName === 'TABLE' && cur) {
+      cur.headers = [...node.querySelectorAll('thead th')].map(th => th.textContent.trim());
+      cur.rows    = [...node.querySelectorAll('tbody tr')].map(tr =>
+        [...tr.querySelectorAll('td')].map(td => td.textContent.trim())
+      );
+    }
+  });
+  return { title, sections };
+}
+
+function _reportToWordXML(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let out = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><?mso-application progid="Word.Document"?>` +
+    `<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">` +
+    `<w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${x(title)}</w:t></w:r></w:p>`;
+  sections.forEach(s => {
+    out += `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${x(s.heading)}</w:t></w:r></w:p>`;
+    if (s.headers.length) {
+      out += `<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/></w:tblPr>`;
+      out += `<w:tr>${s.headers.map(h=>`<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${x(h)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`;
+      s.rows.forEach(row => {
+        out += `<w:tr>${row.map(c=>`<w:tc><w:p><w:r><w:t>${x(c)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`;
+      });
+      out += `</w:tbl>`;
+    }
+  });
+  return out + `</w:body></w:wordDocument>`;
+}
+
+function _reportToRTF(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/\\/g,'\\\\').replace(/\{/g,'\\{').replace(/\}/g,'\\}')
+    .replace(/[^\x00-\x7F]/g, c => `\\'${c.charCodeAt(0).toString(16).padStart(2,'0')}`);
+  let out = `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}}\\widowctrl\n`;
+  out += `{\\b\\fs28 ${x(title)}}\\par\\par\n`;
+  sections.forEach(s => {
+    out += `{\\b\\fs22 ${x(s.heading)}}\\par\n`;
+    if (s.headers.length) {
+      const cw = Math.floor(9000 / s.headers.length);
+      const rowRTF = (cells, bold) => {
+        let r = `{\\trowd\\trgaph120`;
+        cells.forEach((_,i) => { r += `\\cellx${cw*(i+1)}`; });
+        cells.forEach(c => { r += `\\intbl${bold?'{\\b ':'{ '}${x(c)}}\\cell`; });
+        return r + `\\row}\n`;
+      };
+      out += rowRTF(s.headers, true);
+      s.rows.forEach(row => { out += rowRTF(row, false); });
+    }
+    out += `\\par\n`;
+  });
+  return out + `}`;
+}
+
+function _reportToSpreadsheetML(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cell = v => `<Cell><Data ss:Type="String">${x(v)}</Data></Cell>`;
+  let rows = `<Row>${cell(title)}</Row><Row/>`;
+  sections.forEach(s => {
+    rows += `<Row>${cell(s.heading)}</Row>`;
+    if (s.headers.length) {
+      rows += `<Row>${s.headers.map(cell).join('')}</Row>`;
+      s.rows.forEach(r => { rows += `<Row>${r.map(cell).join('')}</Row>`; });
+    }
+    rows += `<Row/>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>` +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    `<Worksheet ss:Name="Report"><Table>${rows}</Table></Worksheet></Workbook>`;
 }
 
 // ── Auto Report ─────────────────────────────────────────────────────────────
