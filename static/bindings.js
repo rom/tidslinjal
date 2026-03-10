@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#templateFileInput',  'change', function () { handleTemplateFileLoad(this); });
 
   // ---------- Report modal ---------------------------------------------------
-  on('#btnGenerateReport', 'click', function () { generateReport(); });
+  on('#lbl-report-generate', 'click', function () { generateReport(); });
 
   // ---------- Auto report modal ----------------------------------------------
   on('#btnAddAutoReport', 'click', function () { addAutoReport(); });
