@@ -12,13 +12,9 @@
  * Use data-event="change|input" for non-click events (default is 'click').
  */
 function _bindActions(root) {
-  // Resolve function name from local scope chain (works for non-global fns)
-  const _resolve = (name) => {
-    try { return eval(name); } catch { return undefined; }
-  };
   root.querySelectorAll('[data-action]').forEach(el => {
     const fnName = el.dataset.action;
-    const fn = _resolve(fnName);
+    const fn = window[fnName];
     if (typeof fn !== 'function') return;
     const eventType = el.dataset.event || 'click';
     el.addEventListener(eventType, e => {
