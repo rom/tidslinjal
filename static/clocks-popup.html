@@ -68,6 +68,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .vcr-tz    { color:#880000 !important; }
 .vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
 @keyframes vcr-blink { 50% { opacity:0; } }
+/* ── Clickable label ── */
+.clock-label-click { cursor:pointer; user-select:none; }
+.clock-label-click:hover { text-decoration:underline; }
 </style>
 </head>
 <body class="theme-dark sz-md">
@@ -86,6 +89,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <label>Size</label>
   <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
+  <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
 <script src="/static/clocks-popup.js"></script>

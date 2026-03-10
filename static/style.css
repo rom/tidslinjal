@@ -523,6 +523,7 @@ select.ctrl-select:focus { border-color: var(--accent); }
 /* Form elements */
 .form-group   { display: flex; flex-direction: column; gap: 5px; }
 .form-group label { font-size: var(--fs-sm); color: var(--text-dim); font-weight: 500; }
+.tz-hint { font-size: 10px; font-weight: 400; color: var(--accent); opacity: .8; }
 .form-row     { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3   { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 input[type="text"], input[type="password"], input[type="datetime-local"], input[type="color"],
