@@ -1,0 +1,135 @@
+{
+  "name": "Operations — Event / Conference Management (1 Day)",
+  "description": "A single-day operational template for managing a conference, seminar, workshop, or public event. Covers setup, registration, sessions, breaks, and teardown. Suitable for event organisers, conference staff, and venue managers.",
+  "exercise_name": "EVENT",
+  "day_start_hour": 7,
+  "day_end_hour": 19,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Setup & Registration",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Main Programme",
+      "color": "#27AE60",
+      "start_offset_min": 120,
+      "end_offset_min": 540,
+      "order": 1
+    },
+    {
+      "name": "Closing & Teardown",
+      "color": "#9B59B6",
+      "start_offset_min": 540,
+      "end_offset_min": 720,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Event Lead", "description": "Overall event coordination" },
+    { "name": "Venue & Logistics", "description": "Venue setup, AV, catering, signage" },
+    { "name": "Speakers / Presenters", "description": "Session presenters and panel members" },
+    { "name": "Registration Desk", "description": "Check-in, badges, attendee support" }
+  ],
+  "events": [
+    {
+      "title": "Venue Opens — Setup Begins",
+      "description": "Staff arrives. AV check, signage, catering setup, registration desk prepared.",
+      "event_type": "assigned_task",
+      "start_offset_min": 0,
+      "duration_min": 60,
+      "responsible": "Venue & Logistics"
+    },
+    {
+      "title": "Registration Opens",
+      "description": "Doors open for attendees. Check-in, badges, and welcome materials distributed.",
+      "event_type": "instant",
+      "start_offset_min": 60,
+      "duration_min": 0,
+      "responsible": "Registration Desk"
+    },
+    {
+      "title": "Opening Session / Keynote",
+      "description": "Welcome address and keynote presentation.",
+      "event_type": "mote",
+      "start_offset_min": 120,
+      "duration_min": 60,
+      "responsible": "Speakers / Presenters"
+    },
+    {
+      "title": "Morning Break",
+      "description": "Coffee break and networking.",
+      "event_type": "instant",
+      "start_offset_min": 180,
+      "duration_min": 0,
+      "responsible": "Venue & Logistics"
+    },
+    {
+      "title": "Session Block 1",
+      "description": "First session block: presentations, panels, or workshops.",
+      "event_type": "mote",
+      "start_offset_min": 195,
+      "duration_min": 90,
+      "responsible": "Speakers / Presenters"
+    },
+    {
+      "title": "Lunch Break",
+      "description": "Lunch served. Networking time.",
+      "event_type": "instant",
+      "start_offset_min": 300,
+      "duration_min": 0,
+      "responsible": "Venue & Logistics"
+    },
+    {
+      "title": "Session Block 2",
+      "description": "Afternoon sessions: presentations, panels, or workshops.",
+      "event_type": "mote",
+      "start_offset_min": 360,
+      "duration_min": 90,
+      "responsible": "Speakers / Presenters"
+    },
+    {
+      "title": "Afternoon Break",
+      "description": "Short break.",
+      "event_type": "instant",
+      "start_offset_min": 450,
+      "duration_min": 0,
+      "responsible": "Venue & Logistics"
+    },
+    {
+      "title": "Closing Session & Summary",
+      "description": "Closing remarks, key takeaways, next steps, and thank-yous.",
+      "event_type": "mote",
+      "start_offset_min": 465,
+      "duration_min": 45,
+      "responsible": "Event Lead"
+    },
+    {
+      "title": "Event Ends — Attendees Depart",
+      "description": "Formal close. Attendees depart.",
+      "event_type": "instant",
+      "start_offset_min": 540,
+      "duration_min": 0,
+      "responsible": "Event Lead"
+    },
+    {
+      "title": "Teardown & Venue Handback",
+      "description": "Remove signage, pack equipment, clean venue, hand back keys.",
+      "event_type": "assigned_task",
+      "start_offset_min": 540,
+      "duration_min": 120,
+      "responsible": "Venue & Logistics"
+    },
+    {
+      "title": "Staff Debrief",
+      "description": "Quick debrief with staff: what went well, issues, improvements for next time.",
+      "event_type": "standup",
+      "start_offset_min": 660,
+      "duration_min": 30,
+      "responsible": "Event Lead"
+    }
+  ]
+}

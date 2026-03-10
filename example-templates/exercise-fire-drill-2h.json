@@ -1,0 +1,107 @@
+{
+  "name": "Exercise — Fire / Evacuation Drill (2 Hours)",
+  "description": "A short practical evacuation drill for buildings or facilities. Covers alarm activation, evacuation, assembly, accountability, and debrief. Suitable for office buildings, schools, hospitals, or industrial sites.",
+  "exercise_name": "EVACUATION DRILL",
+  "day_start_hour": 10,
+  "day_end_hour": 12,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Pre-Drill Preparation",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 15,
+      "order": 0
+    },
+    {
+      "name": "Drill Execution",
+      "color": "#E74C3C",
+      "start_offset_min": 15,
+      "end_offset_min": 60,
+      "order": 1
+    },
+    {
+      "name": "Debrief & Lessons",
+      "color": "#27AE60",
+      "start_offset_min": 60,
+      "end_offset_min": 120,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Safety Officer", "description": "Drill coordinator and safety lead" },
+    { "name": "Floor Wardens", "description": "Designated evacuation wardens per floor or zone" },
+    { "name": "All Personnel", "description": "Everyone participating in the evacuation" }
+  ],
+  "roles": [
+    { "name": "Safety Officer", "description": "Initiates drill, monitors execution, leads debrief" },
+    { "name": "Floor Warden", "description": "Guides evacuation of assigned zone, confirms all-clear" },
+    { "name": "Observer", "description": "Times evacuation, notes issues, counts personnel" }
+  ],
+  "events": [
+    {
+      "title": "Safety Officer Pre-Brief",
+      "description": "Brief floor wardens and observers. Confirm assembly points and head-count procedures.",
+      "event_type": "mote",
+      "start_offset_min": 0,
+      "duration_min": 10,
+      "responsible": "Safety Officer"
+    },
+    {
+      "title": "ALARM ACTIVATED — Drill Begins",
+      "description": "Fire alarm activated. Evacuation commences. Start timer.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Safety Officer"
+    },
+    {
+      "title": "Evacuation In Progress",
+      "description": "All personnel evacuate to designated assembly points via assigned routes.",
+      "event_type": "assigned_task",
+      "start_offset_min": 15,
+      "duration_min": 15,
+      "responsible": "Floor Wardens"
+    },
+    {
+      "title": "Head Count at Assembly Point",
+      "description": "Floor wardens conduct head count and report to Safety Officer.",
+      "event_type": "reporting",
+      "start_offset_min": 30,
+      "duration_min": 10,
+      "responsible": "Floor Wardens"
+    },
+    {
+      "title": "ALL CLEAR — Drill Concluded",
+      "description": "Safety Officer confirms all personnel accounted for. Alarm silenced.",
+      "event_type": "instant",
+      "start_offset_min": 45,
+      "duration_min": 0,
+      "responsible": "Safety Officer"
+    },
+    {
+      "title": "Return to Building",
+      "description": "Personnel return to workstations in orderly fashion.",
+      "event_type": "instant",
+      "start_offset_min": 50,
+      "duration_min": 0,
+      "responsible": "All Personnel"
+    },
+    {
+      "title": "Observer Reports Collected",
+      "description": "Observers submit timing data, issues noted, and improvement suggestions.",
+      "event_type": "reporting",
+      "start_offset_min": 60,
+      "duration_min": 15,
+      "responsible": "Safety Officer"
+    },
+    {
+      "title": "Debrief & Lessons Learned",
+      "description": "Review evacuation time, issues found, and improvements for next drill.",
+      "event_type": "mote",
+      "start_offset_min": 80,
+      "duration_min": 30,
+      "responsible": "Safety Officer"
+    }
+  ]
+}

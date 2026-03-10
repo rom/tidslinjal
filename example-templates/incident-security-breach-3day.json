@@ -1,0 +1,171 @@
+{
+  "name": "Incident — Security Breach (3 Days)",
+  "description": "A 3-day incident response template for a confirmed security breach — unauthorized access, data leak, or account compromise. Covers containment, investigation, remediation, and stakeholder communication. Suitable as a starting point for security teams.",
+  "exercise_name": "SECURITY BREACH RESPONSE",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Containment",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Investigation",
+      "color": "#E67E22",
+      "start_offset_min": 480,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Remediation & Recovery",
+      "color": "#F39C12",
+      "start_offset_min": 2880,
+      "end_offset_min": 3840,
+      "order": 2
+    },
+    {
+      "name": "Closure & Review",
+      "color": "#27AE60",
+      "start_offset_min": 3840,
+      "end_offset_min": 4320,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Security Team", "description": "SOC analysts and incident responders" },
+    { "name": "IT Operations", "description": "System administrators and network engineers" },
+    { "name": "Management", "description": "Senior management, legal, HR if needed" },
+    { "name": "Communications", "description": "Internal and external communications" }
+  ],
+  "roles": [
+    { "name": "Incident Commander", "description": "Overall coordination and decision authority" },
+    { "name": "Lead Investigator", "description": "Leads technical forensic investigation" },
+    { "name": "Communications Lead", "description": "Manages stakeholder messaging" }
+  ],
+  "events": [
+    {
+      "title": "BREACH CONFIRMED",
+      "description": "Unauthorized access or data exposure confirmed. Document initial indicators.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Incident Commander Assigned",
+      "description": "IC takes charge. Establishes command structure and communication channels.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Management"
+    },
+    {
+      "title": "Immediate Containment",
+      "description": "Isolate affected systems, disable compromised accounts, block attacker access.",
+      "event_type": "assigned_task",
+      "start_offset_min": 20,
+      "duration_min": 120,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Management Notification",
+      "description": "Brief senior management on confirmed breach, initial scope, and response actions.",
+      "event_type": "reporting",
+      "start_offset_min": 60,
+      "duration_min": 30,
+      "responsible": "Communications"
+    },
+    {
+      "title": "Evidence Preservation",
+      "description": "Capture forensic images, preserve logs, and secure evidence chain of custody.",
+      "event_type": "assigned_task",
+      "start_offset_min": 120,
+      "duration_min": 180,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "SITREP #1",
+      "description": "First formal situation report: what happened, what was contained, next steps.",
+      "event_type": "reporting",
+      "start_offset_min": 360,
+      "duration_min": 30,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 1 — Forensic Investigation Begins",
+      "description": "Deep analysis of attack vector, scope of access, data affected.",
+      "event_type": "assigned_task",
+      "start_offset_min": 480,
+      "duration_min": 480,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 1 — Decision: External Notification",
+      "description": "Decide if customers, regulators, or law enforcement need to be notified.",
+      "event_type": "decision",
+      "start_offset_min": 720,
+      "duration_min": 60,
+      "responsible": "Management"
+    },
+    {
+      "title": "Day 2 Morning — Status Briefing",
+      "description": "Update all stakeholders on investigation findings and containment status.",
+      "event_type": "mote",
+      "start_offset_min": 1500,
+      "duration_min": 30,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 2 — Investigation Continues",
+      "description": "Continue forensic analysis. Map full extent of compromise.",
+      "event_type": "assigned_task",
+      "start_offset_min": 1560,
+      "duration_min": 480,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 2 — SITREP #2",
+      "description": "Second formal situation report with updated findings and timeline.",
+      "event_type": "reporting",
+      "start_offset_min": 2160,
+      "duration_min": 30,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 3 — Remediation Actions",
+      "description": "Patch vulnerabilities, reset credentials, harden configurations, restore systems.",
+      "event_type": "assigned_task",
+      "start_offset_min": 2880,
+      "duration_min": 480,
+      "responsible": "IT Operations"
+    },
+    {
+      "title": "Day 3 — Verification Testing",
+      "description": "Verify all remediation actions effective. Run security scans.",
+      "event_type": "assigned_task",
+      "start_offset_min": 3600,
+      "duration_min": 120,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "Day 3 — Post-Incident Review",
+      "description": "Review full timeline, root cause, response effectiveness, and improvements.",
+      "event_type": "mote",
+      "start_offset_min": 3840,
+      "duration_min": 120,
+      "responsible": "Security Team"
+    },
+    {
+      "title": "INCIDENT CLOSED",
+      "description": "Incident formally closed. Lessons learned documented. Improvement actions assigned.",
+      "event_type": "instant",
+      "start_offset_min": 4200,
+      "duration_min": 0,
+      "responsible": "Management"
+    }
+  ]
+}

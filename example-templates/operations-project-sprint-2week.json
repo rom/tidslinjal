@@ -1,0 +1,149 @@
+{
+  "name": "Operations — Project Sprint (2 Weeks)",
+  "description": "A two-week project sprint template with planning, daily standups, mid-sprint review, and retrospective. Based on agile/sprint methodology. Suitable for software teams, project groups, or any team running time-boxed delivery cycles.",
+  "exercise_name": "SPRINT",
+  "day_start_hour": 9,
+  "day_end_hour": 17,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Sprint Planning (Day 1)",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Week 1 — Execution",
+      "color": "#27AE60",
+      "start_offset_min": 1440,
+      "end_offset_min": 7200,
+      "order": 1
+    },
+    {
+      "name": "Week 2 — Execution",
+      "color": "#F39C12",
+      "start_offset_min": 7200,
+      "end_offset_min": 12960,
+      "order": 2
+    },
+    {
+      "name": "Sprint Close (Day 10)",
+      "color": "#9B59B6",
+      "start_offset_min": 12960,
+      "end_offset_min": 13440,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Product Owner", "description": "Defines priorities and accepts deliverables" },
+    { "name": "Team", "description": "Delivery team members" },
+    { "name": "Scrum Master / Lead", "description": "Facilitates process and removes blockers" }
+  ],
+  "events": [
+    {
+      "title": "Day 1 — Sprint Planning",
+      "description": "Review backlog, agree on sprint goal, estimate and commit to sprint items.",
+      "event_type": "mote",
+      "start_offset_min": 0,
+      "duration_min": 120,
+      "responsible": "Scrum Master / Lead"
+    },
+    {
+      "title": "Day 1 — Task Breakdown",
+      "description": "Break sprint items into tasks. Assign initial owners.",
+      "event_type": "assigned_task",
+      "start_offset_min": 120,
+      "duration_min": 120,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 2 — Daily Standup",
+      "description": "What did you do? What will you do? Any blockers?",
+      "event_type": "standup",
+      "start_offset_min": 1440,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 3 — Daily Standup",
+      "description": "Daily sync. Track progress against sprint goal.",
+      "event_type": "standup",
+      "start_offset_min": 2880,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 4 — Daily Standup",
+      "description": "Daily sync. Identify blockers early.",
+      "event_type": "standup",
+      "start_offset_min": 4320,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 5 — Mid-Sprint Review",
+      "description": "Review progress at week 1 end. Adjust scope if needed. Demo early work.",
+      "event_type": "mote",
+      "start_offset_min": 5760,
+      "duration_min": 60,
+      "responsible": "Scrum Master / Lead"
+    },
+    {
+      "title": "Day 6 — Daily Standup",
+      "description": "Week 2 start. Refocus on remaining sprint items.",
+      "event_type": "standup",
+      "start_offset_min": 7200,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 7 — Daily Standup",
+      "description": "Daily sync.",
+      "event_type": "standup",
+      "start_offset_min": 8640,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 8 — Daily Standup",
+      "description": "Daily sync. Focus on closing items.",
+      "event_type": "standup",
+      "start_offset_min": 10080,
+      "duration_min": 15,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 9 — Final Push & Testing",
+      "description": "Complete remaining tasks. Final testing and quality checks.",
+      "event_type": "assigned_task",
+      "start_offset_min": 11520,
+      "duration_min": 480,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 10 — Sprint Review / Demo",
+      "description": "Demonstrate completed work to product owner and stakeholders.",
+      "event_type": "mote",
+      "start_offset_min": 12960,
+      "duration_min": 60,
+      "responsible": "Team"
+    },
+    {
+      "title": "Day 10 — Sprint Retrospective",
+      "description": "What went well? What didn't? What to improve? Action items for next sprint.",
+      "event_type": "mote",
+      "start_offset_min": 13080,
+      "duration_min": 60,
+      "responsible": "Scrum Master / Lead"
+    },
+    {
+      "title": "Sprint Closed",
+      "description": "Sprint formally concluded. Unfinished items return to backlog.",
+      "event_type": "instant",
+      "start_offset_min": 13200,
+      "duration_min": 0,
+      "responsible": "Product Owner"
+    }
+  ]
+}

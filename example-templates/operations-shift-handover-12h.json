@@ -1,0 +1,105 @@
+{
+  "name": "Operations — Shift Handover (12 Hours)",
+  "description": "A 12-hour shift template for operations centres, control rooms, or 24/7 facilities. Covers incoming shift briefing, operational monitoring, scheduled checks, reporting, and handover to the next shift. Use as a repeating pattern for continuous operations.",
+  "exercise_name": "SHIFT OPS",
+  "day_start_hour": 7,
+  "day_end_hour": 19,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Shift Start & Handover",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 60,
+      "order": 0
+    },
+    {
+      "name": "Active Monitoring",
+      "color": "#27AE60",
+      "start_offset_min": 60,
+      "end_offset_min": 600,
+      "order": 1
+    },
+    {
+      "name": "Shift Close & Handover",
+      "color": "#9B59B6",
+      "start_offset_min": 600,
+      "end_offset_min": 720,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Shift Supervisor", "description": "Shift leader responsible for all operations during the shift" },
+    { "name": "Operators", "description": "Operations centre personnel on shift" }
+  ],
+  "roles": [
+    { "name": "Shift Supervisor", "description": "Leads shift, makes operational decisions, approves reports" },
+    { "name": "Duty Operator", "description": "Monitors systems, responds to events, maintains logs" }
+  ],
+  "events": [
+    {
+      "title": "Incoming Shift Handover Brief",
+      "description": "Outgoing shift briefs incoming: open incidents, pending tasks, key contacts, known issues.",
+      "event_type": "standup",
+      "start_offset_min": 0,
+      "duration_min": 30,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "System Status Check",
+      "description": "Verify all monitored systems are operational. Check dashboards and alerts.",
+      "event_type": "assigned_task",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "responsible": "Operators"
+    },
+    {
+      "title": "Mid-Morning Check-In",
+      "description": "Quick status check: any new issues, resource needs, or schedule changes.",
+      "event_type": "standup",
+      "start_offset_min": 180,
+      "duration_min": 10,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "Noon Status Report",
+      "description": "Mid-shift status report: events handled, system health, upcoming tasks.",
+      "event_type": "reporting",
+      "start_offset_min": 300,
+      "duration_min": 15,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "Afternoon Check-In",
+      "description": "Afternoon status check. Review remaining tasks for the shift.",
+      "event_type": "standup",
+      "start_offset_min": 420,
+      "duration_min": 10,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "End-of-Shift Report",
+      "description": "Compile shift summary: events, decisions, open items, handover notes.",
+      "event_type": "reporting",
+      "start_offset_min": 600,
+      "duration_min": 30,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "Outgoing Shift Handover",
+      "description": "Brief incoming shift on everything they need to know. Confirm handover complete.",
+      "event_type": "standup",
+      "start_offset_min": 660,
+      "duration_min": 30,
+      "responsible": "Shift Supervisor"
+    },
+    {
+      "title": "Shift Ends",
+      "description": "Outgoing shift personnel released. Incoming shift has full responsibility.",
+      "event_type": "instant",
+      "start_offset_min": 710,
+      "duration_min": 0,
+      "responsible": "Shift Supervisor"
+    }
+  ]
+}
