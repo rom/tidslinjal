@@ -261,23 +261,23 @@
 
 <!-- Context menu -->
 <div id="contextMenu" class="context-menu" style="display:none">
-  <div class="context-menu-item" id="ctxEdit" onclick="ctxAction('edit')">✏️ Edit Event</div>
-  <div class="context-menu-item" id="ctxDuplicate" onclick="ctxAction('duplicate')">⧉ Duplicate</div>
-  <div class="context-menu-item" id="ctxAlarm" onclick="ctxAction('alarm')">🔔 Set Alarm</div>
-  <div class="context-menu-item" id="ctxMove" onclick="ctxAction('move')">📅 Move to new time/date…</div>
+  <div class="context-menu-item" id="ctxEdit" data-ctx-action="edit">✏️ Edit Event</div>
+  <div class="context-menu-item" id="ctxDuplicate" data-ctx-action="duplicate">⧉ Duplicate</div>
+  <div class="context-menu-item" id="ctxAlarm" data-ctx-action="alarm">🔔 Set Alarm</div>
+  <div class="context-menu-item" id="ctxMove" data-ctx-action="move">📅 Move to new time/date…</div>
   <div class="context-menu-sep"></div>
-  <div class="context-menu-item" id="ctxStatusPlanned" onclick="ctxAction('status','planned')">Set Planned</div>
-  <div class="context-menu-item" id="ctxStatusActive" onclick="ctxAction('status','active')">Set Active</div>
-  <div class="context-menu-item" id="ctxStatusCompleted" onclick="ctxAction('status','completed')">Set Completed</div>
-  <div class="context-menu-item" id="ctxStatusCancelled" onclick="ctxAction('status','cancelled')">Set Cancelled</div>
+  <div class="context-menu-item" id="ctxStatusPlanned" data-ctx-action="status" data-ctx-param="planned">Set Planned</div>
+  <div class="context-menu-item" id="ctxStatusActive" data-ctx-action="status" data-ctx-param="active">Set Active</div>
+  <div class="context-menu-item" id="ctxStatusCompleted" data-ctx-action="status" data-ctx-param="completed">Set Completed</div>
+  <div class="context-menu-item" id="ctxStatusCancelled" data-ctx-action="status" data-ctx-param="cancelled">Set Cancelled</div>
   <div class="context-menu-sep"></div>
-  <div class="context-menu-item ctx-danger" id="ctxDelete" onclick="ctxAction('delete')">🗑 Delete</div>
+  <div class="context-menu-item ctx-danger" id="ctxDelete" data-ctx-action="delete">🗑 Delete</div>
 </div>
 
 <!-- Empty slot context menu -->
 <div id="slotContextMenu" class="context-menu" style="display:none">
-  <div class="context-menu-item" onclick="ctxSlotAction('add')">Add Event Here</div>
-  <div class="context-menu-item" onclick="ctxSlotAction('lock')">Lock This Slot</div>
+  <div class="context-menu-item" data-ctx-slot-action="add">Add Event Here</div>
+  <div class="context-menu-item" data-ctx-slot-action="lock">Lock This Slot</div>
 </div>
 
 <!-- Error Modal -->
@@ -285,13 +285,13 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header" style="background:var(--danger,#c0392b);border-radius:var(--radius) var(--radius) 0 0">
       <h2 style="color:#fff;display:flex;align-items:center;gap:8px"><span style="font-size:1.2em">⚠</span> <span id="errorModalTitle">Error</span></h2>
-      <button class="modal-close" style="color:#fff" onclick="closeModal('errorModal')">&times;</button>
+      <button class="modal-close" style="color:#fff" data-close-modal="errorModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="errorModalMsg" style="font-size:var(--fs-base);line-height:1.5;white-space:pre-wrap"></p>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-primary" onclick="closeModal('errorModal')">OK</button>
+      <button class="btn btn-primary" data-close-modal="errorModal">OK</button>
     </div>
   </div>
 </div>
@@ -301,20 +301,20 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>📋 Templates</h2>
-      <button class="modal-close" onclick="closeModal('templatesModal')">&times;</button>
+      <button class="modal-close" data-close-modal="templatesModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Templates let you quickly create a pre-defined set of events. Save the current view's events as a template or apply a saved template to any date.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" id="btnSaveTemplate">💾 Save current events as template…</button>
-        <button class="btn btn-secondary btn-sm" id="btnImportTemplate" onclick="importTemplateFromFile()">📂 Load from file…</button>
-        <button class="btn btn-secondary btn-sm" id="btnExportTemplates" onclick="exportTemplatesToFile()">⬇ Save to file…</button>
+        <button class="btn btn-secondary btn-sm" id="btnImportTemplate">📂 Load from file…</button>
+        <button class="btn btn-secondary btn-sm" id="btnExportTemplates">⬇ Save to file…</button>
         <input type="file" id="templateFileInput" accept=".json" style="display:none" onchange="handleTemplateFileLoad(this)">
       </div>
       <div id="templatesList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('templatesModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="templatesModal">Close</button>
     </div>
   </div>
 </div>
@@ -324,7 +324,7 @@
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <h2>💾 Save as Template</h2>
-      <button class="modal-close" onclick="closeModal('saveTemplateModal')">&times;</button>
+      <button class="modal-close" data-close-modal="saveTemplateModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -358,7 +358,7 @@
       </fieldset>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="saveTemplateModal">Cancel</button>
       <button class="btn btn-primary" id="btnConfirmSaveTemplate">Save Template</button>
     </div>
   </div>
@@ -369,7 +369,7 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
       <h2>▶ Apply Template</h2>
-      <button class="modal-close" onclick="closeModal('applyTemplateModal')">&times;</button>
+      <button class="modal-close" data-close-modal="applyTemplateModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="applyTemplateInfo" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -384,7 +384,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('applyTemplateModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="applyTemplateModal">Cancel</button>
       <button class="btn btn-primary" id="btnConfirmApplyTemplate">Load Template</button>
     </div>
   </div>
@@ -396,7 +396,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔁 Edit Recurring Event</h2>
-      <button class="modal-close" onclick="closeModal('recurEditModal')">&times;</button>
+      <button class="modal-close" data-close-modal="recurEditModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="recurEditMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to edit?</p>
@@ -407,7 +407,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('recurEditModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="recurEditModal">Cancel</button>
     </div>
   </div>
 </div>
@@ -416,7 +416,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔁 Delete Recurring Event</h2>
-      <button class="modal-close" onclick="closeModal('recurDeleteModal')">&times;</button>
+      <button class="modal-close" data-close-modal="recurDeleteModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="recurDeleteMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to delete?</p>
@@ -427,21 +427,21 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('recurDeleteModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="recurDeleteModal">Cancel</button>
     </div>
   </div>
 </div>
 
 <!-- Sidebar backdrop for mobile -->
-<div id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+<div id="sidebarBackdrop"></div>
 
 <!-- Mobile bottom nav -->
 <nav id="mobileNav" class="mobile-nav" style="display:none">
-  <button class="mobile-nav-btn" onclick="mobileNavTab('timeline')" id="mnTimeline">📅<span>Timeline</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('legend')" id="mnLegend">🏷️<span>Legend</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('layers')" id="mnLayers">📂<span>Layers</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('settings')" id="mnSettings">⚙️<span>Settings</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('menu')" id="mnMenu">☰<span>More</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="timeline" id="mnTimeline">📅<span>Timeline</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="legend" id="mnLegend">🏷️<span>Legend</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="layers" id="mnLayers">📂<span>Layers</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="settings" id="mnSettings">⚙️<span>Settings</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="menu" id="mnMenu">☰<span>More</span></button>
 </nav>
 
 <!-- Layer quick-toggle popover -->
@@ -460,7 +460,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="eventModalTitle">Add Event</h2>
-      <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
+      <button class="modal-close" data-close-modal="eventModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="eventId">
@@ -546,7 +546,7 @@
             <option value="teleconf">Tele conference</option>
             <option value="other">Other</option>
           </select>
-          <button type="button" class="btn btn-secondary btn-sm" id="btnGenerateMeetingLink" style="margin-top:6px;display:none" onclick="generateMeetingLink()">🔗 Generate Meeting Link</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnGenerateMeetingLink" style="margin-top:6px;display:none">🔗 Generate Meeting Link</button>
         </div>
       </div>
       <div class="form-row">
@@ -602,9 +602,9 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <label id="lbl-ev-invited">Invited (notify on creation)</label>
           <div class="inv-filter-btns" style="display:flex;gap:2px">
-            <button type="button" class="btn btn-sm inv-filter-btn active" data-filter="both" onclick="setInvitedFilter('both')">Both</button>
-            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="users" onclick="setInvitedFilter('users')">Users</button>
-            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="groups" onclick="setInvitedFilter('groups')">Groups</button>
+            <button type="button" class="btn btn-sm inv-filter-btn active" data-filter="both" data-invited-filter="both">Both</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="users" data-invited-filter="users">Users</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="groups" data-invited-filter="groups">Groups</button>
           </div>
         </div>
         <div id="eventInvitedList" class="group-picker" style="margin-top:4px"></div>
@@ -680,7 +680,7 @@
       <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none" onclick="openEventHistory()">🕐 History</button>
       <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none" onclick="openDependenciesModal()">🔗 Dependencies</button>
       <span style="flex:1"></span>
-      <button class="btn btn-secondary" onclick="closeModal('eventModal')" id="lbl-btn-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="eventModal" id="lbl-btn-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEvent">Save</button>
     </div>
   </div>
@@ -691,7 +691,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="detailTitle">—</h2>
-      <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+      <button class="modal-close" data-close-modal="detailModal">&times;</button>
     </div>
     <div class="modal-body" id="detailBody"></div>
     <div class="modal-footer" id="detailFooter"></div>
@@ -703,7 +703,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-alarm-title">Set Alarm</h2>
-      <button class="modal-close" onclick="closeModal('alarmModal')">&times;</button>
+      <button class="modal-close" data-close-modal="alarmModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="alarmEventId">
@@ -743,7 +743,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('alarmModal')" id="lbl-alarm-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="alarmModal" id="lbl-alarm-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveAlarm">Set Alarm</button>
     </div>
   </div>
@@ -754,7 +754,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-lock-title">Lock / Unlock Time Slot</h2>
-      <button class="modal-close" onclick="closeModal('lockModal')">&times;</button>
+      <button class="modal-close" data-close-modal="lockModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- Existing locks list -->
@@ -791,7 +791,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('lockModal')" id="lbl-lock-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="lockModal" id="lbl-lock-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLock">Lock Slot</button>
     </div>
   </div>
@@ -802,7 +802,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="userModalTitle">Add User</h2>
-      <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+      <button class="modal-close" data-close-modal="userModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="userId">
@@ -867,7 +867,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
-      <button class="btn btn-secondary" onclick="closeModal('userModal')" id="lbl-u-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="userModal" id="lbl-u-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveUser">Save</button>
     </div>
   </div>
@@ -878,7 +878,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>👤 <span data-i18n="profile_title">My Profile</span></h2>
-      <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+      <button class="modal-close" data-close-modal="profileModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- Photo + identity row -->
@@ -1037,7 +1037,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('profileModal')" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="profileModal" data-i18n="btn_cancel">Cancel</button>
       <button class="btn btn-primary" onclick="saveProfile()" data-i18n="profile_save">Save Profile</button>
     </div>
   </div>
@@ -1048,7 +1048,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-pwd-title">Change Password</h2>
-      <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
+      <button class="modal-close" data-close-modal="passwordModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- SSO/OIDC accounts cannot change password here -->
@@ -1094,7 +1094,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('passwordModal')" id="lbl-pwd-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="passwordModal" id="lbl-pwd-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePassword">Change Password</button>
     </div>
   </div>
@@ -1105,7 +1105,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="phaseModalTitle">New Phase</h2>
-      <button class="modal-close" onclick="closeModal('phaseModal')">&times;</button>
+      <button class="modal-close" data-close-modal="phaseModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="phaseId">
@@ -1142,7 +1142,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeletePhase" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('phaseModal')" id="lbl-phase-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="phaseModal" id="lbl-phase-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePhase">Save</button>
     </div>
   </div>
@@ -1153,7 +1153,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="lbl-report-title">📄 Generate Report</h2>
-      <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="reportModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
@@ -1200,7 +1200,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('reportModal')" id="lbl-report-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="reportModal" id="lbl-report-cancel">Cancel</button>
       <button class="btn btn-primary" onclick="generateReport()" id="lbl-report-generate">Generate</button>
     </div>
   </div>
@@ -1211,7 +1211,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>⏰ Automatic Report Scheduling</h2>
-      <button class="modal-close" onclick="closeModal('autoReportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="autoReportModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">Configure scheduled reports to be automatically generated and distributed.</p>
@@ -1270,7 +1270,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('autoReportModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="autoReportModal">Cancel</button>
       <button class="btn btn-primary" onclick="addAutoReport()">➕ Add Schedule</button>
     </div>
   </div>
@@ -1281,7 +1281,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🕐 Event Change History</h2>
-      <button class="modal-close" onclick="closeModal('eventHistoryModal')">&times;</button>
+      <button class="modal-close" data-close-modal="eventHistoryModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="eventHistoryList">
@@ -1289,7 +1289,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('eventHistoryModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="eventHistoryModal">Close</button>
     </div>
   </div>
 </div>
@@ -1299,7 +1299,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🔗 Event Dependencies</h2>
-      <button class="modal-close" onclick="closeModal('dependenciesModal')">&times;</button>
+      <button class="modal-close" data-close-modal="dependenciesModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">
@@ -1317,7 +1317,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('dependenciesModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="dependenciesModal">Cancel</button>
       <button class="btn btn-primary" onclick="saveDependencies()">Save Dependencies</button>
     </div>
   </div>
@@ -1328,7 +1328,7 @@
   <div class="modal modal-wide" style="max-width:800px">
     <div class="modal-header">
       <h2>🗺️ Event Location</h2>
-      <button class="modal-close" onclick="closeModal('mapModal')">&times;</button>
+      <button class="modal-close" data-close-modal="mapModal">&times;</button>
     </div>
     <div class="modal-body" style="padding:0">
       <div id="mapContainer" style="height:400px;width:100%"></div>
@@ -1351,7 +1351,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('mapModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="mapModal">Cancel</button>
       <button class="btn btn-primary" onclick="saveMapLocation()">Use this location</button>
     </div>
   </div>
@@ -1362,7 +1362,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2>💾 Backup &amp; Restore</h2>
-      <button class="modal-close" onclick="closeModal('backupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="backupModal">&times;</button>
     </div>
     <div class="modal-body">
       <h3 style="font-size:var(--fs-base);margin-bottom:8px">Backup</h3>
@@ -1384,7 +1384,7 @@
       <div id="restoreStatus" style="font-size:var(--fs-sm);margin-top:8px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('backupModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="backupModal">Close</button>
       <button class="btn btn-danger" onclick="uploadRestore()">⬆️ Restore from Backup</button>
     </div>
   </div>
@@ -1395,7 +1395,7 @@
   <div class="modal modal-wide" style="max-width:760px">
     <div class="modal-header">
       <h2>🔄 Gradual Backup (Auto-Snapshots)</h2>
-      <button class="modal-close" onclick="closeModal('gradualBackupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="gradualBackupModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:14px">
@@ -1433,7 +1433,7 @@
       <div id="gbSnapshotsList" style="max-height:320px;overflow-y:auto"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('gradualBackupModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="gradualBackupModal">Close</button>
     </div>
   </div>
 </div>
@@ -1443,7 +1443,7 @@
   <div class="modal modal-wide" style="max-width:900px">
     <div class="modal-header">
       <h2>📊 Planned vs. Actual Comparison</h2>
-      <button class="modal-close" onclick="closeModal('pvaModal')">&times;</button>
+      <button class="modal-close" data-close-modal="pvaModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="pvaContent">
@@ -1451,7 +1451,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('pvaModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="pvaModal">Close</button>
       <button class="btn btn-primary" onclick="exportPVAReport()">📄 Export Report</button>
     </div>
   </div>
@@ -1462,7 +1462,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="groupModalTitle">Add Group</h2>
-      <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="groupModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="groupId">
@@ -1477,7 +1477,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteGroup" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('groupModal')" id="lbl-group-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="groupModal" id="lbl-group-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveGroup">Save</button>
     </div>
   </div>
@@ -1488,7 +1488,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="layerModalTitle">New Layer</h2>
-      <button class="modal-close" onclick="closeModal('layerModal')">&times;</button>
+      <button class="modal-close" data-close-modal="layerModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="layerId">
@@ -1530,7 +1530,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteLayer" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('layerModal')" id="lbl-layer-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="layerModal" id="lbl-layer-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLayer">Save</button>
     </div>
   </div>
@@ -1541,7 +1541,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="etypeModalTitle">New Event Type</h2>
-      <button class="modal-close" onclick="closeModal('etypeModal')">&times;</button>
+      <button class="modal-close" data-close-modal="etypeModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="etypeId">
@@ -1575,34 +1575,34 @@
           <input type="text" id="etypeIcon" placeholder="none" maxlength="4"
             style="width:64px;text-align:center;font-size:1.4em;padding:2px 6px">
           <div id="etypeIconPicker" style="display:flex;flex-wrap:wrap;gap:4px">
-            <button type="button" class="icon-pick-btn" data-icon="" title="None" onclick="pickEtypeIcon('')">✕</button>
-            <button type="button" class="icon-pick-btn" data-icon="🤝" onclick="pickEtypeIcon('🤝')">🤝</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚖️" onclick="pickEtypeIcon('⚖️')">⚖️</button>
-            <button type="button" class="icon-pick-btn" data-icon="⏰" onclick="pickEtypeIcon('⏰')">⏰</button>
-            <button type="button" class="icon-pick-btn" data-icon="🧍" onclick="pickEtypeIcon('🧍')">🧍</button>
-            <button type="button" class="icon-pick-btn" data-icon="📊" onclick="pickEtypeIcon('📊')">📊</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚡" onclick="pickEtypeIcon('⚡')">⚡</button>
-            <button type="button" class="icon-pick-btn" data-icon="🎯" onclick="pickEtypeIcon('🎯')">🎯</button>
-            <button type="button" class="icon-pick-btn" data-icon="📋" onclick="pickEtypeIcon('📋')">📋</button>
-            <button type="button" class="icon-pick-btn" data-icon="🔔" onclick="pickEtypeIcon('🔔')">🔔</button>
-            <button type="button" class="icon-pick-btn" data-icon="🚨" onclick="pickEtypeIcon('🚨')">🚨</button>
-            <button type="button" class="icon-pick-btn" data-icon="✅" onclick="pickEtypeIcon('✅')">✅</button>
-            <button type="button" class="icon-pick-btn" data-icon="❌" onclick="pickEtypeIcon('❌')">❌</button>
-            <button type="button" class="icon-pick-btn" data-icon="📌" onclick="pickEtypeIcon('📌')">📌</button>
-            <button type="button" class="icon-pick-btn" data-icon="🏁" onclick="pickEtypeIcon('🏁')">🏁</button>
-            <button type="button" class="icon-pick-btn" data-icon="🔒" onclick="pickEtypeIcon('🔒')">🔒</button>
-            <button type="button" class="icon-pick-btn" data-icon="💡" onclick="pickEtypeIcon('💡')">💡</button>
-            <button type="button" class="icon-pick-btn" data-icon="📡" onclick="pickEtypeIcon('📡')">📡</button>
-            <button type="button" class="icon-pick-btn" data-icon="🗺️" onclick="pickEtypeIcon('🗺️')">🗺️</button>
-            <button type="button" class="icon-pick-btn" data-icon="🛡️" onclick="pickEtypeIcon('🛡️')">🛡️</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚔️" onclick="pickEtypeIcon('⚔️')">⚔️</button>
+            <button type="button" class="icon-pick-btn" data-icon="" title="None">✕</button>
+            <button type="button" class="icon-pick-btn" data-icon="🤝">🤝</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚖️">⚖️</button>
+            <button type="button" class="icon-pick-btn" data-icon="⏰">⏰</button>
+            <button type="button" class="icon-pick-btn" data-icon="🧍">🧍</button>
+            <button type="button" class="icon-pick-btn" data-icon="📊">📊</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚡">⚡</button>
+            <button type="button" class="icon-pick-btn" data-icon="🎯">🎯</button>
+            <button type="button" class="icon-pick-btn" data-icon="📋">📋</button>
+            <button type="button" class="icon-pick-btn" data-icon="🔔">🔔</button>
+            <button type="button" class="icon-pick-btn" data-icon="🚨">🚨</button>
+            <button type="button" class="icon-pick-btn" data-icon="✅">✅</button>
+            <button type="button" class="icon-pick-btn" data-icon="❌">❌</button>
+            <button type="button" class="icon-pick-btn" data-icon="📌">📌</button>
+            <button type="button" class="icon-pick-btn" data-icon="🏁">🏁</button>
+            <button type="button" class="icon-pick-btn" data-icon="🔒">🔒</button>
+            <button type="button" class="icon-pick-btn" data-icon="💡">💡</button>
+            <button type="button" class="icon-pick-btn" data-icon="📡">📡</button>
+            <button type="button" class="icon-pick-btn" data-icon="🗺️">🗺️</button>
+            <button type="button" class="icon-pick-btn" data-icon="🛡️">🛡️</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚔️">⚔️</button>
           </div>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteEtype" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('etypeModal')" id="lbl-etype-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="etypeModal" id="lbl-etype-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEtype">Save</button>
     </div>
   </div>
@@ -1613,11 +1613,11 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="memberModalTitle">Members</h2>
-      <button class="modal-close" onclick="closeModal('memberModal')">&times;</button>
+      <button class="modal-close" data-close-modal="memberModal">&times;</button>
     </div>
     <div class="modal-body" id="memberModalBody"></div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('memberModal')" id="lbl-member-close">Close</button>
+      <button class="btn btn-secondary" data-close-modal="memberModal" id="lbl-member-close">Close</button>
     </div>
   </div>
 </div>
@@ -1632,7 +1632,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-secondary btn-sm" onclick="detachHelp()" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
-        <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+        <button class="modal-close" data-close-modal="helpModal">&times;</button>
       </div>
     </div>
     <div style="padding:8px 20px 0;border-bottom:1px solid var(--border)">
@@ -2199,7 +2199,7 @@
     </div><!-- .modal-body -->
     <div class="modal-footer" style="justify-content:space-between;align-items:center">
       <span style="font-size:var(--fs-xs);color:var(--text-dim)" id="helpVersionLine"></span>
-      <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="helpModal">Close</button>
     </div>
   </div>
 </div>
@@ -2209,7 +2209,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="lbl-export-title">⬇ Export</h2>
-      <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="exportModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- JSON export section with category selection -->
@@ -2239,7 +2239,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('exportModal')" id="lbl-export-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="exportModal" id="lbl-export-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2249,7 +2249,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>⬆ Import</h2>
-      <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+      <button class="modal-close" data-close-modal="importModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -2273,7 +2273,7 @@
       <div id="importResult" style="display:none;margin-top:12px;padding:10px;border-radius:var(--radius);background:var(--bg3);font-size:var(--fs-sm)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" id="btnImportCancel" onclick="closeModal('importModal')">Cancel</button>
+      <button class="btn btn-secondary" id="btnImportCancel" data-close-modal="importModal">Cancel</button>
       <button class="btn btn-primary" id="btnDoImport" onclick="doImport()">⬆ Import</button>
     </div>
   </div>
@@ -2284,7 +2284,7 @@
   <div class="modal modal-xl" style="max-width:1400px;width:99vw;max-height:92vh">
     <div class="modal-header">
       <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
-      <button class="modal-close" onclick="closeModal('roleEditorModal')">&times;</button>
+      <button class="modal-close" data-close-modal="roleEditorModal">&times;</button>
     </div>
     <div class="modal-body" style="padding-bottom:8px;overflow-y:auto;max-height:calc(92vh - 120px)">
       <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Admin role is locked.</p>
@@ -2293,7 +2293,7 @@
     <div class="modal-footer" style="justify-content:space-between">
       <button class="btn btn-secondary" onclick="addNewRoleRow()">＋ Add Custom Role</button>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="closeModal('roleEditorModal')">Cancel</button>
+        <button class="btn btn-secondary" data-close-modal="roleEditorModal">Cancel</button>
         <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
       </div>
     </div>
@@ -2305,7 +2305,7 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
       <h2 id="lbl-move-event-title">📅 Move Event</h2>
-      <button class="modal-close" onclick="closeModal('moveEventModal')">&times;</button>
+      <button class="modal-close" data-close-modal="moveEventModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="lbl-move-event-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -2315,7 +2315,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('moveEventModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="moveEventModal">Cancel</button>
       <button class="btn btn-primary" id="btnConfirmMove" onclick="confirmMoveEvents()">Move</button>
     </div>
   </div>
@@ -2326,7 +2326,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔄 Change Status for Selected Events</h2>
-      <button class="modal-close" onclick="closeModal('bulkStatusModal')">&times;</button>
+      <button class="modal-close" data-close-modal="bulkStatusModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="bulkStatusCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -2342,7 +2342,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('bulkStatusModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="bulkStatusModal">Cancel</button>
       <button class="btn btn-primary" onclick="confirmBulkStatus()">Apply Status</button>
     </div>
   </div>
@@ -2353,7 +2353,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🔧 Bulk Event Actions</h2>
-      <button class="modal-close" onclick="closeModal('bulkActionsModal')">&times;</button>
+      <button class="modal-close" data-close-modal="bulkActionsModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:14px">Filter events and apply a bulk action. Use with care — actions cannot be undone.</p>
@@ -2444,7 +2444,7 @@
       <div id="baResult" style="display:none;margin-top:12px;padding:8px 12px;border-radius:var(--radius);font-size:var(--fs-sm)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('bulkActionsModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="bulkActionsModal">Close</button>
     </div>
   </div>
 </div>
