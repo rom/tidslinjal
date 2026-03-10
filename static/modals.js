@@ -129,8 +129,8 @@ function applyPreferences() {
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
   updateLangFlags();
   // Broadcast theme to detached windows
-  if (typeof _broadcastSync === 'function' && typeof _getThemeClass === 'function') {
-    _broadcastSync({ type: 'theme', themeClass: _getThemeClass() });
+  if (typeof _broadcastSync === 'function') {
+    _broadcastSync({ type: 'theme', theme: state.preferences.theme || 'dark' });
   }
 }
 
