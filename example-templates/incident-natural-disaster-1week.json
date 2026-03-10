@@ -1,0 +1,172 @@
+{
+  "name": "Incident — Natural Disaster Response (1 Week)",
+  "description": "A one-week template for managing a natural disaster response — storm, flood, earthquake, or wildfire. Covers initial emergency response, sustained operations, and transition to recovery. Suitable for emergency management agencies, municipalities, and civil protection.",
+  "exercise_name": "DISASTER RESPONSE",
+  "day_start_hour": 6,
+  "day_end_hour": 22,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Immediate Response (Day 1)",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 960,
+      "order": 0
+    },
+    {
+      "name": "Sustained Operations (Days 2–4)",
+      "color": "#E67E22",
+      "start_offset_min": 1440,
+      "end_offset_min": 5760,
+      "order": 1
+    },
+    {
+      "name": "Stabilisation (Days 5–6)",
+      "color": "#F39C12",
+      "start_offset_min": 5760,
+      "end_offset_min": 8640,
+      "order": 2
+    },
+    {
+      "name": "Transition to Recovery (Day 7)",
+      "color": "#27AE60",
+      "start_offset_min": 8640,
+      "end_offset_min": 10080,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Incident Command", "description": "Emergency operations centre leadership" },
+    { "name": "Field Teams", "description": "Search and rescue, emergency services, field workers" },
+    { "name": "Logistics", "description": "Supply, shelter, transport, equipment" },
+    { "name": "Public Information", "description": "Public warnings, media, community liaison" }
+  ],
+  "roles": [
+    { "name": "Incident Commander", "description": "Overall operational authority" },
+    { "name": "Operations Chief", "description": "Directs field operations" },
+    { "name": "Logistics Chief", "description": "Manages resources and supply chain" },
+    { "name": "Public Information Officer", "description": "Public messaging and media relations" }
+  ],
+  "events": [
+    {
+      "title": "DISASTER EVENT — Response Activated",
+      "description": "Natural disaster event occurs or warning received. Emergency operations centre activated.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Initial Damage Assessment",
+      "description": "Field teams conduct rapid assessment of affected area. Report scope and severity.",
+      "event_type": "assigned_task",
+      "start_offset_min": 30,
+      "duration_min": 120,
+      "responsible": "Field Teams"
+    },
+    {
+      "title": "Emergency Public Warning",
+      "description": "Issue public safety warnings via all channels: sirens, SMS, radio, social media.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Public Information"
+    },
+    {
+      "title": "Resource Mobilisation",
+      "description": "Deploy available resources: vehicles, equipment, shelter supplies, personnel.",
+      "event_type": "assigned_task",
+      "start_offset_min": 60,
+      "duration_min": 180,
+      "responsible": "Logistics"
+    },
+    {
+      "title": "Day 1 Evening — SITREP #1",
+      "description": "End of first day situation report: areas affected, resources deployed, immediate needs.",
+      "event_type": "reporting",
+      "start_offset_min": 720,
+      "duration_min": 30,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 2 — Morning Briefing",
+      "description": "Operational briefing for all teams. Priorities for the day. Resource requests.",
+      "event_type": "mote",
+      "start_offset_min": 1440,
+      "duration_min": 60,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 2 — Sustained Field Operations",
+      "description": "Continued search, rescue, and emergency services across affected areas.",
+      "event_type": "assigned_task",
+      "start_offset_min": 1500,
+      "duration_min": 480,
+      "responsible": "Field Teams"
+    },
+    {
+      "title": "Day 3 — Logistics Resupply",
+      "description": "Major resupply operation: food, water, medical supplies, shelter materials.",
+      "event_type": "assigned_task",
+      "start_offset_min": 2880,
+      "duration_min": 360,
+      "responsible": "Logistics"
+    },
+    {
+      "title": "Day 3 — Decision: Expand or Maintain Operations",
+      "description": "Command decides whether to expand, maintain, or scale down operations.",
+      "event_type": "decision",
+      "start_offset_min": 3360,
+      "duration_min": 60,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 4 — Daily SITREP",
+      "description": "Mid-week situation report. Progress, outstanding needs, resource status.",
+      "event_type": "reporting",
+      "start_offset_min": 4800,
+      "duration_min": 30,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 5 — Begin Transition Planning",
+      "description": "Start planning transition from emergency response to recovery phase.",
+      "event_type": "mote",
+      "start_offset_min": 5760,
+      "duration_min": 120,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 6 — Scale Down Field Operations",
+      "description": "Reduce emergency posture. Transition field teams to recovery support.",
+      "event_type": "assigned_task",
+      "start_offset_min": 7200,
+      "duration_min": 480,
+      "responsible": "Field Teams"
+    },
+    {
+      "title": "Day 7 — Recovery Handover",
+      "description": "Formal handover from emergency response to long-term recovery coordination.",
+      "event_type": "mote",
+      "start_offset_min": 8640,
+      "duration_min": 120,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 7 — After Action Review",
+      "description": "Review response: what worked, what didn't, improvements for future events.",
+      "event_type": "mote",
+      "start_offset_min": 9000,
+      "duration_min": 120,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "EMERGENCY RESPONSE PHASE CLOSED",
+      "description": "Emergency response formally concluded. Recovery phase continues separately.",
+      "event_type": "instant",
+      "start_offset_min": 9600,
+      "duration_min": 0,
+      "responsible": "Incident Command"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "name": "Exercise — Tabletop Half-Day",
+  "description": "A simple half-day tabletop exercise (0900–1200). Participants discuss a scenario around a table with no live systems. Ideal for leadership decision-making practice, policy validation, or introducing new staff to exercise methodology.",
+  "exercise_name": "TABLETOP EXERCISE",
+  "day_start_hour": 9,
+  "day_end_hour": 12,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Introduction & Scenario Brief",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 30,
+      "order": 0
+    },
+    {
+      "name": "Scenario Discussion",
+      "color": "#E74C3C",
+      "start_offset_min": 30,
+      "end_offset_min": 135,
+      "order": 1
+    },
+    {
+      "name": "Summary & Lessons",
+      "color": "#27AE60",
+      "start_offset_min": 135,
+      "end_offset_min": 180,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Facilitator", "description": "Exercise facilitator delivering injects and guiding discussion" },
+    { "name": "Participants", "description": "All exercise participants" }
+  ],
+  "roles": [
+    { "name": "Facilitator", "description": "Leads discussion, delivers scenario injects, manages time" },
+    { "name": "Note-Taker", "description": "Records decisions, actions, and key discussion points" }
+  ],
+  "events": [
+    {
+      "title": "Welcome & Ground Rules",
+      "description": "Facilitator introduces the exercise, ground rules, and expected outcomes.",
+      "event_type": "mote",
+      "start_offset_min": 0,
+      "duration_min": 15,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "Scenario Presentation",
+      "description": "Present the scenario background. Distribute any handouts or situation reports.",
+      "event_type": "mote",
+      "start_offset_min": 15,
+      "duration_min": 15,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "INJECT #1 — Opening Situation",
+      "description": "First scenario inject. Participants discuss: What would you do? Who do you call? What information do you need?",
+      "event_type": "instant",
+      "start_offset_min": 30,
+      "duration_min": 0,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "Group Discussion Round 1",
+      "description": "Open discussion on inject #1. Each group or role describes their response.",
+      "event_type": "assigned_task",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "responsible": "Participants"
+    },
+    {
+      "title": "INJECT #2 — Escalation",
+      "description": "Situation escalates. New information changes the picture. Discuss revised response.",
+      "event_type": "instant",
+      "start_offset_min": 60,
+      "duration_min": 0,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "Group Discussion Round 2",
+      "description": "Discuss inject #2. Focus on coordination, communication, and resource needs.",
+      "event_type": "assigned_task",
+      "start_offset_min": 60,
+      "duration_min": 30,
+      "responsible": "Participants"
+    },
+    {
+      "title": "INJECT #3 — Resolution Dilemma",
+      "description": "Final inject presenting a decision dilemma. No perfect answer — focus on trade-offs.",
+      "event_type": "instant",
+      "start_offset_min": 95,
+      "duration_min": 0,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "Decision & Discussion Round 3",
+      "description": "Final discussion round. Participants make and justify a decision.",
+      "event_type": "decision",
+      "start_offset_min": 95,
+      "duration_min": 40,
+      "responsible": "Participants"
+    },
+    {
+      "title": "Key Takeaways",
+      "description": "Facilitator summarises key decisions, gaps identified, and lessons learned.",
+      "event_type": "mote",
+      "start_offset_min": 135,
+      "duration_min": 30,
+      "responsible": "Facilitator"
+    },
+    {
+      "title": "Actions & Close",
+      "description": "Capture follow-up actions. Thank participants. Exercise concludes.",
+      "event_type": "instant",
+      "start_offset_min": 170,
+      "duration_min": 0,
+      "responsible": "Facilitator"
+    }
+  ]
+}

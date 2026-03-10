@@ -1,0 +1,110 @@
+{
+  "name": "Incident — IT Service Outage (4 Hours)",
+  "description": "A basic template for managing a short IT service outage — server down, application failure, or network disruption. Covers detection, diagnosis, fix, verification, and communication. Suitable as a starting point for any technical service disruption.",
+  "exercise_name": "IT OUTAGE",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Triage",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 30,
+      "order": 0
+    },
+    {
+      "name": "Diagnosis & Fix",
+      "color": "#E67E22",
+      "start_offset_min": 30,
+      "end_offset_min": 180,
+      "order": 1
+    },
+    {
+      "name": "Verification & Close",
+      "color": "#27AE60",
+      "start_offset_min": 180,
+      "end_offset_min": 240,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "On-Call Engineer", "description": "First responder — diagnoses and fixes the issue" },
+    { "name": "Service Manager", "description": "Manages communications and escalation" },
+    { "name": "Affected Users", "description": "Users or teams impacted by the outage" }
+  ],
+  "events": [
+    {
+      "title": "OUTAGE DETECTED",
+      "description": "Monitoring alert triggered or user report received. Document affected service and symptoms.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "On-Call Engineer"
+    },
+    {
+      "title": "Initial Assessment",
+      "description": "Engineer triages: what is down, how many users affected, severity classification.",
+      "event_type": "assigned_task",
+      "start_offset_min": 5,
+      "duration_min": 15,
+      "responsible": "On-Call Engineer"
+    },
+    {
+      "title": "User Notification — Outage Acknowledged",
+      "description": "Inform affected users that the issue is known and being worked on.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Service Manager"
+    },
+    {
+      "title": "Root Cause Diagnosis",
+      "description": "Investigate logs, metrics, and recent changes to identify root cause.",
+      "event_type": "assigned_task",
+      "start_offset_min": 30,
+      "duration_min": 60,
+      "responsible": "On-Call Engineer"
+    },
+    {
+      "title": "Status Update #1",
+      "description": "Update stakeholders on diagnosis progress and estimated time to fix.",
+      "event_type": "reporting",
+      "start_offset_min": 60,
+      "duration_min": 10,
+      "responsible": "Service Manager"
+    },
+    {
+      "title": "Fix Applied",
+      "description": "Corrective action applied: restart, patch, configuration change, failover, etc.",
+      "event_type": "assigned_task",
+      "start_offset_min": 90,
+      "duration_min": 60,
+      "responsible": "On-Call Engineer"
+    },
+    {
+      "title": "Service Verification",
+      "description": "Confirm service is restored. Check monitoring, run smoke tests, verify user access.",
+      "event_type": "assigned_task",
+      "start_offset_min": 180,
+      "duration_min": 30,
+      "responsible": "On-Call Engineer"
+    },
+    {
+      "title": "User Notification — Service Restored",
+      "description": "Inform users that service is back. Note any remaining limitations.",
+      "event_type": "instant",
+      "start_offset_min": 210,
+      "duration_min": 0,
+      "responsible": "Service Manager"
+    },
+    {
+      "title": "INCIDENT CLOSED",
+      "description": "Incident formally closed. Schedule post-incident review if warranted.",
+      "event_type": "instant",
+      "start_offset_min": 230,
+      "duration_min": 0,
+      "responsible": "Service Manager"
+    }
+  ]
+}

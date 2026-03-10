@@ -1,0 +1,85 @@
+{
+  "name": "Exercise — Communications Check (1 Hour)",
+  "description": "A short communications verification exercise. Tests that all communication channels (radio, phone, email, chat) work correctly and that contact lists are up to date. Run monthly or before major operations.",
+  "exercise_name": "COMMS CHECK",
+  "day_start_hour": 9,
+  "day_end_hour": 10,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Preparation",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 10,
+      "order": 0
+    },
+    {
+      "name": "Communications Test",
+      "color": "#F39C12",
+      "start_offset_min": 10,
+      "end_offset_min": 45,
+      "order": 1
+    },
+    {
+      "name": "Results & Close",
+      "color": "#27AE60",
+      "start_offset_min": 45,
+      "end_offset_min": 60,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Comms Lead", "description": "Person coordinating the communications check" },
+    { "name": "All Stations", "description": "All participating stations, teams, or individuals" }
+  ],
+  "events": [
+    {
+      "title": "Announce Comms Check",
+      "description": "Comms lead announces the exercise on the primary channel. All stations acknowledge.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Comms Lead"
+    },
+    {
+      "title": "Primary Channel Roll Call",
+      "description": "Test primary communication channel. Each station responds in sequence.",
+      "event_type": "assigned_task",
+      "start_offset_min": 10,
+      "duration_min": 10,
+      "responsible": "All Stations"
+    },
+    {
+      "title": "Secondary Channel Test",
+      "description": "Switch to backup/secondary channel. Repeat roll call.",
+      "event_type": "assigned_task",
+      "start_offset_min": 20,
+      "duration_min": 10,
+      "responsible": "All Stations"
+    },
+    {
+      "title": "Alert Notification Test",
+      "description": "Send test alert via SMS/email/app. All stations confirm receipt and response time.",
+      "event_type": "assigned_task",
+      "start_offset_min": 30,
+      "duration_min": 10,
+      "responsible": "Comms Lead"
+    },
+    {
+      "title": "Results Compiled",
+      "description": "Comms lead compiles results: who responded, response times, any failures.",
+      "event_type": "reporting",
+      "start_offset_min": 45,
+      "duration_min": 10,
+      "responsible": "Comms Lead"
+    },
+    {
+      "title": "Comms Check Complete",
+      "description": "Exercise concluded. Issues logged for follow-up. Contact lists updated if needed.",
+      "event_type": "instant",
+      "start_offset_min": 58,
+      "duration_min": 0,
+      "responsible": "Comms Lead"
+    }
+  ]
+}
