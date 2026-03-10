@@ -40,21 +40,48 @@ async function fetchExercise() {
 }
 
 // ── Refresh all ─────────────────────────────────────────────────────────────
+let _refreshInFlight = null;
+let _refreshQueued = false;
 async function refreshAll() {
-  await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases()]);
-  if (typeof _listViewActive !== 'undefined' && _listViewActive) {
-    renderListView();
-  } else {
-    renderTimeline();
+  // If a refresh is already running, queue one follow-up but don't stack
+  if (_refreshInFlight) {
+    _refreshQueued = true;
+    return _refreshInFlight;
   }
-  renderSidebar();
-  updateSyntheticUI();
+  _refreshInFlight = (async () => {
+    try {
+      await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases()]);
+      if (typeof _listViewActive !== 'undefined' && _listViewActive) {
+        renderListView();
+      } else {
+        renderTimeline();
+      }
+      renderSidebar();
+      updateSyntheticUI();
+    } finally {
+      _refreshInFlight = null;
+      if (_refreshQueued) {
+        _refreshQueued = false;
+        refreshAll();
+      }
+    }
+  })();
+  return _refreshInFlight;
 }
 
 // ── Preferences persistence ─────────────────────────────────────────────────
 async function loadPreferences() {
   state.preferences = await apiGet('/api/preferences');
 }
+let _savePrefTimer = null;
 async function savePreferences() {
-  await apiPut('/api/preferences', state.preferences);
+  // Debounce rapid successive saves (e.g. toggling multiple settings quickly)
+  if (_savePrefTimer) clearTimeout(_savePrefTimer);
+  return new Promise(resolve => {
+    _savePrefTimer = setTimeout(async () => {
+      _savePrefTimer = null;
+      await apiPut('/api/preferences', state.preferences);
+      resolve();
+    }, 300);
+  });
 }

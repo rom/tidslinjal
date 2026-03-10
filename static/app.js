@@ -282,6 +282,14 @@ async function init() {
   setupSidebarResize();
   setupContextMenus();
 
+  // Clean up drag state when tab loses focus (e.g. alt-tab during drag)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Release any mouse-button-held state by dispatching a synthetic mouseup
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    }
+  });
+
   // Change password button
   const btnChgPw = document.getElementById('btnChangePassword');
   if (btnChgPw) {
