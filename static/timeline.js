@@ -704,9 +704,13 @@ function openLayerPopover(btn) {
 }
 
 // ── Drag-to-zoom on time column ─────────────────────────────────────────────
+let _zoomDragSetup = false;
 function setupZoomDrag() {
+  if (_zoomDragSetup) return;
+  _zoomDragSetup = true;
   const container = document.getElementById('timeline-container');
   let dragging = false, startY = 0, startZoom = 1.0;
+  let _zoomRafPending = false;
 
   container.addEventListener('mousedown', e => {
     if (!e.target.closest('.tl-time-label, .tl-corner')) return;
@@ -721,7 +725,10 @@ function setupZoomDrag() {
     const newZoom = Math.max(0.2, Math.min(6.0, startZoom + (startY - e.clientY) / 150));
     if (Math.abs(newZoom - state.zoomFactor) > 0.01) {
       state.zoomFactor = newZoom;
-      renderTimeline();
+      if (!_zoomRafPending) {
+        _zoomRafPending = true;
+        requestAnimationFrame(() => { _zoomRafPending = false; renderTimeline(); });
+      }
     }
   });
 
@@ -735,9 +742,12 @@ function setupZoomDrag() {
 }
 
 // ── Drag-to-reschedule ──────────────────────────────────────────────────────
+let _dragRescheduleSetup = false;
 function setupDragToReschedule() {
+  if (_dragRescheduleSetup) return;
+  _dragRescheduleSetup = true;
   const container = document.getElementById('timeline-container');
-  let dragging = false, ghost = null, dragEvId = null, dragOrigEl = null;
+  let dragging = false, ghost = null, dragEvId = null, dragOrigEl = null, ghostHalfW = 0;
 
   container.addEventListener('mousedown', e => {
     const block = e.target.closest('.event-block[data-ev-id]');
@@ -745,11 +755,12 @@ function setupDragToReschedule() {
     dragging    = true;
     dragEvId    = parseInt(block.dataset.evId, 10);
     dragOrigEl  = block;
+    ghostHalfW  = block.offsetWidth / 2;
     ghost = block.cloneNode(true);
     ghost.style.cssText = `
       position: fixed; pointer-events: none; z-index: 999; opacity: 0.75;
       width: ${block.offsetWidth}px; box-shadow: 0 4px 20px rgba(0,0,0,.5);
-      left: ${e.clientX - block.offsetWidth/2}px;
+      left: ${e.clientX - ghostHalfW}px;
       top:  ${e.clientY - 12}px;
     `;
     ghost.classList.add('dragging');
@@ -760,7 +771,7 @@ function setupDragToReschedule() {
 
   document.addEventListener('mousemove', e => {
     if (!dragging || !ghost) return;
-    ghost.style.left = (e.clientX - parseInt(ghost.style.width)/2) + 'px';
+    ghost.style.left = (e.clientX - ghostHalfW) + 'px';
     ghost.style.top  = (e.clientY - 12) + 'px';
     document.querySelectorAll('.tl-cell.drag-target').forEach(c => c.classList.remove('drag-target'));
     ghost.style.display = 'none';
@@ -871,7 +882,10 @@ function setupDragToReschedule() {
 }
 
 // ── Horizontal drag-to-pan ──────────────────────────────────────────────────
+let _horizDragSetup = false;
 function setupHorizontalDrag() {
+  if (_horizDragSetup) return;
+  _horizDragSetup = true;
   const container = document.getElementById('timeline-container');
   let dragging = false, startX = 0, startScrollLeft = 0;
 
@@ -901,7 +915,10 @@ function setupHorizontalDrag() {
 }
 
 // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+let _keyboardSetup = false;
 function setupKeyboardShortcuts() {
+  if (_keyboardSetup) return;
+  _keyboardSetup = true;
   document.addEventListener('keydown', e => {
     const tag = document.activeElement ? document.activeElement.tagName : '';
     if (['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
@@ -935,7 +952,10 @@ function setupKeyboardShortcuts() {
 }
 
 // ── Event resize by dragging ──────────────────────────────────────────────
+let _eventResizeSetup = false;
 function setupEventResize() {
+  if (_eventResizeSetup) return;
+  _eventResizeSetup = true;
   const container = document.getElementById('timeline-container');
   let resizing = false, resizeEvId = null, startY = 0, origHeight = 0, resizeBlock = null;
 

@@ -3891,8 +3891,14 @@ function playAlarmSound(sound) {
 
 // ── SSE, Alarm ACK: connectSSE, unackedAlarms, showAlarmNotification, dismissAlarmNotif, ackAlarm ──
 // ── SSE ────────────────────────────────────────────────────────────────────
+let _sseConnection = null;
 function connectSSE() {
+  if (_sseConnection) {
+    _sseConnection.close();
+    _sseConnection = null;
+  }
   const es = new EventSource('/api/notifications/stream');
+  _sseConnection = es;
   es.addEventListener('alarm', e => {
     const data = JSON.parse(e.data);
     playAlarmSound(data.sound || 'klaxon');
@@ -3919,7 +3925,13 @@ function connectSSE() {
       if (window._handleEditingLockEvent) window._handleEditingLockEvent(data);
     } catch { /* ignore parse errors */ }
   });
-  es.onerror = () => setTimeout(connectSSE, 5000);
+  es.onerror = () => {
+    if (_sseConnection === es) {
+      _sseConnection = null;
+      es.close();
+    }
+    setTimeout(connectSSE, 5000);
+  };
 }
 
 // ── Alarm ACK ──────────────────────────────────────────────────────────────
@@ -5300,20 +5312,26 @@ function initHelpNav() {
     });
   });
 
-  // Highlight active section on scroll
+  // Highlight active section on scroll (throttled via rAF)
+  let _helpScrollRaf = false;
   content.addEventListener('scroll', () => {
-    let activeId = null;
-    links.forEach(link => {
-      const id = link.getAttribute('href')?.replace('#', '');
-      if (!id) return;
-      const el = document.getElementById(id);
-      if (el && el.getBoundingClientRect().top - content.getBoundingClientRect().top < 80) {
-        activeId = id;
-      }
-    });
-    links.forEach(link => {
-      const id = link.getAttribute('href')?.replace('#', '');
-      link.classList.toggle('active', id === activeId);
+    if (_helpScrollRaf) return;
+    _helpScrollRaf = true;
+    requestAnimationFrame(() => {
+      _helpScrollRaf = false;
+      let activeId = null;
+      links.forEach(link => {
+        const id = link.getAttribute('href')?.replace('#', '');
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top - content.getBoundingClientRect().top < 80) {
+          activeId = id;
+        }
+      });
+      links.forEach(link => {
+        const id = link.getAttribute('href')?.replace('#', '');
+        link.classList.toggle('active', id === activeId);
+      });
     });
   });
 
@@ -5737,7 +5755,10 @@ function ctxSlotAction(action) {
 }
 
 // ── Sidebar Resize ──────────────────────────────────────────────────────────
+let _sidebarResizeSetup = false;
 function setupSidebarResize() {
+  if (_sidebarResizeSetup) return;
+  _sidebarResizeSetup = true;
   const handle = document.getElementById('sidebarResizeHandle');
   const sidebar = document.getElementById('sidebar');
   if (!handle || !sidebar) return;
