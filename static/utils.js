@@ -376,6 +376,16 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .style-compact .clock-label { font-size:10px; }
 /* ── Header row ── */
 .page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
+/* ── VCR mode ── */
+.vcr-card { background:#050000 !important; border-color:#3a0000 !important; }
+.vcr-time {
+  color:#ff2200; text-shadow:0 0 8px rgba(255,40,0,.9),0 0 18px rgba(255,0,0,.5);
+  font-family:'Courier New','Lucida Console',monospace; font-weight:bold; letter-spacing:.1em; }
+.vcr-label { color:#880000 !important; }
+.vcr-date  { color:#660000 !important; }
+.vcr-tz    { color:#880000 !important; }
+.vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
+@keyframes vcr-blink { 50% { opacity:0; } }
 </style>
 </head>
 <body class="theme-dark sz-md">
@@ -390,15 +400,16 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <label>Mode</label>
   <button class="btn-tb active" id="btnDigital" onclick="setMode('digital')">Digital</button>
   <button class="btn-tb" id="btnAnalog" onclick="setMode('analog')">Analog</button>
+  <button class="btn-tb" id="btnVCR" onclick="setMode('vcr')">VCR</button>
   <label>Size</label>
-  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1" oninput="applySize(this.value)">
+  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1" oninput="applySize(this.value)" onchange="applySize(this.value)">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
 <script>
 'use strict';
 /* ── State ── */
-let clockMode = 'digital'; // 'digital' | 'analog'
+let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
 const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
 const sizeLabels  = ['XS','S','M','L','XL'];
 let currentStyle = '';
@@ -437,6 +448,7 @@ function setMode(m) {
   clockMode = m;
   document.getElementById('btnDigital').classList.toggle('active', m==='digital');
   document.getElementById('btnAnalog').classList.toggle('active', m==='analog');
+  document.getElementById('btnVCR').classList.toggle('active', m==='vcr');
   rebuildClocks();
 }
 
@@ -514,6 +526,13 @@ function rebuildClocks() {
       <div class="clock-date" id="main-date"></div>
       <div class="clock-tz" id="main-tz"></div>
     </div>\`;
+  } else if (clockMode === 'vcr') {
+    html += \`<div class="clock-card vcr-card" id="card-main">
+      <div class="clock-label vcr-label" id="main-label">\${isUTC?'UTC/Z':'LOCAL'}</div>
+      <div class="clock-time vcr-time"><span id="vcr-main-h">--</span><span class="vcr-colon">:</span><span id="vcr-main-m">--</span><span class="vcr-colon">:</span><span id="vcr-main-s">--</span></div>
+      <div class="clock-date vcr-date" id="main-date"></div>
+      <div class="clock-tz vcr-tz" id="main-tz"></div>
+    </div>\`;
   } else {
     html += \`<div class="clock-card" id="card-main">
       <div class="clock-label" id="main-label">\${isUTC?'UTC/Z':'Local Time'}</div>
@@ -530,6 +549,13 @@ function rebuildClocks() {
         <div class="clock-label">\${escH(ec.label||ec.timezone)}</div>
         <div class="analog-wrap">\${buildAnalogSVG('svg-'+ec.id)}</div>
         <div class="clock-tz" id="ec-\${ec.id}-tz"></div>
+      </div>\`;
+    } else if (clockMode === 'vcr') {
+      html += \`<div class="clock-card vcr-card" id="card-\${ec.id}">
+        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <div class="clock-label vcr-label">\${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-time vcr-time"><span id="vcr-ec-\${ec.id}-h">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-m">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-s">--</span></div>
+        <div class="clock-tz vcr-tz" id="ec-\${ec.id}-tz"></div>
       </div>\`;
     } else {
       html += \`<div class="clock-card" id="card-\${ec.id}">
@@ -575,6 +601,10 @@ function tick() {
 
   if (clockMode === 'analog') {
     updateAnalog('svg-main', h, m, s);
+  } else if (clockMode === 'vcr') {
+    const vh=document.getElementById('vcr-main-h'); if(vh)vh.textContent=pad(h);
+    const vm=document.getElementById('vcr-main-m'); if(vm)vm.textContent=pad(m);
+    const vs=document.getElementById('vcr-main-s'); if(vs)vs.textContent=pad(s);
   } else {
     const t=document.getElementById('main-time'); if(t)t.textContent=timeStr;
   }
@@ -592,6 +622,10 @@ function tick() {
       const ecTZ = ecTime.toLocaleTimeString('en-GB',{timeZoneName:'short',timeZone:ec.timezone}).split(' ').pop()||ec.timezone;
       if (clockMode === 'analog') {
         updateAnalog('svg-'+ec.id, ecH, ecM, ecS);
+      } else if (clockMode === 'vcr') {
+        const vh=document.getElementById('vcr-ec-'+ec.id+'-h'); if(vh)vh.textContent=pad(ecH);
+        const vm=document.getElementById('vcr-ec-'+ec.id+'-m'); if(vm)vm.textContent=pad(ecM);
+        const vs=document.getElementById('vcr-ec-'+ec.id+'-s'); if(vs)vs.textContent=pad(ecS);
       } else {
         const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent=ecTStr;
       }
@@ -604,6 +638,7 @@ function tick() {
 
 // Initial build + start ticking
 rebuildClocks();
+applySize(2);
 tick();
 setInterval(tick, 1000);
 <\/script>

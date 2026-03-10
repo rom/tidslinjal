@@ -136,15 +136,6 @@
     <h1>Tidslinjal</h1>
     <p class="login-subtitle">Collaborative Operational Timeline</p>
 
-    <!-- SSO status banner (shown when OIDC is configured) -->
-    <div id="ssoBanner" class="sso-banner">
-      <div class="sso-label">
-        <span>🔐</span>
-        <span>Single Sign-On Active <span class="sso-badge">SSO</span></span>
-      </div>
-      <div class="sso-detail" id="ssoIssuerDetail"></div>
-    </div>
-
     <!-- SSO-exclusive notice (when local login is disabled) -->
     <div id="ssoExclusiveNotice" style="display:none;text-align:center;font-size:13px;color:var(--text-dim);margin-bottom:10px">
       Local login is disabled — please use SSO to sign in.
@@ -372,17 +363,6 @@
 
       oidcConfig = await r.json();
       const issuer = oidcConfig.issuer || '';
-
-      // Show SSO info banner
-      const banner = document.getElementById('ssoBanner');
-      const issuerDetail = document.getElementById('ssoIssuerDetail');
-      banner.classList.add('active');
-      if (issuer) {
-        const domain = (() => {
-          try { return new URL(issuer).hostname; } catch { return issuer; }
-        })();
-        issuerDetail.textContent = 'Identity provider: ' + domain;
-      }
 
       // Show SSO section with provider name
       const oidcSec = document.getElementById('oidcSection');

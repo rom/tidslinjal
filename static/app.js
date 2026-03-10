@@ -134,6 +134,17 @@ async function init() {
     try {
       state._integrationStatus = await apiGet('/api/status');
     } catch { state._integrationStatus = null; }
+    // Load gradual backup status for legend panel
+    try {
+      const gbData = await apiGet('/api/admin/gradual-backup');
+      if (gbData && gbData.settings) {
+        state._gradualBackupStatus = {
+          enabled: gbData.settings.enabled !== false,
+          interval_minutes: gbData.settings.interval_minutes || 15,
+          snapshot_count: (gbData.snapshots || []).length,
+        };
+      }
+    } catch { state._gradualBackupStatus = null; }
   }
 
   // User info in header

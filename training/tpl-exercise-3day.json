@@ -1,0 +1,184 @@
+{
+  "name": "Exercise — 3 Days (Standard)",
+  "description": "Standard three-day exercise template covering preparation, execution, and evaluation. Suitable for multi-team command post exercises and operational drills with full planning and AAR cycle.",
+  "exercise_name": "EXERCISE",
+  "day_start_hour": 8,
+  "day_end_hour": 18,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Day 1 — Preparation & INITEX",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 600,
+      "order": 0
+    },
+    {
+      "name": "Day 2 — Main Exercise",
+      "color": "#E74C3C",
+      "start_offset_min": 1440,
+      "end_offset_min": 2040,
+      "order": 1
+    },
+    {
+      "name": "Day 3 — Culmination & ENDEX",
+      "color": "#27AE60",
+      "start_offset_min": 2880,
+      "end_offset_min": 3480,
+      "order": 2
+    }
+  ],
+  "groups": [
+    { "name": "Blue Team Alpha", "description": "Primary friendly force element" },
+    { "name": "Blue Team Bravo", "description": "Secondary friendly force element" },
+    { "name": "Red Cell", "description": "Opposing force / adversary simulation" },
+    { "name": "Control Cell (EXCON)", "description": "Exercise control, administration, and inject management" },
+    { "name": "Observer / Evaluator", "description": "Exercise observers and evaluators" }
+  ],
+  "events": [
+    {
+      "title": "Day 1 — Participant Check-In & Admin",
+      "description": "Registration, equipment checks, communications setup.",
+      "event_type": "mote",
+      "start_offset_min": 0,
+      "duration_min": 60,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 1 — Opening Brief & Scenario Overview",
+      "description": "EXCON delivers full scenario overview, rules of engagement, and exercise objectives.",
+      "event_type": "mote",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 1 — Team Planning Phase",
+      "description": "Teams conduct initial planning and establish command structures.",
+      "event_type": "assigned_task",
+      "start_offset_min": 120,
+      "duration_min": 240,
+      "responsible": "Blue Team Alpha"
+    },
+    {
+      "title": "INITEX — Exercise Commences",
+      "description": "Exercise formally begins. All teams report readiness.",
+      "event_type": "instant",
+      "start_offset_min": 360,
+      "duration_min": 0,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 1 — INJECT #1 (Initial Incident)",
+      "description": "First scenario inject. Opening event that sets the exercise in motion.",
+      "event_type": "instant",
+      "start_offset_min": 390,
+      "duration_min": 0,
+      "responsible": "Red Cell"
+    },
+    {
+      "title": "Day 1 — Initial Response",
+      "description": "Teams respond to opening inject. Document actions, communications, and decisions.",
+      "event_type": "assigned_task",
+      "start_offset_min": 390,
+      "duration_min": 120,
+      "responsible": "Blue Team Alpha"
+    },
+    {
+      "title": "Day 1 — Evening Hot Wash",
+      "description": "Brief end-of-day review. Key observations, issues to address overnight.",
+      "event_type": "standup",
+      "start_offset_min": 540,
+      "duration_min": 30,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 2 — Morning Situation Update",
+      "description": "Updated SITREP. Overnight developments briefed to all participants.",
+      "event_type": "reporting",
+      "start_offset_min": 1440,
+      "duration_min": 45,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 2 — INJECT #2 (Escalation)",
+      "description": "Major escalation inject. Raises complexity and stress on teams.",
+      "event_type": "instant",
+      "start_offset_min": 1530,
+      "duration_min": 0,
+      "responsible": "Red Cell"
+    },
+    {
+      "title": "Day 2 — Critical Decision Point",
+      "description": "Teams must make a high-stakes decision within 30 minutes.",
+      "event_type": "decision",
+      "start_offset_min": 1560,
+      "duration_min": 30,
+      "responsible": "Blue Team Alpha"
+    },
+    {
+      "title": "Day 2 — Multi-Team Coordination",
+      "description": "Alpha and Bravo teams coordinate response to escalated situation.",
+      "event_type": "mote",
+      "start_offset_min": 1620,
+      "duration_min": 60,
+      "responsible": "Blue Team Bravo"
+    },
+    {
+      "title": "Day 2 — INJECT #3 (Complication)",
+      "description": "Additional complicating factor introduced to test team flexibility.",
+      "event_type": "instant",
+      "start_offset_min": 1740,
+      "duration_min": 0,
+      "responsible": "Red Cell"
+    },
+    {
+      "title": "Day 2 — Observer Assessment Period",
+      "description": "Observers conduct structured evaluation of team performance.",
+      "event_type": "assigned_task",
+      "start_offset_min": 1800,
+      "duration_min": 120,
+      "responsible": "Observer / Evaluator"
+    },
+    {
+      "title": "Day 3 — Culminating Event",
+      "description": "Final complex inject requiring full team integration and peak performance.",
+      "event_type": "instant",
+      "start_offset_min": 2880,
+      "duration_min": 0,
+      "responsible": "Red Cell"
+    },
+    {
+      "title": "Day 3 — Resolution & Recovery",
+      "description": "Teams bring situation to resolution. Document final status.",
+      "event_type": "assigned_task",
+      "start_offset_min": 2880,
+      "duration_min": 180,
+      "responsible": "Blue Team Alpha"
+    },
+    {
+      "title": "ENDEX — Exercise Ends",
+      "description": "Exercise formally concluded. All activity ceases.",
+      "event_type": "instant",
+      "start_offset_min": 3180,
+      "duration_min": 0,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 3 — After Action Review (AAR)",
+      "description": "Full structured AAR. Facilitator reviews timeline, key decisions, lessons identified.",
+      "event_type": "mote",
+      "start_offset_min": 3180,
+      "duration_min": 120,
+      "responsible": "Control Cell (EXCON)"
+    },
+    {
+      "title": "Day 3 — Closing Remarks & Admin Out",
+      "description": "Closing remarks, certificates, equipment return, debrief.",
+      "event_type": "mote",
+      "start_offset_min": 3360,
+      "duration_min": 60,
+      "responsible": "Control Cell (EXCON)"
+    }
+  ]
+}

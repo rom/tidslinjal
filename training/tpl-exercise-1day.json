@@ -1,0 +1,125 @@
+{
+  "name": "Exercise — 1 Day (Basic)",
+  "description": "Simple single-day training exercise template (0800–1700). Four phases: INITEX, main exercise body, resolution, and ENDEX/AAR. Good for introductory tabletops and short drills.",
+  "exercise_name": "EXERCISE",
+  "day_start_hour": 8,
+  "day_end_hour": 17,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "INITEX — Exercise Start",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 30,
+      "order": 0
+    },
+    {
+      "name": "Main Exercise",
+      "color": "#E74C3C",
+      "start_offset_min": 30,
+      "end_offset_min": 420,
+      "order": 1
+    },
+    {
+      "name": "Wind-Down",
+      "color": "#27AE60",
+      "start_offset_min": 420,
+      "end_offset_min": 510,
+      "order": 2
+    },
+    {
+      "name": "ENDEX — After Action Review",
+      "color": "#3498DB",
+      "start_offset_min": 510,
+      "end_offset_min": 540,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Blue Team", "description": "Friendly forces / own side" },
+    { "name": "Red Team", "description": "Opposing force / adversary" },
+    { "name": "Control Cell", "description": "Exercise control and administration" }
+  ],
+  "events": [
+    {
+      "title": "INITEX — Exercise commences",
+      "description": "Exercise formally begins. All participants acknowledge readiness.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Control Cell"
+    },
+    {
+      "title": "Initial Situation Briefing",
+      "description": "Control cell delivers opening situation brief to all participants.",
+      "event_type": "mote",
+      "start_offset_min": 5,
+      "duration_min": 25,
+      "responsible": "Control Cell"
+    },
+    {
+      "title": "INJECT #1 — First exercise event",
+      "description": "First planned inject. Replace with scenario-specific content.",
+      "event_type": "instant",
+      "start_offset_min": 60,
+      "duration_min": 0,
+      "responsible": "Red Team"
+    },
+    {
+      "title": "Blue Team Response",
+      "description": "Blue team responds to initial inject. Document actions taken.",
+      "event_type": "assigned_task",
+      "start_offset_min": 60,
+      "duration_min": 90,
+      "responsible": "Blue Team"
+    },
+    {
+      "title": "INJECT #2 — Escalation",
+      "description": "Second inject escalating the scenario.",
+      "event_type": "instant",
+      "start_offset_min": 180,
+      "duration_min": 0,
+      "responsible": "Red Team"
+    },
+    {
+      "title": "Decision Point",
+      "description": "Key decision required from team lead. Document decision rationale.",
+      "event_type": "decision",
+      "start_offset_min": 240,
+      "duration_min": 30,
+      "responsible": "Blue Team"
+    },
+    {
+      "title": "INJECT #3 — Resolution Trigger",
+      "description": "Final inject leading to resolution phase.",
+      "event_type": "instant",
+      "start_offset_min": 360,
+      "duration_min": 0,
+      "responsible": "Red Team"
+    },
+    {
+      "title": "Situation Normalised",
+      "description": "Situation brought under control. Transition to wind-down phase.",
+      "event_type": "instant",
+      "start_offset_min": 420,
+      "duration_min": 0,
+      "responsible": "Blue Team"
+    },
+    {
+      "title": "ENDEX — Exercise ends",
+      "description": "Exercise formally concluded. All injects cancelled.",
+      "event_type": "instant",
+      "start_offset_min": 510,
+      "duration_min": 0,
+      "responsible": "Control Cell"
+    },
+    {
+      "title": "After Action Review (AAR)",
+      "description": "Structured debrief. Review timeline, lessons learned, improvement areas.",
+      "event_type": "mote",
+      "start_offset_min": 510,
+      "duration_min": 30,
+      "responsible": "Control Cell"
+    }
+  ]
+}

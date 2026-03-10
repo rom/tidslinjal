@@ -1,0 +1,158 @@
+{
+  "name": "Incident — 1 Day (Basic Response)",
+  "description": "Simple single-day incident response template. Covers detection through initial containment. Suitable for quick incident simulations, tabletops, and short response drills.",
+  "exercise_name": "INCIDENT RESPONSE",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Alert",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 60,
+      "order": 0
+    },
+    {
+      "name": "Initial Response",
+      "color": "#E67E22",
+      "start_offset_min": 60,
+      "end_offset_min": 240,
+      "order": 1
+    },
+    {
+      "name": "Containment",
+      "color": "#F39C12",
+      "start_offset_min": 240,
+      "end_offset_min": 540,
+      "order": 2
+    },
+    {
+      "name": "Recovery & Closure",
+      "color": "#27AE60",
+      "start_offset_min": 540,
+      "end_offset_min": 1440,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Incident Commander", "description": "Overall incident coordination and decisions" },
+    { "name": "Response Team", "description": "Technical response personnel" },
+    { "name": "Communications", "description": "Stakeholder communications and reporting" },
+    { "name": "Legal / Management", "description": "Management escalation and legal review" }
+  ],
+  "events": [
+    {
+      "title": "INCIDENT DETECTED",
+      "description": "Initial detection or report. Document detection method, time, and source.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Initial Assessment",
+      "description": "First assessment of scope and severity. Classify the incident.",
+      "event_type": "assigned_task",
+      "start_offset_min": 5,
+      "duration_min": 30,
+      "responsible": "Incident Commander"
+    },
+    {
+      "title": "Incident Commander Notified",
+      "description": "IC formally notified and assumes command.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Incident Commander"
+    },
+    {
+      "title": "Response Team Activated",
+      "description": "Response team assembled and briefed on initial situation.",
+      "event_type": "mote",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Management Notified",
+      "description": "Senior management informed of incident. Escalation path confirmed.",
+      "event_type": "instant",
+      "start_offset_min": 45,
+      "duration_min": 0,
+      "responsible": "Legal / Management"
+    },
+    {
+      "title": "Containment Actions Begin",
+      "description": "Immediate containment measures implemented to limit spread or impact.",
+      "event_type": "assigned_task",
+      "start_offset_min": 60,
+      "duration_min": 120,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Evidence Collection",
+      "description": "Preserve logs, artefacts, and forensic evidence before it is lost.",
+      "event_type": "assigned_task",
+      "start_offset_min": 90,
+      "duration_min": 90,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Situation Report #1",
+      "description": "First formal SITREP to management and stakeholders.",
+      "event_type": "reporting",
+      "start_offset_min": 120,
+      "duration_min": 15,
+      "responsible": "Communications"
+    },
+    {
+      "title": "Root Cause Analysis Begins",
+      "description": "Technical team investigates root cause of the incident.",
+      "event_type": "assigned_task",
+      "start_offset_min": 240,
+      "duration_min": 180,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Situation Report #2",
+      "description": "Updated SITREP. Include containment status and initial findings.",
+      "event_type": "reporting",
+      "start_offset_min": 360,
+      "duration_min": 15,
+      "responsible": "Communications"
+    },
+    {
+      "title": "Decision: Escalate or De-escalate",
+      "description": "IC decision point on whether to escalate resources or move to recovery.",
+      "event_type": "decision",
+      "start_offset_min": 480,
+      "duration_min": 30,
+      "responsible": "Incident Commander"
+    },
+    {
+      "title": "Recovery Actions Begin",
+      "description": "Systems and processes restored following containment.",
+      "event_type": "assigned_task",
+      "start_offset_min": 540,
+      "duration_min": 240,
+      "responsible": "Response Team"
+    },
+    {
+      "title": "Final Situation Report",
+      "description": "Closing SITREP. Incident status, actions taken, next steps.",
+      "event_type": "reporting",
+      "start_offset_min": 780,
+      "duration_min": 30,
+      "responsible": "Communications"
+    },
+    {
+      "title": "INCIDENT CLOSED",
+      "description": "Incident formally closed. Transition to lessons-learned review.",
+      "event_type": "instant",
+      "start_offset_min": 840,
+      "duration_min": 0,
+      "responsible": "Incident Commander"
+    }
+  ]
+}

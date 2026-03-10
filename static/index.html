@@ -877,7 +877,7 @@
 <div class="modal-overlay" id="profileModal">
   <div class="modal modal-wide">
     <div class="modal-header">
-      <h2>👤 My Profile</h2>
+      <h2>👤 <span data-i18n="profile_title">My Profile</span></h2>
       <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
     </div>
     <div class="modal-body">
@@ -891,35 +891,40 @@
           <label for="profilePhotoInput" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:var(--fs-xs)">📷 Photo</label>
           <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="loadProfilePhoto(this)">
           <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)" onclick="removeProfilePhoto()">✕ Remove</button>
+          <!-- Default avatar picker -->
+          <div style="margin-top:8px">
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px" data-i18n="profile_default_avatars">Or choose a default:</div>
+            <div id="profileAvatarGrid" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:120px;margin:0 auto"></div>
+          </div>
         </div>
         <div style="flex:1">
           <!-- Identity section -->
           <div class="form-row">
             <div class="form-group">
-              <label>Username</label>
+              <label data-i18n="profile_username">Username</label>
               <input type="text" id="profileUsername" readonly style="opacity:0.6">
             </div>
             <div class="form-group">
-              <label>Role</label>
+              <label data-i18n="profile_role">Role</label>
               <input type="text" id="profileRole" readonly style="opacity:0.6">
             </div>
             <div class="form-group" id="profileJLevelGroup" style="display:none">
-              <label>J-Level / NATO</label>
+              <label data-i18n="profile_jlevel">J-Level / NATO</label>
               <input type="text" id="profileJLevel" readonly style="opacity:0.6">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Display Name</label>
+              <label data-i18n="profile_display_name">Display Name</label>
               <input type="text" id="profileDisplayName" placeholder="Your display name">
             </div>
             <div class="form-group">
-              <label>Email</label>
+              <label data-i18n="profile_email">Email</label>
               <input type="email" id="profileEmail" placeholder="your@email.com">
             </div>
             <div class="form-group">
-              <label>Preferred Language</label>
-              <select id="profileLanguage">
+              <label data-i18n="profile_language">Preferred Language</label>
+              <select id="profileLanguage" onchange="onProfileLanguageChange(this.value)">
                 <option value="en">English</option>
                 <option value="sv">Svenska</option>
                 <option value="fr">Français</option>
@@ -930,57 +935,57 @@
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🪪 Professional Profile</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🪪 <span data-i18n="profile_professional">Professional Profile</span></h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Title / Position</label>
+          <label data-i18n="profile_title_label">Title / Position</label>
           <input type="text" id="profileTitle" placeholder="e.g. Incident Commander">
         </div>
         <div class="form-group">
-          <label>Rank</label>
+          <label data-i18n="profile_rank">Rank</label>
           <input type="text" id="profileRank" placeholder="e.g. Major, Sergeant, N/A">
         </div>
         <div class="form-group">
-          <label>Job Role</label>
+          <label data-i18n="profile_job_role">Job Role</label>
           <input type="text" id="profileJobRole" placeholder="e.g. SOC Analyst, Watch Officer">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:2">
-          <label>Area of Expertise</label>
+          <label data-i18n="profile_expertise">Area of Expertise</label>
           <input type="text" id="profileExpertise" placeholder="e.g. Cyber Threat Intel, Logistics, CBRN">
         </div>
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">📞 Communication</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">📞 <span data-i18n="profile_communication">Communication</span></h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Telephone</label>
+          <label data-i18n="profile_telephone">Telephone</label>
           <input type="tel" id="profileTelephone" placeholder="+1 555 000 0000">
         </div>
         <div class="form-group">
-          <label>Cellular / Mobile</label>
+          <label data-i18n="profile_cellular">Cellular / Mobile</label>
           <input type="tel" id="profileCellular" placeholder="+1 555 000 0001">
         </div>
         <div class="form-group">
-          <label>Signal</label>
+          <label data-i18n="profile_signal">Signal</label>
           <input type="text" id="profileSignal" placeholder="+12345678900">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Mattermost</label>
+          <label data-i18n="profile_mattermost">Mattermost</label>
           <input type="text" id="profileMattermost" placeholder="@username">
         </div>
         <div class="form-group">
-          <label>Discord</label>
+          <label data-i18n="profile_discord">Discord</label>
           <input type="text" id="profileDiscord" placeholder="username#1234">
         </div>
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 Change Password</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 <span data-i18n="change_password">Change Password</span></h3>
       <!-- Password policy info (loaded dynamically) -->
       <div id="profilePwdPolicyInfo" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim)"></div>
       <!-- SSO banner shown for OIDC users -->
@@ -993,11 +998,11 @@
       <div id="profilePwdFields">
         <div class="form-row">
           <div class="form-group">
-            <label>Current Password</label>
+            <label data-i18n="current_password">Current Password</label>
             <input type="password" id="profilePwdCurrent" autocomplete="current-password">
           </div>
           <div class="form-group">
-            <label>New Password</label>
+            <label data-i18n="new_password">New Password</label>
             <div style="position:relative;display:flex;gap:6px;align-items:center">
               <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1" oninput="updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel')">
               <button type="button" class="btn btn-ghost btn-icon" onclick="generateProfilePassword()" title="Auto-generate a strong password">🎲</button>
@@ -1005,7 +1010,7 @@
             </div>
           </div>
           <div class="form-group">
-            <label>Confirm New Password</label>
+            <label data-i18n="confirm_password">Confirm New Password</label>
             <input type="password" id="profilePwdConfirm" autocomplete="new-password">
           </div>
         </div>
@@ -1018,11 +1023,11 @@
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📋 Account Info</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📋 <span data-i18n="profile_account_info">Account Info</span></h3>
       <div id="profileInfo" style="font-size:var(--fs-sm);color:var(--text-dim)"></div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📅 Calendar Subscription</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📅 <span data-i18n="profile_webcal">Calendar Subscription</span></h3>
       <div id="profileWebCalSection" style="font-size:var(--fs-sm)">
         <p style="color:var(--text-dim);margin-bottom:8px">Subscribe to your events in any calendar app (CalDAV/WebCal compatible).</p>
         <div id="profileWebCalURL" style="display:none;margin-bottom:8px">
@@ -1032,8 +1037,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-secondary" onclick="closeModal('profileModal')" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProfile()" data-i18n="profile_save">Save Profile</button>
     </div>
   </div>
 </div>

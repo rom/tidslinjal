@@ -1,0 +1,174 @@
+{
+  "name": "Operations — Weekly Cycle (7 Days)",
+  "description": "One-week operational template with standard weekly battle rhythm: Monday kick-off, mid-week review, reporting cycle, and Friday wrap/planning. Suitable for sustained ongoing operations with regular review cadence.",
+  "exercise_name": "OPERATIONS",
+  "day_start_hour": 7,
+  "day_end_hour": 19,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Week Kick-Off (Mon)",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 720,
+      "order": 0
+    },
+    {
+      "name": "Active Operations (Tue–Wed)",
+      "color": "#27AE60",
+      "start_offset_min": 1440,
+      "end_offset_min": 4320,
+      "order": 1
+    },
+    {
+      "name": "Mid-Week Review (Thu)",
+      "color": "#F39C12",
+      "start_offset_min": 4320,
+      "end_offset_min": 5760,
+      "order": 2
+    },
+    {
+      "name": "Reporting & Wrap-Up (Fri)",
+      "color": "#9B59B6",
+      "start_offset_min": 5760,
+      "end_offset_min": 7200,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Operations Lead", "description": "Overall operational direction and decisions" },
+    { "name": "Teams A & B", "description": "Operational delivery teams" },
+    { "name": "Analytics & Intel", "description": "Data analysis, situational awareness, metrics" },
+    { "name": "Stakeholders", "description": "External stakeholders, clients, or command" }
+  ],
+  "events": [
+    {
+      "title": "Mon 0800 — Weekly Kick-Off Brief",
+      "description": "Week begins. Review previous week summary, set objectives for the week, assign tasks.",
+      "event_type": "mote",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Mon 0900 — Task Distribution",
+      "description": "Formal task assignment to Teams A and B for the week.",
+      "event_type": "assigned_task",
+      "start_offset_min": 120,
+      "duration_min": 30,
+      "responsible": "Teams A & B"
+    },
+    {
+      "title": "Mon 1000 — Intel/Analytics Brief",
+      "description": "Analytics team presents current picture, trend analysis, and priority intelligence.",
+      "event_type": "reporting",
+      "start_offset_min": 180,
+      "duration_min": 45,
+      "responsible": "Analytics & Intel"
+    },
+    {
+      "title": "Mon 1100 — Stakeholder Update Call",
+      "description": "Weekly stakeholder update. Status, progress against objectives, upcoming events.",
+      "event_type": "mote",
+      "start_offset_min": 240,
+      "duration_min": 30,
+      "responsible": "Stakeholders"
+    },
+    {
+      "title": "Tue 0900 — Daily Standup (Tuesday)",
+      "description": "Daily standup: what was done, what's planned, any blockers.",
+      "event_type": "standup",
+      "start_offset_min": 1560,
+      "duration_min": 15,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Tue 1400 — Key Deliverable Due",
+      "description": "First weekly deliverable deadline. Replace with specific task.",
+      "event_type": "deadline",
+      "start_offset_min": 1860,
+      "duration_min": 0,
+      "responsible": "Teams A & B"
+    },
+    {
+      "title": "Wed 0900 — Daily Standup (Wednesday)",
+      "description": "Mid-week standup: check pace against weekly objectives.",
+      "event_type": "standup",
+      "start_offset_min": 3000,
+      "duration_min": 15,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Wed 1400 — Decision Point",
+      "description": "Mid-week decision review. Adjust priorities, approve/reject changes.",
+      "event_type": "decision",
+      "start_offset_min": 3300,
+      "duration_min": 30,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Thu 0900 — Daily Standup (Thursday)",
+      "description": "Thursday standup. Review completion trajectory for week.",
+      "event_type": "standup",
+      "start_offset_min": 4440,
+      "duration_min": 15,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Thu 1000 — Mid-Week Performance Review",
+      "description": "Analytics presents mid-week performance metrics. Assess against targets.",
+      "event_type": "mote",
+      "start_offset_min": 4500,
+      "duration_min": 60,
+      "responsible": "Analytics & Intel"
+    },
+    {
+      "title": "Thu 1400 — Risk & Issues Review",
+      "description": "Review open risks and issues. Escalate blockers that need senior decision.",
+      "event_type": "mote",
+      "start_offset_min": 4700,
+      "duration_min": 45,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Fri 0900 — Week Closing Brief",
+      "description": "Friday brief: achievements vs. objectives, carry-forward tasks, next week preview.",
+      "event_type": "mote",
+      "start_offset_min": 5880,
+      "duration_min": 60,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Fri 1100 — Weekly Report Submitted",
+      "description": "Formal weekly operational report submitted to stakeholders.",
+      "event_type": "reporting",
+      "start_offset_min": 6000,
+      "duration_min": 0,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Fri 1300 — Lessons Learned Capture",
+      "description": "Brief session to capture lessons learned from the week. Update improvement log.",
+      "event_type": "standup",
+      "start_offset_min": 6120,
+      "duration_min": 30,
+      "responsible": "Teams A & B"
+    },
+    {
+      "title": "Fri 1400 — Next Week Planning",
+      "description": "Begin planning for next week. Draft objectives, initial task list.",
+      "event_type": "assigned_task",
+      "start_offset_min": 6180,
+      "duration_min": 60,
+      "responsible": "Operations Lead"
+    },
+    {
+      "title": "Fri 1600 — Week Closed",
+      "description": "Week formally concluded. Systems in standby, on-call confirmed.",
+      "event_type": "instant",
+      "start_offset_min": 6300,
+      "duration_min": 0,
+      "responsible": "Operations Lead"
+    }
+  ]
+}
