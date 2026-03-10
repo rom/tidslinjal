@@ -16,7 +16,7 @@ const (
 	RoleObserver      Role = "observer"      // read-only access (same level as read)
 	RoleRead          Role = "read"
 	RoleReporter      Role = "reporter"      // can comment + set responded/completed, needs approval
-	RoleReadWrite     Role = "readwrite"
+	RoleReadWrite     Role = "teammember"
 	RoleTeamLead      Role = "teamlead"      // can create groups/layers, verify/reject events
 	RoleOpLead        Role = "oplead"        // operations lead: master timeline + teamlead rights
 	RoleStaffOfficer     Role = "staffofficer"      // staff officer assistant: same rights as oplead
@@ -95,10 +95,19 @@ type User struct {
 	PasswordResetToken  string    `json:"password_reset_token,omitempty"`
 	PasswordResetExpiry *time.Time `json:"password_reset_expiry,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
+	// Professional profile fields
+	Title     string `json:"title,omitempty"`      // job title / position
+	Rank      string `json:"rank,omitempty"`       // military rank or equivalent
+	JobRole   string `json:"job_role,omitempty"`   // functional role / position description
+	Expertise string `json:"expertise,omitempty"` // area of expertise
+	// Profile photo (base64 data URL, e.g. "data:image/jpeg;base64,…")
+	PhotoDataURL string `json:"photo_data_url,omitempty"`
 	// Social/communication handles
 	MattermostHandle string `json:"mattermost_handle,omitempty"`
 	DiscordHandle    string `json:"discord_handle,omitempty"`
 	SignalHandle     string `json:"signal_handle,omitempty"`
+	Telephone        string `json:"telephone,omitempty"`
+	Cellular         string `json:"cellular,omitempty"`
 	// Login tracking
 	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
 	LastLoginIP     string     `json:"last_login_ip,omitempty"`
@@ -121,9 +130,18 @@ type UserPublic struct {
 	Vetted           bool       `json:"vetted"`
 	NATODesignations []string   `json:"nato_designations,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
+	// Professional profile fields
+	Title        string `json:"title,omitempty"`
+	Rank         string `json:"rank,omitempty"`
+	JobRole      string `json:"job_role,omitempty"`
+	Expertise    string `json:"expertise,omitempty"`
+	PhotoDataURL string `json:"photo_data_url,omitempty"`
+	// Communication
 	MattermostHandle string     `json:"mattermost_handle,omitempty"`
 	DiscordHandle    string     `json:"discord_handle,omitempty"`
 	SignalHandle     string     `json:"signal_handle,omitempty"`
+	Telephone        string     `json:"telephone,omitempty"`
+	Cellular         string     `json:"cellular,omitempty"`
 	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
 	LastLoginIP      string     `json:"last_login_ip,omitempty"`
 	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
@@ -143,9 +161,16 @@ func (u *User) Public() UserPublic {
 		Vetted:           u.Vetted,
 		NATODesignations: u.NATODesignations,
 		CreatedAt:        u.CreatedAt,
+		Title:            u.Title,
+		Rank:             u.Rank,
+		JobRole:          u.JobRole,
+		Expertise:        u.Expertise,
+		PhotoDataURL:     u.PhotoDataURL,
 		MattermostHandle: u.MattermostHandle,
 		DiscordHandle:    u.DiscordHandle,
 		SignalHandle:     u.SignalHandle,
+		Telephone:        u.Telephone,
+		Cellular:         u.Cellular,
 		LastLoginAt:      u.LastLoginAt,
 		LastLoginIP:      u.LastLoginIP,
 		LastLoginDomain:  u.LastLoginDomain,
@@ -534,7 +559,7 @@ type OIDCPersistentConfig struct {
 	ClientSecret string `json:"client_secret,omitempty"`
 	RedirectURL  string `json:"redirect_url,omitempty"`
 	Exclusive    bool   `json:"exclusive"`
-	DefaultRole  string `json:"default_role,omitempty"` // readwrite | teamlead | oplead
+	DefaultRole  string `json:"default_role,omitempty"` // teammember | teamlead | oplead
 }
 
 // ExerciseSettings controls synthetic time display across the application

@@ -149,7 +149,7 @@ function escHtml(s) {
 
 // ── Role check ──────────────────────────────────────────────────────────────
 function hasRole2(userRole, required) {
-  const order = {read:0, reporter:1, readwrite:2, teamlead:3, oplead:4, admin:5};
+  const order = {read:0, reporter:1, readwrite:2, teammember:2, teamlead:3, oplead:4, staffofficer:4, staffofficer_full:4, admin:5};
   return (order[userRole]||0) >= (order[required]||0);
 }
 

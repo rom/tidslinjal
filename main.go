@@ -3018,31 +3018,43 @@ func (app *App) handleAdminBulkStatus(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Filter string      `json:"filter"` // type | user | group | role
-		Value  string      `json:"value"`  // event type key | user id | group name | role name
-		Status EventStatus `json:"status"`
+		Filter   string      `json:"filter"` // type | user | group | role | status | layer | all
+		Value    string      `json:"value"`
+		Status   EventStatus `json:"status"`
+		TimeFrom string      `json:"time_from,omitempty"` // ISO8601
+		TimeTo   string      `json:"time_to,omitempty"`   // ISO8601
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
 	if !validFilters[req.Filter] {
-		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		jsonError(w, "filter must be one of: type, user, group, role, status, layer, all", http.StatusBadRequest)
 		return
 	}
 	if req.Status == "" {
 		jsonError(w, "status required", http.StatusBadRequest)
 		return
 	}
-	count, err := app.store.BulkSetEventStatus(req.Filter, req.Value, req.Status)
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkSetEventStatus(f, req.Status)
 	if err != nil {
 		jsonError(w, "bulk update failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	app.audit(user.ID, user.DisplayName, "bulk_status", "event", 0,
 		fmt.Sprintf("Admin %q set %d events (filter=%s value=%q) to status %q", user.Username, count, req.Filter, req.Value, req.Status))
-	// Broadcast event change to all clients
 	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"status_updated"}`})
 	jsonOK(w, map[string]any{"updated": count})
 }
@@ -3053,9 +3065,11 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Filter  string `json:"filter"` // type | user | group | role
-		Value   string `json:"value"`
-		Confirm string `json:"confirm"` // must be "DELETE"
+		Filter   string `json:"filter"`
+		Value    string `json:"value"`
+		Confirm  string `json:"confirm"` // must be "DELETE"
+		TimeFrom string `json:"time_from,omitempty"`
+		TimeTo   string `json:"time_to,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -3065,12 +3079,23 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "confirmation required: send {\"confirm\":\"DELETE\"}", http.StatusBadRequest)
 		return
 	}
-	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
 	if !validFilters[req.Filter] {
-		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		jsonError(w, "filter must be one of: type, user, group, role, status, layer, all", http.StatusBadRequest)
 		return
 	}
-	count, err := app.store.BulkDeleteEvents(req.Filter, req.Value)
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkDeleteEvents(f)
 	if err != nil {
 		jsonError(w, "bulk delete failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -3079,6 +3104,53 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		fmt.Sprintf("Admin %q deleted %d events (filter=%s value=%q)", user.Username, count, req.Filter, req.Value))
 	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"events_deleted"}`})
 	jsonOK(w, map[string]any{"deleted": count})
+}
+
+func (app *App) handleAdminBulkSetType(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Filter    string `json:"filter"`
+		Value     string `json:"value"`
+		EventType string `json:"event_type"`
+		TimeFrom  string `json:"time_from,omitempty"`
+		TimeTo    string `json:"time_to,omitempty"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.EventType == "" {
+		jsonError(w, "event_type required", http.StatusBadRequest)
+		return
+	}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
+	if !validFilters[req.Filter] {
+		jsonError(w, "invalid filter", http.StatusBadRequest)
+		return
+	}
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkSetEventType(f, req.EventType)
+	if err != nil {
+		jsonError(w, "bulk update failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "bulk_type", "event", 0,
+		fmt.Sprintf("Admin %q changed type of %d events (filter=%s value=%q) to %q", user.Username, count, req.Filter, req.Value, req.EventType))
+	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"type_updated"}`})
+	jsonOK(w, map[string]any{"updated": count})
 }
 
 // ── Event Comment handlers ─────────────────────────────────────────────────────
@@ -4137,6 +4209,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/admin/sessions/", app.requireRole(RoleAdmin, app.handleAdminDeleteSession))
 	mux.HandleFunc("/api/admin/bulk/status", app.requireRole(RoleAdmin, app.handleAdminBulkStatus))
 	mux.HandleFunc("/api/admin/bulk/delete", app.requireRole(RoleAdmin, app.handleAdminBulkDelete))
+	mux.HandleFunc("/api/admin/bulk/type", app.requireRole(RoleAdmin, app.handleAdminBulkSetType))
 	mux.HandleFunc("/api/export/xlsx", func(w http.ResponseWriter, r *http.Request) {
 		app.requireAuth(app.handleExportXLSX)(w, r)
 	})
@@ -6100,10 +6173,22 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		MattermostHandle string `json:"mattermost_handle"`
 		DiscordHandle    string `json:"discord_handle"`
 		SignalHandle     string `json:"signal_handle"`
+		Telephone        string `json:"telephone"`
+		Cellular         string `json:"cellular"`
+		Title            string `json:"title"`
+		Rank             string `json:"rank"`
+		JobRole          string `json:"job_role"`
+		Expertise        string `json:"expertise"`
+		PhotoDataURL     string `json:"photo_data_url"` // base64 data URL
 		GenerateWebCal   bool   `json:"generate_webcal"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	// Limit photo size to 1 MB (base64 overhead ~1.33x → ~750 KB raw)
+	if len(req.PhotoDataURL) > 1_400_000 {
+		jsonError(w, "photo too large (max ~1 MB)", http.StatusRequestEntityTooLarge)
 		return
 	}
 	fullUser, ok := app.store.GetUserByID(user.ID)
@@ -6114,8 +6199,16 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	fullUser.MattermostHandle = req.MattermostHandle
 	fullUser.DiscordHandle = req.DiscordHandle
 	fullUser.SignalHandle = req.SignalHandle
+	fullUser.Telephone = req.Telephone
+	fullUser.Cellular = req.Cellular
+	fullUser.Title = req.Title
+	fullUser.Rank = req.Rank
+	fullUser.JobRole = req.JobRole
+	fullUser.Expertise = req.Expertise
+	if req.PhotoDataURL != "" {
+		fullUser.PhotoDataURL = req.PhotoDataURL
+	}
 	if req.GenerateWebCal && fullUser.WebCalToken == "" {
-		// Generate a new WebCal subscription token
 		tokBytes := make([]byte, 16)
 		rand.Read(tokBytes) //nolint
 		fullUser.WebCalToken = hex.EncodeToString(tokBytes)
@@ -6474,7 +6567,7 @@ func main() {
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", os.Getenv("OIDC_CLIENT_SECRET"), "OIDC client secret")
 	flag.StringVar(&oidcRedirectURL,  "oidc-redirect-url",  os.Getenv("OIDC_REDIRECT_URL"),  "OIDC redirect URL (e.g. https://your-server/auth/oidc/callback)")
 	flag.BoolVar(&oidcExclusive,      "oidc-exclusive",     os.Getenv("OIDC_EXCLUSIVE") == "true", "Disable local username/password login (SSO only; admin account excepted)")
-	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (readwrite|teamlead|oplead; default: readwrite)")
+	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (teammember|teamlead|oplead; default: teammember)")
 
 	// Syslog flags (override persistent config stored in syslog.json)
 	var (

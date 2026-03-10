@@ -270,7 +270,7 @@ const TRANSLATIONS = {
 
     // Roles
     role_read: 'Read',
-    role_readwrite: 'Read/Write',
+    role_teammember: 'Team Member',
     role_admin: 'Admin',
 
     // Confirms
@@ -516,7 +516,7 @@ const TRANSLATIONS = {
     help_role_observer:      'Read-only access to timeline and events. Cannot edit, comment, or lock.',
     help_role_read:          'Read-only access. Can set personal alarms.',
     help_role_reporter:      'Can create events on the master timeline. Can add comments.',
-    help_role_readwrite:     'Can create, edit and delete events. Can manage attachments.',
+    help_role_teammember:     'Can create, edit and delete events. Can manage attachments.',
     help_role_teamlead:      'Read/Write + can manage layers and groups.',
     help_role_oplead:        'Team Lead + can manage users and event types.',
     help_role_staffofficer:  'Same rights as Operations Lead. Alternative command-staff designation.',
@@ -688,7 +688,7 @@ const TRANSLATIONS = {
     notif_alarm_title: '🔔 Larm',
     notif_done: '✓ Klart',
     role_read: 'Läs',
-    role_readwrite: 'Läs/Skriv',
+    role_teammember: 'Teammedlem',
     role_admin: 'Admin',
     confirm_delete_event: 'Ta bort den här händelsen?',
     confirm_delete_lock: 'Ta bort det här låset?',
@@ -939,7 +939,7 @@ const TRANSLATIONS = {
     help_role_observer:      'Skrivskyddad åtkomst till tidslinje och händelser. Kan inte redigera, kommentera eller låsa.',
     help_role_read:          'Skrivskyddad åtkomst. Kan ange personliga larm.',
     help_role_reporter:      'Kan skapa händelser på masterlinjen. Kan lägga till kommentarer.',
-    help_role_readwrite:     'Kan skapa, redigera och ta bort händelser. Kan hantera bilagor.',
+    help_role_teammember:     'Kan skapa, redigera och ta bort händelser. Kan hantera bilagor.',
     help_role_teamlead:      'Läs/Skriv + kan hantera lager och grupper.',
     help_role_oplead:        'Gruppledare + kan hantera användare och händelsetyper.',
     help_role_staffofficer:  'Samma rättigheter som operationsledare. Alternativ beteckning för stabspersonal.',
@@ -1174,7 +1174,7 @@ const TRANSLATIONS = {
     notif_alarm_title: '🔔 Alarme',
     notif_done: '✓ Fait',
     role_read: 'Lecture',
-    role_readwrite: 'Lecture/Écriture',
+    role_teammember: 'Membre d\'équipe',
     role_admin: 'Admin',
     confirm_delete_event: 'Supprimer cet événement ?',
     confirm_delete_lock: 'Supprimer ce verrou ?',
@@ -1425,7 +1425,7 @@ const TRANSLATIONS = {
     help_role_observer:      'Accès en lecture seule à la chronologie et aux événements. Ne peut pas modifier, commenter ou verrouiller.',
     help_role_read:          'Accès en lecture seule. Peut définir des alarmes personnelles.',
     help_role_reporter:      'Peut créer des événements sur la chronologie principale. Peut ajouter des commentaires.',
-    help_role_readwrite:     'Peut créer, modifier et supprimer des événements. Peut gérer les pièces jointes.',
+    help_role_teammember:     'Peut créer, modifier et supprimer des événements. Peut gérer les pièces jointes.',
     help_role_teamlead:      'Lecture/Écriture + peut gérer les couches et les groupes.',
     help_role_oplead:        'Chef d\'équipe + peut gérer les utilisateurs et les types d\'événements.',
     help_role_staffofficer:  'Mêmes droits que le chef des opérations. Désignation alternative pour le personnel d\'état-major.',

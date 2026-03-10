@@ -13,7 +13,7 @@ Every user has a **role** that determines what they can do.
 | **Admin** | Everything — user management, system configuration, all events |
 | **Operations Lead (oplead)** | Manage templates, groups, layers; approve users; full event access |
 | **Team Lead (teamlead)** | View audit log, manage layers and groups, approve comments/changes |
-| **Read-Write** | Create and edit events on permitted layers |
+| **Team Member** | Create and edit events on permitted layers |
 | **Reporter** | Read events; propose status changes (requires Team Lead approval) |
 | **Read-Only** | View events only |
 
