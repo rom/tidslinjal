@@ -1,0 +1,158 @@
+{
+  "name": "Operations — Daily Rhythm (24h)",
+  "description": "Standard 24-hour operational tempo template with daily battle rhythm: morning briefs, operational activity, reporting cycles, and end-of-day review. Use as a repeating daily pattern for sustained operations.",
+  "exercise_name": "OPERATIONS",
+  "day_start_hour": 6,
+  "day_end_hour": 22,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Morning Battle Rhythm",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 180,
+      "order": 0
+    },
+    {
+      "name": "Active Operations",
+      "color": "#3498DB",
+      "start_offset_min": 180,
+      "end_offset_min": 780,
+      "order": 1
+    },
+    {
+      "name": "Afternoon Reports & Review",
+      "color": "#27AE60",
+      "start_offset_min": 780,
+      "end_offset_min": 960,
+      "order": 2
+    },
+    {
+      "name": "Evening Wrap & Handover",
+      "color": "#9B59B6",
+      "start_offset_min": 960,
+      "end_offset_min": 1440,
+      "order": 3
+    }
+  ],
+  "groups": [
+    { "name": "Operations Centre", "description": "Main operations hub — tracking, coordination, decisions" },
+    { "name": "Field Teams", "description": "Deployed operational elements" },
+    { "name": "Intelligence", "description": "Situational awareness, threat assessment, reporting" },
+    { "name": "Logistics", "description": "Supply, transport, resource management" }
+  ],
+  "events": [
+    {
+      "title": "0600 — Shift Change & Handover",
+      "description": "Outgoing shift briefs incoming. Open incidents, pending tasks, key contacts.",
+      "event_type": "standup",
+      "start_offset_min": 0,
+      "duration_min": 30,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "0630 — Morning Intelligence Brief",
+      "description": "Intelligence cell delivers overnight threat picture and key developments.",
+      "event_type": "reporting",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "responsible": "Intelligence"
+    },
+    {
+      "title": "0700 — Daily Operations Brief (OPSBRF)",
+      "description": "Full operations brief. Tasks for the day, resource allocation, risk assessment.",
+      "event_type": "mote",
+      "start_offset_min": 60,
+      "duration_min": 60,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "0800 — Field Teams Deploy / Tasking Issued",
+      "description": "Field elements receive daily tasking and deploy to objectives.",
+      "event_type": "instant",
+      "start_offset_min": 120,
+      "duration_min": 0,
+      "responsible": "Field Teams"
+    },
+    {
+      "title": "0900 — Main Activity Window Begins",
+      "description": "Core operational activity. Track all significant actions and decisions.",
+      "event_type": "instant",
+      "start_offset_min": 180,
+      "duration_min": 0,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1000 — Mid-Morning SITREP",
+      "description": "Brief status update from all elements. Issues, resource requests, blockers.",
+      "event_type": "standup",
+      "start_offset_min": 240,
+      "duration_min": 15,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1200 — Noon SITREP & Logistics Check",
+      "description": "Noon status report. Logistics reviews supplies, transport needs.",
+      "event_type": "reporting",
+      "start_offset_min": 360,
+      "duration_min": 30,
+      "responsible": "Logistics"
+    },
+    {
+      "title": "1400 — Decision Point / Tasking Review",
+      "description": "Review ongoing tasks. Reallocate resources if needed. Approve new tasks.",
+      "event_type": "decision",
+      "start_offset_min": 480,
+      "duration_min": 30,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1600 — Afternoon SITREP",
+      "description": "End-of-activity-window status report. All elements report current status.",
+      "event_type": "reporting",
+      "start_offset_min": 600,
+      "duration_min": 30,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1700 — End of Main Activity Window",
+      "description": "Core operational activity concludes. Remaining tasks handed to overnight watch.",
+      "event_type": "instant",
+      "start_offset_min": 660,
+      "duration_min": 0,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1800 — Daily Summary Report",
+      "description": "Full daily summary: tasks completed, incidents, issues, next-day priorities.",
+      "event_type": "reporting",
+      "start_offset_min": 720,
+      "duration_min": 45,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "1900 — Intelligence Wrap-Up",
+      "description": "Intelligence cell daily wrap. Updated threat picture for overnight / next day.",
+      "event_type": "reporting",
+      "start_offset_min": 780,
+      "duration_min": 30,
+      "responsible": "Intelligence"
+    },
+    {
+      "title": "2000 — Evening Shift Handover",
+      "description": "Day shift hands over to night watch. Open items, on-call contacts, alerts.",
+      "event_type": "standup",
+      "start_offset_min": 840,
+      "duration_min": 30,
+      "responsible": "Operations Centre"
+    },
+    {
+      "title": "2200 — Night Watch Check-In",
+      "description": "Night watch confirms all systems nominal. Escalation procedures reviewed.",
+      "event_type": "standup",
+      "start_offset_min": 960,
+      "duration_min": 15,
+      "responsible": "Operations Centre"
+    }
+  ]
+}
