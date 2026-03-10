@@ -200,6 +200,28 @@ function showNotification(type, message, duration=4000) {
 // ── Clock ───────────────────────────────────────────────────────────────────
 let _clockUTC = localStorage.getItem('clockFmt') === 'zulu'; // false = local time, true = UTC
 
+// BroadcastChannel for syncing state to detached windows
+const _detachedChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
+
+function _broadcastSync(msg) {
+  if (_detachedChannel) _detachedChannel.postMessage(msg);
+}
+
+// Listen for messages from detached windows
+if (_detachedChannel) {
+  _detachedChannel.onmessage = e => {
+    if (e.data.type === 'clock-format') {
+      _clockUTC = e.data.zulu;
+      localStorage.setItem('clockFmt', _clockUTC ? 'zulu' : 'local');
+      updateClock();
+      const localBtn = document.getElementById('clockFmtLocal');
+      const zuluBtn  = document.getElementById('clockFmtZulu');
+      if (localBtn) localBtn.classList.toggle('active', !_clockUTC);
+      if (zuluBtn)  zuluBtn.classList.toggle('active',  _clockUTC);
+    }
+  };
+}
+
 function setClockFormat(fmt) {
   _clockUTC = (fmt === 'zulu');
   localStorage.setItem('clockFmt', _clockUTC ? 'zulu' : 'local');
@@ -209,6 +231,7 @@ function setClockFormat(fmt) {
   const zuluBtn  = document.getElementById('clockFmtZulu');
   if (localBtn) localBtn.classList.toggle('active', !_clockUTC);
   if (zuluBtn)  zuluBtn.classList.toggle('active',  _clockUTC);
+  _broadcastSync({ type: 'clock-format', zulu: _clockUTC });
 }
 
 function toggleClockTZ() {
@@ -467,4 +490,231 @@ function confirmAddClock() {
   updateExtraClocks(new Date());
   savePreferences();
   if (typeof renderSidebar === 'function') renderSidebar();
+}
+
+// ── Detached Clock Window ──────────────────────────────────────────────────
+let _detachedClockWin = null;
+
+function _getThemeClass() {
+  const t = (state.preferences && state.preferences.theme) || 'dark';
+  if (t === 'light') return 'light-mode';
+  if (t === 'city-camo') return 'city-camo';
+  if (t === 'urban-camo') return 'urban-camo';
+  return '';
+}
+
+function _getThemeVars(themeClass) {
+  const themes = {
+    '': { bg:'#0f1923', bg2:'#162030', bg3:'#1e2d40', border:'#2a3f56', accent:'#4A90D9', text:'#cfd8e3', textDim:'#7a8fa6', textBright:'#f0f4f8' },
+    'light-mode': { bg:'#f0f4f8', bg2:'#ffffff', bg3:'#e4eaf2', border:'#c4d0de', accent:'#2a6fad', text:'#2c3e50', textDim:'#5f7a99', textBright:'#0a1929' },
+    'city-camo': { bg:'#3a3d2e', bg2:'#4a4d38', bg3:'#555847', border:'#6b6e58', accent:'#8faa5a', text:'#d4d8c4', textDim:'#9a9e8a', textBright:'#eef0e0' },
+    'urban-camo': { bg:'#1a2233', bg2:'#1e293b', bg3:'#243044', border:'#3a4a5c', accent:'#4a90d9', text:'#c8d8e8', textDim:'#7a90a8', textBright:'#e8f0f8' },
+  };
+  return themes[themeClass] || themes[''];
+}
+
+function openDetachedClock() {
+  if (_detachedClockWin && !_detachedClockWin.closed) { _detachedClockWin.focus(); return; }
+  const themeClass = _getThemeClass();
+  const tv = _getThemeVars(themeClass);
+  // Gather today's deadlines from state.events
+  const deadlines = _getTodayDeadlines();
+  const deadlineJSON = JSON.stringify(deadlines);
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal Clock</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;
+  background:var(--bg);color:var(--text);transition:background .3s,color .3s}
+:root{--bg:${tv.bg};--bg2:${tv.bg2};--bg3:${tv.bg3};--border:${tv.border};--accent:${tv.accent};--text:${tv.text};--text-dim:${tv.textDim};--text-bright:${tv.textBright}}
+.clock-container{text-align:center;padding:30px}
+.analog-clock{position:relative;width:280px;height:280px;margin:0 auto 20px}
+.analog-clock svg{width:100%;height:100%}
+.digital-time{font-size:48px;font-weight:700;letter-spacing:2px;color:var(--text-bright);font-variant-numeric:tabular-nums}
+.digital-date{font-size:16px;color:var(--text-dim);margin-top:4px}
+.tz-label{font-size:14px;font-weight:700;color:var(--accent);margin-top:2px;cursor:pointer;user-select:none}
+.tz-label:hover{text-decoration:underline}
+</style></head><body>
+<div class="clock-container">
+  <div class="analog-clock"><svg id="analogSvg" viewBox="0 0 200 200"></svg></div>
+  <div class="digital-time" id="dTime">--:--:--</div>
+  <div class="digital-date" id="dDate">—</div>
+  <div class="tz-label" id="dTZ" onclick="toggleTZ()" title="Click to toggle Local / ZULU">—</div>
+</div>
+<script>
+let useUTC = ${_clockUTC};
+const deadlines = ${deadlineJSON};
+const channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
+
+function toggleTZ() {
+  useUTC = !useUTC;
+  // Notify main window
+  if (channel) channel.postMessage({ type: 'clock-format', zulu: useUTC });
+  tick();
+}
+
+if (channel) {
+  channel.onmessage = e => {
+    if (e.data.type === 'clock-format') { useUTC = e.data.zulu; tick(); }
+    if (e.data.type === 'theme') { applyTheme(e.data.themeClass); }
+    if (e.data.type === 'deadlines') { deadlines.length = 0; e.data.list.forEach(d => deadlines.push(d)); tick(); }
+  };
+}
+
+function applyTheme(cls) {
+  const themes = ${JSON.stringify({
+    '': _getThemeVars(''),
+    'light-mode': _getThemeVars('light-mode'),
+    'city-camo': _getThemeVars('city-camo'),
+    'urban-camo': _getThemeVars('urban-camo'),
+  })};
+  const tv = themes[cls] || themes[''];
+  const r = document.documentElement.style;
+  r.setProperty('--bg', tv.bg); r.setProperty('--bg2', tv.bg2);
+  r.setProperty('--bg3', tv.bg3); r.setProperty('--border', tv.border);
+  r.setProperty('--accent', tv.accent); r.setProperty('--text', tv.text);
+  r.setProperty('--text-dim', tv.textDim); r.setProperty('--text-bright', tv.textBright);
+}
+
+function drawAnalogClock(now) {
+  const svg = document.getElementById('analogSvg');
+  if (!svg) return;
+  const cx = 100, cy = 100, r = 90;
+  const h = useUTC ? now.getUTCHours() : now.getHours();
+  const m = useUTC ? now.getUTCMinutes() : now.getMinutes();
+  const s = useUTC ? now.getUTCSeconds() : now.getSeconds();
+  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4A90D9';
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#cfd8e3';
+  const dimColor = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#7a8fa6';
+  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#2a3f56';
+  let markup = '';
+  // Face
+  markup += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+borderColor+'" stroke-width="2"/>';
+  // Hour marks
+  for (let i=0;i<12;i++) {
+    const a = (i*30-90)*Math.PI/180;
+    const x1 = cx+Math.cos(a)*(r-8), y1 = cy+Math.sin(a)*(r-8);
+    const x2 = cx+Math.cos(a)*(r-2), y2 = cy+Math.sin(a)*(r-2);
+    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+textColor+'" stroke-width="'+(i%3===0?2.5:1)+'"/>';
+  }
+  // Minute marks
+  for (let i=0;i<60;i++) {
+    if (i%5===0) continue;
+    const a = (i*6-90)*Math.PI/180;
+    const x1 = cx+Math.cos(a)*(r-4), y1 = cy+Math.sin(a)*(r-4);
+    const x2 = cx+Math.cos(a)*(r-2), y2 = cy+Math.sin(a)*(r-2);
+    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+dimColor+'" stroke-width="0.5"/>';
+  }
+  // Deadline markers (RED lines)
+  deadlines.forEach(dl => {
+    const dDate = new Date(dl.time);
+    const dh = useUTC ? dDate.getUTCHours() : dDate.getHours();
+    const dm = useUTC ? dDate.getUTCMinutes() : dDate.getMinutes();
+    const angle = ((dh%12)*30 + dm*0.5 - 90) * Math.PI/180;
+    const x1 = cx+Math.cos(angle)*(r-18), y1 = cy+Math.sin(angle)*(r-18);
+    const x2 = cx+Math.cos(angle)*(r-1), y2 = cy+Math.sin(angle)*(r-1);
+    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#E74C3C" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>';
+    // Small red dot at outer end
+    markup += '<circle cx="'+x2+'" cy="'+y2+'" r="3" fill="#E74C3C" opacity="0.85"/>';
+  });
+  // Hour hand
+  const hAngle = ((h%12)*30 + m*0.5 - 90) * Math.PI/180;
+  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(hAngle)*55)+'" y2="'+(cy+Math.sin(hAngle)*55)+'" stroke="'+textColor+'" stroke-width="3.5" stroke-linecap="round"/>';
+  // Minute hand
+  const mAngle = (m*6 + s*0.1 - 90) * Math.PI/180;
+  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(mAngle)*72)+'" y2="'+(cy+Math.sin(mAngle)*72)+'" stroke="'+textColor+'" stroke-width="2" stroke-linecap="round"/>';
+  // Second hand
+  const sAngle = (s*6 - 90) * Math.PI/180;
+  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(sAngle)*78)+'" y2="'+(cy+Math.sin(sAngle)*78)+'" stroke="'+accentColor+'" stroke-width="1" stroke-linecap="round"/>';
+  // Center dot
+  markup += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+accentColor+'"/>';
+  svg.innerHTML = markup;
+}
+
+function tick() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  let timeStr, dateStr, tzLabel;
+  const locale = navigator.language || 'en';
+  if (useUTC) {
+    timeStr = pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
+    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+    tzLabel = 'UTC/Z — click to switch';
+  } else {
+    timeStr = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    try { tzLabel = now.toLocaleTimeString(locale,{timeZoneName:'short'}).split(' ').pop()+' — click to switch'; } catch { tzLabel = 'Local'; }
+  }
+  document.getElementById('dTime').textContent = timeStr;
+  document.getElementById('dDate').textContent = dateStr;
+  document.getElementById('dTZ').textContent = tzLabel;
+  drawAnalogClock(now);
+}
+tick();
+setInterval(tick, 1000);
+<\/script></body></html>`;
+
+  _detachedClockWin = window.open('', 'tidslinjal-clock', 'width=380,height=520,resizable=yes');
+  if (_detachedClockWin) {
+    _detachedClockWin.document.write(html);
+    _detachedClockWin.document.close();
+  }
+}
+
+function _getTodayDeadlines() {
+  if (!state.events) return [];
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart.getTime() + 86400000);
+  return state.events
+    .filter(ev => {
+      if (ev.event_type !== 'deadline') return false;
+      const t = new Date(ev.start_time);
+      return t >= todayStart && t < todayEnd;
+    })
+    .map(ev => ({ time: ev.start_time, title: ev.title }));
+}
+
+// ── Detached Help Window ───────────────────────────────────────────────────
+let _detachedHelpWin = null;
+
+function openDetachedHelp() {
+  if (_detachedHelpWin && !_detachedHelpWin.closed) { _detachedHelpWin.focus(); return; }
+  const helpBody = document.querySelector('.help-body');
+  if (!helpBody) return;
+  const themeClass = _getThemeClass();
+  const tv = _getThemeVars(themeClass);
+  // Clone help content
+  const helpHTML = helpBody.innerHTML;
+  // Get the help-specific styles from the stylesheet
+  const styleEl = document.querySelector('link[href*="style.css"]');
+  const stylePath = styleEl ? styleEl.href : '/static/style.css';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Help</title>
+<link rel="stylesheet" href="${stylePath}">
+<style>
+body{background:var(--bg);color:var(--text);padding:20px;overflow:auto;min-height:100vh}
+.help-body{max-width:900px;margin:0 auto}
+h2{color:var(--text-bright);font-size:20px;margin-bottom:16px}
+</style></head><body class="${themeClass}">
+<h2>Tidslinjal — Quick Reference Guide</h2>
+<div class="help-body">${helpHTML}</div>
+<script>
+const channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
+if (channel) {
+  channel.onmessage = e => {
+    if (e.data.type === 'theme') {
+      document.body.className = e.data.themeClass;
+    }
+  };
+}
+<\/script></body></html>`;
+
+  _detachedHelpWin = window.open('', 'tidslinjal-help', 'width=800,height=700,resizable=yes');
+  if (_detachedHelpWin) {
+    _detachedHelpWin.document.write(html);
+    _detachedHelpWin.document.close();
+  }
+  // Close the modal since we detached
+  if (typeof closeModal === 'function') closeModal('helpModal');
 }

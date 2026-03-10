@@ -111,6 +111,7 @@
     <div class="header-right">
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <div class="clock-area" id="clockArea">
+        <button class="btn btn-ghost btn-icon clock-add-btn" onclick="openDetachedClock()" title="Open detached clock window" style="font-size:14px">⏱</button>
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
         <div id="extraClocksContainer" style="display:contents"></div>
         <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
@@ -1474,6 +1475,7 @@
         <span class="help-modal-logo">Tids<span>linjal</span></span>
         <span class="help-modal-subtitle">Quick Reference Guide</span>
       </div>
+      <button class="btn btn-ghost btn-sm" onclick="openDetachedHelp()" title="Open help in separate window" style="margin-right:8px;font-size:12px;padding:2px 8px">⧉ Detach</button>
       <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
     </div>
     <div class="modal-body help-body">

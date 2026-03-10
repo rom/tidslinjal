@@ -45,6 +45,10 @@ function applyPreferences() {
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
   updateLangFlags();
+  // Broadcast theme to detached windows
+  if (typeof _broadcastSync === 'function') {
+    _broadcastSync({ type: 'theme', themeClass: _getThemeClass() });
+  }
 }
 
 // ── Event Modal Functions + Event Listeners ────────────────────────────────
@@ -2710,11 +2714,21 @@ async function saveProfile() {
   const mattermostHandle = val('profileMattermost');
   const discordHandle    = val('profileDiscord');
   const signalHandle     = val('profileSignal');
-  await api('PUT', '/api/auth/profile', {
-    mattermost_handle: mattermostHandle,
-    discord_handle:    discordHandle,
-    signal_handle:     signalHandle,
-  }).catch(() => {});
+  try {
+    const handleRes = await api('PUT', '/api/auth/profile', {
+      mattermost_handle: mattermostHandle,
+      discord_handle:    discordHandle,
+      signal_handle:     signalHandle,
+    });
+    if (!handleRes.ok) {
+      const err = await handleRes.json().catch(() => ({}));
+      showError(err.error || 'Failed to update communication handles');
+      return;
+    }
+  } catch (e) {
+    showError('Failed to update communication handles');
+    return;
+  }
 
   // Save language preference
   if (lang) {
