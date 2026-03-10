@@ -1,0 +1,193 @@
+{
+  "name": "EX-11 Border Security Operation — 2 Days",
+  "description": "48-hour border security operation exercise covering enhanced border monitoring, interdiction of illicit cross-border movement, and coordination between border guard, customs, intelligence, and national police. Covers 24/7 shift operations with day/night cycles, checkpoints, surveillance assets, and incident response. Suitable for 2-day joint agency exercises.",
+  "exercise_name": "EX-11 Border Security Operation",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "INITEX & Area Familiarisation",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Day 1 Operations",
+      "color": "#E74C3C",
+      "start_offset_min": 120,
+      "end_offset_min": 1440,
+      "order": 1
+    },
+    {
+      "name": "Night Operations",
+      "color": "#2C3E50",
+      "start_offset_min": 1440,
+      "end_offset_min": 1920,
+      "order": 2
+    },
+    {
+      "name": "Day 2 Surge",
+      "color": "#E67E22",
+      "start_offset_min": 1920,
+      "end_offset_min": 2700,
+      "order": 3
+    },
+    {
+      "name": "ENDEX & AAR",
+      "color": "#3498DB",
+      "start_offset_min": 2700,
+      "end_offset_min": 2880,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "Border Guard Alpha",
+      "description": "Primary border guard unit — northern sector"
+    },
+    {
+      "name": "Border Guard Bravo",
+      "description": "Border guard unit — southern sector"
+    },
+    {
+      "name": "Customs & Inspections",
+      "description": "Customs interdiction and inspection team"
+    },
+    {
+      "name": "Intelligence Cell",
+      "description": "Intelligence and surveillance coordination"
+    },
+    {
+      "name": "Command & Control",
+      "description": "Joint operations command post"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Border Guard Ops",
+      "description": "Border Guard Alpha and Bravo operations",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0, 1]
+    },
+    {
+      "name": "Customs",
+      "description": "Customs and inspection activities",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Intelligence",
+      "description": "Intelligence and surveillance layer",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [3]
+    },
+    {
+      "name": "Command",
+      "description": "Command decisions and coordination",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [4]
+    }
+  ],
+  "items": [
+    {
+      "title": "INITEX — All Units",
+      "event_type": "instant",
+      "color": "#F39C12",
+      "description": "Exercise commences. All units report readiness to Joint Command. Sector assignments confirmed. Rules of Engagement (ROE) briefed. Communications check on all nets. Surveillance assets activated.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Sector Patrol — Alpha Northern",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Border Guard Alpha begins motorised patrol of northern sector. Checkpoint Alpha-1 established at crossing point. Vehicle inspection procedures initiated. Liaison with local police established.",
+      "start_offset_min": 120,
+      "duration_min": 360,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Intelligence Briefing — Threat Picture",
+      "event_type": "physical_meeting",
+      "color": "#8E44AD",
+      "description": "Intelligence Cell briefs Command on current threat picture: two known smuggling networks active in area, UAV surveillance tasking approved for northern sector, tip from partner agency regarding planned crossing at grid reference foxtrot-7.",
+      "start_offset_min": 240,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "INJECT: Vehicle with Contraband Detected",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Customs team at crossing point detects anomalous cargo in transit vehicle. X-ray scanning reveals concealed compartment. Interdiction initiated. Border Guard Alpha provides security cordon. Intelligence Cell notified for documentation and debrief.",
+      "start_offset_min": 480,
+      "duration_min": 60,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Shift Handover — Day to Night",
+      "event_type": "standup",
+      "color": "#00ACC1",
+      "description": "Day shift hands over to night shift. Sector status briefing: all checkpoints status, active intelligence leads, outstanding tasks. Night shift commander assumes operational control. Shift handover documented in operations log.",
+      "start_offset_min": 1440,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Night Surveillance — UAV Tasking",
+      "event_type": "activity",
+      "color": "#2C3E50",
+      "description": "UAV patrol tasked over northern sector based on intelligence tip. Thermal imaging active. Quick Reaction Force on 15-minute standby. Command notified of any contacts.",
+      "start_offset_min": 1500,
+      "duration_min": 420,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Illegal Border Crossing — Group Contact",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: UAV detects group of 6 individuals attempting crossing at foxtrot-7. QRF deployed. Border Guard Bravo intercepts. Command coordinates response across Alpha and Bravo sectors. Procedures for processing, documentation, and welfare followed.",
+      "start_offset_min": 1920,
+      "duration_min": 90,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Day 2 Morning SITREP",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Command issues SITREP to higher headquarters. 24-hour summary: 3 vehicle interdictions (2 minor, 1 major), 1 illegal crossing incident, all sectors green, no safety incidents. Intelligence updates incorporated into afternoon operations order.",
+      "start_offset_min": 2160,
+      "duration_min": 0,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#3498DB",
+      "description": "Exercise end declared by Chief Controller. All units stand down to safe state. Equipment and weapons cleared. Personnel accountability complete. All sections submit exercise logs to command.",
+      "start_offset_min": 2700,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "After Action Review",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Full exercise AAR. Topics: patrol effectiveness, checkpoint procedures, intelligence-operations integration, shift handover quality, incident response times, inter-agency communication. Lessons identified and owner-assigned for follow-up.",
+      "start_offset_min": 2730,
+      "duration_min": 90,
+      "alarm_lead_time": 15
+    }
+  ]
+}

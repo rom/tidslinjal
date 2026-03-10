@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -933,5 +934,469 @@ func TestAPI_CreateLock_RequiresCanLock(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("expected 403 for user without can_lock, got %d", resp.StatusCode)
+	}
+}
+
+// ── Integration Status ────────────────────────────────────────────────────────
+
+func TestAPI_Status_AdminOnly(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/status", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for admin /api/status, got %d", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeJSON(t, resp, &out)
+	for _, key := range []string{"sso", "tls", "syslog", "smtp", "mattermost", "api_keys"} {
+		if _, ok := out[key]; !ok {
+			t.Errorf("missing key %q in /api/status response", key)
+		}
+	}
+}
+
+func TestAPI_Status_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "readuser", "password": "pass", "display_name": "RU", "role": "read",
+	}, adminCookies)
+	readCookies := login(t, srv, "readuser", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/status", nil, readCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin /api/status, got %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_Status_Unauthenticated(t *testing.T) {
+	_, srv := newTestApp(t)
+	resp := apiDo(t, srv, http.MethodGet, "/api/status", nil, nil)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 for unauthenticated /api/status, got %d", resp.StatusCode)
+	}
+}
+
+// ── OIDC Settings ─────────────────────────────────────────────────────────────
+
+func TestAPI_OIDCSettings_GetDefault(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/admin/oidc", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for GET /api/admin/oidc, got %d", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeJSON(t, resp, &out)
+	if _, ok := out["enabled"]; !ok {
+		t.Error("expected 'enabled' field in OIDC settings response")
+	}
+}
+
+func TestAPI_OIDCSettings_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "rwuser", "password": "pass", "display_name": "RW", "role": "readwrite",
+	}, adminCookies)
+	rwCookies := login(t, srv, "rwuser", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/admin/oidc", nil, rwCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin GET /api/admin/oidc, got %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_OIDCSettings_SaveAndRetrieve(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	cfg := map[string]any{
+		"enabled":      false,
+		"issuer":       "https://idp.example.com",
+		"client_id":    "myapp",
+		"client_secret": "s3cret",
+		"redirect_url": "https://app.example.com/auth/oidc/callback",
+		"exclusive":    false,
+		"default_role": "readwrite",
+	}
+	saveResp := apiDo(t, srv, http.MethodPut, "/api/admin/oidc", cfg, adminCookies)
+	defer saveResp.Body.Close()
+	if !isSuccess(saveResp.StatusCode) {
+		body, _ := io.ReadAll(saveResp.Body)
+		t.Fatalf("expected 200 for PUT /api/admin/oidc, got %d: %s", saveResp.StatusCode, body)
+	}
+
+	getResp := apiDo(t, srv, http.MethodGet, "/api/admin/oidc", nil, adminCookies)
+	var out map[string]any
+	decodeJSON(t, getResp, &out)
+	if out["issuer"] != "https://idp.example.com" {
+		t.Errorf("issuer not persisted: got %v", out["issuer"])
+	}
+	if out["client_id"] != "myapp" {
+		t.Errorf("client_id not persisted: got %v", out["client_id"])
+	}
+	// Secret must NOT be returned
+	if secret, ok := out["client_secret"]; ok && secret != "" && secret != nil {
+		t.Errorf("client_secret should be redacted, got %v", secret)
+	}
+}
+
+// ── Mail / SMTP Integration ───────────────────────────────────────────────────
+
+func TestAPI_MailConfig_GetDefault(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/mail", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for GET /api/integrations/mail, got %d", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeJSON(t, resp, &out)
+	if _, ok := out["enabled"]; !ok {
+		t.Error("expected 'enabled' field in mail config response")
+	}
+}
+
+func TestAPI_MailConfig_SaveAndRetrieve(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	cfg := map[string]any{
+		"enabled":   false,
+		"smtp_host": "smtp.example.com",
+		"smtp_port": 587,
+		"username":  "user@example.com",
+		"password":  "secret",
+		"from_addr": "noreply@example.com",
+		"from_name": "Tidslinjal",
+		"tls_mode":  "starttls",
+	}
+	saveResp := apiDo(t, srv, http.MethodPut, "/api/integrations/mail", cfg, adminCookies)
+	defer saveResp.Body.Close()
+	if !isSuccess(saveResp.StatusCode) {
+		body, _ := io.ReadAll(saveResp.Body)
+		t.Fatalf("expected 200 for PUT /api/integrations/mail, got %d: %s", saveResp.StatusCode, body)
+	}
+
+	getResp := apiDo(t, srv, http.MethodGet, "/api/integrations/mail", nil, adminCookies)
+	var out map[string]any
+	decodeJSON(t, getResp, &out)
+	if out["smtp_host"] != "smtp.example.com" {
+		t.Errorf("smtp_host not persisted: got %v", out["smtp_host"])
+	}
+	if out["tls_mode"] != "starttls" {
+		t.Errorf("tls_mode not persisted: got %v", out["tls_mode"])
+	}
+	// Password must NOT be returned
+	if pw, ok := out["password"]; ok && pw != "" && pw != nil {
+		t.Errorf("password should be redacted, got %v", pw)
+	}
+}
+
+func TestAPI_MailConfig_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "nonAdminMail", "password": "pass", "display_name": "NA", "role": "oplead",
+	}, adminCookies)
+	opCookies := login(t, srv, "nonAdminMail", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/mail", nil, opCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin mail config, got %d", resp.StatusCode)
+	}
+}
+
+// ── Syslog Integration ────────────────────────────────────────────────────────
+
+func TestAPI_SyslogConfig_GetDefault(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/syslog", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for GET /api/integrations/syslog, got %d", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeJSON(t, resp, &out)
+	if _, ok := out["enabled"]; !ok {
+		t.Error("expected 'enabled' field in syslog config response")
+	}
+}
+
+func TestAPI_SyslogConfig_SaveAndRetrieve(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	cfg := map[string]any{
+		"enabled":   false,
+		"host":      "syslog.example.com",
+		"port":      514,
+		"transport": "udp",
+		"format":    "classic",
+		"app_name":  "tidslinjal",
+		"facility":  1,
+		"tls_verify": true,
+	}
+	saveResp := apiDo(t, srv, http.MethodPut, "/api/integrations/syslog", cfg, adminCookies)
+	defer saveResp.Body.Close()
+	if !isSuccess(saveResp.StatusCode) {
+		body, _ := io.ReadAll(saveResp.Body)
+		t.Fatalf("expected 200 for PUT /api/integrations/syslog, got %d: %s", saveResp.StatusCode, body)
+	}
+
+	getResp := apiDo(t, srv, http.MethodGet, "/api/integrations/syslog", nil, adminCookies)
+	var out map[string]any
+	decodeJSON(t, getResp, &out)
+	if out["host"] != "syslog.example.com" {
+		t.Errorf("syslog host not persisted: got %v", out["host"])
+	}
+	if out["transport"] != "udp" {
+		t.Errorf("transport not persisted: got %v", out["transport"])
+	}
+}
+
+func TestAPI_SyslogConfig_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "nonAdminSyslog", "password": "pass", "display_name": "NAS", "role": "teamlead",
+	}, adminCookies)
+	tlCookies := login(t, srv, "nonAdminSyslog", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/syslog", nil, tlCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin syslog config, got %d", resp.StatusCode)
+	}
+}
+
+// ── TLS Config ────────────────────────────────────────────────────────────────
+
+func TestAPI_TLSConfig_GetDefault(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/tls", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for GET /api/integrations/tls, got %d", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeJSON(t, resp, &out)
+	// Default TLS config: empty cert and key paths
+	if certFile, ok := out["cert_file"]; ok && certFile != "" && certFile != nil {
+		t.Logf("cert_file present: %v (expected empty on fresh store)", certFile)
+	}
+}
+
+func TestAPI_TLSConfig_SaveAndRetrieve(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	// The handler validates that cert/key files exist on disk; use temp files.
+	tmpDir := t.TempDir()
+	certPath := tmpDir + "/server.crt"
+	keyPath := tmpDir + "/server.key"
+	// Write minimal (empty) placeholder files — the handler only checks os.Stat.
+	if err := os.WriteFile(certPath, []byte("placeholder"), 0o600); err != nil {
+		t.Fatalf("create cert placeholder: %v", err)
+	}
+	if err := os.WriteFile(keyPath, []byte("placeholder"), 0o600); err != nil {
+		t.Fatalf("create key placeholder: %v", err)
+	}
+
+	cfg := map[string]any{
+		"cert_file": certPath,
+		"key_file":  keyPath,
+	}
+	saveResp := apiDo(t, srv, http.MethodPut, "/api/integrations/tls", cfg, adminCookies)
+	defer saveResp.Body.Close()
+	if !isSuccess(saveResp.StatusCode) {
+		body, _ := io.ReadAll(saveResp.Body)
+		t.Fatalf("expected 200 for PUT /api/integrations/tls, got %d: %s", saveResp.StatusCode, body)
+	}
+
+	getResp := apiDo(t, srv, http.MethodGet, "/api/integrations/tls", nil, adminCookies)
+	var out map[string]any
+	decodeJSON(t, getResp, &out)
+	if out["cert_file"] != certPath {
+		t.Errorf("cert_file not persisted: got %v", out["cert_file"])
+	}
+	if out["key_file"] != keyPath {
+		t.Errorf("key_file not persisted: got %v", out["key_file"])
+	}
+}
+
+func TestAPI_TLSConfig_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "nonAdminTLS", "password": "pass", "display_name": "NAT", "role": "oplead",
+	}, adminCookies)
+	opCookies := login(t, srv, "nonAdminTLS", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/integrations/tls", nil, opCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin TLS config, got %d", resp.StatusCode)
+	}
+}
+
+// ── API Keys ──────────────────────────────────────────────────────────────────
+
+func TestAPI_APIKeys_ListEmpty(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/apikeys", nil, adminCookies)
+	defer resp.Body.Close()
+	if !isSuccess(resp.StatusCode) {
+		t.Fatalf("expected 200 for GET /api/apikeys, got %d", resp.StatusCode)
+	}
+	var keys []any
+	decodeJSON(t, resp, &keys)
+	if len(keys) != 0 {
+		t.Errorf("expected empty API key list on fresh app, got %d keys", len(keys))
+	}
+}
+
+func TestAPI_APIKeys_CreateAndList(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	createResp := apiDo(t, srv, http.MethodPost, "/api/apikeys", map[string]any{
+		"name":        "CI Pipeline",
+		"description": "Used by GitHub Actions",
+	}, adminCookies)
+	if !isSuccess(createResp.StatusCode) {
+		body, _ := io.ReadAll(createResp.Body)
+		t.Fatalf("expected 200/201 for POST /api/apikeys, got %d: %s", createResp.StatusCode, body)
+	}
+	var created map[string]any
+	decodeJSON(t, createResp, &created)
+	if created["key"] == nil || created["key"] == "" {
+		t.Error("expected 'key' field (plain text) on creation response")
+	}
+	if created["name"] != "CI Pipeline" {
+		t.Errorf("expected name 'CI Pipeline', got %v", created["name"])
+	}
+
+	listResp := apiDo(t, srv, http.MethodGet, "/api/apikeys", nil, adminCookies)
+	var keys []map[string]any
+	decodeJSON(t, listResp, &keys)
+	if len(keys) != 1 {
+		t.Errorf("expected 1 API key after create, got %d", len(keys))
+	}
+	// Plain key must NOT appear in list
+	if keys[0]["key"] != nil && keys[0]["key"] != "" {
+		t.Errorf("plain key should not appear in list response, got %v", keys[0]["key"])
+	}
+}
+
+func TestAPI_APIKeys_Delete(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	createResp := apiDo(t, srv, http.MethodPost, "/api/apikeys", map[string]any{
+		"name": "Temp Key",
+	}, adminCookies)
+	var created map[string]any
+	decodeJSON(t, createResp, &created)
+	id := fmt.Sprintf("%v", created["id"])
+
+	delResp := apiDo(t, srv, http.MethodDelete, "/api/apikeys/"+id, nil, adminCookies)
+	defer delResp.Body.Close()
+	if !isSuccess(delResp.StatusCode) {
+		t.Fatalf("expected 200 for DELETE /api/apikeys/%s, got %d", id, delResp.StatusCode)
+	}
+
+	listResp := apiDo(t, srv, http.MethodGet, "/api/apikeys", nil, adminCookies)
+	var keys []any
+	decodeJSON(t, listResp, &keys)
+	if len(keys) != 0 {
+		t.Errorf("expected empty list after delete, got %d keys", len(keys))
+	}
+}
+
+func TestAPI_APIKeys_RequiresAdmin(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
+		"username": "nonAdminAPIKey", "password": "pass", "display_name": "NAK", "role": "oplead",
+	}, adminCookies)
+	opCookies := login(t, srv, "nonAdminAPIKey", "pass")
+
+	resp := apiDo(t, srv, http.MethodGet, "/api/apikeys", nil, opCookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin API keys list, got %d", resp.StatusCode)
+	}
+}
+
+func TestAPI_IntegrationStatus_ReflectsMailConfig(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	// Initially SMTP should be disabled
+	resp1 := apiDo(t, srv, http.MethodGet, "/api/status", nil, adminCookies)
+	var status1 map[string]any
+	decodeJSON(t, resp1, &status1)
+	smtp1 := status1["smtp"].(map[string]any)
+	if smtp1["enabled"] != false {
+		t.Errorf("expected smtp.enabled=false initially, got %v", smtp1["enabled"])
+	}
+
+	// Save SMTP config with enabled=true
+	apiDo(t, srv, http.MethodPut, "/api/integrations/mail", map[string]any{
+		"enabled":   true,
+		"smtp_host": "mail.example.com",
+		"smtp_port": 465,
+		"tls_mode":  "tls",
+		"from_addr": "no-reply@example.com",
+	}, adminCookies)
+
+	resp2 := apiDo(t, srv, http.MethodGet, "/api/status", nil, adminCookies)
+	var status2 map[string]any
+	decodeJSON(t, resp2, &status2)
+	smtp2 := status2["smtp"].(map[string]any)
+	if smtp2["enabled"] != true {
+		t.Errorf("expected smtp.enabled=true after save, got %v", smtp2["enabled"])
+	}
+}
+
+func TestAPI_IntegrationStatus_ReflectsAPIKeyCount(t *testing.T) {
+	_, srv := newTestApp(t)
+	adminCookies := login(t, srv, "admin", "admin")
+
+	resp1 := apiDo(t, srv, http.MethodGet, "/api/status", nil, adminCookies)
+	var status1 map[string]any
+	decodeJSON(t, resp1, &status1)
+	ak1 := status1["api_keys"].(map[string]any)
+	initialCount := ak1["count"].(float64)
+
+	// Create an API key
+	createResp := apiDo(t, srv, http.MethodPost, "/api/apikeys", map[string]any{"name": "StatusTest"}, adminCookies)
+	io.ReadAll(createResp.Body)
+	createResp.Body.Close()
+
+	resp2 := apiDo(t, srv, http.MethodGet, "/api/status", nil, adminCookies)
+	var status2 map[string]any
+	decodeJSON(t, resp2, &status2)
+	ak2 := status2["api_keys"].(map[string]any)
+	if ak2["count"].(float64) != initialCount+1 {
+		t.Errorf("expected api_key count %v, got %v", initialCount+1, ak2["count"])
 	}
 }

@@ -1,0 +1,198 @@
+{
+  "name": "Incident — 1 Week (Extended Response)",
+  "description": "Extended one-week incident response template covering the full lifecycle: detection, containment, eradication, recovery, and post-incident review. Suitable for major incidents requiring sustained response.",
+  "exercise_name": "EXTENDED INCIDENT RESPONSE",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Triage",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Containment (Days 1–2)",
+      "color": "#E67E22",
+      "start_offset_min": 120,
+      "end_offset_min": 2880,
+      "order": 1
+    },
+    {
+      "name": "Eradication (Days 2–4)",
+      "color": "#F39C12",
+      "start_offset_min": 2880,
+      "end_offset_min": 5760,
+      "order": 2
+    },
+    {
+      "name": "Recovery (Days 4–6)",
+      "color": "#3498DB",
+      "start_offset_min": 5760,
+      "end_offset_min": 8640,
+      "order": 3
+    },
+    {
+      "name": "Post-Incident Review (Day 7)",
+      "color": "#27AE60",
+      "start_offset_min": 8640,
+      "end_offset_min": 10080,
+      "order": 4
+    }
+  ],
+  "groups": [
+    { "name": "Incident Command", "description": "Overall incident direction and decisions" },
+    { "name": "Technical Response", "description": "Hands-on technical investigation and remediation" },
+    { "name": "Communications & PR", "description": "Internal and external communications, media" },
+    { "name": "Legal & Compliance", "description": "Legal review, regulatory reporting, and compliance" },
+    { "name": "Executive", "description": "Senior leadership escalation and strategic decisions" }
+  ],
+  "events": [
+    {
+      "title": "H+0: INCIDENT DETECTED",
+      "description": "Initial detection. Document: who detected it, how, what system/data affected.",
+      "event_type": "instant",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "H+0: Incident Classified & IC Assigned",
+      "description": "Incident severity classified (P1/Critical). Incident Commander formally appointed.",
+      "event_type": "instant",
+      "start_offset_min": 15,
+      "duration_min": 0,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "H+1: Incident Bridge / War Room Opened",
+      "description": "All key responders assembled. Roles and responsibilities confirmed.",
+      "event_type": "mote",
+      "start_offset_min": 30,
+      "duration_min": 30,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "H+1: Executive Notified",
+      "description": "C-suite and board informed. Escalation path and spokesperson designated.",
+      "event_type": "instant",
+      "start_offset_min": 60,
+      "duration_min": 0,
+      "responsible": "Executive"
+    },
+    {
+      "title": "H+2: Immediate Containment",
+      "description": "Emergency containment — isolate affected systems, revoke compromised credentials.",
+      "event_type": "assigned_task",
+      "start_offset_min": 120,
+      "duration_min": 240,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "H+4: Evidence Preservation",
+      "description": "Forensic evidence captured before any remediation that might destroy artefacts.",
+      "event_type": "assigned_task",
+      "start_offset_min": 240,
+      "duration_min": 120,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "H+4: First External Communication",
+      "description": "First customer / public communication if required. Prepared statement reviewed by Legal.",
+      "event_type": "instant",
+      "start_offset_min": 240,
+      "duration_min": 0,
+      "responsible": "Communications & PR"
+    },
+    {
+      "title": "H+6: Regulatory Notification Assessment",
+      "description": "Legal reviews whether regulatory breach notification is required (GDPR 72h clock, etc.).",
+      "event_type": "decision",
+      "start_offset_min": 360,
+      "duration_min": 60,
+      "responsible": "Legal & Compliance"
+    },
+    {
+      "title": "Day 1 Closing SITREP",
+      "description": "End-of-day situation report to leadership. Status, containment effectiveness, next 24h plan.",
+      "event_type": "reporting",
+      "start_offset_min": 1380,
+      "duration_min": 30,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 2: Root Cause Deep Dive",
+      "description": "Technical team conducts full forensic analysis to determine root cause and scope.",
+      "event_type": "assigned_task",
+      "start_offset_min": 1440,
+      "duration_min": 480,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "Day 2: SITREP to Executive",
+      "description": "Updated brief to C-suite. Scope confirmed, timeline to recovery estimated.",
+      "event_type": "reporting",
+      "start_offset_min": 2160,
+      "duration_min": 30,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 3: Eradication Phase Begins",
+      "description": "Remove threat from all systems. Patch vulnerabilities. Reset credentials.",
+      "event_type": "assigned_task",
+      "start_offset_min": 2880,
+      "duration_min": 1440,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "Day 4: Recovery Planning Approved",
+      "description": "Executive approves recovery plan. Resources and timeline confirmed.",
+      "event_type": "decision",
+      "start_offset_min": 5040,
+      "duration_min": 60,
+      "responsible": "Executive"
+    },
+    {
+      "title": "Day 4: Regulatory Report Filed (if required)",
+      "description": "Submit mandatory breach notification to relevant regulators.",
+      "event_type": "deadline",
+      "start_offset_min": 5760,
+      "duration_min": 0,
+      "responsible": "Legal & Compliance"
+    },
+    {
+      "title": "Day 5: System Recovery & Validation",
+      "description": "Restore systems from clean backups. Verify integrity before going live.",
+      "event_type": "assigned_task",
+      "start_offset_min": 5760,
+      "duration_min": 1440,
+      "responsible": "Technical Response"
+    },
+    {
+      "title": "Day 6: Full Operations Restored",
+      "description": "All systems verified clean and operational. Incident Response phase ends.",
+      "event_type": "instant",
+      "start_offset_min": 8520,
+      "duration_min": 0,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 7: Post-Incident Review (PIR)",
+      "description": "Full post-incident review. Timeline walkthrough, root cause, lessons learned, action items.",
+      "event_type": "mote",
+      "start_offset_min": 8640,
+      "duration_min": 180,
+      "responsible": "Incident Command"
+    },
+    {
+      "title": "Day 7: Lessons Learned Report Published",
+      "description": "PIR findings documented and distributed. Improvement actions tracked.",
+      "event_type": "deadline",
+      "start_offset_min": 9360,
+      "duration_min": 0,
+      "responsible": "Incident Command"
+    }
+  ]
+}

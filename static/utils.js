@@ -149,7 +149,7 @@ function escHtml(s) {
 
 // ── Role check ──────────────────────────────────────────────────────────────
 function hasRole2(userRole, required) {
-  const order = {read:0, reporter:1, readwrite:2, teamlead:3, oplead:4, admin:5};
+  const order = {read:0, reporter:1, readwrite:2, teammember:2, teamlead:3, oplead:4, staffofficer:4, staffofficer_full:4, admin:5};
   return (order[userRole]||0) >= (order[required]||0);
 }
 
@@ -316,6 +316,379 @@ function removeExtraClock(id) {
   if (el) el.remove();
   savePreferences();
   if (typeof renderSidebar === 'function') renderSidebar();
+}
+
+// ── Detachable clock window ──────────────────────────────────────────────────
+let _clockPopout = null;
+let _clockPopoutMonitor = null;
+
+// Show/hide the main window clock area when the popout is open/closed
+function _setClockAreaDetached(detached) {
+  const area = document.getElementById('clockArea');
+  const indicator = document.getElementById('clockDetachedIndicator');
+  if (area) area.style.display = detached ? 'none' : '';
+  if (indicator) indicator.style.display = detached ? '' : 'none';
+}
+
+function detachClock() {
+  if (_clockPopout && !_clockPopout.closed) {
+    _clockPopout.focus();
+    return;
+  }
+
+  // Hide the main header clock while the popout is open
+  _setClockAreaDetached(true);
+
+  const popupHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Clocks</title>
+<style>
+/* ── Theme application ── */
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex; flex-direction:column; align-items:center; min-height:100vh; gap:16px; padding:16px; }
+/* ── Toolbar ── */
+.toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--bg2);
+  border:1px solid var(--border); border-radius:10px; padding:8px 14px; width:100%; max-width:600px; }
+.toolbar label { font-size:11px; color:var(--text-dim); }
+.toolbar select, .toolbar input[type=range] { background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:3px 6px; font-size:11px; }
+.toolbar input[type=range] { width:80px; cursor:pointer; }
+.btn-tb { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:3px 10px; font-size:11px; cursor:pointer; }
+.btn-tb:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-tb.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+/* ── Clock cards ── */
+.clocks-wrap { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; width:100%; max-width:800px; }
+.clock-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  padding:16px 24px 14px; text-align:center; position:relative; min-width:180px; transition:box-shadow .2s; }
+.clock-card:hover { box-shadow:0 0 0 2px var(--accent); }
+.clock-label { font-size:11px; font-weight:700; color:var(--accent); letter-spacing:.1em;
+  text-transform:uppercase; margin-bottom:6px; }
+.clock-time { font-weight:700; letter-spacing:.04em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.clock-date { font-size:11px; color:var(--text-dim); margin-top:4px; }
+.clock-tz { font-size:11px; font-weight:700; color:var(--accent); margin-top:2px; }
+/* ── Size variants ── */
+.sz-xs .clock-time { font-size:28px; } .sz-xs .clock-card { padding:10px 16px 8px; min-width:130px; }
+.sz-sm .clock-time { font-size:38px; } .sz-sm .clock-card { padding:12px 20px 10px; min-width:160px; }
+.sz-md .clock-time { font-size:52px; }
+.sz-lg .clock-time { font-size:72px; } .sz-lg .clock-card { padding:20px 32px 18px; min-width:240px; }
+.sz-xl .clock-time { font-size:96px; } .sz-xl .clock-card { padding:24px 40px 22px; min-width:300px; }
+/* ── Analog clock ── */
+.analog-wrap { width:120px; height:120px; margin:0 auto 4px; }
+.analog-face { width:100%; height:100%; }
+.sz-lg .analog-wrap { width:160px; height:160px; }
+.sz-xl .analog-wrap { width:200px; height:200px; }
+/* ── Remove button ── */
+.clock-remove { position:absolute; top:6px; right:8px; background:none; border:none;
+  color:var(--text-dim); font-size:15px; cursor:pointer; line-height:1; padding:2px 5px;
+  border-radius:4px; }
+.clock-remove:hover { background:var(--danger); color:#fff; }
+/* ── Style: minimal ── */
+.style-minimal .clock-card { background:transparent; border-color:transparent; box-shadow:none; }
+.style-minimal .clock-card:hover { box-shadow:0 0 0 1px var(--border); }
+/* ── Style: compact ── */
+.style-compact .clock-card { padding:8px 14px 6px; min-width:120px; }
+.style-compact .clock-time { font-size:28px!important; }
+.style-compact .clock-label { font-size:10px; }
+/* ── Header row ── */
+.page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
+/* ── VCR mode ── */
+.vcr-card { background:#050000 !important; border-color:#3a0000 !important; }
+.vcr-time {
+  color:#ff2200; text-shadow:0 0 8px rgba(255,40,0,.9),0 0 18px rgba(255,0,0,.5);
+  font-family:'Courier New','Lucida Console',monospace; font-weight:bold; letter-spacing:.1em; }
+.vcr-label { color:#880000 !important; }
+.vcr-date  { color:#660000 !important; }
+.vcr-tz    { color:#880000 !important; }
+.vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
+@keyframes vcr-blink { 50% { opacity:0; } }
+</style>
+</head>
+<body class="theme-dark sz-md">
+<p class="page-header">Tidslinjal — Clocks</p>
+<div class="toolbar" id="toolbar">
+  <label>Style</label>
+  <select id="selStyle" onchange="applyStyle(this.value)">
+    <option value="">Standard</option>
+    <option value="style-minimal">Minimal</option>
+    <option value="style-compact">Compact</option>
+  </select>
+  <label>Mode</label>
+  <button class="btn-tb active" id="btnDigital" onclick="setMode('digital')">Digital</button>
+  <button class="btn-tb" id="btnAnalog" onclick="setMode('analog')">Analog</button>
+  <button class="btn-tb" id="btnVCR" onclick="setMode('vcr')">VCR</button>
+  <label>Size</label>
+  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1" oninput="applySize(this.value)" onchange="applySize(this.value)">
+  <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
+</div>
+<div class="clocks-wrap" id="clocksWrap"></div>
+<script>
+'use strict';
+/* ── State ── */
+let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
+const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
+const sizeLabels  = ['XS','S','M','L','XL'];
+let currentStyle = '';
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+/* ── Theme sync: read from opener every 2 s ── */
+function syncTheme() {
+  try {
+    const t = window.opener?.state?.preferences?.theme || 'dark';
+    const cls = 'theme-' + t;
+    if (!document.body.classList.contains(cls)) {
+      document.body.className = document.body.className
+        .replace(/theme-\S+/g, '').trim() + ' ' + cls;
+    }
+  } catch(e) {}
+}
+
+/* ── Size ── */
+function applySize(val) {
+  const v = parseInt(val,10);
+  document.body.className = document.body.className.replace(/sz-\S+/g,'').trim() + ' ' + sizeClasses[v];
+  document.getElementById('sizeLbl').textContent = sizeLabels[v];
+}
+
+/* ── Clock style ── */
+function applyStyle(cls) {
+  const wrap = document.getElementById('clocksWrap');
+  if (currentStyle) wrap.classList.remove(currentStyle);
+  currentStyle = cls;
+  if (cls) wrap.classList.add(cls);
+}
+
+/* ── Mode toggle ── */
+function setMode(m) {
+  clockMode = m;
+  document.getElementById('btnDigital').classList.toggle('active', m==='digital');
+  document.getElementById('btnAnalog').classList.toggle('active', m==='analog');
+  document.getElementById('btnVCR').classList.toggle('active', m==='vcr');
+  rebuildClocks();
+}
+
+/* ── SVG analog face builder ── */
+function buildAnalogSVG(id) {
+  const ticks = Array.from({length:60},(_,i)=>{
+    const a = i*6-90, r1=i%5===0?38:42, r2=46;
+    const [x1,y1] = [50+r1*Math.cos(a*Math.PI/180), 50+r1*Math.sin(a*Math.PI/180)];
+    const [x2,y2] = [50+r2*Math.cos(a*Math.PI/180), 50+r2*Math.sin(a*Math.PI/180)];
+    const w = i%5===0 ? 2 : 0.8;
+    return \`<line x1="\${x1.toFixed(2)}" y1="\${y1.toFixed(2)}" x2="\${x2.toFixed(2)}" y2="\${y2.toFixed(2)}" stroke="currentColor" stroke-opacity=".5" stroke-width="\${w}"/>\`;
+  }).join('');
+  return \`<svg viewBox="0 0 100 100" class="analog-face" id="\${id}">
+  <circle cx="50" cy="50" r="49" fill="var(--bg3)" stroke="var(--border)" stroke-width="1.5"/>
+  \${ticks}
+  <line id="\${id}-h"  x1="50" y1="50" x2="50" y2="22" stroke="var(--text)"   stroke-width="3.5" stroke-linecap="round"/>
+  <line id="\${id}-m"  x1="50" y1="50" x2="50" y2="14" stroke="var(--text)"   stroke-width="2.5" stroke-linecap="round"/>
+  <line id="\${id}-s"  x1="50" y1="50" x2="50" y2="10" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="50" cy="50" r="3" fill="var(--accent)"/>
+</svg>\`;
+}
+
+function updateAnalog(svgId, h, m, s) {
+  const hEl = document.getElementById(svgId+'-h');
+  const mEl = document.getElementById(svgId+'-m');
+  const sEl = document.getElementById(svgId+'-s');
+  if (!hEl) return;
+  const hDeg = (h%12)*30 + m*0.5 + s*(0.5/60) - 90;
+  const mDeg = m*6 + s*0.1 - 90;
+  const sDeg = s*6 - 90;
+  const rot = (deg, x1,y1,x2,y2) => {
+    const a=deg*Math.PI/180;
+    const nx2 = 50+(x2-50)*Math.cos(a)-(y2-50)*Math.sin(a);
+    const ny2 = 50+(x2-50)*Math.sin(a)+(y2-50)*Math.cos(a);
+    return [nx2,ny2];
+  };
+  // Rotate hands using transform
+  hEl.setAttribute('transform',\`rotate(\${hDeg+90},50,50)\`);
+  mEl.setAttribute('transform',\`rotate(\${mDeg+90},50,50)\`);
+  sEl.setAttribute('transform',\`rotate(\${sDeg+90},50,50)\`);
+}
+
+/* ── Read clock data from opener ── */
+function getClockData() {
+  try {
+    const op = window.opener;
+    const isUTC = op?._clockUTC || false;
+    const extra = op?.state?.preferences?.extra_clocks || [];
+    return { isUTC, extra };
+  } catch(e) { return { isUTC:false, extra:[] }; }
+}
+
+/* ── Remove a clock by calling parent ── */
+function removeClock(id) {
+  try { window.opener?.removeExtraClock(id); } catch(e){}
+  rebuildClocks();
+}
+
+/* ── Build / rebuild all clock cards ── */
+let _lastClockCount = -1;
+let _lastMode = '';
+function rebuildClocks() {
+  const {isUTC, extra} = getClockData();
+  const total = 1 + extra.length;
+  const wrap = document.getElementById('clocksWrap');
+  if (!wrap) return;
+  _lastClockCount = total;
+  _lastMode = clockMode;
+  let html = '';
+  // Main clock
+  if (clockMode === 'analog') {
+    html += \`<div class="clock-card" id="card-main">
+      <div class="clock-label" id="main-label">\${isUTC?'UTC/Z':'Local Time'}</div>
+      <div class="analog-wrap">\${buildAnalogSVG('svg-main')}</div>
+      <div class="clock-date" id="main-date"></div>
+      <div class="clock-tz" id="main-tz"></div>
+    </div>\`;
+  } else if (clockMode === 'vcr') {
+    html += \`<div class="clock-card vcr-card" id="card-main">
+      <div class="clock-label vcr-label" id="main-label">\${isUTC?'UTC/Z':'LOCAL'}</div>
+      <div class="clock-time vcr-time"><span id="vcr-main-h">--</span><span class="vcr-colon">:</span><span id="vcr-main-m">--</span><span class="vcr-colon">:</span><span id="vcr-main-s">--</span></div>
+      <div class="clock-date vcr-date" id="main-date"></div>
+      <div class="clock-tz vcr-tz" id="main-tz"></div>
+    </div>\`;
+  } else {
+    html += \`<div class="clock-card" id="card-main">
+      <div class="clock-label" id="main-label">\${isUTC?'UTC/Z':'Local Time'}</div>
+      <div class="clock-time" id="main-time">--:--:--</div>
+      <div class="clock-date" id="main-date"></div>
+      <div class="clock-tz" id="main-tz"></div>
+    </div>\`;
+  }
+  // Extra clocks
+  extra.forEach(ec => {
+    if (clockMode === 'analog') {
+      html += \`<div class="clock-card" id="card-\${ec.id}">
+        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <div class="clock-label">\${escH(ec.label||ec.timezone)}</div>
+        <div class="analog-wrap">\${buildAnalogSVG('svg-'+ec.id)}</div>
+        <div class="clock-tz" id="ec-\${ec.id}-tz"></div>
+      </div>\`;
+    } else if (clockMode === 'vcr') {
+      html += \`<div class="clock-card vcr-card" id="card-\${ec.id}">
+        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <div class="clock-label vcr-label">\${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-time vcr-time"><span id="vcr-ec-\${ec.id}-h">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-m">--</span><span class="vcr-colon">:</span><span id="vcr-ec-\${ec.id}-s">--</span></div>
+        <div class="clock-tz vcr-tz" id="ec-\${ec.id}-tz"></div>
+      </div>\`;
+    } else {
+      html += \`<div class="clock-card" id="card-\${ec.id}">
+        <button class="clock-remove" title="Remove this clock" onclick="removeClock(\${ec.id})">&times;</button>
+        <div class="clock-label">\${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-time" id="ec-\${ec.id}-time">--:--:--</div>
+        <div class="clock-tz" id="ec-\${ec.id}-tz"></div>
+      </div>\`;
+    }
+  });
+  wrap.innerHTML = html;
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── Main tick function ── */
+function tick() {
+  syncTheme();
+  const {isUTC, extra} = getClockData();
+  const now = new Date();
+
+  // Detect if clock list changed or mode changed
+  if (1 + extra.length !== _lastClockCount || clockMode !== _lastMode) {
+    rebuildClocks();
+  }
+
+  // Update main clock label if UTC mode changed
+  const lbl = document.getElementById('main-label');
+  if (lbl) lbl.textContent = isUTC ? 'UTC/Z' : 'Local Time';
+
+  let h, m, s, dateStr, tzLabel, timeStr;
+  if (isUTC) {
+    h=now.getUTCHours(); m=now.getUTCMinutes(); s=now.getUTCSeconds();
+    timeStr = pad(h)+pad(m)+pad(s)+'Z';
+    dateStr = now.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+    tzLabel = 'UTC/Z';
+  } else {
+    h=now.getHours(); m=now.getMinutes(); s=now.getSeconds();
+    timeStr = pad(h)+':'+pad(m)+':'+pad(s);
+    dateStr = now.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    try { tzLabel=now.toLocaleTimeString(undefined,{timeZoneName:'short'}).split(' ').pop(); } catch{tzLabel='';}
+  }
+
+  if (clockMode === 'analog') {
+    updateAnalog('svg-main', h, m, s);
+  } else if (clockMode === 'vcr') {
+    const vh=document.getElementById('vcr-main-h'); if(vh)vh.textContent=pad(h);
+    const vm=document.getElementById('vcr-main-m'); if(vm)vm.textContent=pad(m);
+    const vs=document.getElementById('vcr-main-s'); if(vs)vs.textContent=pad(s);
+  } else {
+    const t=document.getElementById('main-time'); if(t)t.textContent=timeStr;
+  }
+  const d=document.getElementById('main-date'); if(d)d.textContent=dateStr;
+  const z=document.getElementById('main-tz');   if(z)z.textContent=tzLabel;
+
+  // Extra clocks
+  extra.forEach(ec => {
+    try {
+      const ecTime = new Date();
+      const ecH = parseInt(ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
+      const ecM = parseInt(ecTime.toLocaleTimeString('en-GB',{minute:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
+      const ecS = parseInt(ecTime.toLocaleTimeString('en-GB',{second:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
+      const ecTStr = ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:ec.timezone});
+      const ecTZ = ecTime.toLocaleTimeString('en-GB',{timeZoneName:'short',timeZone:ec.timezone}).split(' ').pop()||ec.timezone;
+      if (clockMode === 'analog') {
+        updateAnalog('svg-'+ec.id, ecH, ecM, ecS);
+      } else if (clockMode === 'vcr') {
+        const vh=document.getElementById('vcr-ec-'+ec.id+'-h'); if(vh)vh.textContent=pad(ecH);
+        const vm=document.getElementById('vcr-ec-'+ec.id+'-m'); if(vm)vm.textContent=pad(ecM);
+        const vs=document.getElementById('vcr-ec-'+ec.id+'-s'); if(vs)vs.textContent=pad(ecS);
+      } else {
+        const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent=ecTStr;
+      }
+      const z=document.getElementById('ec-'+ec.id+'-tz'); if(z)z.textContent=ecTZ;
+    } catch(e) {
+      const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent='??:??:??';
+    }
+  });
+}
+
+// Initial build + start ticking
+rebuildClocks();
+applySize(2);
+tick();
+setInterval(tick, 1000);
+<\/script>
+</body>
+</html>`;
+
+  const w = Math.min(window.screen.availWidth, 720);
+  const extraClocks = (state.preferences && state.preferences.extra_clocks) || [];
+  const h = Math.min(window.screen.availHeight - 100, Math.max(340, 220 + extraClocks.length * 160));
+  _clockPopout = window.open('', 'tidslinjal-clocks',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (_clockPopout) {
+    _clockPopout.document.open();
+    _clockPopout.document.write(popupHTML);
+    _clockPopout.document.close();
+  }
+
+  // Poll for popout closure so we can restore the main clock display
+  if (_clockPopoutMonitor) clearInterval(_clockPopoutMonitor);
+  _clockPopoutMonitor = setInterval(() => {
+    if (!_clockPopout || _clockPopout.closed) {
+      clearInterval(_clockPopoutMonitor);
+      _clockPopoutMonitor = null;
+      _clockPopout = null;
+      _setClockAreaDetached(false);
+    }
+  }, 800);
 }
 
 // City → IANA timezone hint table (supplement to IANA search)
@@ -492,229 +865,214 @@ function confirmAddClock() {
   if (typeof renderSidebar === 'function') renderSidebar();
 }
 
-// ── Detached Clock Window ──────────────────────────────────────────────────
-let _detachedClockWin = null;
+// ── Detachable help window ──────────────────────────────────────────────────
+let _helpPopout = null;
+let _helpPopoutMonitor = null;
 
-function _getThemeClass() {
-  const t = (state.preferences && state.preferences.theme) || 'dark';
-  if (t === 'light') return 'light-mode';
-  if (t === 'city-camo') return 'city-camo';
-  if (t === 'urban-camo') return 'urban-camo';
-  return '';
-}
+function detachHelp() {
+  if (_helpPopout && !_helpPopout.closed) {
+    _helpPopout.focus();
+    closeModal('helpModal');
+    return;
+  }
+  const theme = (state.preferences && state.preferences.theme) || 'dark';
+  // Grab the full help content from the current modal
+  const helpBody = document.querySelector('#helpModal .modal-body');
+  const helpContent = helpBody ? helpBody.innerHTML : '<p>Help unavailable</p>';
+  const helpStyles = Array.from(document.styleSheets)
+    .map(s => { try { return s.href || ''; } catch { return ''; } })
+    .filter(h => h && h.includes('style'))
+    .map(h => `<link rel="stylesheet" href="${h}">`)
+    .join('\n');
 
-function _getThemeVars(themeClass) {
-  const themes = {
-    '': { bg:'#0f1923', bg2:'#162030', bg3:'#1e2d40', border:'#2a3f56', accent:'#4A90D9', text:'#cfd8e3', textDim:'#7a8fa6', textBright:'#f0f4f8' },
-    'light-mode': { bg:'#f0f4f8', bg2:'#ffffff', bg3:'#e4eaf2', border:'#c4d0de', accent:'#2a6fad', text:'#2c3e50', textDim:'#5f7a99', textBright:'#0a1929' },
-    'city-camo': { bg:'#3a3d2e', bg2:'#4a4d38', bg3:'#555847', border:'#6b6e58', accent:'#8faa5a', text:'#d4d8c4', textDim:'#9a9e8a', textBright:'#eef0e0' },
-    'urban-camo': { bg:'#1a2233', bg2:'#1e293b', bg3:'#243044', border:'#3a4a5c', accent:'#4a90d9', text:'#c8d8e8', textDim:'#7a90a8', textBright:'#e8f0f8' },
-  };
-  return themes[themeClass] || themes[''];
-}
-
-function openDetachedClock() {
-  if (_detachedClockWin && !_detachedClockWin.closed) { _detachedClockWin.focus(); return; }
-  const themeClass = _getThemeClass();
-  const tv = _getThemeVars(themeClass);
-  // Gather today's deadlines from state.events
-  const deadlines = _getTodayDeadlines();
-  const deadlineJSON = JSON.stringify(deadlines);
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal Clock</title>
+  const popupHTML = `<!DOCTYPE html>
+<html lang="en" data-theme="${escHtml(theme)}" data-size="normal">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Help</title>
+<link rel="stylesheet" href="/static/style.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;
-  background:var(--bg);color:var(--text);transition:background .3s,color .3s}
-:root{--bg:${tv.bg};--bg2:${tv.bg2};--bg3:${tv.bg3};--border:${tv.border};--accent:${tv.accent};--text:${tv.text};--text-dim:${tv.textDim};--text-bright:${tv.textBright}}
-.clock-container{text-align:center;padding:30px}
-.analog-clock{position:relative;width:280px;height:280px;margin:0 auto 20px}
-.analog-clock svg{width:100%;height:100%}
-.digital-time{font-size:48px;font-weight:700;letter-spacing:2px;color:var(--text-bright);font-variant-numeric:tabular-nums}
-.digital-date{font-size:16px;color:var(--text-dim);margin-top:4px}
-.tz-label{font-size:14px;font-weight:700;color:var(--accent);margin-top:2px;cursor:pointer;user-select:none}
-.tz-label:hover{text-decoration:underline}
-</style></head><body>
-<div class="clock-container">
-  <div class="analog-clock"><svg id="analogSvg" viewBox="0 0 200 200"></svg></div>
-  <div class="digital-time" id="dTime">--:--:--</div>
-  <div class="digital-date" id="dDate">—</div>
-  <div class="tz-label" id="dTZ" onclick="toggleTZ()" title="Click to toggle Local / ZULU">—</div>
+  body { margin:0; padding:0; overflow:hidden; }
+  .help-window-wrap { display:flex; flex-direction:column; height:100vh; background:var(--bg); color:var(--text); }
+  .help-win-header { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .help-win-title { font-weight:700; font-size:14px; color:var(--text-bright,var(--text)); flex:1; }
+  .help-win-search { flex:1; max-width:320px; background:var(--bg3,var(--bg)); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 9px; font-size:12px; }
+  .help-body { display:flex; gap:0; flex:1; overflow:hidden; }
+  .help-toc { width:200px; flex-shrink:0; overflow-y:auto; padding:12px 8px; border-right:1px solid var(--border); font-size:12px; }
+  .help-toc-link { display:block; padding:4px 8px; border-radius:5px; color:var(--text-dim,#888); text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .help-toc-link:hover { background:var(--bg3,#333); color:var(--text); }
+  .help-content { flex:1; overflow-y:auto; padding:16px 20px; }
+  .help-section { display:flex; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
+  .help-section.hidden { display:none; }
+  .help-section-icon { font-size:28px; flex-shrink:0; width:36px; text-align:center; }
+  .help-section-body { flex:1; min-width:0; }
+  .help-section-body h3 { font-size:14px; font-weight:700; margin-bottom:6px; color:var(--text-bright,var(--text)); }
+  .help-section-body h4 { font-size:12px; font-weight:600; margin:8px 0 4px; }
+  .help-section-body p { font-size:12px; line-height:1.5; margin-bottom:6px; }
+  .help-section-body ul, .help-section-body ol { font-size:12px; padding-left:18px; margin-bottom:6px; }
+  .help-section-body li { margin-bottom:3px; line-height:1.5; }
+  .help-list { padding-left:16px; }
+  .help-table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:6px; }
+  .help-table th { text-align:left; font-weight:600; padding:4px 6px; border-bottom:1px solid var(--border); color:var(--accent); }
+  .help-table td { padding:4px 6px; border-bottom:1px solid var(--border,#333); vertical-align:top; }
+  .help-kbd { display:inline-block; background:var(--bg3,#444); border:1px solid var(--border,#555); border-radius:3px; padding:1px 5px; font-size:10px; font-family:monospace; }
+  .help-badge { background:var(--bg3,#333); border-radius:3px; padding:1px 4px; font-size:10px; }
+  mark { background:rgba(255,200,0,.35); border-radius:2px; padding:0 2px; }
+  .role-badge { font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600; }
+  code { background:var(--bg3,#333); padding:1px 4px; border-radius:3px; font-size:11px; font-family:monospace; }
+</style>
+</head>
+<body>
+<div class="help-window-wrap">
+  <div class="help-win-header">
+    <span class="help-win-title">Tidslinjal — Help</span>
+    <input type="search" class="help-win-search" id="helpWinSearch" placeholder="Search…" oninput="filterHelpWin(this.value)" autocomplete="off">
+    <span id="helpWinStatus" style="font-size:11px;color:var(--text-dim,#888);min-width:60px"></span>
+  </div>
+  <div class="help-body">${helpContent}</div>
 </div>
 <script>
-let useUTC = ${_clockUTC};
-const deadlines = ${deadlineJSON};
-const channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
-
-function toggleTZ() {
-  useUTC = !useUTC;
-  // Notify main window
-  if (channel) channel.postMessage({ type: 'clock-format', zulu: useUTC });
-  tick();
+'use strict';
+// Sync theme from opener
+function syncTheme() {
+  try {
+    const t = window.opener?.state?.preferences?.theme || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch(e) {}
 }
+syncTheme();
+setInterval(syncTheme, 2000);
 
-if (channel) {
-  channel.onmessage = e => {
-    if (e.data.type === 'clock-format') { useUTC = e.data.zulu; tick(); }
-    if (e.data.type === 'theme') { applyTheme(e.data.themeClass); }
-    if (e.data.type === 'deadlines') { deadlines.length = 0; e.data.list.forEach(d => deadlines.push(d)); tick(); }
-  };
-}
-
-function applyTheme(cls) {
-  const themes = ${JSON.stringify({
-    '': _getThemeVars(''),
-    'light-mode': _getThemeVars('light-mode'),
-    'city-camo': _getThemeVars('city-camo'),
-    'urban-camo': _getThemeVars('urban-camo'),
-  })};
-  const tv = themes[cls] || themes[''];
-  const r = document.documentElement.style;
-  r.setProperty('--bg', tv.bg); r.setProperty('--bg2', tv.bg2);
-  r.setProperty('--bg3', tv.bg3); r.setProperty('--border', tv.border);
-  r.setProperty('--accent', tv.accent); r.setProperty('--text', tv.text);
-  r.setProperty('--text-dim', tv.textDim); r.setProperty('--text-bright', tv.textBright);
-}
-
-function drawAnalogClock(now) {
-  const svg = document.getElementById('analogSvg');
-  if (!svg) return;
-  const cx = 100, cy = 100, r = 90;
-  const h = useUTC ? now.getUTCHours() : now.getHours();
-  const m = useUTC ? now.getUTCMinutes() : now.getMinutes();
-  const s = useUTC ? now.getUTCSeconds() : now.getSeconds();
-  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4A90D9';
-  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#cfd8e3';
-  const dimColor = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#7a8fa6';
-  const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#2a3f56';
-  let markup = '';
-  // Face
-  markup += '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+borderColor+'" stroke-width="2"/>';
-  // Hour marks
-  for (let i=0;i<12;i++) {
-    const a = (i*30-90)*Math.PI/180;
-    const x1 = cx+Math.cos(a)*(r-8), y1 = cy+Math.sin(a)*(r-8);
-    const x2 = cx+Math.cos(a)*(r-2), y2 = cy+Math.sin(a)*(r-2);
-    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+textColor+'" stroke-width="'+(i%3===0?2.5:1)+'"/>';
+function filterHelpWin(q) {
+  const sections = document.querySelectorAll('.help-section');
+  const status = document.getElementById('helpWinStatus');
+  if (!q.trim()) {
+    sections.forEach(s => { s.classList.remove('hidden'); clearMarks(s); });
+    if (status) status.textContent = '';
+    return;
   }
-  // Minute marks
-  for (let i=0;i<60;i++) {
-    if (i%5===0) continue;
-    const a = (i*6-90)*Math.PI/180;
-    const x1 = cx+Math.cos(a)*(r-4), y1 = cy+Math.sin(a)*(r-4);
-    const x2 = cx+Math.cos(a)*(r-2), y2 = cy+Math.sin(a)*(r-2);
-    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+dimColor+'" stroke-width="0.5"/>';
-  }
-  // Deadline markers (RED lines)
-  deadlines.forEach(dl => {
-    const dDate = new Date(dl.time);
-    const dh = useUTC ? dDate.getUTCHours() : dDate.getHours();
-    const dm = useUTC ? dDate.getUTCMinutes() : dDate.getMinutes();
-    const angle = ((dh%12)*30 + dm*0.5 - 90) * Math.PI/180;
-    const x1 = cx+Math.cos(angle)*(r-18), y1 = cy+Math.sin(angle)*(r-18);
-    const x2 = cx+Math.cos(angle)*(r-1), y2 = cy+Math.sin(angle)*(r-1);
-    markup += '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#E74C3C" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>';
-    // Small red dot at outer end
-    markup += '<circle cx="'+x2+'" cy="'+y2+'" r="3" fill="#E74C3C" opacity="0.85"/>';
-  });
-  // Hour hand
-  const hAngle = ((h%12)*30 + m*0.5 - 90) * Math.PI/180;
-  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(hAngle)*55)+'" y2="'+(cy+Math.sin(hAngle)*55)+'" stroke="'+textColor+'" stroke-width="3.5" stroke-linecap="round"/>';
-  // Minute hand
-  const mAngle = (m*6 + s*0.1 - 90) * Math.PI/180;
-  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(mAngle)*72)+'" y2="'+(cy+Math.sin(mAngle)*72)+'" stroke="'+textColor+'" stroke-width="2" stroke-linecap="round"/>';
-  // Second hand
-  const sAngle = (s*6 - 90) * Math.PI/180;
-  markup += '<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(sAngle)*78)+'" y2="'+(cy+Math.sin(sAngle)*78)+'" stroke="'+accentColor+'" stroke-width="1" stroke-linecap="round"/>';
-  // Center dot
-  markup += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+accentColor+'"/>';
-  svg.innerHTML = markup;
-}
-
-function tick() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  let timeStr, dateStr, tzLabel;
-  const locale = navigator.language || 'en';
-  if (useUTC) {
-    timeStr = pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
-    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
-    tzLabel = 'UTC/Z — click to switch';
-  } else {
-    timeStr = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
-    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    try { tzLabel = now.toLocaleTimeString(locale,{timeZoneName:'short'}).split(' ').pop()+' — click to switch'; } catch { tzLabel = 'Local'; }
-  }
-  document.getElementById('dTime').textContent = timeStr;
-  document.getElementById('dDate').textContent = dateStr;
-  document.getElementById('dTZ').textContent = tzLabel;
-  drawAnalogClock(now);
-}
-tick();
-setInterval(tick, 1000);
-<\/script></body></html>`;
-
-  _detachedClockWin = window.open('', 'tidslinjal-clock', 'width=380,height=520,resizable=yes');
-  if (_detachedClockWin) {
-    _detachedClockWin.document.write(html);
-    _detachedClockWin.document.close();
-  }
-}
-
-function _getTodayDeadlines() {
-  if (!state.events) return [];
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 86400000);
-  return state.events
-    .filter(ev => {
-      if (ev.event_type !== 'deadline') return false;
-      const t = new Date(ev.start_time);
-      return t >= todayStart && t < todayEnd;
-    })
-    .map(ev => ({ time: ev.start_time, title: ev.title }));
-}
-
-// ── Detached Help Window ───────────────────────────────────────────────────
-let _detachedHelpWin = null;
-
-function openDetachedHelp() {
-  if (_detachedHelpWin && !_detachedHelpWin.closed) { _detachedHelpWin.focus(); return; }
-  const helpBody = document.querySelector('.help-body');
-  if (!helpBody) return;
-  const themeClass = _getThemeClass();
-  const tv = _getThemeVars(themeClass);
-  // Clone help content
-  const helpHTML = helpBody.innerHTML;
-  // Get the help-specific styles from the stylesheet
-  const styleEl = document.querySelector('link[href*="style.css"]');
-  const stylePath = styleEl ? styleEl.href : '/static/style.css';
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Help</title>
-<link rel="stylesheet" href="${stylePath}">
-<style>
-body{background:var(--bg);color:var(--text);padding:20px;overflow:auto;min-height:100vh}
-.help-body{max-width:900px;margin:0 auto}
-h2{color:var(--text-bright);font-size:20px;margin-bottom:16px}
-</style></head><body class="${themeClass}">
-<h2>Tidslinjal — Quick Reference Guide</h2>
-<div class="help-body">${helpHTML}</div>
-<script>
-const channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
-if (channel) {
-  channel.onmessage = e => {
-    if (e.data.type === 'theme') {
-      document.body.className = e.data.themeClass;
+  const lq = q.toLowerCase();
+  let shown = 0;
+  sections.forEach(s => {
+    const text = s.textContent.toLowerCase();
+    if (text.includes(lq)) {
+      s.classList.remove('hidden');
+      highlightMarks(s, q);
+      shown++;
+    } else {
+      s.classList.add('hidden');
+      clearMarks(s);
     }
-  };
+  });
+  if (status) status.textContent = shown + ' section' + (shown===1?'':'s');
 }
-<\/script></body></html>`;
 
-  _detachedHelpWin = window.open('', 'tidslinjal-help', 'width=800,height=700,resizable=yes');
-  if (_detachedHelpWin) {
-    _detachedHelpWin.document.write(html);
-    _detachedHelpWin.document.close();
+function clearMarks(el) {
+  el.querySelectorAll('mark').forEach(m => {
+    const parent = m.parentNode;
+    parent.replaceChild(document.createTextNode(m.textContent), m);
+    parent.normalize();
+  });
+}
+
+function highlightMarks(el, q) {
+  clearMarks(el);
+  const lq = q.toLowerCase();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  nodes.forEach(node => {
+    const idx = node.nodeValue.toLowerCase().indexOf(lq);
+    if (idx < 0) return;
+    const before = document.createTextNode(node.nodeValue.slice(0, idx));
+    const mark   = document.createElement('mark');
+    mark.textContent = node.nodeValue.slice(idx, idx + q.length);
+    const after  = document.createTextNode(node.nodeValue.slice(idx + q.length));
+    const parent = node.parentNode;
+    parent.insertBefore(before, node);
+    parent.insertBefore(mark, node);
+    parent.insertBefore(after, node);
+    parent.removeChild(node);
+  });
+}
+<\/script>
+</body>
+</html>`;
+
+  const w = Math.min(window.screen.availWidth - 100, 1000);
+  const h = Math.min(window.screen.availHeight - 80, 800);
+  _helpPopout = window.open('', 'tidslinjal-help',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (_helpPopout) {
+    _helpPopout.document.open();
+    _helpPopout.document.write(popupHTML);
+    _helpPopout.document.close();
+    closeModal('helpModal');
   }
-  // Close the modal since we detached
-  if (typeof closeModal === 'function') closeModal('helpModal');
+
+  if (_helpPopoutMonitor) clearInterval(_helpPopoutMonitor);
+  _helpPopoutMonitor = setInterval(() => {
+    if (!_helpPopout || _helpPopout.closed) {
+      clearInterval(_helpPopoutMonitor);
+      _helpPopoutMonitor = null;
+      _helpPopout = null;
+    }
+  }, 1000);
+}
+
+// ── Help search (in-modal) ──────────────────────────────────────────────────
+function filterHelp(q) {
+  const sections = document.querySelectorAll('#helpModal .help-section');
+  const status = document.getElementById('helpSearchStatus');
+  if (!q || !q.trim()) {
+    sections.forEach(s => { s.style.display = ''; _clearHelpMarks(s); });
+    if (status) status.textContent = '';
+    return;
+  }
+  const lq = q.toLowerCase();
+  let shown = 0;
+  sections.forEach(s => {
+    const text = s.textContent.toLowerCase();
+    if (text.includes(lq)) {
+      s.style.display = '';
+      _highlightHelpMarks(s, q);
+      shown++;
+    } else {
+      s.style.display = 'none';
+      _clearHelpMarks(s);
+    }
+  });
+  if (status) status.textContent = shown + ' section' + (shown===1?'':'s') + ' match';
+}
+
+function _clearHelpMarks(el) {
+  el.querySelectorAll('mark.help-highlight').forEach(m => {
+    const p = m.parentNode;
+    p.replaceChild(document.createTextNode(m.textContent), m);
+    p.normalize();
+  });
+}
+
+function _highlightHelpMarks(el, q) {
+  _clearHelpMarks(el);
+  const lq = q.toLowerCase();
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  nodes.forEach(node => {
+    const idx = node.nodeValue.toLowerCase().indexOf(lq);
+    if (idx < 0 || node.parentElement?.tagName === 'SCRIPT' || node.parentElement?.tagName === 'STYLE') return;
+    const before = document.createTextNode(node.nodeValue.slice(0, idx));
+    const mark   = document.createElement('mark');
+    mark.className = 'help-highlight';
+    mark.textContent = node.nodeValue.slice(idx, idx + q.length);
+    const after  = document.createTextNode(node.nodeValue.slice(idx + q.length));
+    const parent = node.parentNode;
+    parent.insertBefore(before, node);
+    parent.insertBefore(mark, node);
+    parent.insertBefore(after, node);
+    parent.removeChild(node);
+  });
 }

@@ -1,0 +1,170 @@
+{
+  "name": "EX-18 Air Defence Exercise — 2 Days",
+  "description": "48-hour integrated air defence exercise covering air surveillance, threat tracking, engagement authority, missile battery operations, and coordination between ground-based air defence (GBAD), fighter aircraft, and command and control nodes. 24/7 operations. Suitable for air defence battalion and joint air defence exercises.",
+  "exercise_name": "EX-18 Air Defence Exercise",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "INITEX & System Activation",
+      "color": "#F39C12",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Air Picture Establishment",
+      "color": "#3498DB",
+      "start_offset_min": 120,
+      "end_offset_min": 720,
+      "order": 1
+    },
+    {
+      "name": "Threat Engagement — Day 1",
+      "color": "#E74C3C",
+      "start_offset_min": 720,
+      "end_offset_min": 1440,
+      "order": 2
+    },
+    {
+      "name": "Night Operations",
+      "color": "#2C3E50",
+      "start_offset_min": 1440,
+      "end_offset_min": 1920,
+      "order": 3
+    },
+    {
+      "name": "Saturation Attack — Day 2",
+      "color": "#C0392B",
+      "start_offset_min": 1920,
+      "end_offset_min": 2700,
+      "order": 4
+    },
+    {
+      "name": "ENDEX & AAR",
+      "color": "#95A5A6",
+      "start_offset_min": 2700,
+      "end_offset_min": 2880,
+      "order": 5
+    }
+  ],
+  "groups": [
+    {
+      "name": "Missile Battery Alpha",
+      "description": "SAM battery — northern sector"
+    },
+    {
+      "name": "Missile Battery Bravo",
+      "description": "SAM battery — southern sector"
+    },
+    {
+      "name": "Air Operations Centre",
+      "description": "Air C2 and engagement authority"
+    },
+    {
+      "name": "Radar & Surveillance",
+      "description": "Air surveillance radar systems"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Battery Ops",
+      "description": "Missile battery operations",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0, 1]
+    },
+    {
+      "name": "Air C2",
+      "description": "Air Operations Centre decisions",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Surveillance",
+      "description": "Radar and surveillance track data",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "INITEX — Systems Online",
+      "event_type": "instant",
+      "color": "#F39C12",
+      "description": "Exercise commenced. All radar systems activated and reporting. Battery Alpha and Bravo in standby (RED) state. Air Operations Centre assumes control of exercise airspace. Engagement rules declared: Free Fire Zone above FL100, ROE briefed.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Radar Network Calibration",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Surveillance radars conduct cross-calibration against known friendly aircraft tracks. Long-range search radar (60nm coverage), medium-range tracking radar, and fire control radar systems all verified. Common air picture established on AOC display. Data links tested.",
+      "start_offset_min": 60,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Unknown Track — ID Request",
+      "event_type": "event",
+      "color": "#E67E22",
+      "description": "EXERCISE INJECT: Unknown radar track detected entering air defence identification zone (ADIZ). Track does not respond to IFF query. Speed: 450 knots, altitude FL080, heading 270. Scramble requested. Fighter pair dispatched for visual identification.",
+      "start_offset_min": 720,
+      "duration_min": 30,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "INJECT: Ballistic Missile Launch Detected",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Ballistic missile launch detected by early warning sensor. Trajectory calculated: impact point within defended area. Battery Alpha given track data and shoot authorisation. Time to intercept: 4 minutes 20 seconds. Launch command issued.",
+      "start_offset_min": 1440,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Saturation Cruise Missile Attack",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Saturation attack — 12 cruise missiles launched simultaneously from 4 compass bearings. All batteries engage. Priority assignment: AOC allocates targets to Alpha and Bravo to avoid fratricide. Multiple simultaneous engagements. Reload procedures initiated. Ammunition status reported.",
+      "start_offset_min": 1920,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Engagement Battle Damage Assessment",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "AOC compiles battle damage assessment: intercept probability, leakers (missiles through defence), ammunition expended, system availability after engagement. Report submitted to exercise headquarters.",
+      "start_offset_min": 2160,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "ENDEX declared. All systems to safe state. Missiles safe. Radars to standby. All teams stand down.",
+      "start_offset_min": 2700,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Air Defence AAR",
+      "event_type": "physical_meeting",
+      "color": "#95A5A6",
+      "description": "Full AAR: track detection times, engagement authority decision speed, battery coordination, fratricide avoidance, saturation attack performance, ammunition management, BDA accuracy.",
+      "start_offset_min": 2730,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    }
+  ]
+}

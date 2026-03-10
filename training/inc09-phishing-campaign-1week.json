@@ -1,0 +1,190 @@
+{
+  "name": "INC-09 Targeted Phishing Campaign — 1 Week",
+  "description": "7-day incident response for a targeted spear-phishing campaign that successfully compromised 6 executive and finance staff accounts, leading to Business Email Compromise (BEC) and an attempted fraudulent wire transfer. Covers detection via fraud alert, email forensics, account remediation, financial institution coordination, and user awareness. Suitable for SOC, IT, Finance, Legal, and Management teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 8,
+  "day_end_hour": 18,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Triage",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 240,
+      "order": 0
+    },
+    {
+      "name": "Account Containment",
+      "color": "#E67E22",
+      "start_offset_min": 240,
+      "end_offset_min": 720,
+      "order": 1
+    },
+    {
+      "name": "Email Forensics",
+      "color": "#8E44AD",
+      "start_offset_min": 720,
+      "end_offset_min": 2880,
+      "order": 2
+    },
+    {
+      "name": "Financial Recovery",
+      "color": "#C0392B",
+      "start_offset_min": 2880,
+      "end_offset_min": 5760,
+      "order": 3
+    },
+    {
+      "name": "Hardening & Awareness",
+      "color": "#27AE60",
+      "start_offset_min": 5760,
+      "end_offset_min": 10080,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "SOC Team",
+      "description": "Security Operations — alert and investigation"
+    },
+    {
+      "name": "IT / M365 Admin",
+      "description": "Email administration and account management"
+    },
+    {
+      "name": "Finance",
+      "description": "Finance team — fraud management"
+    },
+    {
+      "name": "Legal & Management",
+      "description": "Legal, executive oversight"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOC Operations",
+      "description": "SOC investigation and monitoring",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "IT / M365",
+      "description": "Email and account administration",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Finance & Legal",
+      "description": "Financial recovery and legal layer",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [2, 3]
+    }
+  ],
+  "items": [
+    {
+      "title": "Bank Fraud Alert — Suspicious Wire Transfer",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Finance team receives alert from corporate bank: wire transfer of €240,000 to unknown overseas account was flagged by bank's fraud system before execution. Finance Director not recognising the instruction. SOC immediately notified. T=0 established. Wire transfer placed on hold by bank pending verification.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Email Thread Analysis — Wire Transfer Request",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "SOC Team and IT Admin review email chain that generated the wire transfer request. CFO account (compromised) sent authentic-appearing payment instruction to Finance team. Email headers analysis reveals: CFO account logged in from VPN exit node in Eastern Europe, inbox rule created to forward all emails to external address, OAuth token issued to unknown application.",
+      "start_offset_min": 30,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Phishing Email Identified",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "IT Admin locates original phishing email in CFO's inbox (3 days old). Highly convincing HTML email impersonating Microsoft 365 sign-in prompt. Adversary-in-the-middle (AiTM) phishing kit used — MFA token captured at time of initial sign-in. 5 additional executives identified as recipients of same phishing email. All 6 accounts considered compromised.",
+      "start_offset_min": 120,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Emergency Account Lockdown — 6 Accounts",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Admin immediately disables all 6 compromised accounts, revokes all active sessions, invalidates all OAuth tokens (including legitimate MFA tokens), and blocks sign-in. Exchange Online inbox rules removed from all affected mailboxes. Email forwarding rules deleted. Admin audit logging reviewed for additional changes made by attacker.",
+      "start_offset_min": 240,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "M365 Audit Log Deep Dive",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "SOC Team reviews M365 Unified Audit Log for all 6 compromised accounts over 30-day window. Findings: CFO account accessed by attacker for 3 days, read 847 emails, downloaded 12 attachments, created email rule, sent fraudulent wire transfer request. Other accounts: calendar access, some email reading. No evidence of further wire transfer attempts.",
+      "start_offset_min": 720,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Phishing Campaign Scope — Mail Gateway Analysis",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "IT Admin analyses Defender for M365 and mail gateway logs for the original phishing domain. 23 employees received the phishing email. 6 clicked and entered credentials. Domain takedown request submitted to registrar. Indicators of Compromise (IoC) shared with ISAC and threat intel feeds. Phishing domain added to DNS blacklist.",
+      "start_offset_min": 1440,
+      "duration_min": 720,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Wire Transfer Cancellation — Bank Coordination",
+      "event_type": "assigned_task",
+      "color": "#C0392B",
+      "description": "Finance Director contacts bank fraud team via dedicated fraud hotline. Bank confirms wire transfer still on hold. Official cancellation submitted with fraud report reference number. Bank's Financial Intelligence Unit notified. Correspondent bank in destination country also notified via SWIFT network. Transfer officially cancelled.",
+      "start_offset_min": 2880,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Regulatory Notification — Financial Regulator",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal submits mandatory incident report to financial services regulator. Report includes: nature of BEC attack, financial impact (nil — transfer cancelled), data access scope, remediation actions taken. GDPR notification assessed — personal data of 6 executives accessed; DPA notification submitted.",
+      "start_offset_min": 4320,
+      "duration_min": 0,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "MFA Hardening — Phishing-Resistant MFA",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "IT Admin deploys phishing-resistant MFA (FIDO2 security keys / Windows Hello for Business) for all executives and finance staff — replacing SMS/authenticator app MFA which is vulnerable to AiTM attacks. Conditional Access policies updated to require compliant device sign-in. Number matching enforced for all remaining authenticator-based MFA.",
+      "start_offset_min": 5760,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Organisation-Wide Phishing Awareness Training",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "IT and HR deploy targeted phishing simulation and awareness training to all 23 employees who received the phishing email, plus mandatory AiTM phishing awareness module for all 480 staff. Completion tracked in LMS. Finance team receives additional BEC-specific training covering wire transfer verification procedures.",
+      "start_offset_min": 7200,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Report",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Incident Commander submits Post-Incident Report. Key findings: AiTM phishing bypassed legacy MFA, lack of out-of-band wire transfer verification allowed near-miss. Recommendations: phishing-resistant MFA for all users (prioritise finance/exec), dual-authorisation for wire transfers above €10k, payment verification callback procedure, enhanced email filtering for lookalike domains.",
+      "start_offset_min": 10080,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    }
+  ]
+}

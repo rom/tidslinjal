@@ -3,6 +3,8 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
@@ -26,6 +28,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // Global logger flags (set in main)
@@ -58,6 +61,184 @@ func logDebug(format string, args ...any) {
 	if debug {
 		log.Printf("[DEBUG] "+format, args...)
 	}
+}
+
+// ── Syslog writer ─────────────────────────────────────────────────────────────
+
+// syslogWriter forwards log messages to a remote syslog server.
+// It supports UDP, TCP, and TLS transports, and classic or JSON message formats.
+// An instance is set via setSyslogWriter(); concurrent use is safe via its own mutex.
+type syslogWriter struct {
+	mu       sync.Mutex
+	cfg      SyslogConfig
+	conn     net.Conn // nil for UDP (reconnect on each write)
+	hostname string
+}
+
+var (
+	globalSyslog     *syslogWriter
+	globalSyslogOnce sync.Once
+)
+
+// setSyslogWriter replaces the active syslog writer (or disables it if cfg.Enabled is false).
+func setSyslogWriter(cfg SyslogConfig) {
+	if !cfg.Enabled || cfg.Host == "" {
+		globalSyslog = nil
+		return
+	}
+	hn, _ := os.Hostname()
+	globalSyslog = &syslogWriter{cfg: cfg, hostname: hn}
+}
+
+// syslogSend forwards a log line to the remote syslog server (if configured).
+func syslogSend(severity int, msg string) {
+	sw := globalSyslog
+	if sw == nil {
+		return
+	}
+	sw.send(severity, msg)
+}
+
+// syslogPriority computes the RFC 3164 priority value from facility and severity.
+func syslogPriority(facility, severity int) int {
+	return facility*8 + severity
+}
+
+func (sw *syslogWriter) formatClassic(priority int, msg string) []byte {
+	// RFC 3164: <PRI>Mmm DD HH:MM:SS hostname tag: message
+	t := time.Now().UTC()
+	app := sw.cfg.AppName
+	if app == "" {
+		app = "tidslinjal"
+	}
+	line := fmt.Sprintf("<%d>%s %s %s: %s\n",
+		priority,
+		t.Format("Jan _2 15:04:05"),
+		sw.hostname,
+		app,
+		msg,
+	)
+	return []byte(line)
+}
+
+func (sw *syslogWriter) formatJSON(priority int, severity int, msg string) []byte {
+	app := sw.cfg.AppName
+	if app == "" {
+		app = "tidslinjal"
+	}
+	b, _ := json.Marshal(map[string]any{
+		"priority":  priority,
+		"facility":  sw.cfg.Facility,
+		"severity":  severity,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"hostname":  sw.hostname,
+		"app":       app,
+		"message":   msg,
+	})
+	return append(b, '\n')
+}
+
+func (sw *syslogWriter) send(severity int, msg string) {
+	facility := sw.cfg.Facility
+	if facility == 0 {
+		facility = 1 // user-level messages
+	}
+	priority := syslogPriority(facility, severity)
+
+	var payload []byte
+	if sw.cfg.Format == "json" {
+		payload = sw.formatJSON(priority, severity, msg)
+	} else {
+		payload = sw.formatClassic(priority, msg)
+	}
+
+	port := sw.cfg.Port
+	if port == 0 {
+		if sw.cfg.Transport == "tls" {
+			port = 6514
+		} else {
+			port = 514
+		}
+	}
+	addr := fmt.Sprintf("%s:%d", sw.cfg.Host, port)
+
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	switch sw.cfg.Transport {
+	case "udp":
+		// UDP: connectionless, create a new connection per message
+		conn, err := net.DialTimeout("udp", addr, 3*time.Second)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
+		conn.Write(payload)                                //nolint
+	case "tls":
+		tlsCfg := &tls.Config{InsecureSkipVerify: !sw.cfg.TLSVerify} //nolint
+		if sw.conn == nil {
+			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, tlsCfg)
+			if err != nil {
+				return
+			}
+			sw.conn = conn
+		}
+		sw.conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+		if _, err := sw.conn.Write(payload); err != nil {
+			sw.conn.Close()
+			sw.conn = nil
+			// Retry once
+			conn, err2 := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, tlsCfg)
+			if err2 != nil {
+				return
+			}
+			sw.conn = conn
+			sw.conn.Write(payload) //nolint
+		}
+	default: // tcp
+		if sw.conn == nil {
+			conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+			if err != nil {
+				return
+			}
+			sw.conn = conn
+		}
+		sw.conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+		if _, err := sw.conn.Write(payload); err != nil {
+			sw.conn.Close()
+			sw.conn = nil
+			conn, err2 := net.DialTimeout("tcp", addr, 5*time.Second)
+			if err2 != nil {
+				return
+			}
+			sw.conn = conn
+			sw.conn.Write(payload) //nolint
+		}
+	}
+}
+
+// syslogLogWriter wraps the standard log package to also forward to syslog.
+// It implements io.Writer so it can be set as log.SetOutput(…).
+type syslogLogWriter struct {
+	orig io.Writer
+}
+
+func (w *syslogLogWriter) Write(p []byte) (int, error) {
+	n, err := w.orig.Write(p)
+	// Determine severity from prefix: ERROR/FATAL→3, WARN→4, INFO→6, default→6
+	s := strings.TrimSpace(string(p))
+	severity := 6 // informational
+	sl := strings.ToUpper(s)
+	if strings.Contains(sl, "[WARN]") {
+		severity = 4 // warning
+	} else if strings.Contains(sl, "[DEBUG]") {
+		severity = 7 // debug
+	} else if strings.Contains(sl, "FATAL") || strings.Contains(sl, "ERROR") {
+		severity = 3 // error
+	}
+	syslogSend(severity, strings.TrimRight(s, "\n"))
+	return n, err
 }
 
 // ── SSE broker ────────────────────────────────────────────────────────────────
@@ -183,6 +364,40 @@ type App struct {
 	oidcExclusive   bool        // when true, disable local username/password login
 	oidcDefaultRole Role        // role assigned to auto-created OIDC users (default: RoleReadWrite)
 	webhookCh       chan webhookJob
+	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
+	authLimiter     *ipRateLimiter
+}
+
+// ipRateLimiter implements a simple per-IP sliding-window rate limiter.
+type ipRateLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*rateBucket
+}
+
+type rateBucket struct {
+	count   int
+	resetAt time.Time
+}
+
+func newIPRateLimiter() *ipRateLimiter {
+	return &ipRateLimiter{buckets: make(map[string]*rateBucket)}
+}
+
+// allow returns true if the request from ip is within limit per window.
+func (rl *ipRateLimiter) allow(ip string, limit int, window time.Duration) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	b, ok := rl.buckets[ip]
+	if !ok || now.After(b.resetAt) {
+		rl.buckets[ip] = &rateBucket{count: 1, resetAt: now.Add(window)}
+		return true
+	}
+	if b.count >= limit {
+		return false
+	}
+	b.count++
+	return true
 }
 
 // broadcastEventChange sends an SSE notification to all clients about an event change
@@ -235,9 +450,10 @@ func NewApp(dataDir string) (*App, error) {
 		return nil, err
 	}
 	app := &App{
-		store:     store,
-		broker:    NewSSEBroker(),
-		webhookCh: make(chan webhookJob, 256),
+		store:       store,
+		broker:      NewSSEBroker(),
+		webhookCh:   make(chan webhookJob, 256),
+		authLimiter: newIPRateLimiter(),
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
 	for i := 0; i < webhookConcurrency; i++ {
@@ -447,6 +663,10 @@ func pathSegment(r *http.Request, n int) string {
 // ── Auth handlers ──────────────────────────────────────────────────────────────
 
 func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if !app.authLimiter.allow(clientIP(r), 10, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
+		return
+	}
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -462,27 +682,24 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
 		return
 	}
-	clientIP := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		clientIP = strings.SplitN(fwd, ",", 2)[0]
-	}
+	loginClientIP := clientIP(r)
 	user, ok := app.store.GetUserByUsername(req.Username)
 	if !ok {
 		app.audit(0, "system", "login_failed", "user", 0,
-			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, clientIP))
+			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		app.audit(0, "system", "login_failed", "user", user.ID,
-			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, clientIP))
+			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	// Deny login for blocked accounts
 	if user.Blocked {
 		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
-			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, clientIP))
+			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, loginClientIP))
 		jsonError(w, "account is blocked", http.StatusForbidden)
 		return
 	}
@@ -502,12 +719,17 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: "session", Value: sessID, Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteLaxMode, Expires: sess.ExpiresAt,
+		Name:     "session",
+		Value:    sessID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   app.secureMode,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  sess.ExpiresAt,
 	})
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
-		fmt.Sprintf("User %q logged in from %s", user.Username, clientIP))
-	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, clientIP)
+		fmt.Sprintf("User %q logged in from %s", user.Username, loginClientIP))
+	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, loginClientIP)
 
 	// Record last login time, IP, and domain (async to avoid blocking login response)
 	go func(u User, ip string) {
@@ -524,7 +746,7 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			fullUser.LastLoginDomain = u.LastLoginDomain
 			app.store.UpdateUser(*fullUser) //nolint
 		}
-	}(*user, clientIP)
+	}(*user, loginClientIP)
 
 	jsonOK(w, user.Public())
 }
@@ -594,12 +816,26 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "user not found", http.StatusNotFound)
 		return
 	}
-	if req.CurrentPassword != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-			jsonError(w, "current password incorrect", http.StatusUnauthorized)
+
+	// Block OIDC/SSO users — their identity is managed by the external provider
+	if fullUser.IsOIDC {
+		jsonError(w, "oidc_account: Password cannot be changed here — this account uses Single Sign-On (SSO/OIDC). Manage your password through your identity provider.", http.StatusForbidden)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		jsonError(w, "current password incorrect", http.StatusUnauthorized)
+		return
+	}
+
+	// Enforce password quality policy if enabled
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.NewPassword, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
@@ -618,11 +854,71 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// validateUsername checks that a username is non-empty, not too long, and only
+// contains safe characters (letters, digits, underscores, hyphens, dots).
+// This prevents log injection and other issues caused by unusual characters.
+func validateUsername(username string) error {
+	if username == "" {
+		return fmt.Errorf("username is required")
+	}
+	if len(username) > 64 {
+		return fmt.Errorf("username must be at most 64 characters")
+	}
+	for _, r := range username {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '_' || r == '-' || r == '.') {
+			return fmt.Errorf("username may only contain letters, digits, underscores, hyphens and dots")
+		}
+	}
+	return nil
+}
+
+// validatePasswordQuality checks a candidate password against the active policy.
+func validatePasswordQuality(password string, policy SecuritySettings) error {
+	minLen := policy.MinLength
+	if minLen == 0 {
+		minLen = 8
+	}
+	if len(password) < minLen {
+		return fmt.Errorf("password_quality: Password must be at least %d characters long", minLen)
+	}
+	var hasUpper, hasLower, hasDigit, hasSymbol bool
+	for _, r := range password {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			hasUpper = true
+		case r >= 'a' && r <= 'z':
+			hasLower = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		default:
+			hasSymbol = true
+		}
+	}
+	if policy.RequireUppercase && !hasUpper {
+		return fmt.Errorf("password_quality: Password must contain at least one uppercase letter (A–Z)")
+	}
+	if policy.RequireLowercase && !hasLower {
+		return fmt.Errorf("password_quality: Password must contain at least one lowercase letter (a–z)")
+	}
+	if policy.RequireNumbers && !hasDigit {
+		return fmt.Errorf("password_quality: Password must contain at least one number (0–9)")
+	}
+	if policy.RequireSymbols && !hasSymbol {
+		return fmt.Errorf("password_quality: Password must contain at least one symbol (e.g. !@#$%%^&*)")
+	}
+	return nil
+}
+
 // ── Registration handler ───────────────────────────────────────────────────────
 
 func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
 	rs := app.store.GetRegistrationSettings()
@@ -647,11 +943,21 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		jsonError(w, "username and password required", http.StatusBadRequest)
+	if err := validateUsername(req.Username); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if len(req.Password) < 6 {
+	if req.Password == "" {
+		jsonError(w, "password is required", http.StatusBadRequest)
+		return
+	}
+	// Apply password quality policy if enabled; otherwise enforce bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.Password, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.Password) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
@@ -999,8 +1305,9 @@ func (app *App) handleInvitations(w http.ResponseWriter, r *http.Request, user *
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		// Use a shorter, more readable code
-		code = code[:12]
+		// Use a 24-character code (96 bits of entropy) — short enough to share
+		// but long enough to be brute-force resistant.
+		code = code[:24]
 		inv, err := app.store.CreateInvitation(PersonalInvitation{
 			Code:      code,
 			Note:      req.Note,
@@ -1173,6 +1480,10 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
+		return
+	}
 	var req struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`
@@ -1214,7 +1525,8 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	expiry := time.Now().Add(2 * time.Hour)
 	app.store.SetPasswordResetToken(targetUser.ID, token, expiry) //nolint
 
-	log.Printf("Password reset requested for user %q — token: %s (valid 2h)", targetUser.Username, token)
+	// Never log the token in plaintext — only note that a reset was initiated.
+	log.Printf("Password reset requested for user %q (valid 2h)", targetUser.Username)
 
 	// Send reset email if SMTP is configured and user has an email
 	cfg := app.store.GetMailConfig()
@@ -1229,11 +1541,16 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		if err := app.sendMail(cfg, targetUser.Email, "Tidslinjal — Password Reset", body); err != nil {
 			log.Printf("Failed to send password reset email to %s: %v", targetUser.Email, err)
 		}
-		jsonOK(w, map[string]string{"status": "ok"})
 	} else {
-		// Return token directly (admin will see it in logs, or no SMTP configured)
-		jsonOK(w, map[string]string{"status": "ok", "token": token})
+		// SMTP not configured and/or user has no email. Log the token to stderr
+		// (server console only, not the HTTP response) so an admin can relay it
+		// out-of-band. Never return it in the API response.
+		log.Printf("[SECURITY] No SMTP configured — password reset token for %q is available in server logs only. Deliver it out-of-band.", targetUser.Username)
+		log.Printf("[SECURITY] Reset token (copy and send to user): %s", token)
 	}
+	// Always return a generic "ok" regardless of whether email was sent,
+	// to avoid leaking whether the account/email exists or whether SMTP is set up.
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -1253,7 +1570,13 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token and new_password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.NewPassword) < 6 {
+	// Apply password quality policy if enabled; otherwise enforce a bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.NewPassword, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.NewPassword) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
@@ -1796,7 +2119,12 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 	}
 	defer file.Close()
 
-	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), header.Filename)
+	// Strip any path components from the filename to prevent path traversal attacks.
+	safeFilename := filepath.Base(header.Filename)
+	if safeFilename == "." || safeFilename == "/" {
+		safeFilename = "upload"
+	}
+	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeFilename)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
 	dst, err := os.Create(destPath)
 	if err != nil {
@@ -1845,7 +2173,15 @@ func (app *App) handleDownloadAttachment(w http.ResponseWriter, r *http.Request,
 	}
 	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
 	w.Header().Set("Content-Type", att.MimeType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, att.Filename))
+	// Sanitise filename for use in Content-Disposition to prevent header injection.
+	// Remove double-quotes, backslashes, and newline characters that could break the header.
+	safeDisp := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, att.Filename)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
 	http.ServeFile(w, r, path)
 }
 
@@ -2381,8 +2717,12 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		jsonError(w, "username and password required", http.StatusBadRequest)
+	if err := validateUsername(req.Username); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Password == "" {
+		jsonError(w, "password is required", http.StatusBadRequest)
 		return
 	}
 	if _, exists := app.store.GetUserByUsername(req.Username); exists {
@@ -2394,8 +2734,16 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	validRoles := map[Role]bool{
+		RoleObserver: true, RoleRead: true, RoleReporter: true,
+		RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
+		RoleStaffOfficer: true, RoleStaffOfficerFull: true, RoleAdmin: true,
+	}
 	if req.Role == "" {
 		req.Role = RoleRead
+	} else if !validRoles[req.Role] {
+		jsonError(w, "invalid role", http.StatusBadRequest)
+		return
 	}
 	if req.DisplayName == "" {
 		req.DisplayName = req.Username
@@ -2439,6 +2787,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	var req struct {
 		Password         string   `json:"password"`
+		CurrentPassword  string   `json:"current_password"` // required when non-admin changes own password
 		DisplayName      string   `json:"display_name"`
 		Email            string   `json:"email"`
 		Role             Role     `json:"role"`
@@ -2452,6 +2801,13 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	if req.Password != "" {
+		// Non-admin users must verify their current password before changing it
+		if !hasRole(user.Role, RoleAdmin) {
+			if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+				jsonError(w, "current password incorrect", http.StatusUnauthorized)
+				return
+			}
+		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			jsonError(w, "internal error", http.StatusInternalServerError)
@@ -2628,6 +2984,85 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "debug": debug})
 }
 
+// ── Integration Status ─────────────────────────────────────────────────────────
+
+// handleStatus returns a summary of all integration statuses (admin-only).
+// This powers the legend panel's "Integrations" section.
+func (app *App) handleStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// OIDC / SSO
+	oidcCfg := app.store.GetOIDCSettings()
+	ssoStatus := map[string]any{
+		"enabled":   oidcCfg.Enabled,
+		"issuer":    oidcCfg.Issuer,
+		"exclusive": oidcCfg.Exclusive,
+		"active":    app.oidc != nil && oidcCfg.Enabled,
+	}
+
+	// TLS
+	tlsCfg := app.store.GetTLSConfig()
+	tlsStatus := map[string]any{
+		"configured": tlsCfg.CertFile != "" && tlsCfg.KeyFile != "",
+		"cert_file":  tlsCfg.CertFile,
+	}
+
+	// Syslog
+	syslogCfg := app.store.GetSyslogConfig()
+	syslogStatus := map[string]any{
+		"enabled":   syslogCfg.Enabled,
+		"host":      syslogCfg.Host,
+		"port":      syslogCfg.Port,
+		"transport": syslogCfg.Transport,
+		"format":    syslogCfg.Format,
+	}
+
+	// SMTP / Mail
+	mailCfg := app.store.GetMailConfig()
+	smtpStatus := map[string]any{
+		"enabled":   mailCfg.Enabled,
+		"host":      mailCfg.SMTPHost,
+		"port":      mailCfg.SMTPPort,
+		"tls_mode":  mailCfg.TLSMode,
+		"from_addr": mailCfg.FromAddr,
+	}
+
+	// Mattermost / Webhooks — count users with configured webhooks
+	allPrefs := app.store.GetAllPreferences()
+	mattermostCount := 0
+	webhookCount := 0
+	for _, p := range allPrefs {
+		if p.WebhookURL != "" {
+			webhookCount++
+			if p.WebhookType == "mattermost" || p.WebhookType == "slack" {
+				mattermostCount++
+			}
+		}
+	}
+	mattermostStatus := map[string]any{
+		"webhook_users":     webhookCount,
+		"mattermost_users":  mattermostCount,
+	}
+
+	// API Keys
+	apiKeys := app.store.GetAPIKeys()
+	apiKeyStatus := map[string]any{
+		"count": len(apiKeys),
+	}
+
+	jsonOK(w, map[string]any{
+		"sso":        ssoStatus,
+		"tls":        tlsStatus,
+		"syslog":     syslogStatus,
+		"smtp":       smtpStatus,
+		"mattermost": mattermostStatus,
+		"api_keys":   apiKeyStatus,
+	})
+}
+
 // ── Admin Reset ────────────────────────────────────────────────────────────────
 
 func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *User) {
@@ -2700,31 +3135,43 @@ func (app *App) handleAdminBulkStatus(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Filter string      `json:"filter"` // type | user | group | role
-		Value  string      `json:"value"`  // event type key | user id | group name | role name
-		Status EventStatus `json:"status"`
+		Filter   string      `json:"filter"` // type | user | group | role | status | layer | all
+		Value    string      `json:"value"`
+		Status   EventStatus `json:"status"`
+		TimeFrom string      `json:"time_from,omitempty"` // ISO8601
+		TimeTo   string      `json:"time_to,omitempty"`   // ISO8601
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
 	if !validFilters[req.Filter] {
-		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		jsonError(w, "filter must be one of: type, user, group, role, status, layer, all", http.StatusBadRequest)
 		return
 	}
 	if req.Status == "" {
 		jsonError(w, "status required", http.StatusBadRequest)
 		return
 	}
-	count, err := app.store.BulkSetEventStatus(req.Filter, req.Value, req.Status)
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkSetEventStatus(f, req.Status)
 	if err != nil {
 		jsonError(w, "bulk update failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	app.audit(user.ID, user.DisplayName, "bulk_status", "event", 0,
 		fmt.Sprintf("Admin %q set %d events (filter=%s value=%q) to status %q", user.Username, count, req.Filter, req.Value, req.Status))
-	// Broadcast event change to all clients
 	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"status_updated"}`})
 	jsonOK(w, map[string]any{"updated": count})
 }
@@ -2735,9 +3182,11 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Filter  string `json:"filter"` // type | user | group | role
-		Value   string `json:"value"`
-		Confirm string `json:"confirm"` // must be "DELETE"
+		Filter   string `json:"filter"`
+		Value    string `json:"value"`
+		Confirm  string `json:"confirm"` // must be "DELETE"
+		TimeFrom string `json:"time_from,omitempty"`
+		TimeTo   string `json:"time_to,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -2747,12 +3196,23 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "confirmation required: send {\"confirm\":\"DELETE\"}", http.StatusBadRequest)
 		return
 	}
-	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
 	if !validFilters[req.Filter] {
-		jsonError(w, "filter must be one of: type, user, group, role", http.StatusBadRequest)
+		jsonError(w, "filter must be one of: type, user, group, role, status, layer, all", http.StatusBadRequest)
 		return
 	}
-	count, err := app.store.BulkDeleteEvents(req.Filter, req.Value)
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkDeleteEvents(f)
 	if err != nil {
 		jsonError(w, "bulk delete failed: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -2761,6 +3221,53 @@ func (app *App) handleAdminBulkDelete(w http.ResponseWriter, r *http.Request, us
 		fmt.Sprintf("Admin %q deleted %d events (filter=%s value=%q)", user.Username, count, req.Filter, req.Value))
 	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"events_deleted"}`})
 	jsonOK(w, map[string]any{"deleted": count})
+}
+
+func (app *App) handleAdminBulkSetType(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Filter    string `json:"filter"`
+		Value     string `json:"value"`
+		EventType string `json:"event_type"`
+		TimeFrom  string `json:"time_from,omitempty"`
+		TimeTo    string `json:"time_to,omitempty"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.EventType == "" {
+		jsonError(w, "event_type required", http.StatusBadRequest)
+		return
+	}
+	validFilters := map[string]bool{"type": true, "user": true, "group": true, "role": true, "status": true, "layer": true, "all": true}
+	if !validFilters[req.Filter] {
+		jsonError(w, "invalid filter", http.StatusBadRequest)
+		return
+	}
+	f := BulkFilter{Filter: req.Filter, Value: req.Value}
+	if req.TimeFrom != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeFrom); err == nil {
+			f.TimeFrom = &t
+		}
+	}
+	if req.TimeTo != "" {
+		if t, err := time.Parse(time.RFC3339, req.TimeTo); err == nil {
+			f.TimeTo = &t
+		}
+	}
+	count, err := app.store.BulkSetEventType(f, req.EventType)
+	if err != nil {
+		jsonError(w, "bulk update failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "bulk_type", "event", 0,
+		fmt.Sprintf("Admin %q changed type of %d events (filter=%s value=%q) to %q", user.Username, count, req.Filter, req.Value, req.EventType))
+	app.broker.BroadcastAll(SSEMessage{Event: "bulk_change", Data: `{"action":"type_updated"}`})
+	jsonOK(w, map[string]any{"updated": count})
 }
 
 // ── Event Comment handlers ─────────────────────────────────────────────────────
@@ -3761,6 +4268,34 @@ func (app *App) runSessionCleaner() {
 	}
 }
 
+// securityHeaders wraps an http.Handler and injects security-related HTTP
+// response headers on every reply. This provides defence-in-depth against
+// clickjacking, MIME-sniffing, and other common web vulnerabilities.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		// Allow inline scripts/styles used by the SPA while blocking external scripts.
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// securityHeadersWithHSTS wraps securityHeaders and additionally sets HSTS
+// (HTTP Strict Transport Security) when the server is running over HTTPS.
+func securityHeadersWithHSTS(next http.Handler) http.Handler {
+	inner := securityHeaders(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// max-age=31536000 = 1 year; includeSubDomains is intentionally omitted
+		// to avoid breaking non-TLS subdomains that are outside our control.
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		inner.ServeHTTP(w, r)
+	})
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────────
 
 func (app *App) routes() http.Handler {
@@ -3773,6 +4308,11 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
+			return
+		}
+		_, user := app.getSession(r)
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
 		http.ServeFile(w, r, "static/index.html")
@@ -3790,6 +4330,8 @@ func (app *App) routes() http.Handler {
 
 	// Version
 	mux.HandleFunc("/api/version", handleVersion)
+	// Integration status (admin-only summary of SSO/TLS/Syslog/SMTP/Webhooks/API keys)
+	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 
 	// Admin operations
 	mux.HandleFunc("/api/admin/reset", app.requireAuth(app.handleAdminReset))
@@ -3817,6 +4359,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/admin/sessions/", app.requireRole(RoleAdmin, app.handleAdminDeleteSession))
 	mux.HandleFunc("/api/admin/bulk/status", app.requireRole(RoleAdmin, app.handleAdminBulkStatus))
 	mux.HandleFunc("/api/admin/bulk/delete", app.requireRole(RoleAdmin, app.handleAdminBulkDelete))
+	mux.HandleFunc("/api/admin/bulk/type", app.requireRole(RoleAdmin, app.handleAdminBulkSetType))
 	mux.HandleFunc("/api/export/xlsx", func(w http.ResponseWriter, r *http.Request) {
 		app.requireAuth(app.handleExportXLSX)(w, r)
 	})
@@ -4299,6 +4842,60 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Syslog configuration (admin only)
+	mux.HandleFunc("/api/integrations/syslog", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetSyslogConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveSyslogConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Syslog: test connection
+	mux.HandleFunc("/api/integrations/syslog/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleTestSyslog)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Security settings (password policy) — admin only
+	mux.HandleFunc("/api/admin/security", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetSecuritySettings)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveSecuritySettings)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// TLS configuration — admin only (takes effect on next server restart)
+	mux.HandleFunc("/api/integrations/tls", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetTLSConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveTLSConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Reports: on-demand download in specific format
+	mux.HandleFunc("/api/reports/download", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleTeamLead, app.handleReportDownload)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Auto-report schedules (server-side)
 	mux.HandleFunc("/api/auto-report-schedules", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -4381,6 +4978,39 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Gradual Backup (admin only)
+	mux.HandleFunc("/api/admin/gradual-backup", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleGradualBackupSettings)(w, r)
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/snapshot", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleGradualBackupSnapshotNow)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/restore/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleGradualBackupRestore)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/download/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, app.handleGradualBackupDownload)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/snapshots/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleGradualBackupDelete)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// WebCal subscription (token-based, no session cookie required)
 	mux.HandleFunc("/webcal/", app.handleWebCal)
 
@@ -4402,7 +5032,11 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	return mux
+	// Wrap the entire mux with security headers.
+	if app.secureMode {
+		return securityHeadersWithHSTS(mux)
+	}
+	return securityHeaders(mux)
 }
 
 // ── Mail Config ────────────────────────────────────────────────────────────────
@@ -4541,6 +5175,170 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 	return smtp.SendMail(addr, nil, from, []string{to}, msg)
 }
 
+// ── Syslog Config Handlers ────────────────────────────────────────────────────
+
+func (app *App) handleGetSyslogConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetSyslogConfig())
+}
+
+func (app *App) handleSaveSyslogConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg SyslogConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if cfg.Transport == "" {
+		cfg.Transport = "udp"
+	}
+	if cfg.Format == "" {
+		cfg.Format = "classic"
+	}
+	if err := app.store.SaveSyslogConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Apply new config immediately
+	setSyslogWriter(cfg)
+	if cfg.Enabled && cfg.Host != "" {
+		log.SetOutput(&syslogLogWriter{orig: os.Stderr})
+	} else {
+		log.SetOutput(os.Stderr)
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "syslog_config", 0, "Updated syslog configuration")
+	jsonOK(w, cfg)
+}
+
+func (app *App) handleTestSyslog(w http.ResponseWriter, r *http.Request, user *User) {
+	cfg := app.store.GetSyslogConfig()
+	if !cfg.Enabled || cfg.Host == "" {
+		jsonError(w, "Syslog is not configured", http.StatusBadRequest)
+		return
+	}
+	// Temporarily create a writer and send a test message
+	hn, _ := os.Hostname()
+	sw := &syslogWriter{cfg: cfg, hostname: hn}
+	sw.send(6, fmt.Sprintf("Tidslinjal syslog test from %s (user: %s)", hn, user.Username))
+	jsonOK(w, map[string]string{"status": "ok", "transport": cfg.Transport, "host": cfg.Host})
+}
+
+// ── Security Settings Handlers ────────────────────────────────────────────────
+
+func (app *App) handleGetSecuritySettings(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetSecuritySettings())
+}
+
+func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Request, user *User) {
+	var ss SecuritySettings
+	if err := json.NewDecoder(r.Body).Decode(&ss); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if ss.MinLength == 0 {
+		ss.MinLength = 8
+	}
+	if err := app.store.SaveSecuritySettings(ss); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "security_settings", 0, "Updated password policy")
+	jsonOK(w, ss)
+}
+
+// ── TLS Config Handlers ───────────────────────────────────────────────────────
+
+func (app *App) handleGetTLSConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetTLSConfig())
+}
+
+func (app *App) handleSaveTLSConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg TLSConfig
+	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	// Validate paths exist if provided
+	if cfg.CertFile != "" {
+		if _, err := os.Stat(cfg.CertFile); err != nil {
+			jsonError(w, fmt.Sprintf("cert file not accessible: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	if cfg.KeyFile != "" {
+		if _, err := os.Stat(cfg.KeyFile); err != nil {
+			jsonError(w, fmt.Sprintf("key file not accessible: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+	if err := app.store.SaveTLSConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "tls_config", 0,
+		fmt.Sprintf("Updated TLS config: cert=%s key=%s", cfg.CertFile, cfg.KeyFile))
+	jsonOK(w, map[string]any{
+		"cert_file":       cfg.CertFile,
+		"key_file":        cfg.KeyFile,
+		"restart_required": true,
+	})
+}
+
+// ── Report Download Handler ────────────────────────────────────────────────────
+
+// handleReportDownload serves an on-demand report in the requested format.
+// Query params: type=<report_type>, format=excel|rtf|docx|html|csv
+func (app *App) handleReportDownload(w http.ResponseWriter, r *http.Request, user *User) {
+	q := r.URL.Query()
+	reportType := q.Get("type")
+	if reportType == "" {
+		reportType = "timeline"
+	}
+	format := strings.ToLower(q.Get("format"))
+	if format == "" {
+		format = "html"
+	}
+
+	from := time.Now().Add(-30 * 24 * time.Hour)
+	to := time.Now().Add(30 * 24 * time.Hour)
+	if qf := q.Get("from"); qf != "" {
+		if t, err := time.Parse(time.RFC3339, qf); err == nil {
+			from = t
+		}
+	}
+	if qt := q.Get("to"); qt != "" {
+		if t, err := time.Parse(time.RFC3339, qt); err == nil {
+			to = t
+		}
+	}
+
+	events := app.store.GetEvents(from, to, nil)
+	commentsMap := make(map[int64][]EventComment)
+	for _, ev := range events {
+		if cs := app.store.GetCommentsByEvent(ev.ID); len(cs) > 0 {
+			commentsMap[ev.ID] = cs
+		}
+	}
+	title := fmt.Sprintf("%s Report — %s", reportType, time.Now().Format("2006-01-02"))
+
+	switch format {
+	case "excel", "xlsx":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.xlsx\"", reportType))
+		buildReportXLSXWriter(w, title, events)
+	case "rtf":
+		w.Header().Set("Content-Type", "application/rtf")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.rtf\"", reportType))
+		w.Write(buildAutoReportRTF(title, events, commentsMap)) //nolint
+	case "docx":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.docx\"", reportType))
+		buildReportDOCXWriter(w, title, events, commentsMap)
+	default: // html
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.html\"", reportType))
+		w.Write([]byte(buildAutoReportHTML(reportType, events, commentsMap))) //nolint
+	}
+}
+
 // ── Auto-Report Schedule Handlers ─────────────────────────────────────────────
 
 func (app *App) handleListAutoReportSchedules(w http.ResponseWriter, r *http.Request, user *User) {
@@ -4641,11 +5439,42 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 			commentsMap[ev.ID] = comments
 		}
 	}
-	html := buildAutoReportHTML(s.ReportType, events, commentsMap)
-	if err := app.sendMail(cfg, s.Recipient, subject, html); err != nil {
+
+	format := strings.ToLower(s.Format)
+	if format == "" {
+		format = "html"
+	}
+
+	var err error
+	switch format {
+	case "excel", "xlsx":
+		var buf bytes.Buffer
+		buildReportXLSXWriter(&buf, subject, events)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as an Excel file.</p>",
+			buf.Bytes(), fmt.Sprintf("report-%s.xlsx", s.ReportType),
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	case "rtf":
+		data := buildAutoReportRTF(subject, events, commentsMap)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as an RTF file.</p>",
+			data, fmt.Sprintf("report-%s.rtf", s.ReportType), "application/rtf")
+	case "docx":
+		var buf bytes.Buffer
+		buildReportDOCXWriter(&buf, subject, events, commentsMap)
+		err = app.sendMailWithAttachment(cfg, s.Recipient, subject,
+			"<p>Please find the report attached as a Word document.</p>",
+			buf.Bytes(), fmt.Sprintf("report-%s.docx", s.ReportType),
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	default: // html
+		html := buildAutoReportHTML(s.ReportType, events, commentsMap)
+		err = app.sendMail(cfg, s.Recipient, subject, html)
+	}
+
+	if err != nil {
 		log.Printf("Auto-report: failed to send email for schedule %d: %v", s.ID, err)
 	} else {
-		log.Printf("Auto-report: sent %s report to %s (schedule %d)", s.ReportType, s.Recipient, s.ID)
+		log.Printf("Auto-report: sent %s report (%s) to %s (schedule %d)", s.ReportType, format, s.Recipient, s.ID)
 	}
 }
 
@@ -4682,6 +5511,302 @@ func htmlEscape(s string) string {
 	s = strings.ReplaceAll(s, ">", "&gt;")
 	s = strings.ReplaceAll(s, `"`, "&#34;")
 	return s
+}
+
+// ── Report format builders ────────────────────────────────────────────────────
+
+// buildReportXLSXWriter writes an XLSX report to w using the existing xlsx helpers.
+func buildReportXLSXWriter(w io.Writer, title string, events []Event) {
+	zw := zip.NewWriter(w)
+	xlsxWriteFile(zw, "[Content_Types].xml", xlsxContentTypes())
+	xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+	xlsxWriteFile(zw, "xl/workbook.xml", xlsxWorkbook())
+	xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels())
+	xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+	xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", xlsxSheet(events, nil))
+	zw.Close() //nolint
+}
+
+// buildAutoReportRTF builds an RTF document for the given events.
+// RTF is a plain-text format that any word processor can open.
+func buildAutoReportRTF(title string, events []Event, commentsMap map[int64][]EventComment) []byte {
+	rtfEsc := func(s string) string {
+		var b strings.Builder
+		for _, r := range s {
+			switch {
+			case r == '\\':
+				b.WriteString(`\\`)
+			case r == '{':
+				b.WriteString(`\{`)
+			case r == '}':
+				b.WriteString(`\}`)
+			case r > 127:
+				b.WriteString(fmt.Sprintf(`\u%d?`, r))
+			default:
+				b.WriteRune(r)
+			}
+		}
+		return b.String()
+	}
+
+	var b strings.Builder
+	b.WriteString(`{\rtf1\ansi\deff0`)
+	b.WriteString(`{\fonttbl{\f0\froman\fcharset0 Times New Roman;}{\f1\fswiss\fcharset0 Arial;}}`)
+	b.WriteString(`{\colortbl;\red0\green0\blue0;\red100\green100\blue100;\red0\green70\blue150;}`)
+	b.WriteString("\n")
+
+	// Title
+	b.WriteString(fmt.Sprintf(`\f1\fs28\b\cf3 %s\b0\cf1\fs22\par`, rtfEsc(title)))
+	b.WriteString(fmt.Sprintf(`\f0\fs18\cf2 Generated: %s\cf1\par\par`, time.Now().Format("2006-01-02 15:04:05")))
+
+	// Table header (simulated with tabs)
+	b.WriteString(`\f1\fs20\b Title\tab Type\tab Status\tab Start\tab End\b0\par`)
+	b.WriteString(`\brdrb\brdrs\brdrw10 `)
+
+	for _, ev := range events {
+		start := ev.StartTime.Format("2006-01-02 15:04")
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		b.WriteString(fmt.Sprintf(`\f0\fs18 %s\tab %s\tab %s\tab %s\tab %s\par`,
+			rtfEsc(ev.Title), rtfEsc(ev.EventType), rtfEsc(string(ev.Status)), rtfEsc(start), rtfEsc(end)))
+		if comments, ok := commentsMap[ev.ID]; ok {
+			for _, c := range comments {
+				b.WriteString(fmt.Sprintf(`\cf2\fs16   [%s] %s: %s\cf1\fs18\par`,
+					rtfEsc(c.CreatedAt.Format("2006-01-02 15:04")), rtfEsc(c.AuthorName), rtfEsc(c.Content)))
+			}
+		}
+	}
+	b.WriteString("}")
+	return []byte(b.String())
+}
+
+// buildReportDOCXWriter writes a DOCX document to w.
+// DOCX is an Office Open XML ZIP archive with XML parts.
+func buildReportDOCXWriter(w io.Writer, title string, events []Event, commentsMap map[int64][]EventComment) {
+	docxEsc := func(s string) string {
+		s = strings.ReplaceAll(s, "&", "&amp;")
+		s = strings.ReplaceAll(s, "<", "&lt;")
+		s = strings.ReplaceAll(s, ">", "&gt;")
+		s = strings.ReplaceAll(s, `"`, "&quot;")
+		return s
+	}
+
+	// Build document.xml body
+	var body strings.Builder
+	body.WriteString(fmt.Sprintf(`<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>%s</w:t></w:r></w:p>`, docxEsc(title)))
+	body.WriteString(fmt.Sprintf(`<w:p><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="18"/></w:rPr><w:t>Generated: %s</w:t></w:r></w:p>`,
+		time.Now().Format("2006-01-02 15:04:05")))
+
+	// Table
+	body.WriteString(`<w:tbl>`)
+	body.WriteString(`<w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>`)
+	body.WriteString(`<w:tblGrid><w:gridCol w:w="2400"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/><w:gridCol w:w="1500"/></w:tblGrid>`)
+
+	// Header row
+	hdrCell := func(text string) string {
+		return fmt.Sprintf(`<w:tc><w:tcPr><w:shd w:val="clear" w:color="auto" w:fill="D9E1F2"/></w:tcPr><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>`, docxEsc(text))
+	}
+	body.WriteString(`<w:tr>`)
+	for _, h := range []string{"Title", "Type", "Status", "Start", "End"} {
+		body.WriteString(hdrCell(h))
+	}
+	body.WriteString(`</w:tr>`)
+
+	for _, ev := range events {
+		start := ev.StartTime.Format("2006-01-02 15:04")
+		end := ""
+		if ev.EndTime != nil {
+			end = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		cell := func(text string) string {
+			return fmt.Sprintf(`<w:tc><w:p><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`, docxEsc(text))
+		}
+		body.WriteString(`<w:tr>`)
+		body.WriteString(cell(ev.Title))
+		body.WriteString(cell(ev.EventType))
+		body.WriteString(cell(string(ev.Status)))
+		body.WriteString(cell(start))
+		body.WriteString(cell(end))
+		body.WriteString(`</w:tr>`)
+
+		// Comments as extra rows
+		if comments, ok := commentsMap[ev.ID]; ok {
+			for _, c := range comments {
+				commentText := fmt.Sprintf("[%s] %s: %s", c.CreatedAt.Format("2006-01-02 15:04"), c.AuthorName, c.Content)
+				body.WriteString(fmt.Sprintf(`<w:tr><w:tc><w:tcPr><w:gridSpan w:val="5"/></w:tcPr><w:p><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">  %s</w:t></w:r></w:p></w:tc></w:tr>`, docxEsc(commentText)))
+			}
+		}
+	}
+	body.WriteString(`</w:tbl>`)
+
+	documentXML := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml">
+<w:body>%s<w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:body>
+</w:document>`, body.String())
+
+	stylesXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="heading 1"/>
+    <w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="003366"/></w:rPr>
+  </w:style>
+  <w:style w:type="table" w:styleId="TableGrid">
+    <w:name w:val="Table Grid"/>
+    <w:tblPr><w:tblBorders>
+      <w:top w:val="single" w:sz="4" w:color="auto"/>
+      <w:left w:val="single" w:sz="4" w:color="auto"/>
+      <w:bottom w:val="single" w:sz="4" w:color="auto"/>
+      <w:right w:val="single" w:sz="4" w:color="auto"/>
+      <w:insideH w:val="single" w:sz="4" w:color="auto"/>
+      <w:insideV w:val="single" w:sz="4" w:color="auto"/>
+    </w:tblBorders></w:tblPr>
+  </w:style>
+</w:styles>`
+
+	contentTypes := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`
+
+	relsRoot := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`
+
+	wordRels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`
+
+	zw := zip.NewWriter(w)
+	for _, part := range []struct{ name, content string }{
+		{"[Content_Types].xml", contentTypes},
+		{"_rels/.rels", relsRoot},
+		{"word/document.xml", documentXML},
+		{"word/styles.xml", stylesXML},
+		{"word/_rels/document.xml.rels", wordRels},
+	} {
+		f, _ := zw.Create(part.name)
+		f.Write([]byte(part.content)) //nolint
+	}
+	zw.Close() //nolint
+}
+
+// sendMailWithAttachment sends an email with a binary attachment via SMTP.
+func (app *App) sendMailWithAttachment(cfg MailConfig, to, subject, bodyHTML string, attachData []byte, attachName, attachMIME string) error {
+	smtpPort := cfg.SMTPPort
+	if smtpPort == 0 {
+		smtpPort = 587
+	}
+	from := cfg.FromAddr
+	if from == "" {
+		from = "tidslinjal@localhost"
+	}
+	fromName := cfg.FromName
+	if fromName == "" {
+		fromName = "Tidslinjal"
+	}
+
+	boundary := fmt.Sprintf("---=_Part_%d", time.Now().UnixNano())
+	// Encode attachment as base64
+	enc := make([]byte, 0, len(attachData)*2)
+	const lineLen = 76
+	b64 := make([]byte, ((len(attachData)+2)/3)*4)
+	n := encodeBase64(b64, attachData)
+	for i := 0; i < n; i += lineLen {
+		end := i + lineLen
+		if end > n {
+			end = n
+		}
+		enc = append(enc, b64[i:end]...)
+		enc = append(enc, '\r', '\n')
+	}
+
+	msg := fmt.Sprintf(
+		"From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"%s\"\r\n\r\n"+
+			"--%s\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n\r\n"+
+			"--%s\r\nContent-Type: %s; name=\"%s\"\r\nContent-Disposition: attachment; filename=\"%s\"\r\nContent-Transfer-Encoding: base64\r\n\r\n%s\r\n--%s--",
+		fromName, from, to, subject, boundary,
+		boundary, bodyHTML,
+		boundary, attachMIME, attachName, attachName, string(enc), boundary,
+	)
+
+	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, smtpPort)
+	var auth smtp.Auth
+	if cfg.Username != "" && cfg.Password != "" {
+		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.SMTPHost)
+	}
+
+	if cfg.TLSMode == "tls" {
+		tlsCfg := &tls.Config{ServerName: cfg.SMTPHost}
+		conn, err := tls.Dial("tcp", addr, tlsCfg)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		client, err := smtp.NewClient(conn, cfg.SMTPHost)
+		if err != nil {
+			return err
+		}
+		defer client.Quit()
+		if auth != nil {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+		if err := client.Mail(from); err != nil {
+			return err
+		}
+		if err := client.Rcpt(to); err != nil {
+			return err
+		}
+		wc, err := client.Data()
+		if err != nil {
+			return err
+		}
+		_, err = wc.Write([]byte(msg))
+		wc.Close()
+		return err
+	}
+	return smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
+}
+
+// encodeBase64 encodes src into dst using standard base64 encoding, returns bytes written.
+func encodeBase64(dst, src []byte) int {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	di, si := 0, 0
+	for ; si+2 < len(src); si += 3 {
+		v := uint(src[si])<<16 | uint(src[si+1])<<8 | uint(src[si+2])
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = alphabet[v>>6&0x3F]
+		dst[di+3] = alphabet[v&0x3F]
+		di += 4
+	}
+	rem := len(src) - si
+	if rem == 1 {
+		v := uint(src[si]) << 16
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = '='
+		dst[di+3] = '='
+		di += 4
+	} else if rem == 2 {
+		v := uint(src[si])<<16 | uint(src[si+1])<<8
+		dst[di] = alphabet[v>>18&0x3F]
+		dst[di+1] = alphabet[v>>12&0x3F]
+		dst[di+2] = alphabet[v>>6&0x3F]
+		dst[di+3] = '='
+		di += 4
+	}
+	return di
 }
 
 // ── XLSX Export ────────────────────────────────────────────────────────────────
@@ -5096,14 +6221,216 @@ func (app *App) handleGetEditingLocks(w http.ResponseWriter, r *http.Request, us
 	jsonOK(w, locks)
 }
 
+// ── Gradual Backup ──────────────────────────────────────────────────────────────
+
+// runGradualBackupScheduler runs in a background goroutine, waking every minute
+// to check whether it is time to create a new automatic snapshot.
+func (app *App) runGradualBackupScheduler() {
+	// Track when the last snapshot was taken so we fire at the correct cadence
+	// even if the ticker is slightly late.
+	var lastSnap time.Time
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		cfg := app.store.GetGradualBackupSettings()
+		if !cfg.Enabled {
+			continue
+		}
+		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+		if time.Since(lastSnap) < interval {
+			continue
+		}
+		filename, err := app.store.CreateGradualBackupSnapshot()
+		if err != nil {
+			log.Printf("[WARN] gradual backup snapshot failed: %v", err)
+			continue
+		}
+		logVerbose("[gradual-backup] snapshot created: %s", filename)
+		lastSnap = time.Now()
+		// Prune old snapshots
+		if err := app.store.PruneGradualBackupSnapshots(cfg.MaxSnapshots); err != nil {
+			log.Printf("[WARN] gradual backup prune failed: %v", err)
+		}
+	}
+}
+
+// handleGradualBackupSettings handles GET and PUT for /api/admin/gradual-backup
+func (app *App) handleGradualBackupSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	switch r.Method {
+	case http.MethodGet:
+		cfg := app.store.GetGradualBackupSettings()
+		snapshots, _ := app.store.ListGradualBackupSnapshots()
+		if snapshots == nil {
+			snapshots = []GradualBackupSnapshot{}
+		}
+		jsonOK(w, map[string]interface{}{
+			"settings":  cfg,
+			"snapshots": snapshots,
+		})
+	case http.MethodPut:
+		var cfg GradualBackupSettings
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			jsonError(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := app.store.SaveGradualBackupSettings(cfg); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		app.audit(user.ID, user.DisplayName, "update", "gradual_backup_settings", 0,
+			fmt.Sprintf("Gradual backup settings updated: enabled=%v interval=%dm max=%d",
+				cfg.Enabled, cfg.IntervalMinutes, cfg.MaxSnapshots))
+		jsonOK(w, cfg)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleGradualBackupSnapshotNow handles POST /api/admin/gradual-backup/snapshot
+func (app *App) handleGradualBackupSnapshotNow(w http.ResponseWriter, r *http.Request, user *User) {
+	filename, err := app.store.CreateGradualBackupSnapshot()
+	if err != nil {
+		jsonError(w, "failed to create snapshot: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Prune per current settings
+	cfg := app.store.GetGradualBackupSettings()
+	_ = app.store.PruneGradualBackupSnapshots(cfg.MaxSnapshots)
+	app.audit(user.ID, user.DisplayName, "create", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Manual snapshot created: %s", filename))
+	snapshots, _ := app.store.ListGradualBackupSnapshots()
+	if snapshots == nil {
+		snapshots = []GradualBackupSnapshot{}
+	}
+	jsonOK(w, map[string]interface{}{"filename": filename, "snapshots": snapshots})
+}
+
+// handleGradualBackupRestore handles POST /api/admin/gradual-backup/restore/{filename}
+func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/restore/")
+	if filename == "" {
+		jsonError(w, "filename required", http.StatusBadRequest)
+		return
+	}
+	restored, err := app.store.RestoreGradualBackupSnapshot(filename)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "restore", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Restored %d files from snapshot: %s", restored, filename))
+	jsonOK(w, map[string]interface{}{
+		"restored": restored,
+		"message":  fmt.Sprintf("Restored %d files. Please restart the server for changes to take full effect.", restored),
+	})
+}
+
+// handleGradualBackupDownload handles GET /api/admin/gradual-backup/download/{filename}
+func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/")
+	if filename == "" || strings.ContainsAny(filename, "/\\") {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	snapPath := filepath.Join(app.store.DataDir(), "snapshots", filename)
+	if _, err := os.Stat(snapPath); err != nil {
+		http.Error(w, "snapshot not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	http.ServeFile(w, r, snapPath)
+}
+
+// handleGradualBackupDelete handles DELETE /api/admin/gradual-backup/snapshots/{filename}
+func (app *App) handleGradualBackupDelete(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/")
+	if filename == "" || strings.ContainsAny(filename, "/\\") {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	snapPath := filepath.Join(app.store.DataDir(), "snapshots", filename)
+	if err := os.Remove(snapPath); err != nil {
+		if os.IsNotExist(err) {
+			jsonError(w, "snapshot not found", http.StatusNotFound)
+		} else {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "delete", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Deleted snapshot: %s", filename))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
-func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
-	// Create a zip archive of all JSON data files
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-backup-%s.zip"`, time.Now().Format("2006-01-02T150405")))
+// encryptBackupData encrypts plaintext using AES-256-GCM with a key derived from
+// keyMaterial (the admin password hash) via PBKDF2-SHA256.
+// Output layout: salt(16) ‖ nonce(12) ‖ AES-GCM ciphertext.
+func encryptBackupData(plaintext, keyMaterial []byte) ([]byte, error) {
+	if len(keyMaterial) == 0 {
+		return nil, fmt.Errorf("no encryption key material available")
+	}
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, err
+	}
+	key := deriveBackupKey(keyMaterial, salt)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize()) // 12 bytes
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+	out := make([]byte, 0, 16+len(nonce)+len(ciphertext))
+	out = append(out, salt...)
+	out = append(out, nonce...)
+	out = append(out, ciphertext...)
+	return out, nil
+}
 
-	zw := zip.NewWriter(w)
+// decryptBackupData reverses encryptBackupData.
+func decryptBackupData(data, keyMaterial []byte) ([]byte, error) {
+	if len(keyMaterial) == 0 {
+		return nil, fmt.Errorf("no encryption key material available")
+	}
+	const saltLen, nonceLen = 16, 12
+	if len(data) < saltLen+nonceLen {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+	key := deriveBackupKey(keyMaterial, data[:saltLen])
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return gcm.Open(nil, data[saltLen:saltLen+nonceLen], data[saltLen+nonceLen:], nil)
+}
+
+// deriveBackupKey derives a 32-byte AES-256 key from keyMaterial and salt using PBKDF2-SHA256.
+func deriveBackupKey(keyMaterial, salt []byte) []byte {
+	return pbkdf2.Key(keyMaterial, salt, 100_000, 32, sha256.New)
+}
+
+func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
+	// Create a zip archive of all JSON data files, then encrypt it.
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-backup-%s.zip.enc"`, time.Now().Format("2006-01-02T150405")))
+
+	// Build zip in memory
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	dataDir := app.store.DataDir()
 	files := []string{
 		"event_types.json", "users.json", "preferences.json", "groups.json",
@@ -5126,10 +6453,19 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		fw.Write(data) //nolint
 	}
 	zw.Close() //nolint
+
+	// Encrypt with admin password hash as key material
+	keyMaterial := app.store.GetAdminPasswordHash()
+	encrypted, err := encryptBackupData(buf.Bytes(), keyMaterial)
+	if err != nil {
+		jsonError(w, "failed to encrypt backup", http.StatusInternalServerError)
+		return
+	}
+	w.Write(encrypted) //nolint
 	app.store.LogAudit(AuditEntry{ //nolint
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "backup", EntityType: "system", EntityID: 0,
-		Summary: "Admin downloaded data backup",
+		Summary: "Admin downloaded encrypted data backup",
 	})
 }
 
@@ -5146,14 +6482,26 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 	}
 	defer file.Close()
 
-	// Read the entire zip into memory to get its size
+	// Read the entire file into memory
 	buf := new(bytes.Buffer)
-	size, err := io.Copy(buf, file)
-	if err != nil {
+	if _, err := io.Copy(buf, file); err != nil {
 		jsonError(w, "failed to read backup", http.StatusInternalServerError)
 		return
 	}
-	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), size)
+	raw := buf.Bytes()
+
+	// Detect encrypted backups (magic bytes "PK" = plain zip; anything else = encrypted)
+	if len(raw) < 2 || raw[0] != 0x50 || raw[1] != 0x4B {
+		keyMaterial := app.store.GetAdminPasswordHash()
+		decrypted, err := decryptBackupData(raw, keyMaterial)
+		if err != nil {
+			jsonError(w, "failed to decrypt backup — wrong admin password or corrupt file", http.StatusBadRequest)
+			return
+		}
+		raw = decrypted
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
 	if err != nil {
 		jsonError(w, "invalid zip file", http.StatusBadRequest)
 		return
@@ -5235,11 +6583,33 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		MattermostHandle string `json:"mattermost_handle"`
 		DiscordHandle    string `json:"discord_handle"`
 		SignalHandle     string `json:"signal_handle"`
+		Telephone        string `json:"telephone"`
+		Cellular         string `json:"cellular"`
+		Title            string `json:"title"`
+		Rank             string `json:"rank"`
+		JobRole          string `json:"job_role"`
+		Expertise        string `json:"expertise"`
+		PhotoDataURL     string `json:"photo_data_url"` // base64 data URL
 		GenerateWebCal   bool   `json:"generate_webcal"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
+	}
+	// Validate and limit photo data URL.
+	if req.PhotoDataURL != "" {
+		if len(req.PhotoDataURL) > 1_400_000 {
+			jsonError(w, "photo too large (max ~1 MB)", http.StatusRequestEntityTooLarge)
+			return
+		}
+		// Only accept image/* data URLs to prevent arbitrary content injection.
+		if !strings.HasPrefix(req.PhotoDataURL, "data:image/jpeg;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/png;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/gif;base64,") &&
+			!strings.HasPrefix(req.PhotoDataURL, "data:image/webp;base64,") {
+			jsonError(w, "photo must be a JPEG, PNG, GIF, or WebP image", http.StatusBadRequest)
+			return
+		}
 	}
 	fullUser, ok := app.store.GetUserByID(user.ID)
 	if !ok {
@@ -5249,8 +6619,16 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	fullUser.MattermostHandle = req.MattermostHandle
 	fullUser.DiscordHandle = req.DiscordHandle
 	fullUser.SignalHandle = req.SignalHandle
+	fullUser.Telephone = req.Telephone
+	fullUser.Cellular = req.Cellular
+	fullUser.Title = req.Title
+	fullUser.Rank = req.Rank
+	fullUser.JobRole = req.JobRole
+	fullUser.Expertise = req.Expertise
+	if req.PhotoDataURL != "" {
+		fullUser.PhotoDataURL = req.PhotoDataURL
+	}
 	if req.GenerateWebCal && fullUser.WebCalToken == "" {
-		// Generate a new WebCal subscription token
 		tokBytes := make([]byte, 16)
 		rand.Read(tokBytes) //nolint
 		fullUser.WebCalToken = hex.EncodeToString(tokBytes)
@@ -5389,6 +6767,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   app.secureMode,
 		MaxAge:   300, // 5 minutes
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -5545,6 +6924,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		user = &created
 		log.Printf("OIDC: auto-created user %q (role=%s, vetted=true)", username, defaultRole)
+		app.audit(0, "system", "created", "user", created.ID,
+			fmt.Sprintf("SSO auto enrollment: user %q auto-created via OIDC (role=%s)", username, defaultRole))
 	} else {
 		// Sync display name from IDP on every login
 		if displayName != "" && displayName != user.DisplayName {
@@ -5586,6 +6967,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    sessID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   app.secureMode,
 		Expires:  sess.ExpiresAt,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -5631,7 +7013,7 @@ func main() {
 		oidcDefaultRole  string
 	)
 	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
-	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 8443 for HTTPS, or $PORT env)")
+	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 443 for HTTPS, or $PORT env)")
 	flag.StringVar(&dataDir, "data",    "",      "Data directory (default: data, or $DATA_DIR env)")
 	flag.BoolVar(&verbose,   "verbose", false,   "Enable verbose logging")
 	flag.BoolVar(&debug,     "debug",   false,   "Enable debug logging (implies verbose)")
@@ -5642,23 +7024,29 @@ func main() {
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", os.Getenv("OIDC_CLIENT_SECRET"), "OIDC client secret")
 	flag.StringVar(&oidcRedirectURL,  "oidc-redirect-url",  os.Getenv("OIDC_REDIRECT_URL"),  "OIDC redirect URL (e.g. https://your-server/auth/oidc/callback)")
 	flag.BoolVar(&oidcExclusive,      "oidc-exclusive",     os.Getenv("OIDC_EXCLUSIVE") == "true", "Disable local username/password login (SSO only; admin account excepted)")
-	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (readwrite|teamlead|oplead; default: readwrite)")
+	flag.StringVar(&oidcDefaultRole,  "oidc-default-role",  os.Getenv("OIDC_DEFAULT_ROLE"),  "Default role for auto-created OIDC users (teammember|teamlead|oplead; default: teammember)")
+
+	// Syslog flags (override persistent config stored in syslog.json)
+	var (
+		syslogHost      = os.Getenv("SYSLOG_HOST")
+		syslogPort      int
+		syslogTransport = os.Getenv("SYSLOG_TRANSPORT") // udp | tcp | tls
+		syslogFormat    = os.Getenv("SYSLOG_FORMAT")    // classic | json
+	)
+	flag.StringVar(&syslogHost,      "syslog-host",      syslogHost,      "Syslog server host (enables syslog forwarding)")
+	flag.IntVar(&syslogPort,         "syslog-port",      0,               "Syslog server port (default 514 UDP/TCP, 6514 TLS)")
+	flag.StringVar(&syslogTransport, "syslog-transport", syslogTransport, "Syslog transport: udp | tcp | tls (default: udp)")
+	flag.StringVar(&syslogFormat,    "syslog-format",    syslogFormat,    "Syslog message format: classic | json (default: classic)")
 	flag.Parse()
 
 	if debug {
 		verbose = true
 	}
 
-	// Fall back to environment variables, then defaults
+	// Fall back to environment variables
+	portEnv := os.Getenv("PORT")
 	if port == "" {
-		port = os.Getenv("PORT")
-		if port == "" {
-			if tlsCert != "" && tlsKey != "" {
-				port = "8443"
-			} else {
-				port = "8080"
-			}
-		}
+		port = portEnv // may still be "" — final default set after TLS is resolved
 	}
 	if dataDir == "" {
 		dataDir = os.Getenv("DATA_DIR")
@@ -5676,6 +7064,26 @@ func main() {
 	app, err := NewApp(dataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// TLS config: CLI flags / env vars take priority; fall back to persistent admin UI settings
+	if tlsCert == "" && tlsKey == "" {
+		persisted := app.store.GetTLSConfig()
+		if persisted.CertFile != "" && persisted.KeyFile != "" {
+			tlsCert = persisted.CertFile
+			tlsKey = persisted.KeyFile
+			log.Printf("[INFO] TLS config loaded from persistent settings: cert=%s key=%s", tlsCert, tlsKey)
+		}
+	}
+
+	// Set default port now that TLS is fully resolved:
+	// 443 when TLS is configured (saved or via flags/env), 8080 otherwise.
+	if port == "" {
+		if tlsCert != "" && tlsKey != "" {
+			port = "443"
+		} else {
+			port = "8080"
+		}
 	}
 
 	// Configure OIDC — CLI flags take priority; fall back to persistent settings stored in DB
@@ -5707,8 +7115,39 @@ func main() {
 		}
 	}
 
+	// Configure syslog — CLI flags override persistent settings
+	{
+		sysCfg := app.store.GetSyslogConfig()
+		if syslogHost != "" {
+			// CLI flags take priority
+			sysCfg.Enabled = true
+			sysCfg.Host = syslogHost
+			if syslogPort != 0 {
+				sysCfg.Port = syslogPort
+			}
+			if syslogTransport != "" {
+				sysCfg.Transport = syslogTransport
+			}
+			if syslogFormat != "" {
+				sysCfg.Format = syslogFormat
+			}
+		}
+		if sysCfg.Transport == "" {
+			sysCfg.Transport = "udp"
+		}
+		if sysCfg.Format == "" {
+			sysCfg.Format = "classic"
+		}
+		setSyslogWriter(sysCfg)
+		if sysCfg.Enabled && sysCfg.Host != "" {
+			// Hook syslog into the standard logger
+			log.SetOutput(&syslogLogWriter{orig: os.Stderr})
+		}
+	}
+
 	go app.runAlarmScheduler()
 	go app.runSessionCleaner()
+	go app.runGradualBackupScheduler()
 	app.startAutoReportScheduler()
 
 	addr := host + ":" + port
@@ -5786,6 +7225,23 @@ func main() {
 
 	log.Printf("  Default credentials: admin / admin")
 
+	// Syslog
+	sysCfgDisplay := app.store.GetSyslogConfig()
+	if globalSyslog != nil {
+		p := sysCfgDisplay.Port
+		if p == 0 {
+			if sysCfgDisplay.Transport == "tls" {
+				p = 6514
+			} else {
+				p = 514
+			}
+		}
+		log.Printf("  Syslog     : ENABLED (%s) %s:%d format=%s",
+			sysCfgDisplay.Transport, sysCfgDisplay.Host, p, sysCfgDisplay.Format)
+	} else {
+		log.Printf("  Syslog     : disabled")
+	}
+
 	// Extra debug info: data counts
 	if debug {
 		users := app.store.GetUsers()
@@ -5800,6 +7256,9 @@ func main() {
 		log.Printf("  [DEBUG] All registered API routes will be logged per request")
 	}
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Enable secure-mode (HTTPS) features when TLS is configured.
+	app.secureMode = useTLS
 
 	handler := app.routes()
 

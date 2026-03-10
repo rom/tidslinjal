@@ -1,0 +1,163 @@
+{
+  "name": "EX-19 Peacekeeping & Stabilisation — 5 Days",
+  "description": "5-day UN-style peacekeeping and stabilisation operations exercise in a post-conflict environment. Covers patrol operations, force protection, civilian interaction, rule of law support, disarmament monitoring, humanitarian coordination, and reporting to UN mandate authority. Working hours with overnight rest periods. Suitable for UN peacekeeping battalions, multinational force exercises, and stability operations staff.",
+  "exercise_name": "EX-19 Peacekeeping & Stabilisation",
+  "day_start_hour": 7,
+  "day_end_hour": 19,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Mission Orientation",
+      "color": "#3498DB",
+      "start_offset_min": 0,
+      "end_offset_min": 360,
+      "order": 0
+    },
+    {
+      "name": "Patrol & Presence",
+      "color": "#27AE60",
+      "start_offset_min": 360,
+      "end_offset_min": 2160,
+      "order": 1
+    },
+    {
+      "name": "Crisis Response",
+      "color": "#E74C3C",
+      "start_offset_min": 2160,
+      "end_offset_min": 3600,
+      "order": 2
+    },
+    {
+      "name": "Stabilisation & Reporting",
+      "color": "#F39C12",
+      "start_offset_min": 3600,
+      "end_offset_min": 4800,
+      "order": 3
+    },
+    {
+      "name": "ENDEX",
+      "color": "#95A5A6",
+      "start_offset_min": 4800,
+      "end_offset_min": 4980,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "Peacekeeping Force A",
+      "description": "Infantry company — zone Alpha"
+    },
+    {
+      "name": "Peacekeeping Force B",
+      "description": "Infantry company — zone Bravo"
+    },
+    {
+      "name": "UN Civilian Affairs",
+      "description": "UN civilian affairs and political advisers"
+    },
+    {
+      "name": "Force HQ",
+      "description": "Multinational Force Headquarters"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Military Ops",
+      "description": "Military peacekeeping operations",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0, 1]
+    },
+    {
+      "name": "UN Civilian",
+      "description": "UN civilian activities and political reporting",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Force HQ",
+      "description": "Headquarters decisions and UN reporting",
+      "color": "#F39C12",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "Mission Brief — UN Mandate",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Force Commander briefs all units on UN mandate (Chapter VII), rules of engagement, use of force authority, impartiality obligations, civilian protection priorities, reporting requirements, and coordination with UN Mission HQ. Rules of Engagement card issued.",
+      "start_offset_min": 0,
+      "duration_min": 120,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Zone Alpha Patrol — Vehicle & Foot",
+      "event_type": "activity",
+      "color": "#3498DB",
+      "description": "Peacekeeping Force A conducts routine vehicle patrol in Zone Alpha. Population interaction: 3 community leader meetings conducted. Disarmament checkpoint: 2 illegal weapons surrendered voluntarily. Incident reports filed. Village elder concerns about food distribution recorded and forwarded to UN Civilian Affairs.",
+      "start_offset_min": 360,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "UN Civilian — Community Liaison",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "UN Civilian Affairs team meets local government representatives, community leaders, and NGO partners. Topics: reconstruction progress, land dispute mediation, return of displaced persons, upcoming local elections support. 3 formal meeting reports filed for UN Mission HQ.",
+      "start_offset_min": 720,
+      "duration_min": 360,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Armed Group Checkpoint Standoff",
+      "event_type": "event",
+      "color": "#E74C3C",
+      "description": "EXERCISE INJECT: Peacekeeping Force B patrol encounters illegal armed checkpoint manned by 8 armed individuals blocking main supply route. ROE assessment: use of force not yet authorised. Negotiation team deployed. UN Civilian Affairs adviser called forward. Force HQ notified. Situation managed through negotiation — checkpoint dismantled after 90 minutes.",
+      "start_offset_min": 2160,
+      "duration_min": 90,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "INJECT: Civilian Protection Emergency",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Report of armed group threatening civilians in village 4km from Force B sector. Force Protection authorisation: use of force to protect civilians authorised under mandate. QRF dispatched. Armed group withdraws on approach of peacekeeping force. 340 civilians evacuated to safe area.",
+      "start_offset_min": 3600,
+      "duration_min": 120,
+      "alarm_lead_time": 10
+    },
+    {
+      "title": "Daily UN SITREP",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Force HQ compiles and submits daily SITREP to UN Mission HQ. Format: J2 (intelligence), J3 (operations), J5 (civil-military), civilian casualties, human rights observations, security incidents, force readiness. Submitted via encrypted UN communications system.",
+      "start_offset_min": 4320,
+      "duration_min": 60,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "ENDEX declared. All exercise activities terminated. Force units return to base. Final exercise reports compiled. Civilian affairs products archived.",
+      "start_offset_min": 4800,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Peacekeeping Operations AAR",
+      "event_type": "physical_meeting",
+      "color": "#95A5A6",
+      "description": "Full multi-national AAR. Topics: ROE application, civilian interaction, crisis response decision-making, UN reporting quality, force protection vs mandate implementation, inter-contingent coordination, language/interpretation challenges.",
+      "start_offset_min": 4830,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    }
+  ]
+}

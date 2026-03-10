@@ -719,6 +719,9 @@ function showEventDetail(ev) {
     };
   }
 
+  // Attach @mention autocomplete to comment textarea
+  _attachMentionAutocomplete(document.getElementById('commentText'));
+
   // Load comments
   apiGet(`/api/events/${ev.id}/comments`).then(comments => {
     const listEl = document.getElementById('commentList');
@@ -790,7 +793,7 @@ function showEventDetail(ev) {
   const isMaster = !ev.layer_id;
   const canEdit = !isEventLocked(ev) && state.user && (
     state.user.role === 'admin' ||
-    (!isMaster && (state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
+    (!isMaster && (state.user.role === 'teammember' || state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
     (isMaster && hasRole2(state.user.role, 'oplead'))
   );
   if (canEdit) {
@@ -835,6 +838,106 @@ function showEventDetail(ev) {
 // renderCommentContent highlights @mentions in comment text
 function renderCommentContent(text) {
   return escHtml(text).replace(/@(\w+)/g, '<span style="color:var(--accent);font-weight:600">@$1</span>');
+}
+
+// ── @username autocomplete ───────────────────────────────────────────────────
+let _mentionDropdown = null;
+let _mentionStart = -1;
+
+function _attachMentionAutocomplete(textarea) {
+  if (!textarea || textarea._mentionBound) return;
+  textarea._mentionBound = true;
+
+  textarea.addEventListener('input', _onMentionInput);
+  textarea.addEventListener('keydown', _onMentionKey);
+  textarea.addEventListener('blur', () => { setTimeout(_closeMentionDropdown, 150); });
+}
+
+function _onMentionInput() {
+  const ta = document.getElementById('commentText');
+  if (!ta) return;
+  const val = ta.value;
+  const pos = ta.selectionStart;
+  // Find the @ that begins the current word
+  let start = pos - 1;
+  while (start >= 0 && /\w/.test(val[start])) start--;
+  if (start < 0 || val[start] !== '@') { _closeMentionDropdown(); return; }
+  _mentionStart = start;
+  const query = val.slice(start + 1, pos).toLowerCase();
+  const users = (state.users || []).filter(u =>
+    u.username && u.username.toLowerCase().includes(query) ||
+    u.display_name && u.display_name.toLowerCase().includes(query)
+  ).slice(0, 8);
+  if (!users.length) { _closeMentionDropdown(); return; }
+  _showMentionDropdown(ta, users, query);
+}
+
+function _onMentionKey(e) {
+  if (!_mentionDropdown) return;
+  const items = _mentionDropdown.querySelectorAll('.mention-item');
+  const active = _mentionDropdown.querySelector('.mention-item.active');
+  let idx = Array.from(items).indexOf(active);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _updateMentionActive(items, Math.min(idx + 1, items.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _updateMentionActive(items, Math.max(idx - 1, 0));
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (active) { e.preventDefault(); active.click(); }
+    else if (items.length === 1) { e.preventDefault(); items[0].click(); }
+  } else if (e.key === 'Escape') {
+    e.preventDefault(); _closeMentionDropdown();
+  }
+}
+
+function _updateMentionActive(items, idx) {
+  items.forEach((it, i) => it.classList.toggle('active', i === idx));
+  const el = items[idx]; if (el) el.scrollIntoView({block:'nearest'});
+}
+
+function _showMentionDropdown(ta, users, query) {
+  _closeMentionDropdown();
+  const rect = ta.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.id = 'mentionDropdown';
+  _mentionDropdown = dd;
+  Object.assign(dd.style, {
+    position: 'fixed', zIndex: '9999', background: 'var(--bg2)',
+    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+    boxShadow: 'var(--shadow-lg)', minWidth: '180px', maxHeight: '220px',
+    overflowY: 'auto', left: rect.left + 'px', top: (rect.bottom + 2) + 'px'
+  });
+  users.forEach((u, i) => {
+    const item = document.createElement('div');
+    item.className = 'mention-item' + (i === 0 ? ' active' : '');
+    item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
+    item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
+    item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
+    item.addEventListener('click', () => _insertMention(u.username));
+    dd.appendChild(item);
+  });
+  document.body.appendChild(dd);
+}
+
+function _closeMentionDropdown() {
+  if (_mentionDropdown) { _mentionDropdown.remove(); _mentionDropdown = null; }
+  _mentionStart = -1;
+}
+
+function _insertMention(username) {
+  const ta = document.getElementById('commentText');
+  if (!ta || _mentionStart < 0) return;
+  const pos = ta.selectionStart;
+  const val = ta.value;
+  const before = val.slice(0, _mentionStart);
+  const after = val.slice(pos);
+  const insert = '@' + username + ' ';
+  ta.value = before + insert + after;
+  const newPos = before.length + insert.length;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  _closeMentionDropdown();
 }
 
 async function submitComment(eventId) {
@@ -1040,7 +1143,7 @@ async function openUserModal(user) {
   const roleSel = document.getElementById('uRole');
   const builtinRoles = [
     {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
-    {key:'reporter', label:'Reporter'}, {key:'readwrite', label:'Read/Write'},
+    {key:'reporter', label:'Reporter'}, {key:'teammember', label:'Team Member'},
     {key:'teamlead', label:'Team Lead'}, {key:'oplead', label:'Operations Lead'},
     {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
   ];
@@ -1058,6 +1161,24 @@ async function openUserModal(user) {
   const delBtn = document.getElementById('btnDeleteUser');
   delBtn.style.display = isEdit ? '' : 'none';
   delBtn.onclick = isEdit ? () => deleteUser(user.id) : null;
+
+  // User info panel (created_at + SSO badge)
+  const uUserInfo = document.getElementById('uUserInfo');
+  if (uUserInfo) {
+    if (isEdit && user) {
+      const createdStr = user.created_at
+        ? new Date(user.created_at).toLocaleString()
+        : '—';
+      const ssoNote = user.is_oidc
+        ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:3px;background:var(--accent-muted,rgba(0,120,255,.12));color:var(--accent);border:1px solid var(--accent);font-weight:600">🔗 SSO / OIDC — auto enrolled</span><br>This account was automatically created via Single Sign-On (OIDC). The identity is managed by the external identity provider.`
+        : '';
+      uUserInfo.innerHTML = `<strong>Created:</strong> ${escHtml(createdStr)}${ssoNote ? '<br>' + ssoNote : ''}`;
+      uUserInfo.style.display = '';
+    } else {
+      uUserInfo.style.display = 'none';
+      uUserInfo.innerHTML = '';
+    }
+  }
 
   // Populate group picker
   const picker = document.getElementById('uGroupPicker');
@@ -1469,6 +1590,7 @@ function renderSidebar() {
     const lastTemplate = state.lastAppliedTemplate || null;
     const langLabel = {en:'English 🇬🇧', sv:'Svenska 🇸🇪', fr:'Français 🇫🇷'}[lang] || lang;
     const vInfo = state._versionInfo || {};
+    const gbStatus = state._gradualBackupStatus || null;
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">
@@ -1513,7 +1635,7 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${state.groups.length}</span>
         </div>
         ${(() => {
-          const roleOrder = ['admin','staffofficer_full','staffofficer','oplead','teamlead','readwrite','reporter','read','observer'];
+          const roleOrder = ['admin','staffofficer_full','staffofficer','oplead','teamlead','teammember','readwrite','reporter','read','observer'];
           const roleCounts = {};
           (state.users||[]).forEach(u => { roleCounts[u.role] = (roleCounts[u.role]||0)+1; });
           const rows = roleOrder.filter(r => roleCounts[r]).map(r =>
@@ -1533,8 +1655,40 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_synth_time')||'Synthetic time'}:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
+          ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
       </div>
+      ${(() => {
+        // Integration status panel — admin only
+        const st = (state.user && state.user.role === 'admin') ? (state._integrationStatus || null) : null;
+        if (!st) return '';
+        const pill = (ok, label, detail) => {
+          const col = ok ? '#22c55e' : '#6b7280';
+          return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span>
+            <span style="font-size:var(--fs-xs);font-weight:600;color:var(--text);min-width:80px">${label}</span>
+            <span style="font-size:10px;color:var(--text-dim);word-break:break-all">${escHtml(detail||'')}</span>
+          </div>`;
+        };
+        const sso = st.sso || {};
+        const tls = st.tls || {};
+        const sys = st.syslog || {};
+        const smtp = st.smtp || {};
+        const mm = st.mattermost || {};
+        const ak = st.api_keys || {};
+        return `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">🔌 ${t('info_integrations')||'Integrations'}</div>
+          <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;padding:0 4px">
+            ${pill(sso.active, 'SSO / OIDC', sso.active ? (sso.issuer||'active') + (sso.exclusive?' · excl.':'') : sso.enabled ? 'configured, inactive' : 'disabled')}
+            ${pill(tls.configured, 'TLS', tls.configured ? (tls.cert_file||'cert set') : 'not configured')}
+            ${pill(sys.enabled, 'Syslog', sys.enabled ? `${escHtml(sys.host||'')}:${sys.port||514} (${sys.transport||'udp'}, ${sys.format||'classic'})` : 'disabled')}
+            ${pill(smtp.enabled, 'SMTP/Mail', smtp.enabled ? `${escHtml(smtp.host||'')}:${smtp.port||587} ${smtp.tls_mode||''}` : 'disabled')}
+            ${pill((mm.mattermost_users||0)>0, 'Mattermost', (mm.webhook_users||0)>0 ? `${mm.webhook_users} webhook user${mm.webhook_users!==1?'s':''}, ${mm.mattermost_users} Mattermost` : 'no webhooks')}
+            ${pill((ak.count||0)>0, 'API Keys', `${ak.count||0} key${(ak.count||0)!==1?'s':''} active`)}
+          </div>
+        </div>`;
+      })()}
       ${vInfo.github ? `
       <div class="sidebar-section" style="padding-top:6px">
         <a href="${escHtml(vInfo.github)}" target="_blank" rel="noopener" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:5px">
@@ -1619,7 +1773,7 @@ function renderSidebar() {
             ${(users||[]).map(u => `
               <div class="user-item">
                 <div class="user-name">
-                  <div>${escHtml(u.display_name||u.username)}</div>
+                  <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                   <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}</div>
                 </div>
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
@@ -1827,7 +1981,7 @@ function renderSidebar() {
           <select id="oidcDefaultRole"
             title="When a user logs in via SSO for the first time and no local account exists, they are automatically created with this role."
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <option value="readwrite">Read/Write — can create and edit events</option>
+            <option value="teammember">Team Member — can create and edit events</option>
             <option value="teamlead">Team Lead — can manage events for their group</option>
             <option value="oplead">Op Lead — operational leadership role</option>
           </select>
@@ -1933,6 +2087,75 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">📡 Syslog Forwarding</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Forward application log messages to a remote syslog server.
+          Supports UDP, TCP, and TLS transports with classic (RFC 3164) or JSON formats.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"
+          title="Enable syslog forwarding. When off, logs are written to stderr only.">
+          <input type="checkbox" id="syslogEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Syslog Forwarding
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Hostname or IP of the remote syslog server.">Syslog Host</label>
+          <input type="text" id="syslogHost" placeholder="syslog.example.com"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:1;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Port: default 514 for UDP/TCP, 6514 for TLS.">Port</label>
+            <input type="number" id="syslogPort" placeholder="514"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="flex:2;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Transport protocol. UDP is fire-and-forget. TCP guarantees delivery. TLS encrypts the channel.">Transport</label>
+            <select id="syslogTransport" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+              <option value="udp">UDP (RFC 3164, port 514)</option>
+              <option value="tcp">TCP (RFC 6587, port 514)</option>
+              <option value="tls">TLS (RFC 5425, port 6514)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Message format. Classic uses RFC 3164 syslog format. JSON sends structured JSON objects.">Log Format</label>
+          <select id="syslogFormat" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="classic">Classic (RFC 3164)</option>
+            <option value="json">JSON (structured)</option>
+          </select>
+        </div>
+        <div class="form-row" style="gap:8px">
+          <div class="form-group" style="flex:2;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Application name / tag appearing in syslog messages. Defaults to 'tidslinjal'.">App Name / Tag</label>
+            <input type="text" id="syslogAppName" placeholder="tidslinjal"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="flex:1;margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+              title="Syslog facility (0–23). Default 1 = user-level. 16–23 = local0–local7.">Facility</label>
+            <input type="number" id="syslogFacility" placeholder="1" min="0" max="23" value="1"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px"
+          title="When enabled, the TLS server certificate must be signed by a trusted CA. Disable only for self-signed certs in private networks.">
+          <input type="checkbox" id="syslogTLSVerify" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          Verify TLS certificate
+        </label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" onclick="saveSyslogConfig()"
+            title="Save syslog settings and apply immediately.">Save</button>
+          <button class="btn btn-secondary btn-sm" onclick="testSyslogConfig()"
+            title="Send a test message to the syslog server.">Send Test Message</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">💼 Microsoft Teams Integration</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           Configure Teams and Zoom to automatically attach meeting links to Meeting-type events.
@@ -1970,6 +2193,36 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 TLS / HTTPS Configuration</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Configure TLS certificate and key file paths for HTTPS.
+          CLI flags <code>--tls-cert</code> / <code>--tls-key</code> and environment variables
+          <code>TLS_CERT</code> / <code>TLS_KEY</code> always take priority over settings stored here.
+        </p>
+        <div id="tlsCurrentStatus" style="margin-bottom:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
+          Checking TLS status…
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Absolute path to the PEM-encoded TLS certificate file on the server.">Certificate File (cert.pem)</label>
+          <input type="text" id="tlsCertFile" placeholder="/etc/ssl/certs/tidslinjal.crt"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)"
+            title="Absolute path to the PEM-encoded private key file on the server.">Private Key File (key.pem)</label>
+          <input type="text" id="tlsKeyFile" placeholder="/etc/ssl/private/tidslinjal.key"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="padding:8px 10px;border-radius:var(--radius);background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ⚠️ Changes to TLS configuration require a <strong>server restart</strong> to take effect.
+          The server validates that both file paths are accessible before saving.
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveTLSConfig()"
+          title="Save TLS file paths. The server will use them on next restart.">Save TLS Config</button>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">🔑 API Keys</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           API keys allow external tools (scripts, monitoring systems, integrations) to access
@@ -1989,8 +2242,35 @@ function renderSidebar() {
     // Load current OIDC settings into the form
     setTimeout(_initOIDCSettingsUI, 0);
     setTimeout(_initMailSettingsUI, 0);
+    setTimeout(_initSyslogSettingsUI, 0);
+    setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
+  } else if (tab === 'tools') {
+    const role          = state.user?.role || '';
+    const isAdminOrOplead = hasRole2(role, 'oplead');
+    const isTeamLead    = hasRole2(role, 'teamlead');
+    const canReport     = role === 'admin' || isAdminOrOplead || isTeamLead || userHasCapability('report');
+    const canAutoReport = role === 'admin' || isAdminOrOplead || userHasCapability('auto_report');
+    const toolBtn = (icon, label, onclick) =>
+      `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" onclick="${onclick}">${icon} ${label}</button>`;
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
+          ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
+          ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
+          ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
+          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
+          ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
+          ${role === 'admin' ? toolBtn('🔄', 'Gradual Backup', 'openGradualBackupModal()') : ''}
+          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
+          ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+        </div>
+      </div>
+    `;
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -2241,6 +2521,38 @@ function renderSidebar() {
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🔐 Password Policy</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          Enforce password quality requirements for all local accounts.
+          OIDC/SSO accounts are always excluded.
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Password Quality Policy
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Minimum Length</label>
+          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> Require uppercase (A–Z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> Require lowercase (a–z)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> Require numbers (0–9)
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
+          </label>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="saveSecuritySettings()">Save Policy</button>
+      </div>` : ''}
+      ${state.user && state.user.role==='admin' ? `
+      <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
         <button class="btn btn-danger btn-sm" onclick="resetDatabase()">${t('settings_reset')||'Reset to Empty'}</button>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
@@ -2249,6 +2561,7 @@ function renderSidebar() {
     // After DOM injection, initialise dynamic state for enrollment settings
     if (state.user && state.user.role === 'admin') {
       setTimeout(_initEnrollmentUI, 0);
+      setTimeout(_initSecuritySettingsUI, 0);
     }
   }
 }
@@ -2427,7 +2740,7 @@ async function _initOIDCSettingsUI() {
   setVal('oidcIssuer', data.issuer);
   setVal('oidcClientID', data.client_id);
   setVal('oidcRedirectURL', data.redirect_url);
-  setVal('oidcDefaultRole', data.default_role || 'readwrite');
+  setVal('oidcDefaultRole', data.default_role || 'teammember');
   setChk('oidcExclusive', data.exclusive);
   setChk('oidcEnabled', data.enabled);
 
@@ -2608,6 +2921,27 @@ async function openProfileModal() {
   setVal('profileMattermost',  u.mattermost_handle || '');
   setVal('profileDiscord',     u.discord_handle || '');
   setVal('profileSignal',      u.signal_handle || '');
+  setVal('profileTelephone',   u.telephone || '');
+  setVal('profileCellular',    u.cellular || '');
+  setVal('profileTitle',       u.title || '');
+  setVal('profileRank',        u.rank || '');
+  setVal('profileJobRole',     u.job_role || '');
+  setVal('profileExpertise',   u.expertise || '');
+  // Profile photo
+  const preview = document.getElementById('profilePhotoPreview');
+  const placeholder = document.getElementById('profilePhotoPlaceholder');
+  const removeBtn = document.getElementById('profilePhotoRemove');
+  if (u.photo_data_url) {
+    if (preview) { preview.src = u.photo_data_url; preview.style.display = ''; }
+    if (placeholder) placeholder.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    if (preview) { preview.src = ''; preview.style.display = 'none'; }
+    if (placeholder) placeholder.style.display = '';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+  // Password policy
+  _loadProfilePwdPolicy();
 
   // Language select
   const langSel = document.getElementById('profileLanguage');
@@ -2629,6 +2963,17 @@ async function openProfileModal() {
   ['profilePwdCurrent', 'profilePwdNew', 'profilePwdConfirm'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  // Reset strength indicator
+  const profBar = document.getElementById('profilePwdStrengthBar');
+  const profLbl = document.getElementById('profilePwdStrengthLabel');
+  if (profBar) { profBar.style.width = '0%'; profBar.style.background = '#ccc'; }
+  if (profLbl) profLbl.textContent = '';
+  // Show SSO banner for OIDC accounts
+  const isSSO = u.is_oidc;
+  const ssoBanner   = document.getElementById('profilePwdSSOBanner');
+  const pwdFields   = document.getElementById('profilePwdFields');
+  if (ssoBanner) ssoBanner.style.display = isSSO ? '' : 'none';
+  if (pwdFields) pwdFields.style.display  = isSSO ? 'none' : '';
 
   // Account info section
   const info = document.getElementById('profileInfo');
@@ -2663,6 +3008,7 @@ async function openProfileModal() {
     if (webCalURL) webCalURL.style.display = 'none';
   }
 
+  renderProfileAvatars();
   openModal('profileModal');
 }
 
@@ -2710,25 +3056,21 @@ async function saveProfile() {
     }
   }
 
-  // Save social handles
-  const mattermostHandle = val('profileMattermost');
-  const discordHandle    = val('profileDiscord');
-  const signalHandle     = val('profileSignal');
-  try {
-    const handleRes = await api('PUT', '/api/auth/profile', {
-      mattermost_handle: mattermostHandle,
-      discord_handle:    discordHandle,
-      signal_handle:     signalHandle,
-    });
-    if (!handleRes.ok) {
-      const err = await handleRes.json().catch(() => ({}));
-      showError(err.error || 'Failed to update communication handles');
-      return;
-    }
-  } catch (e) {
-    showError('Failed to update communication handles');
-    return;
-  }
+  // Save profile fields, communication handles, photo
+  const photoPreview = document.getElementById('profilePhotoPreview');
+  const photoDataURL = (photoPreview && photoPreview.style.display !== 'none') ? (photoPreview.src || '') : '';
+  await api('PUT', '/api/auth/profile', {
+    mattermost_handle: val('profileMattermost'),
+    discord_handle:    val('profileDiscord'),
+    signal_handle:     val('profileSignal'),
+    telephone:         val('profileTelephone'),
+    cellular:          val('profileCellular'),
+    title:             val('profileTitle'),
+    rank:              val('profileRank'),
+    job_role:          val('profileJobRole'),
+    expertise:         val('profileExpertise'),
+    photo_data_url:    photoDataURL,
+  }).catch(() => {});
 
   // Save language preference
   if (lang) {
@@ -2741,13 +3083,228 @@ async function saveProfile() {
     const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      showError(err.error || 'Failed to change password');
+      const msg = (err.error || 'Failed to change password').replace(/^password_quality:\s*/,'').replace(/^oidc_account:\s*/,'');
+      showError(msg);
       return;
     }
   }
 
   closeModal('profileModal');
   showNotification('success', 'Profile updated');
+}
+
+// ── Profile Photo helpers ─────────────────────────────────────────────────────
+function loadProfilePhoto(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 1_000_000) { showError('Photo must be under 1 MB'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('profilePhotoPreview');
+    const placeholder = document.getElementById('profilePhotoPlaceholder');
+    const removeBtn = document.getElementById('profilePhotoRemove');
+    if (preview) { preview.src = e.target.result; preview.style.display = ''; }
+    if (placeholder) placeholder.style.display = 'none';
+    if (removeBtn) removeBtn.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeProfilePhoto() {
+  const preview = document.getElementById('profilePhotoPreview');
+  const placeholder = document.getElementById('profilePhotoPlaceholder');
+  const removeBtn = document.getElementById('profilePhotoRemove');
+  const input = document.getElementById('profilePhotoInput');
+  if (preview) { preview.src = ''; preview.style.display = 'none'; }
+  if (placeholder) placeholder.style.display = '';
+  if (removeBtn) removeBtn.style.display = 'none';
+  if (input) input.value = '';
+}
+
+// ── Default avatar picker ─────────────────────────────────────────────────────
+const _DEFAULT_AVATARS = [
+  { id: 'person',  label: 'Person',     svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#3a5a8a"/><circle cx="40" cy="30" r="13" fill="#c8a07a"/><ellipse cx="40" cy="72" rx="24" ry="20" fill="#c8a07a"/><rect x="16" y="60" width="48" height="24" rx="4" fill="#3a5a8a"/></svg>` },
+  { id: 'soldier', label: 'Soldier',    svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#3d5228"/><circle cx="40" cy="30" r="13" fill="#c8a07a"/><rect x="22" y="20" width="36" height="14" rx="4" fill="#253418"/><rect x="18" y="50" width="44" height="30" rx="4" fill="#4a6030"/></svg>` },
+  { id: 'tech',    label: 'Tech',       svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#1a304a"/><rect x="24" y="20" width="32" height="28" rx="5" fill="#4090c0"/><circle cx="33" cy="32" r="5" fill="#e0f0ff"/><circle cx="47" cy="32" r="5" fill="#e0f0ff"/><rect x="30" y="42" width="20" height="5" rx="2" fill="#80d0ff"/><rect x="33" y="50" width="6" height="14" rx="3" fill="#4090c0"/><rect x="41" y="50" width="6" height="14" rx="3" fill="#4090c0"/></svg>` },
+  { id: 'star',    label: 'Star Badge', svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#1a2a50"/><polygon points="40,16 46,34 65,34 51,46 56,64 40,53 24,64 29,46 15,34 34,34" fill="#f0c030"/></svg>` },
+  { id: 'cat',     label: 'Cat',        svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#4a3060"/><polygon points="20,32 28,50 14,50" fill="#c09060"/><polygon points="60,32 66,50 52,50" fill="#c09060"/><circle cx="40" cy="44" r="22" fill="#c09060"/><circle cx="33" cy="42" r="4" fill="#1a0a00"/><circle cx="47" cy="42" r="4" fill="#1a0a00"/><ellipse cx="40" cy="52" rx="5" ry="3" fill="#d08080"/></svg>` },
+  { id: 'bear',    label: 'Bear',       svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#3a2010"/><circle cx="26" cy="26" r="10" fill="#8a6040"/><circle cx="54" cy="26" r="10" fill="#8a6040"/><circle cx="40" cy="44" r="22" fill="#8a6040"/><circle cx="33" cy="41" r="4" fill="#1a0a00"/><circle cx="47" cy="41" r="4" fill="#1a0a00"/><ellipse cx="40" cy="52" rx="8" ry="6" fill="#b08060"/><circle cx="40" cy="49" r="3" fill="#1a0a00"/></svg>` },
+  { id: 'shield',  label: 'Shield',     svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#2a1a40"/><path d="M40 12 L64 22 L64 44 Q64 64 40 72 Q16 64 16 44 L16 22 Z" fill="#4060c0" stroke="#6080e0" stroke-width="2"/><polygon points="40,28 44,38 55,38 46,44 50,55 40,49 30,55 34,44 25,38 36,38" fill="#f0d060"/></svg>` },
+  { id: 'pilot',   label: 'Pilot',      svg: `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="80" rx="40" fill="#202840"/><ellipse cx="40" cy="36" rx="20" ry="22" fill="#3060a0"/><rect x="20" y="28" width="40" height="14" rx="3" fill="#506090"/><rect x="26" y="31" width="28" height="8" rx="2" fill="#80d0ff" opacity=".7"/><ellipse cx="40" cy="62" rx="22" ry="16" fill="#3060a0"/></svg>` },
+];
+
+function renderProfileAvatars() {
+  const grid = document.getElementById('profileAvatarGrid');
+  if (!grid) return;
+  grid.innerHTML = _DEFAULT_AVATARS.map(a =>
+    `<div title="${escHtml(a.label)}" onclick="selectDefaultAvatar('${a.id}')"
+      style="width:32px;height:32px;border-radius:50%;overflow:hidden;cursor:pointer;
+             border:2px solid var(--border);transition:border-color .15s,transform .15s;flex-shrink:0"
+      onmouseover="this.style.borderColor='var(--accent)';this.style.transform='scale(1.1)'"
+      onmouseout="this.style.borderColor='var(--border)';this.style.transform='scale(1)'">${a.svg}</div>`
+  ).join('');
+}
+
+function selectDefaultAvatar(id) {
+  const avatar = _DEFAULT_AVATARS.find(a => a.id === id);
+  if (!avatar) return;
+  const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(avatar.svg);
+  const preview = document.getElementById('profilePhotoPreview');
+  const placeholder = document.getElementById('profilePhotoPlaceholder');
+  const removeBtn = document.getElementById('profilePhotoRemove');
+  if (preview) { preview.src = dataUrl; preview.style.display = ''; }
+  if (placeholder) placeholder.style.display = 'none';
+  if (removeBtn) removeBtn.style.display = '';
+}
+
+// ── Profile language change handler ──────────────────────────────────────────
+function onProfileLanguageChange(lang) {
+  state.preferences.language = lang;
+  applyPreferences();
+  updateUILabels();
+  // Refresh all data-i18n elements inside the profile modal immediately
+  document.querySelectorAll('#profileModal [data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const translated = t(key);
+    if (translated && translated !== key) el.textContent = translated;
+  });
+}
+
+// ── Password Policy helpers ───────────────────────────────────────────────────
+let _cachedPasswordPolicy = null;
+
+async function _loadProfilePwdPolicy() {
+  try {
+    if (!_cachedPasswordPolicy) {
+      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+    }
+    const ss = _cachedPasswordPolicy;
+    const infoEl = document.getElementById('profilePwdPolicyInfo');
+    if (!infoEl || !ss || !ss.password_policy_enabled) return;
+    const rules = [];
+    if (ss.min_length > 0) rules.push(`Min. ${ss.min_length} characters`);
+    if (ss.require_uppercase) rules.push('Uppercase (A–Z)');
+    if (ss.require_lowercase) rules.push('Lowercase (a–z)');
+    if (ss.require_numbers)   rules.push('Numbers (0–9)');
+    if (ss.require_symbols)   rules.push('Symbols (!@#…)');
+    if (rules.length) {
+      infoEl.style.display = '';
+      infoEl.textContent = '🔐 Password policy: ' + rules.join(' · ');
+    }
+  } catch { /* policy load is best-effort */ }
+}
+
+async function _loadStandalonePwdPolicy() {
+  try {
+    if (!_cachedPasswordPolicy) {
+      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+    }
+    const ss = _cachedPasswordPolicy;
+    const infoEl = document.getElementById('pwdPolicyInfo');
+    if (!infoEl || !ss || !ss.password_policy_enabled) return;
+    const rules = [];
+    if (ss.min_length > 0) rules.push(`Min. ${ss.min_length} characters`);
+    if (ss.require_uppercase) rules.push('Uppercase (A–Z)');
+    if (ss.require_lowercase) rules.push('Lowercase (a–z)');
+    if (ss.require_numbers)   rules.push('Numbers (0–9)');
+    if (ss.require_symbols)   rules.push('Symbols (!@#…)');
+    if (rules.length) {
+      infoEl.style.display = '';
+      infoEl.textContent = '🔐 Password policy: ' + rules.join(' · ');
+    }
+  } catch { /* best-effort */ }
+}
+
+function _generatePassword(policy) {
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower  = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const syms   = '!@#$%^&*-_=+?';
+  const minLen = (policy && policy.min_length > 0) ? Math.max(policy.min_length, 12) : 12;
+  let chars = lower + upper + digits;
+  let pwd = [];
+  if (!policy || policy.require_uppercase) { pwd.push(upper[Math.floor(Math.random()*upper.length)]); }
+  if (!policy || policy.require_lowercase) { pwd.push(lower[Math.floor(Math.random()*lower.length)]); }
+  if (!policy || policy.require_numbers)   { pwd.push(digits[Math.floor(Math.random()*digits.length)]); }
+  if (policy && policy.require_symbols)    { pwd.push(syms[Math.floor(Math.random()*syms.length)]); chars += syms; }
+  while (pwd.length < minLen) {
+    pwd.push(chars[Math.floor(Math.random()*chars.length)]);
+  }
+  // Shuffle
+  for (let i = pwd.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pwd[i], pwd[j]] = [pwd[j], pwd[i]];
+  }
+  return pwd.join('');
+}
+
+async function generateProfilePassword() {
+  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  _cachedPasswordPolicy = policy;
+  const pw = _generatePassword(policy);
+  const inp = document.getElementById('profilePwdNew');
+  const conf = document.getElementById('profilePwdConfirm');
+  const copyBtn = document.getElementById('profilePwdCopyBtn');
+  if (inp) { inp.value = pw; inp.type = 'text'; updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel'); }
+  if (conf) conf.value = pw;
+  if (copyBtn) copyBtn.style.display = '';
+}
+
+function copyProfilePassword() {
+  const inp = document.getElementById('profilePwdNew');
+  if (!inp || !inp.value) return;
+  navigator.clipboard.writeText(inp.value).then(() => showNotification('success', 'Password copied to clipboard')).catch(() => {
+    prompt('Copy this password:', inp.value);
+  });
+}
+
+async function generateStandalonePassword() {
+  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  _cachedPasswordPolicy = policy;
+  const pw = _generatePassword(policy);
+  const inp = document.getElementById('pwdNew');
+  const conf = document.getElementById('pwdConfirm');
+  const copyBtn = document.getElementById('pwdCopyBtn');
+  if (inp) { inp.value = pw; inp.type = 'text'; updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel'); }
+  if (conf) conf.value = pw;
+  if (copyBtn) copyBtn.style.display = '';
+}
+
+function copyStandalonePassword() {
+  const inp = document.getElementById('pwdNew');
+  if (!inp || !inp.value) return;
+  navigator.clipboard.writeText(inp.value).then(() => showNotification('success', 'Password copied to clipboard')).catch(() => {
+    prompt('Copy this password:', inp.value);
+  });
+}
+
+// ── Password Strength Meter ───────────────────────────────────────────────────
+// updatePwdStrength(inputId, barId, labelId) — call from oninput on password fields.
+// Computes a 0–4 score and updates the visual bar + label.
+function updatePwdStrength(inputId, barId, labelId) {
+  const pw  = document.getElementById(inputId)?.value || '';
+  const bar = document.getElementById(barId);
+  const lbl = document.getElementById(labelId);
+  if (!bar || !lbl) return;
+
+  let score = 0;
+  if (pw.length >= 8)  score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  // clamp to 4
+  score = Math.min(score, 4);
+
+  const pct   = pw.length === 0 ? 0 : Math.max(10, score * 25);
+  const color = ['#ccc','#e74c3c','#e67e22','#f1c40f','#27ae60'][score];
+  const label = ['','Very weak','Weak','Fair','Strong','Very strong'][pw.length === 0 ? 0 : score + (score === 4 ? 0 : 0)];
+  // Simpler label map
+  const labels = {0:'',1:'Very weak',2:'Weak',3:'Fair',4:'Strong'};
+  bar.style.width = pct + '%';
+  bar.style.background = color;
+  lbl.textContent = pw.length === 0 ? '' : (labels[score] || '');
+  lbl.style.color = color;
 }
 
 // ── Mail Config UI ─────────────────────────────────────────────────────────
@@ -2802,6 +3359,128 @@ async function testMailConfig() {
   }
 }
 
+// ── Syslog Config UI ─────────────────────────────────────────────────────────
+async function _initSyslogSettingsUI() {
+  try {
+    const cfg = await apiGet('/api/integrations/syslog');
+    if (!cfg) return;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    const setCb  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    setCb('syslogEnabled', cfg.enabled);
+    setVal('syslogHost',      cfg.host);
+    setVal('syslogPort',      cfg.port || '');
+    setVal('syslogTransport', cfg.transport || 'udp');
+    setVal('syslogFormat',    cfg.format || 'classic');
+    setVal('syslogAppName',   cfg.app_name);
+    setVal('syslogFacility',  cfg.facility ?? 1);
+    setCb('syslogTLSVerify',  cfg.tls_verify !== false);
+  } catch { /* syslog not configured yet */ }
+}
+
+async function saveSyslogConfig() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const cfg = {
+    enabled:    document.getElementById('syslogEnabled')?.checked || false,
+    host:       val('syslogHost'),
+    port:       parseInt(val('syslogPort'), 10) || 0,
+    transport:  val('syslogTransport') || 'udp',
+    format:     val('syslogFormat') || 'classic',
+    app_name:   val('syslogAppName'),
+    facility:   parseInt(val('syslogFacility'), 10) || 1,
+    tls_verify: document.getElementById('syslogTLSVerify')?.checked !== false,
+  };
+  const res = await api('PUT', '/api/integrations/syslog', cfg);
+  if (res.ok) {
+    showNotification('success', 'Syslog settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save syslog settings');
+  }
+}
+
+async function testSyslogConfig() {
+  const res = await api('POST', '/api/integrations/syslog/test', {});
+  if (res.ok) {
+    const d = await res.json();
+    showNotification('success', `Syslog test message sent via ${d.transport} to ${d.host}`);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Syslog test failed');
+  }
+}
+
+// ── Security Settings UI ──────────────────────────────────────────────────────
+async function _initSecuritySettingsUI() {
+  try {
+    const ss = await apiGet('/api/admin/security');
+    if (!ss) return;
+    const setCb  = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setCb('secPolicyEnabled', ss.password_policy_enabled);
+    setVal('secMinLength',    ss.min_length || 8);
+    setCb('secReqUpper',    ss.require_uppercase);
+    setCb('secReqLower',    ss.require_lowercase);
+    setCb('secReqNumbers',  ss.require_numbers);
+    setCb('secReqSymbols',  ss.require_symbols);
+  } catch { /* not configured yet */ }
+}
+
+async function saveSecuritySettings() {
+  const cb  = id => document.getElementById(id)?.checked || false;
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const ss = {
+    password_policy_enabled: cb('secPolicyEnabled'),
+    min_length:       parseInt(val('secMinLength'), 10) || 8,
+    require_uppercase: cb('secReqUpper'),
+    require_lowercase: cb('secReqLower'),
+    require_numbers:   cb('secReqNumbers'),
+    require_symbols:   cb('secReqSymbols'),
+  };
+  const res = await api('PUT', '/api/admin/security', ss);
+  if (res.ok) {
+    showNotification('success', 'Password policy saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save password policy');
+  }
+}
+
+// ── TLS Config UI ─────────────────────────────────────────────────────────────
+async function _initTLSConfigUI() {
+  const statusEl = document.getElementById('tlsCurrentStatus');
+  try {
+    const cfg = await apiGet('/api/integrations/tls');
+    if (!cfg) return;
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    setVal('tlsCertFile', cfg.cert_file);
+    setVal('tlsKeyFile',  cfg.key_file);
+    if (statusEl) {
+      const active = cfg.cert_file && cfg.key_file;
+      statusEl.innerHTML = active
+        ? `<span style="color:#27ae60">✓ TLS configured</span> — cert: <code>${escHtml(cfg.cert_file)}</code>`
+        : `<span style="color:var(--text-dim)">TLS not configured (server running on HTTP)</span>`;
+    }
+  } catch {
+    if (statusEl) statusEl.textContent = 'Could not load TLS status.';
+  }
+}
+
+async function saveTLSConfig() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const cfg = {
+    cert_file: val('tlsCertFile'),
+    key_file:  val('tlsKeyFile'),
+  };
+  const res = await api('PUT', '/api/integrations/tls', cfg);
+  if (res.ok) {
+    showNotification('success', 'TLS config saved — restart the server to apply');
+    _initTLSConfigUI();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save TLS config');
+  }
+}
+
 // ── API Keys UI ─────────────────────────────────────────────────────────────
 async function _loadAPIKeys() {
   const listEl = document.getElementById('apiKeyList');
@@ -2817,7 +3496,7 @@ async function _loadAPIKeys() {
         <div>
           <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
           ${k.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${escHtml(k.description)}</span>` : ''}
-          ${k.last_used_at ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Last used: ${new Date(k.last_used_at).toLocaleString()}</span>` : ''}
+          <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '—'}${k.last_used_at ? ` · Last used: ${new Date(k.last_used_at).toLocaleString()}` : ''}</span>
         </div>
         <button class="btn btn-danger btn-sm" onclick="deleteAPIKey(${k.id})">Delete</button>
       </div>
@@ -3017,7 +3696,7 @@ function updateUILabels() {
   if (uRole) {
     const roleMap = {
       observer:'role_observer',read:'role_read',reporter:'role_reporter',
-      readwrite:'role_readwrite',teamlead:'role_teamlead',oplead:'role_oplead',
+      readwrite:'role_teammember',teammember:'role_teammember',teamlead:'role_teamlead',oplead:'role_oplead',
       staffofficer:'role_staffofficer',staffofficer_full:'role_staffofficer_full',admin:'role_admin'
     };
     [...uRole.options].forEach(opt => { const k = roleMap[opt.value]; if (k) opt.text = t(k) || opt.text; });
@@ -3992,73 +4671,29 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Password change ────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const btnSavePw = document.getElementById('btnSavePassword');
-  if (btnSavePw) {
-    btnSavePw.addEventListener('click', async () => {
-      const curPw  = document.getElementById('pwdCurrent')?.value || '';
-      const newPw  = document.getElementById('pwdNew')?.value?.trim()    || '';
-      const conPw  = document.getElementById('pwdConfirm')?.value?.trim() || '';
-      if (!newPw || newPw !== conPw) {
-        showError(t('password_mismatch') || 'Passwords do not match', 'Validation'); return;
-      }
-      const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
-      if (res.ok) {
-        closeModal('passwordModal');
-        showNotification('success', t('password_saved')||'Password changed');
-      } else {
-        const err = await res.json();
-        showError(err.error);
-      }
+function openReportModal() {
+  const layerList = document.getElementById('reportLayerList');
+  if (layerList) {
+    layerList.innerHTML = `
+      <label class="group-chip selected" style="cursor:pointer">
+        <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
+        ${t('layers_master')||'Master'}
+      </label>
+      ${state.layers.map(l => `
+        <label class="group-chip selected" style="cursor:pointer">
+          <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
+          ${escHtml(l.name)}
+        </label>
+      `).join('')}
+    `;
+    layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+      });
     });
   }
-
-  const btnExport = document.getElementById('btnExportData');
-  if (btnExport) {
-    btnExport.addEventListener('click', async () => {
-      const res = await api('GET', '/api/export');
-      if (!res.ok) { showError('Export failed'); return; }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `tidslinjal-export-${new Date().toISOString().slice(0,10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  }
-
-  const btnReport = document.getElementById('btnReport');
-  if (btnReport) {
-    btnReport.addEventListener('click', () => {
-      // Populate layer checkboxes in report modal
-      const layerList = document.getElementById('reportLayerList');
-      if (layerList) {
-        layerList.innerHTML = `
-          <label class="group-chip selected" style="cursor:pointer">
-            <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
-            ${t('layers_master')||'Master'}
-          </label>
-          ${state.layers.map(l => `
-            <label class="group-chip selected" style="cursor:pointer">
-              <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
-              ${escHtml(l.name)}
-            </label>
-          `).join('')}
-        `;
-        // Toggle chip selected class on change
-        layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
-          cb.addEventListener('change', () => {
-            cb.closest('.group-chip').classList.toggle('selected', cb.checked);
-          });
-        });
-      }
-      openModal('reportModal');
-    });
-  }
-});
+  openModal('reportModal');
+}
 
 
 // ── generateReport, mobileNavTab, closeMobileSidebar ─────────────────────
@@ -4339,33 +4974,125 @@ async function generateReport() {
   html += '</body></html>';
 
   const format = document.getElementById('reportFormat')?.value || 'html';
-  const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
-  const url  = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().slice(0,10);
 
   if (format === 'print') {
-    // Open in new window and trigger print dialog (user can save as PDF)
     const printWin = window.open('', '_blank');
     if (printWin) {
       printWin.document.write(html);
       printWin.document.close();
       printWin.focus();
-      // Delay print to allow rendering
-      setTimeout(() => {
-        printWin.print();
-      }, 500);
+      setTimeout(() => { printWin.print(); }, 500);
     }
+  } else if (format === 'docx') {
+    const content = _reportToWordXML(html);
+    _downloadBlob(content, 'application/msword', `report-${type}-${dateStr}.doc`);
+  } else if (format === 'rtf') {
+    const content = _reportToRTF(html);
+    _downloadBlob(content, 'application/rtf', `report-${type}-${dateStr}.rtf`);
+  } else if (format === 'excel') {
+    const content = _reportToSpreadsheetML(html);
+    _downloadBlob(content, 'application/vnd.ms-excel', `report-${type}-${dateStr}.xls`);
   } else {
-    // Download as HTML
-    const a = document.createElement('a');
-    a.href     = url;
-    a.download = `report-${type}-${new Date().toISOString().slice(0,10)}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // HTML download
+    _downloadBlob(html, 'text/html;charset=utf-8', `report-${type}-${dateStr}.html`);
   }
-  URL.revokeObjectURL(url);
   closeModal('reportModal');
   showNotification('success', t('report_ready')||'Report downloaded');
+}
+
+// ── Report format helpers ────────────────────────────────────────────────────
+
+function _downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], {type: mimeType});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function _parseReportHTML(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const title = doc.querySelector('h1')?.textContent?.trim() || 'Report';
+  const sections = [];
+  let cur = null;
+  doc.body.childNodes.forEach(node => {
+    if (!node.tagName) return;
+    if (node.tagName === 'H1') return;
+    if (node.tagName === 'H2') {
+      cur = { heading: node.textContent.trim(), headers: [], rows: [] };
+      sections.push(cur);
+    } else if (node.tagName === 'TABLE' && cur) {
+      cur.headers = [...node.querySelectorAll('thead th')].map(th => th.textContent.trim());
+      cur.rows    = [...node.querySelectorAll('tbody tr')].map(tr =>
+        [...tr.querySelectorAll('td')].map(td => td.textContent.trim())
+      );
+    }
+  });
+  return { title, sections };
+}
+
+function _reportToWordXML(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let out = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><?mso-application progid="Word.Document"?>` +
+    `<w:wordDocument xmlns:w="http://schemas.microsoft.com/office/word/2003/wordml">` +
+    `<w:body><w:p><w:r><w:rPr><w:b/><w:sz w:val="28"/></w:rPr><w:t>${x(title)}</w:t></w:r></w:p>`;
+  sections.forEach(s => {
+    out += `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${x(s.heading)}</w:t></w:r></w:p>`;
+    if (s.headers.length) {
+      out += `<w:tbl><w:tblPr><w:tblW w:w="9000" w:type="dxa"/></w:tblPr>`;
+      out += `<w:tr>${s.headers.map(h=>`<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${x(h)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`;
+      s.rows.forEach(row => {
+        out += `<w:tr>${row.map(c=>`<w:tc><w:p><w:r><w:t>${x(c)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`;
+      });
+      out += `</w:tbl>`;
+    }
+  });
+  return out + `</w:body></w:wordDocument>`;
+}
+
+function _reportToRTF(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/\\/g,'\\\\').replace(/\{/g,'\\{').replace(/\}/g,'\\}')
+    .replace(/[^\x00-\x7F]/g, c => `\\'${c.charCodeAt(0).toString(16).padStart(2,'0')}`);
+  let out = `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fnil\\fcharset0 Arial;}}\\widowctrl\n`;
+  out += `{\\b\\fs28 ${x(title)}}\\par\\par\n`;
+  sections.forEach(s => {
+    out += `{\\b\\fs22 ${x(s.heading)}}\\par\n`;
+    if (s.headers.length) {
+      const cw = Math.floor(9000 / s.headers.length);
+      const rowRTF = (cells, bold) => {
+        let r = `{\\trowd\\trgaph120`;
+        cells.forEach((_,i) => { r += `\\cellx${cw*(i+1)}`; });
+        cells.forEach(c => { r += `\\intbl${bold?'{\\b ':'{ '}${x(c)}}\\cell`; });
+        return r + `\\row}\n`;
+      };
+      out += rowRTF(s.headers, true);
+      s.rows.forEach(row => { out += rowRTF(row, false); });
+    }
+    out += `\\par\n`;
+  });
+  return out + `}`;
+}
+
+function _reportToSpreadsheetML(html) {
+  const { title, sections } = _parseReportHTML(html);
+  const x = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const cell = v => `<Cell><Data ss:Type="String">${x(v)}</Data></Cell>`;
+  let rows = `<Row>${cell(title)}</Row><Row/>`;
+  sections.forEach(s => {
+    rows += `<Row>${cell(s.heading)}</Row>`;
+    if (s.headers.length) {
+      rows += `<Row>${s.headers.map(cell).join('')}</Row>`;
+      s.rows.forEach(r => { rows += `<Row>${r.map(cell).join('')}</Row>`; });
+    }
+    rows += `<Row/>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>` +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    `<Worksheet ss:Name="Report"><Table>${rows}</Table></Worksheet></Workbook>`;
 }
 
 // ── Auto Report ─────────────────────────────────────────────────────────────
@@ -4386,11 +5113,13 @@ async function _renderAutoReportList() {
     el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No schedules configured yet.</p>';
     return;
   }
+  const fmtLabel = {html:'HTML', excel:'Excel', rtf:'RTF', docx:'DOCX'};
   el.innerHTML = list.map(r => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:6px">
       <div>
         <strong>${escHtml(r.report_type)}</strong> — ${escHtml(r.frequency)}
         <span style="color:var(--accent);margin-left:6px">${escHtml(r.delivery)}</span>
+        <span style="color:var(--text-dim);margin-left:6px;font-size:var(--fs-xs)">[${fmtLabel[r.format||'html']||escHtml(r.format||'html')}]</span>
         ${r.recipient ? `<span style="color:var(--text-dim);margin-left:8px">→ ${escHtml(r.recipient)}</span>` : ''}
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Next: ${r.next_run ? new Date(r.next_run).toLocaleString() : 'soon'}</div>
       </div>
@@ -4402,6 +5131,7 @@ async function _renderAutoReportList() {
 async function addAutoReport() {
   const report_type = document.getElementById('arType')?.value || 'timeline';
   const frequency   = document.getElementById('arFrequency')?.value || 'daily';
+  const format      = document.getElementById('arFormat')?.value || 'html';
   const delivery    = document.getElementById('arDelivery')?.value || 'download';
   const recipient   = document.getElementById('arRecipient')?.value?.trim() || '';
 
@@ -4414,7 +5144,7 @@ async function addAutoReport() {
     return;
   }
 
-  const res = await apiPost('/api/auto-report-schedules', { report_type, frequency, delivery, recipient });
+  const res = await apiPost('/api/auto-report-schedules', { report_type, frequency, format, delivery, recipient });
   if (res && res.ok !== false) {
     showNotification('success', 'Auto-report schedule added');
     const rec = document.getElementById('arRecipient');
@@ -5079,7 +5809,7 @@ const DEFAULT_ROLE_CONFIGS = [
   { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
   { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
   { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
-  { key: 'readwrite',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
+  { key: 'teammember',        display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
   { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true } },
   { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
   { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
@@ -5604,6 +6334,112 @@ function saveMapLocation() {
   closeModal('mapModal');
 }
 
+// ── Gradual Backup Settings (admin) ───────────────────────────────────────────
+
+async function openGradualBackupModal() {
+  openModal('gradualBackupModal');
+  await loadGradualBackupData();
+}
+
+async function loadGradualBackupData() {
+  const data = await apiGet('/api/admin/gradual-backup').catch(() => null);
+  if (!data) return;
+  const cfg = data.settings || {};
+  const snaps = data.snapshots || [];
+
+  const en = document.getElementById('gbEnabled');
+  const interval = document.getElementById('gbInterval');
+  const maxSnaps = document.getElementById('gbMaxSnapshots');
+  if (en) en.checked = cfg.enabled !== false;
+  if (interval) interval.value = cfg.interval_minutes || 15;
+  if (maxSnaps) maxSnaps.value = cfg.max_snapshots || 48;
+  renderGradualBackupSnapshots(snaps);
+}
+
+function renderGradualBackupSnapshots(snaps) {
+  const el = document.getElementById('gbSnapshotsList');
+  if (!el) return;
+  if (!snaps || !snaps.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No snapshots yet. They will be created automatically once the feature is enabled.</p>';
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+    <thead><tr style="background:var(--bg3)">
+      <th style="padding:4px 8px;text-align:left">Snapshot</th>
+      <th style="padding:4px 8px;text-align:right">Size</th>
+      <th style="padding:4px 8px;text-align:right">Actions</th>
+    </tr></thead><tbody>
+    ${snaps.map(s => `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px;font-family:monospace">${escHtml(s.filename)}<br>
+        <span style="color:var(--text-dim)">${new Date(s.created_at).toLocaleString()}</span></td>
+      <td style="padding:4px 8px;text-align:right;white-space:nowrap">${fmtFileSize(s.size_bytes||0)}</td>
+      <td style="padding:4px 8px;text-align:right;white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="downloadGradualSnapshot('${escHtml(s.filename)}')" title="Download this snapshot as a ZIP file">⬇</button>
+        <button class="btn btn-secondary btn-sm" onclick="restoreGradualSnapshot('${escHtml(s.filename)}')" title="Restore data from this snapshot" style="color:var(--warning,#f39c12)">↩ Restore</button>
+        <button class="btn btn-secondary btn-sm" onclick="deleteGradualSnapshot('${escHtml(s.filename)}')" title="Delete this snapshot" style="color:var(--danger)">🗑</button>
+      </td>
+    </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function saveGradualBackupSettings() {
+  const enabled = document.getElementById('gbEnabled')?.checked ?? true;
+  const interval = parseInt(document.getElementById('gbInterval')?.value||'15', 10);
+  const max = parseInt(document.getElementById('gbMaxSnapshots')?.value||'48', 10);
+  const res = await api('PUT', '/api/admin/gradual-backup', {
+    enabled, interval_minutes: interval, max_snapshots: max
+  });
+  if (res.ok) {
+    showNotification('success', 'Gradual backup settings saved');
+  } else {
+    const e = await res.json().catch(()=>({}));
+    showError(e.error || 'Failed to save settings');
+  }
+}
+
+async function createGradualSnapshotNow() {
+  const btn = document.getElementById('btnSnapshotNow');
+  if (btn) btn.disabled = true;
+  const res = await api('POST', '/api/admin/gradual-backup/snapshot', {});
+  if (btn) btn.disabled = false;
+  if (res.ok) {
+    const d = await res.json().catch(()=>({}));
+    showNotification('success', `Snapshot created: ${d.filename||''}`);
+    renderGradualBackupSnapshots(d.snapshots || []);
+  } else {
+    const e = await res.json().catch(()=>({}));
+    showError(e.error || 'Failed to create snapshot');
+  }
+}
+
+function downloadGradualSnapshot(filename) {
+  window.location.href = `/api/admin/gradual-backup/download/${encodeURIComponent(filename)}`;
+}
+
+async function restoreGradualSnapshot(filename) {
+  if (!confirm(`Restore from snapshot "${filename}"?\n\nThis will overwrite current data. A server restart is recommended after restore.`)) return;
+  const res = await api('POST', `/api/admin/gradual-backup/restore/${encodeURIComponent(filename)}`, {});
+  if (res.ok) {
+    const d = await res.json().catch(()=>({}));
+    showNotification('success', d.message || 'Restored successfully');
+  } else {
+    const e = await res.json().catch(()=>({}));
+    showError(e.error || 'Restore failed');
+  }
+}
+
+async function deleteGradualSnapshot(filename) {
+  if (!confirm(`Delete snapshot "${filename}"? This cannot be undone.`)) return;
+  const res = await apiDel(`/api/admin/gradual-backup/snapshots/${encodeURIComponent(filename)}`);
+  if (res.ok) {
+    showNotification('success', 'Snapshot deleted');
+    await loadGradualBackupData();
+  } else {
+    const e = await res.json().catch(()=>({}));
+    showError(e.error || 'Delete failed');
+  }
+}
+
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
 function openBackupModal() {
@@ -5747,7 +6583,157 @@ async function releaseEditingLock(eventId) {
 // Expose for SSE event handler in app.js
 window._handleEditingLockEvent = handleEditingLockEvent;
 
-// ── Bulk Operations ───────────────────────────────────────────────────────
+// ── Bulk Event Actions (Tools panel, admin) ────────────────────────────────
+
+function openBulkActionsModal() {
+  // Populate event type dropdown
+  const sel = document.getElementById('baNewType');
+  if (sel) {
+    sel.innerHTML = (state.eventTypes || []).map(et =>
+      `<option value="${escHtml(et.key)}">${escHtml(et.label || et.key)}</option>`
+    ).join('');
+  }
+  // Reset result
+  const res = document.getElementById('baResult');
+  if (res) { res.style.display = 'none'; res.textContent = ''; }
+  const delConf = document.getElementById('baDeleteConfirm');
+  if (delConf) delConf.value = '';
+  updateBulkActionUI();
+  openModal('bulkActionsModal');
+}
+
+function switchBulkTab(tab, btn) {
+  document.querySelectorAll('.ba-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ba-tab-btn').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('baPane_' + tab);
+  if (pane) pane.style.display = '';
+  if (btn) btn.classList.add('active');
+}
+
+function updateBulkActionUI() {
+  const f = document.getElementById('baFilter')?.value || 'all';
+  const hints = {
+    all:    'Applies to ALL events (use time range to narrow down)',
+    type:   'Event type key, e.g. "event", "decision", "activity"',
+    user:   'Username or display name (autocomplete available)',
+    group:  'Group name or numeric ID',
+    role:   'Role: observer, read, reporter, teammember, teamlead, oplead, admin',
+    status: 'Current status: planned, active, completed, cancelled…',
+    layer:  'Layer numeric ID (see Layers tab)',
+  };
+  const hintEl = document.getElementById('baFilterHint');
+  if (hintEl) hintEl.textContent = hints[f] || '';
+  const vg = document.getElementById('baValueGroup');
+  if (vg) vg.style.display = f === 'all' ? 'none' : '';
+}
+
+function updateBulkUserAutocomplete() {
+  const f = document.getElementById('baFilter')?.value || '';
+  if (f !== 'user') { _closeBulkDrop(); return; }
+  const q = (document.getElementById('baValue')?.value || '').toLowerCase();
+  if (!q) { _closeBulkDrop(); return; }
+  const users = (state.users || []).filter(u =>
+    (u.username && u.username.toLowerCase().includes(q)) ||
+    (u.display_name && u.display_name.toLowerCase().includes(q))
+  ).slice(0, 8);
+  const drop = document.getElementById('baMentionDrop');
+  if (!drop) return;
+  if (!users.length) { drop.style.display = 'none'; return; }
+  drop.innerHTML = users.map(u =>
+    `<div class="mention-item" onclick="_selectBulkUser('${escHtml(u.username)}')" style="padding:6px 10px;cursor:pointer;font-size:var(--fs-sm)">${escHtml(u.display_name||u.username)} <span style="color:var(--text-dim);font-size:var(--fs-xs)">@${escHtml(u.username)}</span></div>`
+  ).join('');
+  drop.style.display = '';
+}
+
+function _selectBulkUser(username) {
+  const inp = document.getElementById('baValue');
+  if (inp) inp.value = username;
+  _closeBulkDrop();
+}
+
+function _closeBulkDrop() {
+  const drop = document.getElementById('baMentionDrop');
+  if (drop) drop.style.display = 'none';
+}
+
+function _getBulkFilterParams() {
+  const filter = document.getElementById('baFilter')?.value || 'all';
+  const value  = document.getElementById('baValue')?.value?.trim() || '';
+  const from   = document.getElementById('baTimeFrom')?.value || '';
+  const to     = document.getElementById('baTimeTo')?.value   || '';
+  const payload = { filter, value };
+  if (from) payload.time_from = new Date(from).toISOString();
+  if (to)   payload.time_to   = new Date(to).toISOString();
+  return payload;
+}
+
+function _showBulkResult(el, ok, text) {
+  if (!el) return;
+  el.style.display = '';
+  el.style.color = ok ? 'var(--green)' : 'var(--danger)';
+  el.style.background = ok ? 'rgba(39,174,96,.1)' : 'rgba(231,76,60,.1)';
+  el.style.border = `1px solid ${ok ? 'rgba(39,174,96,.3)' : 'rgba(231,76,60,.3)'}`;
+  el.textContent = text;
+}
+
+async function executeBulkStatus() {
+  const params = _getBulkFilterParams();
+  const status = document.getElementById('baNewStatus')?.value;
+  if (!status) return;
+  if (!confirm(`Set all matching events to status "${status}"?`)) return;
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/status', { ...params, status });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Updated ${d.updated} event(s) to status "${status}".`);
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+async function executeBulkType() {
+  const params = _getBulkFilterParams();
+  const eventType = document.getElementById('baNewType')?.value;
+  if (!eventType) return;
+  if (!confirm(`Change event type of all matching events to "${eventType}"?`)) return;
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/type', { ...params, event_type: eventType });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Changed type of ${d.updated} event(s) to "${eventType}".`);
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+async function executeBulkDelete() {
+  const params = _getBulkFilterParams();
+  const conf = document.getElementById('baDeleteConfirm')?.value;
+  if (conf !== 'DELETE') { showError('Type DELETE to confirm deletion.'); return; }
+  const res = document.getElementById('baResult');
+  try {
+    const r = await api('POST', '/api/admin/bulk/delete', { ...params, confirm: 'DELETE' });
+    if (r.ok) {
+      const d = await r.json();
+      _showBulkResult(res, true, `✓ Deleted ${d.deleted} event(s).`);
+      document.getElementById('baDeleteConfirm').value = '';
+      await refreshAll();
+    } else {
+      const d = await r.json().catch(()=>({}));
+      _showBulkResult(res, false, `✗ ${d.error||'Error'}`);
+    }
+  } catch(e) { _showBulkResult(res, false, '✗ ' + e.message); }
+}
+
+// ── Bulk Operations (legacy selection-based) ──────────────────────────────
 
 function openBulkStatusDialog() {
   const count = (state.selectedEventIds || []).length;

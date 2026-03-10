@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "4.0.0"
+const AppVersion = "4.1.0"
 
 
 // AppGitHub is the project repository URL
@@ -16,7 +16,7 @@ const (
 	RoleObserver      Role = "observer"      // read-only access (same level as read)
 	RoleRead          Role = "read"
 	RoleReporter      Role = "reporter"      // can comment + set responded/completed, needs approval
-	RoleReadWrite     Role = "readwrite"
+	RoleReadWrite     Role = "teammember"
 	RoleTeamLead      Role = "teamlead"      // can create groups/layers, verify/reject events
 	RoleOpLead        Role = "oplead"        // operations lead: master timeline + teamlead rights
 	RoleStaffOfficer     Role = "staffofficer"      // staff officer assistant: same rights as oplead
@@ -95,10 +95,19 @@ type User struct {
 	PasswordResetToken  string    `json:"password_reset_token,omitempty"`
 	PasswordResetExpiry *time.Time `json:"password_reset_expiry,omitempty"`
 	CreatedAt           time.Time `json:"created_at"`
+	// Professional profile fields
+	Title     string `json:"title,omitempty"`      // job title / position
+	Rank      string `json:"rank,omitempty"`       // military rank or equivalent
+	JobRole   string `json:"job_role,omitempty"`   // functional role / position description
+	Expertise string `json:"expertise,omitempty"` // area of expertise
+	// Profile photo (base64 data URL, e.g. "data:image/jpeg;base64,…")
+	PhotoDataURL string `json:"photo_data_url,omitempty"`
 	// Social/communication handles
 	MattermostHandle string `json:"mattermost_handle,omitempty"`
 	DiscordHandle    string `json:"discord_handle,omitempty"`
 	SignalHandle     string `json:"signal_handle,omitempty"`
+	Telephone        string `json:"telephone,omitempty"`
+	Cellular         string `json:"cellular,omitempty"`
 	// Login tracking
 	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
 	LastLoginIP     string     `json:"last_login_ip,omitempty"`
@@ -121,9 +130,18 @@ type UserPublic struct {
 	Vetted           bool       `json:"vetted"`
 	NATODesignations []string   `json:"nato_designations,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
+	// Professional profile fields
+	Title        string `json:"title,omitempty"`
+	Rank         string `json:"rank,omitempty"`
+	JobRole      string `json:"job_role,omitempty"`
+	Expertise    string `json:"expertise,omitempty"`
+	PhotoDataURL string `json:"photo_data_url,omitempty"`
+	// Communication
 	MattermostHandle string     `json:"mattermost_handle,omitempty"`
 	DiscordHandle    string     `json:"discord_handle,omitempty"`
 	SignalHandle     string     `json:"signal_handle,omitempty"`
+	Telephone        string     `json:"telephone,omitempty"`
+	Cellular         string     `json:"cellular,omitempty"`
 	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
 	LastLoginIP      string     `json:"last_login_ip,omitempty"`
 	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
@@ -143,9 +161,16 @@ func (u *User) Public() UserPublic {
 		Vetted:           u.Vetted,
 		NATODesignations: u.NATODesignations,
 		CreatedAt:        u.CreatedAt,
+		Title:            u.Title,
+		Rank:             u.Rank,
+		JobRole:          u.JobRole,
+		Expertise:        u.Expertise,
+		PhotoDataURL:     u.PhotoDataURL,
 		MattermostHandle: u.MattermostHandle,
 		DiscordHandle:    u.DiscordHandle,
 		SignalHandle:     u.SignalHandle,
+		Telephone:        u.Telephone,
+		Cellular:         u.Cellular,
 		LastLoginAt:      u.LastLoginAt,
 		LastLoginIP:      u.LastLoginIP,
 		LastLoginDomain:  u.LastLoginDomain,
@@ -534,7 +559,7 @@ type OIDCPersistentConfig struct {
 	ClientSecret string `json:"client_secret,omitempty"`
 	RedirectURL  string `json:"redirect_url,omitempty"`
 	Exclusive    bool   `json:"exclusive"`
-	DefaultRole  string `json:"default_role,omitempty"` // readwrite | teamlead | oplead
+	DefaultRole  string `json:"default_role,omitempty"` // teammember | teamlead | oplead
 }
 
 // ExerciseSettings controls synthetic time display across the application
@@ -555,16 +580,47 @@ type ExerciseSettings struct {
 
 // AutoReportSchedule defines a server-side scheduled report
 type AutoReportSchedule struct {
-	ID        int64     `json:"id"`
-	ReportType string   `json:"report_type"` // aar | timeline | per_layer | status_summary | daily_briefing | type_breakdown | responsible | planned_vs_actual
-	Frequency  string   `json:"frequency"`   // hourly | daily | weekly
-	Delivery   string   `json:"delivery"`    // email | webhook | download
-	Recipient  string   `json:"recipient"`   // email address or webhook URL
-	CreatedBy  int64    `json:"created_by"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int64      `json:"id"`
+	ReportType string     `json:"report_type"` // aar | timeline | per_layer | status_summary | daily_briefing | type_breakdown | responsible | planned_vs_actual
+	Format     string     `json:"format"`      // html | excel | rtf | docx
+	Frequency  string     `json:"frequency"`   // hourly | daily | weekly
+	Delivery   string     `json:"delivery"`    // email | webhook | download
+	Recipient  string     `json:"recipient"`   // email address or webhook URL
+	CreatedBy  int64      `json:"created_by"`
+	CreatedAt  time.Time  `json:"created_at"`
 	LastRun    *time.Time `json:"last_run,omitempty"`
 	NextRun    time.Time  `json:"next_run"`
-	Enabled    bool      `json:"enabled"`
+	Enabled    bool       `json:"enabled"`
+}
+
+// SyslogConfig stores settings for remote syslog forwarding
+type SyslogConfig struct {
+	Enabled   bool   `json:"enabled"`
+	Host      string `json:"host"`                 // syslog server hostname or IP
+	Port      int    `json:"port"`                 // default 514 for UDP/TCP, 6514 for TLS
+	Transport string `json:"transport"`            // udp | tcp | tls
+	Format    string `json:"format"`               // classic | json
+	AppName   string `json:"app_name,omitempty"`   // tag/app name in syslog messages (default: tidslinjal)
+	Facility  int    `json:"facility,omitempty"`   // syslog facility 0-23 (default 1 = user-level)
+	TLSVerify bool   `json:"tls_verify,omitempty"` // verify TLS certificate (default true)
+}
+
+// SecuritySettings controls server-side password quality enforcement
+type SecuritySettings struct {
+	PasswordPolicyEnabled bool `json:"password_policy_enabled"`
+	MinLength             int  `json:"min_length,omitempty"`      // minimum password length (default 8)
+	RequireUppercase      bool `json:"require_uppercase,omitempty"` // at least one A-Z
+	RequireLowercase      bool `json:"require_lowercase,omitempty"` // at least one a-z
+	RequireNumbers        bool `json:"require_numbers,omitempty"`   // at least one 0-9
+	RequireSymbols        bool `json:"require_symbols,omitempty"`   // at least one symbol
+}
+
+// TLSConfig stores TLS certificate and key file paths for persistent server configuration.
+// CLI flags --tls-cert / --tls-key always override values stored here.
+// Changes take effect on next server restart.
+type TLSConfig struct {
+	CertFile string `json:"cert_file,omitempty"` // path to PEM certificate file
+	KeyFile  string `json:"key_file,omitempty"`  // path to PEM private key file
 }
 
 // EventVersion records a historical snapshot of an event at a point in time
@@ -586,4 +642,20 @@ type EditingLock struct {
 	UserName  string    `json:"user_name"`
 	LockedAt  time.Time `json:"locked_at"`
 	ExpiresAt time.Time `json:"expires_at"` // auto-release after 2 minutes of inactivity
+}
+
+// GradualBackupSettings configures the automatic periodic data snapshot feature.
+// When enabled, the server takes rolling ZIP snapshots at a configurable interval
+// and retains up to MaxSnapshots copies before pruning the oldest.
+type GradualBackupSettings struct {
+	Enabled         bool `json:"enabled"`
+	IntervalMinutes int  `json:"interval_minutes"` // 0 → default 15
+	MaxSnapshots    int  `json:"max_snapshots"`     // 0 → default 48
+}
+
+// GradualBackupSnapshot is metadata about a single auto-backup snapshot file.
+type GradualBackupSnapshot struct {
+	Filename  string    `json:"filename"`
+	CreatedAt time.Time `json:"created_at"`
+	SizeBytes int64     `json:"size_bytes"`
 }

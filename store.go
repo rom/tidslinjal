@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,6 +47,9 @@ type Store struct {
 	invitations          []PersonalInvitation
 	oidcSettings         OIDCPersistentConfig
 	mailConfig           MailConfig
+	syslogConfig         SyslogConfig
+	securitySettings     SecuritySettings
+	tlsConfig            TLSConfig
 	apiKeys              []APIKey
 	filterPresets        []FilterPreset
 	eventVersions        []EventVersion
@@ -112,6 +119,9 @@ func (s *Store) load() error {
 	s.loadFile("invitations.json", &s.invitations)
 	s.loadFile("oidc.json", &s.oidcSettings)
 	s.loadFile("mail.json", &s.mailConfig)
+	s.loadFile("syslog.json", &s.syslogConfig)
+	s.loadFile("security.json", &s.securitySettings)
+	s.loadFile("tls.json", &s.tlsConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
 	s.loadFile("event_versions.json", &s.eventVersions)
@@ -122,10 +132,18 @@ func (s *Store) load() error {
 			s.nextEventTypeID = x.ID
 		}
 	}
-	for _, x := range s.users {
-		if x.ID > s.nextUserID {
+	// Migration: rename legacy "readwrite" role to "teammember"
+	for i, u := range s.users {
+		if u.Role == "readwrite" {
+			s.users[i].Role = RoleReadWrite // "teammember"
+		}
+		if x := s.users[i]; x.ID > s.nextUserID {
 			s.nextUserID = x.ID
 		}
+	}
+	// Migration: OIDC default_role "readwrite" → "teammember"
+	if s.oidcSettings.DefaultRole == "readwrite" {
+		s.oidcSettings.DefaultRole = string(RoleReadWrite)
 	}
 	for _, x := range s.groups {
 		if x.ID > s.nextGroupID {
@@ -697,6 +715,19 @@ func (s *Store) GetUserByID(id int64) (*User, bool) {
 		return nil, false
 	}
 	return &u, true
+}
+
+// GetAdminPasswordHash returns the bcrypt hash of the "admin" account, used as
+// key material when encrypting/decrypting backup archives.
+func (s *Store) GetAdminPasswordHash() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.users {
+		if s.users[i].Username == "admin" {
+			return []byte(s.users[i].PasswordHash)
+		}
+	}
+	return nil
 }
 
 // GetUserByUsername is O(n) but username lookups are rare (login only).
@@ -2216,6 +2247,54 @@ func (s *Store) SaveMailConfig(cfg MailConfig) error {
 	return s.persist("mail.json", snap)
 }
 
+// ── Syslog Config ──────────────────────────────────────────────────────────────
+
+func (s *Store) GetSyslogConfig() SyslogConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.syslogConfig
+}
+
+func (s *Store) SaveSyslogConfig(cfg SyslogConfig) error {
+	s.mu.Lock()
+	s.syslogConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("syslog.json", snap)
+}
+
+// ── Security Settings ─────────────────────────────────────────────────────────
+
+func (s *Store) GetSecuritySettings() SecuritySettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.securitySettings
+}
+
+func (s *Store) SaveSecuritySettings(ss SecuritySettings) error {
+	s.mu.Lock()
+	s.securitySettings = ss
+	snap := ss
+	s.mu.Unlock()
+	return s.persist("security.json", snap)
+}
+
+// ── TLS Config ────────────────────────────────────────────────────────────────
+
+func (s *Store) GetTLSConfig() TLSConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.tlsConfig
+}
+
+func (s *Store) SaveTLSConfig(cfg TLSConfig) error {
+	s.mu.Lock()
+	s.tlsConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("tls.json", snap)
+}
+
 // ── API Keys ──────────────────────────────────────────────────────────────────
 
 func (s *Store) GetAPIKeys() []APIKey {
@@ -2517,19 +2596,80 @@ func (s *Store) GetAllSessions() []SessionInfo {
 
 // ── Bulk admin actions ────────────────────────────────────────────────────────
 
+// BulkFilter holds criteria for bulk event operations.
+type BulkFilter struct {
+	Filter   string     // type | user | group | role | status | layer | all
+	Value    string     // filter value (event type key, user id/name, group name/id, role, status, layer id)
+	TimeFrom *time.Time // optional: only affect events starting at or after this time
+	TimeTo   *time.Time // optional: only affect events starting before or at this time
+}
+
+// matchesBulkFilter reports whether ev matches the given BulkFilter.
+// groupMemberIDs must be pre-computed when Filter=="group".
+func matchesBulkFilter(ev Event, f BulkFilter, groupMemberIDs map[int64]bool, users []User) bool {
+	filterMatch := false
+	switch f.Filter {
+	case "all":
+		filterMatch = true
+	case "type":
+		filterMatch = ev.EventType == f.Value
+	case "user":
+		// match by username or numeric id
+		uid, err := strconv.ParseInt(f.Value, 10, 64)
+		if err == nil {
+			filterMatch = ev.CreatedBy == uid || (ev.ResponsibleID != nil && *ev.ResponsibleID == uid)
+		} else {
+			// match by username
+			for _, u := range users {
+				if strings.EqualFold(u.Username, f.Value) || strings.EqualFold(u.DisplayName, f.Value) {
+					if ev.CreatedBy == u.ID || (ev.ResponsibleID != nil && *ev.ResponsibleID == u.ID) {
+						filterMatch = true
+						break
+					}
+				}
+			}
+		}
+	case "group":
+		filterMatch = groupMemberIDs[ev.CreatedBy]
+	case "role":
+		for _, u := range users {
+			if u.ID == ev.CreatedBy && (string(u.Role) == f.Value || (f.Value == "readwrite" && u.Role == RoleReadWrite)) {
+				filterMatch = true
+				break
+			}
+		}
+	case "status":
+		filterMatch = string(ev.Status) == f.Value
+	case "layer":
+		lid, err := strconv.ParseInt(f.Value, 10, 64)
+		if err == nil {
+			filterMatch = ev.LayerID != nil && *ev.LayerID == lid
+		}
+	}
+	if !filterMatch {
+		return false
+	}
+	// Time range filter
+	if f.TimeFrom != nil && ev.StartTime.Before(*f.TimeFrom) {
+		return false
+	}
+	if f.TimeTo != nil && ev.StartTime.After(*f.TimeTo) {
+		return false
+	}
+	return true
+}
+
 // BulkSetEventStatus sets the status on all events matching the filter.
-// filter: "type"/"user"/"group"/"role"  value: the key/id/name to match.
 // Returns the count of events updated.
-func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) (int, error) {
+func (s *Store) BulkSetEventStatus(f BulkFilter, newStatus EventStatus) (int, error) {
 	s.mu.Lock()
 
-	// Collect group members for group filter
 	var groupMemberIDs map[int64]bool
-	if filter == "group" {
+	if f.Filter == "group" {
 		groupMemberIDs = make(map[int64]bool)
 		for _, m := range s.memberships {
 			for _, g := range s.groups {
-				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
 					if m.GroupID == g.ID {
 						groupMemberIDs[m.UserID] = true
 					}
@@ -2540,26 +2680,7 @@ func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) 
 
 	count := 0
 	for i, ev := range s.events {
-		match := false
-		switch filter {
-		case "type":
-			match = ev.EventType == value
-		case "user":
-			uid, err := strconv.ParseInt(value, 10, 64)
-			if err == nil {
-				match = ev.CreatedBy == uid
-			}
-		case "group":
-			match = groupMemberIDs[ev.CreatedBy]
-		case "role":
-			for _, u := range s.users {
-				if u.ID == ev.CreatedBy && string(u.Role) == value {
-					match = true
-					break
-				}
-			}
-		}
-		if match {
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
 			s.events[i].Status = newStatus
 			s.events[i].UpdatedAt = time.Now()
 			count++
@@ -2575,17 +2696,268 @@ func (s *Store) BulkSetEventStatus(filter, value string, newStatus EventStatus) 
 	return count, nil
 }
 
-// BulkDeleteEvents deletes all events matching the filter.
-// Returns the count of events deleted.
-func (s *Store) BulkDeleteEvents(filter, value string) (int, error) {
+// BulkSetEventType sets the event type on all events matching the filter.
+// Returns the count of events updated.
+func (s *Store) BulkSetEventType(f BulkFilter, newType string) (int, error) {
 	s.mu.Lock()
 
 	var groupMemberIDs map[int64]bool
-	if filter == "group" {
+	if f.Filter == "group" {
 		groupMemberIDs = make(map[int64]bool)
 		for _, m := range s.memberships {
 			for _, g := range s.groups {
-				if fmt.Sprintf("%d", g.ID) == value || g.Name == value {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
+					if m.GroupID == g.ID {
+						groupMemberIDs[m.UserID] = true
+					}
+				}
+			}
+		}
+	}
+
+	count := 0
+	for i, ev := range s.events {
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
+			s.events[i].EventType = newType
+			s.events[i].UpdatedAt = time.Now()
+			count++
+		}
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	if count > 0 {
+		if err := s.persist("events.json", snap); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
+// ── Gradual Backup ─────────────────────────────────────────────────────────────
+
+const gradualBackupDefaultInterval = 15
+const gradualBackupDefaultMax      = 48
+const gradualBackupDir             = "snapshots"
+
+// GetGradualBackupSettings reads the gradual backup configuration from disk.
+// Returns sensible defaults if the file does not exist yet.
+func (s *Store) GetGradualBackupSettings() GradualBackupSettings {
+	raw, err := os.ReadFile(filepath.Join(s.dataDir, "gradual_backup.json"))
+	var cfg GradualBackupSettings
+	if err != nil || len(raw) < 2 {
+		// File not saved yet → all defaults, enabled by default
+		cfg.Enabled = true
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+		return cfg
+	}
+	_ = json.Unmarshal(raw, &cfg)
+	if cfg.IntervalMinutes <= 0 {
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+	}
+	if cfg.MaxSnapshots <= 0 {
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+	}
+	return cfg
+}
+
+// SaveGradualBackupSettings writes gradual backup settings to disk.
+func (s *Store) SaveGradualBackupSettings(cfg GradualBackupSettings) error {
+	if cfg.IntervalMinutes <= 0 {
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+	}
+	if cfg.MaxSnapshots <= 0 {
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.dataDir, "gradual_backup.json"), data, 0644)
+}
+
+// snapshotDir returns the path to the snapshots subdirectory, creating it if needed.
+func (s *Store) snapshotDir() string {
+	d := filepath.Join(s.dataDir, gradualBackupDir)
+	_ = os.MkdirAll(d, 0755)
+	return d
+}
+
+// CreateGradualBackupSnapshot takes an in-memory ZIP of all data JSON files,
+// encrypts it with AES-256-GCM using the admin password hash as key material,
+// and saves it to the snapshots directory. Returns the filename of the snapshot.
+func (s *Store) CreateGradualBackupSnapshot() (string, error) {
+	snapDir := s.snapshotDir()
+	filename := fmt.Sprintf("snapshot-%s.zip.enc", time.Now().UTC().Format("2006-01-02T150405"))
+	dstPath := filepath.Join(snapDir, filename)
+
+	// Build zip in memory
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	files := []string{
+		"event_types.json", "preferences.json", "groups.json",
+		"memberships.json", "layers.json", "events.json", "attachments.json",
+		"alarms.json", "locks.json", "audit.json", "exercise.json",
+		"comments.json", "phases.json", "templates.json", "roles.json",
+		"registration.json", "invitations.json", "filter_presets.json",
+		"event_versions.json", "auto_report_schedules.json",
+	}
+	for _, fn := range files {
+		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
+		if err != nil {
+			continue // skip missing
+		}
+		fw, err := zw.Create(fn)
+		if err != nil {
+			continue
+		}
+		_, _ = fw.Write(data)
+	}
+	if err := zw.Close(); err != nil {
+		return "", err
+	}
+
+	// Encrypt with admin password hash
+	keyMaterial := s.GetAdminPasswordHash()
+	encrypted, err := encryptBackupData(buf.Bytes(), keyMaterial)
+	if err != nil {
+		return "", fmt.Errorf("encrypt snapshot: %w", err)
+	}
+	if err := os.WriteFile(dstPath, encrypted, 0600); err != nil {
+		return "", fmt.Errorf("write snapshot file: %w", err)
+	}
+	return filename, nil
+}
+
+// ListGradualBackupSnapshots returns metadata for all snapshot files, newest first.
+func (s *Store) ListGradualBackupSnapshots() ([]GradualBackupSnapshot, error) {
+	snapDir := s.snapshotDir()
+	entries, err := os.ReadDir(snapDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []GradualBackupSnapshot{}, nil
+		}
+		return nil, err
+	}
+	var out []GradualBackupSnapshot
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || (!strings.HasSuffix(name, ".zip") && !strings.HasSuffix(name, ".zip.enc")) {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, GradualBackupSnapshot{
+			Filename:  name,
+			CreatedAt: fi.ModTime().UTC(),
+			SizeBytes: fi.Size(),
+		})
+	}
+	// Sort newest first
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
+}
+
+// RestoreGradualBackupSnapshot restores data files from a named snapshot ZIP.
+// Returns the count of files restored.
+func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
+	// Sanitise: filename must be a plain name with no path separators
+	if strings.ContainsAny(filename, "/\\") {
+		return 0, fmt.Errorf("invalid snapshot filename")
+	}
+	snapPath := filepath.Join(s.snapshotDir(), filename)
+	raw, err := os.ReadFile(snapPath)
+	if err != nil {
+		return 0, fmt.Errorf("snapshot not found: %w", err)
+	}
+
+	// Decrypt if not a plain zip (magic bytes "PK" = unencrypted; anything else = encrypted)
+	if len(raw) < 2 || raw[0] != 0x50 || raw[1] != 0x4B {
+		keyMaterial := s.GetAdminPasswordHash()
+		decrypted, err := decryptBackupData(raw, keyMaterial)
+		if err != nil {
+			return 0, fmt.Errorf("decrypt snapshot: %w", err)
+		}
+		raw = decrypted
+	}
+
+	zr, err := zip.NewReader(&bytesReaderAt{raw}, int64(len(raw)))
+	if err != nil {
+		return 0, fmt.Errorf("invalid zip: %w", err)
+	}
+	allowed := map[string]bool{
+		"event_types.json": true, "preferences.json": true, "groups.json": true,
+		"memberships.json": true, "layers.json": true, "events.json": true,
+		"attachments.json": true, "alarms.json": true, "locks.json": true,
+		"exercise.json": true, "comments.json": true, "phases.json": true,
+		"templates.json": true, "roles.json": true, "registration.json": true,
+		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
+		"auto_report_schedules.json": true,
+	}
+	restored := 0
+	for _, f := range zr.File {
+		if !allowed[f.Name] {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		fdata, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(s.dataDir, f.Name), fdata, 0644); err != nil {
+			continue
+		}
+		restored++
+	}
+	return restored, nil
+}
+
+// bytesReaderAt wraps a byte slice to satisfy zip.NewReader's io.ReaderAt interface.
+type bytesReaderAt struct{ d []byte }
+func (b *bytesReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off >= int64(len(b.d)) { return 0, io.EOF }
+	n := copy(p, b.d[off:])
+	return n, nil
+}
+func (b *bytesReaderAt) Len() int64 { return int64(len(b.d)) }
+
+// PruneGradualBackupSnapshots removes the oldest snapshots keeping at most max.
+func (s *Store) PruneGradualBackupSnapshots(max int) error {
+	if max <= 0 {
+		max = gradualBackupDefaultMax
+	}
+	snapshots, err := s.ListGradualBackupSnapshots()
+	if err != nil {
+		return err
+	}
+	// snapshots is newest-first; delete beyond max
+	for i := max; i < len(snapshots); i++ {
+		_ = os.Remove(filepath.Join(s.snapshotDir(), snapshots[i].Filename))
+	}
+	return nil
+}
+
+// ── BulkDeleteEvents (existing, moved label) ───────────────────────────────
+
+// BulkDeleteEvents deletes all events matching the filter.
+// Returns the count of events deleted.
+func (s *Store) BulkDeleteEvents(f BulkFilter) (int, error) {
+	s.mu.Lock()
+
+	var groupMemberIDs map[int64]bool
+	if f.Filter == "group" {
+		groupMemberIDs = make(map[int64]bool)
+		for _, m := range s.memberships {
+			for _, g := range s.groups {
+				if fmt.Sprintf("%d", g.ID) == f.Value || g.Name == f.Value {
 					if m.GroupID == g.ID {
 						groupMemberIDs[m.UserID] = true
 					}
@@ -2597,26 +2969,7 @@ func (s *Store) BulkDeleteEvents(filter, value string) (int, error) {
 	var kept []Event
 	count := 0
 	for _, ev := range s.events {
-		match := false
-		switch filter {
-		case "type":
-			match = ev.EventType == value
-		case "user":
-			uid, err := strconv.ParseInt(value, 10, 64)
-			if err == nil {
-				match = ev.CreatedBy == uid
-			}
-		case "group":
-			match = groupMemberIDs[ev.CreatedBy]
-		case "role":
-			for _, u := range s.users {
-				if u.ID == ev.CreatedBy && string(u.Role) == value {
-					match = true
-					break
-				}
-			}
-		}
-		if match {
+		if matchesBulkFilter(ev, f, groupMemberIDs, s.users) {
 			count++
 		} else {
 			kept = append(kept, ev)

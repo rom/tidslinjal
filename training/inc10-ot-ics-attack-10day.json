@@ -1,0 +1,206 @@
+{
+  "name": "INC-10 OT/ICS Cyber Attack — 10 Days",
+  "description": "10-day incident response for a cyberattack targeting Operational Technology (OT) and Industrial Control Systems (ICS) at an energy utility. A threat actor exploited a vulnerable remote access gateway to reach the SCADA network, manipulate PLC configurations, and cause a partial service outage. Covers IT/OT convergence challenges, safe system recovery, regulatory notification to energy authorities, and coordination with national CERT. Suitable for IT Security, OT Engineering, SCADA, Management, and Regulatory Liaison teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Detection & Emergency Response",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 1440,
+      "order": 0
+    },
+    {
+      "name": "OT Containment",
+      "color": "#E67E22",
+      "start_offset_min": 1440,
+      "end_offset_min": 4320,
+      "order": 1
+    },
+    {
+      "name": "OT Forensics & Root Cause",
+      "color": "#8E44AD",
+      "start_offset_min": 4320,
+      "end_offset_min": 7200,
+      "order": 2
+    },
+    {
+      "name": "Safe System Recovery",
+      "color": "#F39C12",
+      "start_offset_min": 7200,
+      "end_offset_min": 11520,
+      "order": 3
+    },
+    {
+      "name": "Return to Operation",
+      "color": "#27AE60",
+      "start_offset_min": 11520,
+      "end_offset_min": 14400,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "IT Security (SOC)",
+      "description": "IT Security Operations Centre"
+    },
+    {
+      "name": "OT / SCADA Engineering",
+      "description": "OT engineers and SCADA specialists"
+    },
+    {
+      "name": "Operations Control Room",
+      "description": "Grid/plant operations team"
+    },
+    {
+      "name": "Management & Regulatory",
+      "description": "Executive team and regulatory liaison"
+    }
+  ],
+  "layers": [
+    {
+      "name": "IT Security",
+      "description": "IT SOC investigation",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "OT Engineering",
+      "description": "OT / SCADA engineering layer",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Operations",
+      "description": "Control room and operations layer",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Management",
+      "description": "Executive and regulatory layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3]
+    }
+  ],
+  "locks": [
+    {
+      "start_offset_min": 7200,
+      "end_offset_min": 7260,
+      "reason": "OT Recovery window start — no changes to SCADA configuration without OT Engineering sign-off.",
+      "scope": "all"
+    }
+  ],
+  "items": [
+    {
+      "title": "SCADA Anomaly Alarm — PLC Misbehaviour",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Operations Control Room operator notices unexpected valve actuations on HMI display — pumping station P3 cycling abnormally. SCADA historian shows PLC ladder logic setpoints modified. OT alarms cascade. IT Security notified by OT engineer. Initial assessment: not mechanical fault — possible cyber event. T=0. Safety team placed on standby.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Emergency Safety Assessment",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "OT Engineering conducts immediate safety assessment. Physical safety: no imminent danger to personnel or environment — modified setpoints within safe operating limits. Operations switches affected systems to manual control. Safety instrumented systems (SIS) verified independently intact. Decision: maintain manual operation until cyber scope determined.",
+      "start_offset_min": 15,
+      "duration_min": 45,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Remote Access Gateway — Suspected Entry Point",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "IT Security identifies unusual authentication patterns on OT remote access gateway (Fortinet FortiGate). VPN logs show authentication from unknown IP (185.x.x.x) using legitimate contractor credentials 6 hours before anomaly. Firewall rules show that gateway had direct access to SCADA VLAN. Gateway immediately isolated.",
+      "start_offset_min": 60,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "National CERT Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Management notifies national CERT (Computer Emergency Response Team) per critical infrastructure protection obligations. CERT advisory team deployed on-site within 4 hours. Energy sector regulator also notified per mandatory incident reporting requirements (NIS Directive / sector-specific regulations). Media holding statement prepared.",
+      "start_offset_min": 120,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "IT/OT Network Segmentation — Emergency",
+      "event_type": "assigned_task",
+      "color": "#E67E22",
+      "description": "IT Security and OT Engineering implement emergency network segmentation: all remote access paths to OT network severed, firewall rules updated to deny all traffic between IT and OT zones. OT network operating in fully isolated mode. Historian data replication paused. All contractor VPN accounts suspended pending credential audit.",
+      "start_offset_min": 1440,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "PLC Configuration Audit — All PLCs",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "OT Engineering team manually audits PLC ladder logic on all 34 PLCs in the affected facility using engineering workstations. Comparing current configuration against known-good backups (last verified baseline). 4 PLCs identified with modified setpoints. 2 PLCs with new ladder logic rungs inserted. All changes documented.",
+      "start_offset_min": 2880,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "SCADA Historian & Log Forensics",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "IT Security and CERT conduct forensic analysis of SCADA historian and engineering workstation logs. Attack chain reconstructed: VPN access → lateral movement via unpatched EWS vulnerability → PLC programming software accessed → setpoint modifications applied over 4-hour window. Attacker accessed but did not modify SIS logic.",
+      "start_offset_min": 4320,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "PLC Restoration — Known-Good Backup",
+      "event_type": "assigned_task",
+      "color": "#F39C12",
+      "description": "OT Engineering restores all 6 affected PLCs from verified backup configurations. Restoration process: (1) engineering workstation isolated, (2) PLC put in program mode, (3) verified backup loaded, (4) functional test on each actuator/sensor loop, (5) OT Security signs off before returning to auto mode. Process takes approximately 3 hours per PLC.",
+      "start_offset_min": 7200,
+      "duration_min": 5760,
+      "alarm_lead_time": 60
+    },
+    {
+      "title": "Contractor Credential Audit & Reissue",
+      "event_type": "assigned_task",
+      "color": "#F39C12",
+      "description": "IT Security audits all 47 active contractor accounts with OT network access. Compromised account (belonging to SCADA integrator) suspended and integrator formally notified. All contractor passwords reset. MFA enforced for all remote access accounts. Privileged Access Workstations (PAW) requirement added for any OT remote session.",
+      "start_offset_min": 8640,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Return to Automatic Operation — Phased",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "Operations Control Room returns affected systems from manual to automatic control in phased sequence. Each system monitored for 30 minutes before next system switched. OT Engineering and Operations present throughout. All restored PLCs operating within expected parameters. Full automatic operation restored.",
+      "start_offset_min": 11520,
+      "duration_min": 1440,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Regulator — Detailed Incident Report",
+      "event_type": "deadline",
+      "color": "#C0392B",
+      "description": "Management and Legal submit mandatory detailed incident report to energy regulator. Contents: attack timeline, attack vector, OT systems affected, production impact (hours of partial outage), safety systems status, full remediation actions, OT security improvement plan. Report includes CERT's independent findings and assessment.",
+      "start_offset_min": 14400,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    }
+  ]
+}

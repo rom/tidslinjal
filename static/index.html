@@ -85,20 +85,6 @@
 
       <div class="toolbar-sep"></div>
 
-      <!-- Group 6: Data management -->
-      <div class="toolbar-group">
-        <button class="btn btn-secondary toolbar-btn" id="btnTemplates">📋 Templates</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnExport">⬇ Export</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnImport">⬆ Import</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnReport">📄 Report</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnAutoReport" style="display:none" title="Configure automatic scheduled reports">⏰ Auto Report</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnPVA" style="display:none" title="Planned vs. Actual comparison">📊 Plan vs Actual</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnBackup" style="display:none" title="Backup & Restore data">💾 Backup</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnPrint" title="Print day/week sheet">🖨 Print</button>
-      </div>
-
-      <div class="toolbar-sep"></div>
-
       <!-- Group 7: Language -->
       <div class="lang-flags" id="langFlags">
         <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
@@ -110,9 +96,15 @@
 
     <div class="header-right">
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
+      <!-- Shown when clocks are detached to separate window -->
+      <div id="clockDetachedIndicator" style="display:none;align-items:center;gap:6px;cursor:pointer;opacity:.7;font-size:12px;color:var(--accent)"
+           onclick="if(_clockPopout&&!_clockPopout.closed){_clockPopout.focus();}else{_setClockAreaDetached(false);}" title="Clocks are in a separate window — click to focus or reattach">
+        ⧉ <span>Clocks detached</span>
+      </div>
       <div class="clock-area" id="clockArea">
         <button class="btn btn-ghost btn-icon clock-add-btn" onclick="openDetachedClock()" title="Open detached clock window" style="font-size:14px">⏱</button>
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" onclick="detachClock()" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
         <div id="extraClocksContainer" style="display:contents"></div>
         <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
           <div class="clock-time" id="clockTime">00:00:00</div>
@@ -210,6 +202,7 @@
     <aside id="sidebar">
       <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-tab="legend" data-i18n="tab_legend">Legend</button>
+        <button class="sidebar-tab" data-tab="tools" data-i18n="tab_tools">Tools</button>
         <button class="sidebar-tab" data-tab="alarms" data-i18n="tab_alarms">Alarms</button>
         <button class="sidebar-tab" data-tab="layers" data-i18n="tab_layers">Layers</button>
         <button class="sidebar-tab admin-only" data-tab="users" style="display:none" data-i18n="tab_users">Users</button>
@@ -841,7 +834,7 @@
             <option value="observer">Observer</option>
             <option value="read" id="lbl-role-read">Read</option>
             <option value="reporter" id="lbl-role-reporter">Reporter</option>
-            <option value="readwrite" id="lbl-role-readwrite">Read/Write</option>
+            <option value="teammember" id="lbl-role-teammember">Team Member</option>
             <option value="teamlead" id="lbl-role-teamlead">Team Lead</option>
             <option value="oplead" id="lbl-role-oplead">Operations Lead</option>
             <option value="staffofficer" id="lbl-role-staffofficer">Staff Officer Assistant</option>
@@ -871,6 +864,7 @@
           <input type="password" id="uConfirmPassword" placeholder="Confirm new password">
         </div>
       </div>
+      <div id="uUserInfo" style="display:none;margin-top:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg-subtle,var(--bg2));border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim);line-height:1.7"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
@@ -884,84 +878,157 @@
 <div class="modal-overlay" id="profileModal">
   <div class="modal modal-wide">
     <div class="modal-header">
-      <h2>👤 My Profile</h2>
+      <h2>👤 <span data-i18n="profile_title">My Profile</span></h2>
       <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <!-- Identity section -->
-      <div class="form-row">
-        <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="profileUsername" readonly style="opacity:0.6">
+      <!-- Photo + identity row -->
+      <div style="display:flex;gap:18px;align-items:flex-start;margin-bottom:14px">
+        <div style="flex-shrink:0;text-align:center">
+          <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;margin-bottom:6px">
+            <img id="profilePhotoPreview" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none">
+            <span id="profilePhotoPlaceholder" style="font-size:32px;color:var(--text-dim)">👤</span>
+          </div>
+          <label for="profilePhotoInput" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:var(--fs-xs)">📷 Photo</label>
+          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="loadProfilePhoto(this)">
+          <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)" onclick="removeProfilePhoto()">✕ Remove</button>
+          <!-- Default avatar picker -->
+          <div style="margin-top:8px">
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px" data-i18n="profile_default_avatars">Or choose a default:</div>
+            <div id="profileAvatarGrid" style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;max-width:120px;margin:0 auto"></div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Role</label>
-          <input type="text" id="profileRole" readonly style="opacity:0.6">
-        </div>
-        <div class="form-group" id="profileJLevelGroup" style="display:none">
-          <label>J-Level / NATO</label>
-          <input type="text" id="profileJLevel" readonly style="opacity:0.6">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Display Name</label>
-          <input type="text" id="profileDisplayName" placeholder="Your display name">
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="profileEmail" placeholder="your@email.com">
-        </div>
-        <div class="form-group">
-          <label>Preferred Language</label>
-          <select id="profileLanguage">
-            <option value="en">English</option>
-            <option value="sv">Svenska</option>
-            <option value="fr">Français</option>
-          </select>
+        <div style="flex:1">
+          <!-- Identity section -->
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="profile_username">Username</label>
+              <input type="text" id="profileUsername" readonly style="opacity:0.6">
+            </div>
+            <div class="form-group">
+              <label data-i18n="profile_role">Role</label>
+              <input type="text" id="profileRole" readonly style="opacity:0.6">
+            </div>
+            <div class="form-group" id="profileJLevelGroup" style="display:none">
+              <label data-i18n="profile_jlevel">J-Level / NATO</label>
+              <input type="text" id="profileJLevel" readonly style="opacity:0.6">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label data-i18n="profile_display_name">Display Name</label>
+              <input type="text" id="profileDisplayName" placeholder="Your display name">
+            </div>
+            <div class="form-group">
+              <label data-i18n="profile_email">Email</label>
+              <input type="email" id="profileEmail" placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+              <label data-i18n="profile_language">Preferred Language</label>
+              <select id="profileLanguage" onchange="onProfileLanguageChange(this.value)">
+                <option value="en">English</option>
+                <option value="sv">Svenska</option>
+                <option value="fr">Français</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">💬 Communication Handles</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🪪 <span data-i18n="profile_professional">Professional Profile</span></h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Mattermost</label>
-          <input type="text" id="profileMattermost" placeholder="@username">
+          <label data-i18n="profile_title_label">Title / Position</label>
+          <input type="text" id="profileTitle" placeholder="e.g. Incident Commander">
         </div>
         <div class="form-group">
-          <label>Discord</label>
-          <input type="text" id="profileDiscord" placeholder="username#1234">
+          <label data-i18n="profile_rank">Rank</label>
+          <input type="text" id="profileRank" placeholder="e.g. Major, Sergeant, N/A">
         </div>
         <div class="form-group">
-          <label>Signal</label>
+          <label data-i18n="profile_job_role">Job Role</label>
+          <input type="text" id="profileJobRole" placeholder="e.g. SOC Analyst, Watch Officer">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label data-i18n="profile_expertise">Area of Expertise</label>
+          <input type="text" id="profileExpertise" placeholder="e.g. Cyber Threat Intel, Logistics, CBRN">
+        </div>
+      </div>
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">📞 <span data-i18n="profile_communication">Communication</span></h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="profile_telephone">Telephone</label>
+          <input type="tel" id="profileTelephone" placeholder="+1 555 000 0000">
+        </div>
+        <div class="form-group">
+          <label data-i18n="profile_cellular">Cellular / Mobile</label>
+          <input type="tel" id="profileCellular" placeholder="+1 555 000 0001">
+        </div>
+        <div class="form-group">
+          <label data-i18n="profile_signal">Signal</label>
           <input type="text" id="profileSignal" placeholder="+12345678900">
         </div>
       </div>
-
-      <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 Change Password</h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Current Password</label>
-          <input type="password" id="profilePwdCurrent">
+          <label data-i18n="profile_mattermost">Mattermost</label>
+          <input type="text" id="profileMattermost" placeholder="@username">
         </div>
         <div class="form-group">
-          <label>New Password</label>
-          <input type="password" id="profilePwdNew">
-        </div>
-        <div class="form-group">
-          <label>Confirm New Password</label>
-          <input type="password" id="profilePwdConfirm">
+          <label data-i18n="profile_discord">Discord</label>
+          <input type="text" id="profileDiscord" placeholder="username#1234">
         </div>
       </div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📋 Account Info</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:10px">🔑 <span data-i18n="change_password">Change Password</span></h3>
+      <!-- Password policy info (loaded dynamically) -->
+      <div id="profilePwdPolicyInfo" style="display:none;margin-bottom:10px;padding:8px 12px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim)"></div>
+      <!-- SSO banner shown for OIDC users -->
+      <div id="profilePwdSSOBanner" style="display:none;padding:12px 14px;border-radius:var(--radius);background:rgba(0,120,255,.1);border:1px solid var(--accent);margin-bottom:12px">
+        <div style="font-weight:600;color:var(--accent);margin-bottom:4px">🔗 SSO / Single Sign-On Account</div>
+        <p style="font-size:var(--fs-xs);margin:0;color:var(--text)">
+          Your account is managed by an external identity provider. Password changes must be made through your organisation's SSO portal.
+        </p>
+      </div>
+      <div id="profilePwdFields">
+        <div class="form-row">
+          <div class="form-group">
+            <label data-i18n="current_password">Current Password</label>
+            <input type="password" id="profilePwdCurrent" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label data-i18n="new_password">New Password</label>
+            <div style="position:relative;display:flex;gap:6px;align-items:center">
+              <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1" oninput="updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel')">
+              <button type="button" class="btn btn-ghost btn-icon" onclick="generateProfilePassword()" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="profilePwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyProfilePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label data-i18n="confirm_password">Confirm New Password</label>
+            <input type="password" id="profilePwdConfirm" autocomplete="new-password">
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-bottom:4px">
+            <div id="profilePwdStrengthBar" style="height:100%;width:0%;transition:width .25s,background .25s;border-radius:3px;background:#ccc"></div>
+          </div>
+          <div id="profilePwdStrengthLabel" style="font-size:var(--fs-xs);color:var(--text-dim)"></div>
+        </div>
+      </div>
+
+      <hr style="border-color:var(--border);margin:14px 0">
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📋 <span data-i18n="profile_account_info">Account Info</span></h3>
       <div id="profileInfo" style="font-size:var(--fs-sm);color:var(--text-dim)"></div>
 
       <hr style="border-color:var(--border);margin:14px 0">
-      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📅 Calendar Subscription</h3>
+      <h3 style="font-size:var(--fs-base);margin-bottom:8px">📅 <span data-i18n="profile_webcal">Calendar Subscription</span></h3>
       <div id="profileWebCalSection" style="font-size:var(--fs-sm)">
         <p style="color:var(--text-dim);margin-bottom:8px">Subscribe to your events in any calendar app (CalDAV/WebCal compatible).</p>
         <div id="profileWebCalURL" style="display:none;margin-bottom:8px">
@@ -971,8 +1038,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+      <button class="btn btn-secondary" onclick="closeModal('profileModal')" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProfile()" data-i18n="profile_save">Save Profile</button>
     </div>
   </div>
 </div>
@@ -985,18 +1052,45 @@
       <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
     </div>
     <div class="modal-body">
-      <div class="password-form">
-        <div class="form-group">
-          <label id="lbl-pwd-current">Current password</label>
-          <input type="password" id="pwdCurrent">
-        </div>
-        <div class="form-group">
-          <label id="lbl-pwd-new">New password</label>
-          <input type="password" id="pwdNew">
-        </div>
-        <div class="form-group">
-          <label id="lbl-pwd-confirm">Confirm new password</label>
-          <input type="password" id="pwdConfirm">
+      <!-- SSO/OIDC accounts cannot change password here -->
+      <div id="pwdSSOBanner" style="display:none;padding:14px 16px;border-radius:var(--radius);background:rgba(0,120,255,.1);border:1px solid var(--accent);margin-bottom:14px">
+        <div style="font-weight:600;color:var(--accent);margin-bottom:6px">🔗 SSO / Single Sign-On Account</div>
+        <p style="font-size:var(--fs-sm);margin:0;color:var(--text)">
+          Your account is managed by an external identity provider (SSO/OIDC).
+          Passwords for SSO accounts cannot be changed here — please use your
+          organisation's identity provider portal to update your password.
+        </p>
+      </div>
+      <div id="pwdLocalForm">
+        <!-- Password policy summary (loaded dynamically) -->
+        <div id="pwdPolicyInfo" style="display:none;margin-bottom:12px;padding:8px 12px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim)"></div>
+        <div class="password-form">
+          <div class="form-group">
+            <label id="lbl-pwd-current">Current password</label>
+            <input type="password" id="pwdCurrent" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label id="lbl-pwd-new">New password</label>
+            <div style="position:relative;display:flex;gap:6px;align-items:center">
+              <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')" style="flex:1;padding-right:32px">
+              <button type="button" id="pwdNewEye" onclick="togglePwdVisibility('pwdNew','pwdNewEye')" style="position:absolute;right:60px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+              <button type="button" class="btn btn-ghost btn-icon" onclick="generateStandalonePassword()" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="pwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyStandalonePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+            </div>
+          </div>
+          <div id="pwdStrengthWrap" style="margin-bottom:10px">
+            <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-bottom:4px">
+              <div id="pwdStrengthBar" style="height:100%;width:0%;transition:width .25s,background .25s;border-radius:3px;background:#ccc"></div>
+            </div>
+            <div id="pwdStrengthLabel" style="font-size:var(--fs-xs);color:var(--text-dim)"></div>
+          </div>
+          <div class="form-group">
+            <label id="lbl-pwd-confirm">Confirm new password</label>
+            <div style="position:relative">
+              <input type="password" id="pwdConfirm" autocomplete="new-password" style="padding-right:32px">
+              <button type="button" id="pwdConfirmEye" onclick="togglePwdVisibility('pwdConfirm','pwdConfirmEye')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1083,6 +1177,9 @@
           <select id="reportFormat">
             <option value="html" id="lbl-report-html">HTML (view)</option>
             <option value="print" id="lbl-report-print">Print / PDF</option>
+            <option value="docx">DOCX (Word)</option>
+            <option value="rtf">RTF</option>
+            <option value="excel">Excel (XLS)</option>
           </select>
         </div>
       </div>
@@ -1149,6 +1246,15 @@
       </div>
       <div class="form-row">
         <div class="form-group">
+          <label>Format</label>
+          <select id="arFormat">
+            <option value="html">HTML (inline email)</option>
+            <option value="excel">Excel (XLSX attachment)</option>
+            <option value="rtf">RTF (Word-compatible attachment)</option>
+            <option value="docx">Word Document (DOCX attachment)</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Delivery</label>
           <select id="arDelivery">
             <option value="webhook">Webhook</option>
@@ -1156,7 +1262,9 @@
             <option value="download">Download only</option>
           </select>
         </div>
-        <div class="form-group">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
           <label>Recipient / URL</label>
           <input type="text" id="arRecipient" placeholder="email@example.com or webhook URL" style="width:100%">
         </div>
@@ -1279,6 +1387,54 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('backupModal')">Close</button>
       <button class="btn btn-danger" onclick="uploadRestore()">⬆️ Restore from Backup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gradual Backup Modal -->
+<div class="modal-overlay" id="gradualBackupModal">
+  <div class="modal modal-wide" style="max-width:760px">
+    <div class="modal-header">
+      <h2>🔄 Gradual Backup (Auto-Snapshots)</h2>
+      <button class="modal-close" onclick="closeModal('gradualBackupModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:14px">
+        Gradual backup automatically takes rolling snapshots of all data at a configurable interval.
+        Use it to recover from accidental resets, bulk deletes, or bugs.
+      </p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div class="form-group" style="flex:1;min-width:180px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="gbEnabled">
+            <span>Enable automatic snapshots</span>
+          </label>
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Snapshot interval</label>
+          <select id="gbInterval" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="5">Every 5 minutes</option>
+            <option value="10">Every 10 minutes</option>
+            <option value="15" selected>Every 15 minutes</option>
+            <option value="30">Every 30 minutes</option>
+            <option value="60">Every 60 minutes</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Max snapshots to keep</label>
+          <input type="number" id="gbMaxSnapshots" min="2" max="500" value="48"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn btn-primary btn-sm" onclick="saveGradualBackupSettings()">💾 Save Settings</button>
+        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow" onclick="createGradualSnapshotNow()">📸 Snapshot Now</button>
+      </div>
+      <h3 style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-dim)">Saved Snapshots</h3>
+      <div id="gbSnapshotsList" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('gradualBackupModal')">Close</button>
     </div>
   </div>
 </div>
@@ -1475,8 +1631,16 @@
         <span class="help-modal-logo">Tids<span>linjal</span></span>
         <span class="help-modal-subtitle">Quick Reference Guide</span>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="openDetachedHelp()" title="Open help in separate window" style="margin-right:8px;font-size:12px;padding:2px 8px">⧉ Detach</button>
-      <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="detachHelp()" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
+        <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+      </div>
+    </div>
+    <div style="padding:8px 20px 0;border-bottom:1px solid var(--border)">
+      <input type="search" id="helpSearchInput" placeholder="Search help… (e.g. alarms, templates, backup)"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)"
+        oninput="filterHelp(this.value)" autocomplete="off">
+      <div id="helpSearchStatus" style="font-size:var(--fs-xs);color:var(--text-dim);padding:4px 2px;min-height:18px"></div>
     </div>
     <div class="modal-body help-body">
 
@@ -1484,9 +1648,12 @@
         <a class="help-toc-link" href="#h-nav">🧭 Navigation</a>
         <a class="help-toc-link" href="#h-events">📅 Events</a>
         <a class="help-toc-link" href="#h-icons">🏷 Event icons</a>
+        <a class="help-toc-link" href="#h-attachments">📎 Attachments</a>
+        <a class="help-toc-link" href="#h-comments">💬 Comments</a>
         <a class="help-toc-link" href="#h-clocks">🕐 Multi-zone clocks</a>
         <a class="help-toc-link" href="#h-layers">🗂 Layers</a>
         <a class="help-toc-link" href="#h-templates">📋 Templates</a>
+        <a class="help-toc-link" href="#h-filters">🔍 Filters</a>
         <a class="help-toc-link" href="#h-roles">👥 Roles</a>
         <a class="help-toc-link" href="#h-alarms">🔔 Alarms</a>
         <a class="help-toc-link" href="#h-status">🔄 Status</a>
@@ -1494,7 +1661,19 @@
         <a class="help-toc-link" href="#h-exercise">🕐 Exercise time</a>
         <a class="help-toc-link" href="#h-locks">🔒 Time locks</a>
         <a class="help-toc-link" href="#h-reports">📊 Reports</a>
+        <a class="help-toc-link" href="#h-settings">⚙ Settings</a>
+        <a class="help-toc-link" href="#h-themes">🎨 Themes</a>
+        <a class="help-toc-link" href="#h-backup">💾 Backup</a>
+        <a class="help-toc-link" href="#h-gradual-backup">🔄 Gradual Backup</a>
+        <a class="help-toc-link" href="#h-audit">📜 Audit Log</a>
+        <a class="help-toc-link" href="#h-profile">🪪 User Profile</a>
         <a class="help-toc-link" href="#h-webhooks">🔗 Webhooks</a>
+        <a class="help-toc-link" href="#h-sso">🔑 SSO / OIDC</a>
+        <a class="help-toc-link" href="#h-tls">🔐 TLS</a>
+        <a class="help-toc-link" href="#h-syslog">📡 Syslog</a>
+        <a class="help-toc-link" href="#h-smtp">✉ SMTP / Mail</a>
+        <a class="help-toc-link" href="#h-mattermost">💬 Mattermost</a>
+        <a class="help-toc-link" href="#h-apikeys">🗝 API Keys</a>
         <a class="help-toc-link" href="#h-shortcuts">⌨ Shortcuts</a>
       </div>
 
@@ -1534,6 +1713,38 @@
           </div>
         </div>
 
+        <div class="help-section" id="h-attachments">
+          <div class="help-section-icon">📎</div>
+          <div class="help-section-body">
+            <h3>File Attachments</h3>
+            <p>Any event can have one or more files attached to it — useful for orders, maps, briefing documents, images, or reference materials.</p>
+            <ul class="help-list">
+              <li>Open an event's detail view and click <b>📎 Attachments</b> to upload files.</li>
+              <li>Accepted: any file type. Individual file size is limited by server configuration (default 32 MB).</li>
+              <li>Uploaded files are listed with name, size, uploader and timestamp.</li>
+              <li>Click a filename to download it. Admins and the uploader can delete attachments.</li>
+              <li>Events with attachments show a <span class="help-badge">📎</span> badge on the timeline block.</li>
+              <li><b>Templates include attachments</b>: when you save a template, all attached files are copied into the template. When you apply the template, files are re-created on each new event automatically.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-comments">
+          <div class="help-section-icon">💬</div>
+          <div class="help-section-body">
+            <h3>Comments &amp; @mentions</h3>
+            <p>Leave text comments on any event to record decisions, share context, or flag issues for other team members.</p>
+            <ul class="help-list">
+              <li>Open the event detail view and scroll to the <b>Comments</b> section.</li>
+              <li>Type a comment and press <b>Enter</b> (or click <b>Add</b>) to post.</li>
+              <li>Use <b>@username</b> to mention a specific user — they receive an in-app notification.</li>
+              <li>Comments are timestamped and show the author's display name.</li>
+              <li>Team Leads and admins can delete any comment; others can only delete their own.</li>
+              <li>Comments are included in the <b>Daily Briefing</b> and <b>AAR</b> reports.</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="help-section" id="h-layers">
           <div class="help-section-icon">🗂</div>
           <div class="help-section-body">
@@ -1544,6 +1755,10 @@
               <li>When all layers are checked (default), everything is visible.</li>
               <li>Master timeline events are always shown regardless of layer filters.</li>
               <li>Manage layers (create, edit, share) in the <b>Layers</b> sidebar tab.</li>
+              <li>Layer visibility is per-user and persists across sessions.</li>
+              <li>Layers can be shared with specific <b>Groups</b> at read or read/write access level.</li>
+              <li>Team Leads and above can create, rename, and delete layers.</li>
+              <li>A layer color-codes event blocks for quick visual identification on the timeline.</li>
             </ul>
           </div>
         </div>
@@ -1552,18 +1767,37 @@
           <div class="help-section-icon">📋</div>
           <div class="help-section-body">
             <h3>Templates</h3>
-            <p>Templates capture a set of events relative to a base time so they can be replicated quickly.</p>
+            <p>Templates capture a set of events (with relative time offsets) so an entire exercise or incident schedule can be reused and replayed in seconds.</p>
             <ul class="help-list">
               <li>Click <b>📋 Templates</b> in the toolbar to open the template manager.</li>
-              <li><b>Save</b>: all events in the current view are stored as a template with relative time offsets.</li>
-              <li><b>Apply</b>: choose a base date/time — events are recreated offset from that moment.</li>
-              <li>Private templates are visible only to you; Public templates are visible to all users.</li>
-              <li>Only Admins and Operations Leads can create public templates that include master-timeline events.</li>
+              <li><b>Save</b>: all events in the current view (or a selected date range) are stored as a template. Attachments, phases, locks, and groups can all be included.</li>
+              <li><b>Apply</b>: choose a base date/time (STARTEX) — all events are recreated at their original relative offsets from that moment.</li>
+              <li><b>Export / Import</b>: download templates as JSON files for offline storage or sharing with other installations.</li>
+              <li>Private templates are visible only to you; Public templates are visible to all users (requires Ops Lead or Admin role to create).</li>
+              <li><b>Attachments are preserved</b>: files attached to original events are copied into the template and re-created on every apply.</li>
+              <li>Templates can embed theme, language, operation mode, and terminology preferences that are applied when the template is loaded.</li>
+              <li>The <b>example-templates/</b> folder in the distribution contains 31 ready-made templates (exercise scenarios, incident responses).</li>
             </ul>
           </div>
         </div>
 
-        <div class="help-section" id="h-roles">
+        <div class="help-section" id="h-filters">
+          <div class="help-section-icon">🔍</div>
+          <div class="help-section-body">
+            <h3>Filters &amp; Presets</h3>
+            <p>Use the filter bar (sidebar → Filters tab) to narrow down what is shown on the timeline without hiding anything permanently.</p>
+            <ul class="help-list">
+              <li>Filter by <b>event type</b>, <b>status</b>, <b>participant</b> (internal/external), <b>responsible user</b>, or <b>free-text search</b> on title/description.</li>
+              <li>Multiple filters combine with AND logic — only events matching all criteria are shown.</li>
+              <li>Filters are purely visual; they do not affect exports or reports.</li>
+              <li><b>Save as preset</b>: give a filter combination a name and save it for quick recall. Presets are per-user.</li>
+              <li>Click a saved preset to apply it instantly; click it again to clear.</li>
+              <li>The active filter count is shown as a badge on the Filter button in the toolbar.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section help-full-width" id="h-roles">
           <div class="help-section-icon">👥</div>
           <div class="help-section-body">
             <h3 data-i18n="help_roles_title">User Roles</h3>
@@ -1572,7 +1806,7 @@
               <tr><td><span class="role-badge role-observer">Observer</span></td><td data-i18n="help_role_observer">Read-only view of the timeline · no editing</td></tr>
               <tr><td><span class="role-badge role-read">Read</span></td><td data-i18n="help_role_read">View timeline · set personal alarms · comment on events</td></tr>
               <tr><td><span class="role-badge role-reporter">Reporter</span></td><td data-i18n="help_role_reporter">+ Set status to Responded To / Completed (needs Team Lead approval)</td></tr>
-              <tr><td><span class="role-badge role-readwrite">Read/Write</span></td><td data-i18n="help_role_readwrite">+ Create and edit own events on accessible layers · create event types and layers</td></tr>
+              <tr><td><span class="role-badge role-teammember">Team Member</span></td><td data-i18n="help_role_teammember">+ Create and edit own events on accessible layers · create event types and layers</td></tr>
               <tr><td><span class="role-badge role-teamlead">Team Lead</span></td><td data-i18n="help_role_teamlead">+ Create groups · verify/reject events · manage phases · approve reporter changes · view audit log</td></tr>
               <tr><td><span class="role-badge role-oplead">Ops Lead</span></td><td data-i18n="help_role_oplead">+ Create/edit/delete master timeline events · manage exercise settings · pause timeline</td></tr>
               <tr><td><span class="role-badge role-staffofficer">Staff Officer Asst.</span></td><td data-i18n="help_role_staffofficer">Same rights as Operations Lead</td></tr>
@@ -1596,7 +1830,7 @@
           </div>
         </div>
 
-        <div class="help-section" id="h-status">
+        <div class="help-section help-full-width" id="h-status">
           <div class="help-section-icon">🔄</div>
           <div class="help-section-body">
             <h3>Event Status Workflow</h3>
@@ -1651,7 +1885,100 @@
           </div>
         </div>
 
-        <div class="help-section" id="h-shortcuts">
+        <div class="help-section" id="h-sso">
+          <div class="help-section-icon">🔑</div>
+          <div class="help-section-body">
+            <h3>SSO / OIDC Single Sign-On</h3>
+            <p>Administrators can configure OIDC-based SSO so users log in via an external identity provider (Entra ID, Keycloak, Authentik, etc.).</p>
+            <ul class="help-list">
+              <li>Go to <b>🔌 Integrations → SSO / OIDC</b> in the sidebar (admin only).</li>
+              <li>Provide the <b>Issuer URL</b>, <b>Client ID</b>, and <b>Client Secret</b> from your IdP.</li>
+              <li>Enable <b>Exclusive mode</b> to force all non-admin users through SSO.</li>
+              <li>SSO users are created automatically on first login with the configured default role.</li>
+              <li>SSO accounts display an <span style="font-size:var(--fs-xs);background:rgba(0,120,255,.15);color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;font-weight:600">SSO</span> badge and cannot change their password here.</li>
+              <li>The legend panel shows real-time SSO status (active / inactive) for admins.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-tls">
+          <div class="help-section-icon">🔐</div>
+          <div class="help-section-body">
+            <h3>TLS / HTTPS</h3>
+            <p>Serve Tidslinjal over HTTPS by providing a TLS certificate and private key.</p>
+            <ul class="help-list">
+              <li>Supply <code>--tls-cert</code> and <code>--tls-key</code> CLI flags, <b>or</b> set paths via <b>Integrations → TLS</b> in the admin panel.</li>
+              <li>CLI flags always take precedence over the stored config.</li>
+              <li>TLS changes take effect on the next server restart.</li>
+              <li>For self-signed certificates on internal networks, disable <b>TLS Verify</b> for syslog forwarding.</li>
+              <li>The legend panel shows whether TLS is configured (cert file set).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-syslog">
+          <div class="help-section-icon">📡</div>
+          <div class="help-section-body">
+            <h3>Syslog Forwarding</h3>
+            <p>Forward audit and application log messages to a remote syslog server.</p>
+            <ul class="help-list">
+              <li>Configure via <b>Integrations → Syslog</b> (admin only).</li>
+              <li><b>Transport</b>: UDP (default, fastest), TCP (reliable), or TLS (encrypted).</li>
+              <li><b>Format</b>: Classic RFC 3164 or structured JSON.</li>
+              <li>Default port: 514 (UDP/TCP) or 6514 (TLS).</li>
+              <li>Use <b>Test</b> to verify connectivity before saving.</li>
+              <li>App name, facility code, and TLS certificate verification are configurable.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-smtp">
+          <div class="help-section-icon">✉</div>
+          <div class="help-section-body">
+            <h3>SMTP / Email Notifications</h3>
+            <p>Tidslinjal can send email notifications for alarms and scheduled reports.</p>
+            <ul class="help-list">
+              <li>Configure via <b>Integrations → Mail / SMTP</b> (admin only).</li>
+              <li>Supports <b>STARTTLS</b>, <b>TLS/SSL</b>, or plain (no encryption) connections.</li>
+              <li>Set SMTP host, port, credentials, and a From address/name.</li>
+              <li>Use <b>Test Email</b> to send a confirmation message before saving.</li>
+              <li>Scheduled reports can be delivered to any email address once SMTP is enabled.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-mattermost">
+          <div class="help-section-icon">💬</div>
+          <div class="help-section-body">
+            <h3>Mattermost &amp; Webhook Notifications</h3>
+            <p>Each user can configure a personal <b>webhook URL</b> to receive push notifications for alarm events.</p>
+            <ul class="help-list">
+              <li>Go to <b>Settings → Notifications / Webhook</b> and enter your incoming webhook URL.</li>
+              <li>Choose webhook type: <b>Mattermost / Slack</b> (sends <code>{"text":"…"}</code>) or <b>Generic</b>.</li>
+              <li>Click <b>Test</b> to verify the endpoint.</li>
+              <li>Notifications fire when a user's alarm triggers.</li>
+              <li>The legend panel (admin) shows how many users have webhooks configured.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-apikeys">
+          <div class="help-section-icon">🗝</div>
+          <div class="help-section-body">
+            <h3>API Keys</h3>
+            <p>API keys allow external tools and scripts to call the Tidslinjal REST API without interactive login.</p>
+            <ul class="help-list">
+              <li>Create API keys via <b>Integrations → API Keys</b> (admin only).</li>
+              <li>The key is shown only once on creation — copy and store it securely.</li>
+              <li>Send the key in the <code>Authorization: Bearer &lt;key&gt;</code> header.</li>
+              <li>API keys have a name and optional description for auditing.</li>
+              <li>Last-used timestamps help identify unused keys to rotate or revoke.</li>
+              <li>The legend panel shows the total count of active API keys.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section help-full-width" id="h-shortcuts">
           <div class="help-section-icon">⌨</div>
           <div class="help-section-body">
             <h3>Keyboard &amp; Mouse Shortcuts</h3>
@@ -1706,12 +2033,23 @@
             <h4>Adding a clock</h4>
             <ol>
               <li>Click the <b>+</b> button to the left of the main clock in the header.</li>
-              <li>Enter a short label (e.g. <em>Tallinn</em>, <em>Kyiv</em>, <em>Kabul</em>).</li>
-              <li>Select the IANA timezone from the dropdown (supports all world time zones).</li>
-              <li>Click <b>Add</b>. The clock appears immediately to the left of the main clock.</li>
+              <li>Search for a city, country or IANA timezone name (e.g. <em>London</em>, <em>America/New_York</em>).</li>
+              <li>Select from the suggestions and optionally edit the short label.</li>
+              <li>Click <b>Add</b>. The clock appears immediately next to the main clock.</li>
             </ol>
             <h4>Removing a clock</h4>
             <p>Click the <b>×</b> button on the extra clock widget, or go to <b>Settings → Date/Time Format → Additional timezone clocks</b> and click <b>Remove</b>.</p>
+            <h4>Detached clock window</h4>
+            <p>Click the <b>⧉</b> button to open all clocks in a separate floating window. While detached:</p>
+            <ul class="help-list">
+              <li>The main clock area is hidden from the header to save space.</li>
+              <li>The detached window automatically follows the application's current <b>theme</b> (dark, light, camouflage).</li>
+              <li>Switch between <b>digital</b> and <b>analog</b> (round clock face with hour/minute/second hands) modes.</li>
+              <li>Choose a clock style: <b>Standard</b>, <b>Minimal</b> (transparent cards), or <b>Compact</b> (smaller cards).</li>
+              <li>Use the size slider to scale all clocks from XS to XL.</li>
+              <li>Each extra clock has its own <b>×</b> button to remove it directly from the detached window.</li>
+              <li>The detached window dynamically reflects changes to the clock list — no need to reopen it.</li>
+            </ul>
             <p>Additional clocks are saved per user and persist across sessions.</p>
           </div>
         </div>
@@ -1741,6 +2079,120 @@
               <li><b>Timeline Snapshot</b> — Full chronological list.</li>
             </ul>
             <p>Filter by date range and visible layers. Times are formatted according to your language/locale setting. The report opens in a new browser tab for printing or saving.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-settings">
+          <div class="help-section-icon">⚙</div>
+          <div class="help-section-body">
+            <h3>Settings Overview</h3>
+            <p>Open Settings via the <b>☰</b> sidebar button → <b>Settings</b> tab. All preferences are saved per user and take effect immediately.</p>
+            <table class="help-table">
+              <tr><th>Setting</th><th>Description</th></tr>
+              <tr><td><b>Theme</b></td><td>Visual color scheme: Dark, Light, City-Camo (green military), Urban-Camo (blue military)</td></tr>
+              <tr><td><b>Size</b></td><td>Overall UI scale: Small, Normal, Large, Huge — scales fonts and timeline slot heights</td></tr>
+              <tr><td><b>Language</b></td><td>Interface language: English, Swedish (Svenska), French (Français)</td></tr>
+              <tr><td><b>Date format</b></td><td>ISO 8601, UK (DD/MM/YYYY), French, Swedish</td></tr>
+              <tr><td><b>Day hours</b></td><td>Working day start and end — slots outside this range are shown grayed out</td></tr>
+              <tr><td><b>Clock format</b></td><td>Local time with HH:MM:SS, or ZULU/UTC format (HHMMSSz)</td></tr>
+              <tr><td><b>Extra clocks</b></td><td>Additional timezone clocks shown in the header</td></tr>
+              <tr><td><b>Default view</b></td><td>Which date range the timeline opens with (Day, Week, Month, etc.)</td></tr>
+              <tr><td><b>Show out-of-hours</b></td><td>Whether time slots outside the day hours are shown as a grayed area or hidden</td></tr>
+              <tr><td><b>Event icons</b></td><td>Show or hide the emoji type icon on each event block</td></tr>
+              <tr><td><b>Current-time line</b></td><td>Red line at the current time: enable/disable, color, width, style (solid/dashed/dotted), H+N label</td></tr>
+              <tr><td><b>Push notifications</b></td><td>Browser notification permission for alarms and real-time event changes</td></tr>
+              <tr><td><b>Terminology</b></td><td>Rename "Group" to Unit/Team, "Users" to Soldiers/Personnel for different operational contexts</td></tr>
+            </table>
+            <p>Ops Lead and Admin users also have <b>Exercise Settings</b> in the sidebar: set the operation name, STARTEX epoch, ENDEX, day-hours-only counting, and freeze/pause state.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-themes">
+          <div class="help-section-icon">🎨</div>
+          <div class="help-section-body">
+            <h3>Themes &amp; Visual Appearance</h3>
+            <p>Tidslinjal ships with four themes and four size scales:</p>
+            <table class="help-table">
+              <tr><th>Theme</th><th>Best for</th></tr>
+              <tr><td><b>Dark</b></td><td>Default — low-light environments, night operations, tactical operations centres</td></tr>
+              <tr><td><b>Light</b></td><td>Bright office environments, printed screenshots, daylight briefings</td></tr>
+              <tr><td><b>City-Camo</b></td><td>Military field use — green/gray tones matching woodland camouflage patterns</td></tr>
+              <tr><td><b>Urban-Camo</b></td><td>Military field use — blue/gray tones matching urban camouflage patterns</td></tr>
+            </table>
+            <table class="help-table" style="margin-top:8px">
+              <tr><th>Size</th><th>Use case</th></tr>
+              <tr><td><b>Small</b></td><td>High-density screens, compact view with many events visible</td></tr>
+              <tr><td><b>Normal</b></td><td>Default — balanced readability</td></tr>
+              <tr><td><b>Large</b></td><td>Large display screens, touch interfaces</td></tr>
+              <tr><td><b>Huge</b></td><td>Projectors, wall displays, situational awareness screens</td></tr>
+            </table>
+            <p>The <b>detached clock window</b> and <b>detached help window</b> both automatically follow the current application theme.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-backup">
+          <div class="help-section-icon">💾</div>
+          <div class="help-section-body">
+            <h3>Manual Backup &amp; Restore</h3>
+            <p>Admins can download a full ZIP backup and restore from it at any time. Go to the <b>Admin</b> sidebar tab → <b>💾 Backup</b>.</p>
+            <ul class="help-list">
+              <li><b>Download backup</b>: creates a ZIP containing all JSON data files (events, users' preferences, templates, layers, groups, alarms, phases, locks, comments, versions, etc.).</li>
+              <li><b>Restore</b>: upload a previously downloaded ZIP. The server overwrites data files immediately. A restart is recommended for changes to take full effect.</li>
+              <li>For security, restore does <em>not</em> overwrite <code>users.json</code> (passwords), <code>sessions.json</code>, <code>apikeys.json</code>, <code>oidc.json</code>, or <code>mail.json</code>.</li>
+              <li>Uploaded file attachments (in the <code>data/attachments/</code> folder) are <em>not</em> included in the ZIP and must be backed up separately.</li>
+              <li>All backup and restore actions are recorded in the <b>Audit Log</b>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-gradual-backup">
+          <div class="help-section-icon">🔄</div>
+          <div class="help-section-body">
+            <h3>Gradual (Automatic) Backup</h3>
+            <p>The <b>Gradual Backup</b> feature takes rolling automatic snapshots at a configurable interval, making it easy to recover from accidental deletions, resets, or bugs.</p>
+            <ul class="help-list">
+              <li><b>Enabled by default</b> with a 15-minute interval and up to 48 retained snapshots (~12 hours of history).</li>
+              <li>Configure in <b>Settings → Gradual Backup</b> (admin only): toggle on/off, set the interval (5–60 min), and set the maximum number of retained snapshots.</li>
+              <li>Each snapshot is a ZIP file stored in <code>data/snapshots/</code> on the server, named with a timestamp.</li>
+              <li>Use <b>Snapshot now</b> to immediately create a snapshot outside the regular schedule.</li>
+              <li>Browse the list of saved snapshots and click <b>Restore</b> to revert to a specific point in time.</li>
+              <li>Download any snapshot as a ZIP file for offline archival.</li>
+              <li>Old snapshots beyond the <em>max snapshots</em> limit are automatically pruned.</li>
+              <li>All snapshot creation, restoration, and deletion actions are recorded in the Audit Log.</li>
+            </ul>
+            <p><strong>Use cases:</strong> recover from an accidental admin reset, undo a bulk delete, restore a clean state before a new exercise begins, or roll back after a configuration error.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-audit">
+          <div class="help-section-icon">📜</div>
+          <div class="help-section-body">
+            <h3>Audit Log</h3>
+            <p>Tidslinjal records all significant actions in an append-only audit log visible to Team Leads and above.</p>
+            <ul class="help-list">
+              <li>Access via the <b>Audit</b> sidebar tab (requires Team Lead role or higher).</li>
+              <li>Each entry shows: timestamp, user, action type, entity type/ID, and a human-readable summary.</li>
+              <li>Actions logged include: event create/edit/delete, user management, backup/restore, login/logout, template save/apply, lock create/delete, phase changes, and more.</li>
+              <li>The log is capped at 10,000 entries; oldest entries are pruned automatically.</li>
+              <li>Audit data is included in full backup ZIPs.</li>
+              <li>The audit log can be forwarded to a remote syslog server for long-term retention (see Syslog section).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-profile">
+          <div class="help-section-icon">🪪</div>
+          <div class="help-section-body">
+            <h3>User Profile</h3>
+            <p>Each user can maintain a professional profile visible to other team members.</p>
+            <ul class="help-list">
+              <li>Click your username / <b>🔑</b> button in the header to open profile settings.</li>
+              <li>Fields: <b>Display name</b>, job <b>Title</b>, military <b>Rank</b>, <b>Job role</b>, area of <b>Expertise</b>.</li>
+              <li>Communication handles: Mattermost, Discord, Signal, Telephone, Cellular.</li>
+              <li>Upload a <b>profile photo</b> (shown on hover over your name, and in the Users panel).</li>
+              <li><b>WebCal token</b>: generate a personal iCalendar feed URL for subscribing to events in external calendar apps (Outlook, Google Calendar, Apple Calendar).</li>
+              <li>NATO J-staff designations (e.g. J3, J5) are shown as badges and can be assigned by admins.</li>
+            </ul>
           </div>
         </div>
 
@@ -1893,6 +2345,107 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('bulkStatusModal')">Cancel</button>
       <button class="btn btn-primary" onclick="confirmBulkStatus()">Apply Status</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Event Actions Modal (admin, from Tools panel) -->
+<div class="modal-overlay" id="bulkActionsModal" style="z-index:1100">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h2>🔧 Bulk Event Actions</h2>
+      <button class="modal-close" onclick="closeModal('bulkActionsModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:14px">Filter events and apply a bulk action. Use with care — actions cannot be undone.</p>
+
+      <!-- Filter row -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;align-items:flex-end">
+        <div class="form-group" style="margin:0;min-width:140px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Filter by</label>
+          <select id="baFilter" onchange="updateBulkActionUI()" style="width:100%">
+            <option value="all">All events</option>
+            <option value="type">Event Type</option>
+            <option value="user">User (name or ID)</option>
+            <option value="group">Group (name or ID)</option>
+            <option value="role">Role</option>
+            <option value="status">Current Status</option>
+            <option value="layer">Layer (ID)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:150px" id="baValueGroup">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Value</label>
+          <div style="position:relative">
+            <input type="text" id="baValue" placeholder="Value…" autocomplete="off" oninput="updateBulkUserAutocomplete()" style="width:100%">
+            <div id="baMentionDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:200;max-height:180px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+      <div id="baFilterHint" style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px"></div>
+
+      <!-- Time range -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">
+        <div class="form-group" style="margin:0;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">From (start time)</label>
+          <input type="datetime-local" id="baTimeFrom" style="width:100%">
+        </div>
+        <div class="form-group" style="margin:0;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">To (start time)</label>
+          <input type="datetime-local" id="baTimeTo" style="width:100%">
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);align-self:center">Leave blank = no time filter</div>
+      </div>
+
+      <!-- Action tabs -->
+      <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg3)">
+          <button class="ba-tab-btn active" data-tab="status" onclick="switchBulkTab('status',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Set Status</button>
+          <button class="ba-tab-btn" data-tab="type" onclick="switchBulkTab('type',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Change Type</button>
+          <button class="ba-tab-btn" data-tab="delete" onclick="switchBulkTab('delete',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--danger);font-size:var(--fs-sm)">Delete</button>
+        </div>
+
+        <!-- Status pane -->
+        <div id="baPane_status" class="ba-pane" style="padding:12px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">Set all matching events to status</label>
+            <select id="baNewStatus" style="width:100%;margin-top:4px">
+              <option value="planned">Planned</option>
+              <option value="active">Active</option>
+              <option value="responded_to">Responded To</option>
+              <option value="completed">Completed</option>
+              <option value="submitted">Submitted</option>
+              <option value="verified">Verified</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkStatus()">Apply Status</button>
+        </div>
+
+        <!-- Type pane -->
+        <div id="baPane_type" class="ba-pane" style="padding:12px;display:none">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">Change event type of all matching events to</label>
+            <select id="baNewType" style="width:100%;margin-top:4px">
+              <!-- populated dynamically -->
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkType()">Apply Type</button>
+        </div>
+
+        <!-- Delete pane -->
+        <div id="baPane_delete" class="ba-pane" style="padding:12px;display:none">
+          <p style="font-size:var(--fs-sm);color:var(--danger);margin-bottom:10px">⚠ This will permanently delete all matching events. Type <strong>DELETE</strong> to confirm.</p>
+          <input type="text" id="baDeleteConfirm" placeholder="Type DELETE to confirm" style="width:100%;margin-bottom:10px">
+          <button class="btn btn-danger btn-sm" onclick="executeBulkDelete()">🗑 Delete Matching Events</button>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="baResult" style="display:none;margin-top:12px;padding:8px 12px;border-radius:var(--radius);font-size:var(--fs-sm)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('bulkActionsModal')">Close</button>
     </div>
   </div>
 </div>
