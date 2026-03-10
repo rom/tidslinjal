@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -714,6 +715,19 @@ func (s *Store) GetUserByID(id int64) (*User, bool) {
 		return nil, false
 	}
 	return &u, true
+}
+
+// GetAdminPasswordHash returns the bcrypt hash of the "admin" account, used as
+// key material when encrypting/decrypting backup archives.
+func (s *Store) GetAdminPasswordHash() []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.users {
+		if s.users[i].Username == "admin" {
+			return []byte(s.users[i].PasswordHash)
+		}
+	}
+	return nil
 }
 
 // GetUserByUsername is O(n) but username lookups are rare (login only).
@@ -2769,20 +2783,17 @@ func (s *Store) snapshotDir() string {
 	return d
 }
 
-// CreateGradualBackupSnapshot takes an in-memory ZIP of all data JSON files and
-// saves it to the snapshots directory. Returns the filename of the created snapshot.
+// CreateGradualBackupSnapshot takes an in-memory ZIP of all data JSON files,
+// encrypts it with AES-256-GCM using the admin password hash as key material,
+// and saves it to the snapshots directory. Returns the filename of the snapshot.
 func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 	snapDir := s.snapshotDir()
-	filename := fmt.Sprintf("snapshot-%s.zip", time.Now().UTC().Format("2006-01-02T150405"))
+	filename := fmt.Sprintf("snapshot-%s.zip.enc", time.Now().UTC().Format("2006-01-02T150405"))
 	dstPath := filepath.Join(snapDir, filename)
 
-	f, err := os.Create(dstPath)
-	if err != nil {
-		return "", fmt.Errorf("create snapshot file: %w", err)
-	}
-	defer f.Close()
-
-	zw := zip.NewWriter(f)
+	// Build zip in memory
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	files := []string{
 		"event_types.json", "preferences.json", "groups.json",
 		"memberships.json", "layers.json", "events.json", "attachments.json",
@@ -2805,6 +2816,16 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 	if err := zw.Close(); err != nil {
 		return "", err
 	}
+
+	// Encrypt with admin password hash
+	keyMaterial := s.GetAdminPasswordHash()
+	encrypted, err := encryptBackupData(buf.Bytes(), keyMaterial)
+	if err != nil {
+		return "", fmt.Errorf("encrypt snapshot: %w", err)
+	}
+	if err := os.WriteFile(dstPath, encrypted, 0600); err != nil {
+		return "", fmt.Errorf("write snapshot file: %w", err)
+	}
 	return filename, nil
 }
 
@@ -2820,7 +2841,8 @@ func (s *Store) ListGradualBackupSnapshots() ([]GradualBackupSnapshot, error) {
 	}
 	var out []GradualBackupSnapshot
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".zip") {
+		name := e.Name()
+		if e.IsDir() || (!strings.HasSuffix(name, ".zip") && !strings.HasSuffix(name, ".zip.enc")) {
 			continue
 		}
 		fi, err := e.Info()
@@ -2828,7 +2850,7 @@ func (s *Store) ListGradualBackupSnapshots() ([]GradualBackupSnapshot, error) {
 			continue
 		}
 		out = append(out, GradualBackupSnapshot{
-			Filename:  e.Name(),
+			Filename:  name,
 			CreatedAt: fi.ModTime().UTC(),
 			SizeBytes: fi.Size(),
 		})
@@ -2848,11 +2870,22 @@ func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
 		return 0, fmt.Errorf("invalid snapshot filename")
 	}
 	snapPath := filepath.Join(s.snapshotDir(), filename)
-	data, err := os.ReadFile(snapPath)
+	raw, err := os.ReadFile(snapPath)
 	if err != nil {
 		return 0, fmt.Errorf("snapshot not found: %w", err)
 	}
-	zr, err := zip.NewReader(&bytesReaderAt{data}, int64(len(data)))
+
+	// Decrypt if not a plain zip (magic bytes "PK" = unencrypted; anything else = encrypted)
+	if len(raw) < 2 || raw[0] != 0x50 || raw[1] != 0x4B {
+		keyMaterial := s.GetAdminPasswordHash()
+		decrypted, err := decryptBackupData(raw, keyMaterial)
+		if err != nil {
+			return 0, fmt.Errorf("decrypt snapshot: %w", err)
+		}
+		raw = decrypted
+	}
+
+	zr, err := zip.NewReader(&bytesReaderAt{raw}, int64(len(raw)))
 	if err != nil {
 		return 0, fmt.Errorf("invalid zip: %w", err)
 	}
