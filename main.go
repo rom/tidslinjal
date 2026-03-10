@@ -3,7 +3,10 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
@@ -24,6 +27,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // Global logger flags (set in main)
@@ -360,6 +364,39 @@ type App struct {
 	oidcDefaultRole Role        // role assigned to auto-created OIDC users (default: RoleReadWrite)
 	webhookCh       chan webhookJob
 	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
+	authLimiter     *ipRateLimiter
+}
+
+// ipRateLimiter implements a simple per-IP sliding-window rate limiter.
+type ipRateLimiter struct {
+	mu      sync.Mutex
+	buckets map[string]*rateBucket
+}
+
+type rateBucket struct {
+	count   int
+	resetAt time.Time
+}
+
+func newIPRateLimiter() *ipRateLimiter {
+	return &ipRateLimiter{buckets: make(map[string]*rateBucket)}
+}
+
+// allow returns true if the request from ip is within limit per window.
+func (rl *ipRateLimiter) allow(ip string, limit int, window time.Duration) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	b, ok := rl.buckets[ip]
+	if !ok || now.After(b.resetAt) {
+		rl.buckets[ip] = &rateBucket{count: 1, resetAt: now.Add(window)}
+		return true
+	}
+	if b.count >= limit {
+		return false
+	}
+	b.count++
+	return true
 }
 
 // broadcastEventChange sends an SSE notification to all clients about an event change
@@ -412,9 +449,10 @@ func NewApp(dataDir string) (*App, error) {
 		return nil, err
 	}
 	app := &App{
-		store:     store,
-		broker:    NewSSEBroker(),
-		webhookCh: make(chan webhookJob, 256),
+		store:       store,
+		broker:      NewSSEBroker(),
+		webhookCh:   make(chan webhookJob, 256),
+		authLimiter: newIPRateLimiter(),
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
 	for i := 0; i < webhookConcurrency; i++ {
@@ -624,6 +662,10 @@ func pathSegment(r *http.Request, n int) string {
 // ── Auth handlers ──────────────────────────────────────────────────────────────
 
 func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if !app.authLimiter.allow(clientIP(r), 10, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
+		return
+	}
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -872,6 +914,10 @@ func validatePasswordQuality(password string, policy SecuritySettings) error {
 func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
 	rs := app.store.GetRegistrationSettings()
@@ -1431,6 +1477,10 @@ func (app *App) handleUnblockUser(w http.ResponseWriter, r *http.Request, admin 
 func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
 	var req struct {
@@ -4257,6 +4307,11 @@ func (app *App) routes() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		_, user := app.getSession(r)
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
 		http.ServeFile(w, r, "static/index.html")
 	})
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
@@ -6307,12 +6362,72 @@ func (app *App) handleGradualBackupDelete(w http.ResponseWriter, r *http.Request
 
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
-func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
-	// Create a zip archive of all JSON data files
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-backup-%s.zip"`, time.Now().Format("2006-01-02T150405")))
+// encryptBackupData encrypts plaintext using AES-256-GCM with a key derived from
+// keyMaterial (the admin password hash) via PBKDF2-SHA256.
+// Output layout: salt(16) ‖ nonce(12) ‖ AES-GCM ciphertext.
+func encryptBackupData(plaintext, keyMaterial []byte) ([]byte, error) {
+	if len(keyMaterial) == 0 {
+		return nil, fmt.Errorf("no encryption key material available")
+	}
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, err
+	}
+	key := deriveBackupKey(keyMaterial, salt)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize()) // 12 bytes
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+	out := make([]byte, 0, 16+len(nonce)+len(ciphertext))
+	out = append(out, salt...)
+	out = append(out, nonce...)
+	out = append(out, ciphertext...)
+	return out, nil
+}
 
-	zw := zip.NewWriter(w)
+// decryptBackupData reverses encryptBackupData.
+func decryptBackupData(data, keyMaterial []byte) ([]byte, error) {
+	if len(keyMaterial) == 0 {
+		return nil, fmt.Errorf("no encryption key material available")
+	}
+	const saltLen, nonceLen = 16, 12
+	if len(data) < saltLen+nonceLen {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+	key := deriveBackupKey(keyMaterial, data[:saltLen])
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	return gcm.Open(nil, data[saltLen:saltLen+nonceLen], data[saltLen+nonceLen:], nil)
+}
+
+// deriveBackupKey derives a 32-byte AES-256 key from keyMaterial and salt using PBKDF2-SHA256.
+func deriveBackupKey(keyMaterial, salt []byte) []byte {
+	return pbkdf2.Key(keyMaterial, salt, 100_000, 32, sha256.New)
+}
+
+func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
+	// Create a zip archive of all JSON data files, then encrypt it.
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-backup-%s.zip.enc"`, time.Now().Format("2006-01-02T150405")))
+
+	// Build zip in memory
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
 	dataDir := app.store.DataDir()
 	files := []string{
 		"event_types.json", "users.json", "preferences.json", "groups.json",
@@ -6335,10 +6450,19 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		fw.Write(data) //nolint
 	}
 	zw.Close() //nolint
+
+	// Encrypt with admin password hash as key material
+	keyMaterial := app.store.GetAdminPasswordHash()
+	encrypted, err := encryptBackupData(buf.Bytes(), keyMaterial)
+	if err != nil {
+		jsonError(w, "failed to encrypt backup", http.StatusInternalServerError)
+		return
+	}
+	w.Write(encrypted) //nolint
 	app.store.LogAudit(AuditEntry{ //nolint
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "backup", EntityType: "system", EntityID: 0,
-		Summary: "Admin downloaded data backup",
+		Summary: "Admin downloaded encrypted data backup",
 	})
 }
 
@@ -6355,14 +6479,26 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 	}
 	defer file.Close()
 
-	// Read the entire zip into memory to get its size
+	// Read the entire file into memory
 	buf := new(bytes.Buffer)
-	size, err := io.Copy(buf, file)
-	if err != nil {
+	if _, err := io.Copy(buf, file); err != nil {
 		jsonError(w, "failed to read backup", http.StatusInternalServerError)
 		return
 	}
-	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), size)
+	raw := buf.Bytes()
+
+	// Detect encrypted backups (magic bytes "PK" = plain zip; anything else = encrypted)
+	if len(raw) < 2 || raw[0] != 0x50 || raw[1] != 0x4B {
+		keyMaterial := app.store.GetAdminPasswordHash()
+		decrypted, err := decryptBackupData(raw, keyMaterial)
+		if err != nil {
+			jsonError(w, "failed to decrypt backup — wrong admin password or corrupt file", http.StatusBadRequest)
+			return
+		}
+		raw = decrypted
+	}
+
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
 	if err != nil {
 		jsonError(w, "invalid zip file", http.StatusBadRequest)
 		return
@@ -6628,6 +6764,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   app.secureMode,
 		MaxAge:   300, // 5 minutes
 		SameSite: http.SameSiteLaxMode,
 	})
