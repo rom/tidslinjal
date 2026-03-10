@@ -1,8 +1,8 @@
 # Example Templates for Tidslinjal
 
-This directory contains **16 ready-made templates** for the Tidslinjal collaborative timeline tool:
-- **10 exercise templates** (`ex01`–`ex10`): military and civilian exercise planning, from 1-day QRF to 5-day NATO coalition exercises
-- **6 incident response templates** (`inc01`–`inc06`): real-world cybersecurity and physical disaster response plans
+This directory contains **31 ready-made templates** for the Tidslinjal collaborative timeline tool:
+- **20 exercise templates** (`ex01`–`ex20`): military and civilian exercise planning, from 1-day QRF to 5-day NATO coalition exercises
+- **11 incident response templates** (`inc01`–`inc11`): real-world cybersecurity and physical disaster response plans
 
 ---
 
@@ -35,10 +35,20 @@ You can import multiple templates at once by selecting multiple files.
 | 08 | `ex08-crisis-management-3day-hours.json` | 3 days | 0800–1800 | Multi-agency | Civil crisis response |
 | 09 | `ex09-nato-integration-5day-24h.json` | 5 days | Around the clock (D1–D4) + working hours D5 | Coalition | Multinational operations |
 | 10 | `ex10-full-spectrum-warfare-5day.json` | 5 days | Working hours D1–D2, 24h D3–D4, working hours D5 | Mixed | Full spectrum, all phases |
+| 11 | `ex11-border-security-operation-2day.json` | 2 days | Around the clock | Joint agency | Border interdiction, customs |
+| 12 | `ex12-maritime-patrol-3day.json` | 3 days | Around the clock | Maritime | Patrol, boarding, SAR |
+| 13 | `ex13-civil-military-cooperation-4day.json` | 4 days | 0800–2000 | Multi-agency | CIMIC, flood response |
+| 14 | `ex14-logistics-sustainment-5day.json` | 5 days | 0700–1900 | Military | Supply chain, MEDEVAC |
+| 15 | `ex15-hostage-rescue-operation-1day.json` | 1 day | 0600–2000 | Special ops | HRO, assault, exploitation |
+| 16 | `ex16-nbc-cbrn-response-2day.json` | 2 days | Around the clock | Multi-agency | CBRN detection, decon, MASSCAS |
+| 17 | `ex17-information-operations-3day.json` | 3 days | 0800–1800 | Info Ops | Counter-disinfo, PSYOPS, media ops |
+| 18 | `ex18-air-defence-exercise-2day.json` | 2 days | Around the clock | Military | SAM batteries, radar, engagement |
+| 19 | `ex19-peacekeeping-stabilisation-5day.json` | 5 days | 0700–1900 | UN/Multinational | Peacekeeping, CIMIC, ROE |
+| 20 | `ex20-electronic-warfare-3day.json` | 3 days | Around the clock | Military | SIGINT, jamming, spectrum management |
 
 ## Incident Response Template Overview
 
-All incident response templates set **operation mode = "incident"**, `group_label = "team"`, and `user_label = "personnel"` automatically when applied. They include alarms for critical events.
+All incident response templates set **operation mode = "incident"** automatically when applied. They include alarms for critical events.
 
 | # | File | Duration | Scenario | Key stakeholders |
 |---|------|----------|----------|-----------------|
@@ -48,6 +58,11 @@ All incident response templates set **operation mode = "incident"**, `group_labe
 | INC-04 | `inc04-ransomware-2week.json` | 2 weeks | Ransomware attack | CIRT, Legal, Insurance, Law Enforcement |
 | INC-05 | `inc05-wiper-attack-4week.json` | 4 weeks | Destructive wiper malware | CIRT, Board, Government, Insurance |
 | INC-06 | `inc06-datacenter-fire-12week.json` | 12 weeks | Datacenter fire / physical disaster | IT, Facilities, Insurance, Legal, PR |
+| INC-07 | `inc07-supply-chain-attack-3week.json` | 3 weeks | Software supply chain compromise | SOC, Forensics, IT, Legal, Management |
+| INC-08 | `inc08-insider-threat-2week.json` | 2 weeks | Insider threat / data exfiltration | SOC/DLP, Forensics, HR, Legal |
+| INC-09 | `inc09-phishing-campaign-1week.json` | 1 week | Targeted phishing / BEC | SOC, IT/M365, Finance, Legal |
+| INC-10 | `inc10-ot-ics-attack-10day.json` | 10 days | OT/ICS / SCADA cyber attack | IT Sec, OT Engineering, National CERT |
+| INC-11 | `inc11-cloud-breach-5day.json` | 5 days | Cloud infrastructure breach | Cloud/DevOps, SOC, Legal |
 
 ---
 
@@ -321,7 +336,7 @@ Templates include **locked time slots** for:
 These locks appear as blocked/hatched slots on the timeline and prevent new events being dropped into them.
 
 ### 6. Progression of Complexity
-The 10 templates follow a deliberate learning progression:
+The core exercise templates (EX-01 through EX-10) follow a deliberate learning progression:
 ```
 EX-01  →  Simple, 1-day, single location
 EX-02  →  1-day, adversarial (red/blue) structure
@@ -333,6 +348,20 @@ EX-07  →  3-day, mixed hours, military
 EX-08  →  3-day, working hours, multi-agency
 EX-09  →  5-day, 24/7 coalition, complex
 EX-10  →  5-day, variable intensity, full spectrum
+```
+
+Templates EX-11 through EX-20 cover **specialist domains**:
+```
+EX-11  →  Border security & interdiction
+EX-12  →  Maritime patrol & SAR
+EX-13  →  Civil-military cooperation (CIMIC)
+EX-14  →  Logistics & sustainment
+EX-15  →  Special operations / hostage rescue
+EX-16  →  CBRN / NBC response
+EX-17  →  Information operations & counter-disinformation
+EX-18  →  Air defence (GBAD)
+EX-19  →  UN peacekeeping & stabilisation
+EX-20  →  Electronic warfare & spectrum management
 ```
 
 ### 7. Same-vs-Different Locations (EX-03/05 and EX-04/06)

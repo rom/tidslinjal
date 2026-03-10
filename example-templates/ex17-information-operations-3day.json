@@ -1,0 +1,189 @@
+{
+  "name": "EX-17 Information Operations — 3 Days",
+  "description": "3-day Information Operations (Info Ops) exercise covering counter-disinformation, PSYOPS, media operations, and cyber influence activities. Working-hours schedule (0800–1800). Participants practice coordinating narrative development, counter-narrative deployment, social media monitoring, and strategic communications across a simulated complex information environment. Suitable for Info Ops staff, public affairs, and strategic communications exercises.",
+  "exercise_name": "EX-17 Information Operations",
+  "day_start_hour": 8,
+  "day_end_hour": 18,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "INITEX & Situation Analysis",
+      "color": "#8E44AD",
+      "start_offset_min": 0,
+      "end_offset_min": 300,
+      "order": 0
+    },
+    {
+      "name": "Counter-Narrative Development",
+      "color": "#3498DB",
+      "start_offset_min": 300,
+      "end_offset_min": 1200,
+      "order": 1
+    },
+    {
+      "name": "Active Information Operations",
+      "color": "#E74C3C",
+      "start_offset_min": 1200,
+      "end_offset_min": 2400,
+      "order": 2
+    },
+    {
+      "name": "Assessment & Adaptation",
+      "color": "#27AE60",
+      "start_offset_min": 2400,
+      "end_offset_min": 3300,
+      "order": 3
+    },
+    {
+      "name": "ENDEX & Debrief",
+      "color": "#95A5A6",
+      "start_offset_min": 3300,
+      "end_offset_min": 3600,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "Info Ops Planning Cell",
+      "description": "Information Operations planning and coordination"
+    },
+    {
+      "name": "Media Operations",
+      "description": "Public affairs and media engagement"
+    },
+    {
+      "name": "OSINT & Monitoring",
+      "description": "Open source intelligence and social media monitoring"
+    },
+    {
+      "name": "PSYOPS Cell",
+      "description": "Psychological Operations — message development and delivery"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Info Ops",
+      "description": "Information Operations planning layer",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Media Ops",
+      "description": "Media operations and public affairs",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "OSINT",
+      "description": "Intelligence and monitoring layer",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "PSYOPS",
+      "description": "PSYOPS activities layer",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "INJECT: Disinformation Campaign Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "EXERCISE INJECT: OSINT monitoring detects coordinated inauthentic behaviour on social media platforms: 3,400 bot accounts amplifying false narrative about friendly force activities. Narrative: fabricated atrocity claims. Source analysis indicates state-sponsored activity. Info Ops Commander briefed. T=0.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Information Environment Assessment",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "Info Ops Cell conducts rapid Information Environment Assessment: identifies key audiences, influencers, vulnerable populations, trusted voices, platform reach. OSINT cell maps bot network and identifies coordinating infrastructure. Assessment products distributed to all cells.",
+      "start_offset_min": 60,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Counter-Narrative Product Development",
+      "event_type": "activity",
+      "color": "#3498DB",
+      "description": "Info Ops and Media Ops develop counter-narrative messaging package: video evidence rebuttal, factual narrative, graphic products, spokesperson Q&A preparation. Legal review of all products. Tone calibrated to target audience. Multi-language versions prepared.",
+      "start_offset_min": 300,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Platform Takedown Requests",
+      "event_type": "assigned_task",
+      "color": "#8E44AD",
+      "description": "OSINT cell submits coordinated inauthentic behaviour reports to social media platforms (Twitter/X, Facebook, TikTok). Evidence package submitted: bot network connections, coordinated posting patterns, false narrative examples. Platform trust and safety teams notified via expedited government channel.",
+      "start_offset_min": 600,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Press Conference — Factual Rebuttal",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Official spokesperson delivers factual rebuttal at press conference. Video evidence presented. Journalists Q&A managed. Messaging reinforces core counter-narrative. Live-streamed on official channels. Social media team amplifies through verified accounts.",
+      "start_offset_min": 1200,
+      "duration_min": 60,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "PSYOPS — Leaflet & Social Media Campaign",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "PSYOPS cell executes approved influence campaign: targeted social media content reaching key demographics, radio broadcast in disputed area, leaflet design (subject to approval for airdrop). Messages designed to reinforce friendly credibility and expose adversary deception.",
+      "start_offset_min": 1440,
+      "duration_min": 960,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Narrative Impact Assessment",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "OSINT cell provides 24-hour narrative impact assessment: reach metrics, sentiment analysis, counter-narrative pickup by trusted media outlets, bot network activity (reduced by 67% following platform takedowns), key audience polling data. Assessment: positive trend. Adjust messaging for Day 3.",
+      "start_offset_min": 2400,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Adversary Escalation — Deepfake Released",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Adversary releases AI-generated deepfake video showing friendly force commander making false statements. Video spreading rapidly. Info Ops Commander activates rapid response protocol: authentication team analyses video, platforms notified simultaneously, spokesperson statement drafted for 15-minute release.",
+      "start_offset_min": 2880,
+      "duration_min": 60,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#95A5A6",
+      "description": "ENDEX declared. All active information operations stood down. Exercise scenario terminated. Final information environment assessment compiled.",
+      "start_offset_min": 3300,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Info Ops AAR",
+      "event_type": "physical_meeting",
+      "color": "#95A5A6",
+      "description": "Exercise AAR. Topics: detection speed, counter-narrative effectiveness, platform coordination, PSYOPS product quality, deepfake response, inter-cell coordination, legal compliance. Lessons: attribution confidence needed before public rebuttal, deepfake authentication toolset required, platform response time SLAs.",
+      "start_offset_min": 3330,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    }
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "name": "EX-15 Hostage Rescue Operation — 1 Day",
+  "description": "Single-day special operations exercise focused on hostage rescue. Covers intelligence preparation, assault team rehearsal, command and control during the operation, medical support, and post-mission exploitation. 0600–2000 working schedule. Suitable for special operations units, CT teams, and joint special operations task force (JSOTF) command post exercises.",
+  "exercise_name": "EX-15 Hostage Rescue Operation",
+  "day_start_hour": 6,
+  "day_end_hour": 20,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Intelligence & Planning",
+      "color": "#8E44AD",
+      "start_offset_min": 0,
+      "end_offset_min": 240,
+      "order": 0
+    },
+    {
+      "name": "Rehearsals & Staging",
+      "color": "#F39C12",
+      "start_offset_min": 240,
+      "end_offset_min": 480,
+      "order": 1
+    },
+    {
+      "name": "Execution",
+      "color": "#E74C3C",
+      "start_offset_min": 480,
+      "end_offset_min": 600,
+      "order": 2
+    },
+    {
+      "name": "Exploitation & Extraction",
+      "color": "#E67E22",
+      "start_offset_min": 600,
+      "end_offset_min": 720,
+      "order": 3
+    },
+    {
+      "name": "ENDEX & Debrief",
+      "color": "#3498DB",
+      "start_offset_min": 720,
+      "end_offset_min": 840,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "Assault Team",
+      "description": "Primary assault element"
+    },
+    {
+      "name": "Support Element",
+      "description": "Outer cordon, overwatch, and security"
+    },
+    {
+      "name": "Intelligence Cell",
+      "description": "Intelligence and targeting support"
+    },
+    {
+      "name": "JSOTF Command",
+      "description": "Joint Special Operations Task Force HQ"
+    },
+    {
+      "name": "Medical",
+      "description": "Combat medical team and CASEVAC"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Assault Ops",
+      "description": "Assault team actions",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Support Ops",
+      "description": "Support and cordon operations",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Intelligence",
+      "description": "Intelligence support layer",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Command",
+      "description": "JSOTF command layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "Intelligence Briefing — Objective Brief",
+      "event_type": "physical_meeting",
+      "color": "#8E44AD",
+      "description": "Intelligence officer presents full objective brief: building layout, guard positions, estimated number of personnel, time windows of reduced activity, routes in/out, identified command and control nodes, hostage location estimate, communications frequencies. All team leaders present.",
+      "start_offset_min": 0,
+      "duration_min": 60,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Operations Order",
+      "event_type": "physical_meeting",
+      "color": "#F39C12",
+      "description": "Assault Team commander issues OPORD. Full mission briefing covering: situation, mission, execution (assault sequence, support positions, actions on), service support (CASEVAC plan, ammo states), command and signals. Questions and confirmatory brief from all team leaders.",
+      "start_offset_min": 90,
+      "duration_min": 60,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Rehearsals on Replica Objective",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Full team rehearsals on replica objective layout. Walk-through at slow speed, run-through at full speed. Actions on: compromise, CASEVAC, hostage incapacitated, loss of comms. All roles confirmed and muscle-memory established. JSOTF observes rehearsal.",
+      "start_offset_min": 240,
+      "duration_min": 180,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Go/No-Go Decision",
+      "event_type": "decision",
+      "color": "#E74C3C",
+      "description": "JSOTF commander conducts Go/No-Go review. Checks: weather (ceiling and visibility for aviation), team readiness, intelligence confirmation (last-minute ISR pass), communications, medical team ready. Decision: GO. H-Hour confirmed.",
+      "start_offset_min": 450,
+      "duration_min": 30,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Infiltration to Objective",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Assault team and support element depart staging area. Movement to objective via designated infiltration route. Comms check at release point. Support element moves to overwatch positions. Assault team at breach point on schedule.",
+      "start_offset_min": 480,
+      "duration_min": 45,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Assault — Breach & Clear",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Assault team executes breach at H-Hour. Simultaneous entry on multiple points. Objective cleared room by room. Hostage located in designated room — confirmed alive. Guards neutralised (simulated). Objective declared secure. CASEVAC position: no casualties (exercise scenario). Exploitation team moves in.",
+      "start_offset_min": 525,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Site Exploitation",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Exploitation team documents objective: photographs, document collection, electronics seized. Detainees processed (simulated). Time-on-objective: 15 minutes maximum per plan. JSOTF monitors via ISR feed. Exfiltration authorised.",
+      "start_offset_min": 600,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Extraction & Exfil",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Assault and support elements extract via exfil route. Hostage transported to designated reception point. Full team accountability at extraction LZ. Helicopter extract or vehicle extract per plan.",
+      "start_offset_min": 630,
+      "duration_min": 30,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ENDEX & Immediate Debrief",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "ENDEX. Full mission debrief within 1 hour of return. Topics: execution vs plan, decision points, individual and team performance, lessons identified. After Action Review with JSOTF, intelligence, and medical. Recommendations for improved TTPs documented.",
+      "start_offset_min": 720,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    }
+  ]
+}

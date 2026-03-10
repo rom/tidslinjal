@@ -1,0 +1,189 @@
+{
+  "name": "EX-16 CBRN / NBC Response — 2 Days",
+  "description": "48-hour Chemical, Biological, Radiological, Nuclear (CBRN) response exercise covering detection of a suspected chemical agent release, decontamination operations, medical mass casualty management, and consequence management coordination. Suitable for CBRN response units, fire brigade HazMat teams, military NBC units, and multi-agency emergency management exercises.",
+  "exercise_name": "EX-16 CBRN Response",
+  "day_start_hour": 0,
+  "day_end_hour": 24,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Alert & Activation",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 120,
+      "order": 0
+    },
+    {
+      "name": "Detection & Recon",
+      "color": "#E67E22",
+      "start_offset_min": 120,
+      "end_offset_min": 480,
+      "order": 1
+    },
+    {
+      "name": "Decontamination Operations",
+      "color": "#F39C12",
+      "start_offset_min": 480,
+      "end_offset_min": 1440,
+      "order": 2
+    },
+    {
+      "name": "Consequence Management",
+      "color": "#8E44AD",
+      "start_offset_min": 1440,
+      "end_offset_min": 2880,
+      "order": 3
+    },
+    {
+      "name": "ENDEX & AAR",
+      "color": "#3498DB",
+      "start_offset_min": 2880,
+      "end_offset_min": 3000,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "CBRN Recon Team",
+      "description": "CBRN reconnaissance and detection specialists"
+    },
+    {
+      "name": "Decontamination Team",
+      "description": "Decontamination operations team"
+    },
+    {
+      "name": "Medical / MASSCAS",
+      "description": "Mass casualty medical team"
+    },
+    {
+      "name": "Incident Command",
+      "description": "Joint CBRN Incident Command Post"
+    }
+  ],
+  "layers": [
+    {
+      "name": "CBRN Recon",
+      "description": "Reconnaissance and detection",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Decontamination",
+      "description": "Decontamination operations",
+      "color": "#F39C12",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Medical",
+      "description": "Mass casualty medical management",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2]
+    },
+    {
+      "name": "Command",
+      "description": "Incident command coordination",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [3]
+    }
+  ],
+  "items": [
+    {
+      "title": "INJECT: Suspected Chemical Release — Public Space",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "EXERCISE INJECT: Multiple 999/112 calls reporting people collapsing with symptoms consistent with nerve agent exposure at central railway station. First responders (police, ambulance) on scene report suspected chemical smell. Station evacuating. CBRN incident declared. Incident Commander assumes control.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Exclusion Zone Established",
+      "event_type": "assigned_task",
+      "color": "#E74C3C",
+      "description": "Police and fire establish 3-zone CBRN cordon: hot (200m), warm (400m), cold zone. Public evacuation underway. Media exclusion enforced. Traffic management activated. All first responders outside hot zone until CBRN team arrives and clears for entry in PPE.",
+      "start_offset_min": 15,
+      "duration_min": 45,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "CBRN Recon — Hot Zone Entry",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "CBRN Recon team (Level A PPE) enters hot zone. Detection equipment activated: multi-gas monitor, CAM (chemical agent monitor), radiation pager, biological collection swabs. Initial readings: positive for organophosphate compound on CAM. Samples collected for laboratory confirmation.",
+      "start_offset_min": 120,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Agent Identification — Nerve Agent Confirmed",
+      "event_type": "instant",
+      "color": "#C0392B",
+      "description": "Field test kit confirms organophosphate nerve agent (Sarin-type) present at station. National CBRN authority notified. Military CBRN assets requested. Antidote (atropine/pralidoxime) stockpile mobilised. Public health authority activated. Government crisis committee briefed.",
+      "start_offset_min": 240,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Mass Decontamination — Dry & Wet",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Decontamination Team deploys mass decontamination corridor in warm zone. Dry decon (clothing removal) followed by wet decon (shower). Capacity: 200 persons/hour. Priority: symptomatic casualties first. Ambulatory then non-ambulatory. Contaminated clothing bagged and secured. 340 persons decontaminated over 6 hours.",
+      "start_offset_min": 480,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "MASSCAS — Triage & Treatment",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Medical team manages mass casualties. Triage: T1 (immediate) 12 casualties — antidote administered. T2 (delayed) 34 casualties — observation and symptomatic treatment. T3 (minor) 78 casualties — decon and discharge. T4 (expectant) 2 casualties. Regional hospitals notified and surge capacity activated.",
+      "start_offset_min": 120,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Government Press Conference",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Government spokesperson and Incident Commander hold press conference. Key messages: situation under control, decontamination ongoing, no further risk to public, investigation underway, public advised to stay clear of area. Questions from media managed.",
+      "start_offset_min": 720,
+      "duration_min": 30,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Station Decontamination — Technical",
+      "event_type": "activity",
+      "color": "#F39C12",
+      "description": "Specialist decontamination of railway station surfaces, ventilation system, and platforms. High-pressure water and decontamination agents applied. Multiple passes. Air sampling confirms reduction below dangerous levels after 18 hours. Surfaces swabbed for confirmation.",
+      "start_offset_min": 1440,
+      "duration_min": 1440,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#3498DB",
+      "description": "ENDEX declared. Exercise scenario terminated. All teams stand down. Equipment decontaminated and secured. PPE removed under supervision. Personnel accountability completed.",
+      "start_offset_min": 2880,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Multi-Agency CBRN AAR",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Full AAR: CBRN detection and identification speed, decontamination throughput and quality, mass casualty management, command and control, public communications. Cross-agency lessons identified. Doctrine and training gaps documented.",
+      "start_offset_min": 2910,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    }
+  ]
+}

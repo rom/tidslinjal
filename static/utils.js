@@ -295,6 +295,104 @@ function removeExtraClock(id) {
   if (typeof renderSidebar === 'function') renderSidebar();
 }
 
+// ── Detachable clock window ──────────────────────────────────────────────────
+let _clockPopout = null;
+
+function detachClock() {
+  // If a popout is already open and not closed, focus it
+  if (_clockPopout && !_clockPopout.closed) {
+    _clockPopout.focus();
+    return;
+  }
+  const extraClocks = (state.preferences && state.preferences.extra_clocks) || [];
+  const isUTC = _clockUTC;
+  const theme = (state.preferences && state.preferences.theme) || 'dark';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Clocks</title>
+<style>
+  :root {
+    --bg: ${theme === 'light' ? '#f0f2f5' : '#1a1d23'};
+    --bg2: ${theme === 'light' ? '#ffffff' : '#22262e'};
+    --text: ${theme === 'light' ? '#1a1d23' : '#e8eaf0'};
+    --accent: #4a9eff;
+    --border: ${theme === 'light' ? '#d0d4de' : '#2e3340'};
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; gap: 20px; padding: 24px; }
+  .clock-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 36px; text-align: center; min-width: 220px; }
+  .clock-label { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: .08em;
+    text-transform: uppercase; margin-bottom: 6px; }
+  .clock-time { font-size: 48px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+  .clock-date { font-size: 13px; color: #888; margin-top: 4px; }
+  .clock-tz { font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 2px; }
+  h1 { font-size: 14px; color: #888; letter-spacing: .1em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<h1>Tidslinjal Clocks</h1>
+<div class="clock-card" id="main-clock">
+  <div class="clock-label" id="main-label">${isUTC ? 'UTC/Z' : 'Local Time'}</div>
+  <div class="clock-time" id="main-time">--:--:--</div>
+  <div class="clock-date" id="main-date"></div>
+  <div class="clock-tz" id="main-tz"></div>
+</div>
+${extraClocks.map(ec => `
+<div class="clock-card">
+  <div class="clock-label">${ec.label || ec.timezone}</div>
+  <div class="clock-time" id="ec-${ec.id}-time">--:--:--</div>
+  <div class="clock-tz" id="ec-${ec.id}-tz"></div>
+</div>`).join('')}
+<script>
+const isUTC = ${JSON.stringify(isUTC)};
+const extraClocks = ${JSON.stringify(extraClocks)};
+function pad(n) { return String(n).padStart(2,'0'); }
+function tick() {
+  const now = new Date();
+  let timeStr, dateStr, tzLabel;
+  if (isUTC) {
+    const h = now.getUTCHours(), m = now.getUTCMinutes(), s = now.getUTCSeconds();
+    timeStr = pad(h)+pad(m)+pad(s)+'Z';
+    dateStr = now.toLocaleDateString(undefined, {weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+    tzLabel = 'UTC/Z';
+  } else {
+    timeStr = pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+    dateStr = now.toLocaleDateString(undefined, {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    try { tzLabel = now.toLocaleTimeString(undefined,{timeZoneName:'short'}).split(' ').pop(); } catch { tzLabel=''; }
+  }
+  document.getElementById('main-time').textContent = timeStr;
+  document.getElementById('main-date').textContent = dateStr;
+  document.getElementById('main-tz').textContent = tzLabel;
+  extraClocks.forEach(ec => {
+    try {
+      const t = document.getElementById('ec-'+ec.id+'-time');
+      const z = document.getElementById('ec-'+ec.id+'-tz');
+      if (t) t.textContent = now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:ec.timezone});
+      if (z) z.textContent = now.toLocaleTimeString('en-GB',{timeZoneName:'short',timeZone:ec.timezone}).split(' ').pop()||ec.timezone;
+    } catch(e) { const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent='??:??:??'; }
+  });
+}
+tick();
+setInterval(tick, 1000);
+<\/script>
+</body>
+</html>`;
+
+  _clockPopout = window.open('', 'tidslinjal-clocks',
+    'width=320,height=' + Math.max(280, 200 + extraClocks.length * 140) + ',resizable=yes,scrollbars=yes');
+  if (_clockPopout) {
+    _clockPopout.document.open();
+    _clockPopout.document.write(html);
+    _clockPopout.document.close();
+  }
+}
+
 // City → IANA timezone hint table (supplement to IANA search)
 const _TZ_CITY_MAP = [
   ['London','Europe/London'],['Paris','Europe/Paris'],['Berlin','Europe/Berlin'],

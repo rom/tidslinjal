@@ -1,0 +1,203 @@
+{
+  "name": "INC-08 Insider Threat — Data Exfiltration — 2 Weeks",
+  "description": "14-day incident response for a suspected insider data exfiltration case where a departing employee is believed to have copied sensitive intellectual property to personal cloud storage and USB devices. Covers HR-triggered alert, DLP investigation, digital forensics, HR/Legal process, law enforcement notification, and data recovery efforts. Suitable for SOC, Forensics, HR, Legal, and Management teams.",
+  "operation_mode": "incident",
+  "day_start_hour": 8,
+  "day_end_hour": 18,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Alert & Initial Assessment",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 480,
+      "order": 0
+    },
+    {
+      "name": "Covert Investigation",
+      "color": "#8E44AD",
+      "start_offset_min": 480,
+      "end_offset_min": 4800,
+      "order": 1
+    },
+    {
+      "name": "Evidence Preservation",
+      "color": "#E67E22",
+      "start_offset_min": 4800,
+      "end_offset_min": 7200,
+      "order": 2
+    },
+    {
+      "name": "HR & Legal Action",
+      "color": "#C0392B",
+      "start_offset_min": 7200,
+      "end_offset_min": 12960,
+      "order": 3
+    },
+    {
+      "name": "Remediation & Controls",
+      "color": "#27AE60",
+      "start_offset_min": 12960,
+      "end_offset_min": 20160,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "SOC / DLP Team",
+      "description": "Security Operations — DLP alert investigation"
+    },
+    {
+      "name": "Forensics Team",
+      "description": "Digital forensics and evidence collection"
+    },
+    {
+      "name": "HR",
+      "description": "Human Resources — disciplinary process"
+    },
+    {
+      "name": "Legal",
+      "description": "Legal counsel — employment law, IP protection"
+    },
+    {
+      "name": "Management",
+      "description": "Executive oversight and decisions"
+    }
+  ],
+  "layers": [
+    {
+      "name": "SOC & DLP",
+      "description": "DLP and security monitoring layer",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Forensics",
+      "description": "Forensic investigation layer",
+      "color": "#8E44AD",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "HR & Legal",
+      "description": "HR and Legal process layer",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [2, 3, 4]
+    }
+  ],
+  "items": [
+    {
+      "title": "DLP Alert — Mass File Copy Detected",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "Microsoft Purview DLP triggers high-severity alert: employee (subject) copied 14 GB of files from internal SharePoint and OneDrive to a personal Google Drive account. Files classified as Confidential — R&D and Commercial. Employee is in notice period (resignation submitted 10 days ago). T=0 established.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Confidential Briefing — HR and Legal",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "SOC Lead briefs CISO, HR Director, and Legal in person (no email — preserve confidentiality). Topics: DLP alert details, scope of data copied, subject's access rights, employment status, confidentiality obligations, decision on covert vs overt investigation. Legal advises on employment law constraints. Decision: proceed with covert forensic investigation before confronting subject.",
+      "start_offset_min": 60,
+      "duration_min": 90,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "USB Device Audit — Subject's Workstation",
+      "event_type": "assigned_task",
+      "color": "#8E44AD",
+      "description": "Forensics Team remotely pulls USB connection history from subject's workstation (without alerting subject) via SCCM agent. Registry analysis reveals 3 USB mass storage devices connected in the past 30 days, two of which are not corporate-issued devices. Serial numbers recorded for tracking.",
+      "start_offset_min": 240,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Cloud Access Log Analysis",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "SOC Team analyses Azure AD sign-in logs, M365 audit logs, and CASB (Defender for Cloud Apps) records for subject over past 90 days. Identifies pattern of large file downloads outside business hours, Google Drive OAuth token creation, and email forwarding rule created to personal Gmail address.",
+      "start_offset_min": 480,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Network Traffic Analysis",
+      "event_type": "activity",
+      "color": "#8E44AD",
+      "description": "SOC Team reviews proxy/firewall logs for subject's workstation. Large HTTPS uploads to google.com/drive domains confirmed. Total estimated exfiltration: 18.3 GB over 3 weeks. No evidence of data sent to competitors. All transfers completed via corporate network during working hours.",
+      "start_offset_min": 960,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Covert Workstation Imaging",
+      "event_type": "assigned_task",
+      "color": "#8E44AD",
+      "description": "Forensics Team performs covert after-hours acquisition of subject's workstation. Memory dump captured (RAM forensics). Full disk image created using FTK Imager via bootable USB. Evidence bags sealed, chain of custody documented. Subject's workstation returned to desk before next business day. Image analysis begins on isolated forensic system.",
+      "start_offset_min": 4800,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Evidence Review — Legal Privilege Assessment",
+      "event_type": "physical_meeting",
+      "color": "#7F8C8D",
+      "description": "Legal reviews forensic findings for admissibility and employment law compliance. Assessment covers: proportionality of investigation, data protection obligations when monitoring employees, evidence handling for potential tribunal proceedings. Legal advises on confrontation procedure and termination process.",
+      "start_offset_min": 7200,
+      "duration_min": 120,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Subject Confrontation & Suspension",
+      "event_type": "decision",
+      "color": "#C0392B",
+      "description": "HR Director and line manager conduct formal confrontation meeting with subject (Legal present remotely). Subject presented with evidence summary. Subject denies knowledge. HR immediately suspends subject with pay pending investigation. IT revokes all access credentials, recalls corporate assets. Subject escorted from premises.",
+      "start_offset_min": 9600,
+      "duration_min": 60,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Law Enforcement Notification",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Legal submits report to national police cybercrime unit and notifies relevant intellectual property authority. Report includes: evidence summary, estimated IP value of exfiltrated data, timeline, forensic findings. Legal advises Management on civil injunction options to prevent further dissemination.",
+      "start_offset_min": 10080,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Data Recovery — Google Drive Legal Notice",
+      "event_type": "assigned_task",
+      "color": "#27AE60",
+      "description": "Legal issues formal legal notice to subject demanding deletion of all company data from personal cloud storage and devices. Legal also begins process for preservation order via courts to prevent destruction of evidence. Subject's legal representative acknowledges receipt.",
+      "start_offset_min": 12960,
+      "duration_min": 480,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Access Control Review — R&D Assets",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "IT Operations and SOC review access control lists for all R&D SharePoint sites, OneDrive, and development repositories. Principle of least privilege review identifies 47 users with excessive permissions. Access rightsized. Enhanced DLP policies applied to R&D classified data. USB restrictions enforced via Group Policy.",
+      "start_offset_min": 14400,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Post-Incident Report & Process Review",
+      "event_type": "reporting",
+      "color": "#1ABC9C",
+      "description": "Incident Commander submits Post-Incident Report to Board. Lessons learned: inadequate offboarding process (access not revoked on resignation), DLP policy gaps, no behavioural anomaly detection. Recommendations: immediate access revocation on notice, enhanced DLP classification, UEBA deployment, leavers process overhaul.",
+      "start_offset_min": 20160,
+      "duration_min": 0,
+      "alarm_lead_time": 120
+    }
+  ]
+}

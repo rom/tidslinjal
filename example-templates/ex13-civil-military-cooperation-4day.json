@@ -1,0 +1,184 @@
+{
+  "name": "EX-13 Civil-Military Cooperation — 4 Days",
+  "description": "4-day CIMIC (Civil-Military Cooperation) exercise covering the coordination between military forces and civilian authorities during a complex emergency scenario combining a major flooding event with civil unrest. Covers evacuation planning, humanitarian assistance delivery, liaison with NGOs and municipal authorities, and public communications. Suitable for 4-day joint exercise with civilian and military participants.",
+  "exercise_name": "EX-13 Civil-Military Cooperation",
+  "day_start_hour": 8,
+  "day_end_hour": 20,
+  "scope": "public",
+  "phases": [
+    {
+      "name": "Crisis Onset & Activation",
+      "color": "#E74C3C",
+      "start_offset_min": 0,
+      "end_offset_min": 720,
+      "order": 0
+    },
+    {
+      "name": "Immediate Response",
+      "color": "#E67E22",
+      "start_offset_min": 720,
+      "end_offset_min": 2160,
+      "order": 1
+    },
+    {
+      "name": "Sustained Operations",
+      "color": "#F39C12",
+      "start_offset_min": 2160,
+      "end_offset_min": 3600,
+      "order": 2
+    },
+    {
+      "name": "Transition to Civil Authority",
+      "color": "#27AE60",
+      "start_offset_min": 3600,
+      "end_offset_min": 4800,
+      "order": 3
+    },
+    {
+      "name": "ENDEX & Lessons",
+      "color": "#3498DB",
+      "start_offset_min": 4800,
+      "end_offset_min": 4920,
+      "order": 4
+    }
+  ],
+  "groups": [
+    {
+      "name": "CIMIC Team",
+      "description": "Military Civil-Military Cooperation staff"
+    },
+    {
+      "name": "Military Support Element",
+      "description": "Combat support and logistics engineers"
+    },
+    {
+      "name": "Civilian Emergency Management",
+      "description": "Municipal emergency management authority"
+    },
+    {
+      "name": "NGO Liaison",
+      "description": "Red Cross and other NGO coordination"
+    },
+    {
+      "name": "Public Affairs",
+      "description": "Public communications and media"
+    }
+  ],
+  "layers": [
+    {
+      "name": "CIMIC Operations",
+      "description": "CIMIC team activities and coordination",
+      "color": "#E67E22",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [0]
+    },
+    {
+      "name": "Military Support",
+      "description": "Military engineering and logistics",
+      "color": "#E74C3C",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [1]
+    },
+    {
+      "name": "Civilian & NGO",
+      "description": "Civilian authority and NGO layer",
+      "color": "#27AE60",
+      "visibility": "groups",
+      "permission": "readwrite",
+      "group_index": [2, 3]
+    },
+    {
+      "name": "Public Affairs",
+      "description": "Communications layer",
+      "color": "#3498DB",
+      "visibility": "groups",
+      "permission": "read",
+      "group_index": [4]
+    }
+  ],
+  "items": [
+    {
+      "title": "INJECT: Major Flooding — Regional Emergency Declared",
+      "event_type": "instant",
+      "color": "#E74C3C",
+      "description": "EXERCISE INJECT: Regional government declares state of emergency following 48 hours of intense rainfall. River embankments breached in 3 locations. 12,000 civilians in flood zone. Military assistance formally requested by civilian authority. CIMIC team activated.",
+      "start_offset_min": 0,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "CIMIC Liaison — Civil Emergency HQ",
+      "event_type": "physical_meeting",
+      "color": "#E67E22",
+      "description": "CIMIC Team officer embedded at civilian Emergency Operations Centre. Coordination framework established: tasking authority, ROE for civilian support, media protocol, resource allocation procedures. Liaison with Red Cross, police, fire, and medical services.",
+      "start_offset_min": 60,
+      "duration_min": 90,
+      "alarm_lead_time": 15
+    },
+    {
+      "title": "Engineer Reconnaissance — Flood Zones",
+      "event_type": "activity",
+      "color": "#E74C3C",
+      "description": "Military engineers conduct reconnaissance of 3 breached embankments with civilian engineers. Assessment: 2 breaches can be sandbagged, 1 requires heavy equipment. Pontoon bridge needed for cut-off village (pop. 340). Helicopter reconnaissance of inaccessible areas.",
+      "start_offset_min": 240,
+      "duration_min": 240,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Evacuation Support — 3 Districts",
+      "event_type": "activity",
+      "color": "#E67E22",
+      "description": "Military vehicles (trucks, boats) support civilian evacuation of priority flood zones. 8 military boats deployed for water rescues. 15 trucks provide transport to evacuation centres. CIMIC coordinates with police for traffic management and security.",
+      "start_offset_min": 720,
+      "duration_min": 1440,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "Humanitarian Aid Distribution",
+      "event_type": "activity",
+      "color": "#27AE60",
+      "description": "Military logistics and NGO establish humanitarian aid distribution point. Items: food, water, blankets, medical supplies. Military provides security, transport, and crowd management. NGO leads distribution with civilian volunteers. 2,400 people assisted in first 24 hours.",
+      "start_offset_min": 2160,
+      "duration_min": 2880,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "INJECT: Civil Unrest — Looting Reported",
+      "event_type": "event",
+      "color": "#C0392B",
+      "description": "EXERCISE INJECT: Police report looting in evacuated residential area. Military presence requested to support police. CIMIC coordinates ROE update for property protection. Public Affairs issues calming statement. Military patrol added to secure perimeter of evacuated zone.",
+      "start_offset_min": 3600,
+      "duration_min": 120,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Transition Planning — Civil Authority Handover",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "CIMIC and civilian authority plan transition: military support to decrease over 48 hours as civilian emergency services restored. Handover checklist prepared. Military assets to remain on 4-hour standby for 72 hours post-transition.",
+      "start_offset_min": 4320,
+      "duration_min": 60,
+      "alarm_lead_time": 30
+    },
+    {
+      "title": "ENDEX",
+      "event_type": "instant",
+      "color": "#3498DB",
+      "description": "Exercise ENDEX declared. Military units withdrawing from civilian area. All exercise records compiled. After Action Review convened with all participating agencies.",
+      "start_offset_min": 4800,
+      "duration_min": 0,
+      "alarm_lead_time": 0
+    },
+    {
+      "title": "Multi-Agency After Action Review",
+      "event_type": "physical_meeting",
+      "color": "#3498DB",
+      "description": "Joint AAR with all participating agencies. Topics: activation speed, CIMIC effectiveness, civil-military coordination, aid distribution, public communications. NGO and civilian authority perspectives gathered. Lessons identified for doctrine update.",
+      "start_offset_min": 4830,
+      "duration_min": 90,
+      "alarm_lead_time": 0
+    }
+  ]
+}
