@@ -3,3 +3,4 @@ tidslinjal
 
 # Runtime data directory (JSON persistence files)
 data/
+node_modules/

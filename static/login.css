@@ -1,0 +1,112 @@
+    .reg-form { display: none; }
+    .reg-hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+    .login-switch { font-size: 12px; text-align: center; margin-top: 14px; }
+    .login-switch a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .login-switch a:hover { text-decoration: underline; }
+    .success-msg { display: none; color: #2ECC71; font-size: 13px; margin-top: 8px; text-align: center; }
+
+    /* SSO status banner */
+    .sso-banner {
+      display: none;
+      background: rgba(74,144,217,0.12);
+      border: 1px solid rgba(74,144,217,0.35);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .sso-banner.active { display: block; }
+    .sso-banner .sso-label {
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .sso-banner .sso-detail { opacity: 0.8; word-break: break-all; }
+    .sso-badge {
+      display: inline-block;
+      background: rgba(74,144,217,0.18);
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(74,144,217,0.4);
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+      margin-left: 4px;
+    }
+    /* SSO section divider */
+    .sso-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 10px;
+    }
+    .sso-divider hr { flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.15); }
+    .sso-divider span { font-size: 11px; opacity: 0.45; white-space: nowrap; }
+
+    /* SSO login button */
+    .sso-login-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 14px;
+      border-radius: var(--radius);
+      background: rgba(74,144,217,0.15);
+      border: 1px solid rgba(74,144,217,0.45);
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .sso-login-btn:hover {
+      background: rgba(74,144,217,0.28);
+      border-color: rgba(74,144,217,0.7);
+      text-decoration: none;
+    }
+    .sso-provider-name {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 4px;
+    }
+    /* Error detail link */
+    .error-detail-toggle {
+      font-size: 11px;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .error-detail-body {
+      display: none;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(0,0,0,0.15);
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin-top: 4px;
+      word-break: break-all;
+    }
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(74,144,217,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }

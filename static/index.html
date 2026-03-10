@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidslinjal</title>
   <link rel="stylesheet" href="/static/style.css">
-  <!-- Leaflet CSS is lazy-loaded alongside Leaflet JS in loadLeaflet() -->
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
 </head>
 <body>
 <div id="app">
@@ -21,7 +21,7 @@
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
         <button class="btn btn-secondary toolbar-btn" id="btnToday">📍 Today</button>
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnDatePicker" title="Go to date…">📅</button>
-        <input type="date" id="datePickerInput" style="display:none;position:absolute" onchange="goToDate(this.value)">
+        <input type="date" id="datePickerInput" style="display:none;position:absolute">
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
       </div>
 
@@ -86,9 +86,9 @@
 
       <!-- Group 7: Language -->
       <div class="lang-flags" id="langFlags">
-        <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
-        <button class="lang-flag-btn" id="flagSV" title="Svenska" onclick="setPref('language','sv')">🇸🇪</button>
-        <button class="lang-flag-btn" id="flagFR" title="Français" onclick="setPref('language','fr')">🇫🇷</button>
+        <button class="lang-flag-btn" id="flagEN" title="English">🇬🇧</button>
+        <button class="lang-flag-btn" id="flagSV" title="Svenska">🇸🇪</button>
+        <button class="lang-flag-btn" id="flagFR" title="Français">🇫🇷</button>
       </div>
 
     </div>
@@ -97,15 +97,15 @@
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <!-- Shown when clocks are detached to separate window -->
       <div id="clockDetachedIndicator" style="display:none;align-items:center;gap:6px;cursor:pointer;opacity:.7;font-size:12px;color:var(--accent)"
-           onclick="if(_clockPopout&&!_clockPopout.closed){_clockPopout.focus();}else{_setClockAreaDetached(false);}" title="Clocks are in a separate window — click to focus or reattach">
+           title="Clocks are in a separate window — click to focus or reattach">
         ⧉ <span>Clocks detached</span>
       </div>
       <div class="clock-area" id="clockArea">
-        <button class="btn btn-ghost btn-icon clock-add-btn" onclick="openDetachedClock()" title="Open detached clock window" style="font-size:14px">⏱</button>
-        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
-        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" onclick="detachClock()" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnOpenDetachedClock" title="Open detached clock window" style="font-size:14px">⏱</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" title="Add timezone clock">+</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
         <div id="extraClocksContainer" style="display:contents"></div>
-        <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
+        <div class="clock-display" id="clockDisplay" title="Click to toggle local / UTC" style="cursor:pointer">
           <div class="clock-time" id="clockTime">00:00:00</div>
           <div style="display:flex;align-items:center;gap:4px">
             <div class="clock-date" id="clockDate">—</div>
@@ -120,7 +120,7 @@
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">City, country or timezone</label>
           <input type="text" id="newClockSearch" placeholder="e.g. London, Paris, UTC…" maxlength="40" autocomplete="off"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)"
-            oninput="filterTzSuggestions(this.value)" onkeydown="tzSuggestionsKey(event)">
+            >
           <div id="tzSuggestions" style="display:none;position:absolute;left:0;right:0;top:100%;max-height:180px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:201;box-shadow:var(--shadow-lg)"></div>
         </div>
         <div class="form-group" style="margin-bottom:4px">
@@ -134,17 +134,17 @@
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;justify-content:flex-end">
-          <button class="btn btn-secondary btn-sm" onclick="closeAddClockPopover()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="confirmAddClock()">Add</button>
+          <button class="btn btn-secondary btn-sm" id="btnClockPopCancel">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="btnClockPopConfirm">Add</button>
         </div>
       </div>
       <div class="user-info">
-        <div class="user-badge" style="cursor:pointer" onclick="openProfileModal()" title="My Profile">
+        <div class="user-badge" id="userBadge" style="cursor:pointer" title="My Profile">
           <span id="userDisplayName">—</span>
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
         <a id="appVersionLink" href="#" target="_blank" rel="noopener" class="version-badge" title="GitHub repository" style="font-size:10px;opacity:0.6;text-decoration:none;color:inherit">v?</a>
-        <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help" onclick="openModal('helpModal')">?</button>
+        <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help">?</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnChangePassword" title="Change password">🔑</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnSidebar" title="Toggle panel">☰</button>
         <button class="btn btn-secondary btn-sm" id="btnLogout">Logout</button>
@@ -164,8 +164,8 @@
     <!-- List View -->
     <div id="list-view" style="display:none;overflow:auto;flex:1;padding:16px">
       <div id="list-view-toolbar" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <input type="text" id="listSearch" placeholder="🔍 Search…" style="width:200px" autocomplete="off" oninput="renderListView()">
-        <select id="listStatusFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+        <input type="text" id="listSearch" placeholder="🔍 Search…" style="width:200px" autocomplete="off">
+        <select id="listStatusFilter" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
           <option value="">All statuses</option>
           <option value="planned">Planned</option>
           <option value="active">Active</option>
@@ -173,7 +173,7 @@
           <option value="verified">Verified</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select id="listTypeFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+        <select id="listTypeFilter" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
           <option value="">All types</option>
         </select>
         <span id="listCount" style="color:var(--text-dim);font-size:var(--fs-sm)"></span>
@@ -181,10 +181,10 @@
       <table id="list-view-table" style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
         <thead>
           <tr style="background:var(--bg3);position:sticky;top:0;z-index:1">
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('title')">Title <span id="listSort-title"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('event_type')">Type <span id="listSort-event_type"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('status')">Status <span id="listSort-status"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('start_time')">Start <span id="listSort-start_time">▲</span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="title">Title <span id="listSort-title"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="event_type">Type <span id="listSort-event_type"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="status">Status <span id="listSort-status"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="start_time">Start <span id="listSort-start_time">▲</span></th>
             <th style="padding:8px 10px;text-align:left">End</th>
             <th style="padding:8px 10px;text-align:left">Responsible</th>
             <th style="padding:8px 10px;text-align:left">Actions</th>
@@ -219,11 +219,11 @@
 
 <!-- Navigation jump dropdown -->
 <div id="navJumpMenu" class="nav-jump-menu" style="display:none">
-  <div class="nav-jump-item" onclick="navJump(1)">1 Day</div>
-  <div class="nav-jump-item" onclick="navJump(2)">2 Days</div>
-  <div class="nav-jump-item" onclick="navJump(3)">3 Days</div>
-  <div class="nav-jump-item" onclick="navJump(7)">1 Week</div>
-  <div class="nav-jump-item" onclick="navJump(14)">2 Weeks</div>
+  <div class="nav-jump-item" data-jump="1">1 Day</div>
+  <div class="nav-jump-item" data-jump="2">2 Days</div>
+  <div class="nav-jump-item" data-jump="3">3 Days</div>
+  <div class="nav-jump-item" data-jump="7">1 Week</div>
+  <div class="nav-jump-item" data-jump="14">2 Weeks</div>
 </div>
 
 <!-- Filter popover -->
@@ -246,15 +246,15 @@
     </select>
   </div>
   <div style="display:flex;gap:6px;margin-top:8px">
-    <button class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
-    <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+    <button class="btn btn-primary btn-sm" id="btnApplyFilters">Apply</button>
+    <button class="btn btn-secondary btn-sm" id="btnClearFilters">Clear</button>
   </div>
   <div class="filter-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
     <label class="filter-label">💾 Saved Presets:</label>
     <div id="filterPresetList" style="margin-bottom:6px"></div>
     <div style="display:flex;gap:4px">
       <input type="text" id="filterPresetName" placeholder="Preset name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
-      <button class="btn btn-secondary btn-sm" onclick="saveFilterPreset()">Save</button>
+      <button class="btn btn-secondary btn-sm" id="btnSaveFilterPreset">Save</button>
     </div>
   </div>
 </div>
@@ -2465,34 +2465,8 @@
 <script src="/static/timeline.js"></script>
 <script src="/static/modals.js"></script>
 <script src="/static/app.js"></script>
-<!-- Leaflet.js for map integration (lazy loaded) -->
-<script>
-  window._leafletLoaded = false;
-  function loadLeaflet(cb) {
-    if (window._leafletLoaded && window.L) { cb(); return; }
-    if (document.getElementById('leaflet-script')) {
-      // Already loading - wait for it
-      const check = setInterval(() => { if (window.L) { clearInterval(check); window._leafletLoaded = true; cb(); } }, 100);
-      return;
-    }
-    // Load CSS alongside JS (avoids CSP issues with eager <link> in <head>)
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-      link.crossOrigin = '';
-      document.head.appendChild(link);
-    }
-    const s = document.createElement('script');
-    s.id = 'leaflet-script';
-    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    s.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=';
-    s.crossOrigin = '';
-    s.onload = () => { window._leafletLoaded = true; cb(); };
-    document.head.appendChild(s);
-  }
-</script>
+<script src="/static/bindings.js"></script>
+<!-- Leaflet.js for map integration (lazy loaded from local vendor copy) -->
+<script src="/static/leaflet-loader.js"></script>
 </body>
 </html>
