@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Clocks</title>
+<style>
+/* ── Theme application ── */
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex; flex-direction:column; align-items:center; min-height:100vh; gap:16px; padding:16px; }
+/* ── Toolbar ── */
+.toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--bg2);
+  border:1px solid var(--border); border-radius:10px; padding:8px 14px; width:100%; max-width:600px; }
+.toolbar label { font-size:11px; color:var(--text-dim); }
+.toolbar select, .toolbar input[type=range] { background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:3px 6px; font-size:11px; }
+.toolbar input[type=range] { width:80px; cursor:pointer; }
+.btn-tb { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:3px 10px; font-size:11px; cursor:pointer; }
+.btn-tb:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-tb.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+/* ── Clock cards ── */
+.clocks-wrap { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; width:100%; max-width:800px; }
+.clock-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  padding:16px 24px 14px; text-align:center; position:relative; min-width:180px; transition:box-shadow .2s; }
+.clock-card:hover { box-shadow:0 0 0 2px var(--accent); }
+.clock-label { font-size:11px; font-weight:700; color:var(--accent); letter-spacing:.1em;
+  text-transform:uppercase; margin-bottom:6px; }
+.clock-time { font-weight:700; letter-spacing:.04em; font-variant-numeric:tabular-nums; line-height:1.1; }
+.clock-date { font-size:11px; color:var(--text-dim); margin-top:4px; }
+.clock-tz { font-size:11px; font-weight:700; color:var(--accent); margin-top:2px; }
+/* ── Size variants ── */
+.sz-xs .clock-time { font-size:28px; } .sz-xs .clock-card { padding:10px 16px 8px; min-width:130px; }
+.sz-sm .clock-time { font-size:38px; } .sz-sm .clock-card { padding:12px 20px 10px; min-width:160px; }
+.sz-md .clock-time { font-size:52px; }
+.sz-lg .clock-time { font-size:72px; } .sz-lg .clock-card { padding:20px 32px 18px; min-width:240px; }
+.sz-xl .clock-time { font-size:96px; } .sz-xl .clock-card { padding:24px 40px 22px; min-width:300px; }
+/* ── Analog clock ── */
+.analog-wrap { width:120px; height:120px; margin:0 auto 4px; }
+.analog-face { width:100%; height:100%; }
+.sz-lg .analog-wrap { width:160px; height:160px; }
+.sz-xl .analog-wrap { width:200px; height:200px; }
+/* ── Remove button ── */
+.clock-remove { position:absolute; top:6px; right:8px; background:none; border:none;
+  color:var(--text-dim); font-size:15px; cursor:pointer; line-height:1; padding:2px 5px;
+  border-radius:4px; }
+.clock-remove:hover { background:var(--danger); color:#fff; }
+/* ── Style: minimal ── */
+.style-minimal .clock-card { background:transparent; border-color:transparent; box-shadow:none; }
+.style-minimal .clock-card:hover { box-shadow:0 0 0 1px var(--border); }
+/* ── Style: compact ── */
+.style-compact .clock-card { padding:8px 14px 6px; min-width:120px; }
+.style-compact .clock-time { font-size:28px!important; }
+.style-compact .clock-label { font-size:10px; }
+/* ── Header row ── */
+.page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
+/* ── VCR mode ── */
+.vcr-card { background:#050000 !important; border-color:#3a0000 !important; }
+.vcr-time {
+  color:#ff2200; text-shadow:0 0 8px rgba(255,40,0,.9),0 0 18px rgba(255,0,0,.5);
+  font-family:'Courier New','Lucida Console',monospace; font-weight:bold; letter-spacing:.1em; }
+.vcr-label { color:#880000 !important; }
+.vcr-date  { color:#660000 !important; }
+.vcr-tz    { color:#880000 !important; }
+.vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
+@keyframes vcr-blink { 50% { opacity:0; } }
+</style>
+</head>
+<body class="theme-dark sz-md">
+<p class="page-header">Tidslinjal — Clocks</p>
+<div class="toolbar" id="toolbar">
+  <label>Style</label>
+  <select id="selStyle">
+    <option value="">Standard</option>
+    <option value="style-minimal">Minimal</option>
+    <option value="style-compact">Compact</option>
+  </select>
+  <label>Mode</label>
+  <button class="btn-tb active" id="btnDigital" data-mode="digital">Digital</button>
+  <button class="btn-tb" id="btnAnalog" data-mode="analog">Analog</button>
+  <button class="btn-tb" id="btnVCR" data-mode="vcr">VCR</button>
+  <label>Size</label>
+  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
+  <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
+</div>
+<div class="clocks-wrap" id="clocksWrap"></div>
+<script src="/static/clocks-popup.js"></script>
+</body>
+</html>
