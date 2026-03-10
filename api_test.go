@@ -23,7 +23,10 @@ func newTestApp(t *testing.T) (*App, *httptest.Server) {
 		t.Fatalf("NewApp: %v", err)
 	}
 	srv := httptest.NewServer(app.routes())
-	t.Cleanup(srv.Close)
+	t.Cleanup(func() {
+		srv.Close()
+		app.Stop()
+	})
 	return app, srv
 }
 
@@ -287,7 +290,7 @@ func TestAPI_UpdateUser(t *testing.T) {
 
 	// Update
 	resp2 := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/users/%d", id), map[string]any{
-		"username": "updateme", "display_name": "New Name", "role": "readwrite",
+		"username": "updateme", "display_name": "New Name", "role": "teammember",
 	}, cookies)
 	if !isSuccess(resp2.StatusCode) {
 		body, _ := io.ReadAll(resp2.Body)
@@ -503,7 +506,7 @@ func TestAPI_CreateAndGetLayers(t *testing.T) {
 
 	// Create a readwrite user for layer creation
 	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
-		"username": "layermaker", "password": "pass", "display_name": "LM", "role": "readwrite",
+		"username": "layermaker", "password": "pass", "display_name": "LM", "role": "teammember",
 	}, cookies)
 	lmCookies := login(t, srv, "layermaker", "pass")
 
@@ -752,7 +755,7 @@ func TestAPI_SaveExercise_RequiresOpLead(t *testing.T) {
 	_, srv := newTestApp(t)
 	adminCookies := login(t, srv, "admin", "admin")
 	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
-		"username": "rwuser", "password": "pass", "display_name": "RW", "role": "readwrite",
+		"username": "rwuser", "password": "pass", "display_name": "RW", "role": "teammember",
 	}, adminCookies)
 	rwCookies := login(t, srv, "rwuser", "pass")
 
@@ -920,7 +923,7 @@ func TestAPI_CreateLock_RequiresCanLock(t *testing.T) {
 	adminCookies := login(t, srv, "admin", "admin")
 	// Regular user without can_lock
 	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
-		"username": "nolocker", "password": "pass", "display_name": "NL", "role": "readwrite",
+		"username": "nolocker", "password": "pass", "display_name": "NL", "role": "teammember",
 	}, adminCookies)
 	nlCookies := login(t, srv, "nolocker", "pass")
 
@@ -1003,7 +1006,7 @@ func TestAPI_OIDCSettings_RequiresAdmin(t *testing.T) {
 	_, srv := newTestApp(t)
 	adminCookies := login(t, srv, "admin", "admin")
 	apiDo(t, srv, http.MethodPost, "/api/users", map[string]any{
-		"username": "rwuser", "password": "pass", "display_name": "RW", "role": "readwrite",
+		"username": "rwuser", "password": "pass", "display_name": "RW", "role": "teammember",
 	}, adminCookies)
 	rwCookies := login(t, srv, "rwuser", "pass")
 

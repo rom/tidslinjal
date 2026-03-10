@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tidslinjal — Map Projection</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/static/vendor/leaflet.css">
+<style>
+/* ── Theme variables ── */
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+/* ── Toolbar ── */
+.map-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--bg2);
+  border-bottom:1px solid var(--border); padding:6px 12px; flex-shrink:0; z-index:1000; }
+.map-toolbar label { font-size:11px; color:var(--text-dim); }
+.map-toolbar select, .map-toolbar input { background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:3px 6px; font-size:11px; }
+.btn-map { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:3px 10px; font-size:11px; cursor:pointer; }
+.btn-map:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-map.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
+/* ── Map container ── */
+#mapProjection { flex:1; width:100%; }
+/* ── Legend panel ── */
+.map-legend { position:absolute; bottom:24px; right:12px; z-index:1001; background:var(--bg2);
+  border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px;
+  max-height:200px; overflow-y:auto; min-width:150px; }
+.map-legend h4 { font-size:11px; color:var(--accent); margin-bottom:4px; letter-spacing:.08em; text-transform:uppercase; }
+.legend-item { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+/* ── Overlay layers panel ── */
+.map-layers { position:absolute; top:60px; right:12px; z-index:1001; background:var(--bg2);
+  border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px;
+  max-height:300px; overflow-y:auto; min-width:180px; display:none; }
+.map-layers.open { display:block; }
+.map-layers h4 { font-size:11px; color:var(--accent); margin-bottom:4px; }
+.layer-toggle { display:flex; align-items:center; gap:6px; padding:2px 0; cursor:pointer; }
+.layer-toggle input { accent-color:var(--accent); }
+/* ── File import overlay ── */
+.import-overlay { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:1002; background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:20px; text-align:center; min-width:300px; }
+.import-overlay.open { display:block; }
+.import-overlay input[type=file] { margin:10px 0; }
+</style>
+</head>
+<body class="theme-dark">
+<div class="map-toolbar">
+  <span class="page-header">Tidslinjal — Map Projection</span>
+  <label id="lblTileLayer">Tile Layer</label>
+  <select id="selTileLayer">
+    <option value="osm">OpenStreetMap</option>
+    <option value="topo">Topographic</option>
+    <option value="satellite">Satellite</option>
+    <option value="dark">Dark</option>
+  </select>
+  <button class="btn-map" id="btnLayers" title="Toggle overlay layers">Layers</button>
+  <button class="btn-map" id="btnImport" title="Import GeoJSON or KML file">Import</button>
+  <button class="btn-map" id="btnMeetings" title="Show physical meetings">Meetings</button>
+  <button class="btn-map" id="btnUsers" title="Show user locations">Users</button>
+  <button class="btn-map" id="btnFitAll" title="Fit all markers in view">Fit All</button>
+</div>
+<div id="mapProjection"></div>
+<div class="map-legend" id="mapLegend">
+  <h4>Legend</h4>
+  <div id="legendContent"></div>
+</div>
+<div class="map-layers" id="mapLayersPanel">
+  <h4>Overlays</h4>
+  <div id="layersList"></div>
+</div>
+<div class="import-overlay" id="importOverlay">
+  <h4>Import GeoJSON / KML</h4>
+  <input type="file" id="importFile" accept=".geojson,.json,.kml">
+  <br>
+  <button class="btn-map" id="btnDoImport">Import</button>
+  <button class="btn-map" id="btnCancelImport">Cancel</button>
+</div>
+<script src="/static/vendor/leaflet.js"></script>
+<script src="/static/map-popup.js"></script>
+</body>
+</html>

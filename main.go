@@ -367,6 +367,12 @@ type App struct {
 	webhookCh       chan webhookJob
 	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
 	authLimiter     *ipRateLimiter
+	eventBus        *EventBus
+	connectors      *ConnectorRegistry
+	metrics         *Metrics
+	ldap            *LDAPConnector
+	stopCh          chan struct{} // closed to stop background goroutines
+	stopOnce        sync.Once
 }
 
 // ipRateLimiter implements a simple per-IP sliding-window rate limiter.
@@ -455,11 +461,45 @@ func NewApp(dataDir string) (*App, error) {
 		broker:      NewSSEBroker(),
 		webhookCh:   make(chan webhookJob, 256),
 		authLimiter: newIPRateLimiter(),
+		eventBus:    NewEventBus(),
+		connectors:  NewConnectorRegistry(),
+		metrics:     NewMetrics(),
+		stopCh:      make(chan struct{}),
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
 	for i := 0; i < webhookConcurrency; i++ {
 		go app.runWebhookWorker()
 	}
+
+	// Start event bus
+	go app.eventBus.Run()
+
+	// Register connectors
+	app.ldap = NewLDAPConnector()
+	app.connectors.Register(NewSTIXConnector())
+	app.connectors.Register(NewADatP3Connector())
+	app.connectors.Register(NewGitConnector())
+	app.connectors.Register(NewJiraConnector())
+	app.connectors.Register(NewGCalConnector())
+	app.connectors.Register(app.ldap)
+
+	// Load persisted connector configs
+	app.connectors.LoadConfigs(store.GetConnectorConfigs())
+
+	// Subscribe connectors to event bus
+	app.eventBus.Subscribe("connectors", EventBusSubscriberFunc(func(msg EventBusMessage) {
+		app.connectors.Dispatch(msg)
+	}))
+
+	// Subscribe webhooks to event bus (replaces direct fireWebhooks call for bus-originated events)
+	app.eventBus.Subscribe("webhooks", EventBusSubscriberFunc(func(msg EventBusMessage) {
+		if msg.Event != nil {
+			app.fireWebhooks(string(msg.Action), msg.Event)
+		}
+	}))
+
+	// Start connector poller
+	go app.runConnectorPoller()
 
 	if len(store.GetUsers()) == 0 {
 		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
@@ -474,6 +514,15 @@ func NewApp(dataDir string) (*App, error) {
 		log.Println("Created default admin (username: admin, password: admin)")
 	}
 	return app, nil
+}
+
+// Stop shuts down background goroutines (event bus, connector poller, webhook workers).
+func (app *App) Stop() {
+	app.stopOnce.Do(func() {
+		close(app.stopCh)
+		app.eventBus.Stop()
+		close(app.webhookCh)
+	})
 }
 
 // validateWebhookURL checks that a webhook URL is safe to call:
@@ -5128,6 +5177,53 @@ func (app *App) routes() http.Handler {
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+
+	// ── Ingest API ──
+	mux.HandleFunc("/api/ingest", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleIngest)(w, r)
+	})
+
+	// ── Routing rules (admin/oplead) ──
+	mux.HandleFunc("/api/routing-rules", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleOpLead, app.handleRoutingRules)(w, r)
+	})
+	mux.HandleFunc("/api/routing-rules/", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleOpLead, app.handleRoutingRule)(w, r)
+	})
+
+	// ── Connector management (admin only) ──
+	mux.HandleFunc("/api/connectors", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleConnectors)(w, r)
+	})
+	mux.HandleFunc("/api/connectors/", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleConnectorConfig)(w, r)
+	})
+
+	// ── STIX export ──
+	mux.HandleFunc("/api/export/stix", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleSTIXExport)(w, r)
+	})
+
+	// ── LDAP config (admin only) ──
+	mux.HandleFunc("/api/integrations/ldap", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleLDAPConfig)(w, r)
+	})
+	mux.HandleFunc("/api/integrations/ldap/test", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleLDAPTest)(w, r)
+	})
+
+	// ── Prometheus metrics (no auth — standard for metrics endpoints) ──
+	mux.HandleFunc("/metrics", app.handleMetrics)
+
+	// ── Map projection page ──
+	mux.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		http.ServeFile(w, r, "static/map-popup.html")
 	})
 
 	// Wrap the entire mux with security headers.
