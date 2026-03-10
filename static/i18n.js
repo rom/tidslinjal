@@ -538,6 +538,21 @@ const TRANSLATIONS = {
     help_role_oplead:        'Team Lead + can manage users and event types.',
     help_role_staffofficer:  'Same rights as Operations Lead. Alternative command-staff designation.',
     help_role_admin:         'Full access including system settings, resets, and user vetting.',
+
+    // Clock popup
+    clock_title:     'Clocks',
+    clock_local:     'Local Time',
+    clock_style:     'Style',
+    clock_mode:      'Mode',
+    clock_size:      'Size',
+    clock_standard:  'Standard',
+    clock_minimal:   'Minimal',
+    clock_compact:   'Compact',
+    clock_digits:    'Show hour numbers on analog face',
+
+    // Help popup
+    help_title:      'Help',
+    help_search:     'Search\u2026',
   },
 
   sv: {
@@ -1041,6 +1056,21 @@ const TRANSLATIONS = {
 
     // Import klar
     import_done: 'Klar',
+
+    // Clock popup
+    clock_title:     'Klockor',
+    clock_local:     'Lokal tid',
+    clock_style:     'Stil',
+    clock_mode:      'Läge',
+    clock_size:      'Storlek',
+    clock_standard:  'Standard',
+    clock_minimal:   'Minimal',
+    clock_compact:   'Kompakt',
+    clock_digits:    'Visa timtal på analog urtavla',
+
+    // Help popup
+    help_title:      'Hjälp',
+    help_search:     'Sök\u2026',
   },
 
   fr: {
@@ -1544,6 +1574,21 @@ const TRANSLATIONS = {
 
     // Import terminé
     import_done: 'Terminé',
+
+    // Clock popup
+    clock_title:     'Horloges',
+    clock_local:     'Heure locale',
+    clock_style:     'Style',
+    clock_mode:      'Mode',
+    clock_size:      'Taille',
+    clock_standard:  'Standard',
+    clock_minimal:   'Minimal',
+    clock_compact:   'Compact',
+    clock_digits:    'Afficher les chiffres sur le cadran analogique',
+
+    // Help popup
+    help_title:      'Aide',
+    help_search:     'Rechercher\u2026',
   }
 };
 

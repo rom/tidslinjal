@@ -1,13 +1,53 @@
 'use strict';
-// Sync theme from opener
+
+/* ── i18n: read translations from opener ── */
+function _t(key) {
+  try {
+    const lang = window.opener?.state?.preferences?.language || 'en';
+    const TRANSLATIONS = window.opener?.TRANSLATIONS;
+    if (TRANSLATIONS && TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) return TRANSLATIONS[lang][key];
+    if (TRANSLATIONS && TRANSLATIONS.en && TRANSLATIONS.en[key]) return TRANSLATIONS.en[key];
+  } catch(e) {}
+  const fb = { help_title:'Help', help_search:'Search\u2026' };
+  return fb[key] || key;
+}
+
+/* ── Theme sync: use class-based theming matching style.css ── */
+const _themeClasses = ['light-mode', 'city-camo', 'urban-camo'];
 function syncTheme() {
   try {
     const t = window.opener?.state?.preferences?.theme || 'dark';
+    // Map theme name to CSS class (dark = no class)
+    const wantClass = t === 'light' ? 'light-mode' : t === 'city-camo' ? 'city-camo' : t === 'urban-camo' ? 'urban-camo' : '';
+    // Remove all theme classes first
+    _themeClasses.forEach(c => document.body.classList.remove(c));
+    if (wantClass) document.body.classList.add(wantClass);
+    // Also set data-theme for any data-attribute-based styling
     document.documentElement.setAttribute('data-theme', t);
   } catch(e) {}
 }
+
+/* ── Language sync ── */
+let _lastLang = '';
+function syncLanguage() {
+  try {
+    const lang = window.opener?.state?.preferences?.language || 'en';
+    if (lang === _lastLang) return;
+    _lastLang = lang;
+    // Update title
+    const titleEl = document.querySelector('.help-win-title');
+    if (titleEl) titleEl.textContent = 'Tidslinjal \u2014 ' + _t('help_title');
+    document.title = 'Tidslinjal \u2014 ' + _t('help_title');
+    // Update search placeholder
+    const searchEl = document.getElementById('helpWinSearch');
+    if (searchEl) searchEl.placeholder = _t('help_search');
+  } catch(e) {}
+}
+
+// Initial sync + periodic polling
 syncTheme();
-setInterval(syncTheme, 2000);
+syncLanguage();
+setInterval(function() { syncTheme(); syncLanguage(); }, 2000);
 
 // Bind search input (CSP-safe)
 document.getElementById('helpWinSearch').addEventListener('input', function() { filterHelpWin(this.value); });

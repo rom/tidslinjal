@@ -5,10 +5,35 @@ const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
 const sizeLabels  = ['XS','S','M','L','XL'];
 let currentStyle = '';
 let showDigits = false;
+let _lastLang = '';
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
-/* ── Theme sync: read from opener every 2 s ── */
+/* ── i18n: read translations from opener ── */
+function _t(key) {
+  try {
+    const lang = window.opener?.state?.preferences?.language || 'en';
+    const TRANSLATIONS = window.opener?.TRANSLATIONS;
+    if (TRANSLATIONS && TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) return TRANSLATIONS[lang][key];
+    if (TRANSLATIONS && TRANSLATIONS.en && TRANSLATIONS.en[key]) return TRANSLATIONS.en[key];
+  } catch(e) {}
+  // Hardcoded fallbacks
+  const fb = { clock_title:'Clocks', clock_local:'Local Time', clock_style:'Style',
+    clock_mode:'Mode', clock_size:'Size', clock_standard:'Standard',
+    clock_minimal:'Minimal', clock_compact:'Compact', clock_digits:'Show hour numbers on analog face' };
+  return fb[key] || key;
+}
+
+function _getLang() {
+  try { return window.opener?.state?.preferences?.language || 'en'; } catch(e) { return 'en'; }
+}
+
+function _getLocale() {
+  const m = { en:'en-GB', sv:'sv-SE', fr:'fr-FR' };
+  return m[_getLang()] || 'en-GB';
+}
+
+/* ── Theme sync: read from opener ── */
 function syncTheme() {
   try {
     const t = window.opener?.state?.preferences?.theme || 'dark';
@@ -18,6 +43,35 @@ function syncTheme() {
         .replace(/theme-\S+/g, '').trim() + ' ' + cls;
     }
   } catch(e) {}
+}
+
+/* ── Language sync: update toolbar labels when language changes ── */
+function syncLanguage() {
+  const lang = _getLang();
+  if (lang === _lastLang) return;
+  _lastLang = lang;
+  // Update toolbar labels
+  const labels = document.querySelectorAll('#toolbar label');
+  if (labels.length >= 3) {
+    labels[0].textContent = _t('clock_style');
+    labels[1].textContent = _t('clock_mode');
+    labels[2].textContent = _t('clock_size');
+  }
+  // Update style select options
+  const sel = document.getElementById('selStyle');
+  if (sel && sel.options.length >= 3) {
+    sel.options[0].textContent = _t('clock_standard');
+    sel.options[1].textContent = _t('clock_minimal');
+    sel.options[2].textContent = _t('clock_compact');
+  }
+  // Update digits button tooltip
+  const btnD = document.getElementById('btnDigits');
+  if (btnD) btnD.title = _t('clock_digits');
+  // Update page header
+  const hdr = document.querySelector('.page-header');
+  if (hdr) hdr.textContent = 'Tidslinjal \u2014 ' + _t('clock_title');
+  // Update document title
+  document.title = 'Tidslinjal \u2014 ' + _t('clock_title');
 }
 
 /* ── Size ── */
@@ -61,7 +115,6 @@ function buildAnalogSVG(id) {
     const w = i%5===0 ? 2 : 0.8;
     return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="currentColor" stroke-opacity=".5" stroke-width="${w}"/>`;
   }).join('');
-  // Hour digits (1-12) placed inside the tick ring
   let digits = '';
   if (showDigits) {
     for (let i = 1; i <= 12; i++) {
@@ -151,7 +204,6 @@ function toggleUTC() {
       window.opener.toggleClockTZ();
     }
   } catch(e) {}
-  // Force immediate UI update
   tick();
 }
 
@@ -172,8 +224,7 @@ function rebuildClocks() {
   _lastClockCount = total;
   _lastMode = clockMode;
   let html = '';
-  // Main clock
-  const mainLabel = isUTC ? 'UTC/Z' : 'Local Time';
+  const mainLabel = isUTC ? 'UTC/Z' : _t('clock_local');
   if (clockMode === 'analog') {
     html += `<div class="clock-card" id="card-main">
       <div class="clock-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${mainLabel}</div>
@@ -196,7 +247,6 @@ function rebuildClocks() {
       <div class="clock-tz" id="main-tz"></div>
     </div>`;
   }
-  // Extra clocks
   extra.forEach(ec => {
     if (clockMode === 'analog') {
       html += `<div class="clock-card" id="card-${ec.id}">
@@ -225,7 +275,6 @@ function rebuildClocks() {
   wrap.querySelectorAll('[data-rm-clock]').forEach(btn => {
     btn.addEventListener('click', () => removeClock(parseInt(btn.dataset.rmClock, 10)));
   });
-  // Bind click-to-toggle on main clock label
   const mainLbl = document.getElementById('main-label');
   if (mainLbl) mainLbl.addEventListener('click', toggleUTC);
 }
@@ -235,29 +284,29 @@ function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
 /* ── Main tick function ── */
 function tick() {
   syncTheme();
+  syncLanguage();
   const {isUTC, extra} = getClockData();
   const now = new Date();
+  const locale = _getLocale();
 
-  // Detect if clock list changed or mode changed
   if (1 + extra.length !== _lastClockCount || clockMode !== _lastMode) {
     rebuildClocks();
   }
 
-  // Update main clock label if UTC mode changed
   const lbl = document.getElementById('main-label');
-  if (lbl) lbl.textContent = isUTC ? 'UTC/Z' : 'Local Time';
+  if (lbl) lbl.textContent = isUTC ? 'UTC/Z' : _t('clock_local');
 
   let h, m, s, dateStr, tzLabel, timeStr;
   if (isUTC) {
     h=now.getUTCHours(); m=now.getUTCMinutes(); s=now.getUTCSeconds();
     timeStr = pad(h)+pad(m)+pad(s)+'Z';
-    dateStr = now.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
+    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
     tzLabel = 'UTC/Z';
   } else {
     h=now.getHours(); m=now.getMinutes(); s=now.getSeconds();
     timeStr = pad(h)+':'+pad(m)+':'+pad(s);
-    dateStr = now.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-    try { tzLabel=now.toLocaleTimeString(undefined,{timeZoneName:'short'}).split(' ').pop(); } catch{tzLabel='';}
+    dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    try { tzLabel=now.toLocaleTimeString(locale,{timeZoneName:'short'}).split(' ').pop(); } catch{tzLabel='';}
   }
 
   if (clockMode === 'analog') {
@@ -273,7 +322,6 @@ function tick() {
   const d=document.getElementById('main-date'); if(d)d.textContent=dateStr;
   const z=document.getElementById('main-tz');   if(z)z.textContent=tzLabel;
 
-  // Extra clocks
   extra.forEach(ec => {
     try {
       const ecTime = new Date();
