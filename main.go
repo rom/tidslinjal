@@ -2688,14 +2688,28 @@ func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
+	// Only set Connection: keep-alive for HTTP/1.x; it is a hop-by-hop
+	// header forbidden in HTTP/2 and causes ERR_HTTP2_PROTOCOL_ERROR.
+	if !r.ProtoAtLeast(2, 0) {
+		w.Header().Set("Connection", "keep-alive")
+	}
+
+	// Use ResponseController to extend the write deadline before each
+	// write so the global WriteTimeout (5 min) doesn't kill the stream.
+	rc := http.NewResponseController(w)
 
 	client := app.broker.Subscribe(user.ID)
 	defer app.broker.Unsubscribe(client)
 
+	// Helper: extend the write deadline and flush.
+	sseFlush := func() {
+		_ = rc.SetWriteDeadline(time.Now().Add(5 * time.Minute))
+		flusher.Flush()
+	}
+
 	fmt.Fprintf(w, "event: connected\ndata: {\"user_id\":%d}\n\n", user.ID)
-	flusher.Flush()
+	sseFlush()
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -2706,13 +2720,13 @@ func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 		case n := <-client.ch:
 			data, _ := json.Marshal(n)
 			fmt.Fprintf(w, "event: alarm\ndata: %s\n\n", data)
-			flusher.Flush()
+			sseFlush()
 		case msg := <-client.broadcast:
 			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", msg.Event, msg.Data)
-			flusher.Flush()
+			sseFlush()
 		case <-ticker.C:
 			fmt.Fprintf(w, "event: ping\ndata: {}\n\n")
-			flusher.Flush()
+			sseFlush()
 		}
 	}
 }
