@@ -7224,6 +7224,21 @@ func main() {
 
 	handler := app.routes()
 
+	// Security headers — set a Content-Security-Policy that allows Leaflet
+	// assets from unpkg.com while keeping a tight default policy.
+	{
+		inner := handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Security-Policy",
+				"default-src 'self'; "+
+					"script-src 'self' 'unsafe-inline' https://unpkg.com; "+
+					"style-src 'self' 'unsafe-inline' https://unpkg.com; "+
+					"img-src 'self' data: https://*.tile.openstreetmap.org; "+
+					"connect-src 'self'")
+			inner.ServeHTTP(w, r)
+		})
+	}
+
 	// Wrap with debug request logger when --debug is enabled
 	if debug {
 		inner := handler

@@ -4609,26 +4609,6 @@ function exportICS() {
   document.body.removeChild(a);
 }
 
-// ── Mouse drag-to-pan (DOMContentLoaded) ──────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    if (Math.abs(dx) > 4) panTriggered = true;
-    container.scrollLeft = startScrollLeft - dx;
-  });
-
-  document.addEventListener('mouseup', e => {
-    if (!dragging) return;
-    dragging = false;
-    container.style.cursor = '';
-    // If we dragged far enough horizontally, navigate to adjacent date range
-    const dx = startX - e.clientX;
-    if (Math.abs(dx) > container.clientWidth * 0.4) {
-      navigate(dx > 0 ? 1 : -1);
-    }
-  });
-});
 
 // ── ICS drag-and-drop on the calendar view ────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
