@@ -4828,6 +4828,39 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Gradual Backup (admin only)
+	mux.HandleFunc("/api/admin/gradual-backup", func(w http.ResponseWriter, r *http.Request) {
+		app.requireRole(RoleAdmin, app.handleGradualBackupSettings)(w, r)
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/snapshot", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleGradualBackupSnapshotNow)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/restore/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, app.handleGradualBackupRestore)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/download/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, app.handleGradualBackupDownload)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/gradual-backup/snapshots/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleGradualBackupDelete)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// WebCal subscription (token-based, no session cookie required)
 	mux.HandleFunc("/webcal/", app.handleWebCal)
 
@@ -6034,6 +6067,148 @@ func (app *App) handleGetEditingLocks(w http.ResponseWriter, r *http.Request, us
 	jsonOK(w, locks)
 }
 
+// ── Gradual Backup ──────────────────────────────────────────────────────────────
+
+// runGradualBackupScheduler runs in a background goroutine, waking every minute
+// to check whether it is time to create a new automatic snapshot.
+func (app *App) runGradualBackupScheduler() {
+	// Track when the last snapshot was taken so we fire at the correct cadence
+	// even if the ticker is slightly late.
+	var lastSnap time.Time
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		cfg := app.store.GetGradualBackupSettings()
+		if !cfg.Enabled {
+			continue
+		}
+		interval := time.Duration(cfg.IntervalMinutes) * time.Minute
+		if time.Since(lastSnap) < interval {
+			continue
+		}
+		filename, err := app.store.CreateGradualBackupSnapshot()
+		if err != nil {
+			log.Printf("[WARN] gradual backup snapshot failed: %v", err)
+			continue
+		}
+		logVerbose("[gradual-backup] snapshot created: %s", filename)
+		lastSnap = time.Now()
+		// Prune old snapshots
+		if err := app.store.PruneGradualBackupSnapshots(cfg.MaxSnapshots); err != nil {
+			log.Printf("[WARN] gradual backup prune failed: %v", err)
+		}
+	}
+}
+
+// handleGradualBackupSettings handles GET and PUT for /api/admin/gradual-backup
+func (app *App) handleGradualBackupSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	switch r.Method {
+	case http.MethodGet:
+		cfg := app.store.GetGradualBackupSettings()
+		snapshots, _ := app.store.ListGradualBackupSnapshots()
+		if snapshots == nil {
+			snapshots = []GradualBackupSnapshot{}
+		}
+		jsonOK(w, map[string]interface{}{
+			"settings":  cfg,
+			"snapshots": snapshots,
+		})
+	case http.MethodPut:
+		var cfg GradualBackupSettings
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			jsonError(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if err := app.store.SaveGradualBackupSettings(cfg); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		app.audit(user.ID, user.DisplayName, "update", "gradual_backup_settings", 0,
+			fmt.Sprintf("Gradual backup settings updated: enabled=%v interval=%dm max=%d",
+				cfg.Enabled, cfg.IntervalMinutes, cfg.MaxSnapshots))
+		jsonOK(w, cfg)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleGradualBackupSnapshotNow handles POST /api/admin/gradual-backup/snapshot
+func (app *App) handleGradualBackupSnapshotNow(w http.ResponseWriter, r *http.Request, user *User) {
+	filename, err := app.store.CreateGradualBackupSnapshot()
+	if err != nil {
+		jsonError(w, "failed to create snapshot: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Prune per current settings
+	cfg := app.store.GetGradualBackupSettings()
+	_ = app.store.PruneGradualBackupSnapshots(cfg.MaxSnapshots)
+	app.audit(user.ID, user.DisplayName, "create", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Manual snapshot created: %s", filename))
+	snapshots, _ := app.store.ListGradualBackupSnapshots()
+	if snapshots == nil {
+		snapshots = []GradualBackupSnapshot{}
+	}
+	jsonOK(w, map[string]interface{}{"filename": filename, "snapshots": snapshots})
+}
+
+// handleGradualBackupRestore handles POST /api/admin/gradual-backup/restore/{filename}
+func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/restore/")
+	if filename == "" {
+		jsonError(w, "filename required", http.StatusBadRequest)
+		return
+	}
+	restored, err := app.store.RestoreGradualBackupSnapshot(filename)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "restore", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Restored %d files from snapshot: %s", restored, filename))
+	jsonOK(w, map[string]interface{}{
+		"restored": restored,
+		"message":  fmt.Sprintf("Restored %d files. Please restart the server for changes to take full effect.", restored),
+	})
+}
+
+// handleGradualBackupDownload handles GET /api/admin/gradual-backup/download/{filename}
+func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/")
+	if filename == "" || strings.ContainsAny(filename, "/\\") {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	snapPath := filepath.Join(app.store.DataDir(), "snapshots", filename)
+	if _, err := os.Stat(snapPath); err != nil {
+		http.Error(w, "snapshot not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	http.ServeFile(w, r, snapPath)
+}
+
+// handleGradualBackupDelete handles DELETE /api/admin/gradual-backup/snapshots/{filename}
+func (app *App) handleGradualBackupDelete(w http.ResponseWriter, r *http.Request, user *User) {
+	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/")
+	if filename == "" || strings.ContainsAny(filename, "/\\") {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	snapPath := filepath.Join(app.store.DataDir(), "snapshots", filename)
+	if err := os.Remove(snapPath); err != nil {
+		if os.IsNotExist(err) {
+			jsonError(w, "snapshot not found", http.StatusNotFound)
+		} else {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "delete", "gradual_backup_snapshot", 0,
+		fmt.Sprintf("Deleted snapshot: %s", filename))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
 func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User) {
@@ -6690,6 +6865,7 @@ func main() {
 
 	go app.runAlarmScheduler()
 	go app.runSessionCleaner()
+	go app.runGradualBackupScheduler()
 	app.startAutoReportScheduler()
 
 	addr := host + ":" + port

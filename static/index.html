@@ -96,6 +96,11 @@
 
     <div class="header-right">
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
+      <!-- Shown when clocks are detached to separate window -->
+      <div id="clockDetachedIndicator" style="display:none;align-items:center;gap:6px;cursor:pointer;opacity:.7;font-size:12px;color:var(--accent)"
+           onclick="if(_clockPopout&&!_clockPopout.closed){_clockPopout.focus();}else{_setClockAreaDetached(false);}" title="Clocks are in a separate window — click to focus or reattach">
+        ⧉ <span>Clocks detached</span>
+      </div>
       <div class="clock-area" id="clockArea">
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" onclick="detachClock()" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
@@ -1380,6 +1385,54 @@
   </div>
 </div>
 
+<!-- Gradual Backup Modal -->
+<div class="modal-overlay" id="gradualBackupModal">
+  <div class="modal modal-wide" style="max-width:760px">
+    <div class="modal-header">
+      <h2>🔄 Gradual Backup (Auto-Snapshots)</h2>
+      <button class="modal-close" onclick="closeModal('gradualBackupModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:14px">
+        Gradual backup automatically takes rolling snapshots of all data at a configurable interval.
+        Use it to recover from accidental resets, bulk deletes, or bugs.
+      </p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div class="form-group" style="flex:1;min-width:180px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="gbEnabled">
+            <span>Enable automatic snapshots</span>
+          </label>
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Snapshot interval</label>
+          <select id="gbInterval" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="5">Every 5 minutes</option>
+            <option value="10">Every 10 minutes</option>
+            <option value="15" selected>Every 15 minutes</option>
+            <option value="30">Every 30 minutes</option>
+            <option value="60">Every 60 minutes</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Max snapshots to keep</label>
+          <input type="number" id="gbMaxSnapshots" min="2" max="500" value="48"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn btn-primary btn-sm" onclick="saveGradualBackupSettings()">💾 Save Settings</button>
+        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow" onclick="createGradualSnapshotNow()">📸 Snapshot Now</button>
+      </div>
+      <h3 style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-dim)">Saved Snapshots</h3>
+      <div id="gbSnapshotsList" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('gradualBackupModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Planned vs Actual Modal -->
 <div class="modal-overlay" id="pvaModal">
   <div class="modal modal-wide" style="max-width:900px">
@@ -1572,7 +1625,16 @@
         <span class="help-modal-logo">Tids<span>linjal</span></span>
         <span class="help-modal-subtitle">Quick Reference Guide</span>
       </div>
-      <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="detachHelp()" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
+        <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+      </div>
+    </div>
+    <div style="padding:8px 20px 0;border-bottom:1px solid var(--border)">
+      <input type="search" id="helpSearchInput" placeholder="Search help… (e.g. alarms, templates, backup)"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)"
+        oninput="filterHelp(this.value)" autocomplete="off">
+      <div id="helpSearchStatus" style="font-size:var(--fs-xs);color:var(--text-dim);padding:4px 2px;min-height:18px"></div>
     </div>
     <div class="modal-body help-body">
 
@@ -1580,9 +1642,12 @@
         <a class="help-toc-link" href="#h-nav">🧭 Navigation</a>
         <a class="help-toc-link" href="#h-events">📅 Events</a>
         <a class="help-toc-link" href="#h-icons">🏷 Event icons</a>
+        <a class="help-toc-link" href="#h-attachments">📎 Attachments</a>
+        <a class="help-toc-link" href="#h-comments">💬 Comments</a>
         <a class="help-toc-link" href="#h-clocks">🕐 Multi-zone clocks</a>
         <a class="help-toc-link" href="#h-layers">🗂 Layers</a>
         <a class="help-toc-link" href="#h-templates">📋 Templates</a>
+        <a class="help-toc-link" href="#h-filters">🔍 Filters</a>
         <a class="help-toc-link" href="#h-roles">👥 Roles</a>
         <a class="help-toc-link" href="#h-alarms">🔔 Alarms</a>
         <a class="help-toc-link" href="#h-status">🔄 Status</a>
@@ -1590,6 +1655,12 @@
         <a class="help-toc-link" href="#h-exercise">🕐 Exercise time</a>
         <a class="help-toc-link" href="#h-locks">🔒 Time locks</a>
         <a class="help-toc-link" href="#h-reports">📊 Reports</a>
+        <a class="help-toc-link" href="#h-settings">⚙ Settings</a>
+        <a class="help-toc-link" href="#h-themes">🎨 Themes</a>
+        <a class="help-toc-link" href="#h-backup">💾 Backup</a>
+        <a class="help-toc-link" href="#h-gradual-backup">🔄 Gradual Backup</a>
+        <a class="help-toc-link" href="#h-audit">📜 Audit Log</a>
+        <a class="help-toc-link" href="#h-profile">🪪 User Profile</a>
         <a class="help-toc-link" href="#h-webhooks">🔗 Webhooks</a>
         <a class="help-toc-link" href="#h-sso">🔑 SSO / OIDC</a>
         <a class="help-toc-link" href="#h-tls">🔐 TLS</a>
@@ -1636,6 +1707,38 @@
           </div>
         </div>
 
+        <div class="help-section" id="h-attachments">
+          <div class="help-section-icon">📎</div>
+          <div class="help-section-body">
+            <h3>File Attachments</h3>
+            <p>Any event can have one or more files attached to it — useful for orders, maps, briefing documents, images, or reference materials.</p>
+            <ul class="help-list">
+              <li>Open an event's detail view and click <b>📎 Attachments</b> to upload files.</li>
+              <li>Accepted: any file type. Individual file size is limited by server configuration (default 32 MB).</li>
+              <li>Uploaded files are listed with name, size, uploader and timestamp.</li>
+              <li>Click a filename to download it. Admins and the uploader can delete attachments.</li>
+              <li>Events with attachments show a <span class="help-badge">📎</span> badge on the timeline block.</li>
+              <li><b>Templates include attachments</b>: when you save a template, all attached files are copied into the template. When you apply the template, files are re-created on each new event automatically.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-comments">
+          <div class="help-section-icon">💬</div>
+          <div class="help-section-body">
+            <h3>Comments &amp; @mentions</h3>
+            <p>Leave text comments on any event to record decisions, share context, or flag issues for other team members.</p>
+            <ul class="help-list">
+              <li>Open the event detail view and scroll to the <b>Comments</b> section.</li>
+              <li>Type a comment and press <b>Enter</b> (or click <b>Add</b>) to post.</li>
+              <li>Use <b>@username</b> to mention a specific user — they receive an in-app notification.</li>
+              <li>Comments are timestamped and show the author's display name.</li>
+              <li>Team Leads and admins can delete any comment; others can only delete their own.</li>
+              <li>Comments are included in the <b>Daily Briefing</b> and <b>AAR</b> reports.</li>
+            </ul>
+          </div>
+        </div>
+
         <div class="help-section" id="h-layers">
           <div class="help-section-icon">🗂</div>
           <div class="help-section-body">
@@ -1646,6 +1749,10 @@
               <li>When all layers are checked (default), everything is visible.</li>
               <li>Master timeline events are always shown regardless of layer filters.</li>
               <li>Manage layers (create, edit, share) in the <b>Layers</b> sidebar tab.</li>
+              <li>Layer visibility is per-user and persists across sessions.</li>
+              <li>Layers can be shared with specific <b>Groups</b> at read or read/write access level.</li>
+              <li>Team Leads and above can create, rename, and delete layers.</li>
+              <li>A layer color-codes event blocks for quick visual identification on the timeline.</li>
             </ul>
           </div>
         </div>
@@ -1654,13 +1761,32 @@
           <div class="help-section-icon">📋</div>
           <div class="help-section-body">
             <h3>Templates</h3>
-            <p>Templates capture a set of events relative to a base time so they can be replicated quickly.</p>
+            <p>Templates capture a set of events (with relative time offsets) so an entire exercise or incident schedule can be reused and replayed in seconds.</p>
             <ul class="help-list">
               <li>Click <b>📋 Templates</b> in the toolbar to open the template manager.</li>
-              <li><b>Save</b>: all events in the current view are stored as a template with relative time offsets.</li>
-              <li><b>Apply</b>: choose a base date/time — events are recreated offset from that moment.</li>
-              <li>Private templates are visible only to you; Public templates are visible to all users.</li>
-              <li>Only Admins and Operations Leads can create public templates that include master-timeline events.</li>
+              <li><b>Save</b>: all events in the current view (or a selected date range) are stored as a template. Attachments, phases, locks, and groups can all be included.</li>
+              <li><b>Apply</b>: choose a base date/time (STARTEX) — all events are recreated at their original relative offsets from that moment.</li>
+              <li><b>Export / Import</b>: download templates as JSON files for offline storage or sharing with other installations.</li>
+              <li>Private templates are visible only to you; Public templates are visible to all users (requires Ops Lead or Admin role to create).</li>
+              <li><b>Attachments are preserved</b>: files attached to original events are copied into the template and re-created on every apply.</li>
+              <li>Templates can embed theme, language, operation mode, and terminology preferences that are applied when the template is loaded.</li>
+              <li>The <b>example-templates/</b> folder in the distribution contains 31 ready-made templates (exercise scenarios, incident responses).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-filters">
+          <div class="help-section-icon">🔍</div>
+          <div class="help-section-body">
+            <h3>Filters &amp; Presets</h3>
+            <p>Use the filter bar (sidebar → Filters tab) to narrow down what is shown on the timeline without hiding anything permanently.</p>
+            <ul class="help-list">
+              <li>Filter by <b>event type</b>, <b>status</b>, <b>participant</b> (internal/external), <b>responsible user</b>, or <b>free-text search</b> on title/description.</li>
+              <li>Multiple filters combine with AND logic — only events matching all criteria are shown.</li>
+              <li>Filters are purely visual; they do not affect exports or reports.</li>
+              <li><b>Save as preset</b>: give a filter combination a name and save it for quick recall. Presets are per-user.</li>
+              <li>Click a saved preset to apply it instantly; click it again to clear.</li>
+              <li>The active filter count is shown as a badge on the Filter button in the toolbar.</li>
             </ul>
           </div>
         </div>
@@ -1901,12 +2027,23 @@
             <h4>Adding a clock</h4>
             <ol>
               <li>Click the <b>+</b> button to the left of the main clock in the header.</li>
-              <li>Enter a short label (e.g. <em>Tallinn</em>, <em>Kyiv</em>, <em>Kabul</em>).</li>
-              <li>Select the IANA timezone from the dropdown (supports all world time zones).</li>
-              <li>Click <b>Add</b>. The clock appears immediately to the left of the main clock.</li>
+              <li>Search for a city, country or IANA timezone name (e.g. <em>London</em>, <em>America/New_York</em>).</li>
+              <li>Select from the suggestions and optionally edit the short label.</li>
+              <li>Click <b>Add</b>. The clock appears immediately next to the main clock.</li>
             </ol>
             <h4>Removing a clock</h4>
             <p>Click the <b>×</b> button on the extra clock widget, or go to <b>Settings → Date/Time Format → Additional timezone clocks</b> and click <b>Remove</b>.</p>
+            <h4>Detached clock window</h4>
+            <p>Click the <b>⧉</b> button to open all clocks in a separate floating window. While detached:</p>
+            <ul class="help-list">
+              <li>The main clock area is hidden from the header to save space.</li>
+              <li>The detached window automatically follows the application's current <b>theme</b> (dark, light, camouflage).</li>
+              <li>Switch between <b>digital</b> and <b>analog</b> (round clock face with hour/minute/second hands) modes.</li>
+              <li>Choose a clock style: <b>Standard</b>, <b>Minimal</b> (transparent cards), or <b>Compact</b> (smaller cards).</li>
+              <li>Use the size slider to scale all clocks from XS to XL.</li>
+              <li>Each extra clock has its own <b>×</b> button to remove it directly from the detached window.</li>
+              <li>The detached window dynamically reflects changes to the clock list — no need to reopen it.</li>
+            </ul>
             <p>Additional clocks are saved per user and persist across sessions.</p>
           </div>
         </div>
@@ -1936,6 +2073,120 @@
               <li><b>Timeline Snapshot</b> — Full chronological list.</li>
             </ul>
             <p>Filter by date range and visible layers. Times are formatted according to your language/locale setting. The report opens in a new browser tab for printing or saving.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-settings">
+          <div class="help-section-icon">⚙</div>
+          <div class="help-section-body">
+            <h3>Settings Overview</h3>
+            <p>Open Settings via the <b>☰</b> sidebar button → <b>Settings</b> tab. All preferences are saved per user and take effect immediately.</p>
+            <table class="help-table">
+              <tr><th>Setting</th><th>Description</th></tr>
+              <tr><td><b>Theme</b></td><td>Visual color scheme: Dark, Light, City-Camo (green military), Urban-Camo (blue military)</td></tr>
+              <tr><td><b>Size</b></td><td>Overall UI scale: Small, Normal, Large, Huge — scales fonts and timeline slot heights</td></tr>
+              <tr><td><b>Language</b></td><td>Interface language: English, Swedish (Svenska), French (Français)</td></tr>
+              <tr><td><b>Date format</b></td><td>ISO 8601, UK (DD/MM/YYYY), French, Swedish</td></tr>
+              <tr><td><b>Day hours</b></td><td>Working day start and end — slots outside this range are shown grayed out</td></tr>
+              <tr><td><b>Clock format</b></td><td>Local time with HH:MM:SS, or ZULU/UTC format (HHMMSSz)</td></tr>
+              <tr><td><b>Extra clocks</b></td><td>Additional timezone clocks shown in the header</td></tr>
+              <tr><td><b>Default view</b></td><td>Which date range the timeline opens with (Day, Week, Month, etc.)</td></tr>
+              <tr><td><b>Show out-of-hours</b></td><td>Whether time slots outside the day hours are shown as a grayed area or hidden</td></tr>
+              <tr><td><b>Event icons</b></td><td>Show or hide the emoji type icon on each event block</td></tr>
+              <tr><td><b>Current-time line</b></td><td>Red line at the current time: enable/disable, color, width, style (solid/dashed/dotted), H+N label</td></tr>
+              <tr><td><b>Push notifications</b></td><td>Browser notification permission for alarms and real-time event changes</td></tr>
+              <tr><td><b>Terminology</b></td><td>Rename "Group" to Unit/Team, "Users" to Soldiers/Personnel for different operational contexts</td></tr>
+            </table>
+            <p>Ops Lead and Admin users also have <b>Exercise Settings</b> in the sidebar: set the operation name, STARTEX epoch, ENDEX, day-hours-only counting, and freeze/pause state.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-themes">
+          <div class="help-section-icon">🎨</div>
+          <div class="help-section-body">
+            <h3>Themes &amp; Visual Appearance</h3>
+            <p>Tidslinjal ships with four themes and four size scales:</p>
+            <table class="help-table">
+              <tr><th>Theme</th><th>Best for</th></tr>
+              <tr><td><b>Dark</b></td><td>Default — low-light environments, night operations, tactical operations centres</td></tr>
+              <tr><td><b>Light</b></td><td>Bright office environments, printed screenshots, daylight briefings</td></tr>
+              <tr><td><b>City-Camo</b></td><td>Military field use — green/gray tones matching woodland camouflage patterns</td></tr>
+              <tr><td><b>Urban-Camo</b></td><td>Military field use — blue/gray tones matching urban camouflage patterns</td></tr>
+            </table>
+            <table class="help-table" style="margin-top:8px">
+              <tr><th>Size</th><th>Use case</th></tr>
+              <tr><td><b>Small</b></td><td>High-density screens, compact view with many events visible</td></tr>
+              <tr><td><b>Normal</b></td><td>Default — balanced readability</td></tr>
+              <tr><td><b>Large</b></td><td>Large display screens, touch interfaces</td></tr>
+              <tr><td><b>Huge</b></td><td>Projectors, wall displays, situational awareness screens</td></tr>
+            </table>
+            <p>The <b>detached clock window</b> and <b>detached help window</b> both automatically follow the current application theme.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-backup">
+          <div class="help-section-icon">💾</div>
+          <div class="help-section-body">
+            <h3>Manual Backup &amp; Restore</h3>
+            <p>Admins can download a full ZIP backup and restore from it at any time. Go to the <b>Admin</b> sidebar tab → <b>💾 Backup</b>.</p>
+            <ul class="help-list">
+              <li><b>Download backup</b>: creates a ZIP containing all JSON data files (events, users' preferences, templates, layers, groups, alarms, phases, locks, comments, versions, etc.).</li>
+              <li><b>Restore</b>: upload a previously downloaded ZIP. The server overwrites data files immediately. A restart is recommended for changes to take full effect.</li>
+              <li>For security, restore does <em>not</em> overwrite <code>users.json</code> (passwords), <code>sessions.json</code>, <code>apikeys.json</code>, <code>oidc.json</code>, or <code>mail.json</code>.</li>
+              <li>Uploaded file attachments (in the <code>data/attachments/</code> folder) are <em>not</em> included in the ZIP and must be backed up separately.</li>
+              <li>All backup and restore actions are recorded in the <b>Audit Log</b>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-gradual-backup">
+          <div class="help-section-icon">🔄</div>
+          <div class="help-section-body">
+            <h3>Gradual (Automatic) Backup</h3>
+            <p>The <b>Gradual Backup</b> feature takes rolling automatic snapshots at a configurable interval, making it easy to recover from accidental deletions, resets, or bugs.</p>
+            <ul class="help-list">
+              <li><b>Enabled by default</b> with a 15-minute interval and up to 48 retained snapshots (~12 hours of history).</li>
+              <li>Configure in <b>Settings → Gradual Backup</b> (admin only): toggle on/off, set the interval (5–60 min), and set the maximum number of retained snapshots.</li>
+              <li>Each snapshot is a ZIP file stored in <code>data/snapshots/</code> on the server, named with a timestamp.</li>
+              <li>Use <b>Snapshot now</b> to immediately create a snapshot outside the regular schedule.</li>
+              <li>Browse the list of saved snapshots and click <b>Restore</b> to revert to a specific point in time.</li>
+              <li>Download any snapshot as a ZIP file for offline archival.</li>
+              <li>Old snapshots beyond the <em>max snapshots</em> limit are automatically pruned.</li>
+              <li>All snapshot creation, restoration, and deletion actions are recorded in the Audit Log.</li>
+            </ul>
+            <p><strong>Use cases:</strong> recover from an accidental admin reset, undo a bulk delete, restore a clean state before a new exercise begins, or roll back after a configuration error.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-audit">
+          <div class="help-section-icon">📜</div>
+          <div class="help-section-body">
+            <h3>Audit Log</h3>
+            <p>Tidslinjal records all significant actions in an append-only audit log visible to Team Leads and above.</p>
+            <ul class="help-list">
+              <li>Access via the <b>Audit</b> sidebar tab (requires Team Lead role or higher).</li>
+              <li>Each entry shows: timestamp, user, action type, entity type/ID, and a human-readable summary.</li>
+              <li>Actions logged include: event create/edit/delete, user management, backup/restore, login/logout, template save/apply, lock create/delete, phase changes, and more.</li>
+              <li>The log is capped at 10,000 entries; oldest entries are pruned automatically.</li>
+              <li>Audit data is included in full backup ZIPs.</li>
+              <li>The audit log can be forwarded to a remote syslog server for long-term retention (see Syslog section).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-profile">
+          <div class="help-section-icon">🪪</div>
+          <div class="help-section-body">
+            <h3>User Profile</h3>
+            <p>Each user can maintain a professional profile visible to other team members.</p>
+            <ul class="help-list">
+              <li>Click your username / <b>🔑</b> button in the header to open profile settings.</li>
+              <li>Fields: <b>Display name</b>, job <b>Title</b>, military <b>Rank</b>, <b>Job role</b>, area of <b>Expertise</b>.</li>
+              <li>Communication handles: Mattermost, Discord, Signal, Telephone, Cellular.</li>
+              <li>Upload a <b>profile photo</b> (shown on hover over your name, and in the Users panel).</li>
+              <li><b>WebCal token</b>: generate a personal iCalendar feed URL for subscribing to events in external calendar apps (Outlook, Google Calendar, Apple Calendar).</li>
+              <li>NATO J-staff designations (e.g. J3, J5) are shown as badges and can be assigned by admins.</li>
+            </ul>
           </div>
         </div>
 

@@ -643,3 +643,19 @@ type EditingLock struct {
 	LockedAt  time.Time `json:"locked_at"`
 	ExpiresAt time.Time `json:"expires_at"` // auto-release after 2 minutes of inactivity
 }
+
+// GradualBackupSettings configures the automatic periodic data snapshot feature.
+// When enabled, the server takes rolling ZIP snapshots at a configurable interval
+// and retains up to MaxSnapshots copies before pruning the oldest.
+type GradualBackupSettings struct {
+	Enabled         bool `json:"enabled"`
+	IntervalMinutes int  `json:"interval_minutes"` // 0 → default 15
+	MaxSnapshots    int  `json:"max_snapshots"`     // 0 → default 48
+}
+
+// GradualBackupSnapshot is metadata about a single auto-backup snapshot file.
+type GradualBackupSnapshot struct {
+	Filename  string    `json:"filename"`
+	CreatedAt time.Time `json:"created_at"`
+	SizeBytes int64     `json:"size_bytes"`
+}

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -2716,6 +2718,201 @@ func (s *Store) BulkSetEventType(f BulkFilter, newType string) (int, error) {
 	}
 	return count, nil
 }
+
+// ── Gradual Backup ─────────────────────────────────────────────────────────────
+
+const gradualBackupDefaultInterval = 15
+const gradualBackupDefaultMax      = 48
+const gradualBackupDir             = "snapshots"
+
+// GetGradualBackupSettings reads the gradual backup configuration from disk.
+// Returns sensible defaults if the file does not exist yet.
+func (s *Store) GetGradualBackupSettings() GradualBackupSettings {
+	raw, err := os.ReadFile(filepath.Join(s.dataDir, "gradual_backup.json"))
+	var cfg GradualBackupSettings
+	if err != nil || len(raw) < 2 {
+		// File not saved yet → all defaults, enabled by default
+		cfg.Enabled = true
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+		return cfg
+	}
+	_ = json.Unmarshal(raw, &cfg)
+	if cfg.IntervalMinutes <= 0 {
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+	}
+	if cfg.MaxSnapshots <= 0 {
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+	}
+	return cfg
+}
+
+// SaveGradualBackupSettings writes gradual backup settings to disk.
+func (s *Store) SaveGradualBackupSettings(cfg GradualBackupSettings) error {
+	if cfg.IntervalMinutes <= 0 {
+		cfg.IntervalMinutes = gradualBackupDefaultInterval
+	}
+	if cfg.MaxSnapshots <= 0 {
+		cfg.MaxSnapshots = gradualBackupDefaultMax
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.dataDir, "gradual_backup.json"), data, 0644)
+}
+
+// snapshotDir returns the path to the snapshots subdirectory, creating it if needed.
+func (s *Store) snapshotDir() string {
+	d := filepath.Join(s.dataDir, gradualBackupDir)
+	_ = os.MkdirAll(d, 0755)
+	return d
+}
+
+// CreateGradualBackupSnapshot takes an in-memory ZIP of all data JSON files and
+// saves it to the snapshots directory. Returns the filename of the created snapshot.
+func (s *Store) CreateGradualBackupSnapshot() (string, error) {
+	snapDir := s.snapshotDir()
+	filename := fmt.Sprintf("snapshot-%s.zip", time.Now().UTC().Format("2006-01-02T150405"))
+	dstPath := filepath.Join(snapDir, filename)
+
+	f, err := os.Create(dstPath)
+	if err != nil {
+		return "", fmt.Errorf("create snapshot file: %w", err)
+	}
+	defer f.Close()
+
+	zw := zip.NewWriter(f)
+	files := []string{
+		"event_types.json", "preferences.json", "groups.json",
+		"memberships.json", "layers.json", "events.json", "attachments.json",
+		"alarms.json", "locks.json", "audit.json", "exercise.json",
+		"comments.json", "phases.json", "templates.json", "roles.json",
+		"registration.json", "invitations.json", "filter_presets.json",
+		"event_versions.json", "auto_report_schedules.json",
+	}
+	for _, fn := range files {
+		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
+		if err != nil {
+			continue // skip missing
+		}
+		fw, err := zw.Create(fn)
+		if err != nil {
+			continue
+		}
+		_, _ = fw.Write(data)
+	}
+	if err := zw.Close(); err != nil {
+		return "", err
+	}
+	return filename, nil
+}
+
+// ListGradualBackupSnapshots returns metadata for all snapshot files, newest first.
+func (s *Store) ListGradualBackupSnapshots() ([]GradualBackupSnapshot, error) {
+	snapDir := s.snapshotDir()
+	entries, err := os.ReadDir(snapDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []GradualBackupSnapshot{}, nil
+		}
+		return nil, err
+	}
+	var out []GradualBackupSnapshot
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".zip") {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, GradualBackupSnapshot{
+			Filename:  e.Name(),
+			CreatedAt: fi.ModTime().UTC(),
+			SizeBytes: fi.Size(),
+		})
+	}
+	// Sort newest first
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out, nil
+}
+
+// RestoreGradualBackupSnapshot restores data files from a named snapshot ZIP.
+// Returns the count of files restored.
+func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
+	// Sanitise: filename must be a plain name with no path separators
+	if strings.ContainsAny(filename, "/\\") {
+		return 0, fmt.Errorf("invalid snapshot filename")
+	}
+	snapPath := filepath.Join(s.snapshotDir(), filename)
+	data, err := os.ReadFile(snapPath)
+	if err != nil {
+		return 0, fmt.Errorf("snapshot not found: %w", err)
+	}
+	zr, err := zip.NewReader(&bytesReaderAt{data}, int64(len(data)))
+	if err != nil {
+		return 0, fmt.Errorf("invalid zip: %w", err)
+	}
+	allowed := map[string]bool{
+		"event_types.json": true, "preferences.json": true, "groups.json": true,
+		"memberships.json": true, "layers.json": true, "events.json": true,
+		"attachments.json": true, "alarms.json": true, "locks.json": true,
+		"exercise.json": true, "comments.json": true, "phases.json": true,
+		"templates.json": true, "roles.json": true, "registration.json": true,
+		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
+		"auto_report_schedules.json": true,
+	}
+	restored := 0
+	for _, f := range zr.File {
+		if !allowed[f.Name] {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		fdata, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(s.dataDir, f.Name), fdata, 0644); err != nil {
+			continue
+		}
+		restored++
+	}
+	return restored, nil
+}
+
+// bytesReaderAt wraps a byte slice to satisfy zip.NewReader's io.ReaderAt interface.
+type bytesReaderAt struct{ d []byte }
+func (b *bytesReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off >= int64(len(b.d)) { return 0, io.EOF }
+	n := copy(p, b.d[off:])
+	return n, nil
+}
+func (b *bytesReaderAt) Len() int64 { return int64(len(b.d)) }
+
+// PruneGradualBackupSnapshots removes the oldest snapshots keeping at most max.
+func (s *Store) PruneGradualBackupSnapshots(max int) error {
+	if max <= 0 {
+		max = gradualBackupDefaultMax
+	}
+	snapshots, err := s.ListGradualBackupSnapshots()
+	if err != nil {
+		return err
+	}
+	// snapshots is newest-first; delete beyond max
+	for i := max; i < len(snapshots); i++ {
+		_ = os.Remove(filepath.Join(s.snapshotDir(), snapshots[i].Filename))
+	}
+	return nil
+}
+
+// ── BulkDeleteEvents (existing, moved label) ───────────────────────────────
 
 // BulkDeleteEvents deletes all events matching the filter.
 // Returns the count of events deleted.
