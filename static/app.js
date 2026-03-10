@@ -8,8 +8,18 @@
    ============================================================ */
 'use strict';
 
+// ── Password visibility toggle ──────────────────────────────────────────────
+function togglePwdVisibility(inputId, btnId) {
+  const inp = document.getElementById(inputId);
+  const btn = document.getElementById(btnId);
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? '🙈' : '👁';
+}
+
 // ── Additional DOMContentLoaded wiring ─────────────────────────────────────
-// (password change, admin data-export, report modal population)
+// (password change, admin data-export)
 document.addEventListener('DOMContentLoaded', () => {
   const btnSavePw = document.getElementById('btnSavePassword');
   if (btnSavePw) {
@@ -50,47 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const btnReport = document.getElementById('btnReport');
-  if (btnReport) {
-    btnReport.addEventListener('click', () => {
-      const layerList = document.getElementById('reportLayerList');
-      if (layerList) {
-        layerList.innerHTML = `
-          <label class="group-chip selected" style="cursor:pointer">
-            <input type="checkbox" class="report-layer-cb" value="0" checked style="margin-right:4px">
-            ${t('layers_master')||'Master'}
-          </label>
-          ${state.layers.map(l => `
-            <label class="group-chip selected" style="cursor:pointer">
-              <input type="checkbox" class="report-layer-cb" value="${l.id}" checked style="margin-right:4px">
-              ${escHtml(l.name)}
-            </label>
-          `).join('')}
-        `;
-        layerList.querySelectorAll('.report-layer-cb').forEach(cb => {
-          cb.addEventListener('change', () => {
-            cb.closest('.group-chip').classList.toggle('selected', cb.checked);
-          });
-        });
-      }
-      openModal('reportModal');
-    });
-  }
-
-  const btnAutoReport = document.getElementById('btnAutoReport');
-  if (btnAutoReport) {
-    btnAutoReport.addEventListener('click', () => openAutoReportModal());
-  }
-
-  const btnPVA = document.getElementById('btnPVA');
-  if (btnPVA) {
-    btnPVA.addEventListener('click', () => openPVAModal());
-  }
-
-  const btnBackup = document.getElementById('btnBackup');
-  if (btnBackup) {
-    btnBackup.addEventListener('click', () => openBackupModal());
-  }
 });
 
 // ── Init ────────────────────────────────────────────────────────────────────
@@ -185,33 +154,6 @@ async function init() {
   if (state.user.role==='admin' || state.user.can_lock) {
     document.getElementById('btnAddLock').style.display = '';
   }
-  // Templates: admin + oplead only
-  const btnTemplates = document.getElementById('btnTemplates');
-  if (btnTemplates) btnTemplates.style.display = isAdminOrOplead ? '' : 'none';
-  // Export/Import: admin + oplead only
-  const btnExport = document.getElementById('btnExport');
-  if (btnExport) btnExport.style.display = isAdminOrOplead ? '' : 'none';
-  const btnImport = document.getElementById('btnImport');
-  if (btnImport) btnImport.style.display = isAdminOrOplead ? '' : 'none';
-  // Report: based on 'report' capability (admin, oplead, staffofficer both, teamlead by default)
-  const canReport = state.user.role === 'admin' || isAdminOrOplead || isTeamLead ||
-    userHasCapability('report');
-  const btnReport = document.getElementById('btnReport');
-  if (btnReport) btnReport.style.display = canReport ? '' : 'none';
-  // Auto-report button
-  const btnAutoReport = document.getElementById('btnAutoReport');
-  if (btnAutoReport) {
-    const canAutoReport = state.user.role === 'admin' || isAdminOrOplead ||
-      userHasCapability('auto_report');
-    btnAutoReport.style.display = canAutoReport ? '' : 'none';
-  }
-  // Planned vs Actual button (team lead and above)
-  const btnPVA = document.getElementById('btnPVA');
-  if (btnPVA) btnPVA.style.display = isTeamLead || isAdminOrOplead ? '' : 'none';
-  // Backup button (admin only)
-  const btnBackup = document.getElementById('btnBackup');
-  if (btnBackup) btnBackup.style.display = state.user.role === 'admin' ? '' : 'none';
-
   if (state.user.role==='admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
   }
@@ -239,14 +181,10 @@ async function init() {
     inp.showPicker ? inp.showPicker() : inp.click();
   });
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal(null));
-  document.getElementById('btnExport').addEventListener('click', openExportModal);
-  document.getElementById('btnImport')?.addEventListener('click', openImportModal);
-  document.getElementById('btnTemplates')?.addEventListener('click', openTemplatesModal);
   document.getElementById('btnLayerToggle').addEventListener('click', e => openLayerPopover(e.currentTarget));
   document.getElementById('btnFilter')?.addEventListener('click', e => openFilterPopover(e.currentTarget));
   document.getElementById('btnViewToggle')?.addEventListener('click', toggleListView);
   document.getElementById('btnUndo')?.addEventListener('click', performUndo);
-  document.getElementById('btnPrint')?.addEventListener('click', printTimeline);
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;
     renderTimeline();

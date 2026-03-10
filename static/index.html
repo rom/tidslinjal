@@ -85,20 +85,6 @@
 
       <div class="toolbar-sep"></div>
 
-      <!-- Group 6: Data management -->
-      <div class="toolbar-group">
-        <button class="btn btn-secondary toolbar-btn" id="btnTemplates">📋 Templates</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnExport">⬇ Export</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnImport">⬆ Import</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnReport">📄 Report</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnAutoReport" style="display:none" title="Configure automatic scheduled reports">⏰ Auto Report</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnPVA" style="display:none" title="Planned vs. Actual comparison">📊 Plan vs Actual</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnBackup" style="display:none" title="Backup & Restore data">💾 Backup</button>
-        <button class="btn btn-secondary toolbar-btn" id="btnPrint" title="Print day/week sheet">🖨 Print</button>
-      </div>
-
-      <div class="toolbar-sep"></div>
-
       <!-- Group 7: Language -->
       <div class="lang-flags" id="langFlags">
         <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
@@ -216,6 +202,7 @@
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
         <button class="sidebar-tab admin-only" data-tab="integrations" style="display:none" data-i18n="tab_integrations">🔌 Integrations</button>
+        <button class="sidebar-tab" data-tab="tools">🛠 Tools</button>
         <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
       </div>
       <div class="sidebar-content" id="sidebarContent"></div>
@@ -1017,7 +1004,10 @@
           </div>
           <div class="form-group">
             <label id="lbl-pwd-new">New password</label>
-            <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')">
+            <div style="position:relative">
+              <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')" style="padding-right:32px">
+              <button type="button" id="pwdNewEye" onclick="togglePwdVisibility('pwdNew','pwdNewEye')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+            </div>
           </div>
           <div id="pwdStrengthWrap" style="margin-bottom:10px">
             <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden;margin-bottom:4px">
@@ -1027,7 +1017,10 @@
           </div>
           <div class="form-group">
             <label id="lbl-pwd-confirm">Confirm new password</label>
-            <input type="password" id="pwdConfirm" autocomplete="new-password">
+            <div style="position:relative">
+              <input type="password" id="pwdConfirm" autocomplete="new-password" style="padding-right:32px">
+              <button type="button" id="pwdConfirmEye" onclick="togglePwdVisibility('pwdConfirm','pwdConfirmEye')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1115,6 +1108,9 @@
           <select id="reportFormat">
             <option value="html" id="lbl-report-html">HTML (view)</option>
             <option value="print" id="lbl-report-print">Print / PDF</option>
+            <option value="docx">DOCX (Word)</option>
+            <option value="rtf">RTF</option>
+            <option value="excel">Excel (XLS)</option>
           </select>
         </div>
       </div>
