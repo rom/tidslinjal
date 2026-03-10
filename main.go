@@ -880,7 +880,13 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "username and password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.Password) < 6 {
+	// Apply password quality policy if enabled; otherwise enforce bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.Password, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.Password) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
@@ -1482,7 +1488,13 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "token and new_password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.NewPassword) < 6 {
+	// Apply password quality policy if enabled; otherwise enforce a bare minimum of 6
+	if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+		if err := validatePasswordQuality(req.NewPassword, policy); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else if len(req.NewPassword) < 6 {
 		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
 		return
 	}
@@ -2855,6 +2867,85 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "debug": debug})
 }
 
+// ── Integration Status ─────────────────────────────────────────────────────────
+
+// handleStatus returns a summary of all integration statuses (admin-only).
+// This powers the legend panel's "Integrations" section.
+func (app *App) handleStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// OIDC / SSO
+	oidcCfg := app.store.GetOIDCSettings()
+	ssoStatus := map[string]any{
+		"enabled":   oidcCfg.Enabled,
+		"issuer":    oidcCfg.Issuer,
+		"exclusive": oidcCfg.Exclusive,
+		"active":    app.oidc != nil && oidcCfg.Enabled,
+	}
+
+	// TLS
+	tlsCfg := app.store.GetTLSConfig()
+	tlsStatus := map[string]any{
+		"configured": tlsCfg.CertFile != "" && tlsCfg.KeyFile != "",
+		"cert_file":  tlsCfg.CertFile,
+	}
+
+	// Syslog
+	syslogCfg := app.store.GetSyslogConfig()
+	syslogStatus := map[string]any{
+		"enabled":   syslogCfg.Enabled,
+		"host":      syslogCfg.Host,
+		"port":      syslogCfg.Port,
+		"transport": syslogCfg.Transport,
+		"format":    syslogCfg.Format,
+	}
+
+	// SMTP / Mail
+	mailCfg := app.store.GetMailConfig()
+	smtpStatus := map[string]any{
+		"enabled":   mailCfg.Enabled,
+		"host":      mailCfg.SMTPHost,
+		"port":      mailCfg.SMTPPort,
+		"tls_mode":  mailCfg.TLSMode,
+		"from_addr": mailCfg.FromAddr,
+	}
+
+	// Mattermost / Webhooks — count users with configured webhooks
+	allPrefs := app.store.GetAllPreferences()
+	mattermostCount := 0
+	webhookCount := 0
+	for _, p := range allPrefs {
+		if p.WebhookURL != "" {
+			webhookCount++
+			if p.WebhookType == "mattermost" || p.WebhookType == "slack" {
+				mattermostCount++
+			}
+		}
+	}
+	mattermostStatus := map[string]any{
+		"webhook_users":     webhookCount,
+		"mattermost_users":  mattermostCount,
+	}
+
+	// API Keys
+	apiKeys := app.store.GetAPIKeys()
+	apiKeyStatus := map[string]any{
+		"count": len(apiKeys),
+	}
+
+	jsonOK(w, map[string]any{
+		"sso":        ssoStatus,
+		"tls":        tlsStatus,
+		"syslog":     syslogStatus,
+		"smtp":       smtpStatus,
+		"mattermost": mattermostStatus,
+		"api_keys":   apiKeyStatus,
+	})
+}
+
 // ── Admin Reset ────────────────────────────────────────────────────────────────
 
 func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *User) {
@@ -4017,6 +4108,8 @@ func (app *App) routes() http.Handler {
 
 	// Version
 	mux.HandleFunc("/api/version", handleVersion)
+	// Integration status (admin-only summary of SSO/TLS/Syslog/SMTP/Webhooks/API keys)
+	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 
 	// Admin operations
 	mux.HandleFunc("/api/admin/reset", app.requireAuth(app.handleAdminReset))

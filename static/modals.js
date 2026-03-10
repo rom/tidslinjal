@@ -1549,6 +1549,37 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
         </div>
       </div>
+      ${(() => {
+        // Integration status panel — admin only
+        const st = (state.user && state.user.role === 'admin') ? (state._integrationStatus || null) : null;
+        if (!st) return '';
+        const pill = (ok, label, detail) => {
+          const col = ok ? '#22c55e' : '#6b7280';
+          return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span>
+            <span style="font-size:var(--fs-xs);font-weight:600;color:var(--text);min-width:80px">${label}</span>
+            <span style="font-size:10px;color:var(--text-dim);word-break:break-all">${escHtml(detail||'')}</span>
+          </div>`;
+        };
+        const sso = st.sso || {};
+        const tls = st.tls || {};
+        const sys = st.syslog || {};
+        const smtp = st.smtp || {};
+        const mm = st.mattermost || {};
+        const ak = st.api_keys || {};
+        return `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">🔌 ${t('info_integrations')||'Integrations'}</div>
+          <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;padding:0 4px">
+            ${pill(sso.active, 'SSO / OIDC', sso.active ? (sso.issuer||'active') + (sso.exclusive?' · excl.':'') : sso.enabled ? 'configured, inactive' : 'disabled')}
+            ${pill(tls.configured, 'TLS', tls.configured ? (tls.cert_file||'cert set') : 'not configured')}
+            ${pill(sys.enabled, 'Syslog', sys.enabled ? `${escHtml(sys.host||'')}:${sys.port||514} (${sys.transport||'udp'}, ${sys.format||'classic'})` : 'disabled')}
+            ${pill(smtp.enabled, 'SMTP/Mail', smtp.enabled ? `${escHtml(smtp.host||'')}:${smtp.port||587} ${smtp.tls_mode||''}` : 'disabled')}
+            ${pill((mm.mattermost_users||0)>0, 'Mattermost', (mm.webhook_users||0)>0 ? `${mm.webhook_users} webhook user${mm.webhook_users!==1?'s':''}, ${mm.mattermost_users} Mattermost` : 'no webhooks')}
+            ${pill((ak.count||0)>0, 'API Keys', `${ak.count||0} key${(ak.count||0)!==1?'s':''} active`)}
+          </div>
+        </div>`;
+      })()}
       ${vInfo.github ? `
       <div class="sidebar-section" style="padding-top:6px">
         <a href="${escHtml(vInfo.github)}" target="_blank" rel="noopener" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:5px">

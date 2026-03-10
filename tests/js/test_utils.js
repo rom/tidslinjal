@@ -304,6 +304,138 @@ test('backslash escaped', () => expect(escICS('a\\b')).toBe('a\\\\b'));
 test('plain text unchanged', () => expect(escICS('hello world')).toBe('hello world'));
 test('multiple special chars', () => expect(escICS('a;b,c\nd')).toBe('a\\;b\\,c\\nd'));
 
+// ── Additional escHtml edge cases ────────────────────────────────────────────
+
+console.log('\nescHtml — additional');
+test('single quote not escaped (not in spec)', () => expect(escHtml("it's")).toBe("it's"));
+test('numeric 0 is falsy — returns empty (consistent with falsy guard)', () => expect(escHtml(0)).toBe(''));
+test('false returns empty (falsy)', () => expect(escHtml(false)).toBe(''));
+test('nested tags fully escaped', () => expect(escHtml('<a href="x">link</a>')).toBe('&lt;a href=&quot;x&quot;&gt;link&lt;/a&gt;'));
+test('multiple ampersands', () => expect(escHtml('a & b & c')).toBe('a &amp; b &amp; c'));
+
+// ── Additional fmtDuration edge cases ────────────────────────────────────────
+
+console.log('\nfmtDuration — additional');
+test('exactly 59 minutes', () => expect(fmtDuration('2024-03-01T10:00:00Z', '2024-03-01T10:59:00Z')).toBe('59min'));
+test('exactly 24 hours', () => expect(fmtDuration('2024-03-01T00:00:00Z', '2024-03-02T00:00:00Z')).toBe('24h'));
+test('1 hour 1 minute', () => expect(fmtDuration('2024-03-01T10:00:00Z', '2024-03-01T11:01:00Z')).toBe('1h 1min'));
+test('large duration 48 hours', () => expect(fmtDuration('2024-03-01T00:00:00Z', '2024-03-03T00:00:00Z')).toBe('48h'));
+test('same start and end returns em-dash', () => expect(fmtDuration('2024-03-01T10:00:00Z', '2024-03-01T10:00:00Z')).toBe('—'));
+
+// ── Additional fmtFileSize edge cases ────────────────────────────────────────
+
+console.log('\nfmtFileSize — additional');
+test('0 bytes', () => expect(fmtFileSize(0)).toBe('0 B'));
+test('512 KB formats as KB not MB', () => expect(fmtFileSize(512 * 1024)).toBe('512.0 KB'));
+test('1023 KB boundary', () => expect(fmtFileSize(1023 * 1024)).toBe('1023.0 KB'));
+
+// ── Additional hasRole2 edge cases ───────────────────────────────────────────
+
+console.log('\nhasRole2 — additional');
+test('observer is not in order map, treated as 0 (== read)', () => expect(hasRole2('observer', 'read')).toBeTruthy());
+test('staffofficer not in map, treated as 0, below teamlead', () => expect(hasRole2('staffofficer', 'teamlead')).toBeFalsy());
+test('empty string vs read is truthy (0 >= 0)', () => expect(hasRole2('', 'read')).toBeTruthy());
+test('admin >= staffofficer_full (unknown, treated as 0)', () => expect(hasRole2('admin', 'staffofficer_full')).toBeTruthy());
+test('aplead < admin', () => expect(hasRole2('oplead', 'admin')).toBeFalsy());
+test('teamlead >= teamlead', () => expect(hasRole2('teamlead', 'teamlead')).toBeTruthy());
+
+// ── Additional recurStepMs edge cases ────────────────────────────────────────
+
+console.log('\nrecurStepMs — additional');
+test('empty string returns null', () => expect(recurStepMs('')).toBe(null));
+test('null returns null', () => expect(recurStepMs(null)).toBe(null));
+test('15min exact ms', () => expect(recurStepMs('15min')).toBe(900000));
+test('4hours in ms', () => expect(recurStepMs('4hours')).toBe(14400000));
+
+// ── Additional date utility edge cases ───────────────────────────────────────
+
+console.log('\nDate utilities — additional');
+test('addDays with 0 is identity', () => {
+  const d = new Date('2024-06-15');
+  expect(addDays(d, 0).getDate()).toBe(15);
+});
+test('addDays handles leap year Feb 28 + 1 = Feb 29', () => {
+  const d = new Date('2024-02-28');
+  const r = addDays(d, 1);
+  expect(r.getDate()).toBe(29);
+  expect(r.getMonth()).toBe(1);
+});
+test('addMonths with 0 is identity', () => {
+  const d = new Date('2024-06-15');
+  expect(addMonths(d, 0).getMonth()).toBe(5);
+});
+test('addMonths wraps to next year', () => {
+  const d = new Date('2024-11-01');
+  const r = addMonths(d, 3);
+  expect(r.getFullYear()).toBe(2025);
+  expect(r.getMonth()).toBe(1); // Feb
+});
+test('startOfDay preserves year/month/day', () => {
+  const d = new Date('2024-12-31T23:59:59');
+  const s = startOfDay(d);
+  expect(s.getFullYear()).toBe(2024);
+  expect(s.getMonth()).toBe(11);
+  expect(s.getDate()).toBe(31);
+  expect(s.getHours()).toBe(0);
+  expect(s.getSeconds()).toBe(0);
+});
+
+// ── Additional isSameDay edge cases ──────────────────────────────────────────
+
+console.log('\nisSameDay — additional');
+test('same timestamp is same day', () => {
+  const d = new Date('2024-06-15T12:00:00');
+  expect(isSameDay(d, d)).toBeTruthy();
+});
+test('midnight vs 23:59 is same day', () => {
+  expect(isSameDay(new Date('2024-06-15T00:00:00'), new Date('2024-06-15T23:59:59'))).toBeTruthy();
+});
+test('Dec 31 vs Jan 1 different year is not same day', () => {
+  expect(isSameDay(new Date('2024-12-31'), new Date('2025-01-01'))).toBeFalsy();
+});
+
+// ── Additional fmtDateInput edge cases ───────────────────────────────────────
+
+console.log('\nfmtDateInput — additional');
+test('undefined returns empty string', () => expect(fmtDateInput(undefined)).toBe(''));
+test('midnight formats correctly', () => {
+  const d = new Date(2024, 0, 1, 0, 0, 0);
+  expect(fmtDateInput(d)).toBe('2024-01-01T00:00');
+});
+test('end of year formats correctly', () => {
+  const d = new Date(2024, 11, 31, 23, 59, 0);
+  expect(fmtDateInput(d)).toBe('2024-12-31T23:59');
+});
+
+// ── Additional daysInMonth edge cases ────────────────────────────────────────
+
+console.log('\ndaysInMonth — additional');
+test('March has 31 days', () => expect(daysInMonth(new Date('2024-03-01'))).toBe(31));
+test('June has 30 days', () => expect(daysInMonth(new Date('2024-06-01'))).toBe(30));
+test('November has 30 days', () => expect(daysInMonth(new Date('2024-11-01'))).toBe(30));
+test('February 2100 has 28 days (not a leap year)', () => expect(daysInMonth(new Date('2100-02-01'))).toBe(28));
+
+// ── Additional escICS edge cases ─────────────────────────────────────────────
+
+console.log('\nescICS — additional');
+test('caret and pipe are unchanged', () => expect(escICS('a^b|c')).toBe('a^b|c'));
+test('tab is unchanged', () => expect(escICS('a\tb')).toBe('a\tb'));
+test('windows line ending \\r\\n: \\r unchanged, \\n escaped', () => expect(escICS('a\r\nb')).toBe('a\r\\nb'));
+test('double backslash in input', () => expect(escICS('a\\\\b')).toBe('a\\\\\\\\b'));
+test('multiple semicolons', () => expect(escICS('a;b;c')).toBe('a\\;b\\;c'));
+
+// ── toICSDate additional ──────────────────────────────────────────────────────
+
+console.log('\ntoICSDate — additional');
+test('midnight UTC', () => {
+  const d = new Date('2024-01-01T00:00:00Z');
+  expect(toICSDate(d)).toBe('20240101T000000Z');
+});
+test('end of year', () => {
+  const d = new Date('2024-12-31T23:59:59Z');
+  expect(toICSDate(d)).toBe('20241231T235959Z');
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(60)}`);
