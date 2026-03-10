@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -2823,7 +2824,9 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			existing.Role = req.Role
 		}
 		existing.CanLock = req.CanLock
-		existing.NATODesignations = req.NATODesignations
+		if req.NATODesignations != nil {
+			existing.NATODesignations = req.NATODesignations
+		}
 		// Update group memberships if admin passed group_ids
 		if req.GroupIDs != nil {
 			// Remove all existing memberships for this user
@@ -6769,12 +6772,34 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// PKCE: generate code_verifier (43-128 chars of unreserved URL chars)
+	verifierBytes := make([]byte, 32)
+	if _, err := rand.Read(verifierBytes); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	codeVerifier := base64.RawURLEncoding.EncodeToString(verifierBytes)
+	// Store code_verifier in cookie for use during callback
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oidc_pkce",
+		Value:    codeVerifier,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   300,
+		SameSite: http.SameSiteLaxMode,
+	})
+	// code_challenge = BASE64URL(SHA256(code_verifier))
+	h := sha256.Sum256([]byte(codeVerifier))
+	codeChallenge := base64.RawURLEncoding.EncodeToString(h[:])
+
 	params := url.Values{
-		"response_type": {"code"},
-		"client_id":     {app.oidc.ClientID},
-		"redirect_uri":  {app.oidc.RedirectURL},
-		"scope":         {"openid profile email"},
-		"state":         {state},
+		"response_type":         {"code"},
+		"client_id":             {app.oidc.ClientID},
+		"redirect_uri":          {app.oidc.RedirectURL},
+		"scope":                 {"openid profile email"},
+		"state":                 {state},
+		"code_challenge":        {codeChallenge},
+		"code_challenge_method": {"S256"},
 	}
 	http.Redirect(w, r, app.oidc.AuthorizationEndpoint+"?"+params.Encode(), http.StatusFound)
 }
@@ -6795,6 +6820,15 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	// Clear state cookie
 	http.SetCookie(w, &http.Cookie{Name: "oidc_state", Path: "/", MaxAge: -1})
 
+	// Retrieve PKCE code_verifier from cookie
+	pkceCookie, _ := r.Cookie("oidc_pkce")
+	codeVerifier := ""
+	if pkceCookie != nil {
+		codeVerifier = pkceCookie.Value
+	}
+	// Clear PKCE cookie
+	http.SetCookie(w, &http.Cookie{Name: "oidc_pkce", Path: "/", MaxAge: -1})
+
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		errMsg := r.URL.Query().Get("error_description")
@@ -6805,14 +6839,18 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Exchange code for tokens
-	tokenResp, err := http.PostForm(app.oidc.TokenEndpoint, url.Values{
+	// Exchange code for tokens (with PKCE code_verifier)
+	tokenParams := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
 		"redirect_uri":  {app.oidc.RedirectURL},
 		"client_id":     {app.oidc.ClientID},
 		"client_secret": {app.oidc.ClientSecret},
-	})
+	}
+	if codeVerifier != "" {
+		tokenParams.Set("code_verifier", codeVerifier)
+	}
+	tokenResp, err := http.PostForm(app.oidc.TokenEndpoint, tokenParams)
 	if err != nil || tokenResp.StatusCode != http.StatusOK {
 		http.Redirect(w, r, "/login?error=token_exchange_failed", http.StatusFound)
 		return

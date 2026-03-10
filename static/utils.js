@@ -200,6 +200,28 @@ function showNotification(type, message, duration=4000) {
 // ── Clock ───────────────────────────────────────────────────────────────────
 let _clockUTC = localStorage.getItem('clockFmt') === 'zulu'; // false = local time, true = UTC
 
+// BroadcastChannel for syncing state to detached windows
+const _detachedChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
+
+function _broadcastSync(msg) {
+  if (_detachedChannel) _detachedChannel.postMessage(msg);
+}
+
+// Listen for messages from detached windows
+if (_detachedChannel) {
+  _detachedChannel.onmessage = e => {
+    if (e.data.type === 'clock-format') {
+      _clockUTC = e.data.zulu;
+      localStorage.setItem('clockFmt', _clockUTC ? 'zulu' : 'local');
+      updateClock();
+      const localBtn = document.getElementById('clockFmtLocal');
+      const zuluBtn  = document.getElementById('clockFmtZulu');
+      if (localBtn) localBtn.classList.toggle('active', !_clockUTC);
+      if (zuluBtn)  zuluBtn.classList.toggle('active',  _clockUTC);
+    }
+  };
+}
+
 function setClockFormat(fmt) {
   _clockUTC = (fmt === 'zulu');
   localStorage.setItem('clockFmt', _clockUTC ? 'zulu' : 'local');
@@ -209,6 +231,7 @@ function setClockFormat(fmt) {
   const zuluBtn  = document.getElementById('clockFmtZulu');
   if (localBtn) localBtn.classList.toggle('active', !_clockUTC);
   if (zuluBtn)  zuluBtn.classList.toggle('active',  _clockUTC);
+  _broadcastSync({ type: 'clock-format', zulu: _clockUTC });
 }
 
 function toggleClockTZ() {
