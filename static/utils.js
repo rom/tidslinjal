@@ -87,7 +87,11 @@ function daysInMonth(d) {
 }
 function getDays() {
   const n = getRangeDays();
-  return Array.from({length:n}, (_, i) => addDays(state.startDate, i));
+  const all = Array.from({length:n}, (_, i) => addDays(state.startDate, i));
+  if (state.exercise && state.exercise.include_weekends === false) {
+    return all.filter(d => { const dow = d.getDay(); return dow !== 0 && dow !== 6; });
+  }
+  return all;
 }
 function getViewEnd() { return addDays(state.startDate, getRangeDays()); }
 
@@ -547,6 +551,8 @@ function detachHelp() {
     return;
   }
   const theme = (state.preferences && state.preferences.theme) || 'dark';
+  const lang  = (state.preferences && state.preferences.language) || 'en';
+  const themeClass = theme === 'light' ? ' class="light-mode"' : theme === 'city-camo' ? ' class="city-camo"' : theme === 'urban-camo' ? ' class="urban-camo"' : '';
   // Grab the full help content from the current modal
   const helpBody = document.querySelector('#helpModal .modal-body');
   const helpContent = helpBody ? helpBody.innerHTML : '<p>Help unavailable</p>';
@@ -557,10 +563,10 @@ function detachHelp() {
     .join('\n');
 
   const popupHTML = `<!DOCTYPE html>
-<html lang="en" data-theme="${escHtml(theme)}" data-size="normal">
+<html lang="${escHtml(lang)}" data-theme="${escHtml(theme)}" data-size="normal">
 <head>
 <meta charset="UTF-8">
-<title>Tidslinjal — Help</title>
+<title>Tidslinjal — ${escHtml(t('help_title'))}</title>
 <link rel="stylesheet" href="/static/style.css">
 <style>
   body { margin:0; padding:0; overflow:hidden; }
@@ -593,11 +599,11 @@ function detachHelp() {
   code { background:var(--bg3,#333); padding:1px 4px; border-radius:3px; font-size:11px; font-family:monospace; }
 </style>
 </head>
-<body>
+<body${themeClass}>
 <div class="help-window-wrap">
   <div class="help-win-header">
-    <span class="help-win-title">Tidslinjal — Help</span>
-    <input type="search" class="help-win-search" id="helpWinSearch" placeholder="Search…" autocomplete="off">
+    <span class="help-win-title">Tidslinjal — ${escHtml(t('help_title'))}</span>
+    <input type="search" class="help-win-search" id="helpWinSearch" placeholder="${escHtml(t('help_search'))}" autocomplete="off">
     <span id="helpWinStatus" style="font-size:11px;color:var(--text-dim,#888);min-width:60px"></span>
   </div>
   <div class="help-body">${helpContent}</div>
