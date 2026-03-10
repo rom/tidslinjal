@@ -549,10 +549,17 @@ const TRANSLATIONS = {
     clock_minimal:   'Minimal',
     clock_compact:   'Compact',
     clock_digits:    'Show hour numbers on analog face',
+    clock_mode_digital: 'Digital',
+    clock_mode_analog:  'Analog',
+    clock_mode_vcr:     'VCR',
+    clock_digits_label: '1-12',
+    clock_toggle_tz:    'Click to toggle Local / UTC',
+    clock_remove:       'Remove this clock',
 
     // Help popup
     help_title:      'Help',
     help_search:     'Search\u2026',
+    help_unavailable: 'Help unavailable',
   },
 
   sv: {
@@ -1067,10 +1074,17 @@ const TRANSLATIONS = {
     clock_minimal:   'Minimal',
     clock_compact:   'Kompakt',
     clock_digits:    'Visa timtal på analog urtavla',
+    clock_mode_digital: 'Digital',
+    clock_mode_analog:  'Analog',
+    clock_mode_vcr:     'VCR',
+    clock_digits_label: '1-12',
+    clock_toggle_tz:    'Klicka för att växla Lokal / UTC',
+    clock_remove:       'Ta bort denna klocka',
 
     // Help popup
     help_title:      'Hjälp',
     help_search:     'Sök\u2026',
+    help_unavailable: 'Hjälp ej tillgänglig',
   },
 
   fr: {
@@ -1585,10 +1599,17 @@ const TRANSLATIONS = {
     clock_minimal:   'Minimal',
     clock_compact:   'Compact',
     clock_digits:    'Afficher les chiffres sur le cadran analogique',
+    clock_mode_digital: 'Numérique',
+    clock_mode_analog:  'Analogique',
+    clock_mode_vcr:     'VCR',
+    clock_digits_label: '1-12',
+    clock_toggle_tz:    'Cliquer pour basculer Local / UTC',
+    clock_remove:       'Supprimer cette horloge',
 
     // Help popup
     help_title:      'Aide',
     help_search:     'Rechercher\u2026',
+    help_unavailable: 'Aide non disponible',
   }
 };
 

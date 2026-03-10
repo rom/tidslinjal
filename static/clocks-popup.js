@@ -20,7 +20,10 @@ function _t(key) {
   // Hardcoded fallbacks
   const fb = { clock_title:'Clocks', clock_local:'Local Time', clock_style:'Style',
     clock_mode:'Mode', clock_size:'Size', clock_standard:'Standard',
-    clock_minimal:'Minimal', clock_compact:'Compact', clock_digits:'Show hour numbers on analog face' };
+    clock_minimal:'Minimal', clock_compact:'Compact', clock_digits:'Show hour numbers on analog face',
+    clock_mode_digital:'Digital', clock_mode_analog:'Analog', clock_mode_vcr:'VCR',
+    clock_digits_label:'1-12', clock_toggle_tz:'Click to toggle Local / UTC',
+    clock_remove:'Remove this clock' };
   return fb[key] || key;
 }
 
@@ -64,9 +67,20 @@ function syncLanguage() {
     sel.options[1].textContent = _t('clock_minimal');
     sel.options[2].textContent = _t('clock_compact');
   }
-  // Update digits button tooltip
+  // Update mode buttons
+  const btnDig = document.getElementById('btnDigital');
+  if (btnDig) btnDig.textContent = _t('clock_mode_digital');
+  const btnAna = document.getElementById('btnAnalog');
+  if (btnAna) btnAna.textContent = _t('clock_mode_analog');
+  const btnVcr = document.getElementById('btnVCR');
+  if (btnVcr) btnVcr.textContent = _t('clock_mode_vcr');
+  // Update digits button tooltip and label
   const btnD = document.getElementById('btnDigits');
-  if (btnD) btnD.title = _t('clock_digits');
+  if (btnD) { btnD.title = _t('clock_digits'); btnD.textContent = _t('clock_digits_label'); }
+  // Update remove button tooltips
+  document.querySelectorAll('[data-rm-clock]').forEach(function(btn) {
+    btn.title = _t('clock_remove');
+  });
   // Update page header
   const hdr = document.querySelector('.page-header');
   if (hdr) hdr.textContent = 'Tidslinjal \u2014 ' + _t('clock_title');
@@ -225,23 +239,25 @@ function rebuildClocks() {
   _lastMode = clockMode;
   let html = '';
   const mainLabel = isUTC ? 'UTC/Z' : _t('clock_local');
+  const toggleTip = escH(_t('clock_toggle_tz'));
+  const removeTip = escH(_t('clock_remove'));
   if (clockMode === 'analog') {
     html += `<div class="clock-card" id="card-main">
-      <div class="clock-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${mainLabel}</div>
+      <div class="clock-label clock-label-click" id="main-label" title="${toggleTip}">${mainLabel}</div>
       <div class="analog-wrap">${buildAnalogSVG('svg-main')}</div>
       <div class="clock-date" id="main-date"></div>
       <div class="clock-tz" id="main-tz"></div>
     </div>`;
   } else if (clockMode === 'vcr') {
     html += `<div class="clock-card vcr-card" id="card-main">
-      <div class="clock-label vcr-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${isUTC?'UTC/Z':'LOCAL'}</div>
+      <div class="clock-label vcr-label clock-label-click" id="main-label" title="${toggleTip}">${isUTC?'UTC/Z':escH(_t('clock_local'))}</div>
       <div class="clock-time vcr-time"><span id="vcr-main-h">--</span><span class="vcr-colon">:</span><span id="vcr-main-m">--</span><span class="vcr-colon">:</span><span id="vcr-main-s">--</span></div>
       <div class="clock-date vcr-date" id="main-date"></div>
       <div class="clock-tz vcr-tz" id="main-tz"></div>
     </div>`;
   } else {
     html += `<div class="clock-card" id="card-main">
-      <div class="clock-label clock-label-click" id="main-label" title="Click to toggle Local / UTC">${mainLabel}</div>
+      <div class="clock-label clock-label-click" id="main-label" title="${toggleTip}">${mainLabel}</div>
       <div class="clock-time" id="main-time">--:--:--</div>
       <div class="clock-date" id="main-date"></div>
       <div class="clock-tz" id="main-tz"></div>
@@ -250,21 +266,21 @@ function rebuildClocks() {
   extra.forEach(ec => {
     if (clockMode === 'analog') {
       html += `<div class="clock-card" id="card-${ec.id}">
-        <button class="clock-remove" title="Remove this clock" data-rm-clock="${ec.id}">&times;</button>
+        <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
         <div class="clock-label">${escH(ec.label||ec.timezone)}</div>
         <div class="analog-wrap">${buildAnalogSVG('svg-'+ec.id)}</div>
         <div class="clock-tz" id="ec-${ec.id}-tz"></div>
       </div>`;
     } else if (clockMode === 'vcr') {
       html += `<div class="clock-card vcr-card" id="card-${ec.id}">
-        <button class="clock-remove" title="Remove this clock" data-rm-clock="${ec.id}">&times;</button>
+        <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
         <div class="clock-label vcr-label">${escH(ec.label||ec.timezone)}</div>
         <div class="clock-time vcr-time"><span id="vcr-ec-${ec.id}-h">--</span><span class="vcr-colon">:</span><span id="vcr-ec-${ec.id}-m">--</span><span class="vcr-colon">:</span><span id="vcr-ec-${ec.id}-s">--</span></div>
         <div class="clock-tz vcr-tz" id="ec-${ec.id}-tz"></div>
       </div>`;
     } else {
       html += `<div class="clock-card" id="card-${ec.id}">
-        <button class="clock-remove" title="Remove this clock" data-rm-clock="${ec.id}">&times;</button>
+        <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
         <div class="clock-label">${escH(ec.label||ec.timezone)}</div>
         <div class="clock-time" id="ec-${ec.id}-time">--:--:--</div>
         <div class="clock-tz" id="ec-${ec.id}-tz"></div>

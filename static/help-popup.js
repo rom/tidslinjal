@@ -8,7 +8,7 @@ function _t(key) {
     if (TRANSLATIONS && TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) return TRANSLATIONS[lang][key];
     if (TRANSLATIONS && TRANSLATIONS.en && TRANSLATIONS.en[key]) return TRANSLATIONS.en[key];
   } catch(e) {}
-  const fb = { help_title:'Help', help_search:'Search\u2026' };
+  const fb = { help_title:'Help', help_search:'Search\u2026', help_unavailable:'Help unavailable' };
   return fb[key] || key;
 }
 
