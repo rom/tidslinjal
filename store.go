@@ -55,6 +55,8 @@ type Store struct {
 	eventVersions        []EventVersion
 	autoReportSchedules  []AutoReportSchedule
 	editingLocks         []EditingLock // in-memory only; not persisted
+	routingRules         []RoutingRule
+	connectorConfigs     []ConnectorConfig
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -73,6 +75,7 @@ type Store struct {
 	nextFilterPresetID  int64
 	nextEventVersionID      int64
 	nextAutoReportScheduleID int64
+	nextRoutingRuleID        int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -126,6 +129,8 @@ func (s *Store) load() error {
 	s.loadFile("filter_presets.json", &s.filterPresets)
 	s.loadFile("event_versions.json", &s.eventVersions)
 	s.loadFile("auto_report_schedules.json", &s.autoReportSchedules)
+	s.loadFile("routing_rules.json", &s.routingRules)
+	s.loadFile("connectors.json", &s.connectorConfigs)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -218,6 +223,11 @@ func (s *Store) load() error {
 	for _, x := range s.autoReportSchedules {
 		if x.ID > s.nextAutoReportScheduleID {
 			s.nextAutoReportScheduleID = x.ID
+		}
+	}
+	for _, x := range s.routingRules {
+		if x.ID > s.nextRoutingRuleID {
+			s.nextRoutingRuleID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
