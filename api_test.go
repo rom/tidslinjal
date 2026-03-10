@@ -24,8 +24,6 @@ func newTestApp(t *testing.T) (*App, *httptest.Server) {
 	}
 	srv := httptest.NewServer(app.routes())
 	t.Cleanup(func() {
-		http.DefaultTransport.(*http.Transport).CloseIdleConnections()
-		srv.CloseClientConnections()
 		srv.Close()
 		app.Stop()
 	})
