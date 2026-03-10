@@ -146,7 +146,6 @@ type UserPublic struct {
 	LastLoginIP      string     `json:"last_login_ip,omitempty"`
 	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
 	IsOIDC           bool       `json:"is_oidc,omitempty"`
-	WebCalToken      string     `json:"webcal_token,omitempty"`
 	Blocked          bool       `json:"blocked,omitempty"`
 }
 
@@ -175,7 +174,6 @@ func (u *User) Public() UserPublic {
 		LastLoginIP:      u.LastLoginIP,
 		LastLoginDomain:  u.LastLoginDomain,
 		IsOIDC:           u.IsOIDC,
-		WebCalToken:      u.WebCalToken,
 		Blocked:          u.Blocked,
 	}
 }

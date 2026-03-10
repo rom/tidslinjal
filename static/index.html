@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidslinjal</title>
   <link rel="stylesheet" href="/static/style.css">
-  <!-- Leaflet CSS is lazy-loaded alongside Leaflet JS in loadLeaflet() -->
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
 </head>
 <body>
 <div id="app">
@@ -21,7 +21,7 @@
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnPrev" title="Previous" style="font-size:16px">&#8249;</button>
         <button class="btn btn-secondary toolbar-btn" id="btnToday">📍 Today</button>
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnDatePicker" title="Go to date…">📅</button>
-        <input type="date" id="datePickerInput" style="display:none;position:absolute" onchange="goToDate(this.value)">
+        <input type="date" id="datePickerInput" style="display:none;position:absolute">
         <button class="btn btn-secondary toolbar-btn btn-icon" id="btnNext" title="Next" style="font-size:16px">&#8250;</button>
       </div>
 
@@ -86,9 +86,9 @@
 
       <!-- Group 7: Language -->
       <div class="lang-flags" id="langFlags">
-        <button class="lang-flag-btn" id="flagEN" title="English" onclick="setPref('language','en')">🇬🇧</button>
-        <button class="lang-flag-btn" id="flagSV" title="Svenska" onclick="setPref('language','sv')">🇸🇪</button>
-        <button class="lang-flag-btn" id="flagFR" title="Français" onclick="setPref('language','fr')">🇫🇷</button>
+        <button class="lang-flag-btn" id="flagEN" title="English">🇬🇧</button>
+        <button class="lang-flag-btn" id="flagSV" title="Svenska">🇸🇪</button>
+        <button class="lang-flag-btn" id="flagFR" title="Français">🇫🇷</button>
       </div>
 
     </div>
@@ -97,15 +97,15 @@
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <!-- Shown when clocks are detached to separate window -->
       <div id="clockDetachedIndicator" style="display:none;align-items:center;gap:6px;cursor:pointer;opacity:.7;font-size:12px;color:var(--accent)"
-           onclick="if(_clockPopout&&!_clockPopout.closed){_clockPopout.focus();}else{_setClockAreaDetached(false);}" title="Clocks are in a separate window — click to focus or reattach">
+           title="Clocks are in a separate window — click to focus or reattach">
         ⧉ <span>Clocks detached</span>
       </div>
       <div class="clock-area" id="clockArea">
-        <button class="btn btn-ghost btn-icon clock-add-btn" onclick="openDetachedClock()" title="Open detached clock window" style="font-size:14px">⏱</button>
-        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" onclick="openAddClockPopover(this)" title="Add timezone clock">+</button>
-        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" onclick="detachClock()" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnOpenDetachedClock" title="Open detached clock window" style="font-size:14px">⏱</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" title="Add timezone clock">+</button>
+        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
         <div id="extraClocksContainer" style="display:contents"></div>
-        <div class="clock-display" onclick="toggleClockTZ()" title="Click to toggle local / UTC" style="cursor:pointer">
+        <div class="clock-display" id="clockDisplay" title="Click to toggle local / UTC" style="cursor:pointer">
           <div class="clock-time" id="clockTime">00:00:00</div>
           <div style="display:flex;align-items:center;gap:4px">
             <div class="clock-date" id="clockDate">—</div>
@@ -120,7 +120,7 @@
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">City, country or timezone</label>
           <input type="text" id="newClockSearch" placeholder="e.g. London, Paris, UTC…" maxlength="40" autocomplete="off"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)"
-            oninput="filterTzSuggestions(this.value)" onkeydown="tzSuggestionsKey(event)">
+            >
           <div id="tzSuggestions" style="display:none;position:absolute;left:0;right:0;top:100%;max-height:180px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:201;box-shadow:var(--shadow-lg)"></div>
         </div>
         <div class="form-group" style="margin-bottom:4px">
@@ -134,17 +134,17 @@
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-sm)">
         </div>
         <div style="display:flex;gap:6px;justify-content:flex-end">
-          <button class="btn btn-secondary btn-sm" onclick="closeAddClockPopover()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="confirmAddClock()">Add</button>
+          <button class="btn btn-secondary btn-sm" id="btnClockPopCancel">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="btnClockPopConfirm">Add</button>
         </div>
       </div>
       <div class="user-info">
-        <div class="user-badge" style="cursor:pointer" onclick="openProfileModal()" title="My Profile">
+        <div class="user-badge" id="userBadge" style="cursor:pointer" title="My Profile">
           <span id="userDisplayName">—</span>
           <span class="role-badge role-read" id="userRoleBadge">read</span>
         </div>
         <a id="appVersionLink" href="#" target="_blank" rel="noopener" class="version-badge" title="GitHub repository" style="font-size:10px;opacity:0.6;text-decoration:none;color:inherit">v?</a>
-        <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help" onclick="openModal('helpModal')">?</button>
+        <button class="btn btn-secondary btn-icon btn-sm" id="btnHelp" title="Help">?</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnChangePassword" title="Change password">🔑</button>
         <button class="btn btn-secondary btn-icon btn-sm" id="btnSidebar" title="Toggle panel">☰</button>
         <button class="btn btn-secondary btn-sm" id="btnLogout">Logout</button>
@@ -164,8 +164,8 @@
     <!-- List View -->
     <div id="list-view" style="display:none;overflow:auto;flex:1;padding:16px">
       <div id="list-view-toolbar" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <input type="text" id="listSearch" placeholder="🔍 Search…" style="width:200px" autocomplete="off" oninput="renderListView()">
-        <select id="listStatusFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+        <input type="text" id="listSearch" placeholder="🔍 Search…" style="width:200px" autocomplete="off">
+        <select id="listStatusFilter" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
           <option value="">All statuses</option>
           <option value="planned">Planned</option>
           <option value="active">Active</option>
@@ -173,7 +173,7 @@
           <option value="verified">Verified</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select id="listTypeFilter" onchange="renderListView()" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
+        <select id="listTypeFilter" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px">
           <option value="">All types</option>
         </select>
         <span id="listCount" style="color:var(--text-dim);font-size:var(--fs-sm)"></span>
@@ -181,10 +181,10 @@
       <table id="list-view-table" style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
         <thead>
           <tr style="background:var(--bg3);position:sticky;top:0;z-index:1">
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('title')">Title <span id="listSort-title"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('event_type')">Type <span id="listSort-event_type"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('status')">Status <span id="listSort-status"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" onclick="listSortBy('start_time')">Start <span id="listSort-start_time">▲</span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="title">Title <span id="listSort-title"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="event_type">Type <span id="listSort-event_type"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="status">Status <span id="listSort-status"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="start_time">Start <span id="listSort-start_time">▲</span></th>
             <th style="padding:8px 10px;text-align:left">End</th>
             <th style="padding:8px 10px;text-align:left">Responsible</th>
             <th style="padding:8px 10px;text-align:left">Actions</th>
@@ -219,11 +219,11 @@
 
 <!-- Navigation jump dropdown -->
 <div id="navJumpMenu" class="nav-jump-menu" style="display:none">
-  <div class="nav-jump-item" onclick="navJump(1)">1 Day</div>
-  <div class="nav-jump-item" onclick="navJump(2)">2 Days</div>
-  <div class="nav-jump-item" onclick="navJump(3)">3 Days</div>
-  <div class="nav-jump-item" onclick="navJump(7)">1 Week</div>
-  <div class="nav-jump-item" onclick="navJump(14)">2 Weeks</div>
+  <div class="nav-jump-item" data-jump="1">1 Day</div>
+  <div class="nav-jump-item" data-jump="2">2 Days</div>
+  <div class="nav-jump-item" data-jump="3">3 Days</div>
+  <div class="nav-jump-item" data-jump="7">1 Week</div>
+  <div class="nav-jump-item" data-jump="14">2 Weeks</div>
 </div>
 
 <!-- Filter popover -->
@@ -246,38 +246,38 @@
     </select>
   </div>
   <div style="display:flex;gap:6px;margin-top:8px">
-    <button class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
-    <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+    <button class="btn btn-primary btn-sm" id="btnApplyFilters">Apply</button>
+    <button class="btn btn-secondary btn-sm" id="btnClearFilters">Clear</button>
   </div>
   <div class="filter-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
     <label class="filter-label">💾 Saved Presets:</label>
     <div id="filterPresetList" style="margin-bottom:6px"></div>
     <div style="display:flex;gap:4px">
       <input type="text" id="filterPresetName" placeholder="Preset name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
-      <button class="btn btn-secondary btn-sm" onclick="saveFilterPreset()">Save</button>
+      <button class="btn btn-secondary btn-sm" id="btnSaveFilterPreset">Save</button>
     </div>
   </div>
 </div>
 
 <!-- Context menu -->
 <div id="contextMenu" class="context-menu" style="display:none">
-  <div class="context-menu-item" id="ctxEdit" onclick="ctxAction('edit')">✏️ Edit Event</div>
-  <div class="context-menu-item" id="ctxDuplicate" onclick="ctxAction('duplicate')">⧉ Duplicate</div>
-  <div class="context-menu-item" id="ctxAlarm" onclick="ctxAction('alarm')">🔔 Set Alarm</div>
-  <div class="context-menu-item" id="ctxMove" onclick="ctxAction('move')">📅 Move to new time/date…</div>
+  <div class="context-menu-item" id="ctxEdit" data-ctx-action="edit">✏️ Edit Event</div>
+  <div class="context-menu-item" id="ctxDuplicate" data-ctx-action="duplicate">⧉ Duplicate</div>
+  <div class="context-menu-item" id="ctxAlarm" data-ctx-action="alarm">🔔 Set Alarm</div>
+  <div class="context-menu-item" id="ctxMove" data-ctx-action="move">📅 Move to new time/date…</div>
   <div class="context-menu-sep"></div>
-  <div class="context-menu-item" id="ctxStatusPlanned" onclick="ctxAction('status','planned')">Set Planned</div>
-  <div class="context-menu-item" id="ctxStatusActive" onclick="ctxAction('status','active')">Set Active</div>
-  <div class="context-menu-item" id="ctxStatusCompleted" onclick="ctxAction('status','completed')">Set Completed</div>
-  <div class="context-menu-item" id="ctxStatusCancelled" onclick="ctxAction('status','cancelled')">Set Cancelled</div>
+  <div class="context-menu-item" id="ctxStatusPlanned" data-ctx-action="status" data-ctx-param="planned">Set Planned</div>
+  <div class="context-menu-item" id="ctxStatusActive" data-ctx-action="status" data-ctx-param="active">Set Active</div>
+  <div class="context-menu-item" id="ctxStatusCompleted" data-ctx-action="status" data-ctx-param="completed">Set Completed</div>
+  <div class="context-menu-item" id="ctxStatusCancelled" data-ctx-action="status" data-ctx-param="cancelled">Set Cancelled</div>
   <div class="context-menu-sep"></div>
-  <div class="context-menu-item ctx-danger" id="ctxDelete" onclick="ctxAction('delete')">🗑 Delete</div>
+  <div class="context-menu-item ctx-danger" id="ctxDelete" data-ctx-action="delete">🗑 Delete</div>
 </div>
 
 <!-- Empty slot context menu -->
 <div id="slotContextMenu" class="context-menu" style="display:none">
-  <div class="context-menu-item" onclick="ctxSlotAction('add')">Add Event Here</div>
-  <div class="context-menu-item" onclick="ctxSlotAction('lock')">Lock This Slot</div>
+  <div class="context-menu-item" data-ctx-slot-action="add">Add Event Here</div>
+  <div class="context-menu-item" data-ctx-slot-action="lock">Lock This Slot</div>
 </div>
 
 <!-- Error Modal -->
@@ -285,13 +285,13 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header" style="background:var(--danger,#c0392b);border-radius:var(--radius) var(--radius) 0 0">
       <h2 style="color:#fff;display:flex;align-items:center;gap:8px"><span style="font-size:1.2em">⚠</span> <span id="errorModalTitle">Error</span></h2>
-      <button class="modal-close" style="color:#fff" onclick="closeModal('errorModal')">&times;</button>
+      <button class="modal-close" style="color:#fff" data-close-modal="errorModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="errorModalMsg" style="font-size:var(--fs-base);line-height:1.5;white-space:pre-wrap"></p>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-primary" onclick="closeModal('errorModal')">OK</button>
+      <button class="btn btn-primary" data-close-modal="errorModal">OK</button>
     </div>
   </div>
 </div>
@@ -301,20 +301,20 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>📋 Templates</h2>
-      <button class="modal-close" onclick="closeModal('templatesModal')">&times;</button>
+      <button class="modal-close" data-close-modal="templatesModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Templates let you quickly create a pre-defined set of events. Save the current view's events as a template or apply a saved template to any date.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary btn-sm" id="btnSaveTemplate">💾 Save current events as template…</button>
-        <button class="btn btn-secondary btn-sm" id="btnImportTemplate" onclick="importTemplateFromFile()">📂 Load from file…</button>
-        <button class="btn btn-secondary btn-sm" id="btnExportTemplates" onclick="exportTemplatesToFile()">⬇ Save to file…</button>
-        <input type="file" id="templateFileInput" accept=".json" style="display:none" onchange="handleTemplateFileLoad(this)">
+        <button class="btn btn-secondary btn-sm" id="btnImportTemplate">📂 Load from file…</button>
+        <button class="btn btn-secondary btn-sm" id="btnExportTemplates">⬇ Save to file…</button>
+        <input type="file" id="templateFileInput" accept=".json" style="display:none">
       </div>
       <div id="templatesList" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('templatesModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="templatesModal">Close</button>
     </div>
   </div>
 </div>
@@ -324,7 +324,7 @@
   <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <h2>💾 Save as Template</h2>
-      <button class="modal-close" onclick="closeModal('saveTemplateModal')">&times;</button>
+      <button class="modal-close" data-close-modal="saveTemplateModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -358,7 +358,7 @@
       </fieldset>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('saveTemplateModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="saveTemplateModal">Cancel</button>
       <button class="btn btn-primary" id="btnConfirmSaveTemplate">Save Template</button>
     </div>
   </div>
@@ -369,7 +369,7 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
       <h2>▶ Apply Template</h2>
-      <button class="modal-close" onclick="closeModal('applyTemplateModal')">&times;</button>
+      <button class="modal-close" data-close-modal="applyTemplateModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="applyTemplateInfo" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -384,7 +384,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('applyTemplateModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="applyTemplateModal">Cancel</button>
       <button class="btn btn-primary" id="btnConfirmApplyTemplate">Load Template</button>
     </div>
   </div>
@@ -396,7 +396,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔁 Edit Recurring Event</h2>
-      <button class="modal-close" onclick="closeModal('recurEditModal')">&times;</button>
+      <button class="modal-close" data-close-modal="recurEditModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="recurEditMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to edit?</p>
@@ -407,7 +407,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('recurEditModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="recurEditModal">Cancel</button>
     </div>
   </div>
 </div>
@@ -416,7 +416,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔁 Delete Recurring Event</h2>
-      <button class="modal-close" onclick="closeModal('recurDeleteModal')">&times;</button>
+      <button class="modal-close" data-close-modal="recurDeleteModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="recurDeleteMsg" style="margin-bottom:16px;font-size:var(--fs-sm)">This is a recurring event. What would you like to delete?</p>
@@ -427,21 +427,21 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('recurDeleteModal')">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="recurDeleteModal">Cancel</button>
     </div>
   </div>
 </div>
 
 <!-- Sidebar backdrop for mobile -->
-<div id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+<div id="sidebarBackdrop"></div>
 
 <!-- Mobile bottom nav -->
 <nav id="mobileNav" class="mobile-nav" style="display:none">
-  <button class="mobile-nav-btn" onclick="mobileNavTab('timeline')" id="mnTimeline">📅<span>Timeline</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('legend')" id="mnLegend">🏷️<span>Legend</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('layers')" id="mnLayers">📂<span>Layers</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('settings')" id="mnSettings">⚙️<span>Settings</span></button>
-  <button class="mobile-nav-btn" onclick="mobileNavTab('menu')" id="mnMenu">☰<span>More</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="timeline" id="mnTimeline">📅<span>Timeline</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="legend" id="mnLegend">🏷️<span>Legend</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="layers" id="mnLayers">📂<span>Layers</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="settings" id="mnSettings">⚙️<span>Settings</span></button>
+  <button class="mobile-nav-btn" data-mobile-tab="menu" id="mnMenu">☰<span>More</span></button>
 </nav>
 
 <!-- Layer quick-toggle popover -->
@@ -460,7 +460,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="eventModalTitle">Add Event</h2>
-      <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
+      <button class="modal-close" data-close-modal="eventModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="eventId">
@@ -522,7 +522,7 @@
         <div class="form-row">
           <div class="form-group">
             <label id="lbl-ev-contact-type">Contact type</label>
-            <select id="eventContactType" onchange="onContactTypeChange()">
+            <select id="eventContactType">
               <option value="">— None —</option>
               <option value="url">URL</option>
               <option value="ip">IP address</option>
@@ -536,7 +536,7 @@
         </div>
         <div class="form-group" id="virtualMeetingTypeGroup" style="display:none">
           <label id="lbl-ev-virtual-type">Virtual meeting platform</label>
-          <select id="eventVirtualMeetingType" onchange="onVirtualMeetingTypeChange()">
+          <select id="eventVirtualMeetingType">
             <option value="">— Not specified —</option>
             <option value="mattermost">Mattermost</option>
             <option value="teams">Microsoft Teams</option>
@@ -546,7 +546,7 @@
             <option value="teleconf">Tele conference</option>
             <option value="other">Other</option>
           </select>
-          <button type="button" class="btn btn-secondary btn-sm" id="btnGenerateMeetingLink" style="margin-top:6px;display:none" onclick="generateMeetingLink()">🔗 Generate Meeting Link</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnGenerateMeetingLink" style="margin-top:6px;display:none">🔗 Generate Meeting Link</button>
         </div>
       </div>
       <div class="form-row">
@@ -602,9 +602,9 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <label id="lbl-ev-invited">Invited (notify on creation)</label>
           <div class="inv-filter-btns" style="display:flex;gap:2px">
-            <button type="button" class="btn btn-sm inv-filter-btn active" data-filter="both" onclick="setInvitedFilter('both')">Both</button>
-            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="users" onclick="setInvitedFilter('users')">Users</button>
-            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="groups" onclick="setInvitedFilter('groups')">Groups</button>
+            <button type="button" class="btn btn-sm inv-filter-btn active" data-filter="both" data-invited-filter="both">Both</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="users" data-invited-filter="users">Users</button>
+            <button type="button" class="btn btn-sm inv-filter-btn" data-filter="groups" data-invited-filter="groups">Groups</button>
           </div>
         </div>
         <div id="eventInvitedList" class="group-picker" style="margin-top:4px"></div>
@@ -652,7 +652,7 @@
       </div>
       <!-- Map button for physical meetings -->
       <div id="physicalMapGroup" style="display:none;margin-top:8px">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openMapForEvent()">🗺️ Set Map Location</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btnOpenMapForEvent">🗺️ Set Map Location</button>
         <span id="physicalMapCoords" style="font-size:var(--fs-xs);color:var(--text-dim);margin-left:8px"></span>
         <input type="hidden" id="eventLatitude">
         <input type="hidden" id="eventLongitude">
@@ -677,10 +677,10 @@
     </div>
     <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
       <button class="btn btn-danger btn-sm" id="btnDeleteEvent" style="display:none">Delete</button>
-      <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none" onclick="openEventHistory()">🕐 History</button>
-      <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none" onclick="openDependenciesModal()">🔗 Dependencies</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventHistory" style="display:none">🕐 History</button>
+      <button class="btn btn-secondary btn-sm" id="btnEventDeps" style="display:none">🔗 Dependencies</button>
       <span style="flex:1"></span>
-      <button class="btn btn-secondary" onclick="closeModal('eventModal')" id="lbl-btn-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="eventModal" id="lbl-btn-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEvent">Save</button>
     </div>
   </div>
@@ -691,7 +691,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="detailTitle">—</h2>
-      <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+      <button class="modal-close" data-close-modal="detailModal">&times;</button>
     </div>
     <div class="modal-body" id="detailBody"></div>
     <div class="modal-footer" id="detailFooter"></div>
@@ -703,7 +703,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-alarm-title">Set Alarm</h2>
-      <button class="modal-close" onclick="closeModal('alarmModal')">&times;</button>
+      <button class="modal-close" data-close-modal="alarmModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="alarmEventId">
@@ -743,7 +743,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('alarmModal')" id="lbl-alarm-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="alarmModal" id="lbl-alarm-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveAlarm">Set Alarm</button>
     </div>
   </div>
@@ -754,7 +754,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-lock-title">Lock / Unlock Time Slot</h2>
-      <button class="modal-close" onclick="closeModal('lockModal')">&times;</button>
+      <button class="modal-close" data-close-modal="lockModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- Existing locks list -->
@@ -775,7 +775,7 @@
       </div>
       <div class="form-group">
         <label id="lbl-lock-scope">Applies to</label>
-        <select id="lockScope" onchange="onLockScopeChange()">
+        <select id="lockScope">
           <option value="all">All layers and master timeline</option>
           <option value="master">Master timeline only</option>
           <option value="layer">Specific layer</option>
@@ -791,7 +791,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('lockModal')" id="lbl-lock-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="lockModal" id="lbl-lock-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLock">Lock Slot</button>
     </div>
   </div>
@@ -802,7 +802,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="userModalTitle">Add User</h2>
-      <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+      <button class="modal-close" data-close-modal="userModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="userId">
@@ -867,7 +867,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>
-      <button class="btn btn-secondary" onclick="closeModal('userModal')" id="lbl-u-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="userModal" id="lbl-u-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveUser">Save</button>
     </div>
   </div>
@@ -878,7 +878,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>👤 <span data-i18n="profile_title">My Profile</span></h2>
-      <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+      <button class="modal-close" data-close-modal="profileModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- Photo + identity row -->
@@ -889,8 +889,8 @@
             <span id="profilePhotoPlaceholder" style="font-size:32px;color:var(--text-dim)">👤</span>
           </div>
           <label for="profilePhotoInput" class="btn btn-secondary btn-sm" style="cursor:pointer;font-size:var(--fs-xs)">📷 Photo</label>
-          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="loadProfilePhoto(this)">
-          <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)" onclick="removeProfilePhoto()">✕ Remove</button>
+          <input type="file" id="profilePhotoInput" accept="image/*" style="display:none">
+          <button id="profilePhotoRemove" class="btn btn-ghost btn-sm" style="display:none;font-size:var(--fs-xs);color:var(--danger)">✕ Remove</button>
           <!-- Default avatar picker -->
           <div style="margin-top:8px">
             <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px" data-i18n="profile_default_avatars">Or choose a default:</div>
@@ -924,7 +924,7 @@
             </div>
             <div class="form-group">
               <label data-i18n="profile_language">Preferred Language</label>
-              <select id="profileLanguage" onchange="onProfileLanguageChange(this.value)">
+              <select id="profileLanguage">
                 <option value="en">English</option>
                 <option value="sv">Svenska</option>
                 <option value="fr">Français</option>
@@ -1004,9 +1004,9 @@
           <div class="form-group">
             <label data-i18n="new_password">New Password</label>
             <div style="position:relative;display:flex;gap:6px;align-items:center">
-              <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1" oninput="updatePwdStrength('profilePwdNew','profilePwdStrengthBar','profilePwdStrengthLabel')">
-              <button type="button" class="btn btn-ghost btn-icon" onclick="generateProfilePassword()" title="Auto-generate a strong password">🎲</button>
-              <button type="button" id="profilePwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyProfilePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+              <input type="password" id="profilePwdNew" autocomplete="new-password" style="flex:1">
+              <button type="button" class="btn btn-ghost btn-icon" id="btnGenerateProfilePwd" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="btnCopyProfilePwd" class="btn btn-ghost btn-icon" title="Copy new password to clipboard" style="display:none">📋</button>
             </div>
           </div>
           <div class="form-group">
@@ -1033,12 +1033,12 @@
         <div id="profileWebCalURL" style="display:none;margin-bottom:8px">
           <input type="text" id="profileWebCalLink" readonly style="width:100%;font-size:var(--fs-xs);opacity:0.8">
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="generateWebCalToken()">🔗 Generate Calendar Link</button>
+        <button class="btn btn-secondary btn-sm" id="btnGenWebCalToken">🔗 Generate Calendar Link</button>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('profileModal')" data-i18n="btn_cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="saveProfile()" data-i18n="profile_save">Save Profile</button>
+      <button class="btn btn-secondary" data-close-modal="profileModal" data-i18n="btn_cancel">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveProfile" data-i18n="profile_save">Save Profile</button>
     </div>
   </div>
 </div>
@@ -1048,7 +1048,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="lbl-pwd-title">Change Password</h2>
-      <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
+      <button class="modal-close" data-close-modal="passwordModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- SSO/OIDC accounts cannot change password here -->
@@ -1071,10 +1071,10 @@
           <div class="form-group">
             <label id="lbl-pwd-new">New password</label>
             <div style="position:relative;display:flex;gap:6px;align-items:center">
-              <input type="password" id="pwdNew" autocomplete="new-password" oninput="updatePwdStrength('pwdNew','pwdStrengthBar','pwdStrengthLabel')" style="flex:1;padding-right:32px">
-              <button type="button" id="pwdNewEye" onclick="togglePwdVisibility('pwdNew','pwdNewEye')" style="position:absolute;right:60px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
-              <button type="button" class="btn btn-ghost btn-icon" onclick="generateStandalonePassword()" title="Auto-generate a strong password">🎲</button>
-              <button type="button" id="pwdCopyBtn" class="btn btn-ghost btn-icon" onclick="copyStandalonePassword()" title="Copy new password to clipboard" style="display:none">📋</button>
+              <input type="password" id="pwdNew" autocomplete="new-password" style="flex:1;padding-right:32px">
+              <button type="button" id="pwdNewEye" style="position:absolute;right:60px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+              <button type="button" class="btn btn-ghost btn-icon" id="btnGenStandalonePwd" title="Auto-generate a strong password">🎲</button>
+              <button type="button" id="btnCopyStandalonePwd" class="btn btn-ghost btn-icon" title="Copy new password to clipboard" style="display:none">📋</button>
             </div>
           </div>
           <div id="pwdStrengthWrap" style="margin-bottom:10px">
@@ -1087,14 +1087,14 @@
             <label id="lbl-pwd-confirm">Confirm new password</label>
             <div style="position:relative">
               <input type="password" id="pwdConfirm" autocomplete="new-password" style="padding-right:32px">
-              <button type="button" id="pwdConfirmEye" onclick="togglePwdVisibility('pwdConfirm','pwdConfirmEye')" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
+              <button type="button" id="pwdConfirmEye" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0 4px;line-height:1" title="Show/hide password">👁</button>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('passwordModal')" id="lbl-pwd-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="passwordModal" id="lbl-pwd-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePassword">Change Password</button>
     </div>
   </div>
@@ -1105,7 +1105,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="phaseModalTitle">New Phase</h2>
-      <button class="modal-close" onclick="closeModal('phaseModal')">&times;</button>
+      <button class="modal-close" data-close-modal="phaseModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="phaseId">
@@ -1142,7 +1142,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeletePhase" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('phaseModal')" id="lbl-phase-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="phaseModal" id="lbl-phase-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSavePhase">Save</button>
     </div>
   </div>
@@ -1153,7 +1153,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="lbl-report-title">📄 Generate Report</h2>
-      <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="reportModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-row">
@@ -1200,8 +1200,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('reportModal')" id="lbl-report-cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="generateReport()" id="lbl-report-generate">Generate</button>
+      <button class="btn btn-secondary" data-close-modal="reportModal" id="lbl-report-cancel">Cancel</button>
+      <button class="btn btn-primary" id="lbl-report-generate">Generate</button>
     </div>
   </div>
 </div>
@@ -1211,7 +1211,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>⏰ Automatic Report Scheduling</h2>
-      <button class="modal-close" onclick="closeModal('autoReportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="autoReportModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">Configure scheduled reports to be automatically generated and distributed.</p>
@@ -1270,8 +1270,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('autoReportModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="addAutoReport()">➕ Add Schedule</button>
+      <button class="btn btn-secondary" data-close-modal="autoReportModal">Cancel</button>
+      <button class="btn btn-primary" id="btnAddAutoReport">➕ Add Schedule</button>
     </div>
   </div>
 </div>
@@ -1281,7 +1281,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🕐 Event Change History</h2>
-      <button class="modal-close" onclick="closeModal('eventHistoryModal')">&times;</button>
+      <button class="modal-close" data-close-modal="eventHistoryModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="eventHistoryList">
@@ -1289,7 +1289,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('eventHistoryModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="eventHistoryModal">Close</button>
     </div>
   </div>
 </div>
@@ -1299,7 +1299,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🔗 Event Dependencies</h2>
-      <button class="modal-close" onclick="closeModal('dependenciesModal')">&times;</button>
+      <button class="modal-close" data-close-modal="dependenciesModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:12px">
@@ -1312,13 +1312,13 @@
       </div>
       <div class="form-group" style="margin-top:12px">
         <label>Add dependency — search events</label>
-        <input type="text" id="depSearch" placeholder="Search by event title…" oninput="filterDepSearch()" style="width:100%">
+        <input type="text" id="depSearch" placeholder="Search by event title…" style="width:100%">
         <div id="depSearchResults" class="group-picker" style="margin-top:4px;max-height:150px;overflow-y:auto"></div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('dependenciesModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveDependencies()">Save Dependencies</button>
+      <button class="btn btn-secondary" data-close-modal="dependenciesModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveDeps">Save Dependencies</button>
     </div>
   </div>
 </div>
@@ -1328,7 +1328,7 @@
   <div class="modal modal-wide" style="max-width:800px">
     <div class="modal-header">
       <h2>🗺️ Event Location</h2>
-      <button class="modal-close" onclick="closeModal('mapModal')">&times;</button>
+      <button class="modal-close" data-close-modal="mapModal">&times;</button>
     </div>
     <div class="modal-body" style="padding:0">
       <div id="mapContainer" style="height:400px;width:100%"></div>
@@ -1351,8 +1351,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('mapModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMapLocation()">Use this location</button>
+      <button class="btn btn-secondary" data-close-modal="mapModal">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveMapLocation">Use this location</button>
     </div>
   </div>
 </div>
@@ -1362,14 +1362,14 @@
   <div class="modal">
     <div class="modal-header">
       <h2>💾 Backup &amp; Restore</h2>
-      <button class="modal-close" onclick="closeModal('backupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="backupModal">&times;</button>
     </div>
     <div class="modal-body">
       <h3 style="font-size:var(--fs-base);margin-bottom:8px">Backup</h3>
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:10px">
         Download a complete backup of all timeline data as a ZIP archive.
       </p>
-      <button class="btn btn-primary" onclick="downloadBackup()">⬇️ Download Backup</button>
+      <button class="btn btn-primary" id="btnDownloadBackup">⬇️ Download Backup</button>
 
       <hr style="border-color:var(--border);margin:16px 0">
       <h3 style="font-size:var(--fs-base);margin-bottom:8px">Restore</h3>
@@ -1384,8 +1384,8 @@
       <div id="restoreStatus" style="font-size:var(--fs-sm);margin-top:8px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('backupModal')">Close</button>
-      <button class="btn btn-danger" onclick="uploadRestore()">⬆️ Restore from Backup</button>
+      <button class="btn btn-secondary" data-close-modal="backupModal">Close</button>
+      <button class="btn btn-danger" id="btnUploadRestore">⬆️ Restore from Backup</button>
     </div>
   </div>
 </div>
@@ -1395,7 +1395,7 @@
   <div class="modal modal-wide" style="max-width:760px">
     <div class="modal-header">
       <h2>🔄 Gradual Backup (Auto-Snapshots)</h2>
-      <button class="modal-close" onclick="closeModal('gradualBackupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="gradualBackupModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--text-dim);font-size:var(--fs-sm);margin-bottom:14px">
@@ -1426,14 +1426,14 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px">
-        <button class="btn btn-primary btn-sm" onclick="saveGradualBackupSettings()">💾 Save Settings</button>
-        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow" onclick="createGradualSnapshotNow()">📸 Snapshot Now</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveGradualSettings">💾 Save Settings</button>
+        <button class="btn btn-secondary btn-sm" id="btnSnapshotNow">📸 Snapshot Now</button>
       </div>
       <h3 style="font-size:var(--fs-sm);font-weight:600;margin-bottom:8px;color:var(--text-dim)">Saved Snapshots</h3>
       <div id="gbSnapshotsList" style="max-height:320px;overflow-y:auto"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('gradualBackupModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="gradualBackupModal">Close</button>
     </div>
   </div>
 </div>
@@ -1443,7 +1443,7 @@
   <div class="modal modal-wide" style="max-width:900px">
     <div class="modal-header">
       <h2>📊 Planned vs. Actual Comparison</h2>
-      <button class="modal-close" onclick="closeModal('pvaModal')">&times;</button>
+      <button class="modal-close" data-close-modal="pvaModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="pvaContent">
@@ -1451,8 +1451,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('pvaModal')">Close</button>
-      <button class="btn btn-primary" onclick="exportPVAReport()">📄 Export Report</button>
+      <button class="btn btn-secondary" data-close-modal="pvaModal">Close</button>
+      <button class="btn btn-primary" id="btnExportPVA">📄 Export Report</button>
     </div>
   </div>
 </div>
@@ -1462,7 +1462,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="groupModalTitle">Add Group</h2>
-      <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
+      <button class="modal-close" data-close-modal="groupModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="groupId">
@@ -1477,7 +1477,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteGroup" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('groupModal')" id="lbl-group-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="groupModal" id="lbl-group-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveGroup">Save</button>
     </div>
   </div>
@@ -1488,7 +1488,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="layerModalTitle">New Layer</h2>
-      <button class="modal-close" onclick="closeModal('layerModal')">&times;</button>
+      <button class="modal-close" data-close-modal="layerModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="layerId">
@@ -1530,7 +1530,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteLayer" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('layerModal')" id="lbl-layer-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="layerModal" id="lbl-layer-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveLayer">Save</button>
     </div>
   </div>
@@ -1541,7 +1541,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="etypeModalTitle">New Event Type</h2>
-      <button class="modal-close" onclick="closeModal('etypeModal')">&times;</button>
+      <button class="modal-close" data-close-modal="etypeModal">&times;</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="etypeId">
@@ -1575,34 +1575,34 @@
           <input type="text" id="etypeIcon" placeholder="none" maxlength="4"
             style="width:64px;text-align:center;font-size:1.4em;padding:2px 6px">
           <div id="etypeIconPicker" style="display:flex;flex-wrap:wrap;gap:4px">
-            <button type="button" class="icon-pick-btn" data-icon="" title="None" onclick="pickEtypeIcon('')">✕</button>
-            <button type="button" class="icon-pick-btn" data-icon="🤝" onclick="pickEtypeIcon('🤝')">🤝</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚖️" onclick="pickEtypeIcon('⚖️')">⚖️</button>
-            <button type="button" class="icon-pick-btn" data-icon="⏰" onclick="pickEtypeIcon('⏰')">⏰</button>
-            <button type="button" class="icon-pick-btn" data-icon="🧍" onclick="pickEtypeIcon('🧍')">🧍</button>
-            <button type="button" class="icon-pick-btn" data-icon="📊" onclick="pickEtypeIcon('📊')">📊</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚡" onclick="pickEtypeIcon('⚡')">⚡</button>
-            <button type="button" class="icon-pick-btn" data-icon="🎯" onclick="pickEtypeIcon('🎯')">🎯</button>
-            <button type="button" class="icon-pick-btn" data-icon="📋" onclick="pickEtypeIcon('📋')">📋</button>
-            <button type="button" class="icon-pick-btn" data-icon="🔔" onclick="pickEtypeIcon('🔔')">🔔</button>
-            <button type="button" class="icon-pick-btn" data-icon="🚨" onclick="pickEtypeIcon('🚨')">🚨</button>
-            <button type="button" class="icon-pick-btn" data-icon="✅" onclick="pickEtypeIcon('✅')">✅</button>
-            <button type="button" class="icon-pick-btn" data-icon="❌" onclick="pickEtypeIcon('❌')">❌</button>
-            <button type="button" class="icon-pick-btn" data-icon="📌" onclick="pickEtypeIcon('📌')">📌</button>
-            <button type="button" class="icon-pick-btn" data-icon="🏁" onclick="pickEtypeIcon('🏁')">🏁</button>
-            <button type="button" class="icon-pick-btn" data-icon="🔒" onclick="pickEtypeIcon('🔒')">🔒</button>
-            <button type="button" class="icon-pick-btn" data-icon="💡" onclick="pickEtypeIcon('💡')">💡</button>
-            <button type="button" class="icon-pick-btn" data-icon="📡" onclick="pickEtypeIcon('📡')">📡</button>
-            <button type="button" class="icon-pick-btn" data-icon="🗺️" onclick="pickEtypeIcon('🗺️')">🗺️</button>
-            <button type="button" class="icon-pick-btn" data-icon="🛡️" onclick="pickEtypeIcon('🛡️')">🛡️</button>
-            <button type="button" class="icon-pick-btn" data-icon="⚔️" onclick="pickEtypeIcon('⚔️')">⚔️</button>
+            <button type="button" class="icon-pick-btn" data-icon="" title="None">✕</button>
+            <button type="button" class="icon-pick-btn" data-icon="🤝">🤝</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚖️">⚖️</button>
+            <button type="button" class="icon-pick-btn" data-icon="⏰">⏰</button>
+            <button type="button" class="icon-pick-btn" data-icon="🧍">🧍</button>
+            <button type="button" class="icon-pick-btn" data-icon="📊">📊</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚡">⚡</button>
+            <button type="button" class="icon-pick-btn" data-icon="🎯">🎯</button>
+            <button type="button" class="icon-pick-btn" data-icon="📋">📋</button>
+            <button type="button" class="icon-pick-btn" data-icon="🔔">🔔</button>
+            <button type="button" class="icon-pick-btn" data-icon="🚨">🚨</button>
+            <button type="button" class="icon-pick-btn" data-icon="✅">✅</button>
+            <button type="button" class="icon-pick-btn" data-icon="❌">❌</button>
+            <button type="button" class="icon-pick-btn" data-icon="📌">📌</button>
+            <button type="button" class="icon-pick-btn" data-icon="🏁">🏁</button>
+            <button type="button" class="icon-pick-btn" data-icon="🔒">🔒</button>
+            <button type="button" class="icon-pick-btn" data-icon="💡">💡</button>
+            <button type="button" class="icon-pick-btn" data-icon="📡">📡</button>
+            <button type="button" class="icon-pick-btn" data-icon="🗺️">🗺️</button>
+            <button type="button" class="icon-pick-btn" data-icon="🛡️">🛡️</button>
+            <button type="button" class="icon-pick-btn" data-icon="⚔️">⚔️</button>
           </div>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteEtype" style="display:none">Delete</button>
-      <button class="btn btn-secondary" onclick="closeModal('etypeModal')" id="lbl-etype-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="etypeModal" id="lbl-etype-cancel">Cancel</button>
       <button class="btn btn-primary" id="btnSaveEtype">Save</button>
     </div>
   </div>
@@ -1613,11 +1613,11 @@
   <div class="modal">
     <div class="modal-header">
       <h2 id="memberModalTitle">Members</h2>
-      <button class="modal-close" onclick="closeModal('memberModal')">&times;</button>
+      <button class="modal-close" data-close-modal="memberModal">&times;</button>
     </div>
     <div class="modal-body" id="memberModalBody"></div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('memberModal')" id="lbl-member-close">Close</button>
+      <button class="btn btn-secondary" data-close-modal="memberModal" id="lbl-member-close">Close</button>
     </div>
   </div>
 </div>
@@ -1631,14 +1631,14 @@
         <span class="help-modal-subtitle">Quick Reference Guide</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-secondary btn-sm" onclick="detachHelp()" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
-        <button class="modal-close" onclick="closeModal('helpModal')">&times;</button>
+        <button class="btn btn-secondary btn-sm" id="btnDetachHelp" title="Open help in separate window" style="font-size:12px">⧉ Detach</button>
+        <button class="modal-close" data-close-modal="helpModal">&times;</button>
       </div>
     </div>
     <div style="padding:8px 20px 0;border-bottom:1px solid var(--border)">
       <input type="search" id="helpSearchInput" placeholder="Search help… (e.g. alarms, templates, backup)"
         style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)"
-        oninput="filterHelp(this.value)" autocomplete="off">
+        autocomplete="off">
       <div id="helpSearchStatus" style="font-size:var(--fs-xs);color:var(--text-dim);padding:4px 2px;min-height:18px"></div>
     </div>
     <div class="modal-body help-body">
@@ -2199,7 +2199,7 @@
     </div><!-- .modal-body -->
     <div class="modal-footer" style="justify-content:space-between;align-items:center">
       <span style="font-size:var(--fs-xs);color:var(--text-dim)" id="helpVersionLine"></span>
-      <button class="btn btn-secondary" onclick="closeModal('helpModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="helpModal">Close</button>
     </div>
   </div>
 </div>
@@ -2209,7 +2209,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2 id="lbl-export-title">⬇ Export</h2>
-      <button class="modal-close" onclick="closeModal('exportModal')">&times;</button>
+      <button class="modal-close" data-close-modal="exportModal">&times;</button>
     </div>
     <div class="modal-body">
       <!-- JSON export section with category selection -->
@@ -2224,22 +2224,22 @@
           <label class="group-chip" id="exportUsersCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="users" style="margin-right:4px"> Users</label>
           <label class="group-chip" id="exportPhasesCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="phases" checked style="margin-right:4px"> Phases</label>
         </div>
-        <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="doExport('json')">⬇ Download JSON</button>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExportJSON">⬇ Download JSON</button>
       </div>
       <hr style="border-color:var(--border);margin:14px 0">
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('ics')">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" id="btnExportICS">
           <div style="font-weight:600">📅 ICS / iCalendar</div>
           <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Google Calendar, Outlook, Apple Calendar</div>
         </button>
-        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" onclick="doExport('csv')">
+        <button class="btn btn-secondary" style="text-align:left;padding:10px 14px" id="btnExportCSV">
           <div style="font-weight:600">📊 CSV</div>
           <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">Events only — Excel, LibreOffice Calc</div>
         </button>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('exportModal')" id="lbl-export-cancel">Cancel</button>
+      <button class="btn btn-secondary" data-close-modal="exportModal" id="lbl-export-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2249,7 +2249,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>⬆ Import</h2>
-      <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+      <button class="modal-close" data-close-modal="importModal">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -2273,8 +2273,8 @@
       <div id="importResult" style="display:none;margin-top:12px;padding:10px;border-radius:var(--radius);background:var(--bg3);font-size:var(--fs-sm)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" id="btnImportCancel" onclick="closeModal('importModal')">Cancel</button>
-      <button class="btn btn-primary" id="btnDoImport" onclick="doImport()">⬆ Import</button>
+      <button class="btn btn-secondary" id="btnImportCancel" data-close-modal="importModal">Cancel</button>
+      <button class="btn btn-primary" id="btnDoImport">⬆ Import</button>
     </div>
   </div>
 </div>
@@ -2284,17 +2284,17 @@
   <div class="modal modal-xl" style="max-width:1400px;width:99vw;max-height:92vh">
     <div class="modal-header">
       <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
-      <button class="modal-close" onclick="closeModal('roleEditorModal')">&times;</button>
+      <button class="modal-close" data-close-modal="roleEditorModal">&times;</button>
     </div>
     <div class="modal-body" style="padding-bottom:8px;overflow-y:auto;max-height:calc(92vh - 120px)">
       <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Admin role is locked.</p>
       <div id="roleEditorTable"></div>
     </div>
     <div class="modal-footer" style="justify-content:space-between">
-      <button class="btn btn-secondary" onclick="addNewRoleRow()">＋ Add Custom Role</button>
+      <button class="btn btn-secondary" id="btnAddNewRole">＋ Add Custom Role</button>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="closeModal('roleEditorModal')">Cancel</button>
-        <button class="btn btn-primary" id="btnSaveRoles" onclick="saveRoles()">Save Roles</button>
+        <button class="btn btn-secondary" data-close-modal="roleEditorModal">Cancel</button>
+        <button class="btn btn-primary" id="btnSaveRoles">Save Roles</button>
       </div>
     </div>
   </div>
@@ -2305,7 +2305,7 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
       <h2 id="lbl-move-event-title">📅 Move Event</h2>
-      <button class="modal-close" onclick="closeModal('moveEventModal')">&times;</button>
+      <button class="modal-close" data-close-modal="moveEventModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="lbl-move-event-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -2315,8 +2315,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('moveEventModal')">Cancel</button>
-      <button class="btn btn-primary" id="btnConfirmMove" onclick="confirmMoveEvents()">Move</button>
+      <button class="btn btn-secondary" data-close-modal="moveEventModal">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmMove">Move</button>
     </div>
   </div>
 </div>
@@ -2326,7 +2326,7 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <h2>🔄 Change Status for Selected Events</h2>
-      <button class="modal-close" onclick="closeModal('bulkStatusModal')">&times;</button>
+      <button class="modal-close" data-close-modal="bulkStatusModal">&times;</button>
     </div>
     <div class="modal-body">
       <p id="bulkStatusCount" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px"></p>
@@ -2342,8 +2342,8 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('bulkStatusModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmBulkStatus()">Apply Status</button>
+      <button class="btn btn-secondary" data-close-modal="bulkStatusModal">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmBulkStatus">Apply Status</button>
     </div>
   </div>
 </div>
@@ -2353,7 +2353,7 @@
   <div class="modal modal-wide">
     <div class="modal-header">
       <h2>🔧 Bulk Event Actions</h2>
-      <button class="modal-close" onclick="closeModal('bulkActionsModal')">&times;</button>
+      <button class="modal-close" data-close-modal="bulkActionsModal">&times;</button>
     </div>
     <div class="modal-body">
       <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:14px">Filter events and apply a bulk action. Use with care — actions cannot be undone.</p>
@@ -2362,7 +2362,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;align-items:flex-end">
         <div class="form-group" style="margin:0;min-width:140px">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">Filter by</label>
-          <select id="baFilter" onchange="updateBulkActionUI()" style="width:100%">
+          <select id="baFilter" style="width:100%">
             <option value="all">All events</option>
             <option value="type">Event Type</option>
             <option value="user">User (name or ID)</option>
@@ -2375,7 +2375,7 @@
         <div class="form-group" style="margin:0;flex:1;min-width:150px" id="baValueGroup">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">Value</label>
           <div style="position:relative">
-            <input type="text" id="baValue" placeholder="Value…" autocomplete="off" oninput="updateBulkUserAutocomplete()" style="width:100%">
+            <input type="text" id="baValue" placeholder="Value…" autocomplete="off" style="width:100%">
             <div id="baMentionDrop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);z-index:200;max-height:180px;overflow-y:auto"></div>
           </div>
         </div>
@@ -2398,9 +2398,9 @@
       <!-- Action tabs -->
       <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <div style="display:flex;border-bottom:1px solid var(--border);background:var(--bg3)">
-          <button class="ba-tab-btn active" data-tab="status" onclick="switchBulkTab('status',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Set Status</button>
-          <button class="ba-tab-btn" data-tab="type" onclick="switchBulkTab('type',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Change Type</button>
-          <button class="ba-tab-btn" data-tab="delete" onclick="switchBulkTab('delete',this)" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--danger);font-size:var(--fs-sm)">Delete</button>
+          <button class="ba-tab-btn active" data-tab="status" data-bulk-tab="status" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Set Status</button>
+          <button class="ba-tab-btn" data-tab="type" data-bulk-tab="type" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--text);font-size:var(--fs-sm)">Change Type</button>
+          <button class="ba-tab-btn" data-tab="delete" data-bulk-tab="delete" style="flex:1;padding:8px;border:none;cursor:pointer;background:transparent;color:var(--danger);font-size:var(--fs-sm)">Delete</button>
         </div>
 
         <!-- Status pane -->
@@ -2418,7 +2418,7 @@
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkStatus()">Apply Status</button>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExecBulkStatus">Apply Status</button>
         </div>
 
         <!-- Type pane -->
@@ -2429,14 +2429,14 @@
               <!-- populated dynamically -->
             </select>
           </div>
-          <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="executeBulkType()">Apply Type</button>
+          <button class="btn btn-primary btn-sm" style="margin-top:10px" id="btnExecBulkType">Apply Type</button>
         </div>
 
         <!-- Delete pane -->
         <div id="baPane_delete" class="ba-pane" style="padding:12px;display:none">
           <p style="font-size:var(--fs-sm);color:var(--danger);margin-bottom:10px">⚠ This will permanently delete all matching events. Type <strong>DELETE</strong> to confirm.</p>
           <input type="text" id="baDeleteConfirm" placeholder="Type DELETE to confirm" style="width:100%;margin-bottom:10px">
-          <button class="btn btn-danger btn-sm" onclick="executeBulkDelete()">🗑 Delete Matching Events</button>
+          <button class="btn btn-danger btn-sm" id="btnExecBulkDelete">🗑 Delete Matching Events</button>
         </div>
       </div>
 
@@ -2444,7 +2444,7 @@
       <div id="baResult" style="display:none;margin-top:12px;padding:8px 12px;border-radius:var(--radius);font-size:var(--fs-sm)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('bulkActionsModal')">Close</button>
+      <button class="btn btn-secondary" data-close-modal="bulkActionsModal">Close</button>
     </div>
   </div>
 </div>
@@ -2452,10 +2452,10 @@
 <!-- Multi-select info bar -->
 <div id="multiselectBar" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 16px;border-radius:20px;z-index:500;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);font-size:var(--fs-sm)">
   <span id="multiselectCount"></span>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openMoveSelectedDialog()">📅 Move</button>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="openBulkStatusDialog()">🔄 Status</button>
-  <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none" onclick="bulkDeleteSelected()">🗑 Delete</button>
-  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" onclick="clearSelection()">✕ Clear</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnMoveSelected">📅 Move</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnBulkStatusSelected">🔄 Status</button>
+  <button class="btn btn-sm" style="background:rgba(220,50,50,.7);color:#fff;border:none" id="btnBulkDeleteSelected">🗑 Delete</button>
+  <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnClearSelection">✕ Clear</button>
 </div>
 
 <script src="/static/i18n.js"></script>
@@ -2465,34 +2465,8 @@
 <script src="/static/timeline.js"></script>
 <script src="/static/modals.js"></script>
 <script src="/static/app.js"></script>
-<!-- Leaflet.js for map integration (lazy loaded) -->
-<script>
-  window._leafletLoaded = false;
-  function loadLeaflet(cb) {
-    if (window._leafletLoaded && window.L) { cb(); return; }
-    if (document.getElementById('leaflet-script')) {
-      // Already loading - wait for it
-      const check = setInterval(() => { if (window.L) { clearInterval(check); window._leafletLoaded = true; cb(); } }, 100);
-      return;
-    }
-    // Load CSS alongside JS (avoids CSP issues with eager <link> in <head>)
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-      link.crossOrigin = '';
-      document.head.appendChild(link);
-    }
-    const s = document.createElement('script');
-    s.id = 'leaflet-script';
-    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    s.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=';
-    s.crossOrigin = '';
-    s.onload = () => { window._leafletLoaded = true; cb(); };
-    document.head.appendChild(s);
-  }
-</script>
+<script src="/static/bindings.js"></script>
+<!-- Leaflet.js for map integration (lazy loaded from local vendor copy) -->
+<script src="/static/leaflet-loader.js"></script>
 </body>
 </html>

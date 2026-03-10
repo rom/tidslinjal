@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -475,9 +476,66 @@ func NewApp(dataDir string) (*App, error) {
 	return app, nil
 }
 
+// validateWebhookURL checks that a webhook URL is safe to call:
+//   - must be a valid absolute HTTP(S) URL
+//   - must not resolve to a private/loopback/link-local address (SSRF protection)
+func validateWebhookURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("webhook URL must use http or https scheme")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("webhook URL has no host")
+	}
+	// Resolve hostname and check against private address ranges
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve webhook host %q: %w", host, err)
+	}
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+			ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("webhook URL must not target private/loopback addresses (resolved %s → %s)", host, ipStr)
+		}
+	}
+	return nil
+}
+
 // runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
 func (app *App) runWebhookWorker() {
-	client := &http.Client{Timeout: 10 * time.Second}
+	// Use a custom transport that blocks connections to private/loopback IPs.
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address: %w", err)
+			}
+			ips, err := net.LookupHost(host)
+			if err != nil {
+				return nil, err
+			}
+			for _, ipStr := range ips {
+				ip := net.ParseIP(ipStr)
+				if ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()) {
+					return nil, fmt.Errorf("webhook blocked: %s resolves to private address %s", host, ipStr)
+				}
+			}
+			return dialer.DialContext(ctx, network, addr)
+		},
+	}
+	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
 	for job := range app.webhookCh {
 		req, err := http.NewRequest("POST", job.url, bytes.NewReader(job.body))
 		if err != nil {
@@ -788,9 +846,10 @@ func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
 	}
 	type meResponse struct {
 		UserPublic
-		Groups []groupInfo `json:"groups"`
+		Groups      []groupInfo `json:"groups"`
+		WebCalToken string      `json:"webcal_token,omitempty"`
 	}
-	jsonOK(w, meResponse{UserPublic: pub, Groups: groups})
+	jsonOK(w, meResponse{UserPublic: pub, Groups: groups, WebCalToken: user.WebCalToken})
 }
 
 func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, user *User) {
@@ -1649,6 +1708,13 @@ func (app *App) handleSavePreferences(w http.ResponseWriter, r *http.Request, us
 	}
 	if p.ActiveLayers == nil {
 		p.ActiveLayers = []int64{}
+	}
+	// Validate webhook URL: block private/loopback addresses (SSRF protection)
+	if p.WebhookURL != "" {
+		if err := validateWebhookURL(p.WebhookURL); err != nil {
+			jsonError(w, "invalid webhook URL: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	if err := app.store.SavePreferences(p); err != nil {
 		jsonError(w, "failed to save", http.StatusInternalServerError)
@@ -2546,6 +2612,13 @@ func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *
 	if !ok {
 		jsonError(w, "event not found", http.StatusNotFound)
 		return
+	}
+	// Validate per-alarm webhook URL (SSRF protection)
+	if req.WebhookURL != "" {
+		if err := validateWebhookURL(req.WebhookURL); err != nil {
+			jsonError(w, "invalid webhook URL: "+err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	targetUserID := user.ID
 	if req.ForUserID != 0 && req.ForUserID != user.ID {
@@ -4276,10 +4349,17 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		// Allow inline scripts/styles used by the SPA while blocking external scripts.
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), payment=()")
+		// CSP: all JS/CSS served from 'self'; inline style="" attributes still
+		// need 'unsafe-inline' for style-src but script-src is locked to 'self'.
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';")
+			"default-src 'self'; "+
+				"script-src 'self'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: blob: https://*.tile.openstreetmap.org; "+
+				"connect-src 'self'; "+
+				"font-src 'self' data:; "+
+				"frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -4289,9 +4369,8 @@ func securityHeaders(next http.Handler) http.Handler {
 func securityHeadersWithHSTS(next http.Handler) http.Handler {
 	inner := securityHeaders(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// max-age=31536000 = 1 year; includeSubDomains is intentionally omitted
-		// to avoid breaking non-TLS subdomains that are outside our control.
-		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+		// max-age=63072000 = 2 years (OWASP recommended minimum)
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 		inner.ServeHTTP(w, r)
 	})
 }
@@ -5352,6 +5431,13 @@ func (app *App) handleCreateAutoReportSchedule(w http.ResponseWriter, r *http.Re
 		return
 	}
 	sched.CreatedBy = user.ID
+	// Validate webhook URL when delivery is webhook (SSRF protection)
+	if sched.Delivery == "webhook" && sched.Recipient != "" {
+		if err := validateWebhookURL(sched.Recipient); err != nil {
+			jsonError(w, "invalid webhook URL: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	sched.NextRun = calcNextRun(sched.Frequency, time.Now())
 	created, err := app.store.CreateAutoReportSchedule(sched)
 	if err != nil {
@@ -6637,7 +6723,12 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "failed to update profile", http.StatusInternalServerError)
 		return
 	}
-	jsonOK(w, fullUser.Public())
+	// Return public profile plus webcal_token (owner's own data)
+	type profileResponse struct {
+		UserPublic
+		WebCalToken string `json:"webcal_token,omitempty"`
+	}
+	jsonOK(w, profileResponse{UserPublic: fullUser.Public(), WebCalToken: fullUser.WebCalToken})
 }
 
 // ── Cascade Reschedule ─────────────────────────────────────────────────────────
@@ -6785,6 +6876,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    codeVerifier,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   app.secureMode,
 		MaxAge:   300,
 		SameSite: http.SameSiteLaxMode,
 	})
@@ -6792,12 +6884,30 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 	h := sha256.Sum256([]byte(codeVerifier))
 	codeChallenge := base64.RawURLEncoding.EncodeToString(h[:])
 
+	// Nonce: random value bound to the session to prevent ID token replay attacks
+	nonceBytes := make([]byte, 16)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	nonce := hex.EncodeToString(nonceBytes)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oidc_nonce",
+		Value:    nonce,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   app.secureMode,
+		MaxAge:   300,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	params := url.Values{
 		"response_type":         {"code"},
 		"client_id":             {app.oidc.ClientID},
 		"redirect_uri":          {app.oidc.RedirectURL},
 		"scope":                 {"openid profile email"},
 		"state":                 {state},
+		"nonce":                 {nonce},
 		"code_challenge":        {codeChallenge},
 		"code_challenge_method": {"S256"},
 	}
@@ -6805,6 +6915,69 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleOIDCCallback exchanges the auth code for tokens, fetches user info, and creates a session.
+// validateIDToken performs local validation of OIDC ID token claims without
+// full JWK signature verification. It checks issuer, audience, expiry, and nonce.
+func (app *App) validateIDToken(rawToken, expectedNonce string) error {
+	// JWT is three base64url-encoded segments separated by dots
+	parts := strings.SplitN(rawToken, ".", 3)
+	if len(parts) < 2 {
+		return fmt.Errorf("malformed JWT: expected 3 parts, got %d", len(parts))
+	}
+	// Decode the claims (second segment)
+	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return fmt.Errorf("decode JWT claims: %w", err)
+	}
+	var claims struct {
+		Issuer   string `json:"iss"`
+		Audience json.RawMessage `json:"aud"` // can be string or []string
+		Expiry   int64  `json:"exp"`
+		IssuedAt int64  `json:"iat"`
+		Nonce    string `json:"nonce"`
+	}
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		return fmt.Errorf("parse JWT claims: %w", err)
+	}
+
+	// Validate issuer matches our configured OIDC issuer
+	if claims.Issuer != app.oidc.Issuer {
+		return fmt.Errorf("issuer mismatch: got %q, want %q", claims.Issuer, app.oidc.Issuer)
+	}
+
+	// Validate audience contains our client ID
+	var audiences []string
+	var singleAud string
+	if err := json.Unmarshal(claims.Audience, &audiences); err != nil {
+		if err := json.Unmarshal(claims.Audience, &singleAud); err != nil {
+			return fmt.Errorf("invalid aud claim")
+		}
+		audiences = []string{singleAud}
+	}
+	audOK := false
+	for _, a := range audiences {
+		if a == app.oidc.ClientID {
+			audOK = true
+			break
+		}
+	}
+	if !audOK {
+		return fmt.Errorf("audience mismatch: %v does not contain %q", audiences, app.oidc.ClientID)
+	}
+
+	// Validate expiry (with 2-minute clock skew tolerance)
+	now := time.Now().Unix()
+	if claims.Expiry > 0 && now > claims.Expiry+120 {
+		return fmt.Errorf("token expired at %d, now %d", claims.Expiry, now)
+	}
+
+	// Validate nonce (prevents replay attacks)
+	if expectedNonce != "" && claims.Nonce != expectedNonce {
+		return fmt.Errorf("nonce mismatch: got %q, want %q", claims.Nonce, expectedNonce)
+	}
+
+	return nil
+}
+
 func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if app.oidc == nil {
 		http.Redirect(w, r, "/login?error=oidc_not_configured", http.StatusFound)
@@ -6828,6 +7001,14 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	// Clear PKCE cookie
 	http.SetCookie(w, &http.Cookie{Name: "oidc_pkce", Path: "/", MaxAge: -1})
+
+	// Retrieve nonce from cookie for ID token validation
+	nonceCookie, _ := r.Cookie("oidc_nonce")
+	expectedNonce := ""
+	if nonceCookie != nil {
+		expectedNonce = nonceCookie.Value
+	}
+	http.SetCookie(w, &http.Cookie{Name: "oidc_nonce", Path: "/", MaxAge: -1})
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -6865,6 +7046,15 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(tokenResp.Body).Decode(&tokens); err != nil {
 		http.Redirect(w, r, "/login?error=token_parse_failed", http.StatusFound)
 		return
+	}
+
+	// Validate ID token claims (issuer, audience, expiry, nonce)
+	if tokens.IDToken != "" {
+		if err := app.validateIDToken(tokens.IDToken, expectedNonce); err != nil {
+			logVerbose("OIDC: ID token validation failed: %v", err)
+			http.Redirect(w, r, "/login?error=id_token_invalid", http.StatusFound)
+			return
+		}
 	}
 
 	// Fetch user info
@@ -7261,21 +7451,6 @@ func main() {
 	app.secureMode = useTLS
 
 	handler := app.routes()
-
-	// Security headers — set a Content-Security-Policy that allows Leaflet
-	// assets from unpkg.com while keeping a tight default policy.
-	{
-		inner := handler
-		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Security-Policy",
-				"default-src 'self'; "+
-					"script-src 'self' 'unsafe-inline' https://unpkg.com; "+
-					"style-src 'self' 'unsafe-inline' https://unpkg.com; "+
-					"img-src 'self' data: https://*.tile.openstreetmap.org; "+
-					"connect-src 'self'")
-			inner.ServeHTTP(w, r)
-		})
-	}
 
 	// Wrap with debug request logger when --debug is enabled
 	if debug {

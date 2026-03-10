@@ -5,45 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidslinjal — Admin</title>
   <link rel="stylesheet" href="/static/style.css">
-  <style>
-    body { padding: 32px; max-width: 960px; margin: 0 auto; }
-    h1 { color: var(--text-bright); font-size: var(--fs-xl); margin-bottom: 4px; }
-    .admin-subtitle { color: var(--text-dim); font-size: var(--fs-sm); margin-bottom: 28px; }
-    .admin-section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-    .admin-section h2 { font-size: var(--fs-lg); color: var(--text-bright); margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .admin-stat { background: var(--bg3); border-radius: var(--radius); padding: 14px; }
-    .admin-stat-value { font-size: var(--fs-xl); font-weight: 700; color: var(--accent); }
-    .admin-stat-label { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 2px; }
-    .config-row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; align-items: center; margin-bottom: 10px; font-size: var(--fs-sm); }
-    .config-key { color: var(--text-dim); font-weight: 500; }
-    .config-val { color: var(--text-bright); font-family: monospace; background: var(--bg3); padding: 4px 8px; border-radius: 4px; word-break: break-all; }
-    .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 24px; color: var(--accent); font-size: var(--fs-sm); text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-    th { color: var(--text-dim); font-weight: 600; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; }
-    .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-    .badge-admin { background: rgba(231,76,60,.18); color: #e74c3c; }
-    .badge-oplead { background: rgba(230,126,34,.18); color: #e67e22; }
-    .badge-staffofficer { background: rgba(230,126,34,.18); color: #e67e22; }
-    .badge-teamlead { background: rgba(26,188,156,.18); color: #1abc9c; }
-    .badge-readwrite { background: rgba(52,152,219,.18); color: #3498db; }
-    .badge-reporter { background: rgba(155,89,182,.18); color: #9b59b6; }
-    .badge-read { background: rgba(127,140,141,.18); color: #7f8c8d; }
-    .badge-observer { background: rgba(127,140,141,.18); color: #7f8c8d; }
-    #adminError { color: var(--red); font-size: var(--fs-sm); padding: 12px; background: rgba(231,76,60,.1); border-radius: var(--radius); display: none; }
-    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .form-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-    .form-inline label { font-size: var(--fs-sm); color: var(--text-dim); }
-    select.admin-select, input.admin-input {
-      background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius);
-      color: var(--text); padding: 6px 10px; font-size: var(--fs-sm);
-    }
-    .inv-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }
-    .inv-code { font-family: monospace; background: var(--bg3); padding: 2px 6px; border-radius: 4px; }
-    .pending-badge { background: rgba(230,126,34,.2); color: #e67e22; padding: 2px 7px; border-radius: 10px; font-size: 11px; }
-  </style>
+  <link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
   <a class="back-link" href="/">← Back to Timeline</a>
@@ -109,13 +71,13 @@
         <option value="personal_invitation">Personal Invitation (unique per-person code)</option>
         <option value="oidc_auto_enroll">OIDC Auto-Enrollment (OIDC users are enrolled automatically)</option>
       </select>
-      <button class="btn btn-primary btn-sm" onclick="saveRegistrationMode()">Save</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveRegMode">Save</button>
     </div>
     <div id="genericCodeSection" style="display:none;margin-bottom:14px">
       <div class="form-inline">
         <label>Invitation code:</label>
         <input type="text" class="admin-input" id="genericCode" placeholder="Enter shared invitation code" style="flex:1">
-        <button class="btn btn-secondary btn-sm" onclick="saveRegistrationMode()">Save</button>
+        <button class="btn btn-secondary btn-sm" id="btnSaveGenericCode">Save</button>
       </div>
     </div>
     <div id="personalInvSection" style="display:none">
@@ -123,7 +85,7 @@
       <div class="form-inline" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">
         <input type="text" class="admin-input" id="invNote" placeholder="Note (e.g. recipient name)">
         <input type="email" class="admin-input" id="invEmail" placeholder="Email to send invite (optional)" style="min-width:180px">
-        <button class="btn btn-primary btn-sm" onclick="createInvitation()">+ Generate &amp; Send</button>
+        <button class="btn btn-primary btn-sm" id="btnCreateInvitation">+ Generate &amp; Send</button>
       </div>
       <div id="invitationsList"></div>
     </div>
@@ -135,7 +97,7 @@
     <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:14px">Force-set status or remove events matching a filter. Use with care.</p>
     <div class="form-inline" style="margin-bottom:10px">
       <label>Filter by:</label>
-      <select class="admin-select" id="bulkFilter" onchange="updateBulkValueUI()">
+      <select class="admin-select" id="bulkFilter">
         <option value="type">Event Type</option>
         <option value="user">User (ID)</option>
         <option value="group">Group (name or ID)</option>
@@ -157,9 +119,9 @@
           <option value="rejected">Rejected</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <button class="btn btn-primary btn-sm" onclick="bulkSetStatus()">Apply Status</button>
+        <button class="btn btn-primary btn-sm" id="btnBulkSetStatus">Apply Status</button>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="bulkDeleteEvents()">🗑 Delete Matching Events…</button>
+      <button class="btn btn-danger btn-sm" id="btnBulkDelete">🗑 Delete Matching Events…</button>
     </div>
     <div id="bulkResult" style="margin-top:10px;font-size:var(--fs-sm);display:none"></div>
   </div>
@@ -168,7 +130,7 @@
   <div class="admin-section">
     <h2>🔐 Active Sessions</h2>
     <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:10px">All currently active user sessions. You can terminate any session.</p>
-    <button class="btn btn-secondary btn-sm" onclick="loadSessions()" style="margin-bottom:10px">↻ Refresh</button>
+    <button class="btn btn-secondary btn-sm" id="btnRefreshSessions" style="margin-bottom:10px">↻ Refresh</button>
     <div id="sessionsList"></div>
   </div>
 
@@ -193,345 +155,12 @@
       <div style="display:flex;gap:8px">
         <input type="text" id="resetConfirmInput" placeholder="RESET" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 10px;font-size:var(--fs-sm)">
         <button class="btn btn-danger btn-sm" id="btnConfirmReset">Confirm Reset</button>
-        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('resetConfirmBox').style.display='none'">Cancel</button>
+        <button class="btn btn-secondary btn-sm" id="btnCancelReset">Cancel</button>
       </div>
     </div>
   </div>
 
   <script src="/static/i18n.js"></script>
-  <script>
-  'use strict';
-  window.state = { preferences: { language: 'en', theme: 'light', size: 'small' } };
-
-  async function api(path, opts) {
-    const r = await fetch(path, opts);
-    if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
-    if (r.status === 403) { throw new Error('forbidden'); }
-    return r;
-  }
-
-  async function apiJSON(path) {
-    const r = await api(path);
-    return r.json();
-  }
-
-  function fmtDT(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString();
-  }
-
-  async function loadAdmin() {
-    try {
-      const [me, ver, users, groups, layers, exercise, regSettings] = await Promise.all([
-        apiJSON('/api/auth/me'),
-        apiJSON('/api/version'),
-        apiJSON('/api/users'),
-        apiJSON('/api/groups'),
-        apiJSON('/api/layers'),
-        apiJSON('/api/exercise'),
-        apiJSON('/api/admin/registration'),
-      ]);
-
-      // System info
-      document.getElementById('cfgVersion').textContent = ver.version || '—';
-      document.getElementById('cfgDataDir').textContent = ver.data_dir || '(not exposed)';
-      document.getElementById('cfgUser').textContent = `${me.display_name || me.username} (${me.role})`;
-      document.title = `Admin — Tidslinjal v${ver.version || ''}`;
-
-      // Stats
-      document.getElementById('statUsers').textContent = (users||[]).length;
-      document.getElementById('statGroups').textContent = (groups||[]).length;
-      document.getElementById('statLayers').textContent = (layers||[]).length;
-
-      // Exercise
-      document.getElementById('exLabel').textContent   = exercise.label   || '(not set)';
-      document.getElementById('exEpoch').textContent   = exercise.epoch   ? fmtDT(exercise.epoch) : '(not set)';
-      document.getElementById('exEndex').textContent   = exercise.endex   ? fmtDT(exercise.endex) : '(not set)';
-      document.getElementById('exEnabled').textContent = exercise.enabled ? '✓ Yes' : '✗ No';
-
-      // Events stat
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const to   = new Date(now.getFullYear(), now.getMonth()+1, 1).toISOString();
-      try {
-        const evs = await apiJSON(`/api/events?from=${from}&to=${to}`);
-        document.getElementById('statEvents').textContent = (evs||[]).length;
-      } catch { document.getElementById('statEvents').textContent = '?'; }
-
-      // Users table
-      const roleBadge = r => `<span class="badge badge-${r}">${r}</span>`;
-      document.getElementById('userTbody').innerHTML = (users||[]).map(u => {
-        let statusCell = u.vetted ? '✓ Active' : '<span class="pending-badge">Pending</span>';
-        if (u.blocked) statusCell = '<span class="badge" style="background:rgba(231,76,60,.2);color:#e74c3c">⛔ Blocked</span>';
-        let actions = '';
-        if (!u.vetted && !u.blocked) actions += `<button class="btn btn-primary btn-sm" onclick="vetUser(${u.id}, this)" style="margin-right:4px">Approve</button>`;
-        if (!u.blocked && u.role !== 'admin') actions += `<button class="btn btn-danger btn-sm" onclick="blockUser(${u.id}, '${u.username}', this)">Block</button>`;
-        if (u.blocked) actions += `<button class="btn btn-secondary btn-sm" onclick="unblockUser(${u.id}, this)">Unblock</button>`;
-        return `<tr>
-          <td>${u.id}</td>
-          <td>${u.username}${u.is_oidc ? ' <span title="OIDC user" style="font-size:10px;color:var(--accent)">SSO</span>' : ''}</td>
-          <td>${u.display_name||''}</td>
-          <td style="font-size:11px">${u.email||'—'}</td>
-          <td>${roleBadge(u.role)}</td>
-          <td>${u.can_lock ? '✓' : ''}</td>
-          <td>${statusCell}</td>
-          <td style="white-space:nowrap;font-size:11px">${fmtDT(u.created_at)}</td>
-          <td>${actions}</td>
-        </tr>`;
-      }).join('');
-
-      // Registration settings
-      const mode = (regSettings && regSettings.mode) || 'off';
-      document.getElementById('regMode').value = mode;
-      document.getElementById('genericCode').value = (regSettings && regSettings.invitation_code) || '';
-      updateRegUI(mode);
-
-      if (mode === 'personal_invitation') {
-        loadInvitations();
-      }
-
-    } catch(e) {
-      const errEl = document.getElementById('adminError');
-      errEl.style.display = '';
-      errEl.textContent = e.message === 'forbidden'
-        ? 'Access denied — admin role required.'
-        : 'Error loading admin data: ' + e.message;
-    }
-  }
-
-  function updateRegUI(mode) {
-    document.getElementById('genericCodeSection').style.display = mode === 'generic_invitation' ? '' : 'none';
-    document.getElementById('personalInvSection').style.display = mode === 'personal_invitation' ? '' : 'none';
-  }
-
-  document.getElementById('regMode').addEventListener('change', e => {
-    updateRegUI(e.target.value);
-    if (e.target.value === 'personal_invitation') loadInvitations();
-  });
-
-  async function saveRegistrationMode() {
-    const mode = document.getElementById('regMode').value;
-    const code = document.getElementById('genericCode').value.trim();
-    try {
-      const r = await api('/api/admin/registration', {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({mode, invitation_code: code}),
-      });
-      if (r.ok) { alert('Registration settings saved.'); }
-      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  async function loadInvitations() {
-    try {
-      const invs = await apiJSON('/api/admin/invitations');
-      const el = document.getElementById('invitationsList');
-      if (!invs || invs.length === 0) {
-        el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm)">No invitations yet.</div>';
-        return;
-      }
-      el.innerHTML = invs.map(inv => `
-        <div class="inv-item">
-          <span class="inv-code">${inv.code}</span>
-          <span style="color:var(--text-dim);flex:1">${inv.note||''}</span>
-          ${inv.used ? `<span style="color:var(--green);font-size:11px">✓ Used by ${inv.used_by||'?'}</span>` : '<span style="color:var(--accent);font-size:11px">Available</span>'}
-          <button class="btn btn-danger btn-sm" onclick="deleteInvitation(${inv.id}, this)">✕</button>
-        </div>`).join('');
-    } catch(e) { console.error(e); }
-  }
-
-  async function createInvitation() {
-    const note  = document.getElementById('invNote').value.trim();
-    const email = document.getElementById('invEmail')?.value?.trim() || '';
-    try {
-      const r = await api('/api/admin/invitations', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({note, email}),
-      });
-      if (r.ok) {
-        document.getElementById('invNote').value = '';
-        if (document.getElementById('invEmail')) document.getElementById('invEmail').value = '';
-        if (email) alert('Invitation created and email sent to ' + email);
-        loadInvitations();
-      } else {
-        const e = await r.json(); alert('Error: ' + (e.error||'unknown'));
-      }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  async function deleteInvitation(id, btn) {
-    if (!confirm('Delete this invitation code?')) return;
-    try {
-      const r = await api(`/api/admin/invitations/${id}`, {method: 'DELETE'});
-      if (r.ok) loadInvitations();
-      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  async function vetUser(id, btn) {
-    try {
-      const r = await api(`/api/users/${id}/vet`, {method: 'POST'});
-      if (r.ok) {
-        btn.closest('tr').querySelector('td:nth-child(7)').innerHTML = '✓ Active';
-        btn.remove();
-        alert('User approved successfully.');
-      } else {
-        const e = await r.json(); alert('Error: ' + (e.error||'unknown'));
-      }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  // Apply theme from localStorage/cookie if available; default to light
-  const savedTheme = document.cookie.match(/theme=([^;]+)/);
-  const adminTheme = (savedTheme && savedTheme[1]) || 'light';
-  if (adminTheme === 'light') document.body.classList.add('light-mode');
-  else if (adminTheme === 'city-camo') document.body.classList.add('city-camo');
-  else if (adminTheme === 'urban-camo') document.body.classList.add('urban-camo');
-
-  document.getElementById('btnResetToEmpty').addEventListener('click', () => {
-    document.getElementById('resetConfirmBox').style.display = '';
-    document.getElementById('resetConfirmInput').value = '';
-    document.getElementById('resetConfirmInput').focus();
-  });
-
-  document.getElementById('btnConfirmReset').addEventListener('click', async () => {
-    const val = document.getElementById('resetConfirmInput').value.trim();
-    if (val !== 'RESET') {
-      alert('Please type RESET to confirm.');
-      return;
-    }
-    const keepTemplates = document.getElementById('keepTemplatesCheck').checked;
-    try {
-      const r = await fetch('/api/admin/reset', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({confirm: 'RESET', keep_templates: keepTemplates}),
-      });
-      if (r.ok) {
-        alert(`Reset complete. All data has been cleared${keepTemplates ? ' (templates preserved)' : ''}. Reloading...`);
-        window.location.reload();
-      } else {
-        const err = await r.json();
-        alert('Reset failed: ' + (err.error || 'unknown error'));
-      }
-    } catch(e) {
-      alert('Reset failed: ' + e.message);
-    }
-  });
-
-  // ── Block / Unblock User ──────────────────────────────────────────────────
-  async function blockUser(id, username, btn) {
-    if (!confirm(`Block user "${username}"? They will not be able to log in (even via OIDC).`)) return;
-    try {
-      const r = await api(`/api/users/${id}/block`, {method: 'POST'});
-      if (r.ok) { loadAdmin(); }
-      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  async function unblockUser(id, btn) {
-    try {
-      const r = await api(`/api/users/${id}/unblock`, {method: 'POST'});
-      if (r.ok) { loadAdmin(); }
-      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  // ── Bulk Event Actions ────────────────────────────────────────────────────
-  function updateBulkValueUI() {
-    const f = document.getElementById('bulkFilter').value;
-    const hints = {
-      type: 'Event type key, e.g. "event", "decision", "meeting"…',
-      user: 'User numeric ID (see Users table above)',
-      group: 'Group name or numeric ID',
-      role: 'Role name: observer, read, reporter, teammember, teamlead, oplead, staffofficer, staffofficer_full, admin',
-    };
-    document.getElementById('bulkTypeHelper').textContent = hints[f] || '';
-  }
-
-  async function bulkSetStatus() {
-    const filter = document.getElementById('bulkFilter').value;
-    const value  = document.getElementById('bulkValue').value.trim();
-    const status = document.getElementById('bulkStatus').value;
-    if (!value) { alert('Please enter a filter value.'); return; }
-    if (!confirm(`Set all matching events (filter: ${filter}="${value}") to status "${status}"?`)) return;
-    try {
-      const r = await api('/api/admin/bulk/status', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({filter, value, status}),
-      });
-      const data = await r.json();
-      if (r.ok) {
-        const el = document.getElementById('bulkResult');
-        el.style.display = '';
-        el.style.color = 'var(--green)';
-        el.textContent = `✓ Updated ${data.updated} event(s) to status "${status}".`;
-      } else {
-        alert('Error: ' + (data.error||'unknown'));
-      }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  async function bulkDeleteEvents() {
-    const filter = document.getElementById('bulkFilter').value;
-    const value  = document.getElementById('bulkValue').value.trim();
-    if (!value) { alert('Please enter a filter value.'); return; }
-    if (!confirm(`⚠ Delete ALL events matching ${filter}="${value}"? Type DELETE to confirm.`)) return;
-    const conf = prompt('Type DELETE to confirm permanent deletion:');
-    if (conf !== 'DELETE') { alert('Cancelled.'); return; }
-    try {
-      const r = await api('/api/admin/bulk/delete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({filter, value, confirm: 'DELETE'}),
-      });
-      const data = await r.json();
-      if (r.ok) {
-        const el = document.getElementById('bulkResult');
-        el.style.display = '';
-        el.style.color = 'var(--red)';
-        el.textContent = `✓ Deleted ${data.deleted} event(s).`;
-      } else {
-        alert('Error: ' + (data.error||'unknown'));
-      }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  // ── Session Management ────────────────────────────────────────────────────
-  async function loadSessions() {
-    try {
-      const sessions = await apiJSON('/api/admin/sessions');
-      const el = document.getElementById('sessionsList');
-      if (!sessions || sessions.length === 0) {
-        el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm)">No active sessions.</div>';
-        return;
-      }
-      el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
-        <thead><tr><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">User</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Session ID</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Expires</th><th></th></tr></thead>
-        <tbody>` + sessions.map(s => `
-          <tr>
-            <td style="padding:6px 8px;border-bottom:1px solid var(--border)">${s.display_name||s.username||s.user_id}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">${(s.id||'').substring(0,12)}…</td>
-            <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px">${fmtDT(s.expires_at)}</td>
-            <td style="padding:6px 8px;border-bottom:1px solid var(--border)"><button class="btn btn-danger btn-sm" onclick="terminateSession('${s.id}', this)">Terminate</button></td>
-          </tr>`).join('') + `</tbody></table>`;
-    } catch(e) { console.error(e); }
-  }
-
-  async function terminateSession(id, btn) {
-    if (!confirm('Terminate this session? The user will be logged out immediately.')) return;
-    try {
-      const r = await api(`/api/admin/sessions/${encodeURIComponent(id)}`, {method: 'DELETE'});
-      if (r.ok) { loadSessions(); }
-      else { const e = await r.json(); alert('Error: ' + (e.error||'unknown')); }
-    } catch(e) { alert('Error: ' + e.message); }
-  }
-
-  loadAdmin();
-  loadSessions();
-  </script>
+  <script src="/static/admin.js"></script>
 </body>
 </html>

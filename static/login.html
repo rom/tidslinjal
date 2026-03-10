@@ -5,120 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tidslinjal – Login</title>
   <link rel="stylesheet" href="/static/style.css">
-  <style>
-    .reg-form { display: none; }
-    .reg-hint { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
-    .login-switch { font-size: 12px; text-align: center; margin-top: 14px; }
-    .login-switch a { color: var(--accent); cursor: pointer; text-decoration: none; }
-    .login-switch a:hover { text-decoration: underline; }
-    .success-msg { display: none; color: #2ECC71; font-size: 13px; margin-top: 8px; text-align: center; }
-
-    /* SSO status banner */
-    .sso-banner {
-      display: none;
-      background: rgba(74,144,217,0.12);
-      border: 1px solid rgba(74,144,217,0.35);
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-bottom: 14px;
-      line-height: 1.5;
-    }
-    .sso-banner.active { display: block; }
-    .sso-banner .sso-label {
-      font-weight: 700;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-    .sso-banner .sso-detail { opacity: 0.8; word-break: break-all; }
-    .sso-badge {
-      display: inline-block;
-      background: rgba(74,144,217,0.18);
-      color: var(--accent);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 10px;
-      border: 1px solid rgba(74,144,217,0.4);
-      vertical-align: middle;
-      letter-spacing: 0.04em;
-      margin-left: 4px;
-    }
-    /* SSO section divider */
-    .sso-divider {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 14px 0 10px;
-    }
-    .sso-divider hr { flex: 1; border: none; border-top: 1px solid rgba(255,255,255,0.15); }
-    .sso-divider span { font-size: 11px; opacity: 0.45; white-space: nowrap; }
-
-    /* SSO login button */
-    .sso-login-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 9px 14px;
-      border-radius: var(--radius);
-      background: rgba(74,144,217,0.15);
-      border: 1px solid rgba(74,144,217,0.45);
-      color: var(--accent);
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: none;
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .sso-login-btn:hover {
-      background: rgba(74,144,217,0.28);
-      border-color: rgba(74,144,217,0.7);
-      text-decoration: none;
-    }
-    .sso-provider-name {
-      font-size: 11px;
-      color: var(--text-dim);
-      text-align: center;
-      margin-top: 4px;
-    }
-    /* Error detail link */
-    .error-detail-toggle {
-      font-size: 11px;
-      color: var(--accent);
-      cursor: pointer;
-      text-decoration: underline;
-      display: inline-block;
-      margin-top: 4px;
-    }
-    .error-detail-body {
-      display: none;
-      font-size: 11px;
-      color: var(--text-dim);
-      background: rgba(0,0,0,0.15);
-      border-radius: 4px;
-      padding: 6px 8px;
-      margin-top: 4px;
-      word-break: break-all;
-    }
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(74,144,217,0.3);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  <link rel="stylesheet" href="/static/login.css">
 </head>
 <body class="login-page">
   <div class="login-container">
@@ -153,12 +40,12 @@
       </div>
       <div id="loginError" class="error-msg" style="display:none">
         <span id="loginErrorMsg"></span>
-        <br><span class="error-detail-toggle" id="loginDetailToggle" style="display:none" onclick="toggleLoginDetail()">Show details</span>
+        <br><span class="error-detail-toggle" id="loginDetailToggle" style="display:none">Show details</span>
         <pre id="loginErrorDetail" class="error-detail-body"></pre>
       </div>
       <button type="submit" class="btn btn-primary btn-full" id="loginBtn">Sign In</button>
       <div class="login-switch" id="forgotLink">
-        <a onclick="showForgot()">Forgot password?</a>
+        <a id="forgotPasswordLink">Forgot password?</a>
       </div>
     </form>
 
@@ -172,7 +59,7 @@
       <div id="forgotError" class="error-msg" style="display:none"></div>
       <div id="forgotSuccess" class="success-msg"></div>
       <button type="submit" class="btn btn-primary btn-full">Request Reset</button>
-      <div class="login-switch"><a onclick="showLogin()">← Back to login</a></div>
+      <div class="login-switch"><a id="backToLoginFromForgot">← Back to login</a></div>
     </form>
 
     <!-- Reset Password form -->
@@ -189,7 +76,7 @@
       <div id="resetError" class="error-msg" style="display:none"></div>
       <div id="resetSuccess" class="success-msg"></div>
       <button type="submit" class="btn btn-primary btn-full">Set New Password</button>
-      <div class="login-switch"><a onclick="showLogin()">← Back to login</a></div>
+      <div class="login-switch"><a id="backToLoginFromReset">← Back to login</a></div>
     </form>
 
     <!-- Registration form -->
@@ -217,7 +104,7 @@
       <div id="regError" class="error-msg" style="display:none"></div>
       <div id="regSuccess" class="success-msg"></div>
       <button type="submit" class="btn btn-primary btn-full">Register</button>
-      <div class="login-switch"><a onclick="showLogin()">← Back to login</a></div>
+      <div class="login-switch"><a id="backToLoginFromReg">← Back to login</a></div>
     </form>
 
     <!-- SSO / OIDC section — shown dynamically if OIDC is configured -->
@@ -235,7 +122,7 @@
 
     <!-- Register link — shown dynamically if registration is enabled -->
     <div id="registerSection" style="display:none;margin-top:12px;text-align:center;font-size:13px">
-      <a onclick="showRegister()" style="color:var(--accent);cursor:pointer;text-decoration:none">
+      <a id="showRegisterLink" style="color:var(--accent);cursor:pointer;text-decoration:none">
         Don't have an account? Register
       </a>
     </div>
@@ -244,7 +131,7 @@
     <div id="loginUrlError" style="display:none;font-size:12px;border-radius:6px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.35);padding:10px 12px;margin-top:10px">
       <div style="color:#E74C3C;font-weight:600;margin-bottom:4px">⚠ SSO Error</div>
       <div id="loginUrlErrorMsg" style="color:var(--text-dim)"></div>
-      <span class="error-detail-toggle" id="ssoDetailToggle" style="display:none" onclick="toggleSSODetail()">Show technical details</span>
+      <span class="error-detail-toggle" id="ssoDetailToggle" style="display:none">Show technical details</span>
       <pre id="ssoErrorDetail" class="error-detail-body"></pre>
       <div style="margin-top:6px;font-size:11px;color:var(--text-dim)">
         If this problem persists, contact your system administrator.
@@ -253,336 +140,6 @@
     </div>
   </div>
 
-  <script>
-    'use strict';
-
-    let regMode = 'off';
-    let oidcConfig = null;
-
-    // ── Error message map ─────────────────────────────────────────────────────
-    const SSO_ERRORS = {
-      oidc_not_configured:  'SSO is not configured on this server.',
-      state_mismatch:       'Security check failed (state mismatch). This can happen if the page was open in multiple tabs. Please try again.',
-      token_exchange_failed:'Could not exchange authorization code for a token. The SSO provider may be unreachable.',
-      token_parse_failed:   'Received an unexpected response from the SSO provider (token parsing failed).',
-      userinfo_failed:      'Could not retrieve user information from the SSO provider.',
-      userinfo_parse_failed:'The user information returned by the SSO provider could not be read.',
-      user_create_failed:   'Your SSO identity was verified, but an account could not be created automatically. Contact an administrator.',
-      session_failed:       'SSO authentication succeeded but a session could not be established. Please try again.',
-      account_blocked:      'Your account has been blocked. Contact an administrator.',
-      access_denied:        'Access was denied by the SSO provider.',
-    };
-
-    function ssoErrorMessage(code) {
-      const mapped = SSO_ERRORS[code];
-      if (mapped) return mapped;
-      return 'An SSO error occurred (' + code.replace(/_/g, ' ') + ').';
-    }
-
-    // ── View switchers ────────────────────────────────────────────────────────
-    function showLogin() {
-      document.getElementById('loginForm').style.display = '';
-      document.getElementById('regForm').style.display = 'none';
-      document.getElementById('forgotForm').style.display = 'none';
-      document.getElementById('resetForm').style.display = 'none';
-    }
-
-    function showRegister() {
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('regForm').style.display = '';
-      document.getElementById('forgotForm').style.display = 'none';
-      document.getElementById('resetForm').style.display = 'none';
-      document.getElementById('regCodeGroup').style.display =
-        (regMode === 'generic_invitation' || regMode === 'personal_invitation') ? '' : 'none';
-    }
-
-    function showForgot() {
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('regForm').style.display = 'none';
-      document.getElementById('forgotForm').style.display = '';
-      document.getElementById('resetForm').style.display = 'none';
-    }
-
-    function toggleLoginDetail() {
-      const el = document.getElementById('loginErrorDetail');
-      const tog = document.getElementById('loginDetailToggle');
-      const shown = el.style.display === 'block';
-      el.style.display = shown ? 'none' : 'block';
-      tog.textContent = shown ? 'Show details' : 'Hide details';
-    }
-
-    function toggleSSODetail() {
-      const el = document.getElementById('ssoErrorDetail');
-      const tog = document.getElementById('ssoDetailToggle');
-      const shown = el.style.display === 'block';
-      el.style.display = shown ? 'none' : 'block';
-      tog.textContent = shown ? 'Show technical details' : 'Hide technical details';
-    }
-
-    // ── URL error handling ────────────────────────────────────────────────────
-    const urlParams = new URLSearchParams(location.search);
-    const urlError  = urlParams.get('error');
-    if (urlError) {
-      const errDiv  = document.getElementById('loginUrlError');
-      const errMsg  = document.getElementById('loginUrlErrorMsg');
-      const detTog  = document.getElementById('ssoDetailToggle');
-      const detBody = document.getElementById('ssoErrorDetail');
-      const retryHint = document.getElementById('ssoRetryHint');
-
-      errMsg.textContent = ssoErrorMessage(urlError);
-      errDiv.style.display = 'block';
-
-      // Show technical detail toggle for non-obvious errors
-      if (!SSO_ERRORS[urlError]) {
-        detTog.style.display = 'inline';
-        detBody.textContent = 'Raw error code: ' + urlError;
-      } else {
-        // Show raw code as supplemental info
-        detTog.style.display = 'inline';
-        detBody.textContent = 'Error code: ' + urlError + '\nIf you need to report this issue, include the error code above.';
-      }
-
-      // Offer retry for retriable errors
-      if (['token_exchange_failed','userinfo_failed','session_failed','state_mismatch'].includes(urlError)) {
-        retryHint.style.display = 'inline';
-      }
-    }
-
-    // ── Reset token pre-fill ──────────────────────────────────────────────────
-    const resetToken = urlParams.get('reset_token') || urlParams.get('reset');
-    if (resetToken) {
-      document.getElementById('resetToken').value = resetToken;
-      showLogin();
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('resetForm').style.display = '';
-    }
-
-    // ── OIDC config fetch ─────────────────────────────────────────────────────
-    fetch('/api/auth/oidc-config').then(async r => {
-      if (!r.ok) return; // OIDC not configured — keep login form as-is
-
-      oidcConfig = await r.json();
-      const issuer = oidcConfig.issuer || '';
-
-      // Show SSO section with provider name
-      const oidcSec = document.getElementById('oidcSection');
-      oidcSec.style.display = '';
-      const providerEl = document.getElementById('ssoProviderName');
-      if (issuer) {
-        try {
-          providerEl.textContent = 'via ' + new URL(issuer).hostname;
-        } catch { providerEl.textContent = ''; }
-      }
-
-      // Add click spinner on SSO button
-      document.getElementById('ssoLoginBtn').addEventListener('click', () => {
-        document.getElementById('ssoSpinner').style.display = 'inline-block';
-      });
-
-      if (oidcConfig.exclusive === 'true') {
-        // Exclusive SSO mode — hide local forms
-        document.getElementById('loginForm').style.display = 'none';
-        document.getElementById('forgotLink').style.display = 'none';
-        document.getElementById('ssoExclusiveNotice').style.display = '';
-        // Auto-redirect if no URL error and no reset token
-        if (!urlError && !resetToken) {
-          document.getElementById('ssoSpinner').style.display = 'inline-block';
-          setTimeout(() => { window.location.href = '/auth/oidc/login'; }, 600);
-        }
-      }
-    }).catch(() => {});
-
-    // ── Registration mode ─────────────────────────────────────────────────────
-    fetch('/api/admin/registration').then(async r => {
-      if (r.ok) {
-        const data = await r.json();
-        regMode = data.mode || 'off';
-        if (regMode !== 'off' && regMode !== 'oidc_auto_enroll') {
-          document.getElementById('registerSection').style.display = '';
-        }
-      }
-    }).catch(() => {});
-
-    // ── Login form ────────────────────────────────────────────────────────────
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errEl  = document.getElementById('loginError');
-      const errMsg = document.getElementById('loginErrorMsg');
-      const detTog = document.getElementById('loginDetailToggle');
-      const detBody = document.getElementById('loginErrorDetail');
-      const btn    = document.getElementById('loginBtn');
-
-      errEl.style.display = 'none';
-      btn.disabled = true;
-      btn.textContent = 'Signing in…';
-
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        if (res.ok) {
-          btn.textContent = 'Redirecting…';
-          window.location.href = '/';
-          return;
-        }
-        const data = await res.json().catch(() => ({}));
-        let msg = data.error || 'Login failed';
-        let detail = null;
-
-        if (res.status === 403) {
-          if (data.error && data.error.includes('SSO')) {
-            msg = 'Local login is disabled on this server — please use SSO.';
-            detail = 'Server returned: ' + (data.error || '');
-          } else if (data.error === 'account pending approval') {
-            msg = 'Your account is pending admin approval. Please try again later.';
-          } else if (data.error === 'account blocked') {
-            msg = 'Your account has been blocked. Please contact an administrator.';
-          }
-        } else if (res.status === 401) {
-          msg = 'Invalid username or password.';
-        }
-
-        errMsg.textContent = msg;
-        errEl.style.display = 'block';
-
-        if (detail) {
-          detTog.style.display = 'inline';
-          detBody.textContent = detail;
-        } else {
-          detTog.style.display = 'none';
-        }
-      } catch {
-        errMsg.textContent = 'Network error — could not reach the server. Please check your connection.';
-        errEl.style.display = 'block';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-      }
-    });
-
-    // ── Register form ─────────────────────────────────────────────────────────
-    document.getElementById('regForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errEl  = document.getElementById('regError');
-      const succEl = document.getElementById('regSuccess');
-      errEl.style.display = 'none';
-      succEl.style.display = 'none';
-
-      const body = {
-        username:        document.getElementById('regUsername').value.trim(),
-        password:        document.getElementById('regPassword').value,
-        display_name:    document.getElementById('regDisplay').value.trim(),
-        email:           document.getElementById('regEmail').value.trim(),
-        invitation_code: document.getElementById('regCode').value.trim(),
-      };
-
-      if (!body.username || !body.password) {
-        errEl.textContent = 'Username and password are required.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      try {
-        const res  = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (res.ok) {
-          if (data.vetted) {
-            succEl.textContent = 'Registration successful! You can now log in.';
-          } else {
-            succEl.textContent = 'Registration submitted. An admin will review your account before you can log in.';
-          }
-          succEl.style.display = 'block';
-          document.getElementById('regForm').reset();
-        } else {
-          errEl.textContent = data.error || 'Registration failed';
-          errEl.style.display = 'block';
-        }
-      } catch {
-        errEl.textContent = 'Network error';
-        errEl.style.display = 'block';
-      }
-    });
-
-    // ── Forgot Password form ──────────────────────────────────────────────────
-    document.getElementById('forgotForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errEl  = document.getElementById('forgotError');
-      const succEl = document.getElementById('forgotSuccess');
-      errEl.style.display = 'none';
-      succEl.style.display = 'none';
-
-      const val = document.getElementById('forgotUser').value.trim();
-      if (!val) { errEl.textContent = 'Please enter your username or email.'; errEl.style.display = 'block'; return; }
-
-      const body = val.includes('@') ? {email: val} : {username: val};
-
-      try {
-        const res  = await fetch('/api/auth/forgot-password', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (res.ok) {
-          if (data.token) {
-            succEl.innerHTML = `Reset token generated. Please send this to the user:<br>
-              <code style="word-break:break-all;font-size:11px">${data.token}</code><br>
-              <small>They can use it at <a onclick="document.getElementById('resetToken').value='${data.token}';showLogin();document.getElementById('loginForm').style.display='none';document.getElementById('resetForm').style.display=''" style="cursor:pointer;color:var(--accent)">Reset password</a></small>`;
-          } else {
-            succEl.textContent = 'If the account exists, a reset link has been sent.';
-          }
-          succEl.style.display = 'block';
-        } else {
-          errEl.textContent = data.error || 'Request failed';
-          errEl.style.display = 'block';
-        }
-      } catch {
-        errEl.textContent = 'Network error';
-        errEl.style.display = 'block';
-      }
-    });
-
-    // ── Reset Password form ───────────────────────────────────────────────────
-    document.getElementById('resetForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const errEl  = document.getElementById('resetError');
-      const succEl = document.getElementById('resetSuccess');
-      errEl.style.display = 'none';
-      succEl.style.display = 'none';
-
-      const token  = document.getElementById('resetToken').value.trim();
-      const newPwd = document.getElementById('resetPwd').value;
-      if (!token || !newPwd) { errEl.textContent = 'Token and password are required.'; errEl.style.display = 'block'; return; }
-
-      try {
-        const res  = await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({token, new_password: newPwd})
-        });
-        const data = await res.json();
-        if (res.ok) {
-          succEl.textContent = 'Password changed successfully. You can now log in.';
-          succEl.style.display = 'block';
-          setTimeout(showLogin, 2000);
-        } else {
-          errEl.textContent = data.error || 'Reset failed';
-          errEl.style.display = 'block';
-        }
-      } catch {
-        errEl.textContent = 'Network error';
-        errEl.style.display = 'block';
-      }
-    });
-  </script>
+  <script src="/static/login.js"></script>
 </body>
 </html>

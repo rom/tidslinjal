@@ -1,0 +1,23 @@
+{
+  "name": "tidslinjal",
+  "version": "1.0.0",
+  "description": "**Tidslinjal** (\"timeline\" in Swedish) is a collaborative operational timeline web application designed for geographically dispersed groups. It provides a shared, visual chronology and battle rhythm for operations planning, event coordination, and situational awareness — including support for military exercises, cyber incident response, and crisis management.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:33203/git/rom/tidslinjal"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  }
+}
