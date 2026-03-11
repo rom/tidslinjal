@@ -8,6 +8,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
@@ -895,10 +896,18 @@ func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
 	}
 	type meResponse struct {
 		UserPublic
-		Groups      []groupInfo `json:"groups"`
-		WebCalToken string      `json:"webcal_token,omitempty"`
+		Groups          []groupInfo `json:"groups"`
+		WebCalToken     string      `json:"webcal_token,omitempty"`
+		LastLoginIP     string      `json:"last_login_ip,omitempty"`
+		LastLoginDomain string      `json:"last_login_domain,omitempty"`
 	}
-	jsonOK(w, meResponse{UserPublic: pub, Groups: groups, WebCalToken: user.WebCalToken})
+	jsonOK(w, meResponse{
+		UserPublic:      pub,
+		Groups:          groups,
+		WebCalToken:     user.WebCalToken,
+		LastLoginIP:     user.LastLoginIP,
+		LastLoginDomain: user.LastLoginDomain,
+	})
 }
 
 func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, user *User) {
@@ -6385,7 +6394,7 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	rawKey := "tlk_" + hex.EncodeToString(raw)
-	hash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcrypt.MinCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcrypt.DefaultCost)
 	if err != nil {
 		jsonError(w, "failed to hash key", http.StatusInternalServerError)
 		return
@@ -7398,7 +7407,7 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 		if err != nil {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(dataDir, f.Name), data, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(dataDir, f.Name), data, 0600); err != nil {
 			continue
 		}
 		restored++
@@ -7429,7 +7438,7 @@ func (app *App) handleWebCal(w http.ResponseWriter, r *http.Request) {
 	users := app.store.GetUsers()
 	var calUser *User
 	for i := range users {
-		if users[i].WebCalToken == token {
+		if users[i].WebCalToken != "" && subtle.ConstantTimeCompare([]byte(users[i].WebCalToken), []byte(token)) == 1 {
 			calUser = &users[i]
 			break
 		}
@@ -7777,7 +7786,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Validate state
 	stateCookie, err := r.Cookie("oidc_state")
-	if err != nil || stateCookie.Value != r.URL.Query().Get("state") {
+	if err != nil || subtle.ConstantTimeCompare([]byte(stateCookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
 		http.Redirect(w, r, "/login?error=state_mismatch", http.StatusFound)
 		return
 	}

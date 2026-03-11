@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -96,10 +97,10 @@ type Store struct {
 
 func NewStore(dataDir string) (*Store, error) {
 	s := &Store{dataDir: dataDir}
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Join(dataDir, "attachments"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dataDir, "attachments"), 0700); err != nil {
 		return nil, fmt.Errorf("create attachments dir: %w", err)
 	}
 	if err := s.load(); err != nil {
@@ -357,7 +358,7 @@ func (s *Store) loadFile(filename string, v interface{}) {
 func (s *Store) saveFile(filename string, v interface{}) error {
 	path := filepath.Join(s.dataDir, filename)
 	tmp := path + ".tmp"
-	f, err := os.Create(tmp)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -594,7 +595,7 @@ func (s *Store) GetUserByResetToken(token string) (*User, bool) {
 	now := time.Now()
 	for i := range s.users {
 		u := &s.users[i]
-		if u.PasswordResetToken == token && u.PasswordResetExpiry != nil && u.PasswordResetExpiry.After(now) {
+		if u.PasswordResetToken != "" && subtle.ConstantTimeCompare([]byte(u.PasswordResetToken), []byte(token)) == 1 && u.PasswordResetExpiry != nil && u.PasswordResetExpiry.After(now) {
 			cp := *u
 			return &cp, true
 		}
@@ -1867,6 +1868,7 @@ func (s *Store) ImportData(data ExportData, currentUserID int64, currentUserName
 				Role:         u.Role,
 				CanLock:      u.CanLock,
 				PasswordHash: "", // no password; admin must set one
+				Blocked:      true, // blocked until admin sets a password
 				CreatedAt:    time.Now(),
 			}
 			if _, err := s.CreateUser(nu); err == nil {
@@ -2087,17 +2089,18 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 			count++
 			// Copy template attachments to the new event
 			for _, ta := range item.Attachments {
-				srcPath := filepath.Join(s.AttachmentDir(), ta.StoredName)
+				srcPath := filepath.Join(s.AttachmentDir(), filepath.Base(ta.StoredName))
 				if _, err := os.Stat(srcPath); err != nil {
 					continue // source file missing, skip
 				}
-				newStoredName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), ta.Filename)
+				safeName := filepath.Base(ta.Filename)
+				newStoredName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 				dstPath := filepath.Join(s.AttachmentDir(), newStoredName)
 				srcData, err := os.ReadFile(srcPath)
 				if err != nil {
 					continue
 				}
-				if err := os.WriteFile(dstPath, srcData, 0644); err != nil {
+				if err := os.WriteFile(dstPath, srcData, 0600); err != nil {
 					continue
 				}
 				att := Attachment{
@@ -2374,17 +2377,28 @@ func (s *Store) DeleteAPIKey(id int64) error {
 }
 
 // ValidateAPIKey checks a raw key string against stored hashes; returns the key record or nil.
+// Uses a read lock to snapshot keys, then performs expensive bcrypt comparisons without holding
+// the lock to avoid blocking all store operations during validation.
 func (s *Store) ValidateAPIKey(raw string) *APIKey {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i, k := range s.apiKeys {
+	s.mu.RLock()
+	keys := append([]APIKey(nil), s.apiKeys...)
+	s.mu.RUnlock()
+
+	for _, k := range keys {
 		if bcrypt.CompareHashAndPassword([]byte(k.KeyHash), []byte(raw)) == nil {
-			// Update last used
-			now := time.Now()
-			s.apiKeys[i].LastUsedAt = &now
-			cp := s.apiKeys[i]
+			// Found match; update LastUsedAt under write lock
+			s.mu.Lock()
+			for i := range s.apiKeys {
+				if s.apiKeys[i].ID == k.ID {
+					now := time.Now()
+					s.apiKeys[i].LastUsedAt = &now
+					break
+				}
+			}
 			snap := append([]APIKey(nil), s.apiKeys...)
+			s.mu.Unlock()
 			go s.persist("apikeys.json", snap)
+			cp := k
 			cp.KeyHash = ""
 			cp.Key = ""
 			return &cp
