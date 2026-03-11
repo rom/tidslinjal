@@ -2314,13 +2314,13 @@
 
 <!-- Role Editor Modal -->
 <div class="modal-overlay" id="roleEditorModal">
-  <div class="modal modal-xl" style="max-width:1400px;width:99vw;max-height:92vh">
+  <div class="modal modal-xl" style="max-width:98vw;width:98vw;max-height:96vh" id="roleEditorBody">
     <div class="modal-header">
       <h2 id="lbl-role-editor-title">🛡 Role Editor</h2>
       <button class="modal-close" data-close-modal="roleEditorModal">&times;</button>
     </div>
-    <div class="modal-body" style="padding-bottom:8px;overflow-y:auto;max-height:calc(92vh - 120px)">
-      <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Admin role is locked.</p>
+    <div class="modal-body" style="padding-bottom:8px;overflow:auto;max-height:calc(96vh - 120px)">
+      <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Click a column header to select/deselect all. Hover ⓘ for descriptions. Admin role is locked.</p>
       <div id="roleEditorTable"></div>
     </div>
     <div class="modal-footer" style="justify-content:space-between">

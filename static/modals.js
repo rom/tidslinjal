@@ -6888,14 +6888,14 @@ function showConflictWarning(conflicts) {
 
 // Default role configurations
 const DEFAULT_ROLE_CONFIGS = [
-  { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
-  { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true } },
-  { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true } },
-  { key: 'teammember',        display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true } },
-  { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true } },
-  { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
-  { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
-  { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true } },
+  { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, view_free_busy: true } },
+  { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, view_free_busy: true } },
+  { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, decision_log: true, comment: true, manage_alarms: true, view_free_busy: true } },
+  { key: 'teammember',        display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true, decision_log: true, comment: true, manage_alarms: true, view_free_busy: true, import_export: true } },
+  { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, confidential_read: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, confidential_read: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true, manage_integrations: true } },
 ];
 
 // Ordered list of all capabilities shown in role editor
@@ -6903,7 +6903,8 @@ const ALL_CAPABILITIES = [
   'see_groups', 'see_users', 'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
   'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise',
   'report', 'auto_report',
-  'decision_log_readwrite', 'confidential_read', 'see_location', 'critical_line_analysis'
+  'decision_log', 'decision_log_readwrite', 'confidential_read', 'see_location', 'critical_line_analysis',
+  'manage_rooms', 'view_free_busy', 'manage_integrations', 'import_export', 'manage_alarms', 'comment'
 ];
 
 async function openRoleEditor() {
@@ -6934,12 +6935,44 @@ function _roleEditorInputStyle() {
 }
 
 const _ROLE_CAP_LABELS = {
-  see_groups:'See Groups', see_users:'See Users',
-  view_events:'View Evts', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
-  delete_events:'Delete', manage_layers:'Layers', manage_groups:'Manage Groups',
-  manage_users:'Manage Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise',
+  see_groups:'Groups', see_users:'Users',
+  view_events:'View', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
+  delete_events:'Delete', manage_layers:'Layers', manage_groups:'Mgr Groups',
+  manage_users:'Mgr Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise',
   report:'Report', auto_report:'Auto Rpt',
-  decision_log_readwrite:'Dec.Log RW', confidential_read:'Confid.', see_location:'See Loc.', critical_line_analysis:'Crit.Line'
+  decision_log:'Dec.Log', decision_log_readwrite:'Dec.Log RW', confidential_read:'Confid.', see_location:'See Loc.', critical_line_analysis:'Crit.Line',
+  manage_rooms:'Rooms', view_free_busy:'Free/Busy', manage_integrations:'Integr.', import_export:'Imp/Exp', manage_alarms:'Alarms', comment:'Comment'
+};
+
+const _ROLE_CAP_DESCRIPTIONS = {
+  see_groups:       'View groups/units and their members',
+  see_users:        'View the list of registered users',
+  view_events:      'View timeline events and their details',
+  create_events:    'Create new events on the timeline',
+  edit_own:         'Edit events that you created',
+  edit_all:         'Edit any event, regardless of creator',
+  delete_events:    'Delete events from the timeline',
+  manage_layers:    'Create, edit, and delete timeline layers',
+  manage_groups:    'Create and manage groups/units',
+  manage_users:     'Add, edit roles, and remove users',
+  approve_users:    'Approve or vet new user registrations',
+  manage_templates: 'Create and manage event templates',
+  lock_slots:       'Lock time slots to prevent event creation',
+  view_audit:       'View the audit log of all system actions',
+  exercise:         'Configure exercise settings (epoch, ENDEX, labels)',
+  report:           'Generate and export reports',
+  auto_report:      'Create automated/scheduled reports',
+  decision_log:     'View the decision log',
+  decision_log_readwrite: 'Create, edit, and review decision log entries',
+  confidential_read:      'View confidential/classified events and data',
+  see_location:     'View user locations on the map and in profiles',
+  critical_line_analysis: 'Access critical path/line analysis tools',
+  manage_rooms:     'Create and manage bookable rooms and resources',
+  view_free_busy:   'View availability/free-busy status of users and rooms',
+  manage_integrations: 'Configure connectors, webhooks, and external integrations',
+  import_export:    'Import and export events (CSV, ICS, STIX)',
+  manage_alarms:    'Create and manage alarms for events',
+  comment:          'Add comments and notes to events'
 };
 
 function _renderRoleEditorTable(roles) {
@@ -6948,15 +6981,18 @@ function _renderRoleEditorTable(roles) {
   const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key).concat(['admin']);
   tableEl.innerHTML = `
     <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+    <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)" id="roleEditorGrid">
       <thead>
         <tr style="background:var(--bg2)">
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:110px;white-space:nowrap">Key</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇬🇧 EN</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇸🇪 SV</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:130px">🇫🇷 FR</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px;white-space:nowrap;position:sticky;left:0;background:var(--bg2);z-index:1">Key</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇬🇧 EN</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇸🇪 SV</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇷 FR</th>
           ${ALL_CAPABILITIES.map(cap =>
-            `<th style="padding:6px 4px;border-bottom:2px solid var(--border);font-size:11px;text-align:center;min-width:52px" title="${cap}">${_ROLE_CAP_LABELS[cap]||cap}</th>`
+            `<th class="role-cap-header" data-cap="${cap}" style="padding:4px 3px;border-bottom:2px solid var(--border);font-size:10px;text-align:center;min-width:48px;cursor:pointer;user-select:none;vertical-align:bottom" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">
+              <div>${_ROLE_CAP_LABELS[cap]||cap}</div>
+              <div style="font-size:9px;color:var(--text-dim);cursor:help" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">ⓘ</div>
+            </th>`
           ).join('')}
           <th style="padding:6px 4px;border-bottom:2px solid var(--border);min-width:36px"></th>
         </tr>
@@ -6964,7 +7000,7 @@ function _renderRoleEditorTable(roles) {
       <tbody id="roleEditorTbody">
         ${roles.map(role => _renderRoleRow(role, builtinKeys.includes(role.key))).join('')}
         <tr style="opacity:0.4">
-          <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim)">admin</td>
+          <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim);position:sticky;left:0;background:var(--bg2)">admin</td>
           <td style="padding:8px 10px;font-size:var(--fs-sm)" colspan="3">${t('role_admin')||'Admin'} 🔒</td>
           ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
           <td></td>
@@ -6973,9 +7009,32 @@ function _renderRoleEditorTable(roles) {
     </table>
     </div>
   `;
+  // Bind column header click to toggle all checkboxes in that column
+  tableEl.querySelectorAll('.role-cap-header').forEach(th => {
+    th.addEventListener('click', () => {
+      const cap = th.dataset.cap;
+      const cbs = tableEl.querySelectorAll(`.role-cap-cb[data-cap="${cap}"]`);
+      // If all checked, uncheck all; otherwise check all
+      const allChecked = Array.from(cbs).every(cb => cb.checked);
+      cbs.forEach(cb => { cb.checked = !allChecked; });
+    });
+  });
   const body = document.getElementById('roleEditorBody');
   if (body) _bindActions(body);
 }
+
+// Proper translated role name placeholders
+const _ROLE_PLACEHOLDERS = {
+  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur' },
+  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture' },
+  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur' },
+  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe' },
+  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe' },
+  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations' },
+  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major' },
+  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet' },
+  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture' },
+};
 
 function _renderRoleRow(role, isBuiltin) {
   const dn = role.display_names || {};
@@ -6984,19 +7043,20 @@ function _renderRoleRow(role, isBuiltin) {
   const frVal = dn.fr || '';
   const key = role.key;
   const s = _roleEditorInputStyle();
+  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key };
   return `
     <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
-      <td style="padding:6px 10px">
+      <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
         ${isBuiltin
           ? `<span style="font-family:monospace;color:var(--text-dim);font-size:var(--fs-sm)">${escHtml(key)}</span>`
           : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="custom_role" style="${s};font-family:monospace">`}
       </td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(getRoleDisplayName(key))}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(ph.en)}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(ph.sv)}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(ph.fr)}" style="${s}"></td>
       ${ALL_CAPABILITIES.map(cap => {
         const checked = role.capabilities && role.capabilities[cap];
-        return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''}></td>`;
+        return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''} title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}"></td>`;
       }).join('')}
       <td style="text-align:center;padding:4px">
         ${isBuiltin ? '' : `<button class="btn btn-danger btn-xs" data-action="removeRoleRow" data-arg-el title="Remove" style="padding:2px 7px;font-size:12px">✕</button>`}
@@ -7010,7 +7070,7 @@ function addNewRoleRow() {
   state._roleEditorCustomCounter = (state._roleEditorCustomCounter || 0) + 1;
   const key = `custom_role_${state._roleEditorCustomCounter}`;
   // All new custom roles start with see_groups and see_users enabled by default
-  const role = { key, display_name: '', display_names: {}, capabilities: { see_groups: true, see_users: true } };
+  const role = { key, display_name: '', display_names: {}, capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, comment: true, view_free_busy: true } };
   const adminRow = tbody.querySelector('tr[style*="opacity"]');
   const tmp = document.createElement('tbody');
   tmp.innerHTML = _renderRoleRow(role, false);
