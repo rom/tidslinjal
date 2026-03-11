@@ -50,6 +50,19 @@
 /* Off segments glow dimly (ghosted) */
 .seg7 i.off { opacity: 0.08; }
 
+/* Text-size seven-segment display (for labels, dates, tz) */
+.seg7-text {
+  gap: 1px;
+}
+.seg7-text .seg7 {
+  width: 0.55em;
+  height: 0.9em;
+}
+.seg7-space {
+  display: inline-block;
+  width: 0.3em;
+}
+
 /* Colon separator */
 .seg7-colon {
   display: inline-flex;

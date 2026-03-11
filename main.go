@@ -3122,6 +3122,15 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// Auto-record wall-clock time when artificial time is set/changed
+	if es.ArtificialTimeEnabled && es.ArtificialTime != "" {
+		old := app.store.GetExerciseSettings()
+		if es.ArtificialTime != old.ArtificialTime || !old.ArtificialTimeEnabled {
+			es.ArtificialTimeSetAt = time.Now().UTC().Format(time.RFC3339)
+		} else if old.ArtificialTimeSetAt != "" {
+			es.ArtificialTimeSetAt = old.ArtificialTimeSetAt
+		}
+	}
 	if err := app.store.SaveExerciseSettings(es); err != nil {
 		jsonError(w, "failed to save", http.StatusInternalServerError)
 		return

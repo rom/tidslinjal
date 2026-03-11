@@ -665,8 +665,9 @@ type ExerciseSettings struct {
 	OperationMode   string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
 	ExIndex         int    `json:"ex_index,omitempty"`        // exercise/incident index number
 	// Artificial time: user-defined "current time" for exercise simulation
-	ArtificialTime  string `json:"artificial_time,omitempty"` // ISO8601: the artificial "now"
-	ArtificialTimeEnabled bool `json:"artificial_time_enabled"`  // whether artificial time is active
+	ArtificialTime        string `json:"artificial_time,omitempty"`         // ISO8601: the artificial "now"
+	ArtificialTimeEnabled bool   `json:"artificial_time_enabled"`           // whether artificial time is active
+	ArtificialTimeSetAt   string `json:"artificial_time_set_at,omitempty"`  // ISO8601: real wall-clock time when artificial_time was set
 }
 
 // MapLocation represents a named geographic position (HQ, base, POI, etc.)

@@ -6,7 +6,18 @@ const SEG_MAP = {
   '0':[1,1,1,1,1,1,0], '1':[0,1,1,0,0,0,0], '2':[1,1,0,1,1,0,1],
   '3':[1,1,1,1,0,0,1], '4':[0,1,1,0,0,1,1], '5':[1,0,1,1,0,1,1],
   '6':[1,0,1,1,1,1,1], '7':[1,1,1,0,0,0,0], '8':[1,1,1,1,1,1,1],
-  '9':[1,1,1,1,0,1,1], '-':[0,0,0,0,0,0,1]
+  '9':[1,1,1,1,0,1,1], '-':[0,0,0,0,0,0,1],
+  'A':[1,1,1,0,1,1,1], 'B':[0,0,1,1,1,1,1], 'C':[1,0,0,1,1,1,0],
+  'D':[0,1,1,1,1,0,1], 'E':[1,0,0,1,1,1,1], 'F':[1,0,0,0,1,1,1],
+  'G':[1,0,1,1,1,1,0], 'H':[0,1,1,0,1,1,1], 'I':[0,0,1,0,1,0,0],
+  'J':[0,1,1,1,0,0,0], 'K':[0,1,1,0,1,1,1], 'L':[0,0,0,1,1,1,0],
+  'M':[1,1,1,0,1,1,0], 'N':[0,0,1,0,1,0,1], 'O':[1,1,1,1,1,1,0],
+  'P':[1,1,0,0,1,1,1], 'Q':[1,1,1,0,0,1,1], 'R':[0,0,0,0,1,0,1],
+  'S':[1,0,1,1,0,1,1], 'T':[0,0,0,1,1,1,1], 'U':[0,1,1,1,1,1,0],
+  'V':[0,1,1,1,1,1,0], 'W':[0,1,1,1,1,1,0], 'X':[0,1,1,0,1,1,1],
+  'Y':[0,1,1,1,0,1,1], 'Z':[1,1,0,1,1,0,1],
+  ' ':[0,0,0,0,0,0,0], '/':[0,1,0,0,1,0,1], '.':[0,0,0,1,0,0,0],
+  ',':[0,0,0,1,0,0,0], ':':[0,0,0,0,0,0,0], '+':[0,0,0,0,0,0,1]
 };
 
 function buildSeg7(val) {
@@ -23,6 +34,14 @@ function buildSeg7Time(h, m, s) {
   return `<span class="seg7-display">${buildSeg7(hh[0])}${buildSeg7(hh[1])}<span class="seg7-colon"><i></i><i></i></span>${buildSeg7(mm[0])}${buildSeg7(mm[1])}<span class="seg7-colon"><i></i><i></i></span>${buildSeg7(ss[0])}${buildSeg7(ss[1])}</span>`;
 }
 
+function buildSeg7Text(str) {
+  const chars = String(str).toUpperCase().split('');
+  return `<span class="seg7-display seg7-text">${chars.map(c => {
+    if (c === ' ') return '<span class="seg7-space"></span>';
+    return buildSeg7(c);
+  }).join('')}</span>`;
+}
+
 /* ── State ── */
 let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
 const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
@@ -33,6 +52,21 @@ let vcrColor = 'red';
 let _lastLang = '';
 
 function pad(n) { return String(n).padStart(2,'0'); }
+
+/* ── Artificial time offset: read from opener's state ── */
+function _getEffectiveNow() {
+  try {
+    const ex = window.opener?.state?.exercise;
+    if (ex && ex.artificial_time_enabled && ex.artificial_time && ex.artificial_time_set_at) {
+      const artTime = new Date(ex.artificial_time).getTime();
+      const setAt   = new Date(ex.artificial_time_set_at).getTime();
+      if (!isNaN(artTime) && !isNaN(setAt)) {
+        return new Date(Date.now() + (artTime - setAt));
+      }
+    }
+  } catch(e) {}
+  return new Date();
+}
 
 /* ── i18n: read translations from opener ── */
 function _t(key) {
@@ -287,10 +321,10 @@ function rebuildClocks() {
     </div>`;
   } else if (clockMode === 'vcr') {
     html += `<div class="clock-card vcr-card" id="card-main">
-      <div class="clock-label vcr-label clock-label-click" id="main-label" title="${toggleTip}">${isUTC?'UTC/Z':escH(_t('clock_local'))}</div>
+      <div class="clock-label vcr-label clock-label-click" id="main-label" title="${toggleTip}">${buildSeg7Text(isUTC?'UTC/Z':_t('clock_local'))}</div>
       <div class="clock-time vcr-time" id="vcr-main-seg">${buildSeg7Time(0,0,0)}</div>
-      <div class="clock-date vcr-date" id="main-date"></div>
-      <div class="clock-tz vcr-tz" id="main-tz"></div>
+      <div class="clock-date vcr-date" id="main-date">${buildSeg7Text('--')}</div>
+      <div class="clock-tz vcr-tz" id="main-tz">${buildSeg7Text('--')}</div>
     </div>`;
   } else {
     html += `<div class="clock-card" id="card-main">
@@ -311,9 +345,9 @@ function rebuildClocks() {
     } else if (clockMode === 'vcr') {
       html += `<div class="clock-card vcr-card" id="card-${ec.id}">
         <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
-        <div class="clock-label vcr-label">${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-label vcr-label">${buildSeg7Text(ec.label||ec.timezone)}</div>
         <div class="clock-time vcr-time" id="vcr-ec-${ec.id}-seg">${buildSeg7Time(0,0,0)}</div>
-        <div class="clock-tz vcr-tz" id="ec-${ec.id}-tz"></div>
+        <div class="clock-tz vcr-tz" id="ec-${ec.id}-tz">${buildSeg7Text('--')}</div>
       </div>`;
     } else {
       html += `<div class="clock-card" id="card-${ec.id}">
@@ -339,7 +373,7 @@ function tick() {
   syncTheme();
   syncLanguage();
   const {isUTC, extra} = getClockData();
-  const now = new Date();
+  const now = _getEffectiveNow();
   const locale = _getLocale();
 
   if (1 + extra.length !== _lastClockCount || clockMode !== _lastMode) {
@@ -347,7 +381,10 @@ function tick() {
   }
 
   const lbl = document.getElementById('main-label');
-  if (lbl) lbl.textContent = isUTC ? 'UTC/Z' : _t('clock_local');
+  if (lbl) {
+    const lblText = isUTC ? 'UTC/Z' : _t('clock_local');
+    if (clockMode === 'vcr') { lbl.innerHTML = buildSeg7Text(lblText); } else { lbl.textContent = lblText; }
+  }
 
   let h, m, s, dateStr, tzLabel, timeStr;
   if (isUTC) {
@@ -370,12 +407,14 @@ function tick() {
   } else {
     const t=document.getElementById('main-time'); if(t)t.textContent=timeStr;
   }
-  const d=document.getElementById('main-date'); if(d)d.textContent=dateStr;
-  const z=document.getElementById('main-tz');   if(z)z.textContent=tzLabel;
+  const d=document.getElementById('main-date');
+  if(d){ if(clockMode==='vcr'){d.innerHTML=buildSeg7Text(dateStr);}else{d.textContent=dateStr;} }
+  const z=document.getElementById('main-tz');
+  if(z){ if(clockMode==='vcr'){z.innerHTML=buildSeg7Text(tzLabel);}else{z.textContent=tzLabel;} }
 
   extra.forEach(ec => {
     try {
-      const ecTime = new Date();
+      const ecTime = _getEffectiveNow();
       const ecH = parseInt(ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecM = parseInt(ecTime.toLocaleTimeString('en-GB',{minute:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecS = parseInt(ecTime.toLocaleTimeString('en-GB',{second:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
@@ -388,7 +427,8 @@ function tick() {
       } else {
         const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent=ecTStr;
       }
-      const z=document.getElementById('ec-'+ec.id+'-tz'); if(z)z.textContent=ecTZ;
+      const z=document.getElementById('ec-'+ec.id+'-tz');
+      if(z){ if(clockMode==='vcr'){z.innerHTML=buildSeg7Text(ecTZ);}else{z.textContent=ecTZ;} }
     } catch(e) {
       const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent='??:??:??';
     }
