@@ -13,6 +13,8 @@
  */
 function _bindActions(root) {
   root.querySelectorAll('[data-action]').forEach(el => {
+    if (el._actionBound) return;
+    el._actionBound = true;
     const fnName = el.dataset.action;
     const fn = window[fnName];
     if (typeof fn !== 'function') return;
@@ -341,6 +343,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventContactURL').value = ev ? (ev.contact_url||'') : '';
   document.getElementById('eventVirtualMeetingType').value = ev ? (ev.virtual_meeting_type||'') : '';
 
+  // Auto-completion for physical location (rooms, buildings, addresses)
+  _setupLocationAutocomplete('eventPhysicalLocation');
+  _setupLocationAutocomplete('eventLocationAddress');
+
   // Map / coordinates for physical events
   const latEl = document.getElementById('eventLatitude');
   const lngEl = document.getElementById('eventLongitude');
@@ -571,6 +577,73 @@ async function patchEventStatus(id, status, rejectionReason) {
     const err = await res.json();
     showError(err.error);
   }
+}
+
+// Auto-complete for location fields using rooms/buildings
+let _locationSuggestions = null;
+async function _loadLocationSuggestions() {
+  if (_locationSuggestions) return _locationSuggestions;
+  try {
+    const rooms = await apiGet('/api/rooms') || [];
+    const suggestions = [];
+    const subTypeLabels = {meeting_room:'Meeting Room',video_room:'Video Room',aula:'Aula',studio:'Studio',server_room:'Server Room',depot:'Depot',workshop:'Workshop',lab:'Lab'};
+    rooms.forEach(r => {
+      const icon = r.icon || ({room:'🏠',building:'🏢',computer_service:'💻',data_center:'🖥'}[r.type]||'📍');
+      const subLabel = r.sub_type ? ` (${subTypeLabels[r.sub_type]||r.sub_type})` : '';
+      suggestions.push({ text: r.name, detail: (r.location||'') + subLabel, icon, address: r.location||'' });
+      if (r.location && r.location !== r.name) {
+        suggestions.push({ text: r.location, detail: r.name, icon: '📍', address: r.location });
+      }
+    });
+    _locationSuggestions = suggestions;
+    return suggestions;
+  } catch { return []; }
+}
+
+function _setupLocationAutocomplete(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || input._acSetup) return;
+  input._acSetup = true;
+  let dropdown = null;
+
+  function close() { if (dropdown) { dropdown.remove(); dropdown = null; } }
+  function show(items) {
+    close();
+    if (!items.length) return;
+    dropdown = document.createElement('div');
+    dropdown.className = 'ac-dropdown';
+    dropdown.style.cssText = 'position:absolute;z-index:10000;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.3);width:' + input.offsetWidth + 'px';
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+    dropdown.style.left = (rect.left + window.scrollX) + 'px';
+    items.slice(0, 10).forEach(item => {
+      const opt = document.createElement('div');
+      opt.style.cssText = 'padding:6px 10px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:6px;align-items:center';
+      opt.innerHTML = `<span>${item.icon}</span><span style="font-weight:600">${escHtml(item.text)}</span>${item.detail ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(item.detail)}</span>` : ''}`;
+      opt.addEventListener('mousedown', e => { e.preventDefault(); input.value = item.text; close(); });
+      opt.addEventListener('mouseenter', () => opt.style.background = 'var(--bg3)');
+      opt.addEventListener('mouseleave', () => opt.style.background = '');
+      dropdown.appendChild(opt);
+    });
+    document.body.appendChild(dropdown);
+  }
+
+  input.addEventListener('input', async () => {
+    const val = input.value.trim().toLowerCase();
+    if (val.length < 1) { close(); return; }
+    const suggestions = await _loadLocationSuggestions();
+    const matches = suggestions.filter(s => s.text.toLowerCase().includes(val) || s.detail.toLowerCase().includes(val));
+    show(matches);
+  });
+  input.addEventListener('focus', async () => {
+    const val = input.value.trim().toLowerCase();
+    if (val.length >= 1) {
+      const suggestions = await _loadLocationSuggestions();
+      const matches = suggestions.filter(s => s.text.toLowerCase().includes(val) || s.detail.toLowerCase().includes(val));
+      show(matches);
+    }
+  });
+  input.addEventListener('blur', () => setTimeout(close, 200));
 }
 
 async function deleteEvent(id) {
@@ -2187,6 +2260,7 @@ function renderSidebar() {
                   `<span style="font-size:24px;width:48px;text-align:center">${r.icon || iconMap[resSubTab]}</span>`}
                 <div style="flex:1;min-width:0">
                   <div style="font-size:var(--fs-sm);font-weight:600">${r.icon && !r.image_name ? r.icon+' ' : ''}${escHtml(r.name)}</div>
+                  ${r.sub_type ? `<div style="font-size:var(--fs-xs);color:var(--accent);font-weight:600">${t('room_type_'+r.sub_type)||r.sub_type.replace(/_/g,' ')}</div>` : ''}
                   ${r.location ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">📍 ${escHtml(r.location)}</div>` : ''}
                   ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
@@ -2837,9 +2911,12 @@ function renderSidebar() {
           <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
             <input type="text" id="roomName" placeholder="Room/resource name" style="font-size:var(--fs-xs)">
             <select id="roomType" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px">
-              <option value="room">Meeting Room</option>
-              <option value="vehicle">Vehicle</option>
-              <option value="equipment">Equipment</option>
+              <option value="room">${t('resource_rooms')||'Room'}</option>
+              <option value="building">${t('resource_buildings')||'Building'}</option>
+              <option value="computer_service">${t('resource_computer_services')||'Computer Service'}</option>
+              <option value="data_center">${t('resource_data_centers')||'Data Center'}</option>
+              <option value="vehicle">${t('vehicle')||'Vehicle'}</option>
+              <option value="equipment">${t('equipment')||'Equipment'}</option>
             </select>
             <input type="text" id="roomLocation" placeholder="Location" style="font-size:var(--fs-xs)">
             <input type="number" id="roomCapacity" placeholder="Capacity" min="1" style="font-size:var(--fs-xs)">
@@ -4516,6 +4593,18 @@ function openRoomModal(argJson) {
         <input class="form-input" id="rmName" value="${escHtml(data.name||'')}">
         <label class="form-label" style="margin-top:8px">${t('description')||'Description'}</label>
         <input class="form-input" id="rmDesc" value="${escHtml(data.description||'')}">
+        ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">${t('room_sub_type')||'Room Type'}</label>
+        <select class="form-input" id="rmSubType" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px">
+          <option value="">${t('room_type_general')||'General'}</option>
+          <option value="meeting_room"${data.sub_type==='meeting_room'?' selected':''}>${t('room_type_meeting')||'Meeting Room'}</option>
+          <option value="video_room"${data.sub_type==='video_room'?' selected':''}>${t('room_type_video')||'Video Room'}</option>
+          <option value="aula"${data.sub_type==='aula'?' selected':''}>${t('room_type_aula')||'Aula / Lecture Hall'}</option>
+          <option value="studio"${data.sub_type==='studio'?' selected':''}>${t('room_type_studio')||'Studio'}</option>
+          <option value="server_room"${data.sub_type==='server_room'?' selected':''}>${t('room_type_server')||'Server Room'}</option>
+          <option value="depot"${data.sub_type==='depot'?' selected':''}>${t('room_type_depot')||'Depot / Storage'}</option>
+          <option value="workshop"${data.sub_type==='workshop'?' selected':''}>${t('room_type_workshop')||'Workshop'}</option>
+          <option value="lab"${data.sub_type==='lab'?' selected':''}>${t('room_type_lab')||'Laboratory'}</option>
+        </select>` : ''}
         <label class="form-label" style="margin-top:8px">${t('location')||'Location'}</label>
         <input class="form-input" id="rmLoc" value="${escHtml(data.location||'')}">
         ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">${t('capacity')||'Capacity'}</label>
@@ -4560,6 +4649,7 @@ function openRoomModal(argJson) {
     const room = {
       name: document.getElementById('rmName').value.trim(),
       type: data.type || 'room',
+      sub_type: document.getElementById('rmSubType')?.value || '',
       description: document.getElementById('rmDesc')?.value?.trim() || '',
       location: document.getElementById('rmLoc')?.value?.trim() || '',
       capacity: parseInt(document.getElementById('rmCap')?.value) || 0,

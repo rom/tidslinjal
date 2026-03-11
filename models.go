@@ -618,6 +618,7 @@ type Room struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`       // room | building | computer_service | data_center | vehicle | equipment
+	SubType     string    `json:"sub_type,omitempty"` // meeting_room | video_room | aula | studio | server_room | depot | ...
 	Location    string    `json:"location,omitempty"`
 	Capacity    int       `json:"capacity,omitempty"`
 	Description string    `json:"description,omitempty"`

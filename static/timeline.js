@@ -206,7 +206,7 @@ function renderTimeline() {
       const diff = day - start;
       const oneDay = 86400000;
       const doy = Math.floor(diff / oneDay);
-      doyHtml = `<span style="font-size:.6em;color:var(--text-dim);margin-left:2px">[${doy}]</span>`;
+      doyHtml = `<span style="font-size:.85em;color:var(--text-dim);margin-left:4px;font-weight:600">[${doy}]</span>`;
     }
     // Week number
     let weekHtml = '';
