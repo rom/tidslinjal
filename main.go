@@ -3037,6 +3037,38 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 
 // ── Audit log handler ──────────────────────────────────────────────────────────
 
+func (app *App) handleGetEventLog(w http.ResponseWriter, r *http.Request, user *User) {
+	entries := app.store.GetEventLog()
+	if entries == nil {
+		entries = []EventLogEntry{}
+	}
+	jsonOK(w, entries)
+}
+
+func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *User) {
+	var entry EventLogEntry
+	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if entry.Source == "" {
+		entry.Source = "manual"
+	}
+	entry.UserID = user.ID
+	entry.UserName = user.DisplayName
+	created, err := app.store.AddEventLogEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to add event log entry", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "created", EntityType: "event_log", EntityID: created.ID,
+		Summary: fmt.Sprintf("Added event log entry: %s", created.Source),
+	})
+	jsonOK(w, created)
+}
+
 func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *User) {
 	q := r.URL.Query()
 	limit := 500
@@ -4313,9 +4345,9 @@ func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User)
 	isPrivileged := hasRole(user.Role, RoleOpLead)
 	include := r.URL.Query().Get("include")
 	if include == "" {
-		include = "events,groups,layers,alarms,phases"
+		include = "events,groups,layers,alarms,phases,event_types,comments"
 		if isPrivileged {
-			include += ",users"
+			include += ",users,decision_log,role_configs"
 		}
 	}
 	data := app.store.GetExportDataFiltered(user.ID, isPrivileged, parseCommaSet(include))
@@ -5147,6 +5179,18 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireAuth(app.handleDecisionLogAttachment))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", app.handleDecisionLogAttachmentDownload)
+
+	// Event Log
+	mux.HandleFunc("/api/event-log", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleTeamLead, app.handleGetEventLog)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleAddEventLog)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Map Locations
 	mux.HandleFunc("/api/map-locations", func(w http.ResponseWriter, r *http.Request) {
@@ -7400,6 +7444,7 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"comments.json", "phases.json", "templates.json", "roles.json",
 		"registration.json", "invitations.json", "oidc.json", "mail.json",
 		"apikeys.json", "filter_presets.json", "event_versions.json",
+		"decision_log.json", "event_log.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)

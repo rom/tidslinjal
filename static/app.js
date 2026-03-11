@@ -240,7 +240,7 @@ async function init() {
   });
 
   // Sidebar tabs
-  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+  document.querySelectorAll('.sidebar-tab[data-tab]').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.sidebar-tab').forEach(t2 => t2.classList.remove('active'));
       tab.classList.add('active');
@@ -248,6 +248,9 @@ async function init() {
       renderSidebar();
     });
   });
+  // Sidebar detach button
+  const btnDetach = document.getElementById('btnDetachSidebar');
+  if (btnDetach) btnDetach.addEventListener('click', () => detachSidebar());
 
   // Load filter presets
   _loadFilterPresets();

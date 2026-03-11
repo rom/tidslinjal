@@ -143,6 +143,14 @@ let _usersLayer = null;
 let _importedLayers = [];
 let _showMeetings = true;
 let _showUsers = true;
+let _roomsLayer = null;
+let _buildingsLayer = null;
+let _computersLayer = null;
+let _dataCentersLayer = null;
+let _showRooms = false;
+let _showBuildings = false;
+let _showComputers = false;
+let _showDataCenters = false;
 
 /* ── Initialize map ── */
 function initMapProjection() {
@@ -153,15 +161,22 @@ function initMapProjection() {
   _meetingsLayer = L.layerGroup().addTo(_map);
   // Users layer
   _usersLayer = L.layerGroup().addTo(_map);
+  // Resource layers
+  _roomsLayer = L.layerGroup();
+  _buildingsLayer = L.layerGroup();
+  _computersLayer = L.layerGroup();
+  _dataCentersLayer = L.layerGroup();
 
   loadMeetings();
   loadUsers();
+  loadResourceLayers();
   updateLegend();
 
   // Poll for data updates every 30s
   setInterval(() => {
     loadMeetings();
     loadUsers();
+    loadResourceLayers();
   }, 30000);
 }
 
@@ -223,6 +238,46 @@ function loadUsers() {
       }
     });
   } catch(e) {}
+}
+
+/* ── Load resource layers (rooms, buildings, IT, data centers) ── */
+async function loadResourceLayers() {
+  try {
+    const rooms = await fetch('/api/rooms').then(r => r.ok ? r.json() : []);
+    const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer};
+    const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9'};
+    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥'};
+    Object.values(layerMap).forEach(l => l.clearLayers());
+    (rooms || []).forEach(r => {
+      if (!r.location) return;
+      const coords = geocodeSync(r.location);
+      if (!coords) return;
+      const layer = layerMap[r.type] || _roomsLayer;
+      const color = colorMap[r.type] || '#27ae60';
+      const icon = iconMap[r.type] || '🏠';
+      const marker = L.marker(coords, {
+        icon: L.divIcon({
+          className: 'resource-marker',
+          html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px">${icon}</div>`,
+          iconSize: [28, 28], iconAnchor: [14, 14]
+        })
+      });
+      marker.bindPopup(`<b>${escH(r.name)}</b><br>${escH(r.type)}<br>${escH(r.location||'')}${r.capacity ? '<br>Capacity: '+r.capacity : ''}`);
+      marker.bindTooltip(r.name, { direction: 'top', offset: [0, -14] });
+      layer.addLayer(marker);
+    });
+    updateLegend();
+  } catch(e) {}
+}
+
+function geocodeSync(location) {
+  // Try to parse "lat,lng" format
+  const parts = location.split(',').map(s => parseFloat(s.trim()));
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return parts;
+  // Try country lookup
+  const lower = location.toLowerCase().trim();
+  if (COUNTRY_CAPITALS[lower]) return COUNTRY_CAPITALS[lower];
+  return null;
 }
 
 /* ── Import GeoJSON / KML ── */
@@ -334,8 +389,12 @@ function updateLegend() {
   if (!el) return;
   el.innerHTML = '';
   const items = [
-    { color: '#D35400', label: _t('map_meetings_layer') },
-    { color: '#4a9eff', label: _t('map_users_layer') },
+    { color: '#D35400', label: _t('map_meetings_layer') || 'Meetings' },
+    { color: '#4a9eff', label: _t('map_users_layer') || 'Users' },
+    { color: '#27ae60', label: _t('map_rooms') || 'Rooms' },
+    { color: '#8e44ad', label: _t('map_buildings') || 'Buildings' },
+    { color: '#e67e22', label: _t('map_computer_services') || 'IT Services' },
+    { color: '#2980b9', label: _t('map_data_centers') || 'Data Centers' },
   ];
   _importedLayers.forEach(il => {
     items.push({ color: '#e67e22', label: il.name });
@@ -371,6 +430,9 @@ function fitAll() {
   });
   _usersLayer.eachLayer(l => {
     if (l.getLatLng) bounds.extend(l.getLatLng());
+  });
+  [_roomsLayer, _buildingsLayer, _computersLayer, _dataCentersLayer].forEach(layer => {
+    if (layer) layer.eachLayer(l => { if (l.getLatLng) bounds.extend(l.getLatLng()); });
   });
   _importedLayers.forEach(il => {
     try { bounds.extend(il.layer.getBounds()); } catch(e) {}
@@ -416,6 +478,27 @@ document.getElementById('btnUsers').addEventListener('click', function() {
   this.classList.toggle('active', _showUsers);
   if (_showUsers) _map.addLayer(_usersLayer);
   else _map.removeLayer(_usersLayer);
+});
+
+document.getElementById('btnRooms').addEventListener('click', function() {
+  _showRooms = !_showRooms;
+  this.classList.toggle('active', _showRooms);
+  if (_showRooms) _map.addLayer(_roomsLayer); else _map.removeLayer(_roomsLayer);
+});
+document.getElementById('btnBuildings').addEventListener('click', function() {
+  _showBuildings = !_showBuildings;
+  this.classList.toggle('active', _showBuildings);
+  if (_showBuildings) _map.addLayer(_buildingsLayer); else _map.removeLayer(_buildingsLayer);
+});
+document.getElementById('btnComputers').addEventListener('click', function() {
+  _showComputers = !_showComputers;
+  this.classList.toggle('active', _showComputers);
+  if (_showComputers) _map.addLayer(_computersLayer); else _map.removeLayer(_computersLayer);
+});
+document.getElementById('btnDataCenters').addEventListener('click', function() {
+  _showDataCenters = !_showDataCenters;
+  this.classList.toggle('active', _showDataCenters);
+  if (_showDataCenters) _map.addLayer(_dataCentersLayer); else _map.removeLayer(_dataCentersLayer);
 });
 
 document.getElementById('btnFitAll').addEventListener('click', fitAll);

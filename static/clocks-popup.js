@@ -563,6 +563,8 @@ function acknowledgeCountdown(id) {
       });
     }
   } catch(e) {}
+  // Remove the countdown after acknowledgement
+  _countdowns = _countdowns.filter(c => c.id !== id);
   renderCountdowns();
 }
 
@@ -671,7 +673,9 @@ function renderCountdowns() {
       timeDisplay = `<div class="clock-time countdown-time" id="cd-time-${cd.id}">00:00:00</div>`;
     }
 
-    const lblText = cd.label + (isExpired && cd.continueUp && !cd.acknowledged ? ' (ELAPSED)' : isExpired ? ' (EXPIRED)' : '');
+    const elapsedTxt = _t('cd_elapsed') || 'ELAPSED';
+    const expiredTxt = _t('cd_expired_label') || 'EXPIRED';
+    const lblText = cd.label + (isExpired && cd.continueUp && !cd.acknowledged ? ` (${elapsedTxt})` : isExpired ? ` (${expiredTxt})` : '');
     const labelHtml = clockMode === 'vcr'
       ? `<div class="clock-label vcr-label">${buildSeg7Text(cd.label)}</div>`
       : `<div class="clock-label">${escH(lblText)}</div>`;
