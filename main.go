@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -257,10 +258,94 @@ func NewApp(dataDir string) (*App, error) {
 	return app, nil
 }
 
+// isPrivateIP returns true if the IP belongs to a private, loopback, or
+// link-local range that should not be reachable via outbound webhooks.
+func isPrivateIP(ip net.IP) bool {
+	privateRanges := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"169.254.0.0/16",  // link-local
+		"::1/128",         // IPv6 loopback
+		"fc00::/7",        // IPv6 unique local
+		"fe80::/10",       // IPv6 link-local
+		"100.64.0.0/10",   // carrier-grade NAT
+		"0.0.0.0/8",       // "this" network
+	}
+	for _, cidr := range privateRanges {
+		_, network, _ := net.ParseCIDR(cidr)
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// ssrfSafeTransport returns an http.Transport that refuses to connect to
+// private/internal IP addresses, preventing SSRF attacks via webhook URLs.
+func ssrfSafeTransport() *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Control: func(network, address string, c syscall.RawConn) error {
+				host, _, err := net.SplitHostPort(address)
+				if err != nil {
+					return fmt.Errorf("invalid address %q: %w", address, err)
+				}
+				ip := net.ParseIP(host)
+				if ip == nil {
+					return fmt.Errorf("could not parse IP %q", host)
+				}
+				if isPrivateIP(ip) {
+					return fmt.Errorf("webhook blocked: connections to private/internal IP %s are not allowed", ip)
+				}
+				return nil
+			},
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+}
+
+// validateWebhookURL checks that a webhook URL uses an allowed scheme and does
+// not target a hostname that resolves to a private IP (SSRF prevention).
+func validateWebhookURL(rawURL string) error {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("webhook URL scheme %q not allowed; use http or https", parsed.Scheme)
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return fmt.Errorf("webhook URL has no host")
+	}
+	// Resolve hostname and check all resulting IPs.
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve host %q: %w", host, err)
+	}
+	for _, ip := range ips {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("webhook blocked: host %q resolves to private IP %s", host, ip)
+		}
+	}
+	return nil
+}
+
 // runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
 func (app *App) runWebhookWorker() {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: ssrfSafeTransport(),
+	}
 	for job := range app.webhookCh {
+		if err := validateWebhookURL(job.url); err != nil {
+			logVerbose("webhook: %v", err)
+			continue
+		}
 		req, err := http.NewRequest("POST", job.url, bytes.NewReader(job.body))
 		if err != nil {
 			logVerbose("webhook: invalid URL %q: %v", job.url, err)
@@ -1794,8 +1879,24 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 	}
 	defer file.Close()
 
-	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), header.Filename)
+	// Sanitize filename: use only the base name and strip path separators
+	// to prevent path traversal attacks via crafted filenames.
+	safeName := filepath.Base(header.Filename)
+	safeName = strings.ReplaceAll(safeName, "..", "_")
+	safeName = strings.ReplaceAll(safeName, "/", "_")
+	safeName = strings.ReplaceAll(safeName, "\\", "_")
+	if safeName == "." || safeName == "" {
+		safeName = "upload"
+	}
+	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
+	// Final safety check: ensure the resolved path is inside the attachment dir.
+	absDir, _ := filepath.Abs(app.store.AttachmentDir())
+	absPath, _ := filepath.Abs(destPath)
+	if !strings.HasPrefix(absPath, absDir+string(os.PathSeparator)) {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
 	dst, err := os.Create(destPath)
 	if err != nil {
 		jsonError(w, "failed to save file", http.StatusInternalServerError)
@@ -4398,7 +4499,18 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	return mux
+	return securityHeaders(mux)
+}
+
+// securityHeaders wraps an http.Handler to set standard security response headers.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ── Mail Config ────────────────────────────────────────────────────────────────
