@@ -149,10 +149,8 @@ type UserPublic struct {
 	SignalHandle     string     `json:"signal_handle,omitempty"`
 	Telephone        string     `json:"telephone,omitempty"`
 	Cellular         string     `json:"cellular,omitempty"`
-	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
-	LastLoginIP      string     `json:"last_login_ip,omitempty"`
-	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
-	IsOIDC           bool       `json:"is_oidc,omitempty"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	IsOIDC      bool       `json:"is_oidc,omitempty"`
 	Blocked          bool       `json:"blocked,omitempty"`
 	Location         string     `json:"location,omitempty"`
 	Latitude         float64    `json:"latitude,omitempty"`
@@ -181,10 +179,8 @@ func (u *User) Public() UserPublic {
 		SignalHandle:     u.SignalHandle,
 		Telephone:        u.Telephone,
 		Cellular:         u.Cellular,
-		LastLoginAt:      u.LastLoginAt,
-		LastLoginIP:      u.LastLoginIP,
-		LastLoginDomain:  u.LastLoginDomain,
-		IsOIDC:           u.IsOIDC,
+		LastLoginAt: u.LastLoginAt,
+		IsOIDC:      u.IsOIDC,
 		Blocked:          u.Blocked,
 		Location:         u.Location,
 		Latitude:         u.Latitude,
