@@ -1709,6 +1709,118 @@ function _bindResSubTabs(el) {
   });
 }
 
+function _bindLogSubTabs(el) {
+  el.querySelectorAll('[data-log-sub]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.dataset.logSubTab = btn.dataset.logSub;
+      renderSidebar();
+    });
+  });
+}
+
+function detachDecisionLog() {
+  window.open('/static/decision-log-popup.html', 'tidslinjal-decisionlog-' + Date.now(),
+    'width=600,height=700,menubar=no,toolbar=no');
+}
+
+// Event log: external events received via SSE/webhook
+let _eventLogEntries = [];
+
+async function _loadEventLog() {
+  const el = document.getElementById('eventLogEntries');
+  if (!el) return;
+  try {
+    const entries = await apiGet('/api/event-log');
+    if (entries && entries.length) _eventLogEntries = entries;
+  } catch {}
+  if (_eventLogEntries.length === 0) {
+    el.innerHTML = `<em style="color:var(--text-dim)">${t('event_log_empty')||'No external events received yet.'}</em>`;
+    return;
+  }
+  el.innerHTML = _eventLogEntries.slice().reverse().map(e => `
+    <div style="padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-dim)">${new Date(e.timestamp).toLocaleString()}</span>
+      <strong>${escHtml(e.source||'external')}</strong>: ${escHtml(e.message||e.summary||'')}
+    </div>`).join('');
+}
+
+// Detach sidebar into separate window
+let _detachedSidebarWin = null;
+function detachSidebar() {
+  if (_detachedSidebarWin && !_detachedSidebarWin.closed) {
+    _detachedSidebarWin.focus();
+    return;
+  }
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.add('hidden');
+  const w = window.open('', 'tidslinjal-sidebar-' + Date.now(),
+    'width=350,height=700,menubar=no,toolbar=no,scrollbars=yes');
+  if (!w) { sidebar.classList.remove('hidden'); return; }
+  _detachedSidebarWin = w;
+  const theme = document.body.className || '';
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Menu</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}
+.detached-sidebar{display:flex;flex-direction:column;height:100vh}
+.detached-sidebar .sidebar-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
+.detached-sidebar .sidebar-content{flex:1;overflow-y:auto;padding:12px}
+.reattach-bar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.reattach-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+</style></head><body class="${theme}">
+<div class="reattach-bar">
+  <button id="btnReattach">⬅ ${t('btn_reattach_menu')||'Reattach Menu'}</button>
+  <span style="flex:1"></span>
+  <span style="font-size:11px;color:var(--text-dim)">Tidslinjal Menu</span>
+</div>
+<div class="detached-sidebar" id="detachedWrap"></div>
+<script>
+document.getElementById('btnReattach').onclick = () => {
+  try { window.opener._reattachSidebar(); } catch(e) {}
+  window.close();
+};
+// Sync tabs from opener
+function syncContent() {
+  try {
+    const wrap = document.getElementById('detachedWrap');
+    const srcSidebar = window.opener.document.getElementById('sidebar');
+    if (srcSidebar && wrap) {
+      wrap.innerHTML = srcSidebar.innerHTML;
+      // Re-bind tab clicks to talk to opener
+      wrap.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          try { window.opener.state.sidebarTab = tab.dataset.tab; window.opener.renderSidebar(); } catch(e) {}
+          setTimeout(syncContent, 100);
+        });
+      });
+      // Re-bind all data-action buttons
+      wrap.querySelectorAll('[data-action]').forEach(el => {
+        el.addEventListener('click', () => {
+          try {
+            const fn = el.dataset.action;
+            const arg = el.dataset.arg;
+            if (window.opener[fn]) window.opener[fn](arg === 'null' ? null : arg);
+          } catch(e) {}
+        });
+      });
+    }
+  } catch(e) {}
+}
+syncContent();
+setInterval(syncContent, 2000);
+window.addEventListener('beforeunload', () => {
+  try { window.opener._reattachSidebar(); } catch(e) {}
+});
+<\/script></body></html>`);
+  w.document.close();
+}
+
+function _reattachSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.remove('hidden');
+  _detachedSidebarWin = null;
+}
+
 function renderSidebar() {
   const tab  = state.sidebarTab;
   const el   = document.getElementById('sidebarContent');
@@ -1922,9 +2034,13 @@ function renderSidebar() {
     const resSubTab = el.dataset.resSubTab || 'users';
     const subBtn = (key, label, icon) =>
       `<button class="toggle-btn${resSubTab===key?' active':''}" data-res-sub="${key}">${icon} ${label}</button>`;
-    let subTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
+    let subTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px;flex-wrap:wrap">
       ${subBtn('users', t('tab_users')||'Users', '👤')}
       ${subBtn('groups', gl.plural, '👥')}
+      ${subBtn('rooms', t('resource_rooms')||'Rooms', '🏠')}
+      ${subBtn('buildings', t('resource_buildings')||'Buildings', '🏢')}
+      ${subBtn('computers', t('resource_computer_services')||'IT Services', '💻')}
+      ${subBtn('datacenters', t('resource_data_centers')||'Data Centers', '🖥')}
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
     </div>`;
@@ -1979,12 +2095,41 @@ function renderSidebar() {
           </div>
         </div>`;
       _bindResSubTabs(el);
+    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters') {
+      const typeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center'};
+      const labelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers'};
+      const iconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥'};
+      const roomType = typeMap[resSubTab];
+      apiGet('/api/rooms').then(rooms => {
+        const filtered = (rooms||[]).filter(r => r.type === roomType);
+        el.innerHTML = subTabBar + `
+          <div class="sidebar-section">
+            <div class="sidebar-section-title">${iconMap[resSubTab]} ${labelMap[resSubTab]}
+              <button class="btn btn-primary btn-sm" data-action="openRoomModal" data-arg='{"type":"${roomType}"}'  data-arg-el>${t('btn_add')||'Add'}</button>
+            </div>
+            ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${labelMap[resSubTab].toLowerCase()} yet.</p>` : ''}
+            ${filtered.map(r => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+                <div>
+                  <div style="font-size:var(--fs-sm);font-weight:600">${escHtml(r.name)}</div>
+                  ${r.location ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">📍 ${escHtml(r.location)}</div>` : ''}
+                  ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">Capacity: ${r.capacity}</div>` : ''}
+                  ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
+                </div>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el>✏️</button>
+              </div>`).join('')}
+          </div>`;
+        _bindResSubTabs(el);
+        _bindActions(el);
+      });
     } else if (resSubTab === 'resource_list') {
       // Resource list: shows all users, groups, and rooms in a combined view
-      apiGet('/api/users').then(users => {
+      Promise.all([apiGet('/api/users'), apiGet('/api/rooms').catch(()=>[])]).then(([users, rooms]) => {
         const allResources = [];
         (users||[]).forEach(u => allResources.push({type:'user', name: u.display_name||u.username, role: u.role, detail: '@'+u.username}));
         state.groups.forEach(g => allResources.push({type:'group', name: g.name, detail: g.description||''}));
+        const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥'};
+        (rooms||[]).forEach(r => allResources.push({type: r.type||'room', name: r.name, detail: (r.location||'') + (r.capacity ? ' (cap:'+r.capacity+')' : ''), icon: typeIcons[r.type]||'🏠'}));
         el.innerHTML = subTabBar + `
           <div class="sidebar-section">
             <div class="sidebar-section-title">📋 ${t('resource_list')||'Resource List'}</div>
@@ -1995,7 +2140,7 @@ function renderSidebar() {
                 <th style="padding:4px 8px;text-align:left">${t('resource_detail')||'Detail'}</th>
               </tr></thead><tbody>
               ${allResources.map(r => `<tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:4px 8px">${r.type==='user'?'👤':'👥'} ${r.type}</td>
+                <td style="padding:4px 8px">${r.icon||(r.type==='user'?'👤':'👥')} ${r.type}</td>
                 <td style="padding:4px 8px">${escHtml(r.name)}</td>
                 <td style="padding:4px 8px;color:var(--text-dim)">${escHtml(r.detail)}${r.role?' <span class="role-badge role-'+r.role+'">'+getRoleDisplayName(r.role)+'</span>':''}</td>
               </tr>`).join('')}
@@ -2028,6 +2173,55 @@ function renderSidebar() {
           </div>`;
         _bindResSubTabs(el);
       });
+    }
+  } else if (tab === 'logs' && state.user && hasRole2(state.user.role, 'teamlead')) {
+    const logSub = el.dataset.logSubTab || 'decision';
+    const logSubBtn = (key, label) =>
+      `<button class="toggle-btn${logSub===key?' active':''}" data-log-sub="${key}">${label}</button>`;
+    const logTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
+      ${logSubBtn('decision', t('tab_decision_log')||'Decision Log')}
+      ${logSubBtn('audit', t('tab_audit_log')||'Audit Log')}
+      ${logSubBtn('eventlog', t('tab_event_log')||'Event Log')}
+    </div>`;
+    if (logSub === 'decision') {
+      el.innerHTML = logTabBar + `<div class="sidebar-section">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="openDecisionLogModal">📋 ${t('decision_log_title')||'Decision Log'}</button>
+          <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="detachDecisionLog">⧉ ${t('detach_window')||'Detach Window'}</button>
+        </div>
+      </div>`;
+      _bindLogSubTabs(el);
+    } else if (logSub === 'audit') {
+      el.innerHTML = logTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">${t('tab_audit_log')||'Audit Log'}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="oninput">
+            <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
+              <option value="">All actions</option>
+              <option value="created">created</option><option value="updated">updated</option><option value="deleted">deleted</option>
+              <option value="status_changed">status_changed</option><option value="login">login</option><option value="login_failed">login_failed</option><option value="reset">reset</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+            <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
+            <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
+            <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditCSV" title="Export to CSV">⬇ CSV</button>
+          </div>
+          <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
+        </div>`;
+      _bindLogSubTabs(el);
+      refreshAuditLog();
+    } else if (logSub === 'eventlog') {
+      el.innerHTML = logTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">${t('tab_event_log')||'Event Log'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">External events received via pub/sub or webhook.</p>
+          <div id="eventLogEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('event_log_empty')||'No external events received yet.'}</em></div>
+        </div>`;
+      _bindLogSubTabs(el);
+      _loadEventLog();
     }
   } else if (tab === 'phases' && state.user && hasRole2(state.user.role, 'teamlead')) {
     el.innerHTML = `
@@ -4162,6 +4356,64 @@ async function deleteRoom(id) {
   if (res.ok) { showNotification('success','Room deleted'); _loadRoomList(); }
 }
 
+function openRoomModal(argJson) {
+  const data = typeof argJson === 'string' ? JSON.parse(argJson) : (argJson || {});
+  const isEdit = !!data.id;
+  const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center'};
+  const label = typeLabel[data.type] || 'Resource';
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header"><h3>${isEdit ? 'Edit' : 'Add'} ${escHtml(label)}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button></div>
+      <div class="modal-body">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="rmName" value="${escHtml(data.name||'')}">
+        <label class="form-label" style="margin-top:8px">Description</label>
+        <input class="form-input" id="rmDesc" value="${escHtml(data.description||'')}">
+        <label class="form-label" style="margin-top:8px">Location</label>
+        <input class="form-input" id="rmLoc" value="${escHtml(data.location||'')}">
+        ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">Capacity</label>
+        <input class="form-input" id="rmCap" type="number" value="${data.capacity||0}">` : ''}
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-action="_closeParentModal" data-arg-el>${t('btn_cancel')||'Cancel'}</button>
+        <button class="btn btn-primary" id="rmSaveBtn">${t('btn_save')||'Save'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  modal.querySelector('#rmSaveBtn').addEventListener('click', async () => {
+    const room = {
+      name: document.getElementById('rmName').value.trim(),
+      type: data.type || 'room',
+      description: document.getElementById('rmDesc')?.value?.trim() || '',
+      location: document.getElementById('rmLoc')?.value?.trim() || '',
+      capacity: parseInt(document.getElementById('rmCap')?.value) || 0,
+      enabled: true,
+    };
+    if (!room.name) { showError('Name required'); return; }
+    let res;
+    if (isEdit) {
+      room.id = data.id;
+      res = await apiPut('/api/rooms', room);
+    } else {
+      res = await apiPut('/api/rooms', room);
+    }
+    if (res.ok) {
+      showNotification('success', `${label} saved`);
+      modal.remove();
+      _activateSidebarTab('resources');
+    } else { showError('Failed to save'); }
+  });
+}
+
+function _closeParentModal() {
+  const m = event?.target?.closest('.modal-overlay');
+  if (m) m.remove();
+}
+
 // ── Meeting Config ───────────────────────────────────────────────────────────
 async function saveMeetingConfig(provider) {
   const val = id => document.getElementById(id)?.value?.trim() || '';
@@ -4288,7 +4540,7 @@ function updateUILabels() {
   // Sidebar tabs — use dynamic group terminology for the groups tab
   const gl = getGroupLabel();
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
-    tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
+    if (tab.dataset.tab) tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
   });
 
   // Invited filter "Groups" button uses group terminology
@@ -4573,6 +4825,8 @@ function connectSSE() {
     const data = JSON.parse(e.data);
     if (data.action === 'deleted' || data.action === 'created' || data.action === 'updated' || data.action === 'status_changed') {
       refreshAll();
+      // Record to event log
+      _eventLogEntries.push({ timestamp: new Date().toISOString(), source: 'sse', message: `${data.action}: ${data.title||'event #'+data.id}`, summary: data.user_name ? `by ${data.user_name}` : '' });
       // Browser push notification for event changes by others
       if (Notification.permission === 'granted' && state.preferences.push_event_changes !== false && data.user_id !== (state.user && state.user.id)) {
         const actionLabel = { created: 'New event', updated: 'Event updated', deleted: 'Event deleted', status_changed: 'Event status changed' }[data.action] || data.action;
@@ -6609,8 +6863,16 @@ function _initOfflineMode() {
     if (!window._offlineModeForced) {
       window._offlineMode = false;
       _updateOfflineIndicator();
-      if (state.sidebarTab === 'legend') renderSidebar();
-      showNotification('success', 'Connection restored — back online');
+      showNotification('success', 'Connection restored — syncing data…');
+      // Sync: push any queued offline actions, then pull fresh data
+      _syncOfflineQueue().then(() => {
+        refreshAll();
+        _cacheDataForOffline();
+        showNotification('success', 'Data synchronized');
+      }).catch(() => {
+        showNotification('warning', 'Sync partially failed — retrying…');
+        setTimeout(() => _syncOfflineQueue().then(refreshAll), 5000);
+      });
     }
   });
   window.addEventListener('offline', () => {
@@ -6702,6 +6964,42 @@ if (_origApiGet) {
       throw new Error('offline');
     }
     return _origApiGet(url);
+  };
+}
+
+// Offline action queue — stores API calls made while offline for later replay
+window._offlineActionQueue = JSON.parse(localStorage.getItem('tidslinjal_offline_queue') || '[]');
+
+function _queueOfflineAction(method, path, body) {
+  window._offlineActionQueue.push({ method, path, body, timestamp: Date.now() });
+  try { localStorage.setItem('tidslinjal_offline_queue', JSON.stringify(window._offlineActionQueue)); } catch {}
+}
+
+async function _syncOfflineQueue() {
+  const queue = window._offlineActionQueue.slice();
+  if (queue.length === 0) return;
+  const failed = [];
+  for (const action of queue) {
+    try {
+      const res = await api(action.method, action.path, action.body);
+      if (!res.ok && res.status !== 409) failed.push(action); // 409 = conflict, skip
+    } catch {
+      failed.push(action);
+    }
+  }
+  window._offlineActionQueue = failed;
+  try { localStorage.setItem('tidslinjal_offline_queue', JSON.stringify(failed)); } catch {}
+}
+
+// Wrap apiPost to queue when offline
+const _origApiPost = typeof apiPost === 'function' ? apiPost : null;
+if (_origApiPost) {
+  window.apiPost = async function(url, body) {
+    if (window._offlineMode) {
+      _queueOfflineAction('POST', url, body);
+      return new Response(JSON.stringify({queued:true}), {status:202});
+    }
+    return _origApiPost(url, body);
   };
 }
 

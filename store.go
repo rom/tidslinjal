@@ -59,6 +59,7 @@ type Store struct {
 	routingRules         []RoutingRule
 	connectorConfigs     []ConnectorConfig
 	decisionLog          []DecisionLogEntry
+	eventLog             []EventLogEntry
 	mapLocations         []MapLocation
 	federatedIdPs        []FederatedIdP
 	trustRealms          []TrustRealm
@@ -85,6 +86,7 @@ type Store struct {
 	nextDecisionLogID        int64
 	nextMapLocationID        int64
 	nextRoomID               int64
+	nextEventLogID           int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -146,11 +148,33 @@ func (s *Store) load() error {
 	s.loadFile("federated_idps.json", &s.federatedIdPs)
 	s.loadFile("trust_realms.json", &s.trustRealms)
 	s.loadFile("rooms.json", &s.rooms)
+	s.loadFile("event_log.json", &s.eventLog)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
 			s.nextEventTypeID = x.ID
 		}
+	}
+	// Ensure "pause" event type exists
+	hasPause := false
+	for _, et := range s.eventTypes {
+		if et.Key == "pause" {
+			hasPause = true
+			break
+		}
+	}
+	if !hasPause {
+		s.nextEventTypeID++
+		s.eventTypes = append(s.eventTypes, EventTypeDef{
+			ID:      s.nextEventTypeID,
+			Key:     "pause",
+			Label:   "Pause",
+			LabelSV: "Paus",
+			LabelFR: "Pause",
+			Color:   "#95A5A6",
+			Icon:    "⏸",
+		})
+		_ = s.persist("event_types.json", s.eventTypes)
 	}
 	// Migration: rename legacy "readwrite" role to "teammember"
 	for i, u := range s.users {
@@ -258,6 +282,11 @@ func (s *Store) load() error {
 	for _, x := range s.rooms {
 		if x.ID > s.nextRoomID {
 			s.nextRoomID = x.ID
+		}
+	}
+	for _, x := range s.eventLog {
+		if x.ID > s.nextEventLogID {
+			s.nextEventLogID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -1662,15 +1691,19 @@ func (s *Store) DeletePhase(id int64) error {
 // ── Full export ────────────────────────────────────────────────────────────
 
 type ExportData struct {
-	Version  string           `json:"version"`
-	ExportAt time.Time        `json:"export_at"`
-	Events   []Event          `json:"events"`
-	Users    []UserPublic     `json:"users"`
-	Groups   []Group          `json:"groups"`
-	Layers   []Layer          `json:"layers"`
-	Alarms   []Alarm          `json:"alarms"`
-	Exercise ExerciseSettings `json:"exercise"`
-	Phases   []ExercisePhase  `json:"phases"`
+	Version      string             `json:"version"`
+	ExportAt     time.Time          `json:"export_at"`
+	Events       []Event            `json:"events"`
+	Users        []UserPublic       `json:"users"`
+	Groups       []Group            `json:"groups"`
+	Layers       []Layer            `json:"layers"`
+	Alarms       []Alarm            `json:"alarms"`
+	Exercise     ExerciseSettings   `json:"exercise"`
+	Phases       []ExercisePhase    `json:"phases"`
+	EventTypes   []EventTypeDef     `json:"event_types,omitempty"`
+	DecisionLog  []DecisionLogEntry `json:"decision_log,omitempty"`
+	Comments     []EventComment     `json:"comments,omitempty"`
+	RoleConfigs  []RoleConfig       `json:"role_configs,omitempty"`
 }
 
 func (s *Store) GetExportData() ExportData {
@@ -1690,16 +1723,28 @@ func (s *Store) GetExportData() ExportData {
 	copy(alarms, s.alarms)
 	phases := make([]ExercisePhase, len(s.phases))
 	copy(phases, s.phases)
+	eventTypes := make([]EventTypeDef, len(s.eventTypes))
+	copy(eventTypes, s.eventTypes)
+	decisionLog := make([]DecisionLogEntry, len(s.decisionLog))
+	copy(decisionLog, s.decisionLog)
+	comments := make([]EventComment, len(s.comments))
+	copy(comments, s.comments)
+	roleConfigs := make([]RoleConfig, len(s.roleConfigs))
+	copy(roleConfigs, s.roleConfigs)
 	return ExportData{
-		Version:  AppVersion,
-		ExportAt: time.Now(),
-		Events:   events,
-		Users:    users,
-		Groups:   groups,
-		Layers:   layers,
-		Alarms:   alarms,
-		Exercise: s.exercise,
-		Phases:   phases,
+		Version:     AppVersion,
+		ExportAt:    time.Now(),
+		Events:      events,
+		Users:       users,
+		Groups:      groups,
+		Layers:      layers,
+		Alarms:      alarms,
+		Exercise:    s.exercise,
+		Phases:      phases,
+		EventTypes:  eventTypes,
+		DecisionLog: decisionLog,
+		Comments:    comments,
+		RoleConfigs: roleConfigs,
 	}
 }
 
@@ -1746,6 +1791,23 @@ func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include m
 	if include["phases"] && isPrivileged {
 		out.Phases = make([]ExercisePhase, len(s.phases))
 		copy(out.Phases, s.phases)
+	}
+	// Always include event types (needed for proper recovery)
+	if include["event_types"] || include["events"] {
+		out.EventTypes = make([]EventTypeDef, len(s.eventTypes))
+		copy(out.EventTypes, s.eventTypes)
+	}
+	if include["decision_log"] && isPrivileged {
+		out.DecisionLog = make([]DecisionLogEntry, len(s.decisionLog))
+		copy(out.DecisionLog, s.decisionLog)
+	}
+	if include["comments"] {
+		out.Comments = make([]EventComment, len(s.comments))
+		copy(out.Comments, s.comments)
+	}
+	if include["role_configs"] && isPrivileged {
+		out.RoleConfigs = make([]RoleConfig, len(s.roleConfigs))
+		copy(out.RoleConfigs, s.roleConfigs)
 	}
 	return out
 }
@@ -1875,6 +1937,43 @@ func (s *Store) ImportData(data ExportData, currentUserID int64, currentUserName
 			if _, err := s.CreateUser(nu); err == nil {
 				res.Users++
 			}
+		}
+	}
+
+	if include["event_types"] {
+		for _, et := range data.EventTypes {
+			et.ID = 0
+			if _, err := s.CreateEventType(et); err == nil {
+				res.Events++ // reuse counter
+			}
+		}
+	}
+
+	if include["decision_log"] && isPrivileged {
+		for _, dl := range data.DecisionLog {
+			dl.ID = 0
+			dl.UserID = ownerID(dl.UserID)
+			dl.UserName = ownerName(dl.UserName)
+			if _, err := s.AddDecisionLogEntry(dl); err == nil {
+				res.Events++ // reuse counter
+			}
+		}
+	}
+
+	if include["comments"] {
+		for _, c := range data.Comments {
+			c.ID = 0
+			c.AuthorID = ownerID(c.AuthorID)
+			c.AuthorName = ownerName(c.AuthorName)
+			if _, err := s.CreateComment(c); err == nil {
+				res.Events++ // reuse counter
+			}
+		}
+	}
+
+	if include["role_configs"] && isPrivileged {
+		if len(data.RoleConfigs) > 0 {
+			_ = s.SaveRoleConfigs(data.RoleConfigs)
 		}
 	}
 
@@ -3112,6 +3211,29 @@ func (s *Store) AddDecisionLogAttachment(entryID int64, att DecisionAttachment) 
 	snap := append([]DecisionLogEntry(nil), s.decisionLog...)
 	s.mu.Unlock()
 	return s.persist("decision_log.json", snap)
+}
+
+// ── Event Log ───────────────────────────────────────────────────────────────
+
+func (s *Store) GetEventLog() []EventLogEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]EventLogEntry, len(s.eventLog))
+	copy(out, s.eventLog)
+	return out
+}
+
+func (s *Store) AddEventLogEntry(entry EventLogEntry) (EventLogEntry, error) {
+	s.mu.Lock()
+	s.nextEventLogID++
+	entry.ID = s.nextEventLogID
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now()
+	}
+	s.eventLog = append(s.eventLog, entry)
+	snap := append([]EventLogEntry(nil), s.eventLog...)
+	s.mu.Unlock()
+	return entry, s.persist("event_log.json", snap)
 }
 
 // ── Map Locations ───────────────────────────────────────────────────────────

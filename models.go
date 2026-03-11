@@ -797,3 +797,15 @@ type GradualBackupSnapshot struct {
 	CreatedAt time.Time `json:"created_at"`
 	SizeBytes int64     `json:"size_bytes"`
 }
+
+// EventLogEntry represents an external event received via pub/sub or webhook
+type EventLogEntry struct {
+	ID        int64     `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	Source    string    `json:"source"`    // e.g. "webhook", "mqtt", "kafka", "manual"
+	Message   string    `json:"message"`
+	Summary   string    `json:"summary,omitempty"`
+	Data      string    `json:"data,omitempty"` // raw JSON payload
+	UserID    int64     `json:"user_id,omitempty"`
+	UserName  string    `json:"user_name,omitempty"`
+}
