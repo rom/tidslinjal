@@ -5468,9 +5468,19 @@ func (app *App) handleTestMail(w http.ResponseWriter, r *http.Request, user *Use
 		to = user.Username + "@example.com"
 	}
 	if err := app.sendMail(cfg, to, "Tidslinjal — Mail Test", "<p>Mail configuration is working correctly.</p>"); err != nil {
+		app.store.LogAudit(AuditEntry{
+			UserID: user.ID, UserName: user.DisplayName,
+			Action: "mail_test_failed", EntityType: "mail", EntityID: 0,
+			Summary: fmt.Sprintf("Mail test failed to %s: %s", to, err.Error()),
+		})
 		jsonError(w, "Mail test failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "mail_test_sent", EntityType: "mail", EntityID: 0,
+		Summary: fmt.Sprintf("Mail test sent to %s", to),
+	})
 	jsonOK(w, map[string]string{"status": "ok", "sent_to": to})
 }
 
@@ -5495,9 +5505,19 @@ func (app *App) handleSendMail(w http.ResponseWriter, r *http.Request, user *Use
 		body = "<pre>" + req.BodyText + "</pre>"
 	}
 	if err := app.sendMail(cfg, req.To, req.Subject, body); err != nil {
+		app.store.LogAudit(AuditEntry{
+			UserID: user.ID, UserName: user.DisplayName,
+			Action: "mail_send_failed", EntityType: "mail", EntityID: 0,
+			Summary: fmt.Sprintf("Failed to send mail to %s: %s — subject: %s", req.To, err.Error(), req.Subject),
+		})
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "mail_sent", EntityType: "mail", EntityID: 0,
+		Summary: fmt.Sprintf("Sent mail to %s — subject: %s", req.To, req.Subject),
+	})
 	jsonOK(w, map[string]string{"status": "sent"})
 }
 
@@ -5516,6 +5536,9 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 		fromName = "Tidslinjal"
 	}
 
+	logDebug("[mail] sending to=%s from=%s<%s> subject=%q host=%s:%d tls=%s auth=%v",
+		to, fromName, from, subject, cfg.SMTPHost, port, cfg.TLSMode, cfg.Username != "")
+
 	msg := []byte(fmt.Sprintf("From: %s <%s>\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
 		fromName, from, to, subject, bodyHTML))
 
@@ -5523,45 +5546,69 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 	var auth interface{ Start(*smtp.ServerInfo) (string, []byte, error) }
 	if cfg.Username != "" && cfg.Password != "" {
 		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.SMTPHost)
+		logDebug("[mail] using PLAIN auth user=%s", cfg.Username)
 	}
 
 	if cfg.TLSMode == "tls" {
+		logDebug("[mail] connecting with implicit TLS to %s", addr)
 		tlsCfg := &tls.Config{ServerName: cfg.SMTPHost}
 		conn, err := tls.Dial("tcp", addr, tlsCfg)
 		if err != nil {
+			logDebug("[mail] TLS dial failed: %v", err)
 			return err
 		}
 		defer conn.Close()
+		logDebug("[mail] TLS connected, creating SMTP client")
 		client, err := smtp.NewClient(conn, cfg.SMTPHost)
 		if err != nil {
+			logDebug("[mail] SMTP client creation failed: %v", err)
 			return err
 		}
 		defer client.Quit()
 		if auth != nil {
 			if err := client.Auth(auth.(smtp.Auth)); err != nil {
+				logDebug("[mail] AUTH failed: %v", err)
 				return err
 			}
+			logDebug("[mail] AUTH succeeded")
 		}
 		if err := client.Mail(from); err != nil {
+			logDebug("[mail] MAIL FROM failed: %v", err)
 			return err
 		}
 		if err := client.Rcpt(to); err != nil {
+			logDebug("[mail] RCPT TO failed: %v", err)
 			return err
 		}
 		wc, err := client.Data()
 		if err != nil {
+			logDebug("[mail] DATA command failed: %v", err)
 			return err
 		}
 		_, err = wc.Write(msg)
 		wc.Close()
+		if err != nil {
+			logDebug("[mail] DATA write failed: %v", err)
+		} else {
+			logDebug("[mail] sent successfully via TLS to %s", to)
+		}
 		return err
 	}
 
 	// STARTTLS or plain
+	logDebug("[mail] connecting via STARTTLS/plain to %s", addr)
+	var sendErr error
 	if auth != nil {
-		return smtp.SendMail(addr, auth.(smtp.Auth), from, []string{to}, msg)
+		sendErr = smtp.SendMail(addr, auth.(smtp.Auth), from, []string{to}, msg)
+	} else {
+		sendErr = smtp.SendMail(addr, nil, from, []string{to}, msg)
 	}
-	return smtp.SendMail(addr, nil, from, []string{to}, msg)
+	if sendErr != nil {
+		logDebug("[mail] SendMail failed: %v", sendErr)
+	} else {
+		logDebug("[mail] sent successfully to %s", to)
+	}
+	return sendErr
 }
 
 // ── Syslog Config Handlers ────────────────────────────────────────────────────
