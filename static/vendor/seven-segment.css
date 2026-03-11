@@ -28,9 +28,9 @@
 
 /* Horizontal segments (a, d, g) */
 .seg7 i.h {
-  left: 10%;
-  right: 10%;
-  height: 8%;
+  left: 8%;
+  right: 8%;
+  height: 12%;
 }
 .seg7 i.sa { top: 0; }         /* segment a - top */
 .seg7 i.sd { bottom: 0; }      /* segment d - bottom */
@@ -38,7 +38,7 @@
 
 /* Vertical segments (b, c, e, f) */
 .seg7 i.v {
-  width: 10%;
+  width: 14%;
   top: 0;
   bottom: 0;
 }
@@ -74,8 +74,8 @@
   height: 1em;
 }
 .seg7-colon i {
-  width: 0.12em;
-  height: 0.12em;
+  width: 0.16em;
+  height: 0.16em;
   border-radius: 50%;
   background: currentColor;
 }

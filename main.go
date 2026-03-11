@@ -5152,6 +5152,19 @@ func (app *App) routes() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/decision-log/", func(w http.ResponseWriter, r *http.Request) {
+		// Check for attachment sub-path: /api/decision-log/{id}/attachment
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
+		if len(parts) >= 2 && parts[1] == "attachment" {
+			switch r.Method {
+			case http.MethodPost:
+				app.requireAuth(app.handleDecisionLogAttachment)(w, r)
+			case http.MethodGet:
+				app.handleDecisionLogAttachmentDownload(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
 		switch r.Method {
 		case http.MethodDelete:
 			app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry)(w, r)
@@ -6440,7 +6453,7 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 	entries := app.store.GetDecisionLog()
 	// Filter by access: admin sees all; others see general, own, and same-group entries
 	var visible []DecisionLogEntry
-	hasConfidentialRead := userHasCapability(user, "confidential_read")
+	hasConfidentialRead := app.userHasCapability(user, "confidential_read")
 	isAdmin := user.Role == RoleAdmin
 	for _, e := range entries {
 		if e.Confidential && !hasConfidentialRead {
@@ -6489,7 +6502,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Check capability – admin always allowed
-	if user.Role != RoleAdmin && !userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}
@@ -6601,6 +6614,90 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	jsonOK(w, found)
 }
 
+func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	// Check permission
+	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "insufficient permissions", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
+		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonError(w, "file field missing", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	safeFilename := filepath.Base(header.Filename)
+	if safeFilename == "." || safeFilename == "/" {
+		safeFilename = "upload"
+	}
+	storedName := fmt.Sprintf("dl_%d_%d_%s", id, time.Now().UnixNano(), safeFilename)
+	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	written, err := io.Copy(dst, file)
+	dst.Close()
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	att := DecisionAttachment{
+		Filename:   safeFilename,
+		StoredName: storedName,
+		Size:       written,
+		MimeType:   header.Header.Get("Content-Type"),
+	}
+	if err := app.store.AddDecisionLogAttachment(id, att); err != nil {
+		os.Remove(destPath)
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(att)
+}
+
+func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/decision-log/{id}/attachment/{storedName}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
+	if len(parts) < 3 {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	storedName := filepath.Base(parts[2])
+	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
+	if _, err := os.Stat(filePath); err != nil {
+		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	mimeType := mime.TypeByExtension(filepath.Ext(storedName))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", mimeType)
+	safeDisp := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, storedName)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
+	http.ServeFile(w, r, filePath)
+}
+
 // userInGroup checks if a user is a member of a specific group
 func (app *App) userInGroup(userID, groupID int64) bool {
 	members := app.store.GetGroupMembers(groupID)
@@ -6613,10 +6710,15 @@ func (app *App) userInGroup(userID, groupID int64) bool {
 }
 
 // userHasCapability checks if a user has a specific capability via role config
-func userHasCapability(user *User, cap string) bool {
+func (app *App) userHasCapability(user *User, cap string) bool {
 	// Admin always has all capabilities
 	if user.Role == RoleAdmin {
 		return true
+	}
+	for _, rc := range app.store.GetRoleConfigs() {
+		if rc.Key == string(user.Role) {
+			return rc.Capabilities[cap]
+		}
 	}
 	return false
 }
