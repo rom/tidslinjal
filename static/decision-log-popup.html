@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tidslinjal — Decision Log</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+.dl-toolbar { display:flex; align-items:center; gap:8px; background:var(--bg2);
+  border-bottom:1px solid var(--border); padding:8px 12px; flex-shrink:0; }
+.dl-toolbar .page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
+.dl-toolbar .btn { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:4px 10px; font-size:11px; cursor:pointer; }
+.dl-toolbar .btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.dl-content { flex:1; overflow-y:auto; padding:12px; }
+.dl-entry { padding:10px; border-bottom:1px solid var(--border); }
+.dl-entry-header { display:flex; justify-content:space-between; align-items:flex-start; }
+.dl-meta { color:var(--text-dim); font-size:11px; margin-left:6px; }
+.dl-text { margin-top:4px; white-space:pre-wrap; font-size:13px; }
+.badge { font-size:10px; padding:1px 6px; border-radius:3px; font-weight:700; margin-left:6px; color:#fff; }
+.badge-requested { background:#E67E22; }
+.badge-approved { background:#27AE60; }
+.badge-rejected { background:#E74C3C; }
+.dl-review { margin-top:4px; font-size:11px; color:var(--text-dim); }
+.dl-add { padding:12px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+.dl-add textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); padding:8px; font-size:13px; resize:vertical; }
+.dl-add select, .dl-add input { background:var(--bg); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); padding:4px 8px; font-size:11px; }
+.dl-add .btn-primary { background:var(--accent); color:#fff; border:none; border-radius:5px; padding:4px 12px;
+  font-size:11px; cursor:pointer; }
+.dl-add .btn-secondary { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:4px 12px; font-size:11px; cursor:pointer; }
+.dl-add .btn-danger { background:var(--danger); color:#fff; border:none; border-radius:5px; padding:2px 6px;
+  font-size:10px; cursor:pointer; }
+.dl-empty { color:var(--text-dim); padding:20px; text-align:center; }
+</style>
+</head>
+<body class="theme-dark">
+<div class="dl-toolbar">
+  <span class="page-header">📋 Tidslinjal — Decision Log</span>
+  <span style="flex:1"></span>
+  <button class="btn" id="btnRefresh" title="Refresh">🔄 Refresh</button>
+</div>
+<div class="dl-add" id="dlAddPanel" style="display:none">
+  <textarea id="dlNewDecision" rows="2" placeholder="Enter decision..."></textarea>
+  <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
+    <select id="dlLogType">
+      <option value="general">General (all)</option>
+      <option value="group">Group/Unit only</option>
+      <option value="private">Private</option>
+    </select>
+    <select id="dlGroupId" style="display:none"></select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim)">
+      <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)"> Confidential
+    </label>
+    <button class="btn-primary" id="btnAdd">Add Decision</button>
+    <button class="btn-secondary" id="btnRequest">Request Decision</button>
+  </div>
+</div>
+<div class="dl-content" id="dlEntries"></div>
+<script>
+'use strict';
+const opener = window.opener;
+let entries = [];
+let userRole = '';
+let userId = 0;
+let groups = [];
+let users = [];
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(path, opts);
+}
+
+async function loadEntries() {
+  try {
+    const res = await api('GET', '/api/decision-log');
+    if (res.ok) entries = await res.json() || [];
+  } catch { entries = []; }
+  render();
+}
+
+function render() {
+  const el = document.getElementById('dlEntries');
+  if (!entries.length) {
+    el.innerHTML = '<div class="dl-empty">No decisions recorded yet.</div>';
+    return;
+  }
+  const canReview = ['admin','oplead','staffofficer','staffofficer_full','teamlead'].includes(userRole);
+  const isAdmin = userRole === 'admin';
+  el.innerHTML = entries.slice().reverse().map(e => {
+    const ts = new Date(e.timestamp).toLocaleString();
+    const confBadge = e.confidential ? ' <span style="color:var(--danger);font-weight:700">🔒 CONFIDENTIAL</span>' : '';
+    const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
+    let statusBadge = '';
+    let reviewSection = '';
+    if (e.status === 'requested') {
+      const targetInfo = e.requested_of_label ? ' → ' + escHtml(e.requested_of_label) : '';
+      statusBadge = '<span class="badge badge-requested">REQUESTED' + targetInfo + '</span>';
+      if (canReview) {
+        reviewSection = '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+          '<input type="text" data-review-id="' + e.id + '" placeholder="Comment..." style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">' +
+          '<button class="btn-primary" data-approve="' + e.id + '" style="padding:2px 8px;font-size:11px">✓ Approve</button>' +
+          '<button class="btn-danger" data-reject="' + e.id + '" style="padding:2px 8px;font-size:11px">✗ Reject</button>' +
+          '</div>';
+      }
+    } else if (e.status === 'approved') {
+      statusBadge = '<span class="badge badge-approved">APPROVED</span>';
+      if (e.reviewed_by_name) reviewSection = '<div class="dl-review">✓ ' + escHtml(e.reviewed_by_name) + (e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : '') + (e.review_comment ? ': ' + escHtml(e.review_comment) : '') + '</div>';
+    } else if (e.status === 'rejected') {
+      statusBadge = '<span class="badge badge-rejected">REJECTED</span>';
+      if (e.reviewed_by_name) reviewSection = '<div class="dl-review">✗ ' + escHtml(e.reviewed_by_name) + (e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : '') + (e.review_comment ? ': ' + escHtml(e.review_comment) : '') + '</div>';
+    }
+    const delBtn = isAdmin ? ' <button class="btn-danger" data-delete="' + e.id + '" style="padding:1px 6px;font-size:10px">×</button>' : '';
+    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + reviewSection + '</div>';
+  }).join('');
+  bindEntryActions();
+}
+
+function bindEntryActions() {
+  document.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Delete this decision log entry?')) return;
+      await api('DELETE', '/api/decision-log/' + btn.dataset.delete);
+      loadEntries();
+    };
+  });
+  document.querySelectorAll('[data-approve]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.approve;
+      const comment = document.querySelector('[data-review-id="' + id + '"]')?.value || '';
+      await api('PUT', '/api/decision-log/' + id + '/review', { status: 'approved', comment });
+      loadEntries();
+    };
+  });
+  document.querySelectorAll('[data-reject]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.reject;
+      const comment = document.querySelector('[data-review-id="' + id + '"]')?.value || '';
+      await api('PUT', '/api/decision-log/' + id + '/review', { status: 'rejected', comment });
+      loadEntries();
+    };
+  });
+}
+
+function initFromOpener() {
+  if (!opener || !opener.state) return;
+  const s = opener.state;
+  userRole = s.user?.role || '';
+  userId = s.user?.id || 0;
+  groups = s.groups || [];
+  users = s.users || [];
+  // Apply theme
+  const theme = s.preferences?.theme || 'dark';
+  document.body.className = 'theme-' + theme;
+  // Show add panel if user can write
+  const canWrite = userRole === 'admin' ||
+    ['teamlead','oplead','staffofficer','staffofficer_full'].includes(userRole);
+  if (canWrite) {
+    document.getElementById('dlAddPanel').style.display = '';
+    // Populate groups
+    const groupSel = document.getElementById('dlGroupId');
+    groupSel.innerHTML = groups.map(g => '<option value="' + g.id + '">' + escHtml(g.name) + '</option>').join('');
+    document.getElementById('dlLogType').onchange = function() {
+      groupSel.style.display = this.value === 'group' ? '' : 'none';
+    };
+  }
+}
+
+document.getElementById('btnRefresh').onclick = loadEntries;
+
+document.getElementById('btnAdd').onclick = async () => {
+  const text = document.getElementById('dlNewDecision').value.trim();
+  if (!text) return alert('Decision text is required');
+  const logType = document.getElementById('dlLogType').value || 'general';
+  const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
+  const confidential = document.getElementById('dlConfidential').checked;
+  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential });
+  if (res.ok) { document.getElementById('dlNewDecision').value = ''; loadEntries(); }
+  else { const err = await res.json().catch(() => ({})); alert(err.error || 'Failed to add decision'); }
+};
+
+document.getElementById('btnRequest').onclick = async () => {
+  const text = document.getElementById('dlNewDecision').value.trim();
+  if (!text) return alert('Decision request text is required');
+  const logType = document.getElementById('dlLogType').value || 'general';
+  const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
+  const confidential = document.getElementById('dlConfidential').checked;
+  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested' });
+  if (res.ok) { document.getElementById('dlNewDecision').value = ''; loadEntries(); }
+  else { const err = await res.json().catch(() => ({})); alert(err.error || 'Failed to request decision'); }
+};
+
+// Listen for theme changes from parent
+window.addEventListener('message', e => {
+  if (e.data?.type === 'theme') {
+    document.body.className = 'theme-' + (e.data.theme || 'dark');
+  }
+});
+
+// Auto-refresh every 30 seconds
+setInterval(loadEntries, 30000);
+
+initFromOpener();
+loadEntries();
+</script>
+</body>
+</html>

@@ -697,11 +697,14 @@ type DecisionLogEntry struct {
 	GroupID        int64     `json:"group_id,omitempty"` // if log_type=group
 	Confidential   bool      `json:"confidential"`    // only visible to users with confidential_read right
 	// Decision request workflow
-	Status         string    `json:"status,omitempty"`          // "" (decided) | "requested" | "approved" | "rejected"
-	ReviewedBy     int64     `json:"reviewed_by,omitempty"`     // user who approved/rejected
-	ReviewedByName string    `json:"reviewed_by_name,omitempty"`
-	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
-	ReviewComment  string    `json:"review_comment,omitempty"`
+	Status            string    `json:"status,omitempty"`              // "" (decided) | "requested" | "approved" | "rejected"
+	RequestedOfType   string    `json:"requested_of_type,omitempty"`   // "role" | "group" | "person"
+	RequestedOfValue  string    `json:"requested_of_value,omitempty"`  // role key, group id, or user id
+	RequestedOfLabel  string    `json:"requested_of_label,omitempty"`  // display name of target
+	ReviewedBy        int64     `json:"reviewed_by,omitempty"`         // user who approved/rejected
+	ReviewedByName    string    `json:"reviewed_by_name,omitempty"`
+	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
+	ReviewComment     string    `json:"review_comment,omitempty"`
 }
 
 // AutoReportSchedule defines a server-side scheduled report
