@@ -42,6 +42,12 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .sz-md .clock-time { font-size:52px; }
 .sz-lg .clock-time { font-size:72px; } .sz-lg .clock-card { padding:20px 32px 18px; min-width:240px; }
 .sz-xl .clock-time { font-size:96px; } .sz-xl .clock-card { padding:24px 40px 22px; min-width:300px; }
+/* VCR mode gets larger sizing for boldness */
+.sz-xs .vcr-time { font-size:34px; }
+.sz-sm .vcr-time { font-size:46px; }
+.sz-md .vcr-time { font-size:62px; }
+.sz-lg .vcr-time { font-size:86px; }
+.sz-xl .vcr-time { font-size:110px; }
 /* ── Analog clock ── */
 .analog-wrap { width:120px; height:120px; margin:0 auto 4px; }
 .analog-face { width:100%; height:100%; }
@@ -64,14 +70,14 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 /* ── VCR mode ── */
 .vcr-card { background:#050000 !important; border-color:var(--vcr-border,#3a0000) !important; }
 .vcr-time {
-  color:var(--vcr-fg,#ff2200); text-shadow:0 0 8px var(--vcr-glow1,rgba(255,40,0,.9)),0 0 18px var(--vcr-glow2,rgba(255,0,0,.5));
-  font-weight:bold; letter-spacing:.1em; }
+  color:var(--vcr-fg,#ff2200); text-shadow:0 0 10px var(--vcr-glow1,rgba(255,40,0,.95)),0 0 24px var(--vcr-glow2,rgba(255,0,0,.6)),0 0 48px var(--vcr-glow2,rgba(255,0,0,.25));
+  font-weight:900; letter-spacing:.12em; transform:scale(1.15); transform-origin:center; }
 .vcr-time .vcr-ghost {
   position:absolute; top:0; left:0; right:0;
-  color:var(--vcr-ghost,rgba(255,34,0,.12)); pointer-events:none; }
-.vcr-label { color:var(--vcr-dim,#880000) !important; }
-.vcr-date  { color:var(--vcr-dim2,#660000) !important; }
-.vcr-tz    { color:var(--vcr-dim,#880000) !important; }
+  color:var(--vcr-ghost,rgba(255,34,0,.15)); pointer-events:none; }
+.vcr-label { color:var(--vcr-dim,#aa2200) !important; font-weight:700; text-shadow:0 0 6px var(--vcr-glow2,rgba(255,0,0,.3)); }
+.vcr-date  { color:var(--vcr-dim2,#882200) !important; font-weight:600; font-size:13px; text-shadow:0 0 4px var(--vcr-glow2,rgba(255,0,0,.2)); }
+.vcr-tz    { color:var(--vcr-dim,#aa2200) !important; font-weight:700; text-shadow:0 0 6px var(--vcr-glow2,rgba(255,0,0,.3)); }
 /* VCR color presets */
 body.vcr-red    { --vcr-fg:#ff2200; --vcr-glow1:rgba(255,40,0,.9); --vcr-glow2:rgba(255,0,0,.5); --vcr-ghost:rgba(255,34,0,.12); --vcr-dim:#880000; --vcr-dim2:#660000; --vcr-border:#3a0000; }
 body.vcr-green  { --vcr-fg:#33ff33; --vcr-glow1:rgba(50,255,50,.9); --vcr-glow2:rgba(0,200,0,.5); --vcr-ghost:rgba(50,255,50,.12); --vcr-dim:#008800; --vcr-dim2:#006600; --vcr-border:#003a00; }
@@ -79,6 +85,23 @@ body.vcr-blue   { --vcr-fg:#44aaff; --vcr-glow1:rgba(68,170,255,.9); --vcr-glow2
 body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:rgba(255,100,0,.5); --vcr-ghost:rgba(255,136,0,.12); --vcr-dim:#885500; --vcr-dim2:#664400; --vcr-border:#3a2200; }
 .vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
 @keyframes vcr-blink { 50% { opacity:0; } }
+/* ── Countdown cards ── */
+.countdown-card { position:relative; }
+.countdown-time { font-variant-numeric:tabular-nums; line-height:1.1; }
+.countdown-controls { display:flex; gap:4px; margin-top:6px; justify-content:center; }
+.countdown-controls button { background:var(--bg3); border:1px solid var(--border); border-radius:5px;
+  color:var(--text); padding:2px 8px; font-size:10px; cursor:pointer; }
+.countdown-controls button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.cd-expired { animation: cd-flash 1s ease-in-out infinite; }
+@keyframes cd-flash {
+  0%,100% { box-shadow:0 0 0 2px var(--danger,#e05252); }
+  50% { box-shadow:0 0 16px 4px var(--danger,#e05252); }
+}
+.cd-expired .clock-time, .cd-expired .vcr-time { color:var(--danger,#e05252) !important; }
+.cd-counting-up .clock-label { color:var(--danger,#e05252) !important; }
+/* ── VCR segment overrides for visibility ── */
+.vcr-time .seg7 i.off { opacity: 0.12; }
+.vcr-time .seg7 i { transition: none; }
 /* ── Clickable label ── */
 .clock-label-click { cursor:pointer; user-select:none; }
 .clock-label-click:hover { text-decoration:underline; }
@@ -101,6 +124,13 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
   <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
+  <label>TZ</label>
+  <button class="btn-tb active" id="btnTzLocal" data-tz="local">Local</button>
+  <button class="btn-tb" id="btnTzZulu" data-tz="zulu">ZULU</button>
+  <label id="lblHourFmt">Format</label>
+  <button class="btn-tb active" id="btnFmt24" data-fmt="24">24h</button>
+  <button class="btn-tb" id="btnFmt12" data-fmt="12">12h</button>
+  <button class="btn-tb" id="btnAddCountdown" title="Add countdown timer">⏱ Countdown</button>
   <label id="lblVcrColor" style="display:none">VCR Color</label>
   <select id="selVcrColor" style="display:none">
     <option value="red">Red</option>
@@ -110,6 +140,50 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   </select>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
+<div class="clocks-wrap" id="countdownWrap"></div>
+<!-- Countdown setup popover -->
+<div id="countdownPopover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  <div style="font-weight:700;color:var(--accent);margin-bottom:12px;font-size:14px">Add Countdown Timer</div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Label</label>
+    <input type="text" id="cdLabel" placeholder="e.g. Briefing starts" maxlength="40"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Countdown duration</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="number" id="cdHours" min="0" max="999" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">h</span>
+      <input type="number" id="cdMinutes" min="0" max="59" value="30" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">m</span>
+      <input type="number" id="cdSeconds" min="0" max="59" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">s</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+      <button class="btn-tb cd-preset" data-m="15">15m</button>
+      <button class="btn-tb cd-preset" data-m="30">30m</button>
+      <button class="btn-tb cd-preset" data-m="45">45m</button>
+      <button class="btn-tb cd-preset" data-h="1">1h</button>
+      <button class="btn-tb cd-preset" data-h="2">2h</button>
+      <button class="btn-tb cd-preset" data-h="4">4h</button>
+    </div>
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="cdContinueUp" checked> Continue counting up after zero
+    </label>
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="cdPlaySound" checked> Play sound alarm at zero
+    </label>
+  </div>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+    <button class="btn-tb" id="cdCancel">Cancel</button>
+    <button class="btn-tb active" id="cdStart">Start Countdown</button>
+  </div>
+</div>
+<div id="countdownOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
 <script src="/static/clocks-popup.js"></script>
 </body>
 </html>

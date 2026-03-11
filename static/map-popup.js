@@ -1,5 +1,66 @@
 'use strict';
 
+/* ── Country name → capital city coordinates ── */
+const COUNTRY_CAPITALS = {
+  'afghanistan':[34.5553,69.2075],'albania':[41.3275,19.8187],'algeria':[36.7538,3.0588],
+  'argentina':[-34.6037,-58.3816],'armenia':[40.1792,44.4991],'australia':[-35.2809,149.1300],
+  'austria':[48.2082,16.3738],'azerbaijan':[40.4093,49.8671],'bangladesh':[23.8103,90.4125],
+  'belarus':[53.9045,27.5615],'belgium':[50.8503,4.3517],'bolivia':[-16.4897,-68.1193],
+  'bosnia':[43.8563,18.4131],'brazil':[-15.7975,-47.8919],'bulgaria':[42.6977,23.3219],
+  'cambodia':[11.5564,104.9282],'cameroon':[3.8480,11.5021],'canada':[45.4215,-75.6972],
+  'chile':[-33.4489,-70.6693],'china':[39.9042,116.4074],'colombia':[4.7110,-74.0721],
+  'costa rica':[9.9281,-84.0907],'croatia':[45.8150,15.9819],'cuba':[23.1136,-82.3666],
+  'cyprus':[35.1856,33.3823],'czech republic':[50.0755,14.4378],'czechia':[50.0755,14.4378],
+  'denmark':[55.6761,12.5683],'ecuador':[-0.1807,-78.4678],'egypt':[30.0444,31.2357],
+  'estonia':[59.4370,24.7536],'ethiopia':[9.0250,38.7469],'finland':[60.1699,24.9384],
+  'france':[48.8566,2.3522],'georgia':[41.7151,44.8271],'germany':[52.5200,13.4050],
+  'ghana':[5.6037,-0.1870],'greece':[37.9838,23.7275],'guatemala':[14.6349,-90.5069],
+  'hungary':[47.4979,19.0402],'iceland':[64.1466,-21.9426],'india':[28.6139,77.2090],
+  'indonesia':[-6.2088,106.8456],'iran':[35.6892,51.3890],'iraq':[33.3128,44.3615],
+  'ireland':[53.3498,-6.2603],'israel':[31.7683,35.2137],'italy':[41.9028,12.4964],
+  'japan':[35.6762,139.6503],'jordan':[31.9454,35.9284],'kazakhstan':[51.1694,71.4491],
+  'kenya':[-1.2921,36.8219],'kosovo':[42.6629,21.1655],'kuwait':[29.3759,47.9774],
+  'latvia':[56.9496,24.1052],'lebanon':[33.8938,35.5018],'libya':[32.8872,13.1913],
+  'lithuania':[54.6872,25.2797],'luxembourg':[49.6116,6.1319],'malaysia':[3.1390,101.6869],
+  'mali':[12.6392,-8.0029],'mexico':[19.4326,-99.1332],'moldova':[47.0105,28.8638],
+  'mongolia':[47.8864,106.9057],'montenegro':[42.4304,19.2594],'morocco':[33.9716,-6.8498],
+  'mozambique':[-25.9692,32.5732],'myanmar':[19.7633,96.0785],'nepal':[27.7172,85.3240],
+  'netherlands':[52.3676,4.9041],'new zealand':[-41.2865,174.7762],'nicaragua':[12.1150,-86.2362],
+  'niger':[13.5116,2.1254],'nigeria':[9.0579,7.4951],'north korea':[39.0392,125.7625],
+  'north macedonia':[41.9981,21.4254],'norway':[59.9139,10.7522],'oman':[23.5880,58.3829],
+  'pakistan':[33.6844,73.0479],'palestine':[31.9522,35.2332],'panama':[8.9824,-79.5199],
+  'paraguay':[-25.2637,-57.5759],'peru':[-12.0464,-77.0428],'philippines':[14.5995,120.9842],
+  'poland':[52.2297,21.0122],'portugal':[38.7223,-9.1393],'qatar':[25.2854,51.5310],
+  'romania':[44.4268,26.1025],'russia':[55.7558,37.6173],'rwanda':[-1.9403,29.8739],
+  'saudi arabia':[24.7136,46.6753],'senegal':[14.7167,-17.4677],'serbia':[44.7866,20.4489],
+  'singapore':[1.3521,103.8198],'slovakia':[48.1486,17.1077],'slovenia':[46.0569,14.5058],
+  'somalia':[2.0469,45.3182],'south africa':[-25.7479,28.2293],'south korea':[37.5665,126.9780],
+  'spain':[40.4168,-3.7038],'sri lanka':[6.9271,79.8612],'sudan':[15.5007,32.5599],
+  'sweden':[59.3293,18.0686],'switzerland':[46.9480,7.4474],'syria':[33.5138,36.2765],
+  'taiwan':[25.0330,121.5654],'tajikistan':[38.5598,68.7740],'tanzania':[-6.7924,39.2083],
+  'thailand':[13.7563,100.5018],'tunisia':[36.8065,10.1815],'turkey':[39.9334,32.8597],
+  'turkmenistan':[37.9601,58.3261],'uganda':[0.3476,32.5825],'ukraine':[50.4501,30.5234],
+  'united arab emirates':[24.4539,54.3773],'uae':[24.4539,54.3773],
+  'united kingdom':[51.5074,-0.1278],'uk':[51.5074,-0.1278],'great britain':[51.5074,-0.1278],
+  'united states':[38.9072,-77.0369],'usa':[38.9072,-77.0369],'us':[38.9072,-77.0369],
+  'uruguay':[-34.9011,-56.1645],'uzbekistan':[41.2995,69.2401],'venezuela':[10.4806,-66.9036],
+  'vietnam':[21.0278,105.8342],'yemen':[15.3694,44.1910],'zambia':[-15.3875,28.3228],
+  'zimbabwe':[-17.8252,31.0335]
+};
+
+function resolveCountryCoords(locationStr) {
+  if (!locationStr) return null;
+  const lower = locationStr.trim().toLowerCase();
+  // Direct country match
+  if (COUNTRY_CAPITALS[lower]) return COUNTRY_CAPITALS[lower];
+  // Try extracting last word after comma (e.g. "Paris, France")
+  const parts = lower.split(',').map(s => s.trim());
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (COUNTRY_CAPITALS[parts[i]]) return COUNTRY_CAPITALS[parts[i]];
+  }
+  return null;
+}
+
 /* ── i18n: read translations from opener ── */
 function _t(key) {
   try {
@@ -140,9 +201,14 @@ function loadUsers() {
     if (!users) return;
     _usersLayer.clearLayers();
     users.forEach(u => {
-      // Users with location data (if available via profile or device reporting)
-      if (u.latitude && u.longitude) {
-        const marker = L.marker([u.latitude, u.longitude], {
+      let lat = u.latitude, lng = u.longitude;
+      // Fallback: resolve generic country name to capital coordinates
+      if ((!lat || !lng) && u.location) {
+        const resolved = resolveCountryCoords(u.location);
+        if (resolved) { lat = resolved[0]; lng = resolved[1]; }
+      }
+      if (lat && lng) {
+        const marker = L.marker([lat, lng], {
           icon: L.divIcon({
             className: 'user-marker',
             html: `<div style="background:var(--accent,#4a9eff);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700">${(u.display_name||'?')[0]}</div>`,
@@ -150,7 +216,8 @@ function loadUsers() {
             iconAnchor: [12, 12]
           })
         });
-        marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}<br>${(u.nato_designations||[]).join(', ')}`);
+        const locInfo = u.location ? '<br>' + escH(u.location) : '';
+        marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${(u.nato_designations||[]).join(', ')}`);
         marker.bindTooltip(u.display_name, { direction: 'top', offset: [0, -12] });
         _usersLayer.addLayer(marker);
       }

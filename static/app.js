@@ -465,7 +465,7 @@ function renderListView() {
       </td>
       <td style="padding:8px 10px">${escHtml(ev.event_type)}</td>
       <td style="padding:8px 10px">
-        ${state.user && hasRole2(state.user.role, 'readwrite') ?
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[ev.status]||'var(--text-dim)'};margin-right:5px;vertical-align:middle"></span>${state.user && hasRole2(state.user.role, 'readwrite') ?
           `<select class="list-status-sel" data-ev-status="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:${statusColors[ev.status]||'var(--text)'};padding:2px 6px;font-size:inherit;cursor:pointer">
             ${['planned','active','completed','cancelled'].map(s =>
               `<option value="${s}" ${(ev.status||'planned')===s?'selected':''} style="color:var(--text)">${t('status_'+s)||s}</option>`
