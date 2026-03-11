@@ -58,6 +58,8 @@ async function refreshAll() {
       }
       renderSidebar();
       updateSyntheticUI();
+    } catch (err) {
+      if (err.message !== 'offline') console.error('[refreshAll]', err);
     } finally {
       _refreshInFlight = null;
       if (_refreshQueued) {

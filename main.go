@@ -3799,9 +3799,11 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	app.audit(user.ID, user.DisplayName, "applied", "template", id,
 		fmt.Sprintf("Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339)))
 	// Set STARTEX (exercise epoch) to the base time specified by the user
+	// and record the template name for the legend display
 	{
 		ex := app.store.GetExerciseSettings()
 		ex.Epoch = req.BaseTime.Format(time.RFC3339)
+		ex.LastTemplate = tmpl.Name
 		app.store.SaveExerciseSettings(ex) //nolint
 	}
 	// If the template carries an exercise name, update the exercise label
@@ -5135,7 +5137,7 @@ func (app *App) routes() http.Handler {
 		case http.MethodGet:
 			app.requireAuth(app.handleListDecisionLog)(w, r)
 		case http.MethodPost:
-			app.requireRole(RoleTeamLead, app.handleAddDecisionLogEntry)(w, r)
+			app.requireAuth(app.handleAddDecisionLogEntry)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -670,6 +670,7 @@ type ExerciseSettings struct {
 	ArtificialTime        string `json:"artificial_time,omitempty"`         // ISO8601: the artificial "now"
 	ArtificialTimeEnabled bool   `json:"artificial_time_enabled"`           // whether artificial time is active
 	ArtificialTimeSetAt   string `json:"artificial_time_set_at,omitempty"`  // ISO8601: real wall-clock time when artificial_time was set
+	LastTemplate          string `json:"last_template,omitempty"`           // name of the last applied template
 }
 
 // MapLocation represents a named geographic position (HQ, base, POI, etc.)

@@ -457,8 +457,10 @@ function renderListView() {
         </td></tr>`;
       }
     }
+    const isStrikethrough = ev.status === 'cancelled' || ev.status === 'rejected';
+    const strikeStyle = isStrikethrough ? 'text-decoration:line-through;opacity:0.7;' : '';
     return marker + `
-    <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer">
+    <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
@@ -467,7 +469,7 @@ function renderListView() {
       <td style="padding:8px 10px">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[ev.status]||'var(--text-dim)'};margin-right:5px;vertical-align:middle"></span>${state.user && hasRole2(state.user.role, 'readwrite') ?
           `<select class="list-status-sel" data-ev-status="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:${statusColors[ev.status]||'var(--text)'};padding:2px 6px;font-size:inherit;cursor:pointer">
-            ${['planned','active','completed','cancelled'].map(s =>
+            ${['planned','active','completed','rejected','cancelled'].map(s =>
               `<option value="${s}" ${(ev.status||'planned')===s?'selected':''} style="color:var(--text)">${t('status_'+s)||s}</option>`
             ).join('')}
           </select>` :

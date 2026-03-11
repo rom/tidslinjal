@@ -1708,7 +1708,7 @@ function renderSidebar() {
   if (tab === 'legend') {
     const activeLayers = state.layers.filter(l => isLayerActive(l.id));
     const isSynthActive = synthActive ? synthActive() : false;
-    const lastTemplate = state.lastAppliedTemplate || null;
+    const lastTemplate = (state.exercise && state.exercise.last_template) || state.lastAppliedTemplate || null;
     const langLabel = {en:'English 🇬🇧', sv:'Svenska 🇸🇪', fr:'Français 🇫🇷'}[lang] || lang;
     const vInfo = state._versionInfo || {};
     const gbStatus = state._gradualBackupStatus || null;
@@ -1755,6 +1755,7 @@ function renderSidebar() {
             {key:'planned',   color:'var(--text-dim)',  label: t('status_planned')||'Planned'},
             {key:'active',    color:'var(--accent)',    label: t('status_active')||'Active'},
             {key:'completed', color:'var(--green)',     label: t('status_completed')||'Completed'},
+            {key:'rejected',  color:'var(--red)',       label: t('status_rejected')||'Rejected'},
             {key:'cancelled', color:'var(--red)',       label: t('status_cancelled')||'Cancelled'}
           ].map(s => `<div class="legend-item" style="cursor:default">
             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
@@ -2525,19 +2526,19 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
+          ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
+          ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
+          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
+          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
+          ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
+          ${(isTeamLead || isAdminOrOplead || userHasCapability('critical_line_analysis')) ? toolBtn('📈', t('btn_critical_line')||'Critical Line', 'openCriticalLineModal()') : ''}
           ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
-          ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
-          ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
-          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
           ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
           ${role === 'admin' ? toolBtn('🔄', 'Gradual Backup', 'openGradualBackupModal()') : ''}
-          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
           ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
-          ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
-          ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
-          ${(isTeamLead || isAdminOrOplead || userHasCapability('critical_line_analysis')) ? toolBtn('📈', t('btn_critical_line')||'Critical Line Analysis', 'openCriticalLineModal()') : ''}
         </div>
       </div>
     `;
