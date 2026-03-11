@@ -5540,8 +5540,13 @@ func (app *App) routes() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/rooms/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
+		path := r.URL.Path
+		if r.Method == http.MethodDelete && !strings.Contains(path, "/image") {
 			app.requireRole(RoleTeamLead, app.handleDeleteRoom)(w, r)
+		} else if r.Method == http.MethodPost && strings.HasSuffix(path, "/image") {
+			app.requireRole(RoleTeamLead, app.handleRoomImageUpload)(w, r)
+		} else if r.Method == http.MethodGet && strings.Contains(path, "/image") {
+			app.handleRoomImageDownload(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -7222,6 +7227,83 @@ func (app *App) handleDeleteRoom(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, user *User) {
+	// Path: /api/rooms/{id}/image
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/rooms/")
+	idStr = strings.TrimSuffix(idStr, "/image")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		jsonError(w, "image field missing", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	ext := filepath.Ext(header.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	storedName := fmt.Sprintf("room_%d_%d%s", id, time.Now().UnixNano(), ext)
+	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, "failed to save image", http.StatusInternalServerError)
+		return
+	}
+	_, err = io.Copy(dst, file)
+	dst.Close()
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save image", http.StatusInternalServerError)
+		return
+	}
+	// Update room record with image name
+	rooms := app.store.GetRooms()
+	for _, rm := range rooms {
+		if rm.ID == id {
+			// Remove old image if exists
+			if rm.ImageName != "" {
+				os.Remove(filepath.Join(app.store.AttachmentDir(), rm.ImageName))
+			}
+			rm.ImageName = storedName
+			_ = app.store.SaveRoom(rm)
+			break
+		}
+	}
+	jsonOK(w, map[string]string{"status": "ok", "image_name": storedName})
+}
+
+func (app *App) handleRoomImageDownload(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/rooms/{id}/image or /api/rooms/{id}/image/{filename}
+	path := strings.TrimPrefix(r.URL.Path, "/api/rooms/")
+	parts := strings.SplitN(path, "/", 3)
+	if len(parts) < 2 {
+		http.NotFound(w, r)
+		return
+	}
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	rooms := app.store.GetRooms()
+	for _, rm := range rooms {
+		if rm.ID == id && rm.ImageName != "" {
+			filePath := filepath.Join(app.store.AttachmentDir(), rm.ImageName)
+			http.ServeFile(w, r, filePath)
+			return
+		}
+	}
+	http.NotFound(w, r)
 }
 
 // ── Free/Busy lookup handler ───────────────────────────────────────────────────

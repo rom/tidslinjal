@@ -617,11 +617,13 @@ type TrustRealm struct {
 type Room struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
-	Type        string    `json:"type"`       // room | vehicle | equipment
+	Type        string    `json:"type"`       // room | building | computer_service | data_center | vehicle | equipment
 	Location    string    `json:"location,omitempty"`
 	Capacity    int       `json:"capacity,omitempty"`
 	Description string    `json:"description,omitempty"`
 	Equipment   []string  `json:"equipment,omitempty"` // projector, whiteboard, etc.
+	Icon        string    `json:"icon,omitempty"`      // selected symbol/emoji
+	ImageName   string    `json:"image_name,omitempty"` // uploaded image filename (stored)
 	Enabled     bool      `json:"enabled"`
 	CreatedAt   time.Time `json:"created_at"`
 }
