@@ -60,6 +60,7 @@ type Store struct {
 	connectorConfigs     []ConnectorConfig
 	decisionLog          []DecisionLogEntry
 	eventLog             []EventLogEntry
+	logBook              []LogBookEntry
 	mapLocations         []MapLocation
 	federatedIdPs        []FederatedIdP
 	trustRealms          []TrustRealm
@@ -87,6 +88,7 @@ type Store struct {
 	nextMapLocationID        int64
 	nextRoomID               int64
 	nextEventLogID           int64
+	nextLogBookID            int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -149,6 +151,7 @@ func (s *Store) load() error {
 	s.loadFile("trust_realms.json", &s.trustRealms)
 	s.loadFile("rooms.json", &s.rooms)
 	s.loadFile("event_log.json", &s.eventLog)
+	s.loadFile("log_book.json", &s.logBook)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -287,6 +290,11 @@ func (s *Store) load() error {
 	for _, x := range s.eventLog {
 		if x.ID > s.nextEventLogID {
 			s.nextEventLogID = x.ID
+		}
+	}
+	for _, x := range s.logBook {
+		if x.ID > s.nextLogBookID {
+			s.nextLogBookID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -3234,6 +3242,57 @@ func (s *Store) AddEventLogEntry(entry EventLogEntry) (EventLogEntry, error) {
 	snap := append([]EventLogEntry(nil), s.eventLog...)
 	s.mu.Unlock()
 	return entry, s.persist("event_log.json", snap)
+}
+
+// ── Log Book ────────────────────────────────────────────────────────────────
+
+func (s *Store) GetLogBook() []LogBookEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]LogBookEntry, len(s.logBook))
+	copy(out, s.logBook)
+	return out
+}
+
+func (s *Store) AddLogBookEntry(entry LogBookEntry) (LogBookEntry, error) {
+	s.mu.Lock()
+	s.nextLogBookID++
+	entry.ID = s.nextLogBookID
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now()
+	}
+	s.logBook = append(s.logBook, entry)
+	snap := append([]LogBookEntry(nil), s.logBook...)
+	s.mu.Unlock()
+	return entry, s.persist("log_book.json", snap)
+}
+
+func (s *Store) AddLogBookAttachment(entryID int64, att LogBookAttachment) error {
+	s.mu.Lock()
+	for i := range s.logBook {
+		if s.logBook[i].ID == entryID {
+			s.logBook[i].Attachments = append(s.logBook[i].Attachments, att)
+			snap := append([]LogBookEntry(nil), s.logBook...)
+			s.mu.Unlock()
+			return s.persist("log_book.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("log book entry %d not found", entryID)
+}
+
+func (s *Store) DeleteLogBookEntry(id int64) error {
+	s.mu.Lock()
+	for i := range s.logBook {
+		if s.logBook[i].ID == id {
+			s.logBook = append(s.logBook[:i], s.logBook[i+1:]...)
+			snap := append([]LogBookEntry(nil), s.logBook...)
+			s.mu.Unlock()
+			return s.persist("log_book.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("log book entry %d not found", id)
 }
 
 // ── Map Locations ───────────────────────────────────────────────────────────

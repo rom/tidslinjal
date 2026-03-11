@@ -1744,6 +1744,79 @@ async function _loadEventLog() {
     </div>`).join('');
 }
 
+// ── Log Book ───────────────────────────────────────────────────────────────
+let _logBookEntries = [];
+async function _loadLogBook() {
+  const el = document.getElementById('logBookEntries');
+  if (!el) return;
+  try {
+    _logBookEntries = await apiGet('/api/log-book') || [];
+  } catch { _logBookEntries = []; }
+  if (_logBookEntries.length === 0) {
+    el.innerHTML = `<em style="color:var(--text-dim)">${t('lb_empty')||'No log book entries yet.'}</em>`;
+    return;
+  }
+  const isAdmin = state.user?.role === 'admin';
+  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',meeting:'📝',other:'📌'};
+  el.innerHTML = _logBookEntries.slice().reverse().map(e => {
+    const ts = new Date(e.timestamp).toLocaleString();
+    const icon = catIcons[e.category] || '📌';
+    const attHtml = (e.attachments && e.attachments.length) ? `<div style="margin-top:2px">${e.attachments.map(a =>
+      `<a href="/api/log-book/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">📎 ${escHtml(a.filename)}</a>`
+    ).join(' ')}</div>` : '';
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span>${icon}</span>
+          <span style="font-weight:600;font-size:var(--fs-xs)">${escHtml(e.subject)}</span>
+          <span style="color:var(--text-dim);font-size:10px;margin-left:4px">${escHtml(e.display_name||e.user_name)} — ${ts}</span>
+        </div>
+        ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:0 4px;font-size:10px" data-action="deleteLogBookEntry" data-arg="${e.id}">×</button>` : ''}
+      </div>
+      ${e.body ? `<div style="margin-top:2px;white-space:pre-wrap;color:var(--text-dim)">${escHtml(e.body)}</div>` : ''}
+      ${attHtml}
+    </div>`;
+  }).join('');
+  _bindActions(el);
+}
+
+async function addLogBookEntry() {
+  const category = document.getElementById('lbCategory')?.value || 'other';
+  const subject = document.getElementById('lbSubject')?.value?.trim();
+  const body = document.getElementById('lbBody')?.value?.trim() || '';
+  if (!subject) { showError(t('lb_subject_required')||'Subject is required'); return; }
+  const res = await apiPost('/api/log-book', {category, subject, body});
+  if (res.ok) {
+    const created = await res.json().catch(() => null);
+    // Upload attachments
+    const fileInput = document.getElementById('lbAttachFile');
+    if (created && fileInput?.files?.length) {
+      for (const f of fileInput.files) {
+        const fd = new FormData();
+        fd.append('file', f);
+        await api('POST', `/api/log-book/${created.id}/attachment`, fd);
+      }
+      fileInput.value = '';
+    }
+    document.getElementById('lbSubject').value = '';
+    document.getElementById('lbBody').value = '';
+    showNotification('success', t('lb_added')||'Log book entry added');
+    await _loadLogBook();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to add entry');
+  }
+}
+
+async function deleteLogBookEntry(id) {
+  if (!confirm(t('lb_delete_confirm')||'Delete this log book entry?')) return;
+  const res = await api('DELETE', `/api/log-book/${id}`);
+  if (res.ok) {
+    showNotification('success', t('lb_deleted')||'Entry deleted');
+    await _loadLogBook();
+  }
+}
+
 // Detach sidebar into separate window
 let _detachedSidebarWin = null;
 function detachSidebar() {
@@ -2180,6 +2253,7 @@ function renderSidebar() {
       `<button class="toggle-btn${logSub===key?' active':''}" data-log-sub="${key}">${label}</button>`;
     const logTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
       ${logSubBtn('decision', t('tab_decision_log')||'Decision Log')}
+      ${logSubBtn('logbook', t('tab_log_book')||'Log Book')}
       ${logSubBtn('audit', t('tab_audit_log')||'Audit Log')}
       ${logSubBtn('eventlog', t('tab_event_log')||'Event Log')}
     </div>`;
@@ -2222,6 +2296,41 @@ function renderSidebar() {
         </div>`;
       _bindLogSubTabs(el);
       _loadEventLog();
+    } else if (logSub === 'logbook') {
+      const cats = [
+        {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
+        {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
+        {v:'incident',l:t('lb_incident')||'Special incident'},
+        {v:'directive',l:t('lb_directive')||'Directive'},
+        {v:'decision',l:t('lb_decision')||'Decision'},
+        {v:'action',l:t('lb_action')||'Action taken'},
+        {v:'briefing',l:t('lb_briefing')||'Briefing content'},
+        {v:'situation',l:t('lb_situation')||'Situation change'},
+        {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
+        {v:'other',l:t('lb_other')||'Other'}
+      ];
+      el.innerHTML = logTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">📖 ${t('tab_log_book')||'Log Book'}</div>
+          <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
+            <select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
+              ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
+            </select>
+            <input type="text" id="lbSubject" placeholder="${t('lb_subject')||'Subject'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
+            <textarea id="lbBody" rows="2" placeholder="${t('lb_body')||'Details (optional)'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
+                📎 <input type="file" id="lbAttachFile" style="max-width:120px;font-size:10px" multiple>
+              </label>
+              <span style="flex:1"></span>
+              <button class="btn btn-primary btn-sm" data-action="addLogBookEntry">${t('btn_add')||'Add'}</button>
+            </div>
+          </div>
+          <div id="logBookEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('lb_loading')||'Loading…'}</em></div>
+        </div>`;
+      _bindLogSubTabs(el);
+      _bindActions(el);
+      _loadLogBook();
     }
   } else if (tab === 'phases' && state.user && hasRole2(state.user.role, 'teamlead')) {
     el.innerHTML = `
@@ -2924,6 +3033,27 @@ function renderSidebar() {
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('synth_day_hours_only')||'Synthetic time: day hours only'}
         </label>` : ''}
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
+          <input type="checkbox" id="prefShowDayOfYear" ${p.show_day_of_year?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_day_of_year"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_day_of_year')||'Show day-of-year number (1–365)'}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
+          <input type="checkbox" id="prefShowWeekNumbers" ${p.show_week_numbers?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_week_numbers"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_week_numbers')||'Show week numbers'}
+        </label>
+        ${p.show_week_numbers ? `
+        <div style="margin-top:4px;margin-left:22px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_week_style')||'Week number style'}:</span>
+          <select id="prefWeekStyle" data-action="setPrefSelect" data-event="change" data-pref-key="week_number_style"
+            style="margin-left:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+            <option value="iso"${(p.week_number_style||'iso')==='iso'?' selected':''}>ISO (W1–W52)</option>
+            <option value="year_week"${p.week_number_style==='year_week'?' selected':''}>Year+Week (6-W01)</option>
+          </select>
+        </div>` : ''}
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'}</div>
@@ -4448,6 +4578,17 @@ async function setPref(key, value) {
   updateUILabels();
 }
 
+async function setPrefSelect() {
+  const el = event?.target;
+  if (!el) return;
+  const key = el.dataset.prefKey;
+  if (key) state.preferences[key] = el.value;
+  applyPreferences();
+  await savePreferences();
+  renderSidebar();
+  renderTimeline();
+}
+
 async function setViewSpacing(value) {
   state.preferences.view_spacing = parseFloat(value) || 1;
   applyPreferences();
@@ -4842,6 +4983,18 @@ function connectSSE() {
       const data = JSON.parse(e.data);
       if (window._handleEditingLockEvent) window._handleEditingLockEvent(data);
     } catch { /* ignore parse errors */ }
+  });
+  // Decision assignment notification
+  es.addEventListener('decision_assigned', e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.executor_id === state.user?.id) {
+        showNotification('info', `${t('decision_executor')||'Decision assigned'}: ${data.title || data.sequence_number} (${t('lb_action')||'by'} ${data.assigned_by})`);
+        if (Notification.permission === 'granted') {
+          try { new Notification('Tidslinjal', { body: `${data.title || data.sequence_number}\n${t('decision_executor')||'Assigned by'}: ${data.assigned_by}`, icon: '/static/favicon.ico' }); } catch {}
+        }
+      }
+    } catch {}
   });
   es.onerror = () => {
     if (_sseConnection === es) {
@@ -6457,6 +6610,8 @@ async function openDecisionLogModal() {
         <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
           ${canWrite ? `
           <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+            <input type="text" id="dlTitle" placeholder="${t('decision_title_placeholder')||'Decision title (optional)'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
             <textarea id="dlNewDecision" rows="3" placeholder="${t('decision_log_placeholder')||'Enter decision...'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical"></textarea>
             <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
@@ -6476,6 +6631,17 @@ async function openDecisionLogModal() {
                 📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
               </label>
               <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
+            </div>
+            <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('decision_executor')||'Executor'}:</span>
+              <select id="dlExecutorType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="">${t('none')||'None'}</option>
+                <option value="role">${t('role')||'Role'}</option>
+                <option value="group">${t('group')||'Group'}</option>
+                <option value="person">${t('person')||'Person'}</option>
+              </select>
+              <select id="dlExecutorValue" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:120px">
+              </select>
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
@@ -6529,6 +6695,26 @@ async function openDecisionLogModal() {
       targetValueEl.innerHTML = opts;
     };
   }
+  // Executor selector
+  const execTypeEl = document.getElementById('dlExecutorType');
+  const execValueEl = document.getElementById('dlExecutorValue');
+  if (execTypeEl && execValueEl) {
+    execTypeEl.onchange = () => {
+      const tt = execTypeEl.value;
+      if (!tt) { execValueEl.style.display = 'none'; return; }
+      execValueEl.style.display = '';
+      let opts = '';
+      if (tt === 'role') {
+        const roles = ['admin','oplead','staffofficer','teamlead','teammember','readwrite','reporter','read','observer'];
+        opts = roles.map(r => `<option value="${r}">${r}</option>`).join('');
+      } else if (tt === 'group') {
+        opts = (state.groups || []).map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
+      } else if (tt === 'person') {
+        opts = (state.users || []).map(u => `<option value="${u.id}">${escHtml(u.display_name || u.username)}</option>`).join('');
+      }
+      execValueEl.innerHTML = opts;
+    };
+  }
 }
 
 function closeDecisionLogModal() {
@@ -6569,15 +6755,19 @@ function _renderDecisionLogEntries() {
       statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REJECTED</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     }
+    const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
+    const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
     return `<div style="padding:8px;border-bottom:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <span style="font-weight:600">${escHtml(e.display_name || e.user_name)}</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${escHtml(e.sequence_number||'')}</span>
+          <span style="font-weight:600;margin-left:4px">${escHtml(e.display_name || e.user_name)}</span>
           <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
-          ${statusBadge}
+          ${statusBadge}${execHtml}
         </div>
         ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
       </div>
+      ${titleHtml}
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
       ${(e.attachments && e.attachments.length) ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${e.attachments.map(a =>
         `<a href="/api/decision-log/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none" title="${escHtml(a.filename)}">📎 ${escHtml(a.filename)}</a>`
@@ -6593,7 +6783,13 @@ async function addDecisionLogEntry() {
   const logType = document.getElementById('dlLogType')?.value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
   const confidential = document.getElementById('dlConfidential')?.checked || false;
-  const res = await apiPost('/api/decision-log', {decision: text, log_type: logType, group_id: groupId, confidential});
+  const title = document.getElementById('dlTitle')?.value?.trim() || '';
+  const executorType = document.getElementById('dlExecutorType')?.value || '';
+  const executorValueEl = document.getElementById('dlExecutorValue');
+  const executorValue = executorType ? (executorValueEl?.value || '') : '';
+  const executorLabel = executorType ? (executorValueEl?.selectedOptions?.[0]?.textContent || executorValue) : '';
+  const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
+    executor_type: executorType, executor_value: executorValue, executor_label: executorLabel});
   if (res.ok) {
     const created = await res.json().catch(() => null);
     // Upload attachments if any
@@ -6646,8 +6842,9 @@ async function requestDecision() {
   const targetValueEl = document.getElementById('dlTargetValue');
   const targetValue = targetType ? (targetValueEl?.value || '') : '';
   const targetLabel = targetType ? (targetValueEl?.selectedOptions?.[0]?.textContent || targetValue) : '';
+  const title = document.getElementById('dlTitle')?.value?.trim() || '';
   const res = await apiPost('/api/decision-log', {
-    decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested',
+    title, decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested',
     requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel
   });
   if (res.ok) {
@@ -8602,46 +8799,41 @@ async function requestPushPermission() {
 })();
 
 // ── Task-Time Matrix ──────────────────────────────────────────────────────────
-function openTaskTimeMatrix() {
+function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   const el = document.getElementById('taskTimeMatrixContent');
   if (!el) return;
   const events = (state.events || []).filter(ev => ev.start_time && ev.title);
   if (!events.length) {
-    el.innerHTML = '<p style="color:var(--text-dim)">No events to display in the matrix.</p>';
-    openModal('taskTimeMatrixModal');
+    el.innerHTML = `<p style="color:var(--text-dim)">${t('ttm_no_events')||'No events to display in the matrix.'}</p>`;
     return;
   }
-  // Determine time range: each column = 1 hour block between earliest start and latest end
   const sorted = events.slice().sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
-  let minT = new Date(sorted[0].start_time);
-  let maxT = new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time);
-  // Round to hour boundaries
+  let minT = dateFrom ? new Date(dateFrom) : new Date(sorted[0].start_time);
+  let maxT = dateTo ? new Date(dateTo + 'T23:59:59') : new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time);
   minT = new Date(minT.getFullYear(), minT.getMonth(), minT.getDate(), minT.getHours());
   maxT = new Date(maxT.getFullYear(), maxT.getMonth(), maxT.getDate(), maxT.getHours()+1);
   const hours = [];
-  for (let t = new Date(minT); t < maxT; t = new Date(t.getTime() + 3600000)) {
-    hours.push(new Date(t));
-    if (hours.length > 168) break; // max 1 week
+  for (let tm = new Date(minT); tm < maxT; tm = new Date(tm.getTime() + 3600000)) {
+    hours.push(new Date(tm));
+    if (hours.length > 336) break; // max 2 weeks
   }
-  if (hours.length === 0) { el.innerHTML = '<p style="color:var(--text-dim)">No valid time range.</p>'; openModal('taskTimeMatrixModal'); return; }
-  // Build table header
-  let html = '<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:140px;text-align:left">Task</th>';
-  const dateOpts = {hour:'2-digit',hour12:false};
+  if (hours.length === 0) { el.innerHTML = `<p style="color:var(--text-dim)">${t('ttm_no_range')||'No valid time range.'}</p>`; return; }
+  let html = `<table class="ttm-table" style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left">${t('ttm_task')||'Task'}</th>`;
   hours.forEach(h => {
     const dayChanged = h.getHours() === 0;
     const lbl = dayChanged ? h.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' 00' : String(h.getHours()).padStart(2,'0');
     html += `<th style="padding:3px 2px;min-width:28px;text-align:center;border-left:${dayChanged?'2':'1'}px solid var(--border);font-weight:${dayChanged?700:400};color:${dayChanged?'var(--accent)':'var(--text-dim)'}">${lbl}</th>`;
   });
   html += '</tr></thead><tbody>';
-  // One row per event
   const etMap = {};
   (state.eventTypes||[]).forEach(et => etMap[et.id] = et);
   sorted.forEach(ev => {
     const evStart = new Date(ev.start_time).getTime();
     const evEnd = new Date(ev.end_time || ev.start_time).getTime();
+    if (evEnd < minT.getTime() || evStart > maxT.getTime()) return; // outside range
     const et = etMap[ev.event_type_id];
     const color = et?.color || ev.color || 'var(--accent)';
-    html += `<tr><td style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${escHtml(ev.title)}">${escHtml(ev.title)}</td>`;
+    html += `<tr><td style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="${escHtml(ev.title)}">${escHtml(ev.title)}</td>`;
     hours.forEach(h => {
       const hStart = h.getTime();
       const hEnd = hStart + 3600000;
@@ -8652,5 +8844,53 @@ function openTaskTimeMatrix() {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
+}
+
+function openTaskTimeMatrix() {
+  const events = (state.events || []).filter(ev => ev.start_time && ev.title);
+  if (events.length) {
+    const sorted = events.slice().sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
+    const fromEl = document.getElementById('ttmDateFrom');
+    const toEl = document.getElementById('ttmDateTo');
+    if (fromEl && !fromEl.value) fromEl.value = new Date(sorted[0].start_time).toISOString().slice(0,10);
+    if (toEl && !toEl.value) toEl.value = new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time).toISOString().slice(0,10);
+  }
+  _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
   openModal('taskTimeMatrixModal');
+  // Bind date apply
+  document.getElementById('ttmApplyDates')?.addEventListener('click', () => {
+    _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
+  });
+  // Bind detach
+  document.getElementById('ttmDetach')?.addEventListener('click', _detachTaskTimeMatrix);
+  // Bind print
+  document.getElementById('ttmPrint')?.addEventListener('click', _printTaskTimeMatrix);
+}
+
+function _detachTaskTimeMatrix() {
+  const content = document.getElementById('taskTimeMatrixContent')?.innerHTML || '';
+  const theme = document.body.className || 'theme-dark';
+  const w = window.open('', 'ttm-' + Date.now(), 'width=1400,height=700,menubar=no,toolbar=no');
+  if (!w) return;
+  const css = document.querySelector('link[href*="style.css"]');
+  const cssHref = css ? css.href : '/static/style.css';
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${t('btn_task_time_matrix')||'Task-Time Matrix'}</title>
+<link rel="stylesheet" href="${cssHref}">
+<style>
+body{padding:20px;overflow:auto}
+.ttm-table{border-collapse:collapse;font-size:11px;width:100%}
+.ttm-table th,.ttm-table td{border:1px solid var(--border)}
+@media print{body{background:#fff;color:#000} .ttm-table th{background:#eee!important;color:#000!important} .no-print{display:none!important}}
+</style></head><body class="${theme}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px" class="no-print">
+  <h2>${t('btn_task_time_matrix')||'Task-Time Matrix'}</h2>
+  <button onclick="window.print()" class="btn btn-primary btn-sm">🖨 ${t('btn_print')||'Print'}</button>
+</div>
+${content}
+</body></html>`);
+  w.document.close();
+}
+
+function _printTaskTimeMatrix() {
+  _detachTaskTimeMatrix();
 }
