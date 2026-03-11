@@ -1959,6 +1959,11 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 	if e.EventType == "" {
 		e.EventType = "event"
 	}
+	// Auto-calculate end_time for timed events
+	if e.EventType == "timed_event" && e.TimedDurationMinutes > 0 && e.EndTime == nil {
+		end := e.StartTime.Add(time.Duration(e.TimedDurationMinutes) * time.Minute)
+		e.EndTime = &end
+	}
 	if e.Color == "" {
 		if et, ok := app.store.GetEventTypeByKey(e.EventType); ok {
 			e.Color = et.Color
@@ -2072,6 +2077,11 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		if et, ok := app.store.GetEventTypeByKey(e.EventType); ok {
 			e.Color = et.Color
 		}
+	}
+	// Auto-calculate end_time for timed events
+	if e.EventType == "timed_event" && e.TimedDurationMinutes > 0 && e.EndTime == nil {
+		end := e.StartTime.Add(time.Duration(e.TimedDurationMinutes) * time.Minute)
+		e.EndTime = &end
 	}
 	// Check for scheduling overlaps (non-blocking: returns warnings)
 	overlaps := app.store.CheckOverlaps(e.StartTime, e.EndTime, e.ResponsibleID, e.InvitedUserIDs, id)
@@ -6789,10 +6799,14 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
 	_ = app.store.UpdateDecisionLogEntry(created)
 	auditAction := "created"
-	auditSummary := fmt.Sprintf("Decision %s added: %.50s", created.SequenceNumber, req.Decision)
+	decisionText := req.Decision
+	if req.Title != "" {
+		decisionText = req.Title + ": " + req.Decision
+	}
+	auditSummary := fmt.Sprintf("Decision %s added: %s", created.SequenceNumber, decisionText)
 	if req.Status == "requested" {
 		auditAction = "requested"
-		auditSummary = fmt.Sprintf("Decision %s requested: %.50s", created.SequenceNumber, req.Decision)
+		auditSummary = fmt.Sprintf("Decision %s requested: %s", created.SequenceNumber, decisionText)
 	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
@@ -6889,7 +6903,7 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
 		Action: req.Status, EntityType: "decision_log", EntityID: id,
-		Summary: fmt.Sprintf("%s decision request #%d: %s", req.Status, id, req.Comment),
+		Summary: fmt.Sprintf("%s decision %s (#%d): %s — %s", req.Status, found.SequenceNumber, id, found.Decision, req.Comment),
 	})
 	jsonOK(w, found)
 }

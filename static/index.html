@@ -613,6 +613,33 @@
           </select>
         </div>
       </div>
+      <!-- Timed event settings (shown only for timed_event type) -->
+      <div id="timedEventGroup" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:12px">
+        <label style="font-weight:600;font-size:var(--fs-sm)">⏱ Timed Event Settings</label>
+        <div class="form-row" style="margin-top:6px">
+          <div class="form-group" style="flex:1">
+            <label style="font-size:var(--fs-xs)">Duration (minutes)</label>
+            <input type="number" id="timedDuration" min="1" max="1440" value="30" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);width:100%">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label style="font-size:var(--fs-xs)">Show timer before start</label>
+            <select id="timedPreShow" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);width:100%">
+              <option value="1">1 minute</option>
+              <option value="2">2 minutes</option>
+              <option value="5" selected>5 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="15">15 minutes</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:6px">
+          <label style="font-size:var(--fs-xs)">Alarms (comma-separated: minutes left or %, e.g. "5,10,50%")</label>
+          <input type="text" id="timedAlarms" placeholder="5,10,50%" value="5,10" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);width:100%">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);margin-top:6px;color:var(--text-dim)">
+          <input type="checkbox" id="timedContinueAfter" checked style="accent-color:var(--accent)"> Continue counting (with +) after timer completes
+        </label>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label id="lbl-ev-responsible">Responsible</label>

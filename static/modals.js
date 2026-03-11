@@ -164,14 +164,17 @@ function updateEventModalTimeVisibility() {
   const allDay  = document.getElementById('eventAllDay')?.checked;
   const typeVal = document.getElementById('eventType')?.value;
   const isInstant = typeVal === 'instant';
+  const isTimed = typeVal === 'timed_event';
 
   const startRow = document.getElementById('eventTimeRow');
   const endGroup = document.getElementById('eventEndGroup');
   const recurRow = document.querySelectorAll('#eventModal .recurrence-row');
+  const timedGroup = document.getElementById('timedEventGroup');
 
   if (startRow) startRow.style.display = allDay ? 'none' : '';
-  if (endGroup) endGroup.style.display = (allDay || isInstant) ? 'none' : '';
+  if (endGroup) endGroup.style.display = (allDay || isInstant || isTimed) ? 'none' : '';
   recurRow.forEach(el => { el.style.display = allDay ? 'none' : ''; });
+  if (timedGroup) timedGroup.style.display = isTimed ? '' : 'none';
 }
 
 function openEventModal(ev, defaultStart, defaultEnd) {
@@ -245,6 +248,16 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   // Countdown timer
   const cdSelect = document.getElementById('eventCountdownBefore');
   if (cdSelect) cdSelect.value = ev?.countdown_before_minutes || '0';
+
+  // Timed event fields
+  const timedDur = document.getElementById('timedDuration');
+  if (timedDur) timedDur.value = ev?.timed_duration_minutes || 30;
+  const timedAlarms = document.getElementById('timedAlarms');
+  if (timedAlarms) timedAlarms.value = ev?.timed_alarms || '5,10';
+  const timedCont = document.getElementById('timedContinueAfter');
+  if (timedCont) timedCont.checked = ev?.timed_continue_after !== false;
+  const timedPre = document.getElementById('timedPreShow');
+  if (timedPre) timedPre.value = ev?.timed_pre_show_minutes || 5;
 
   // Status
   document.getElementById('eventStatus').value = (ev && ev.status) ? ev.status : 'planned';
@@ -333,7 +346,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   delBtn.onclick = canDel ? () => deleteEvent(ev.id) : null;
 
   const saveBtn = document.getElementById('btnSaveEvent');
-  if (saveBtn) saveBtn.disabled = !!eventIsLocked;
+  if (saveBtn) { saveBtn.disabled = !!eventIsLocked; saveBtn.style.pointerEvents = ''; }
 
   // Physical location and contact/communication fields
   document.getElementById('eventPhysicalLocation').value = ev ? (ev.physical_location||'') : '';
@@ -490,6 +503,10 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     latitude:           document.getElementById('eventLatitude')?.value ? parseFloat(document.getElementById('eventLatitude').value) : null,
     longitude:          document.getElementById('eventLongitude')?.value ? parseFloat(document.getElementById('eventLongitude').value) : null,
     countdown_before_minutes: parseInt(document.getElementById('eventCountdownBefore')?.value, 10) || 0,
+    timed_duration_minutes: typeVal === 'timed_event' ? (parseInt(document.getElementById('timedDuration')?.value, 10) || 30) : 0,
+    timed_alarms: typeVal === 'timed_event' ? (document.getElementById('timedAlarms')?.value || '') : '',
+    timed_continue_after: typeVal === 'timed_event' ? (document.getElementById('timedContinueAfter')?.checked || false) : false,
+    timed_pre_show_minutes: typeVal === 'timed_event' ? (parseInt(document.getElementById('timedPreShow')?.value, 10) || 5) : 0,
   };
 
   // Track undo for updates
@@ -1029,6 +1046,7 @@ function renderCommentContent(text) {
 // ── @username autocomplete ───────────────────────────────────────────────────
 let _mentionDropdown = null;
 let _mentionStart = -1;
+let _mentionCursorPos = -1; // Save cursor position for click handling
 
 function _attachMentionAutocomplete(textarea) {
   if (!textarea || textarea._mentionBound) return;
@@ -1049,6 +1067,7 @@ function _onMentionInput() {
   while (start >= 0 && /\w/.test(val[start])) start--;
   if (start < 0 || val[start] !== '@') { _closeMentionDropdown(); return; }
   _mentionStart = start;
+  _mentionCursorPos = pos;
   const query = val.slice(start + 1, pos).toLowerCase();
   const users = (state.users || []).filter(u =>
     u.username && u.username.toLowerCase().includes(query) ||
@@ -1100,7 +1119,7 @@ function _showMentionDropdown(ta, users, query) {
     item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
     item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
     item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
-    item.addEventListener('click', () => _insertMention(u.username));
+    item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertMention(u.username); });
     dd.appendChild(item);
   });
   document.body.appendChild(dd);
@@ -1114,7 +1133,7 @@ function _closeMentionDropdown() {
 function _insertMention(username) {
   const ta = document.getElementById('commentText');
   if (!ta || _mentionStart < 0) return;
-  const pos = ta.selectionStart;
+  const pos = _mentionCursorPos >= 0 ? _mentionCursorPos : ta.selectionStart;
   const val = ta.value;
   const before = val.slice(0, _mentionStart);
   const after = val.slice(pos);
@@ -1123,6 +1142,7 @@ function _insertMention(username) {
   const newPos = before.length + insert.length;
   ta.setSelectionRange(newPos, newPos);
   ta.focus();
+  _mentionCursorPos = -1;
   _closeMentionDropdown();
 }
 
@@ -4680,7 +4700,7 @@ function openRoomModal(argJson) {
 
     showNotification('success', `${label} ${t('saved')||'saved'}`);
     modal.remove();
-    _activateSidebarTab('resources');
+    renderSidebar();
   });
 }
 
