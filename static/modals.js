@@ -6245,8 +6245,14 @@ function openCriticalLineModal() {
     return (ms/86400000).toFixed(1) + ' d';
   };
 
-  const html = `
-    <div class="modal-overlay" id="criticalLineModal" style="display:flex">
+  // Remove any existing modal to prevent duplicates
+  const old = document.getElementById('criticalLineModal');
+  if (old) old.remove();
+
+  const el = document.createElement('div');
+  el.className = 'modal-overlay open';
+  el.id = 'criticalLineModal';
+  el.innerHTML = `
       <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
           <h2>📈 ${t('critical_line_title')||'Critical Line Analysis'}</h2>
@@ -6297,13 +6303,15 @@ function openCriticalLineModal() {
               </div>`).join('')}
           </div>` : ''}
         </div>
-      </div>
-    </div>`;
-  document.body.insertAdjacentHTML('beforeend', html);
-  _bindActions(document.getElementById('criticalLineModal'));
+      </div>`;
+  document.body.appendChild(el);
+  _bindActions(el);
 }
 
-function closeCriticalLineModal() { closeModal('criticalLineModal'); }
+function closeCriticalLineModal() {
+  const el = document.getElementById('criticalLineModal');
+  if (el) el.remove();
+}
 
 // ── Offline Mode ────────────────────────────────────────────────────────────
 window._offlineMode = false;
