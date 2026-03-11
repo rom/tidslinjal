@@ -452,6 +452,7 @@ const TRANSLATIONS = {
     password_saved:      'Password changed',
     password_mismatch:   'Passwords do not match',
     password_wrong:      'Current password is incorrect',
+    current_password_required: 'Current password is required',
     tab_phases:          'Phases',
     freeze_label:        'Frozen at',
     btn_freeze:          '⏸ Freeze',
@@ -645,6 +646,64 @@ const TRANSLATIONS = {
     // Event bus
     eventbus_title:          'Event Bus',
     eventbus_subscribers:    'Subscribers',
+
+    // Decision log
+    decision_log_title:      'Decision Log',
+    decision_log_placeholder: 'Enter decision...',
+    decision_log_general:    'General (all)',
+    decision_log_group:      'Group/Unit only',
+    decision_log_private:    'Private',
+    decision_log_empty:      'No decisions recorded yet.',
+    decision_added:          'Decision recorded',
+    decision_delete_confirm: 'Delete this decision log entry?',
+    decision_required:       'Decision text is required',
+    confidential:            'Confidential',
+
+    // Map
+    btn_map:                 'Map',
+
+    // Exercise info
+    exercise_click_info:     'Click for details',
+    exercise_index:          'Exercise index',
+    exercise_index_incident: 'Incident index',
+    exercise_index_operation: 'Operation index',
+    exercise_index_info:     'A sequential number identifying this exercise/operation/incident instance. Used for tracking and reference in official documentation.',
+    exercise_index_info_tip: 'What is this?',
+    duration:                'Duration',
+    enabled:                 'Enabled',
+    disabled:                'Disabled',
+    excluded:                'Excluded',
+    mode_exercise:           'Exercise',
+    mode_incident:           'Incident',
+    mode_operation:          'Operation',
+
+    // Artificial time
+    artificial_time:         'Artificial time',
+    artificial_time_desc:    'Set a custom "current time" for exercise simulation',
+
+    // Day visualisation
+    settings_day_visualisation: 'Day Visualisation',
+
+    // Push notification instructions
+    settings_push_enabled:   'Notifications are enabled',
+    settings_push_blocked:   'Blocked — allow in browser settings',
+    settings_push_not_granted: 'Permission not granted yet',
+    settings_push_howto:     'How to enable in your browser',
+    push_chrome:             'Click the lock/tune icon in the address bar → Site settings → Notifications → Allow',
+    push_edge:               'Click the lock icon → Permissions for this site → Notifications → Allow',
+    push_firefox:            'Click the lock icon → Connection secure → More Information → Permissions → Notifications → Allow',
+    push_safari:             'Safari menu → Settings → Websites → Notifications → find this site → Allow',
+
+    // Integrations
+    settings_connectors:     'Connectors / Plugins',
+    settings_connectors_desc: 'Configure external system connectors. Each connector can poll external services and push events into Tidslinjal.',
+    connectors_none:         'No connectors configured. Available connectors: Google Calendar, STIX/TAXII, RSS, Generic Webhook.',
+    settings_event_bus:      'Outbound Event Bus',
+    settings_event_bus_desc: 'The event bus broadcasts lifecycle events (created, updated, deleted) to all registered connectors and webhook endpoints in real-time.',
+    settings_event_bus_status: 'Status: Active — events are routed to configured connectors and webhooks automatically.',
+    settings_ingest_api:     'Inbound Ingestion API',
+    settings_ingest_api_desc: 'External systems can push events into Tidslinjal via the Ingestion API. Authenticate with an API key.',
+    settings_ingest_format:  'JSON payload with title, start, end, type fields',
   },
 
   sv: {
@@ -943,6 +1002,7 @@ const TRANSLATIONS = {
     password_saved:           'Lösenord ändrat',
     password_mismatch:        'Lösenorden stämmer inte överens',
     password_wrong:           'Fel nuvarande lösenord',
+    current_password_required: 'Nuvarande lösenord krävs',
     user_groups:              'Grupper',
     user_groups_hint:         'Tilldela till grupper',
     groups_members_list:      'Medlemmar',
@@ -1255,6 +1315,35 @@ const TRANSLATIONS = {
     // Event bus
     eventbus_title:          'Händelsebuss',
     eventbus_subscribers:    'Prenumeranter',
+
+    // Decision log
+    decision_log_title:      'Beslutslogg',
+    decision_log_placeholder: 'Skriv beslut...',
+    decision_log_general:    'Allmänt (alla)',
+    decision_log_group:      'Grupp/Enhet',
+    decision_log_private:    'Privat',
+    decision_log_empty:      'Inga beslut registrerade ännu.',
+    decision_added:          'Beslut registrerat',
+    decision_delete_confirm: 'Ta bort denna beslutspost?',
+    decision_required:       'Beslutstext krävs',
+    confidential:            'Konfidentiellt',
+    btn_map:                 'Karta',
+    exercise_click_info:     'Klicka för detaljer',
+    exercise_index:          'Övningsindex',
+    exercise_index_incident: 'Incidentindex',
+    exercise_index_operation: 'Operationsindex',
+    exercise_index_info:     'Ett löpnummer som identifierar denna övning/operation/incident. Används för spårning och referens i officiell dokumentation.',
+    duration:                'Varaktighet',
+    enabled:                 'Aktiverad',
+    disabled:                'Inaktiverad',
+    excluded:                'Exkluderade',
+    artificial_time:         'Artificiell tid',
+    artificial_time_desc:    'Ange en anpassad "nuvarande tid" för övningssimulering',
+    settings_day_visualisation: 'Dagsvisualisering',
+    settings_push_howto:     'Hur du aktiverar i din webbläsare',
+    settings_connectors:     'Kopplingar / Tillägg',
+    settings_event_bus:      'Utgående händelsebuss',
+    settings_ingest_api:     'Inkommande inmatnings-API',
   },
 
   fr: {
@@ -1553,6 +1642,7 @@ const TRANSLATIONS = {
     password_saved:           'Mot de passe modifié',
     password_mismatch:        'Les mots de passe ne correspondent pas',
     password_wrong:           'Mot de passe actuel incorrect',
+    current_password_required: 'Le mot de passe actuel est requis',
     user_groups:              'Groupes',
     user_groups_hint:         'Assigner aux groupes',
     groups_members_list:      'Membres',
@@ -1865,6 +1955,34 @@ const TRANSLATIONS = {
     // Event bus
     eventbus_title:          'Bus d\u2019événements',
     eventbus_subscribers:    'Abonnés',
+
+    // Decision log
+    decision_log_title:      'Journal des décisions',
+    decision_log_placeholder: 'Saisir la décision...',
+    decision_log_general:    'Général (tous)',
+    decision_log_group:      'Groupe/Unité',
+    decision_log_private:    'Privé',
+    decision_log_empty:      'Aucune décision enregistrée.',
+    decision_added:          'Décision enregistrée',
+    decision_delete_confirm: 'Supprimer cette entrée?',
+    decision_required:       'Le texte de la décision est requis',
+    confidential:            'Confidentiel',
+    btn_map:                 'Carte',
+    exercise_click_info:     'Cliquez pour les détails',
+    exercise_index:          'Index d\'exercice',
+    exercise_index_incident: 'Index d\'incident',
+    exercise_index_operation: 'Index d\'opération',
+    duration:                'Durée',
+    enabled:                 'Activé',
+    disabled:                'Désactivé',
+    excluded:                'Exclus',
+    artificial_time:         'Temps artificiel',
+    artificial_time_desc:    'Définir un "temps actuel" personnalisé pour la simulation',
+    settings_day_visualisation: 'Visualisation du jour',
+    settings_push_howto:     'Comment activer dans votre navigateur',
+    settings_connectors:     'Connecteurs / Plugins',
+    settings_event_bus:      'Bus d\'événements sortant',
+    settings_ingest_api:     'API d\'ingestion entrante',
   }
 };
 

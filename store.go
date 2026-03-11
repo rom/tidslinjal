@@ -57,6 +57,8 @@ type Store struct {
 	editingLocks         []EditingLock // in-memory only; not persisted
 	routingRules         []RoutingRule
 	connectorConfigs     []ConnectorConfig
+	decisionLog          []DecisionLogEntry
+	mapLocations         []MapLocation
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -76,6 +78,8 @@ type Store struct {
 	nextEventVersionID      int64
 	nextAutoReportScheduleID int64
 	nextRoutingRuleID        int64
+	nextDecisionLogID        int64
+	nextMapLocationID        int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -131,6 +135,8 @@ func (s *Store) load() error {
 	s.loadFile("auto_report_schedules.json", &s.autoReportSchedules)
 	s.loadFile("routing_rules.json", &s.routingRules)
 	s.loadFile("connectors.json", &s.connectorConfigs)
+	s.loadFile("decision_log.json", &s.decisionLog)
+	s.loadFile("map_locations.json", &s.mapLocations)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -228,6 +234,16 @@ func (s *Store) load() error {
 	for _, x := range s.routingRules {
 		if x.ID > s.nextRoutingRuleID {
 			s.nextRoutingRuleID = x.ID
+		}
+	}
+	for _, x := range s.decisionLog {
+		if x.ID > s.nextDecisionLogID {
+			s.nextDecisionLogID = x.ID
+		}
+	}
+	for _, x := range s.mapLocations {
+		if x.ID > s.nextMapLocationID {
+			s.nextMapLocationID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2354,7 +2370,12 @@ func (s *Store) ValidateAPIKey(raw string) *APIKey {
 			// Update last used
 			now := time.Now()
 			s.apiKeys[i].LastUsedAt = &now
-			return &s.apiKeys[i]
+			cp := s.apiKeys[i]
+			snap := append([]APIKey(nil), s.apiKeys...)
+			go s.persist("apikeys.json", snap)
+			cp.KeyHash = ""
+			cp.Key = ""
+			return &cp
 		}
 	}
 	return nil
@@ -2997,4 +3018,86 @@ func (s *Store) BulkDeleteEvents(f BulkFilter) (int, error) {
 		}
 	}
 	return count, nil
+}
+
+// ── Decision Log ────────────────────────────────────────────────────────────
+
+func (s *Store) GetDecisionLog() []DecisionLogEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]DecisionLogEntry, len(s.decisionLog))
+	copy(out, s.decisionLog)
+	return out
+}
+
+func (s *Store) AddDecisionLogEntry(entry DecisionLogEntry) (DecisionLogEntry, error) {
+	s.mu.Lock()
+	s.nextDecisionLogID++
+	entry.ID = s.nextDecisionLogID
+	s.decisionLog = append(s.decisionLog, entry)
+	snap := append([]DecisionLogEntry(nil), s.decisionLog...)
+	s.mu.Unlock()
+	return entry, s.persist("decision_log.json", snap)
+}
+
+func (s *Store) DeleteDecisionLogEntry(id int64) error {
+	s.mu.Lock()
+	for i, e := range s.decisionLog {
+		if e.ID == id {
+			s.decisionLog = append(s.decisionLog[:i], s.decisionLog[i+1:]...)
+			snap := append([]DecisionLogEntry(nil), s.decisionLog...)
+			s.mu.Unlock()
+			return s.persist("decision_log.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("decision log entry %d not found", id)
+}
+
+// ── Map Locations ───────────────────────────────────────────────────────────
+
+func (s *Store) GetMapLocations() []MapLocation {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]MapLocation, len(s.mapLocations))
+	copy(out, s.mapLocations)
+	return out
+}
+
+func (s *Store) AddMapLocation(loc MapLocation) (MapLocation, error) {
+	s.mu.Lock()
+	s.nextMapLocationID++
+	loc.ID = s.nextMapLocationID
+	s.mapLocations = append(s.mapLocations, loc)
+	snap := append([]MapLocation(nil), s.mapLocations...)
+	s.mu.Unlock()
+	return loc, s.persist("map_locations.json", snap)
+}
+
+func (s *Store) UpdateMapLocation(loc MapLocation) error {
+	s.mu.Lock()
+	for i, l := range s.mapLocations {
+		if l.ID == loc.ID {
+			s.mapLocations[i] = loc
+			snap := append([]MapLocation(nil), s.mapLocations...)
+			s.mu.Unlock()
+			return s.persist("map_locations.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("map location %d not found", loc.ID)
+}
+
+func (s *Store) DeleteMapLocation(id int64) error {
+	s.mu.Lock()
+	for i, l := range s.mapLocations {
+		if l.ID == id {
+			s.mapLocations = append(s.mapLocations[:i], s.mapLocations[i+1:]...)
+			snap := append([]MapLocation(nil), s.mapLocations...)
+			s.mu.Unlock()
+			return s.persist("map_locations.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("map location %d not found", id)
 }
