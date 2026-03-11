@@ -70,6 +70,8 @@ const TRANSLATIONS = {
     btn_auto_report: 'Auto reports',
     btn_synth_time: '⏱ T+',
     btn_report: 'Report',
+    btn_critical_line: 'Critical Line',
+    btn_request_decision: 'Request Decision',
 
     // Role editor
     role_editor_title: '🛡 Role Editor',
@@ -1161,6 +1163,8 @@ const TRANSLATIONS = {
     btn_auto_report: 'Autorapporter',
     btn_synth_time: '⏱ T+',
     btn_report: 'Rapport',
+    btn_critical_line: 'Kritisk linje',
+    btn_request_decision: 'Begär beslut',
 
     // Rollredigering
     role_editor_title: '🛡 Rollredigering',
@@ -1801,6 +1805,8 @@ const TRANSLATIONS = {
     btn_auto_report: 'Rapports automatiques',
     btn_synth_time: '⏱ T+',
     btn_report: 'Rapport',
+    btn_critical_line: 'Ligne critique',
+    btn_request_decision: 'Demander une décision',
 
     // Éditeur de rôles
     role_editor_title: '🛡 Éditeur de rôles',
