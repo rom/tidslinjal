@@ -4437,7 +4437,7 @@ func securityHeaders(next http.Handler) http.Handler {
 				"script-src 'self'; "+
 				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https://*.tile.openstreetmap.org; "+
-				"connect-src 'self'; "+
+				"connect-src 'self' https://nominatim.openstreetmap.org; "+
 				"font-src 'self' data:; "+
 				"frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
@@ -5130,9 +5130,12 @@ func (app *App) routes() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/decision-log/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
+		switch r.Method {
+		case http.MethodDelete:
 			app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry)(w, r)
-		} else {
+		case http.MethodPut:
+			app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry)(w, r)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
@@ -6372,6 +6375,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		LogType      string `json:"log_type"`
 		GroupID      int64  `json:"group_id"`
 		Confidential bool   `json:"confidential"`
+		Status       string `json:"status"` // "" = decided, "requested" = request for decision
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -6384,6 +6388,11 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 	if req.LogType == "" {
 		req.LogType = "general"
 	}
+	// Validate status
+	if req.Status != "" && req.Status != "requested" {
+		jsonError(w, "status must be empty or 'requested'", http.StatusBadRequest)
+		return
+	}
 	// Check capability
 	if !userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
@@ -6394,6 +6403,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		UserID:       user.ID,
 		UserName:     user.Username,
 		DisplayName:  user.DisplayName,
+		Status:       req.Status,
 		Decision:     req.Decision,
 		LogType:      req.LogType,
 		GroupID:       req.GroupID,
@@ -6431,6 +6441,66 @@ func (app *App) handleDeleteDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		Summary: fmt.Sprintf("Deleted decision log entry #%d", id),
 	})
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPut {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
+	if len(parts) < 2 || parts[1] != "review" {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Status  string `json:"status"`  // "approved" or "rejected"
+		Comment string `json:"comment"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Status != "approved" && req.Status != "rejected" {
+		jsonError(w, "status must be 'approved' or 'rejected'", http.StatusBadRequest)
+		return
+	}
+	entries := app.store.GetDecisionLog()
+	var found *DecisionLogEntry
+	for i := range entries {
+		if entries[i].ID == id {
+			found = &entries[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "entry not found", http.StatusNotFound)
+		return
+	}
+	now := time.Now()
+	found.Status = req.Status
+	found.ReviewedBy = user.ID
+	found.ReviewedByName = user.DisplayName
+	if found.ReviewedByName == "" {
+		found.ReviewedByName = user.Username
+	}
+	found.ReviewedAt = &now
+	found.ReviewComment = req.Comment
+	if err := app.store.UpdateDecisionLogEntry(*found); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: req.Status, EntityType: "decision_log", EntityID: id,
+		Summary: fmt.Sprintf("%s decision request #%d: %s", req.Status, id, req.Comment),
+	})
+	jsonOK(w, found)
 }
 
 // userInGroup checks if a user is a member of a specific group
@@ -7075,8 +7145,11 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		Rank             string `json:"rank"`
 		JobRole          string `json:"job_role"`
 		Expertise        string `json:"expertise"`
-		PhotoDataURL     string `json:"photo_data_url"` // base64 data URL
-		GenerateWebCal   bool   `json:"generate_webcal"`
+		PhotoDataURL     string  `json:"photo_data_url"` // base64 data URL
+		GenerateWebCal   bool    `json:"generate_webcal"`
+		Location         string  `json:"location"`
+		Latitude         float64 `json:"latitude"`
+		Longitude        float64 `json:"longitude"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -7111,6 +7184,9 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	fullUser.Rank = req.Rank
 	fullUser.JobRole = req.JobRole
 	fullUser.Expertise = req.Expertise
+	fullUser.Location = req.Location
+	fullUser.Latitude = req.Latitude
+	fullUser.Longitude = req.Longitude
 	if req.PhotoDataURL != "" {
 		fullUser.PhotoDataURL = req.PhotoDataURL
 	}

@@ -3054,6 +3054,20 @@ func (s *Store) DeleteDecisionLogEntry(id int64) error {
 	return fmt.Errorf("decision log entry %d not found", id)
 }
 
+func (s *Store) UpdateDecisionLogEntry(entry DecisionLogEntry) error {
+	s.mu.Lock()
+	for i, e := range s.decisionLog {
+		if e.ID == entry.ID {
+			s.decisionLog[i] = entry
+			snap := append([]DecisionLogEntry(nil), s.decisionLog...)
+			s.mu.Unlock()
+			return s.persist("decision_log.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("decision log entry %d not found", entry.ID)
+}
+
 // ── Map Locations ───────────────────────────────────────────────────────────
 
 func (s *Store) GetMapLocations() []MapLocation {

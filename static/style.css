@@ -39,6 +39,8 @@
   --fs-2xl:     24px;
   /* Zoom — updated by JS on renderTimeline() */
   --ev-zoom-scale: 1;
+  /* View spacing — set by applyPreferences() */
+  --view-spacing: 1;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────────── */
@@ -332,6 +334,7 @@ select.ctrl-select:focus { border-color: var(--accent); }
 .tl-cell {
   border-right: 1px solid var(--border); border-bottom: 1px solid rgba(42,63,86,.5);
   min-width: var(--day-col-min); position: relative; cursor: pointer; transition: background .1s;
+  height: calc(var(--slot-h-hour, 40px) * var(--view-spacing, 1));
 }
 .tl-cell:hover { background: rgba(74,144,217,.05); }
 .tl-cell.half-hour { border-bottom-style: dashed; border-bottom-color: rgba(42,63,86,.3); }

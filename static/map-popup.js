@@ -364,3 +364,57 @@ initMapProjection();
 
 // Poll for theme/language changes
 setInterval(function() { syncTheme(); syncLanguage(); }, 2000);
+
+/* ── Address search / geocoding ── */
+let _searchMarker = null;
+
+async function searchAddress(query) {
+  if (!query || !query.trim()) return;
+  query = query.trim();
+  try {
+    // Use Nominatim (OpenStreetMap) for geocoding — free, no API key required
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) { console.warn('Geocoding request failed:', res.status); return; }
+    const data = await res.json();
+    if (!data || data.length === 0) {
+      alert('Address not found: ' + query);
+      return;
+    }
+    const result = data[0];
+    const lat = parseFloat(result.lat);
+    const lon = parseFloat(result.lon);
+
+    // Remove previous search marker
+    if (_searchMarker) _map.removeLayer(_searchMarker);
+
+    // Add marker and zoom
+    _searchMarker = L.marker([lat, lon], {
+      icon: L.divIcon({
+        className: 'search-marker',
+        html: '<div style="background:#E74C3C;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:12px;color:#fff;font-weight:700">📍</span></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28]
+      })
+    }).addTo(_map);
+
+    _searchMarker.bindPopup('<b>' + escH(result.display_name) + '</b>').openPopup();
+    _map.setView([lat, lon], 15);
+  } catch(e) {
+    console.error('Geocoding error:', e);
+  }
+}
+
+document.getElementById('btnSearch').addEventListener('click', function() {
+  const q = document.getElementById('addressSearch')?.value;
+  searchAddress(q);
+});
+
+document.getElementById('addressSearch').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    searchAddress(this.value);
+  }
+});

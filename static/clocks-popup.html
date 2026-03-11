@@ -5,6 +5,7 @@
 <title>Tidslinjal — Clocks</title>
 <link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
 <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/static/vendor/seven-segment.css">
 <style>
 /* ── Theme application ── */
 body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
@@ -64,7 +65,10 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .vcr-card { background:#050000 !important; border-color:#3a0000 !important; }
 .vcr-time {
   color:#ff2200; text-shadow:0 0 8px rgba(255,40,0,.9),0 0 18px rgba(255,0,0,.5);
-  font-family:'Courier New','Lucida Console',monospace; font-weight:bold; letter-spacing:.1em; }
+  font-weight:bold; letter-spacing:.1em; }
+.vcr-time .vcr-ghost {
+  position:absolute; top:0; left:0; right:0;
+  color:rgba(255,34,0,.12); pointer-events:none; }
 .vcr-label { color:#880000 !important; }
 .vcr-date  { color:#660000 !important; }
 .vcr-tz    { color:#880000 !important; }

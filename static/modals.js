@@ -127,6 +127,9 @@ function applyPreferences() {
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
+  // Apply view spacing
+  const spacing = state.preferences.view_spacing || 1;
+  document.documentElement.style.setProperty('--view-spacing', spacing);
   updateLangFlags();
   // Broadcast theme to detached windows
   if (typeof _broadcastSync === 'function') {
@@ -1874,6 +1877,7 @@ function renderSidebar() {
       </div>` : ''}
     `;
   } else if (tab === 'users' && state.user && state.user.role==='admin') {
+    const canSeeLoc = userHasCapability('see_location');
     apiGet('/api/users').then(users => {
       el.innerHTML = `
         <div class="sidebar-section">
@@ -1886,7 +1890,7 @@ function renderSidebar() {
               <div class="user-item">
                 <div class="user-name">
                   <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
-                  <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}</div>
+                  <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
                 </div>
                 <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                 ${u.can_lock?'<span title="Can lock">🔒</span>':''}
@@ -2413,6 +2417,7 @@ function renderSidebar() {
           ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
+          ${(isTeamLead || isAdminOrOplead || userHasCapability('critical_line_analysis')) ? toolBtn('📈', t('btn_critical_line')||'Critical Line Analysis', 'openCriticalLineModal()') : ''}
         </div>
       </div>
     `;
@@ -2535,6 +2540,15 @@ function renderSidebar() {
         </label>` : ''}
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_view_spacing')||'View Spacing'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Row spacing multiplier for calendar and list views.'}</p>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.view_spacing||1)===1?' active':''}" data-action="setViewSpacing" data-arg="1">1×</button>
+          <button class="toggle-btn${p.view_spacing===1.5?' active':''}" data-action="setViewSpacing" data-arg="1.5">1.5×</button>
+          <button class="toggle-btn${p.view_spacing===2?' active':''}" data-action="setViewSpacing" data-arg="2">2×</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_event_icons')||'Event Icons'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefShowEventIcons" ${p.show_event_icons!==false?'checked':''}
@@ -2597,6 +2611,32 @@ function renderSidebar() {
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_event_changes')||'Event changes by other users'}
         </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('artificial_time')||'Artificial Time'}</div>
+        ${hasRole2(state.user?.role, 'teamlead') ? `
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm)">
+            <input type="checkbox" id="settingsArtTimeEnabled" ${ex.artificial_time_enabled?'checked':''}
+              data-action="toggleArtificialTimeSetting" data-event="change"
+              style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('artificial_time_enable')||'Enable artificial time'}
+          </label>
+        </div>
+        <div style="margin-bottom:6px">
+          <input type="datetime-local" id="settingsArtTime" value="${ex.artificial_time ? fmtDateInput(new Date(ex.artificial_time)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveArtificialTimeSetting">${t('btn_save')||'Save'}</button>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:4px">${t('artificial_time_desc')||'Set a custom "current time" for exercise simulation'}</div>
+        ` : `
+        <div style="font-size:var(--fs-sm);color:var(--text)">
+          ${ex.artificial_time_enabled
+            ? `<span style="color:#27AE60">✓ Active</span> — ${ex.artificial_time ? new Date(ex.artificial_time).toLocaleString() : 'Not set'}`
+            : `<span style="color:var(--text-dim)">— Disabled</span>`}
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('artificial_time_readonly')||'Contact a team lead or admin to change artificial time settings.'}</div>
+        `}
       </div>
       ${synthActive() ? `
       <div class="sidebar-section">
@@ -3128,6 +3168,9 @@ async function openProfileModal() {
   setVal('profileRank',        u.rank || '');
   setVal('profileJobRole',     u.job_role || '');
   setVal('profileExpertise',   u.expertise || '');
+  setVal('profileLocation',    u.location || '');
+  setVal('profileLatitude',    u.latitude || '');
+  setVal('profileLongitude',   u.longitude || '');
   // Profile photo
   const preview = document.getElementById('profilePhotoPreview');
   const placeholder = document.getElementById('profilePhotoPlaceholder');
@@ -3271,6 +3314,9 @@ async function saveProfile() {
     job_role:          val('profileJobRole'),
     expertise:         val('profileExpertise'),
     photo_data_url:    photoDataURL,
+    location:          val('profileLocation'),
+    latitude:          parseFloat(val('profileLatitude')) || 0,
+    longitude:         parseFloat(val('profileLongitude')) || 0,
   }).catch(() => {});
 
   // Save language preference
@@ -3797,6 +3843,14 @@ async function setPref(key, value) {
   renderSidebar();
   renderTimeline();
   updateUILabels();
+}
+
+async function setViewSpacing(value) {
+  state.preferences.view_spacing = parseFloat(value) || 1;
+  applyPreferences();
+  await savePreferences();
+  renderSidebar();
+  renderTimeline();
 }
 
 async function setHourPref() {
@@ -5737,7 +5791,8 @@ async function openDecisionLogModal() {
                 <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)">
                 ${t('confidential')||'Confidential'}
               </label>
-              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add')||'Add'}</button>
+              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add')||'Add Decision'}</button>
+              <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
           </div>` : ''}
           <div id="dlEntries" style="font-size:var(--fs-sm)">
@@ -5763,20 +5818,43 @@ async function _loadDecisionLog() {
 
 function _renderDecisionLogEntries() {
   if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
+  const canReview = hasRole2(state.user?.role, 'teamlead');
   return _decisionLogEntries.slice().reverse().map(e => {
     const ts = new Date(e.timestamp).toLocaleString();
     const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
     const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
     const isAdmin = state.user?.role === 'admin';
+    // Status badge for decision requests
+    let statusBadge = '';
+    let reviewSection = '';
+    if (e.status === 'requested') {
+      statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REQUESTED</span>`;
+      if (canReview) {
+        reviewSection = `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
+            style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+          <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-arg-el>✓ Approve</button>
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="rejected" data-arg-el>✗ Reject</button>
+        </div>`;
+      }
+    } else if (e.status === 'approved') {
+      statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">APPROVED</span>`;
+      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+    } else if (e.status === 'rejected') {
+      statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REJECTED</span>`;
+      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+    }
     return `<div style="padding:8px;border-bottom:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span style="font-weight:600">${escHtml(e.display_name || e.user_name)}</span>
           <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
+          ${statusBadge}
         </div>
         ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
       </div>
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
+      ${reviewSection}
     </div>`;
   }).join('');
 }
@@ -5812,6 +5890,42 @@ async function deleteDecisionLogEntry(id) {
   }
 }
 
+async function requestDecision() {
+  const text = document.getElementById('dlNewDecision')?.value?.trim();
+  if (!text) { showError(t('decision_required')||'Decision request text is required'); return; }
+  const logType = document.getElementById('dlLogType')?.value || 'general';
+  const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
+  const confidential = document.getElementById('dlConfidential')?.checked || false;
+  const res = await apiPost('/api/decision-log', {decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested'});
+  if (res.ok) {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+    const inp = document.getElementById('dlNewDecision');
+    if (inp) inp.value = '';
+    showNotification('success', t('decision_requested')||'Decision requested');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to request decision');
+  }
+}
+
+async function reviewDecision(el) {
+  const id = parseInt(el?.dataset?.arg, 10);
+  const status = el?.dataset?.status || 'approved';
+  const comment = document.getElementById('dlReviewComment_' + id)?.value?.trim() || '';
+  const res = await api('PUT', `/api/decision-log/${id}/review`, {status, comment});
+  if (res.ok) {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+    showNotification('success', status === 'approved' ? (t('decision_approved')||'Decision approved') : (t('decision_rejected')||'Decision rejected'));
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to review decision');
+  }
+}
+
 // ── Map Window (detached) ────────────────────────────────────────────────────
 let _mapPopouts = [];
 
@@ -5823,7 +5937,153 @@ function openDetachedMap() {
   if (mapWin) _mapPopouts.push(mapWin);
 }
 
+// ── Critical Line Analysis ──────────────────────────────────────────────────
+function openCriticalLineModal() {
+  const events = (state.events || []).filter(e => !isTypeHidden(e.event_type) && e.start_time);
+  // Build a dependency graph and find the critical path
+  const evMap = {};
+  events.forEach(e => { evMap[e.id] = e; });
+
+  // Find events with dependencies
+  const withDeps = events.filter(e => e.depends_on && e.depends_on.length > 0);
+  // Find event chains (longest path through dependencies)
+  function findLongestPath(evId, visited) {
+    if (visited.has(evId)) return [];
+    visited.add(evId);
+    const ev = evMap[evId];
+    if (!ev) return [];
+    const start = new Date(ev.start_time).getTime();
+    const end = ev.end_time ? new Date(ev.end_time).getTime() : start;
+    const duration = end - start;
+    let longestDown = [];
+    (ev.depends_on || []).forEach(depId => {
+      const path = findLongestPath(depId, new Set(visited));
+      if (path.length > longestDown.length) longestDown = path;
+    });
+    return [...longestDown, { id: evId, title: ev.title, start, end, duration, status: ev.status, type: ev.event_type }];
+  }
+
+  // Find all leaf events (not depended upon by others)
+  const dependedUpon = new Set();
+  events.forEach(e => (e.depends_on || []).forEach(d => dependedUpon.add(d)));
+  const leaves = events.filter(e => !dependedUpon.has(e.id));
+
+  let criticalPath = [];
+  leaves.forEach(ev => {
+    const path = findLongestPath(ev.id, new Set());
+    if (path.length > criticalPath.length) criticalPath = path;
+  });
+
+  // If no dependency chains, show timeline-based analysis
+  const sorted = [...events].sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
+  const totalSpan = sorted.length > 1
+    ? (new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time) - new Date(sorted[0].start_time))
+    : 0;
+
+  // Identify overlapping events (resource conflicts)
+  const overlaps = [];
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i+1; j < sorted.length; j++) {
+      const a = sorted[i], b = sorted[j];
+      const aEnd = new Date(a.end_time || a.start_time);
+      const bStart = new Date(b.start_time);
+      if (aEnd > bStart && a.responsible_id && a.responsible_id === b.responsible_id) {
+        overlaps.push({a, b});
+      }
+    }
+    if (overlaps.length >= 20) break;
+  }
+
+  // Status distribution
+  const statusCounts = {};
+  events.forEach(e => { statusCounts[e.status || 'planned'] = (statusCounts[e.status || 'planned'] || 0) + 1; });
+
+  const fmtDur = ms => {
+    if (ms < 3600000) return Math.round(ms/60000) + ' min';
+    if (ms < 86400000) return (ms/3600000).toFixed(1) + ' h';
+    return (ms/86400000).toFixed(1) + ' d';
+  };
+
+  const html = `
+    <div class="modal-overlay" id="criticalLineModal" style="display:flex">
+      <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>📈 ${t('critical_line_title')||'Critical Line Analysis'}</h2>
+          <button class="modal-close" data-action="closeCriticalLineModal">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+          <div style="margin-bottom:12px">
+            <h3 style="font-size:var(--fs-sm);margin-bottom:6px">Summary</h3>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:var(--fs-sm)">
+              <span style="color:var(--text-dim)">Total events:</span><span>${events.length}</span>
+              <span style="color:var(--text-dim)">Total span:</span><span>${totalSpan > 0 ? fmtDur(totalSpan) : '—'}</span>
+              <span style="color:var(--text-dim)">With dependencies:</span><span>${withDeps.length}</span>
+              <span style="color:var(--text-dim)">Resource conflicts:</span><span style="color:${overlaps.length?'var(--danger)':'var(--text)'}">${overlaps.length}</span>
+            </div>
+          </div>
+          <div style="margin-bottom:12px">
+            <h3 style="font-size:var(--fs-sm);margin-bottom:6px">Status Distribution</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${Object.entries(statusCounts).map(([s,c]) =>
+                `<span style="padding:2px 8px;border-radius:var(--radius);background:var(--bg3);font-size:var(--fs-xs)">${s}: <strong>${c}</strong></span>`
+              ).join('')}
+            </div>
+          </div>
+          ${criticalPath.length > 1 ? `
+          <div style="margin-bottom:12px">
+            <h3 style="font-size:var(--fs-sm);margin-bottom:6px;color:var(--danger)">Critical Path (${criticalPath.length} events)</h3>
+            <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+              ${criticalPath.map((cp,i) => `
+                <div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:var(--fs-xs)">
+                  <span style="font-weight:700;color:var(--accent);min-width:20px">${i+1}</span>
+                  <span style="flex:1">${escHtml(cp.title)}</span>
+                  <span style="color:var(--text-dim)">${fmtDur(cp.duration)}</span>
+                  <span class="role-badge role-${cp.status==='completed'?'admin':cp.status==='active'?'teamlead':'observer'}" style="font-size:10px;padding:1px 5px">${cp.status||'planned'}</span>
+                </div>`).join('')}
+            </div>
+          </div>` : `
+          <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+            <p style="font-size:var(--fs-xs);color:var(--text-dim)">No dependency chains found. Add dependencies between events (via the "Depends On" field) to see the critical path analysis.</p>
+          </div>`}
+          ${overlaps.length ? `
+          <div style="margin-bottom:12px">
+            <h3 style="font-size:var(--fs-sm);margin-bottom:6px;color:#E67E22">Resource Conflicts (${overlaps.length})</h3>
+            ${overlaps.slice(0,10).map(o => `
+              <div style="font-size:var(--fs-xs);padding:4px 0;border-bottom:1px solid var(--border)">
+                <span style="color:var(--danger)">⚠</span>
+                <strong>${escHtml(o.a.title)}</strong> overlaps with <strong>${escHtml(o.b.title)}</strong>
+                ${o.a.responsible_name ? ` (${escHtml(o.a.responsible_name)})` : ''}
+              </div>`).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  _bindActions(document.getElementById('criticalLineModal'));
+}
+
+function closeCriticalLineModal() { closeModal('criticalLineModal'); }
+
 // ── Artificial Time ─────────────────────────────────────────────────────────
+async function toggleArtificialTimeSetting() {
+  const enabled = document.getElementById('settingsArtTimeEnabled')?.checked || false;
+  state.exercise = state.exercise || {};
+  state.exercise.artificial_time_enabled = enabled;
+  await saveExercise();
+  renderSidebar();
+}
+
+async function saveArtificialTimeSetting() {
+  const enabled = document.getElementById('settingsArtTimeEnabled')?.checked || false;
+  const val = document.getElementById('settingsArtTime')?.value;
+  state.exercise = state.exercise || {};
+  state.exercise.artificial_time_enabled = enabled;
+  state.exercise.artificial_time = val ? new Date(val).toISOString() : '';
+  await saveExercise();
+  showNotification('success', t('notif_saved')||'Saved');
+  renderSidebar();
+}
+
 async function setArtificialTime() {
   const val = document.getElementById('exArtificialTime')?.value;
   const enabled = document.getElementById('exArtificialTimeEnabled')?.checked || false;
@@ -6285,7 +6545,8 @@ const DEFAULT_ROLE_CONFIGS = [
 const ALL_CAPABILITIES = [
   'see_groups', 'see_users', 'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
   'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise',
-  'report', 'auto_report'
+  'report', 'auto_report',
+  'decision_log_readwrite', 'confidential_read', 'see_location', 'critical_line_analysis'
 ];
 
 async function openRoleEditor() {
@@ -6319,7 +6580,9 @@ const _ROLE_CAP_LABELS = {
   see_groups:'See Groups', see_users:'See Users',
   view_events:'View Evts', create_events:'Create', edit_own:'Edit Own', edit_all:'Edit All',
   delete_events:'Delete', manage_layers:'Layers', manage_groups:'Manage Groups',
-  manage_users:'Manage Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise'
+  manage_users:'Manage Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise',
+  report:'Report', auto_report:'Auto Rpt',
+  decision_log_readwrite:'Dec.Log RW', confidential_read:'Confid.', see_location:'See Loc.', critical_line_analysis:'Crit.Line'
 };
 
 function _renderRoleEditorTable(roles) {
