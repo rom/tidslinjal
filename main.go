@@ -6429,15 +6429,16 @@ func (app *App) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, user 
 
 func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, user *User) {
 	entries := app.store.GetDecisionLog()
-	// Filter by access: users only see general entries, entries for their groups, and their own private entries
+	// Filter by access: admin sees all; others see general, own, and same-group entries
 	var visible []DecisionLogEntry
 	hasConfidentialRead := userHasCapability(user, "confidential_read")
+	isAdmin := user.Role == RoleAdmin
 	for _, e := range entries {
 		if e.Confidential && !hasConfidentialRead {
 			// Hide the decision text, but show that a confidential entry exists
 			e.Decision = "[CONFIDENTIAL]"
 		}
-		if e.LogType == "general" || e.UserID == user.ID {
+		if isAdmin || e.LogType == "general" || e.UserID == user.ID {
 			visible = append(visible, e)
 		} else if e.LogType == "group" && e.GroupID > 0 {
 			if app.userInGroup(user.ID, e.GroupID) {
@@ -6453,11 +6454,14 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 
 func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Decision     string `json:"decision"`
-		LogType      string `json:"log_type"`
-		GroupID      int64  `json:"group_id"`
-		Confidential bool   `json:"confidential"`
-		Status       string `json:"status"` // "" = decided, "requested" = request for decision
+		Decision          string `json:"decision"`
+		LogType           string `json:"log_type"`
+		GroupID           int64  `json:"group_id"`
+		Confidential      bool   `json:"confidential"`
+		Status            string `json:"status"`              // "" = decided, "requested" = request for decision
+		RequestedOfType   string `json:"requested_of_type"`   // "role" | "group" | "person"
+		RequestedOfValue  string `json:"requested_of_value"`  // role key, group id, or user id
+		RequestedOfLabel  string `json:"requested_of_label"`  // display name
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -6475,21 +6479,24 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		jsonError(w, "status must be empty or 'requested'", http.StatusBadRequest)
 		return
 	}
-	// Check capability
-	if !userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+	// Check capability – admin always allowed
+	if user.Role != RoleAdmin && !userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}
 	entry := DecisionLogEntry{
-		Timestamp:    time.Now(),
-		UserID:       user.ID,
-		UserName:     user.Username,
-		DisplayName:  user.DisplayName,
-		Status:       req.Status,
-		Decision:     req.Decision,
-		LogType:      req.LogType,
-		GroupID:       req.GroupID,
-		Confidential: req.Confidential,
+		Timestamp:         time.Now(),
+		UserID:            user.ID,
+		UserName:          user.Username,
+		DisplayName:       user.DisplayName,
+		Status:            req.Status,
+		Decision:          req.Decision,
+		LogType:           req.LogType,
+		GroupID:            req.GroupID,
+		Confidential:      req.Confidential,
+		RequestedOfType:   req.RequestedOfType,
+		RequestedOfValue:  req.RequestedOfValue,
+		RequestedOfLabel:  req.RequestedOfLabel,
 	}
 	created, err := app.store.AddDecisionLogEntry(entry)
 	if err != nil {

@@ -127,7 +127,7 @@ function applyPreferences() {
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
-  if (state.preferences.hover_zoom_enabled) body.classList.add('hover-zoom-enabled');
+  if (state.preferences.hover_zoom_enabled !== false) body.classList.add('hover-zoom-enabled');
   // Apply view spacing
   const spacing = state.preferences.view_spacing || 1;
   document.documentElement.style.setProperty('--view-spacing', spacing);
@@ -1987,7 +1987,7 @@ function renderSidebar() {
         <div class="sidebar-section-title">${t('tab_audit')}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
           <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="oninput">
-          <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
+          <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
             <option value="">All actions</option>
             <option value="created">created</option>
             <option value="updated">updated</option>
@@ -1999,9 +1999,9 @@ function renderSidebar() {
           </select>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
-          <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
+          <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
           <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
-          <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="onchange">
+          <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
           <button class="btn btn-secondary btn-sm" data-action="exportAuditCSV" title="Export to CSV">⬇ CSV</button>
         </div>
         <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
@@ -2526,6 +2526,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
+          ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -2538,7 +2539,6 @@ function renderSidebar() {
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
           ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
           ${role === 'admin' ? toolBtn('🔄', 'Gradual Backup', 'openGradualBackupModal()') : ''}
-          ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
         </div>
       </div>
     `;
@@ -2582,10 +2582,10 @@ function renderSidebar() {
         <div class="hour-range" style="margin-top:10px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_day_hours')}:</span>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
-          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH" style="width:52px" data-action="setHourPref" data-event="onchange">
+          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH" style="width:52px" data-action="setHourPref" data-event="change">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">–</label>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_end')}</label>
-          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" data-action="setHourPref" data-event="onchange">
+          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH" style="width:52px" data-action="setHourPref" data-event="change">
         </div>
         <div style="margin-top:10px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_timezone')||'Timezone'}:</span>
@@ -2636,10 +2636,10 @@ function renderSidebar() {
         <div class="hour-range" style="margin-bottom:6px">
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_day_hours')}:</span>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
-          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH2" style="width:52px" data-action="setHourPref" data-event="onchange">
+          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH2" style="width:52px" data-action="setHourPref" data-event="change">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">–</label>
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_end')}</label>
-          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH2" style="width:52px" data-action="setHourPref" data-event="onchange">
+          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH2" style="width:52px" data-action="setHourPref" data-event="change">
         </div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
           <input type="checkbox" id="prefIncludeWeekends2" ${(ex.include_weekends!==false)?'checked':''}
@@ -2661,8 +2661,8 @@ function renderSidebar() {
         </label>` : ''}
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_view_spacing')||'View Spacing'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Row spacing multiplier for calendar and list views.'}</p>
+        <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Vertical spacing multiplier for timeline rows.'}</p>
         <div class="toggle-btn-group">
           <button class="toggle-btn${(p.view_spacing||1)===1?' active':''}" data-action="setViewSpacing" data-arg="1">1×</button>
           <button class="toggle-btn${p.view_spacing===1.5?' active':''}" data-action="setViewSpacing" data-arg="1.5">1.5×</button>
@@ -2681,7 +2681,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_hover_zoom')||'Hover Zoom'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
-          <input type="checkbox" id="prefHoverZoom" ${p.hover_zoom_enabled?'checked':''}
+          <input type="checkbox" id="prefHoverZoom" ${p.hover_zoom_enabled!==false?'checked':''}
             data-action="setPref" data-event="change" data-pref-checked="hover_zoom_enabled"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_hover_zoom_desc')||'Enlarge calendar events on hover'}
@@ -2690,7 +2690,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_red_line')||'Current-time Line'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
-          <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} data-action="setRedLinePref" data-event="onchange"
+          <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} data-action="setRedLinePref" data-event="change"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_red_line_enabled')||'Show current-time line'}
         </label>
@@ -2701,13 +2701,13 @@ function renderSidebar() {
         </label>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center;font-size:var(--fs-xs);color:var(--text-dim)">
           <span>${t('settings_red_line_color')||'Color'}:</span>
-          <input type="color" id="prefLineColor" value="${p.red_line_color||'#E74C3C'}" data-action="setRedLinePref" data-event="onchange"
+          <input type="color" id="prefLineColor" value="${p.red_line_color||'#E74C3C'}" data-action="setRedLinePref" data-event="change"
             style="width:32px;height:22px;padding:0;border:none;background:transparent;cursor:pointer">
           <span>${t('settings_red_line_width')||'Width'}:</span>
-          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||2}" data-action="setRedLinePref" data-event="onchange"
+          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||2}" data-action="setRedLinePref" data-event="change"
             style="width:52px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
           <span>${t('settings_red_line_style')||'Style'}:</span>
-          <select id="prefLineStyle" data-action="setRedLinePref" data-event="onchange"
+          <select id="prefLineStyle" data-action="setRedLinePref" data-event="change"
             style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
             <option value="solid" ${(p.red_line_style||'solid')==='solid'?'selected':''}>Solid</option>
             <option value="dashed" ${p.red_line_style==='dashed'?'selected':''}>Dashed</option>
@@ -6060,12 +6060,13 @@ let _decisionLogEntries = [];
 async function openDecisionLogModal() {
   await _loadDecisionLog();
   const groups = state.groups || [];
-  const canWrite = hasRole2(state.user?.role, 'teamlead') || userHasCapability('decision_log_readwrite');
+  const canWrite = state.user?.role === 'admin' || hasRole2(state.user?.role, 'teamlead') || userHasCapability('decision_log_readwrite');
   const html = `
     <div class="modal-overlay" id="decisionLogModal">
       <div class="modal" style="max-width:700px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
           <h2>📋 ${t('decision_log_title')||'Decision Log'}</h2>
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto;margin-right:8px;font-size:11px;padding:2px 8px" data-action="openDetachedDecisionLog" title="${t('detach_window')||'Open in separate window'}">⧉ ${t('btn_detach')||'Detach'}</button>
           <button class="modal-close" data-action="closeDecisionLogModal">✕</button>
         </div>
         <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
@@ -6089,6 +6090,19 @@ async function openDecisionLogModal() {
               <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add')||'Add Decision'}</button>
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
+            <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+              <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">${t('request_decision_to')||'Request decision from'}:</div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <select id="dlTargetType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                  <option value="">${t('anyone')||'Anyone'}</option>
+                  <option value="role">${t('role')||'Role'}</option>
+                  <option value="group">${t('group')||'Group'}</option>
+                  <option value="person">${t('person')||'Person'}</option>
+                </select>
+                <select id="dlTargetValue" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:120px">
+                </select>
+              </div>
+            </div>
           </div>` : ''}
           <div id="dlEntries" style="font-size:var(--fs-sm)">
             ${_renderDecisionLogEntries()}
@@ -6106,6 +6120,26 @@ async function openDecisionLogModal() {
   const groupIdEl = document.getElementById('dlGroupId');
   if (logTypeEl && groupIdEl) {
     logTypeEl.onchange = () => { groupIdEl.style.display = logTypeEl.value === 'group' ? '' : 'none'; };
+  }
+  // Request Decision target selector logic
+  const targetTypeEl = document.getElementById('dlTargetType');
+  const targetValueEl = document.getElementById('dlTargetValue');
+  if (targetTypeEl && targetValueEl) {
+    targetTypeEl.onchange = () => {
+      const tt = targetTypeEl.value;
+      if (!tt) { targetValueEl.style.display = 'none'; return; }
+      targetValueEl.style.display = '';
+      let opts = '';
+      if (tt === 'role') {
+        const roles = ['admin','oplead','staffofficer','teamlead','teammember','readwrite','reporter','read','observer'];
+        opts = roles.map(r => `<option value="${r}">${r}</option>`).join('');
+      } else if (tt === 'group') {
+        opts = (state.groups || []).map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
+      } else if (tt === 'person') {
+        opts = (state.users || []).map(u => `<option value="${u.id}">${escHtml(u.display_name || u.username)}</option>`).join('');
+      }
+      targetValueEl.innerHTML = opts;
+    };
   }
 }
 
@@ -6130,7 +6164,8 @@ function _renderDecisionLogEntries() {
     let statusBadge = '';
     let reviewSection = '';
     if (e.status === 'requested') {
-      statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REQUESTED</span>`;
+      const targetInfo = e.requested_of_label ? ` → ${escHtml(e.requested_of_label)}` : '';
+      statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REQUESTED${targetInfo}</span>`;
       if (canReview) {
         reviewSection = `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
@@ -6193,18 +6228,33 @@ async function deleteDecisionLogEntry(id) {
 }
 
 async function requestDecision() {
+  // Show target selector panel if hidden
+  const targetPanel = document.getElementById('dlRequestTarget');
+  if (targetPanel && targetPanel.style.display === 'none') {
+    targetPanel.style.display = '';
+    return;
+  }
   const text = document.getElementById('dlNewDecision')?.value?.trim();
   if (!text) { showError(t('decision_required')||'Decision request text is required'); return; }
   const logType = document.getElementById('dlLogType')?.value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
   const confidential = document.getElementById('dlConfidential')?.checked || false;
-  const res = await apiPost('/api/decision-log', {decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested'});
+  // Target info
+  const targetType = document.getElementById('dlTargetType')?.value || '';
+  const targetValueEl = document.getElementById('dlTargetValue');
+  const targetValue = targetType ? (targetValueEl?.value || '') : '';
+  const targetLabel = targetType ? (targetValueEl?.selectedOptions?.[0]?.textContent || targetValue) : '';
+  const res = await apiPost('/api/decision-log', {
+    decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested',
+    requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel
+  });
   if (res.ok) {
     await _loadDecisionLog();
     const el = document.getElementById('dlEntries');
     if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
     const inp = document.getElementById('dlNewDecision');
     if (inp) inp.value = '';
+    if (targetPanel) targetPanel.style.display = 'none';
     showNotification('success', t('decision_requested')||'Decision requested');
   } else {
     const err = await res.json().catch(() => ({}));
@@ -6226,6 +6276,15 @@ async function reviewDecision(el) {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to review decision');
   }
+}
+
+// ── Decision Log Window (detached) ───────────────────────────────────────────
+function openDetachedDecisionLog() {
+  const w = Math.min(window.screen.availWidth, 800);
+  const h = Math.min(window.screen.availHeight - 100, 600);
+  window.open('/static/decision-log-popup.html', 'tidslinjal-decisionlog-' + Date.now(),
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  closeDecisionLogModal();
 }
 
 // ── Map Window (detached) ────────────────────────────────────────────────────
