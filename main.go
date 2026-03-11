@@ -3069,6 +3069,142 @@ func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *
 	jsonOK(w, created)
 }
 
+func (app *App) handleGetLogBook(w http.ResponseWriter, r *http.Request, user *User) {
+	entries := app.store.GetLogBook()
+	if entries == nil {
+		entries = []LogBookEntry{}
+	}
+	jsonOK(w, entries)
+}
+
+func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Category string `json:"category"`
+		Subject  string `json:"subject"`
+		Body     string `json:"body"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Subject == "" {
+		jsonError(w, "subject required", http.StatusBadRequest)
+		return
+	}
+	if req.Category == "" {
+		req.Category = "other"
+	}
+	entry := LogBookEntry{
+		UserID:      user.ID,
+		UserName:    user.Username,
+		DisplayName: user.DisplayName,
+		Category:    req.Category,
+		Subject:     req.Subject,
+		Body:        req.Body,
+	}
+	created, err := app.store.AddLogBookEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to add log book entry", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "created", EntityType: "log_book", EntityID: created.ID,
+		Summary: fmt.Sprintf("Log book entry: [%s] %s", req.Category, req.Subject),
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (app *App) handleDeleteLogBookEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteLogBookEntry(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "deleted", EntityType: "log_book", EntityID: id,
+		Summary: fmt.Sprintf("Deleted log book entry #%d", id),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleLogBookAttachment(w http.ResponseWriter, r *http.Request, user *User) {
+	// Extract ID from path: /api/log-book/{id}/attachment
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/log-book/"), "/")
+	if len(parts) < 1 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonError(w, "file field missing", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	safeFilename := filepath.Base(header.Filename)
+	if safeFilename == "." || safeFilename == "/" {
+		safeFilename = "upload"
+	}
+	storedName := fmt.Sprintf("lb_%d_%d_%s", id, time.Now().UnixNano(), safeFilename)
+	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	written, err := io.Copy(dst, file)
+	dst.Close()
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	att := LogBookAttachment{
+		Filename:   safeFilename,
+		StoredName: storedName,
+		Size:       written,
+		MimeType:   header.Header.Get("Content-Type"),
+	}
+	if err := app.store.AddLogBookAttachment(id, att); err != nil {
+		os.Remove(destPath)
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(att)
+}
+
+func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/log-book/{id}/attachment/{filename}
+	path := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
+	parts := strings.SplitN(path, "/attachment/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	storedName := filepath.Base(parts[1])
+	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
+	http.ServeFile(w, r, filePath)
+}
+
 func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *User) {
 	q := r.URL.Query()
 	limit := 500
@@ -5192,6 +5328,30 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Log Book
+	mux.HandleFunc("/api/log-book", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetLogBook)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleAddLogBookEntry)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/log-book/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if r.Method == http.MethodDelete && !strings.Contains(path, "/attachment") {
+			app.requireRole(RoleTeamLead, app.handleDeleteLogBookEntry)(w, r)
+		} else if r.Method == http.MethodPost && strings.Contains(path, "/attachment") {
+			app.requireAuth(app.handleLogBookAttachment)(w, r)
+		} else if r.Method == http.MethodGet && strings.Contains(path, "/attachment/") {
+			app.handleLogBookAttachmentDownload(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Map Locations
 	mux.HandleFunc("/api/map-locations", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -6540,6 +6700,7 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 
 func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
+		Title             string `json:"title"`
 		Decision          string `json:"decision"`
 		LogType           string `json:"log_type"`
 		GroupID           int64  `json:"group_id"`
@@ -6548,6 +6709,9 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		RequestedOfType   string `json:"requested_of_type"`   // "role" | "group" | "person"
 		RequestedOfValue  string `json:"requested_of_value"`  // role key, group id, or user id
 		RequestedOfLabel  string `json:"requested_of_label"`  // display name
+		ExecutorType      string `json:"executor_type"`       // "role" | "group" | "person"
+		ExecutorValue     string `json:"executor_value"`
+		ExecutorLabel     string `json:"executor_label"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -6576,6 +6740,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		UserID:            user.ID,
 		UserName:          user.Username,
 		DisplayName:       user.DisplayName,
+		Title:             req.Title,
 		Status:            req.Status,
 		Decision:          req.Decision,
 		LogType:           req.LogType,
@@ -6584,6 +6749,9 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		RequestedOfType:   req.RequestedOfType,
 		RequestedOfValue:  req.RequestedOfValue,
 		RequestedOfLabel:  req.RequestedOfLabel,
+		ExecutorType:      req.ExecutorType,
+		ExecutorValue:     req.ExecutorValue,
+		ExecutorLabel:     req.ExecutorLabel,
 	}
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
@@ -6596,9 +6764,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Generate sequence number from exercise name + sequential ID
-	seqPrefix := "DEC"
+	seqPrefix := "decision"
 	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
-		// Use uppercase abbreviation of exercise name
 		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
 		if len(abbr) > 20 {
 			abbr = abbr[:20]
@@ -6618,6 +6785,24 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		Action: auditAction, EntityType: "decision_log", EntityID: created.ID,
 		Summary: auditSummary,
 	})
+	// Notify executor via SSE if a person is assigned
+	if req.ExecutorType == "person" && req.ExecutorValue != "" {
+		execID, _ := strconv.ParseInt(req.ExecutorValue, 10, 64)
+		if execID > 0 {
+			titleInfo := created.SequenceNumber
+			if created.Title != "" {
+				titleInfo = created.Title + " (" + created.SequenceNumber + ")"
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"decision_id":     created.ID,
+				"sequence_number": created.SequenceNumber,
+				"title":           titleInfo,
+				"assigned_by":     user.DisplayName,
+				"executor_id":     execID,
+			})
+			app.broker.BroadcastAll(SSEMessage{Event: "decision_assigned", Data: string(payload)})
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
@@ -7491,7 +7676,7 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"comments.json", "phases.json", "templates.json", "roles.json",
 		"registration.json", "invitations.json", "oidc.json", "mail.json",
 		"apikeys.json", "filter_presets.json", "event_versions.json",
-		"decision_log.json", "event_log.json",
+		"decision_log.json", "event_log.json", "log_book.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)

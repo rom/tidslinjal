@@ -488,7 +488,7 @@ let _countdowns = []; // { id, label, targetTime, totalMs, continueUp, playSound
 let _nextCountdownId = 1;
 let _cdAudioCtx = null;
 
-function addCountdown(label, hours, minutes, seconds, continueUp, playSound) {
+function addCountdown(label, hours, minutes, seconds, continueUp, playSound, soundType) {
   const totalMs = ((hours * 3600) + (minutes * 60) + seconds) * 1000;
   if (totalMs <= 0) return;
   const cd = {
@@ -498,6 +498,7 @@ function addCountdown(label, hours, minutes, seconds, continueUp, playSound) {
     totalMs: totalMs,
     continueUp: continueUp,
     playSound: playSound,
+    soundType: soundType || 'beep',
     paused: false,
     pausedRemaining: 0,
     acknowledged: false,
@@ -633,22 +634,48 @@ setInterval(tick,200);tick();
   w.document.close();
 }
 
-function playCdAlarm() {
+function playCdAlarm(soundType) {
   try {
     if (!_cdAudioCtx) _cdAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = _cdAudioCtx;
-    // Play a series of beeps
-    for (let i = 0; i < 3; i++) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.type = 'square';
-      gain.gain.value = 0.15;
-      const t = ctx.currentTime + i * 0.3;
-      osc.start(t);
-      osc.stop(t + 0.15);
+    const type = soundType || 'beep';
+    if (type === 'beep') {
+      for (let i = 0; i < 3; i++) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880; o.type = 'square'; g.gain.value = 0.15;
+        const t = ctx.currentTime + i * 0.3; o.start(t); o.stop(t + 0.15);
+      }
+    } else if (type === 'klaxon') {
+      for (let i = 0; i < 4; i++) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = i % 2 === 0 ? 440 : 550; o.type = 'sawtooth'; g.gain.value = 0.2;
+        const t = ctx.currentTime + i * 0.4; o.start(t); o.stop(t + 0.35);
+      }
+    } else if (type === 'bell') {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 830; o.type = 'sine'; g.gain.value = 0.3;
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 2);
+    } else if (type === 'siren') {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sawtooth'; g.gain.value = 0.15;
+      o.frequency.setValueAtTime(400, ctx.currentTime);
+      o.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.5);
+      o.frequency.linearRampToValueAtTime(400, ctx.currentTime + 1.0);
+      o.frequency.linearRampToValueAtTime(800, ctx.currentTime + 1.5);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + 2);
+    } else if (type === 'chime') {
+      [523, 659, 784].forEach((freq, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = freq; o.type = 'sine'; g.gain.value = 0.2;
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.3 + 0.8);
+        o.start(ctx.currentTime + i * 0.3); o.stop(ctx.currentTime + i * 0.3 + 0.8);
+      });
     }
   } catch(e) {}
 }
@@ -726,7 +753,7 @@ function tickCountdowns() {
       // Expired
       if (!cd.expired) {
         cd.expired = true;
-        if (cd.playSound) playCdAlarm();
+        if (cd.playSound) playCdAlarm(cd.soundType);
         renderCountdowns(); // Re-render for expired styling
       }
       if (cd.continueUp) {
@@ -819,7 +846,8 @@ document.getElementById('cdStart').addEventListener('click', function() {
   const seconds = parseInt(document.getElementById('cdSeconds').value, 10) || 0;
   const continueUp = document.getElementById('cdContinueUp').checked;
   const playSound = document.getElementById('cdPlaySound').checked;
-  addCountdown(label, hours, minutes, seconds, continueUp, playSound);
+  const soundType = document.getElementById('cdSoundType')?.value || 'beep';
+  addCountdown(label, hours, minutes, seconds, continueUp, playSound, soundType);
   hideCountdownPopover();
   // Reset form
   document.getElementById('cdLabel').value = '';
@@ -827,6 +855,17 @@ document.getElementById('cdStart').addEventListener('click', function() {
   document.getElementById('cdMinutes').value = '30';
   document.getElementById('cdSeconds').value = '0';
 });
+// Sound preview
+document.getElementById('cdSoundPreview')?.addEventListener('click', function() {
+  const st = document.getElementById('cdSoundType')?.value || 'beep';
+  playCdAlarm(st);
+});
+// Sound row show/hide based on checkbox
+document.getElementById('cdPlaySound')?.addEventListener('change', function() {
+  const row = document.getElementById('cdSoundRow');
+  if (row) row.style.display = this.checked ? '' : 'none';
+});
+
 document.querySelectorAll('.cd-preset').forEach(function(btn) {
   btn.addEventListener('click', function() {
     const h = parseInt(btn.dataset.h, 10) || 0;

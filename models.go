@@ -239,6 +239,10 @@ type UserPreferences struct {
 	ExtraClocks     []ExtraClock `json:"extra_clocks,omitempty"`   // additional timezone clocks
 	ShowEventIcons  *bool        `json:"show_event_icons,omitempty"` // nil = true (default on)
 	ViewSpacing     float64      `json:"view_spacing,omitempty"`     // 1 | 1.5 | 2 — row spacing multiplier
+	ShowDayOfYear   bool         `json:"show_day_of_year,omitempty"` // show day-of-year number on calendar
+	ShowWeekNumbers bool         `json:"show_week_numbers,omitempty"` // show week numbers on calendar
+	WeekNumberStyle string       `json:"week_number_style,omitempty"` // "iso" (1-52) or "year_week" (Y-WW)
+	PushEventChanges *bool       `json:"push_event_changes,omitempty"` // browser notifications for event changes
 }
 
 // Group is a named set of users used for layer sharing
@@ -689,8 +693,13 @@ type DecisionLogEntry struct {
 	UserID         int64     `json:"user_id"`
 	UserName       string    `json:"user_name"`
 	DisplayName    string    `json:"display_name"`
-	Decision       string    `json:"decision"`       // free text
+	Title          string    `json:"title,omitempty"` // short decision title
+	Decision       string    `json:"decision"`        // free text (decision body)
 	LogType        string    `json:"log_type"`        // private | group | general
+	// Executor: person/role/group assigned to execute the decision
+	ExecutorType   string    `json:"executor_type,omitempty"`  // "role" | "group" | "person"
+	ExecutorValue  string    `json:"executor_value,omitempty"` // role key, group id, or user id
+	ExecutorLabel  string    `json:"executor_label,omitempty"` // display name
 	GroupID        int64     `json:"group_id,omitempty"` // if log_type=group
 	Confidential   bool      `json:"confidential"`    // only visible to users with confidential_read right
 	// Decision request workflow
@@ -799,6 +808,26 @@ type GradualBackupSnapshot struct {
 }
 
 // EventLogEntry represents an external event received via pub/sub or webhook
+// LogBookEntry represents a single entry in the staff log book (stabsloggbok)
+type LogBookEntry struct {
+	ID          int64                `json:"id"`
+	Timestamp   time.Time            `json:"timestamp"`
+	UserID      int64                `json:"user_id"`
+	UserName    string               `json:"user_name"`
+	DisplayName string               `json:"display_name"`
+	Category    string               `json:"category"` // incoming|outgoing|incident|directive|decision|action|briefing|situation|meeting|other
+	Subject     string               `json:"subject"`
+	Body        string               `json:"body"`
+	Attachments []LogBookAttachment  `json:"attachments,omitempty"`
+}
+
+type LogBookAttachment struct {
+	Filename   string `json:"filename"`
+	StoredName string `json:"stored_name"`
+	Size       int64  `json:"size"`
+	MimeType   string `json:"mime_type,omitempty"`
+}
+
 type EventLogEntry struct {
 	ID        int64     `json:"id"`
 	Timestamp time.Time `json:"timestamp"`

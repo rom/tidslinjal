@@ -1512,10 +1512,20 @@
 
 <!-- Task-Time Matrix Modal -->
 <div class="modal-overlay" id="taskTimeMatrixModal">
-  <div class="modal modal-wide" style="max-width:960px">
+  <div class="modal modal-wide" style="max-width:95vw;width:1400px">
     <div class="modal-header">
-      <h2>📊 Task-Time Matrix</h2>
+      <h2 data-i18n="btn_task_time_matrix">📊 Task-Time Matrix</h2>
       <button class="modal-close" data-close-modal="taskTimeMatrixModal">&times;</button>
+    </div>
+    <div style="padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);font-size:var(--fs-xs)">
+      <label style="color:var(--text-dim)" data-i18n="ttm_from">From:</label>
+      <input type="date" id="ttmDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+      <label style="color:var(--text-dim)" data-i18n="ttm_to">To:</label>
+      <input type="date" id="ttmDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+      <button class="btn btn-sm btn-primary" id="ttmApplyDates" data-i18n="btn_apply">Apply</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-sm btn-secondary" id="ttmDetach" title="Detach to window">⧉</button>
+      <button class="btn btn-sm btn-secondary" id="ttmPrint" title="Print report">🖨</button>
     </div>
     <div class="modal-body" style="overflow:auto;max-height:70vh">
       <div id="taskTimeMatrixContent">
@@ -1523,7 +1533,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-close-modal="taskTimeMatrixModal">Close</button>
+      <button class="btn btn-secondary" data-close-modal="taskTimeMatrixModal" data-i18n="btn_close">Close</button>
     </div>
   </div>
 </div>

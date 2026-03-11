@@ -199,9 +199,29 @@ function renderTimeline() {
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);
     const weekendCls = (excludeWeekends && isWeekend) ? ' weekend-excluded' : (isWeekend ? ' weekend' : '');
+    // Day-of-year number
+    let doyHtml = '';
+    if (state.preferences.show_day_of_year) {
+      const start = new Date(day.getFullYear(), 0, 0);
+      const diff = day - start;
+      const oneDay = 86400000;
+      const doy = Math.floor(diff / oneDay);
+      doyHtml = `<span style="font-size:.6em;color:var(--text-dim);margin-left:2px">[${doy}]</span>`;
+    }
+    // Week number
+    let weekHtml = '';
+    if (state.preferences.show_week_numbers && day.getDay() === 1) {
+      const d = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+      const style = state.preferences.week_number_style;
+      const label = style === 'year_week' ? (day.getFullYear() % 10) + '-W' + String(weekNo).padStart(2,'0') : 'W' + weekNo;
+      weekHtml = `<div style="font-size:.55em;color:var(--accent);font-weight:700">${label}</div>`;
+    }
     html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" data-center-day="${day.toISOString()}" title="Click to center this day" style="cursor:pointer">
-      <div class="tl-day-name">${dayName}</div>
-      <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}</div>
+      <div class="tl-day-name">${dayName}${doyHtml}</div>
+      <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}${weekHtml}</div>
     </div>`;
   });
 
