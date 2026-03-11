@@ -120,9 +120,10 @@ type User struct {
 	// Blocked: admin can block a user from logging in (even via OIDC)
 	Blocked bool `json:"blocked,omitempty"`
 	// Location: user's physical location (free text, e.g. "Stockholm, Sweden")
-	Location  string  `json:"location,omitempty"`
-	Latitude  float64 `json:"latitude,omitempty"`
-	Longitude float64 `json:"longitude,omitempty"`
+	Location     string `json:"location,omitempty"`
+	Latitude     float64 `json:"latitude,omitempty"`
+	Longitude    float64 `json:"longitude,omitempty"`
+	Availability string `json:"availability,omitempty"` // free | busy | dnd | away
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
@@ -156,6 +157,7 @@ type UserPublic struct {
 	Location         string     `json:"location,omitempty"`
 	Latitude         float64    `json:"latitude,omitempty"`
 	Longitude        float64    `json:"longitude,omitempty"`
+	Availability     string     `json:"availability,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -187,6 +189,7 @@ func (u *User) Public() UserPublic {
 		Location:         u.Location,
 		Latitude:         u.Latitude,
 		Longitude:        u.Longitude,
+		Availability:     u.Availability,
 	}
 }
 
@@ -318,6 +321,11 @@ type Event struct {
 	// Latitude/Longitude for physical events with map location
 	Latitude  *float64 `json:"latitude,omitempty"`
 	Longitude *float64 `json:"longitude,omitempty"`
+	// Room/resource booking
+	RoomID    *int64  `json:"room_id,omitempty"`
+	RoomName  string  `json:"room_name,omitempty"`
+	// Virtual meeting auto-creation
+	MeetingURL string `json:"meeting_url,omitempty"` // auto-generated Teams/Zoom link
 }
 
 // EventComment is a comment on an event
@@ -575,6 +583,71 @@ type OIDCPersistentConfig struct {
 	RedirectURL  string `json:"redirect_url,omitempty"`
 	Exclusive    bool   `json:"exclusive"`
 	DefaultRole  string `json:"default_role,omitempty"` // teammember | teamlead | oplead
+}
+
+// FederatedIdP represents an external identity provider for partner organizations
+type FederatedIdP struct {
+	ID           string `json:"id"`            // unique slug, e.g. "partner-nato"
+	Name         string `json:"name"`          // display name, e.g. "NATO Partner SSO"
+	Protocol     string `json:"protocol"`      // oidc | saml
+	Issuer       string `json:"issuer"`        // OIDC issuer URL or SAML entity ID
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret,omitempty"`
+	RedirectURL  string `json:"redirect_url,omitempty"`
+	MetadataURL  string `json:"metadata_url,omitempty"` // SAML metadata URL
+	Enabled      bool   `json:"enabled"`
+	TrustRealm   string `json:"trust_realm"`            // e.g. "nato", "eu", "partner-org"
+	DefaultRole  string `json:"default_role,omitempty"`  // role for auto-provisioned users
+	AllowedDomains []string `json:"allowed_domains,omitempty"` // restrict by email domain
+}
+
+// TrustRealm defines a logical trust boundary for partner access
+type TrustRealm struct {
+	ID          string   `json:"id"`           // unique slug
+	Name        string   `json:"name"`         // display name
+	Description string   `json:"description,omitempty"`
+	MaxRole     string   `json:"max_role"`     // highest role users from this realm can have
+	Capabilities []string `json:"capabilities,omitempty"` // allowed capabilities for realm users
+	IdPIDs      []string `json:"idp_ids"`      // which IdPs belong to this realm
+}
+
+// Room represents a bookable resource (meeting room, vehicle, equipment, etc.)
+type Room struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`       // room | vehicle | equipment
+	Location    string    `json:"location,omitempty"`
+	Capacity    int       `json:"capacity,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Equipment   []string  `json:"equipment,omitempty"` // projector, whiteboard, etc.
+	Enabled     bool      `json:"enabled"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// RoomBooking represents a reservation of a room/resource for a time period
+type RoomBooking struct {
+	ID        int64      `json:"id"`
+	RoomID    int64      `json:"room_id"`
+	RoomName  string     `json:"room_name"`
+	EventID   *int64     `json:"event_id,omitempty"` // linked event (optional)
+	Title     string     `json:"title"`
+	StartTime time.Time  `json:"start_time"`
+	EndTime   time.Time  `json:"end_time"`
+	BookedBy  int64      `json:"booked_by"`
+	BookedByName string  `json:"booked_by_name"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// MeetingConfig stores auto-creation settings for virtual meetings
+type MeetingConfig struct {
+	TeamsEnabled   bool   `json:"teams_enabled"`
+	TeamsTenantID  string `json:"teams_tenant_id,omitempty"`
+	TeamsClientID  string `json:"teams_client_id,omitempty"`
+	TeamsSecret    string `json:"teams_secret,omitempty"`
+	ZoomEnabled    bool   `json:"zoom_enabled"`
+	ZoomAccountID  string `json:"zoom_account_id,omitempty"`
+	ZoomClientID   string `json:"zoom_client_id,omitempty"`
+	ZoomSecret     string `json:"zoom_secret,omitempty"`
 }
 
 // ExerciseSettings controls synthetic time display across the application

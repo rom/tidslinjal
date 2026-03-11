@@ -4471,7 +4471,9 @@ func (app *App) routes() http.Handler {
 	// Pages
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
-			http.NotFound(w, r)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+			http.ServeFile(w, r, "static/404.html")
 			return
 		}
 		_, user := app.getSession(r)
@@ -5285,6 +5287,75 @@ func (app *App) routes() http.Handler {
 	})
 	mux.HandleFunc("/api/integrations/ldap/test", func(w http.ResponseWriter, r *http.Request) {
 		app.requireRole(RoleAdmin, app.handleLDAPTest)(w, r)
+	})
+
+	// ── Federated IdPs / Trust Realms (admin only) ──
+	mux.HandleFunc("/api/federation/idps", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleListFederatedIdPs)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveFederatedIdP)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/federation/idps/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleDeleteFederatedIdP)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/federation/realms", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleListTrustRealms)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveTrustRealm)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Rooms / Resources ──
+	mux.HandleFunc("/api/rooms", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListRooms)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleTeamLead, app.handleSaveRoom)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/rooms/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleTeamLead, app.handleDeleteRoom)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Free/Busy lookup ──
+	mux.HandleFunc("/api/free-busy", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleFreeBusy)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Meeting config (admin only) ──
+	mux.HandleFunc("/api/meeting-config", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetMeetingConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveMeetingConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	// ── Prometheus metrics (no auth — standard for metrics endpoints) ──
@@ -6624,6 +6695,228 @@ func (app *App) handleSaveConnectorConfig(w http.ResponseWriter, r *http.Request
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// ── Federated IdP handlers ─────────────────────────────────────────────────────
+
+func (app *App) handleListFederatedIdPs(w http.ResponseWriter, r *http.Request, user *User) {
+	idps := app.store.GetFederatedIdPs()
+	if idps == nil {
+		idps = []FederatedIdP{}
+	}
+	// Strip secrets before sending to frontend
+	safe := make([]FederatedIdP, len(idps))
+	copy(safe, idps)
+	for i := range safe {
+		safe[i].ClientSecret = ""
+	}
+	jsonOK(w, safe)
+}
+
+func (app *App) handleSaveFederatedIdP(w http.ResponseWriter, r *http.Request, user *User) {
+	var idp FederatedIdP
+	if err := decode(r, &idp); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if idp.ID == "" || idp.Name == "" {
+		jsonError(w, "id and name required", http.StatusBadRequest)
+		return
+	}
+	if idp.Protocol != "oidc" && idp.Protocol != "saml" {
+		jsonError(w, "protocol must be oidc or saml", http.StatusBadRequest)
+		return
+	}
+	// If no secret provided, preserve existing one
+	if idp.ClientSecret == "" {
+		existing := app.store.GetFederatedIdPs()
+		for _, e := range existing {
+			if e.ID == idp.ID {
+				idp.ClientSecret = e.ClientSecret
+				break
+			}
+		}
+	}
+	if err := app.store.SaveFederatedIdP(idp); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "federated_idp", EntityID: 0,
+		Summary: fmt.Sprintf("Updated federated IdP: %s (%s)", idp.Name, idp.Protocol),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleDeleteFederatedIdP(w http.ResponseWriter, r *http.Request, user *User) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/federation/idps/")
+	if id == "" {
+		jsonError(w, "id required", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteFederatedIdP(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "deleted", EntityType: "federated_idp", EntityID: 0,
+		Summary: fmt.Sprintf("Deleted federated IdP: %s", id),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleListTrustRealms(w http.ResponseWriter, r *http.Request, user *User) {
+	realms := app.store.GetTrustRealms()
+	if realms == nil {
+		realms = []TrustRealm{}
+	}
+	jsonOK(w, realms)
+}
+
+func (app *App) handleSaveTrustRealm(w http.ResponseWriter, r *http.Request, user *User) {
+	var realm TrustRealm
+	if err := decode(r, &realm); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if realm.ID == "" || realm.Name == "" {
+		jsonError(w, "id and name required", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveTrustRealm(realm); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Room / Resource handlers ───────────────────────────────────────────────────
+
+func (app *App) handleListRooms(w http.ResponseWriter, r *http.Request, user *User) {
+	rooms := app.store.GetRooms()
+	if rooms == nil {
+		rooms = []Room{}
+	}
+	jsonOK(w, rooms)
+}
+
+func (app *App) handleSaveRoom(w http.ResponseWriter, r *http.Request, user *User) {
+	var room Room
+	if err := decode(r, &room); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if room.Name == "" {
+		jsonError(w, "room name required", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveRoom(room); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "room", EntityID: room.ID,
+		Summary: fmt.Sprintf("Updated room: %s", room.Name),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleDeleteRoom(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/rooms/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteRoom(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Free/Busy lookup handler ───────────────────────────────────────────────────
+
+func (app *App) handleFreeBusy(w http.ResponseWriter, r *http.Request, user *User) {
+	q := r.URL.Query()
+	resourceType := q.Get("type")   // "user" or "room"
+	idStr := q.Get("id")
+	fromStr := q.Get("from")
+	toStr := q.Get("to")
+
+	if fromStr == "" || toStr == "" {
+		jsonError(w, "from and to parameters required (ISO8601)", http.StatusBadRequest)
+		return
+	}
+	from, err := time.Parse(time.RFC3339, fromStr)
+	if err != nil {
+		jsonError(w, "invalid from date", http.StatusBadRequest)
+		return
+	}
+	to, err := time.Parse(time.RFC3339, toStr)
+	if err != nil {
+		jsonError(w, "invalid to date", http.StatusBadRequest)
+		return
+	}
+
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+
+	type busySlot struct {
+		Title     string    `json:"title"`
+		StartTime time.Time `json:"start_time"`
+		EndTime   *time.Time `json:"end_time,omitempty"`
+	}
+
+	var slots []busySlot
+	if resourceType == "room" && id > 0 {
+		events := app.store.GetRoomFreeBusy(id, from, to)
+		for _, ev := range events {
+			slots = append(slots, busySlot{Title: ev.Title, StartTime: ev.StartTime, EndTime: ev.EndTime})
+		}
+	} else if id > 0 {
+		events := app.store.GetFreeBusy(id, from, to)
+		for _, ev := range events {
+			slots = append(slots, busySlot{Title: ev.Title, StartTime: ev.StartTime, EndTime: ev.EndTime})
+		}
+	} else {
+		// Return availability for requesting user
+		events := app.store.GetFreeBusy(user.ID, from, to)
+		for _, ev := range events {
+			slots = append(slots, busySlot{Title: ev.Title, StartTime: ev.StartTime, EndTime: ev.EndTime})
+		}
+	}
+	if slots == nil {
+		slots = []busySlot{}
+	}
+	jsonOK(w, slots)
+}
+
+// ── Meeting config handlers ────────────────────────────────────────────────────
+
+func (app *App) handleGetMeetingConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	// Return meeting config (without secrets)
+	jsonOK(w, map[string]interface{}{
+		"teams_enabled": false,
+		"zoom_enabled":  false,
+	})
+}
+
+func (app *App) handleSaveMeetingConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg MeetingConfig
+	if err := decode(r, &cfg); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	// Store meeting config (future: persist and use for auto-creation)
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "meeting_config", EntityID: 0,
+		Summary: "Updated meeting integration config",
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
 // ── API Key auth middleware ────────────────────────────────────────────────────
 
 // requireAPIKeyOrAuth allows requests authenticated with either a session cookie
@@ -7150,6 +7443,7 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		Location         string  `json:"location"`
 		Latitude         float64 `json:"latitude"`
 		Longitude        float64 `json:"longitude"`
+		Availability     string  `json:"availability"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -7187,6 +7481,9 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	fullUser.Location = req.Location
 	fullUser.Latitude = req.Latitude
 	fullUser.Longitude = req.Longitude
+	if req.Availability == "free" || req.Availability == "busy" || req.Availability == "dnd" || req.Availability == "away" || req.Availability == "" {
+		fullUser.Availability = req.Availability
+	}
 	if req.PhotoDataURL != "" {
 		fullUser.PhotoDataURL = req.PhotoDataURL
 	}

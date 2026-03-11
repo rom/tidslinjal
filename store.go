@@ -59,6 +59,9 @@ type Store struct {
 	connectorConfigs     []ConnectorConfig
 	decisionLog          []DecisionLogEntry
 	mapLocations         []MapLocation
+	federatedIdPs        []FederatedIdP
+	trustRealms          []TrustRealm
+	rooms                []Room
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -80,6 +83,7 @@ type Store struct {
 	nextRoutingRuleID        int64
 	nextDecisionLogID        int64
 	nextMapLocationID        int64
+	nextRoomID               int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -137,6 +141,9 @@ func (s *Store) load() error {
 	s.loadFile("connectors.json", &s.connectorConfigs)
 	s.loadFile("decision_log.json", &s.decisionLog)
 	s.loadFile("map_locations.json", &s.mapLocations)
+	s.loadFile("federated_idps.json", &s.federatedIdPs)
+	s.loadFile("trust_realms.json", &s.trustRealms)
+	s.loadFile("rooms.json", &s.rooms)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -244,6 +251,11 @@ func (s *Store) load() error {
 	for _, x := range s.mapLocations {
 		if x.ID > s.nextMapLocationID {
 			s.nextMapLocationID = x.ID
+		}
+	}
+	for _, x := range s.rooms {
+		if x.ID > s.nextRoomID {
+			s.nextRoomID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.

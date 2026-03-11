@@ -29,6 +29,7 @@ const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
 const sizeLabels  = ['XS','S','M','L','XL'];
 let currentStyle = '';
 let showDigits = false;
+let vcrColor = 'red';
 let _lastLang = '';
 
 function pad(n) { return String(n).padStart(2,'0'); }
@@ -127,12 +128,24 @@ function applyStyle(cls) {
   if (cls) wrap.classList.add(cls);
 }
 
+/* ── VCR color ── */
+function setVcrColor(c) {
+  vcrColor = c;
+  document.body.classList.remove('vcr-red','vcr-green','vcr-blue','vcr-orange');
+  document.body.classList.add('vcr-' + c);
+}
+
 /* ── Mode toggle ── */
 function setMode(m) {
   clockMode = m;
   document.getElementById('btnDigital').classList.toggle('active', m==='digital');
   document.getElementById('btnAnalog').classList.toggle('active', m==='analog');
   document.getElementById('btnVCR').classList.toggle('active', m==='vcr');
+  const colorSel = document.getElementById('selVcrColor');
+  const colorLbl = document.getElementById('lblVcrColor');
+  if (colorSel) colorSel.style.display = m==='vcr' ? '' : 'none';
+  if (colorLbl) colorLbl.style.display = m==='vcr' ? '' : 'none';
+  if (m === 'vcr') setVcrColor(vcrColor);
   rebuildClocks();
 }
 
@@ -391,6 +404,7 @@ var slider = document.getElementById('sizeSlider');
 slider.addEventListener('input', function() { applySize(this.value); });
 slider.addEventListener('change', function() { applySize(this.value); });
 document.getElementById('btnDigits').addEventListener('click', toggleDigits);
+document.getElementById('selVcrColor').addEventListener('change', function() { setVcrColor(this.value); });
 
 // Initial build + start ticking
 rebuildClocks();
