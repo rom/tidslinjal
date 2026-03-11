@@ -127,6 +127,7 @@ function applyPreferences() {
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
+  if (state.preferences.hover_zoom_enabled) body.classList.add('hover-zoom-enabled');
   // Apply view spacing
   const spacing = state.preferences.view_spacing || 1;
   document.documentElement.style.setProperty('--view-spacing', spacing);
@@ -1740,6 +1741,28 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('info_connection')||'Connection'}</div>
+        <div style="font-size:var(--fs-sm);display:flex;align-items:center;gap:8px;padding:4px 0">
+          ${navigator.onLine
+            ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></span><span style="color:#22c55e;font-weight:600">Online</span>'
+            : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red,#E74C3C)"></span><span style="color:var(--red,#E74C3C);font-weight:600">Offline</span>'}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('legend_status')||'Event Status'}</div>
+        <div class="legend-list">
+          ${[
+            {key:'planned',   color:'var(--text-dim)',  label: t('status_planned')||'Planned'},
+            {key:'active',    color:'var(--accent)',    label: t('status_active')||'Active'},
+            {key:'completed', color:'var(--green)',     label: t('status_completed')||'Completed'},
+            {key:'cancelled', color:'var(--red)',       label: t('status_cancelled')||'Cancelled'}
+          ].map(s => `<div class="legend-item" style="cursor:default">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
+            <span class="legend-label">${s.label}</span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('info_range')}</div>
         <div style="font-size:var(--fs-sm);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
           <span style="color:var(--text-dim)">${t('info_from')}:</span><span>${localShortDate(state.startDate)}</span>
@@ -2652,6 +2675,15 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="show_event_icons"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_event_icons')||'Show icons on events (type, attachments, etc.)'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_hover_zoom')||'Hover Zoom'}</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="prefHoverZoom" ${p.hover_zoom_enabled?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="hover_zoom_enabled"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_hover_zoom_desc')||'Enlarge calendar events on hover'}
         </label>
       </div>
       <div class="sidebar-section">
@@ -6029,7 +6061,7 @@ async function openDecisionLogModal() {
   const groups = state.groups || [];
   const canWrite = hasRole2(state.user?.role, 'teamlead') || userHasCapability('decision_log_readwrite');
   const html = `
-    <div class="modal-overlay" id="decisionLogModal" style="display:flex">
+    <div class="modal-overlay" id="decisionLogModal">
       <div class="modal" style="max-width:700px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
           <h2>📋 ${t('decision_log_title')||'Decision Log'}</h2>
@@ -6064,7 +6096,11 @@ async function openDecisionLogModal() {
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  _bindActions(document.getElementById('decisionLogModal'));
+  const modal = document.getElementById('decisionLogModal');
+  // Force reflow then add 'open' class for CSS transition
+  void modal.offsetHeight;
+  modal.classList.add('open');
+  _bindActions(modal);
   const logTypeEl = document.getElementById('dlLogType');
   const groupIdEl = document.getElementById('dlGroupId');
   if (logTypeEl && groupIdEl) {
@@ -6072,7 +6108,10 @@ async function openDecisionLogModal() {
   }
 }
 
-function closeDecisionLogModal() { closeModal('decisionLogModal'); }
+function closeDecisionLogModal() {
+  const el = document.getElementById('decisionLogModal');
+  if (el) el.remove();
+}
 
 async function _loadDecisionLog() {
   try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch { _decisionLogEntries = []; }
@@ -6351,12 +6390,14 @@ function _initOfflineMode() {
     if (!window._offlineModeForced) {
       window._offlineMode = false;
       _updateOfflineIndicator();
+      if (state.sidebarTab === 'legend') renderSidebar();
       showNotification('success', 'Connection restored — back online');
     }
   });
   window.addEventListener('offline', () => {
     window._offlineMode = true;
     _updateOfflineIndicator();
+    if (state.sidebarTab === 'legend') renderSidebar();
     showNotification('warning', 'Network lost — offline mode active');
   });
 
