@@ -439,24 +439,50 @@ function renderListView() {
     responded_to:'var(--yellow)', rejected:'var(--red)'
   };
 
-  tbody.innerHTML = events.map(ev => `
+  // Red time line marker in list view
+  const prefs = state.preferences || {};
+  const redLineEnabled = prefs.red_line_enabled;
+  const redLineColor = prefs.red_line_color || '#E74C3C';
+  const now = new Date();
+  let redLineInserted = false;
+
+  tbody.innerHTML = events.map(ev => {
+    let marker = '';
+    if (redLineEnabled && !redLineInserted && _listSortKey === 'start_time') {
+      const evTime = new Date(ev.start_time);
+      if ((_listSortAsc && evTime > now) || (!_listSortAsc && evTime < now)) {
+        redLineInserted = true;
+        marker = `<tr class="list-red-line"><td colspan="7" style="padding:0;position:relative;height:2px;background:${redLineColor}">
+          <span style="position:absolute;left:8px;top:-8px;font-size:9px;color:${redLineColor};background:var(--bg2);padding:0 4px">▶ Now</span>
+        </td></tr>`;
+      }
+    }
+    return marker + `
     <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer">
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
       </td>
       <td style="padding:8px 10px">${escHtml(ev.event_type)}</td>
-      <td style="padding:8px 10px"><span style="color:${statusColors[ev.status]||'var(--text)'}">${t('status_'+(ev.status||'planned'))||ev.status}</span></td>
+      <td style="padding:8px 10px">
+        ${state.user && hasRole2(state.user.role, 'readwrite') ?
+          `<select class="list-status-sel" data-ev-status="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:${statusColors[ev.status]||'var(--text)'};padding:2px 6px;font-size:inherit;cursor:pointer">
+            ${['planned','active','completed','cancelled'].map(s =>
+              `<option value="${s}" ${(ev.status||'planned')===s?'selected':''} style="color:var(--text)">${t('status_'+s)||s}</option>`
+            ).join('')}
+          </select>` :
+          `<span style="color:${statusColors[ev.status]||'var(--text)'}">${t('status_'+(ev.status||'planned'))||ev.status}</span>`}
+      </td>
       <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}</td>
       <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
-      <td style="padding:8px 10px">${escHtml(ev.responsible_name||'')}</td>
+      <td style="padding:8px 10px">${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
       <td style="padding:8px 10px">
         <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">View</button>
         ${state.user && hasRole2(state.user.role, 'readwrite') ?
           `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">Edit</button>` : ''}
       </td>
     </tr>
-  `).join('');
+  `; }).join('');
 
   // Attach event listeners for list view rows
   tbody.querySelectorAll('tr[data-ev-row]').forEach(row => {
@@ -470,5 +496,14 @@ function renderListView() {
   });
   tbody.querySelectorAll('button[data-ev-edit]').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); const ev = state.events.find(x => x.id === parseInt(btn.dataset.evEdit, 10)); if (ev) openEventModal(ev); });
+  });
+  tbody.querySelectorAll('select[data-ev-status]').forEach(sel => {
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('change', async e => {
+      e.stopPropagation();
+      const evId = parseInt(sel.dataset.evStatus, 10);
+      const newStatus = sel.value;
+      await patchEventStatus(evId, newStatus, '');
+    });
   });
 }

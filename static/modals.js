@@ -2384,6 +2384,92 @@ function renderSidebar() {
           <span style="color:var(--text-dim);margin-left:8px">${t('settings_ingest_format')||'JSON payload with title, start, end, type fields'}</span>
         </div>
       </div>
+
+      ${state.user?.role === 'admin' ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔐 ${t('settings_federation')||'Federation / Trust Realms'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_federation_desc')||'Configure multiple identity providers (IdPs) for partner organizations. Each IdP belongs to a trust realm that controls access levels.'}
+        </p>
+        <div id="federatedIdPList" style="margin-bottom:8px">Loading…</div>
+        <details style="margin-bottom:8px">
+          <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--accent);font-weight:600">+ Add Identity Provider</summary>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+            <input type="text" id="fedIdpId" placeholder="ID slug (e.g. partner-nato)" style="font-size:var(--fs-xs)">
+            <input type="text" id="fedIdpName" placeholder="Display name" style="font-size:var(--fs-xs)">
+            <select id="fedIdpProtocol" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px">
+              <option value="oidc">OIDC</option>
+              <option value="saml">SAML</option>
+            </select>
+            <input type="text" id="fedIdpIssuer" placeholder="Issuer URL" style="font-size:var(--fs-xs)">
+            <input type="text" id="fedIdpClientId" placeholder="Client ID" style="font-size:var(--fs-xs)">
+            <input type="password" id="fedIdpSecret" placeholder="Client Secret" style="font-size:var(--fs-xs)">
+            <input type="text" id="fedIdpRealm" placeholder="Trust realm slug" style="font-size:var(--fs-xs)">
+            <input type="text" id="fedIdpDomains" placeholder="Allowed domains (comma-sep)" style="font-size:var(--fs-xs)">
+            <select id="fedIdpRole" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px">
+              <option value="readonly">Read Only</option>
+              <option value="readwrite">Read/Write</option>
+              <option value="teammember" selected>Team Member</option>
+              <option value="teamlead">Team Lead</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" data-action="saveFederatedIdP">Save IdP</button>
+          </div>
+        </details>
+        <details>
+          <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--accent);font-weight:600">Trust Realms</summary>
+          <div id="trustRealmList" style="margin-top:6px">Loading…</div>
+        </details>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🏢 ${t('settings_rooms')||'Rooms & Resources'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_rooms_desc')||'Manage bookable rooms, vehicles, and equipment. Resources can be assigned to events for automatic scheduling.'}
+        </p>
+        <div id="roomList" style="margin-bottom:8px">Loading…</div>
+        <details>
+          <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--accent);font-weight:600">+ Add Room/Resource</summary>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+            <input type="text" id="roomName" placeholder="Room/resource name" style="font-size:var(--fs-xs)">
+            <select id="roomType" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px">
+              <option value="room">Meeting Room</option>
+              <option value="vehicle">Vehicle</option>
+              <option value="equipment">Equipment</option>
+            </select>
+            <input type="text" id="roomLocation" placeholder="Location" style="font-size:var(--fs-xs)">
+            <input type="number" id="roomCapacity" placeholder="Capacity" min="1" style="font-size:var(--fs-xs)">
+            <button class="btn btn-secondary btn-sm" data-action="saveRoom">Save</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📞 ${t('settings_meetings')||'Meeting Integration'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_meetings_desc')||'Configure automatic meeting creation for Microsoft Teams and Zoom. Meeting links are auto-generated when creating virtual meeting events.'}
+        </p>
+        <div id="meetingConfigUI" style="font-size:var(--fs-xs)">
+          <details>
+            <summary style="cursor:pointer;color:var(--accent);font-weight:600">Microsoft Teams</summary>
+            <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+              <input type="text" id="teamsTenantId" placeholder="Tenant ID" style="font-size:var(--fs-xs)">
+              <input type="text" id="teamsClientId" placeholder="Client ID" style="font-size:var(--fs-xs)">
+              <input type="password" id="teamsSecret" placeholder="Client Secret" style="font-size:var(--fs-xs)">
+              <button class="btn btn-secondary btn-sm" data-action="saveMeetingConfig" data-arg="teams">Save Teams Config</button>
+            </div>
+          </details>
+          <details style="margin-top:6px">
+            <summary style="cursor:pointer;color:var(--accent);font-weight:600">Zoom</summary>
+            <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+              <input type="text" id="zoomAccountId" placeholder="Account ID" style="font-size:var(--fs-xs)">
+              <input type="text" id="zoomClientId" placeholder="Client ID" style="font-size:var(--fs-xs)">
+              <input type="password" id="zoomSecret" placeholder="Client Secret" style="font-size:var(--fs-xs)">
+              <button class="btn btn-secondary btn-sm" data-action="saveMeetingConfig" data-arg="zoom">Save Zoom Config</button>
+            </div>
+          </details>
+        </div>
+      </div>
+      ` : ''}
     `;
     // Load current OIDC settings into the form
     setTimeout(_initOIDCSettingsUI, 0);
@@ -2393,6 +2479,11 @@ function renderSidebar() {
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
     setTimeout(_loadConnectorList, 0);
+    if (state.user?.role === 'admin') {
+      setTimeout(_loadFederatedIdPs, 0);
+      setTimeout(_loadTrustRealms, 0);
+      setTimeout(_loadRoomList, 0);
+    }
   } else if (tab === 'tools') {
     const role          = state.user?.role || '';
     const isAdminOrOplead = hasRole2(role, 'oplead');
@@ -2611,6 +2702,21 @@ function renderSidebar() {
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_event_changes')||'Event changes by other users'}
         </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📡 ${t('settings_offline_mode')||'Offline Mode'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('settings_offline_desc')||'When enabled or when network is unavailable, the tool works with locally cached data. Integrations and advanced features are disabled.'}
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="prefOfflineMode" ${window._offlineModeForced?'checked':''}
+            data-action="toggleOfflineMode" data-event="change"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_force_offline')||'Force offline mode'}
+        </label>
+        <div id="offlineStatus" style="font-size:var(--fs-xs);padding:4px 8px;background:var(--bg3);border-radius:var(--radius)">
+          ${window._offlineMode ? '<span style="color:#e05252">● Offline</span>' : '<span style="color:#27ae60">● Online</span>'}
+        </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('artificial_time')||'Artificial Time'}</div>
@@ -3171,6 +3277,7 @@ async function openProfileModal() {
   setVal('profileLocation',    u.location || '');
   setVal('profileLatitude',    u.latitude || '');
   setVal('profileLongitude',   u.longitude || '');
+  setVal('profileAvailability', u.availability || 'free');
   // Profile photo
   const preview = document.getElementById('profilePhotoPreview');
   const placeholder = document.getElementById('profilePhotoPlaceholder');
@@ -3317,6 +3424,7 @@ async function saveProfile() {
     location:          val('profileLocation'),
     latitude:          parseFloat(val('profileLatitude')) || 0,
     longitude:         parseFloat(val('profileLongitude')) || 0,
+    availability:      document.getElementById('profileAvailability')?.value || 'free',
   }).catch(() => {});
 
   // Save language preference
@@ -3790,6 +3898,11 @@ async function deleteAPIKey(id) {
 async function _loadConnectorList() {
   const listEl = document.getElementById('connectorList');
   if (!listEl) return;
+  // Connector management requires admin role
+  if (state.user?.role !== 'admin') {
+    listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('connectors_admin_only')||'Connector configuration is available to administrators only.'}</p>`;
+    return;
+  }
   try {
     const configs = await apiGet('/api/integrations/connectors');
     if (!configs || !configs.length) {
@@ -3823,6 +3936,134 @@ async function toggleConnector(name) {
     showNotification('success', `Connector ${name} ${cfg.enabled ? 'enabled' : 'disabled'}`);
     await _loadConnectorList();
   }
+}
+
+// ── Federated IdPs ──────────────────────────────────────────────────────────
+async function _loadFederatedIdPs() {
+  const el = document.getElementById('federatedIdPList');
+  if (!el) return;
+  try {
+    const idps = await apiGet('/api/federation/idps');
+    if (!idps || !idps.length) {
+      el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No federated identity providers configured.</p>';
+      return;
+    }
+    el.innerHTML = idps.map(idp => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+        <div>
+          <strong style="font-size:var(--fs-sm)">${escHtml(idp.name)}</strong>
+          <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:4px">(${idp.protocol.toUpperCase()})</span>
+          <span style="color:${idp.enabled?'var(--accent)':'var(--text-dim)'};font-size:var(--fs-xs);margin-left:4px">${idp.enabled?'● Active':'○ Disabled'}</span>
+          ${idp.trust_realm ? `<br><span style="font-size:10px;color:var(--text-dim)">Realm: ${escHtml(idp.trust_realm)}</span>` : ''}
+        </div>
+        <button class="btn btn-sm btn-danger" data-action="deleteFederatedIdP" data-arg="${idp.id}">✕</button>
+      </div>
+    `).join('');
+    _bindActions(el);
+  } catch {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load IdPs.</p>';
+  }
+}
+
+async function saveFederatedIdP() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const idp = {
+    id: val('fedIdpId'), name: val('fedIdpName'), protocol: val('fedIdpProtocol'),
+    issuer: val('fedIdpIssuer'), client_id: val('fedIdpClientId'),
+    client_secret: val('fedIdpSecret'), trust_realm: val('fedIdpRealm'),
+    default_role: val('fedIdpRole'), enabled: true,
+    allowed_domains: val('fedIdpDomains') ? val('fedIdpDomains').split(',').map(d=>d.trim()) : []
+  };
+  if (!idp.id || !idp.name) { showError('ID and name are required'); return; }
+  const res = await apiPut('/api/federation/idps', idp);
+  if (res.ok) { showNotification('success','IdP saved'); _loadFederatedIdPs(); }
+  else { showError('Failed to save IdP'); }
+}
+
+async function deleteFederatedIdP(id) {
+  if (!confirm('Delete this identity provider?')) return;
+  const res = await api('DELETE', `/api/federation/idps/${id}`, null);
+  if (res.ok) { showNotification('success','IdP deleted'); _loadFederatedIdPs(); }
+}
+
+async function _loadTrustRealms() {
+  const el = document.getElementById('trustRealmList');
+  if (!el) return;
+  try {
+    const realms = await apiGet('/api/federation/realms');
+    if (!realms || !realms.length) {
+      el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No trust realms configured.</p>';
+      return;
+    }
+    el.innerHTML = realms.map(r => `
+      <div style="padding:4px 6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:3px;font-size:var(--fs-xs)">
+        <strong>${escHtml(r.name)}</strong> <span style="color:var(--text-dim)">(${escHtml(r.id)})</span>
+        <span style="margin-left:6px;color:var(--text-dim)">Max role: ${r.max_role||'teammember'}</span>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load realms.</p>';
+  }
+}
+
+// ── Rooms / Resources ────────────────────────────────────────────────────────
+async function _loadRoomList() {
+  const el = document.getElementById('roomList');
+  if (!el) return;
+  try {
+    const rooms = await apiGet('/api/rooms');
+    if (!rooms || !rooms.length) {
+      el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No rooms or resources configured.</p>';
+      return;
+    }
+    el.innerHTML = rooms.map(r => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+        <div>
+          <strong style="font-size:var(--fs-sm)">${escHtml(r.name)}</strong>
+          <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:4px">${r.type||'room'}${r.capacity ? ' ('+r.capacity+' seats)' : ''}</span>
+          ${r.location ? `<br><span style="font-size:10px;color:var(--text-dim)">${escHtml(r.location)}</span>` : ''}
+        </div>
+        <button class="btn btn-sm btn-danger" data-action="deleteRoom" data-arg="${r.id}">✕</button>
+      </div>
+    `).join('');
+    _bindActions(el);
+  } catch {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load rooms.</p>';
+  }
+}
+
+async function saveRoom() {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  const room = {
+    name: val('roomName'), type: val('roomType'),
+    location: val('roomLocation'),
+    capacity: parseInt(val('roomCapacity')) || 0,
+    enabled: true
+  };
+  if (!room.name) { showError('Room name required'); return; }
+  const res = await apiPut('/api/rooms', room);
+  if (res.ok) { showNotification('success','Room saved'); _loadRoomList(); }
+  else { showError('Failed to save room'); }
+}
+
+async function deleteRoom(id) {
+  if (!confirm('Delete this room/resource?')) return;
+  const res = await api('DELETE', `/api/rooms/${id}`, null);
+  if (res.ok) { showNotification('success','Room deleted'); _loadRoomList(); }
+}
+
+// ── Meeting Config ───────────────────────────────────────────────────────────
+async function saveMeetingConfig(provider) {
+  const val = id => document.getElementById(id)?.value?.trim() || '';
+  let cfg;
+  if (provider === 'teams') {
+    cfg = { teams_enabled: true, teams_tenant_id: val('teamsTenantId'), teams_client_id: val('teamsClientId'), teams_secret: val('teamsSecret') };
+  } else {
+    cfg = { zoom_enabled: true, zoom_account_id: val('zoomAccountId'), zoom_client_id: val('zoomClientId'), zoom_secret: val('zoomSecret') };
+  }
+  const res = await apiPut('/api/meeting-config', cfg);
+  if (res.ok) showNotification('success', `${provider === 'teams' ? 'Teams' : 'Zoom'} config saved`);
+  else showError('Failed to save config');
 }
 
 async function setDefaultView(view) {
@@ -6063,6 +6304,122 @@ function openCriticalLineModal() {
 }
 
 function closeCriticalLineModal() { closeModal('criticalLineModal'); }
+
+// ── Offline Mode ────────────────────────────────────────────────────────────
+window._offlineMode = false;
+window._offlineModeForced = false;
+window._offlineCache = {};
+
+function _initOfflineMode() {
+  // Restore forced offline preference
+  try {
+    window._offlineModeForced = localStorage.getItem('tidslinjal_offline_forced') === 'true';
+    if (window._offlineModeForced) window._offlineMode = true;
+  } catch {}
+
+  // Auto-detect network status
+  window.addEventListener('online', () => {
+    if (!window._offlineModeForced) {
+      window._offlineMode = false;
+      _updateOfflineIndicator();
+      showNotification('success', 'Connection restored — back online');
+    }
+  });
+  window.addEventListener('offline', () => {
+    window._offlineMode = true;
+    _updateOfflineIndicator();
+    showNotification('warning', 'Network lost — offline mode active');
+  });
+
+  // Check initial state
+  if (!navigator.onLine) {
+    window._offlineMode = true;
+  }
+
+  // Periodically cache key data
+  setInterval(_cacheDataForOffline, 60000);
+  _cacheDataForOffline();
+}
+
+function _cacheDataForOffline() {
+  if (window._offlineMode) return;
+  try {
+    if (state.events) localStorage.setItem('tidslinjal_cache_events', JSON.stringify(state.events));
+    if (state.eventTypes) localStorage.setItem('tidslinjal_cache_eventTypes', JSON.stringify(state.eventTypes));
+    if (state.user) localStorage.setItem('tidslinjal_cache_user', JSON.stringify(state.user));
+    if (state.preferences) localStorage.setItem('tidslinjal_cache_preferences', JSON.stringify(state.preferences));
+    if (state.layers) localStorage.setItem('tidslinjal_cache_layers', JSON.stringify(state.layers));
+    if (state.exercise) localStorage.setItem('tidslinjal_cache_exercise', JSON.stringify(state.exercise));
+  } catch {}
+}
+
+function _loadOfflineCache() {
+  try {
+    const events = localStorage.getItem('tidslinjal_cache_events');
+    if (events) state.events = JSON.parse(events);
+    const types = localStorage.getItem('tidslinjal_cache_eventTypes');
+    if (types) state.eventTypes = JSON.parse(types);
+    const user = localStorage.getItem('tidslinjal_cache_user');
+    if (user) state.user = JSON.parse(user);
+    const prefs = localStorage.getItem('tidslinjal_cache_preferences');
+    if (prefs) state.preferences = JSON.parse(prefs);
+    const layers = localStorage.getItem('tidslinjal_cache_layers');
+    if (layers) state.layers = JSON.parse(layers);
+    const exercise = localStorage.getItem('tidslinjal_cache_exercise');
+    if (exercise) state.exercise = JSON.parse(exercise);
+  } catch {}
+}
+
+function _updateOfflineIndicator() {
+  const el = document.getElementById('offlineStatus');
+  if (el) {
+    el.innerHTML = window._offlineMode
+      ? '<span style="color:#e05252">● Offline</span>'
+      : '<span style="color:#27ae60">● Online</span>';
+  }
+  // Show/hide offline banner in header
+  let banner = document.getElementById('offlineBanner');
+  if (window._offlineMode && !banner) {
+    banner = document.createElement('div');
+    banner.id = 'offlineBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#e05252;color:#fff;text-align:center;font-size:11px;padding:3px;letter-spacing:.05em';
+    banner.textContent = '📡 OFFLINE MODE — Working with cached data';
+    document.body.prepend(banner);
+  } else if (!window._offlineMode && banner) {
+    banner.remove();
+  }
+}
+
+function toggleOfflineMode() {
+  window._offlineModeForced = !window._offlineModeForced;
+  window._offlineMode = window._offlineModeForced || !navigator.onLine;
+  try { localStorage.setItem('tidslinjal_offline_forced', window._offlineModeForced); } catch {}
+  _updateOfflineIndicator();
+  renderSidebar();
+  if (window._offlineModeForced) {
+    showNotification('warning', 'Offline mode enabled — using cached data');
+  } else if (navigator.onLine) {
+    showNotification('success', 'Online mode restored');
+    refreshAll();
+  }
+}
+
+// Wrap apiGet to use cache when offline
+const _origApiGet = typeof apiGet === 'function' ? apiGet : null;
+if (_origApiGet) {
+  window.apiGet = async function(url) {
+    if (window._offlineMode) {
+      _loadOfflineCache();
+      throw new Error('offline');
+    }
+    return _origApiGet(url);
+  };
+}
+
+// Initialize offline mode detection
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', _initOfflineMode);
+}
 
 // ── Artificial Time ─────────────────────────────────────────────────────────
 async function toggleArtificialTimeSetting() {

@@ -62,16 +62,21 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 /* ── Header row ── */
 .page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
 /* ── VCR mode ── */
-.vcr-card { background:#050000 !important; border-color:#3a0000 !important; }
+.vcr-card { background:#050000 !important; border-color:var(--vcr-border,#3a0000) !important; }
 .vcr-time {
-  color:#ff2200; text-shadow:0 0 8px rgba(255,40,0,.9),0 0 18px rgba(255,0,0,.5);
+  color:var(--vcr-fg,#ff2200); text-shadow:0 0 8px var(--vcr-glow1,rgba(255,40,0,.9)),0 0 18px var(--vcr-glow2,rgba(255,0,0,.5));
   font-weight:bold; letter-spacing:.1em; }
 .vcr-time .vcr-ghost {
   position:absolute; top:0; left:0; right:0;
-  color:rgba(255,34,0,.12); pointer-events:none; }
-.vcr-label { color:#880000 !important; }
-.vcr-date  { color:#660000 !important; }
-.vcr-tz    { color:#880000 !important; }
+  color:var(--vcr-ghost,rgba(255,34,0,.12)); pointer-events:none; }
+.vcr-label { color:var(--vcr-dim,#880000) !important; }
+.vcr-date  { color:var(--vcr-dim2,#660000) !important; }
+.vcr-tz    { color:var(--vcr-dim,#880000) !important; }
+/* VCR color presets */
+body.vcr-red    { --vcr-fg:#ff2200; --vcr-glow1:rgba(255,40,0,.9); --vcr-glow2:rgba(255,0,0,.5); --vcr-ghost:rgba(255,34,0,.12); --vcr-dim:#880000; --vcr-dim2:#660000; --vcr-border:#3a0000; }
+body.vcr-green  { --vcr-fg:#33ff33; --vcr-glow1:rgba(50,255,50,.9); --vcr-glow2:rgba(0,200,0,.5); --vcr-ghost:rgba(50,255,50,.12); --vcr-dim:#008800; --vcr-dim2:#006600; --vcr-border:#003a00; }
+body.vcr-blue   { --vcr-fg:#44aaff; --vcr-glow1:rgba(68,170,255,.9); --vcr-glow2:rgba(0,100,255,.5); --vcr-ghost:rgba(68,170,255,.12); --vcr-dim:#004488; --vcr-dim2:#003366; --vcr-border:#002244; }
+body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:rgba(255,100,0,.5); --vcr-ghost:rgba(255,136,0,.12); --vcr-dim:#885500; --vcr-dim2:#664400; --vcr-border:#3a2200; }
 .vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
 @keyframes vcr-blink { 50% { opacity:0; } }
 /* ── Clickable label ── */
@@ -96,6 +101,13 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
   <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
+  <label id="lblVcrColor" style="display:none">VCR Color</label>
+  <select id="selVcrColor" style="display:none">
+    <option value="red">Red</option>
+    <option value="green">Green</option>
+    <option value="blue">Blue</option>
+    <option value="orange">Orange</option>
+  </select>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
 <script src="/static/clocks-popup.js"></script>

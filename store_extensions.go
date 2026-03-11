@@ -133,3 +133,162 @@ func (s *Store) DeleteConnectorConfig(name string) error {
 	s.mu.Unlock()
 	return s.persist("connectors.json", snap)
 }
+
+// ── Federated IdPs ─────────────────────────────────────────────────────────
+
+func (s *Store) GetFederatedIdPs() []FederatedIdP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]FederatedIdP, len(s.federatedIdPs))
+	copy(result, s.federatedIdPs)
+	return result
+}
+
+func (s *Store) SaveFederatedIdP(idp FederatedIdP) error {
+	s.mu.Lock()
+	found := false
+	for i := range s.federatedIdPs {
+		if s.federatedIdPs[i].ID == idp.ID {
+			s.federatedIdPs[i] = idp
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.federatedIdPs = append(s.federatedIdPs, idp)
+	}
+	snap := append([]FederatedIdP(nil), s.federatedIdPs...)
+	s.mu.Unlock()
+	return s.persist("federated_idps.json", snap)
+}
+
+func (s *Store) DeleteFederatedIdP(id string) error {
+	s.mu.Lock()
+	found := false
+	for i := range s.federatedIdPs {
+		if s.federatedIdPs[i].ID == id {
+			s.federatedIdPs = append(s.federatedIdPs[:i], s.federatedIdPs[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("federated IdP %q not found", id)
+	}
+	snap := append([]FederatedIdP(nil), s.federatedIdPs...)
+	s.mu.Unlock()
+	return s.persist("federated_idps.json", snap)
+}
+
+// ── Trust Realms ───────────────────────────────────────────────────────────
+
+func (s *Store) GetTrustRealms() []TrustRealm {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]TrustRealm, len(s.trustRealms))
+	copy(result, s.trustRealms)
+	return result
+}
+
+func (s *Store) SaveTrustRealm(realm TrustRealm) error {
+	s.mu.Lock()
+	found := false
+	for i := range s.trustRealms {
+		if s.trustRealms[i].ID == realm.ID {
+			s.trustRealms[i] = realm
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.trustRealms = append(s.trustRealms, realm)
+	}
+	snap := append([]TrustRealm(nil), s.trustRealms...)
+	s.mu.Unlock()
+	return s.persist("trust_realms.json", snap)
+}
+
+// ── Rooms / Resources ──────────────────────────────────────────────────────
+
+func (s *Store) GetRooms() []Room {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]Room, len(s.rooms))
+	copy(result, s.rooms)
+	return result
+}
+
+func (s *Store) SaveRoom(room Room) error {
+	s.mu.Lock()
+	if room.ID == 0 {
+		s.nextRoomID++
+		room.ID = s.nextRoomID
+		room.CreatedAt = time.Now()
+		s.rooms = append(s.rooms, room)
+	} else {
+		for i := range s.rooms {
+			if s.rooms[i].ID == room.ID {
+				s.rooms[i] = room
+				break
+			}
+		}
+	}
+	snap := append([]Room(nil), s.rooms...)
+	s.mu.Unlock()
+	return s.persist("rooms.json", snap)
+}
+
+func (s *Store) DeleteRoom(id int64) error {
+	s.mu.Lock()
+	for i := range s.rooms {
+		if s.rooms[i].ID == id {
+			s.rooms = append(s.rooms[:i], s.rooms[i+1:]...)
+			snap := append([]Room(nil), s.rooms...)
+			s.mu.Unlock()
+			return s.persist("rooms.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("room %d not found", id)
+}
+
+func (s *Store) GetRoomBookings(roomID int64, from, to time.Time) []RoomBooking {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	// Filter events that have a room booking for this room in the time range
+	var bookings []RoomBooking
+	// For now, room bookings are stored within events as metadata
+	// Future: dedicated booking storage
+	return bookings
+}
+
+// ── Free/Busy Lookup ────────────────────────────────────────────────────────
+
+func (s *Store) GetFreeBusy(userID int64, from, to time.Time) []Event {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []Event
+	for _, ev := range s.events {
+		if ev.ResponsibleID != nil && *ev.ResponsibleID == userID {
+			if ev.StartTime.Before(to) && (ev.EndTime == nil || ev.EndTime.After(from)) {
+				result = append(result, ev)
+			}
+		}
+	}
+	return result
+}
+
+func (s *Store) GetRoomFreeBusy(roomID int64, from, to time.Time) []Event {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []Event
+	for _, ev := range s.events {
+		if ev.RoomID != nil && *ev.RoomID == roomID {
+			if ev.StartTime.Before(to) && (ev.EndTime == nil || ev.EndTime.After(from)) {
+				result = append(result, ev)
+			}
+		}
+	}
+	return result
+}
