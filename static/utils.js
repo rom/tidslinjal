@@ -336,6 +336,7 @@ function _setClockAreaDetached(detached) {
   if (indicator) indicator.style.display = detached ? '' : 'none';
 }
 
+function openDetachedClock() { detachClock(); }
 function detachClock() {
   if (_clockPopout && !_clockPopout.closed) {
     _clockPopout.focus();

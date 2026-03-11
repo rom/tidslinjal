@@ -932,7 +932,7 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
-		jsonError(w, "current password incorrect", http.StatusUnauthorized)
+		jsonError(w, "current password incorrect", http.StatusForbidden)
 		return
 	}
 
@@ -960,6 +960,23 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		Summary: "changed own password",
 	})
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// handlePasswordPolicy returns the password policy for any authenticated user.
+func (app *App) handlePasswordPolicy(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodGet {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	ss := app.store.GetSecuritySettings()
+	jsonOK(w, map[string]any{
+		"password_policy_enabled": ss.PasswordPolicyEnabled,
+		"min_length":              ss.MinLength,
+		"require_uppercase":       ss.RequireUppercase,
+		"require_lowercase":       ss.RequireLowercase,
+		"require_numbers":         ss.RequireNumbers,
+		"require_symbols":         ss.RequireSymbols,
+	})
 }
 
 // validateUsername checks that a username is non-empty, not too long, and only
@@ -4516,6 +4533,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/auth/logout", app.handleLogout)
 	mux.HandleFunc("/api/auth/me", app.requireAuth(app.handleMe))
 	mux.HandleFunc("/api/auth/change-password", app.requireAuth(app.handleChangePassword))
+	mux.HandleFunc("/api/auth/password-policy", app.requireAuth(app.handlePasswordPolicy))
 	mux.HandleFunc("/api/auth/register", app.handleRegister)
 	mux.HandleFunc("/api/auth/forgot-password", app.handleForgotPassword)
 	mux.HandleFunc("/api/auth/reset-password", app.handleResetPassword)
@@ -5096,6 +5114,59 @@ func (app *App) routes() http.Handler {
 		if r.Method == http.MethodDelete {
 			app.requireAuth(app.handleDeleteFilterPreset)(w, r)
 		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Decision Log
+	mux.HandleFunc("/api/decision-log", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListDecisionLog)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleAddDecisionLogEntry)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/decision-log/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Map Locations
+	mux.HandleFunc("/api/map-locations", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListMapLocations)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleAddMapLocation)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/map-locations/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			app.requireRole(RoleTeamLead, app.handleUpdateMapLocation)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleTeamLead, app.handleDeleteMapLocation)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Connector configuration (admin only)
+	mux.HandleFunc("/api/integrations/connectors", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleListConnectors)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveConnectorConfig)(w, r)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
@@ -6267,6 +6338,220 @@ func (app *App) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, user 
 	}
 	app.audit(user.ID, user.DisplayName, "deleted", "api_key", id, fmt.Sprintf("Deleted API key #%d", id))
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// ── Decision Log handlers ─────────────────────────────────────────────────────
+
+func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, user *User) {
+	entries := app.store.GetDecisionLog()
+	// Filter by access: users only see general entries, entries for their groups, and their own private entries
+	var visible []DecisionLogEntry
+	hasConfidentialRead := userHasCapability(user, "confidential_read")
+	for _, e := range entries {
+		if e.Confidential && !hasConfidentialRead {
+			// Hide the decision text, but show that a confidential entry exists
+			e.Decision = "[CONFIDENTIAL]"
+		}
+		if e.LogType == "general" || e.UserID == user.ID {
+			visible = append(visible, e)
+		} else if e.LogType == "group" && e.GroupID > 0 {
+			if app.userInGroup(user.ID, e.GroupID) {
+				visible = append(visible, e)
+			}
+		}
+	}
+	if visible == nil {
+		visible = []DecisionLogEntry{}
+	}
+	jsonOK(w, visible)
+}
+
+func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Decision     string `json:"decision"`
+		LogType      string `json:"log_type"`
+		GroupID      int64  `json:"group_id"`
+		Confidential bool   `json:"confidential"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Decision == "" {
+		jsonError(w, "decision text required", http.StatusBadRequest)
+		return
+	}
+	if req.LogType == "" {
+		req.LogType = "general"
+	}
+	// Check capability
+	if !userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "insufficient permissions", http.StatusForbidden)
+		return
+	}
+	entry := DecisionLogEntry{
+		Timestamp:    time.Now(),
+		UserID:       user.ID,
+		UserName:     user.Username,
+		DisplayName:  user.DisplayName,
+		Decision:     req.Decision,
+		LogType:      req.LogType,
+		GroupID:       req.GroupID,
+		Confidential: req.Confidential,
+	}
+	created, err := app.store.AddDecisionLogEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "created", EntityType: "decision_log", EntityID: created.ID,
+		Summary: fmt.Sprintf("Added decision log entry: %.50s", req.Decision),
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (app *App) handleDeleteDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteDecisionLogEntry(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "deleted", EntityType: "decision_log", EntityID: id,
+		Summary: fmt.Sprintf("Deleted decision log entry #%d", id),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// userInGroup checks if a user is a member of a specific group
+func (app *App) userInGroup(userID, groupID int64) bool {
+	members := app.store.GetGroupMembers(groupID)
+	for _, m := range members {
+		if m.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// userHasCapability checks if a user has a specific capability via role config
+func userHasCapability(user *User, cap string) bool {
+	// Admin always has all capabilities
+	if user.Role == RoleAdmin {
+		return true
+	}
+	return false
+}
+
+// ── Map Location handlers ─────────────────────────────────────────────────────
+
+func (app *App) handleListMapLocations(w http.ResponseWriter, r *http.Request, user *User) {
+	locs := app.store.GetMapLocations()
+	if locs == nil {
+		locs = []MapLocation{}
+	}
+	jsonOK(w, locs)
+}
+
+func (app *App) handleAddMapLocation(w http.ResponseWriter, r *http.Request, user *User) {
+	var loc MapLocation
+	if err := decode(r, &loc); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if loc.Name == "" {
+		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	created, err := app.store.AddMapLocation(loc)
+	if err != nil {
+		jsonError(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "created", EntityType: "map_location", EntityID: created.ID,
+		Summary: fmt.Sprintf("Added map location: %s", loc.Name),
+	})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (app *App) handleUpdateMapLocation(w http.ResponseWriter, r *http.Request, user *User) {
+	var loc MapLocation
+	if err := decode(r, &loc); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-locations/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	loc.ID = id
+	if err := app.store.UpdateMapLocation(loc); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, loc)
+}
+
+func (app *App) handleDeleteMapLocation(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-locations/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteMapLocation(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Connector config handlers ─────────────────────────────────────────────────
+
+func (app *App) handleListConnectors(w http.ResponseWriter, r *http.Request, user *User) {
+	configs := app.store.GetConnectorConfigs()
+	if configs == nil {
+		configs = []ConnectorConfig{}
+	}
+	jsonOK(w, configs)
+}
+
+func (app *App) handleSaveConnectorConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg ConnectorConfig
+	if err := decode(r, &cfg); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if cfg.Name == "" {
+		jsonError(w, "connector name required", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveConnectorConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "connector", EntityID: 0,
+		Summary: fmt.Sprintf("Updated connector config: %s", cfg.Name),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 // ── API Key auth middleware ────────────────────────────────────────────────────

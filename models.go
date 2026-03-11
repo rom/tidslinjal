@@ -65,6 +65,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Daglig standup", LabelFR: "Réunion debout"},
 	{Key: "physical_meeting", Label: "Physical Meeting", Color: "#D35400", IsSystem: true,
 		LabelSV: "Fysiskt möte", LabelFR: "Réunion physique", Icon: "🏢"},
+	{Key: "pause", Label: "Pause", Color: "#95A5A6", IsSystem: true, Icon: "⏸",
+		LabelSV: "Paus", LabelFR: "Pause"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -451,6 +453,10 @@ type Template struct {
 	OperationMode string          `json:"operation_mode,omitempty"` // exercise | incident | operation
 	GroupLabel    string          `json:"group_label,omitempty"`    // group | unit | team
 	UserLabel     string          `json:"user_label,omitempty"`     // users | soldiers | personnel
+	// Map / geographic settings
+	MapCenter     []float64       `json:"map_center,omitempty"`     // [lat, lng] default center
+	MapZoom       int             `json:"map_zoom,omitempty"`       // default zoom level
+	MapLocations  []MapLocation   `json:"map_locations,omitempty"`  // named locations (HQ, bases, POIs)
 }
 
 // TemplateAttachment stores attachment metadata within a template item
@@ -574,6 +580,34 @@ type ExerciseSettings struct {
 	UserLabel       string `json:"user_label,omitempty"`      // "users" | "soldiers" | "personnel"
 	OperationMode   string `json:"operation_mode,omitempty"`  // "exercise" | "incident" | "operation"
 	ExIndex         int    `json:"ex_index,omitempty"`        // exercise/incident index number
+	// Artificial time: user-defined "current time" for exercise simulation
+	ArtificialTime  string `json:"artificial_time,omitempty"` // ISO8601: the artificial "now"
+	ArtificialTimeEnabled bool `json:"artificial_time_enabled"`  // whether artificial time is active
+}
+
+// MapLocation represents a named geographic position (HQ, base, POI, etc.)
+type MapLocation struct {
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`        // hq | staff_hq | base | temp_base | target | poi | resource
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
+	Description string  `json:"description,omitempty"`
+	GroupID     int64   `json:"group_id,omitempty"` // optional: linked group/unit
+	Icon        string  `json:"icon,omitempty"`
+}
+
+// DecisionLogEntry represents a single entry in the decision log
+type DecisionLogEntry struct {
+	ID             int64     `json:"id"`
+	Timestamp      time.Time `json:"timestamp"`
+	UserID         int64     `json:"user_id"`
+	UserName       string    `json:"user_name"`
+	DisplayName    string    `json:"display_name"`
+	Decision       string    `json:"decision"`       // free text
+	LogType        string    `json:"log_type"`        // private | group | general
+	GroupID        int64     `json:"group_id,omitempty"` // if log_type=group
+	Confidential   bool      `json:"confidential"`    // only visible to users with confidential_read right
 }
 
 // AutoReportSchedule defines a server-side scheduled report

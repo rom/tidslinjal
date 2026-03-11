@@ -185,7 +185,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     return la < lb ? -1 : la > lb ? 1 : 0;
   });
   const _typeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
-    instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
+    instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
   typeSelect.innerHTML = sortedTypes.map(et => {
     const lbl = lang==='sv' && et.label_sv ? et.label_sv :
                 lang==='fr' && et.label_fr ? et.label_fr : et.label;
@@ -1718,7 +1718,7 @@ function renderSidebar() {
             const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
             const hidden = isTypeHidden(et.key);
             const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
-              instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
+              instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
             const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
             return `<div class="legend-item${hidden?' hidden-type':''}" data-action="toggleType" data-arg="${et.key}">
               <div class="legend-swatch" style="background:${et.color}"></div>
@@ -2351,6 +2351,35 @@ function renderSidebar() {
             title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
         </div>
       </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔌 ${t('settings_connectors')||'Connectors / Plugins'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_connectors_desc')||'Configure external system connectors. Each connector can poll external services and push events into Tidslinjal.'}
+        </p>
+        <div id="connectorList" style="margin-bottom:8px">Loading…</div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📤 ${t('settings_event_bus')||'Outbound Event Bus'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_event_bus_desc')||'The event bus broadcasts lifecycle events (created, updated, deleted) to all registered connectors and webhook endpoints in real-time.'}
+        </p>
+        <div style="font-size:var(--fs-xs);padding:6px 8px;background:var(--bg3);border-radius:var(--radius);color:var(--text-dim)">
+          ${t('settings_event_bus_status')||'Status: Active — events are routed to configured connectors and webhooks automatically.'}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📥 ${t('settings_ingest_api')||'Inbound Ingestion API'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_ingest_api_desc')||'External systems can push events into Tidslinjal via the Ingestion API. Authenticate with an API key using Authorization: Bearer <key>.'}
+        </p>
+        <div style="font-size:var(--fs-xs);padding:6px 8px;background:var(--bg3);border-radius:var(--radius)">
+          <code style="color:var(--accent);font-size:11px">POST /api/ingest</code>
+          <span style="color:var(--text-dim);margin-left:8px">${t('settings_ingest_format')||'JSON payload with title, start, end, type fields'}</span>
+        </div>
+      </div>
     `;
     // Load current OIDC settings into the form
     setTimeout(_initOIDCSettingsUI, 0);
@@ -2359,6 +2388,7 @@ function renderSidebar() {
     setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);
+    setTimeout(_loadConnectorList, 0);
   } else if (tab === 'tools') {
     const role          = state.user?.role || '';
     const isAdminOrOplead = hasRole2(role, 'oplead');
@@ -2381,6 +2411,8 @@ function renderSidebar() {
           ${role === 'admin' ? toolBtn('🔄', 'Gradual Backup', 'openGradualBackupModal()') : ''}
           ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
           ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
+          ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
         </div>
       </div>
     `;
@@ -2469,12 +2501,38 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_out_of_hours')||'Out-of-Hours Area'}</div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+        <div class="sidebar-section-title">${t('settings_day_visualisation')||'Day Visualisation'}</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
           <input type="checkbox" id="prefShowOOH" ${p.show_out_of_hours!==false?'checked':''} data-action="setOOHPref" data-event="change" data-arg-checked
             style="width:14px;height:14px;accent-color:var(--accent)">
-          ${t('settings_show_out_of_hours')||'Show ghosted area outside day hours'}
+          ${t('settings_show_out_of_hours')||'Show time outside day hours'}
         </label>
+        <div class="hour-range" style="margin-bottom:6px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_day_hours')}:</span>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_start')}</label>
+          <input type="number" min="0" max="23" value="${p.day_start_hour||0}" id="prefStartH2" style="width:52px" data-action="setHourPref" data-event="onchange">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">–</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_end')}</label>
+          <input type="number" min="1" max="24" value="${p.day_end_hour||24}" id="prefEndH2" style="width:52px" data-action="setHourPref" data-event="onchange">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="prefIncludeWeekends2" ${(ex.include_weekends!==false)?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="include_weekends"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_include_weekends')||'Include weekends'}
+        </label>
+        ${synthActive() ? `
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="prefSynthLabel2" ${p.synth_label?'checked':''} data-action="setSynthLabelPref" data-event="change" data-arg-checked
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_synth_label')||'Show H+N label on red line'}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="prefSynthDayOnly2" ${ex.day_hours_only?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="synth_day_hours_only"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('synth_day_hours_only')||'Synthetic time: day hours only'}
+        </label>` : ''}
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_event_icons')||'Event Icons'}</div>
@@ -2516,8 +2574,18 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔔 ${t('settings_push_notifications')||'Browser Notifications'}</div>
         <div id="pushNotifStatus" style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
-          ${Notification.permission === 'granted' ? '✅ Notifications are enabled' : Notification.permission === 'denied' ? '🚫 Blocked — allow in browser settings' : '⚠️ Permission not granted yet'}
+          ${Notification.permission === 'granted' ? '✅ ' + (t('settings_push_enabled')||'Notifications are enabled') : Notification.permission === 'denied' ? '🚫 ' + (t('settings_push_blocked')||'Blocked — allow in browser settings') : '⚠️ ' + (t('settings_push_not_granted')||'Permission not granted yet')}
         </div>
+        ${Notification.permission === 'denied' ? `
+        <details style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px;cursor:pointer">
+          <summary style="font-weight:600">${t('settings_push_howto')||'How to enable in your browser'}</summary>
+          <div style="margin-top:6px;line-height:1.6">
+            <p><strong>Chrome:</strong> ${t('push_chrome')||'Click the lock/tune icon in the address bar → Site settings → Notifications → Allow'}</p>
+            <p><strong>Edge:</strong> ${t('push_edge')||'Click the lock icon → Permissions for this site → Notifications → Allow'}</p>
+            <p><strong>Firefox:</strong> ${t('push_firefox')||'Click the lock icon → Connection secure → More Information → Permissions → Notifications → Allow'}</p>
+            <p><strong>Safari:</strong> ${t('push_safari')||'Safari menu → Settings → Websites → Notifications → find this site → Allow'}</p>
+          </div>
+        </details>` : ''}
         ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" data-action="requestPushPermission">${Notification.permission === 'granted' ? '✓ Granted' : 'Enable Notifications'}</button>` : ''}
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:4px">
           <input type="checkbox" ${p.push_alarms!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_alarms"
@@ -2578,9 +2646,23 @@ function renderSidebar() {
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Exercise Index</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${getExIndexLabel(ex)}
+            <span data-action="showExIndexInfo" style="cursor:pointer;margin-left:4px;opacity:.6" title="${t('exercise_index_info_tip')||'What is this?'}">ℹ️</span>
+          </label>
           <input type="number" id="exIndex" value="${ex.ex_index||0}" min="0"
             style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('artificial_time')||'Artificial time'}</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" id="exArtificialTimeEnabled" ${ex.artificial_time_enabled?'checked':''}
+              data-action="setArtificialTime" data-event="change"
+              style="width:14px;height:14px;accent-color:var(--accent)">
+            <input type="datetime-local" id="exArtificialTime" value="${ex.artificial_time ? fmtDateInput(new Date(ex.artificial_time)) : ''}"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('artificial_time_desc')||'Set a custom "current time" for exercise simulation'}</div>
         </div>
         <div class="form-check" style="margin-bottom:6px">
           <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
@@ -2801,6 +2883,8 @@ async function saveExercise() {
   const dayHrsOnly       = document.getElementById('exDayHoursOnly')?.checked || false;
   const includeWeekends  = document.getElementById('exIncludeWeekends')?.checked !== false;
   const exIndex          = parseInt(document.getElementById('exIndex')?.value || '0', 10);
+  const artTimeEnabled   = document.getElementById('exArtificialTimeEnabled')?.checked || false;
+  const artTimeVal       = document.getElementById('exArtificialTime')?.value;
   const payload = {
     enabled,
     epoch: epoch ? new Date(epoch).toISOString() : '',
@@ -2810,6 +2894,8 @@ async function saveExercise() {
     include_weekends: includeWeekends,
     group_label: state.exercise?.group_label || 'group',
     ex_index: exIndex,
+    artificial_time_enabled: artTimeEnabled,
+    artificial_time: artTimeVal ? new Date(artTimeVal).toISOString() : '',
   };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
@@ -3194,6 +3280,7 @@ async function saveProfile() {
 
   // Change password if provided
   if (newPw) {
+    if (!curPw) { showError(t('current_password_required') || 'Current password is required'); return; }
     if (newPw !== conPw) { showError(t('password_mismatch') || 'Passwords do not match'); return; }
     const res = await apiPost('/api/auth/change-password', {current_password: curPw, new_password: newPw});
     if (!res.ok) {
@@ -3295,7 +3382,7 @@ let _cachedPasswordPolicy = null;
 async function _loadProfilePwdPolicy() {
   try {
     if (!_cachedPasswordPolicy) {
-      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+      _cachedPasswordPolicy = await apiGet('/api/auth/password-policy').catch(() => null);
     }
     const ss = _cachedPasswordPolicy;
     const infoEl = document.getElementById('profilePwdPolicyInfo');
@@ -3316,7 +3403,7 @@ async function _loadProfilePwdPolicy() {
 async function _loadStandalonePwdPolicy() {
   try {
     if (!_cachedPasswordPolicy) {
-      _cachedPasswordPolicy = await apiGet('/api/admin/security').catch(() => null);
+      _cachedPasswordPolicy = await apiGet('/api/auth/password-policy').catch(() => null);
     }
     const ss = _cachedPasswordPolicy;
     const infoEl = document.getElementById('pwdPolicyInfo');
@@ -3358,7 +3445,7 @@ function _generatePassword(policy) {
 }
 
 async function generateProfilePassword() {
-  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  const policy = _cachedPasswordPolicy || await apiGet('/api/auth/password-policy').catch(() => null);
   _cachedPasswordPolicy = policy;
   const pw = _generatePassword(policy);
   const inp = document.getElementById('profilePwdNew');
@@ -3378,7 +3465,7 @@ function copyProfilePassword() {
 }
 
 async function generateStandalonePassword() {
-  const policy = _cachedPasswordPolicy || await apiGet('/api/admin/security').catch(() => null);
+  const policy = _cachedPasswordPolicy || await apiGet('/api/auth/password-policy').catch(() => null);
   _cachedPasswordPolicy = policy;
   const pw = _generatePassword(policy);
   const inp = document.getElementById('pwdNew');
@@ -3650,6 +3737,45 @@ async function deleteAPIKey(id) {
     await _loadAPIKeys();
   } else {
     showError('Failed to delete API key');
+  }
+}
+
+// ── Connectors list UI ──────────────────────────────────────────────────────
+async function _loadConnectorList() {
+  const listEl = document.getElementById('connectorList');
+  if (!listEl) return;
+  try {
+    const configs = await apiGet('/api/integrations/connectors');
+    if (!configs || !configs.length) {
+      listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('connectors_none')||'No connectors configured. Available connectors: Google Calendar, STIX/TAXII, RSS, Generic Webhook.'}</p>`;
+      return;
+    }
+    listEl.innerHTML = configs.map(c => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+        <div>
+          <strong style="font-size:var(--fs-sm)">${escHtml(c.name)}</strong>
+          <span style="color:${c.enabled ? 'var(--accent)' : 'var(--text-dim)'};font-size:var(--fs-xs);margin-left:6px">${c.enabled ? '● Active' : '○ Disabled'}</span>
+        </div>
+        <button class="btn btn-sm ${c.enabled ? 'btn-danger' : 'btn-secondary'}" data-action="toggleConnector" data-arg="${c.name}">
+          ${c.enabled ? 'Disable' : 'Enable'}
+        </button>
+      </div>
+    `).join('');
+    _bindActions(listEl);
+  } catch {
+    listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load connectors.</p>';
+  }
+}
+
+async function toggleConnector(name) {
+  const configs = await apiGet('/api/integrations/connectors').catch(() => []);
+  const cfg = (configs || []).find(c => c.name === name);
+  if (!cfg) return;
+  cfg.enabled = !cfg.enabled;
+  const res = await apiPut('/api/integrations/connectors', cfg);
+  if (res.ok) {
+    showNotification('success', `Connector ${name} ${cfg.enabled ? 'enabled' : 'disabled'}`);
+    await _loadConnectorList();
   }
 }
 
@@ -5511,6 +5637,200 @@ function getOperationNameLabel(ex) {
   if (mode === 'incident') return 'Incident name / ticket';
   if (mode === 'operation') return 'Operation name';
   return t('settings_exercise_label') || 'Exercise name';
+}
+
+// ── Exercise Index label helper ─────────────────────────────────────────────
+function getExIndexLabel(ex) {
+  const mode = ex && ex.operation_mode;
+  if (mode === 'incident') return t('exercise_index_incident') || 'Incident index';
+  if (mode === 'operation') return t('exercise_index_operation') || 'Operation index';
+  return t('exercise_index') || 'Exercise index';
+}
+
+function getExIndexDescription() {
+  return t('exercise_index_info') || 'A sequential number identifying this exercise/operation/incident instance. Used for tracking and reference in official documentation.';
+}
+
+function showExIndexInfo() {
+  showNotificationHTML(`<div style="max-width:380px"><h3 style="margin:0 0 8px;font-size:14px;color:var(--accent)">${getExIndexLabel(state.exercise||{})}</h3><p style="font-size:var(--fs-sm);color:var(--text-dim);line-height:1.5">${getExIndexDescription()}</p></div>`);
+}
+
+// ── Exercise Info Popup ─────────────────────────────────────────────────────
+function showExerciseInfoPopup() {
+  const ex = state.exercise || {};
+  const mode = ex.operation_mode || 'exercise';
+  const modeLabel = mode === 'incident' ? (t('mode_incident')||'Incident') : mode === 'operation' ? (t('mode_operation')||'Operation') : (t('mode_exercise')||'Exercise');
+  const epoch = ex.epoch ? new Date(ex.epoch) : null;
+  const endex = ex.endex ? new Date(ex.endex) : null;
+  const fmtDate = d => d ? d.toLocaleString() : '—';
+  const duration = (epoch && endex) ? _fmtDuration(endex - epoch) : '—';
+
+  const html = `
+    <div style="max-width:420px">
+      <h3 style="margin:0 0 12px;font-size:16px;color:var(--accent)">${escHtml(ex.label || modeLabel)}</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <tr><td style="padding:4px 8px;color:var(--text-dim);white-space:nowrap">${t('settings_operation_mode')||'Mode'}</td><td style="padding:4px 8px;font-weight:600">${escHtml(modeLabel)}</td></tr>
+        <tr><td style="padding:4px 8px;color:var(--text-dim)">${getStartexLabel(ex)}</td><td style="padding:4px 8px">${fmtDate(epoch)}</td></tr>
+        <tr><td style="padding:4px 8px;color:var(--text-dim)">${getEndexLabel(ex)}</td><td style="padding:4px 8px">${fmtDate(endex)}</td></tr>
+        <tr><td style="padding:4px 8px;color:var(--text-dim)">${t('duration')||'Duration'}</td><td style="padding:4px 8px">${duration}</td></tr>
+        ${ex.ex_index ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${getExIndexLabel(ex)}</td><td style="padding:4px 8px">#${ex.ex_index}</td></tr>` : ''}
+        <tr><td style="padding:4px 8px;color:var(--text-dim)">${t('settings_exercise_enable')||'Synthetic time'}</td><td style="padding:4px 8px">${ex.enabled ? '✅ ' + (t('enabled')||'Enabled') : '❌ ' + (t('disabled')||'Disabled')}</td></tr>
+        ${ex.day_hours_only ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('synth_day_hours_only')||'Day hours only'}</td><td style="padding:4px 8px">✅</td></tr>` : ''}
+        ${ex.include_weekends===false ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('settings_include_weekends')||'Weekends'}</td><td style="padding:4px 8px">❌ ${t('excluded')||'Excluded'}</td></tr>` : ''}
+        ${ex.paused ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('freeze_label')||'Frozen'}</td><td style="padding:4px 8px">⏸ ${ex.paused_at ? fmtDate(new Date(ex.paused_at)) : 'Yes'}</td></tr>` : ''}
+        ${ex.artificial_time_enabled ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('artificial_time')||'Artificial time'}</td><td style="padding:4px 8px">🕐 ${ex.artificial_time ? fmtDate(new Date(ex.artificial_time)) : '—'}</td></tr>` : ''}
+      </table>
+    </div>`;
+  showNotificationHTML(html);
+}
+
+function _fmtDuration(ms) {
+  const h = Math.floor(ms / 3600000);
+  const d = Math.floor(h / 24);
+  const rem = h % 24;
+  if (d > 0) return d + 'd ' + rem + 'h';
+  return h + 'h';
+}
+
+function showNotificationHTML(html) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20000;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.3);max-width:90vw;max-height:80vh;overflow:auto';
+  el.innerHTML = html + '<div style="text-align:right;margin-top:12px"><button class="btn btn-secondary btn-sm" style="min-width:60px">OK</button></div>';
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position:fixed;inset:0;z-index:19999;background:rgba(0,0,0,.4)';
+  const close = () => { el.remove(); backdrop.remove(); };
+  backdrop.onclick = close;
+  el.querySelector('button').onclick = close;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(el);
+}
+
+// ── Decision Log Modal ──────────────────────────────────────────────────────
+let _decisionLogEntries = [];
+
+async function openDecisionLogModal() {
+  await _loadDecisionLog();
+  const groups = state.groups || [];
+  const canWrite = hasRole2(state.user?.role, 'teamlead') || userHasCapability('decision_log_readwrite');
+  const html = `
+    <div class="modal-overlay" id="decisionLogModal" style="display:flex">
+      <div class="modal" style="max-width:700px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>📋 ${t('decision_log_title')||'Decision Log'}</h2>
+          <button class="modal-close" data-action="closeDecisionLogModal">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+          ${canWrite ? `
+          <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+            <textarea id="dlNewDecision" rows="3" placeholder="${t('decision_log_placeholder')||'Enter decision...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
+              <select id="dlLogType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="general">${t('decision_log_general')||'General (all)'}</option>
+                <option value="group">${t('decision_log_group')||'Group/Unit only'}</option>
+                <option value="private">${t('decision_log_private')||'Private'}</option>
+              </select>
+              <select id="dlGroupId" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                ${groups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')}
+              </select>
+              <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim)">
+                <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)">
+                ${t('confidential')||'Confidential'}
+              </label>
+              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add')||'Add'}</button>
+            </div>
+          </div>` : ''}
+          <div id="dlEntries" style="font-size:var(--fs-sm)">
+            ${_renderDecisionLogEntries()}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  _bindActions(document.getElementById('decisionLogModal'));
+  const logTypeEl = document.getElementById('dlLogType');
+  const groupIdEl = document.getElementById('dlGroupId');
+  if (logTypeEl && groupIdEl) {
+    logTypeEl.onchange = () => { groupIdEl.style.display = logTypeEl.value === 'group' ? '' : 'none'; };
+  }
+}
+
+function closeDecisionLogModal() { closeModal('decisionLogModal'); }
+
+async function _loadDecisionLog() {
+  try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch { _decisionLogEntries = []; }
+}
+
+function _renderDecisionLogEntries() {
+  if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
+  return _decisionLogEntries.slice().reverse().map(e => {
+    const ts = new Date(e.timestamp).toLocaleString();
+    const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
+    const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
+    const isAdmin = state.user?.role === 'admin';
+    return `<div style="padding:8px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span style="font-weight:600">${escHtml(e.display_name || e.user_name)}</span>
+          <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
+        </div>
+        ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
+      </div>
+      <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function addDecisionLogEntry() {
+  const text = document.getElementById('dlNewDecision')?.value?.trim();
+  if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
+  const logType = document.getElementById('dlLogType')?.value || 'general';
+  const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
+  const confidential = document.getElementById('dlConfidential')?.checked || false;
+  const res = await apiPost('/api/decision-log', {decision: text, log_type: logType, group_id: groupId, confidential});
+  if (res.ok) {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) el.innerHTML = _renderDecisionLogEntries();
+    _bindActions(el);
+    const inp = document.getElementById('dlNewDecision');
+    if (inp) inp.value = '';
+    showNotification('success', t('decision_added')||'Decision recorded');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to add decision');
+  }
+}
+
+async function deleteDecisionLogEntry(id) {
+  if (!confirm(t('decision_delete_confirm')||'Delete this decision log entry?')) return;
+  const res = await api('DELETE', `/api/decision-log/${id}`);
+  if (res.ok) {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+  }
+}
+
+// ── Map Window (detached) ────────────────────────────────────────────────────
+let _mapPopouts = [];
+
+function openDetachedMap() {
+  const w = Math.min(window.screen.availWidth, 1024);
+  const h = Math.min(window.screen.availHeight - 100, 700);
+  const mapWin = window.open('/static/map-popup.html', 'tidslinjal-map-' + Date.now(),
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (mapWin) _mapPopouts.push(mapWin);
+}
+
+// ── Artificial Time ─────────────────────────────────────────────────────────
+async function setArtificialTime() {
+  const val = document.getElementById('exArtificialTime')?.value;
+  const enabled = document.getElementById('exArtificialTimeEnabled')?.checked || false;
+  state.exercise = state.exercise || {};
+  state.exercise.artificial_time = val ? new Date(val).toISOString() : '';
+  state.exercise.artificial_time_enabled = enabled;
+  await saveExercise();
 }
 
 // ── Group Label Switching ──────────────────────────────────────────────────

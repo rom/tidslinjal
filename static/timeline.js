@@ -155,6 +155,9 @@ function updateSyntheticUI() {
     if (badge) {
       badge.style.display = (state.syntheticOn && ex.label) ? '' : 'none';
       badge.textContent   = ex.label || '';
+      badge.style.cursor = 'pointer';
+      badge.title = t('exercise_click_info') || 'Click for details';
+      badge.onclick = function() { showExerciseInfoPopup(); };
     }
   } else {
     btn.style.display = 'none';

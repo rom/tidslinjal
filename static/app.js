@@ -27,6 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const curPw = document.getElementById('pwdCurrent')?.value || '';
       const newPw = document.getElementById('pwdNew')?.value?.trim()    || '';
       const conPw = document.getElementById('pwdConfirm')?.value?.trim() || '';
+      if (!curPw) {
+        showError(t('current_password_required') || 'Current password is required', 'Validation'); return;
+      }
       if (!newPw || newPw !== conPw) {
         showError(t('password_mismatch') || 'Passwords do not match', 'Validation'); return;
       }
@@ -363,10 +366,15 @@ function toggleListView() {
     // Populate type filter
     const typeEl = document.getElementById('listTypeFilter');
     if (typeEl && typeEl.options.length <= 1) {
+      const _listTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
+        instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
+      const lang = state.preferences?.language || 'en';
       (state.eventTypes || []).forEach(et => {
         const opt = document.createElement('option');
         opt.value = et.key;
-        opt.textContent = et.label;
+        const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
+        const ico = et.icon || _listTypeIcons[et.key] || '';
+        opt.textContent = (ico ? ico + ' ' : '') + lbl;
         typeEl.appendChild(opt);
       });
     }
