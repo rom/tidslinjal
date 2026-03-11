@@ -326,6 +326,8 @@ type Event struct {
 	RoomName  string  `json:"room_name,omitempty"`
 	// Virtual meeting auto-creation
 	MeetingURL string `json:"meeting_url,omitempty"` // auto-generated Teams/Zoom link
+	// Countdown timer: minutes before event start to begin countdown (0 = no countdown)
+	CountdownBeforeMinutes int `json:"countdown_before_minutes,omitempty"`
 }
 
 // EventComment is a comment on an event

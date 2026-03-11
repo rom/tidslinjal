@@ -50,6 +50,8 @@ let currentStyle = '';
 let showDigits = false;
 let vcrColor = 'red';
 let _lastLang = '';
+let _localIsUTC = null; // null = follow opener, true/false = local override
+let _hourFormat = '24'; // '24' | '12'
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
@@ -276,20 +278,46 @@ function updateDeadlineIndicators(svgId, isUTC) {
 function getClockData() {
   try {
     const op = window.opener;
-    const isUTC = op?._clockUTC || false;
+    const openerUTC = op?._clockUTC || false;
+    // Use local override if set, otherwise follow opener
+    const isUTC = _localIsUTC !== null ? _localIsUTC : openerUTC;
     const extra = op?.state?.preferences?.extra_clocks || [];
     return { isUTC, extra };
-  } catch(e) { return { isUTC:false, extra:[] }; }
+  } catch(e) { return { isUTC: _localIsUTC || false, extra:[] }; }
 }
 
-/* ── Toggle local/Zulu time via opener ── */
-function toggleUTC() {
+/* ── Toggle local/Zulu time (local to this popup) ── */
+function setTZ(mode) {
+  _localIsUTC = (mode === 'zulu');
+  document.getElementById('btnTzLocal').classList.toggle('active', !_localIsUTC);
+  document.getElementById('btnTzZulu').classList.toggle('active', _localIsUTC);
+  // Also sync to opener if available
   try {
-    if (typeof window.opener?.toggleClockTZ === 'function') {
-      window.opener.toggleClockTZ();
+    if (typeof window.opener?.setClockFormat === 'function') {
+      window.opener.setClockFormat(_localIsUTC ? 'zulu' : 'local');
     }
   } catch(e) {}
+  rebuildClocks();
   tick();
+}
+
+function toggleUTC() {
+  const {isUTC} = getClockData();
+  setTZ(isUTC ? 'local' : 'zulu');
+}
+
+/* ── 12h/24h format toggle ── */
+function setHourFormat(fmt) {
+  _hourFormat = fmt;
+  document.getElementById('btnFmt24').classList.toggle('active', fmt === '24');
+  document.getElementById('btnFmt12').classList.toggle('active', fmt === '12');
+  tick();
+}
+
+function formatHour12(h, m, s) {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return pad(h12) + ':' + pad(m) + ':' + pad(s) + ' ' + ampm;
 }
 
 /* ── Remove a clock by calling parent ── */
@@ -389,21 +417,32 @@ function tick() {
   let h, m, s, dateStr, tzLabel, timeStr;
   if (isUTC) {
     h=now.getUTCHours(); m=now.getUTCMinutes(); s=now.getUTCSeconds();
-    timeStr = pad(h)+pad(m)+pad(s)+'Z';
+    if (_hourFormat === '12') {
+      timeStr = formatHour12(h,m,s) + ' Z';
+    } else {
+      timeStr = pad(h)+pad(m)+pad(s)+'Z';
+    }
     dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
     tzLabel = 'UTC/Z';
   } else {
     h=now.getHours(); m=now.getMinutes(); s=now.getSeconds();
-    timeStr = pad(h)+':'+pad(m)+':'+pad(s);
+    if (_hourFormat === '12') {
+      timeStr = formatHour12(h,m,s);
+    } else {
+      timeStr = pad(h)+':'+pad(m)+':'+pad(s);
+    }
     dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     try { tzLabel=now.toLocaleTimeString(locale,{timeZoneName:'short'}).split(' ').pop(); } catch{tzLabel='';}
   }
+
+  // Display hours for VCR seven-segment (always use display h/m/s, respect 12h)
+  const dispH = _hourFormat === '12' ? (h % 12 || 12) : h;
 
   if (clockMode === 'analog') {
     updateAnalog('svg-main', h, m, s);
     updateDeadlineIndicators('svg-main', isUTC);
   } else if (clockMode === 'vcr') {
-    const segEl=document.getElementById('vcr-main-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(h,m,s);
+    const segEl=document.getElementById('vcr-main-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(dispH,m,s);
   } else {
     const t=document.getElementById('main-time'); if(t)t.textContent=timeStr;
   }
@@ -418,12 +457,18 @@ function tick() {
       const ecH = parseInt(ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecM = parseInt(ecTime.toLocaleTimeString('en-GB',{minute:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecS = parseInt(ecTime.toLocaleTimeString('en-GB',{second:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
-      const ecTStr = ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:ec.timezone});
+      let ecTStr;
+      if (_hourFormat === '12') {
+        ecTStr = formatHour12(ecH, ecM, ecS);
+      } else {
+        ecTStr = ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:ec.timezone});
+      }
       const ecTZ = ecTime.toLocaleTimeString('en-GB',{timeZoneName:'short',timeZone:ec.timezone}).split(' ').pop()||ec.timezone;
+      const ecDispH = _hourFormat === '12' ? (ecH % 12 || 12) : ecH;
       if (clockMode === 'analog') {
         updateAnalog('svg-'+ec.id, ecH, ecM, ecS);
       } else if (clockMode === 'vcr') {
-        const segEl=document.getElementById('vcr-ec-'+ec.id+'-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(ecH,ecM,ecS);
+        const segEl=document.getElementById('vcr-ec-'+ec.id+'-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(ecDispH,ecM,ecS);
       } else {
         const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent=ecTStr;
       }
@@ -433,6 +478,247 @@ function tick() {
       const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent='??:??:??';
     }
   });
+}
+
+/* ── Countdown timer system ── */
+let _countdowns = []; // { id, label, targetTime, totalMs, continueUp, playSound, paused, pausedRemaining, acknowledged }
+let _nextCountdownId = 1;
+let _cdAudioCtx = null;
+
+function addCountdown(label, hours, minutes, seconds, continueUp, playSound) {
+  const totalMs = ((hours * 3600) + (minutes * 60) + seconds) * 1000;
+  if (totalMs <= 0) return;
+  const cd = {
+    id: _nextCountdownId++,
+    label: label || 'Countdown',
+    targetTime: Date.now() + totalMs,
+    totalMs: totalMs,
+    continueUp: continueUp,
+    playSound: playSound,
+    paused: false,
+    pausedRemaining: 0,
+    acknowledged: false,
+    expired: false
+  };
+  _countdowns.push(cd);
+  renderCountdowns();
+}
+
+function addCountdownForEvent(ev, minutesBefore) {
+  const eventTime = new Date(ev.start_time).getTime();
+  const targetTime = eventTime - (minutesBefore * 60 * 1000);
+  const remaining = targetTime - Date.now();
+  if (remaining <= 0) return; // already past
+  const cd = {
+    id: _nextCountdownId++,
+    label: ev.title || 'Event',
+    targetTime: targetTime,
+    totalMs: remaining,
+    continueUp: true,
+    playSound: true,
+    paused: false,
+    pausedRemaining: 0,
+    acknowledged: false,
+    expired: false
+  };
+  _countdowns.push(cd);
+  renderCountdowns();
+}
+
+function removeCountdown(id) {
+  _countdowns = _countdowns.filter(cd => cd.id !== id);
+  renderCountdowns();
+}
+
+function togglePauseCountdown(id) {
+  const cd = _countdowns.find(c => c.id === id);
+  if (!cd) return;
+  if (cd.paused) {
+    // Resume: set new target based on remaining
+    cd.targetTime = Date.now() + cd.pausedRemaining;
+    cd.paused = false;
+  } else {
+    // Pause: store remaining
+    cd.pausedRemaining = cd.targetTime - Date.now();
+    cd.paused = true;
+  }
+}
+
+function acknowledgeCountdown(id) {
+  const cd = _countdowns.find(c => c.id === id);
+  if (!cd) return;
+  cd.acknowledged = true;
+  // Log audit event to opener
+  try {
+    const user = window.opener?.state?.user;
+    const userName = user?.display_name || user?.username || 'Unknown';
+    if (typeof window.opener?.apiPost === 'function') {
+      window.opener.apiPost('/api/audit', {
+        action: 'countdown_acknowledged',
+        entity_type: 'countdown',
+        summary: userName + ' acknowledged countdown: ' + cd.label
+      });
+    }
+  } catch(e) {}
+  renderCountdowns();
+}
+
+function resetCountdown(id) {
+  const cd = _countdowns.find(c => c.id === id);
+  if (!cd) return;
+  cd.targetTime = Date.now() + cd.totalMs;
+  cd.paused = false;
+  cd.expired = false;
+  cd.acknowledged = false;
+  renderCountdowns();
+}
+
+function playCdAlarm() {
+  try {
+    if (!_cdAudioCtx) _cdAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _cdAudioCtx;
+    // Play a series of beeps
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'square';
+      gain.gain.value = 0.15;
+      const t = ctx.currentTime + i * 0.3;
+      osc.start(t);
+      osc.stop(t + 0.15);
+    }
+  } catch(e) {}
+}
+
+function renderCountdowns() {
+  const wrap = document.getElementById('countdownWrap');
+  if (!wrap) return;
+  if (_countdowns.length === 0) { wrap.innerHTML = ''; return; }
+  let html = '';
+  _countdowns.forEach(cd => {
+    const isExpired = !cd.paused && Date.now() >= cd.targetTime;
+    const classes = ['clock-card', 'countdown-card'];
+    if (clockMode === 'vcr') classes.push('vcr-card');
+    if (isExpired && !cd.acknowledged) classes.push('cd-expired');
+    if (isExpired && cd.continueUp) classes.push('cd-counting-up');
+
+    let timeDisplay;
+    if (clockMode === 'vcr') {
+      timeDisplay = `<div class="clock-time vcr-time countdown-time" id="cd-time-${cd.id}">${buildSeg7Time(0,0,0)}</div>`;
+    } else {
+      timeDisplay = `<div class="clock-time countdown-time" id="cd-time-${cd.id}">00:00:00</div>`;
+    }
+
+    const lblText = cd.label + (isExpired && cd.continueUp && !cd.acknowledged ? ' (ELAPSED)' : isExpired ? ' (EXPIRED)' : '');
+    const labelHtml = clockMode === 'vcr'
+      ? `<div class="clock-label vcr-label">${buildSeg7Text(cd.label)}</div>`
+      : `<div class="clock-label">${escH(lblText)}</div>`;
+
+    html += `<div class="${classes.join(' ')}" id="cd-card-${cd.id}">
+      <button class="clock-remove" title="Remove" data-rm-cd="${cd.id}">&times;</button>
+      ${labelHtml}
+      ${timeDisplay}
+      <div class="countdown-controls">
+        <button data-cd-pause="${cd.id}">${cd.paused ? '▶' : '⏸'}</button>
+        <button data-cd-reset="${cd.id}">↺</button>
+        ${isExpired && !cd.acknowledged ? `<button data-cd-ack="${cd.id}" style="background:var(--danger,#e05252);color:#fff;border-color:var(--danger,#e05252)">✓ Acknowledge</button>` : ''}
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  // Bind events
+  wrap.querySelectorAll('[data-rm-cd]').forEach(btn => {
+    btn.addEventListener('click', () => removeCountdown(parseInt(btn.dataset.rmCd, 10)));
+  });
+  wrap.querySelectorAll('[data-cd-pause]').forEach(btn => {
+    btn.addEventListener('click', () => { togglePauseCountdown(parseInt(btn.dataset.cdPause, 10)); renderCountdowns(); });
+  });
+  wrap.querySelectorAll('[data-cd-reset]').forEach(btn => {
+    btn.addEventListener('click', () => resetCountdown(parseInt(btn.dataset.cdReset, 10)));
+  });
+  wrap.querySelectorAll('[data-cd-ack]').forEach(btn => {
+    btn.addEventListener('click', () => acknowledgeCountdown(parseInt(btn.dataset.cdAck, 10)));
+  });
+}
+
+function tickCountdowns() {
+  _countdowns.forEach(cd => {
+    if (cd.paused) {
+      // Show paused remaining
+      const rem = Math.max(0, cd.pausedRemaining);
+      displayCountdownTime(cd.id, rem, false);
+      return;
+    }
+    const remaining = cd.targetTime - Date.now();
+    if (remaining > 0) {
+      displayCountdownTime(cd.id, remaining, false);
+    } else {
+      // Expired
+      if (!cd.expired) {
+        cd.expired = true;
+        if (cd.playSound) playCdAlarm();
+        renderCountdowns(); // Re-render for expired styling
+      }
+      if (cd.continueUp) {
+        displayCountdownTime(cd.id, -remaining, true);
+      } else {
+        displayCountdownTime(cd.id, 0, true);
+      }
+    }
+  });
+}
+
+function displayCountdownTime(id, ms, isOvertime) {
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const prefix = isOvertime ? '+' : '';
+  const el = document.getElementById('cd-time-' + id);
+  if (!el) return;
+  if (clockMode === 'vcr') {
+    el.innerHTML = buildSeg7Time(h, m, s);
+  } else {
+    el.textContent = prefix + pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+  // Update card classes for expired state
+  const card = document.getElementById('cd-card-' + id);
+  if (card) {
+    const cd = _countdowns.find(c => c.id === id);
+    if (cd && cd.expired && !cd.acknowledged) {
+      card.classList.add('cd-expired');
+    }
+  }
+}
+
+// Check opener for events with countdown settings
+function loadEventCountdowns() {
+  try {
+    const events = window.opener?.state?.events || [];
+    const now = Date.now();
+    events.forEach(ev => {
+      if (!ev.countdown_before_minutes) return;
+      const eventTime = new Date(ev.start_time).getTime();
+      const cdTarget = eventTime - (ev.countdown_before_minutes * 60 * 1000);
+      // Only create if countdown hasn't expired yet (or recently expired within 1 hour)
+      if (cdTarget > now - 3600000 && !_countdowns.some(c => c.label === ev.title)) {
+        addCountdownForEvent(ev, ev.countdown_before_minutes);
+      }
+    });
+  } catch(e) {}
+}
+
+// Countdown popover controls
+function showCountdownPopover() {
+  document.getElementById('countdownPopover').style.display = '';
+  document.getElementById('countdownOverlay').style.display = '';
+}
+function hideCountdownPopover() {
+  document.getElementById('countdownPopover').style.display = 'none';
+  document.getElementById('countdownOverlay').style.display = 'none';
 }
 
 // Bind toolbar controls (CSP-safe, no inline handlers)
@@ -445,9 +731,51 @@ slider.addEventListener('input', function() { applySize(this.value); });
 slider.addEventListener('change', function() { applySize(this.value); });
 document.getElementById('btnDigits').addEventListener('click', toggleDigits);
 document.getElementById('selVcrColor').addEventListener('change', function() { setVcrColor(this.value); });
+document.getElementById('btnTzLocal').addEventListener('click', function() { setTZ('local'); });
+document.getElementById('btnTzZulu').addEventListener('click', function() { setTZ('zulu'); });
+document.getElementById('btnFmt24').addEventListener('click', function() { setHourFormat('24'); });
+document.getElementById('btnFmt12').addEventListener('click', function() { setHourFormat('12'); });
+
+// Countdown popover bindings
+document.getElementById('btnAddCountdown').addEventListener('click', showCountdownPopover);
+document.getElementById('cdCancel').addEventListener('click', hideCountdownPopover);
+document.getElementById('countdownOverlay').addEventListener('click', hideCountdownPopover);
+document.getElementById('cdStart').addEventListener('click', function() {
+  const label = document.getElementById('cdLabel').value.trim();
+  const hours = parseInt(document.getElementById('cdHours').value, 10) || 0;
+  const minutes = parseInt(document.getElementById('cdMinutes').value, 10) || 0;
+  const seconds = parseInt(document.getElementById('cdSeconds').value, 10) || 0;
+  const continueUp = document.getElementById('cdContinueUp').checked;
+  const playSound = document.getElementById('cdPlaySound').checked;
+  addCountdown(label, hours, minutes, seconds, continueUp, playSound);
+  hideCountdownPopover();
+  // Reset form
+  document.getElementById('cdLabel').value = '';
+  document.getElementById('cdHours').value = '0';
+  document.getElementById('cdMinutes').value = '30';
+  document.getElementById('cdSeconds').value = '0';
+});
+document.querySelectorAll('.cd-preset').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const h = parseInt(btn.dataset.h, 10) || 0;
+    const m = parseInt(btn.dataset.m, 10) || 0;
+    document.getElementById('cdHours').value = h;
+    document.getElementById('cdMinutes').value = m;
+    document.getElementById('cdSeconds').value = '0';
+  });
+});
+
+// Initialize TZ state from opener
+try {
+  const openerUTC = window.opener?._clockUTC || false;
+  _localIsUTC = openerUTC;
+  document.getElementById('btnTzLocal').classList.toggle('active', !_localIsUTC);
+  document.getElementById('btnTzZulu').classList.toggle('active', _localIsUTC);
+} catch(e) {}
 
 // Initial build + start ticking
 rebuildClocks();
 applySize(2);
+loadEventCountdowns();
 tick();
-setInterval(tick, 1000);
+setInterval(function() { tick(); tickCountdowns(); }, 1000);

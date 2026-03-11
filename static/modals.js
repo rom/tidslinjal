@@ -239,6 +239,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     if (ev.recurrence_end) document.getElementById('eventRecurrenceEnd').value = fmtDateInput(new Date(ev.recurrence_end));
   }
 
+  // Countdown timer
+  const cdSelect = document.getElementById('eventCountdownBefore');
+  if (cdSelect) cdSelect.value = ev?.countdown_before_minutes || '0';
+
   // Status
   document.getElementById('eventStatus').value = (ev && ev.status) ? ev.status : 'planned';
 
@@ -478,6 +482,7 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     virtual_meeting_type: document.getElementById('eventVirtualMeetingType')?.value || '',
     latitude:           document.getElementById('eventLatitude')?.value ? parseFloat(document.getElementById('eventLatitude').value) : null,
     longitude:          document.getElementById('eventLongitude')?.value ? parseFloat(document.getElementById('eventLongitude').value) : null,
+    countdown_before_minutes: parseInt(document.getElementById('eventCountdownBefore')?.value, 10) || 0,
   };
 
   // Track undo for updates
@@ -1770,6 +1775,7 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_synth_time')||'Synthetic time'}:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${navigator.onLine ? '<span style="color:#22c55e">● Online</span>' : '<span style="color:var(--red,#E74C3C)">● Offline</span>'}</span>
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
       </div>
@@ -5960,6 +5966,19 @@ function showExerciseInfoPopup() {
   const fmtDate = d => d ? d.toLocaleString() : '—';
   const duration = (epoch && endex) ? _fmtDuration(endex - epoch) : '—';
 
+  // Compute progressed (synthetic) time
+  let progressedTimeStr = '—';
+  let elapsedSinceEpoch = '—';
+  if (ex.enabled && typeof getNow === 'function') {
+    const synNow = getNow();
+    progressedTimeStr = fmtDate(synNow);
+    if (epoch) {
+      const elapsed = synNow.getTime() - epoch.getTime();
+      elapsedSinceEpoch = _fmtDuration(Math.abs(elapsed));
+      if (elapsed < 0) elapsedSinceEpoch = '-' + elapsedSinceEpoch;
+    }
+  }
+
   const html = `
     <div style="max-width:420px">
       <h3 style="margin:0 0 12px;font-size:16px;color:var(--accent)">${escHtml(ex.label || modeLabel)}</h3>
@@ -5970,6 +5989,8 @@ function showExerciseInfoPopup() {
         <tr><td style="padding:4px 8px;color:var(--text-dim)">${t('duration')||'Duration'}</td><td style="padding:4px 8px">${duration}</td></tr>
         ${ex.ex_index ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${getExIndexLabel(ex)}</td><td style="padding:4px 8px">#${ex.ex_index}</td></tr>` : ''}
         <tr><td style="padding:4px 8px;color:var(--text-dim)">${t('settings_exercise_enable')||'Synthetic time'}</td><td style="padding:4px 8px">${ex.enabled ? '✅ ' + (t('enabled')||'Enabled') : '❌ ' + (t('disabled')||'Disabled')}</td></tr>
+        ${ex.enabled ? `<tr style="background:var(--bg3)"><td style="padding:6px 8px;color:var(--accent);font-weight:600">${t('progressed_time')||'Progressed Time'}</td><td style="padding:6px 8px;font-weight:700;color:var(--accent);font-size:var(--fs-lg)">${progressedTimeStr}</td></tr>
+        <tr style="background:var(--bg3)"><td style="padding:4px 8px;color:var(--text-dim)">${t('elapsed_since')||'Elapsed since'} ${getStartexLabel(ex)}</td><td style="padding:4px 8px;font-weight:600">${elapsedSinceEpoch}</td></tr>` : ''}
         ${ex.day_hours_only ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('synth_day_hours_only')||'Day hours only'}</td><td style="padding:4px 8px">✅</td></tr>` : ''}
         ${ex.include_weekends===false ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('settings_include_weekends')||'Weekends'}</td><td style="padding:4px 8px">❌ ${t('excluded')||'Excluded'}</td></tr>` : ''}
         ${ex.paused ? `<tr><td style="padding:4px 8px;color:var(--text-dim)">${t('freeze_label')||'Frozen'}</td><td style="padding:4px 8px">⏸ ${ex.paused_at ? fmtDate(new Date(ex.paused_at)) : 'Yes'}</td></tr>` : ''}
