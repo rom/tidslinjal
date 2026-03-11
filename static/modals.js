@@ -2182,11 +2182,13 @@ function renderSidebar() {
             </div>
             ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${labelMap[resSubTab].toLowerCase()} yet.</p>` : ''}
             ${filtered.map(r => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
-                <div>
-                  <div style="font-size:var(--fs-sm);font-weight:600">${escHtml(r.name)}</div>
+              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+                ${r.image_name ? `<img src="/api/rooms/${r.id}/image" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border)">` :
+                  `<span style="font-size:24px;width:48px;text-align:center">${r.icon || iconMap[resSubTab]}</span>`}
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:var(--fs-sm);font-weight:600">${r.icon && !r.image_name ? r.icon+' ' : ''}${escHtml(r.name)}</div>
                   ${r.location ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">📍 ${escHtml(r.location)}</div>` : ''}
-                  ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">Capacity: ${r.capacity}</div>` : ''}
+                  ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
                 </div>
                 <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el>✏️</button>
@@ -4486,26 +4488,50 @@ async function deleteRoom(id) {
   if (res.ok) { showNotification('success','Room deleted'); _loadRoomList(); }
 }
 
+// Symbol palettes for each resource type
+const _resourceSymbols = {
+  room: ['🏠','🚪','🛋','📐','🪑','🖥','📽','🎙','📞','🏫','🏥','🏛','🏗','🔬','🧪'],
+  building: ['🏢','🏬','🏭','🏗','🏛','🏤','🏣','🏦','🏨','🏩','🏪','🏫','🏥','⛪','🕌','🕍','🛕','⛩','🏰','🏯','🗼','🏚','🏘','🏙','🌆','🌇','🌃','🗽','🏟','⛲'],
+  computer_service: ['💻','🖥','🖨','🖱','⌨','💾','💿','📀','🔌','📡','📶','🌐','🔒','🔑','🛡','⚙','🔧','🧰','📊','📈','🗄','🗃','📁','📂','📧','📨','🔗','🧮','☁','🔄','📲','📱','🤖','🧠','🔬','📟','🎛','📺','🎮','🕹','🌍','🔐','🛜','📳','🏧'],
+  data_center: ['🖥','🗄','💾','📡','🔌','⚡','❄','🌡','🔒','🛡','🏗','🏢','📊','🔄','☁','🌐','📶','🧊','🔧','⚙','🖧','📦','🗃','🔋','💡','🌀','🎚','🎛','📟','🧰']
+};
+
 function openRoomModal(argJson) {
   const data = typeof argJson === 'string' ? JSON.parse(argJson) : (argJson || {});
   const isEdit = !!data.id;
   const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center'};
   const label = typeLabel[data.type] || 'Resource';
+  const symbols = _resourceSymbols[data.type] || _resourceSymbols.room;
+  const currentIcon = data.icon || '';
+  const hasImage = isEdit && data.image_name;
+
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
-    <div class="modal" style="max-width:420px">
-      <div class="modal-header"><h3>${isEdit ? 'Edit' : 'Add'} ${escHtml(label)}</h3>
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header"><h3>${isEdit ? (t('btn_edit')||'Edit') : (t('btn_add')||'Add')} ${escHtml(label)}</h3>
         <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button></div>
-      <div class="modal-body">
-        <label class="form-label">Name</label>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <label class="form-label">${t('name')||'Name'}</label>
         <input class="form-input" id="rmName" value="${escHtml(data.name||'')}">
-        <label class="form-label" style="margin-top:8px">Description</label>
+        <label class="form-label" style="margin-top:8px">${t('description')||'Description'}</label>
         <input class="form-input" id="rmDesc" value="${escHtml(data.description||'')}">
-        <label class="form-label" style="margin-top:8px">Location</label>
+        <label class="form-label" style="margin-top:8px">${t('location')||'Location'}</label>
         <input class="form-input" id="rmLoc" value="${escHtml(data.location||'')}">
-        ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">Capacity</label>
+        ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">${t('capacity')||'Capacity'}</label>
         <input class="form-input" id="rmCap" type="number" value="${data.capacity||0}">` : ''}
+
+        <label class="form-label" style="margin-top:12px">${t('rm_icon')||'Symbol'}</label>
+        <div id="rmIconGrid" style="display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto;padding:4px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
+          ${symbols.map(s => `<button type="button" class="rm-icon-btn${currentIcon===s?' rm-icon-selected':''}" data-icon="${s}" style="font-size:20px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:${currentIcon===s?'var(--accent)':'var(--bg2)'};border:1px solid ${currentIcon===s?'var(--accent)':'var(--border)'};border-radius:var(--radius);cursor:pointer">${s}</button>`).join('')}
+        </div>
+        <input type="hidden" id="rmIcon" value="${escHtml(currentIcon)}">
+
+        <label class="form-label" style="margin-top:12px">${t('rm_image')||'Photo / Image'}</label>
+        ${hasImage ? `<div id="rmCurrentImage" style="margin-bottom:6px">
+          <img src="/api/rooms/${data.id}/image" alt="Resource image" style="max-width:100%;max-height:150px;border-radius:var(--radius);border:1px solid var(--border)">
+        </div>` : ''}
+        <input type="file" id="rmImageFile" accept="image/*" style="font-size:var(--fs-xs)">
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" data-action="_closeParentModal" data-arg-el>${t('btn_cancel')||'Cancel'}</button>
@@ -4514,6 +4540,22 @@ function openRoomModal(argJson) {
     </div>`;
   document.body.appendChild(modal);
   _bindActions(modal);
+
+  // Icon selection
+  modal.querySelectorAll('.rm-icon-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('.rm-icon-btn').forEach(b => {
+        b.style.background = 'var(--bg2)';
+        b.style.borderColor = 'var(--border)';
+        b.classList.remove('rm-icon-selected');
+      });
+      btn.style.background = 'var(--accent)';
+      btn.style.borderColor = 'var(--accent)';
+      btn.classList.add('rm-icon-selected');
+      document.getElementById('rmIcon').value = btn.dataset.icon;
+    });
+  });
+
   modal.querySelector('#rmSaveBtn').addEventListener('click', async () => {
     const room = {
       name: document.getElementById('rmName').value.trim(),
@@ -4521,21 +4563,34 @@ function openRoomModal(argJson) {
       description: document.getElementById('rmDesc')?.value?.trim() || '',
       location: document.getElementById('rmLoc')?.value?.trim() || '',
       capacity: parseInt(document.getElementById('rmCap')?.value) || 0,
+      icon: document.getElementById('rmIcon')?.value || '',
       enabled: true,
     };
-    if (!room.name) { showError('Name required'); return; }
-    let res;
     if (isEdit) {
       room.id = data.id;
-      res = await apiPut('/api/rooms', room);
-    } else {
-      res = await apiPut('/api/rooms', room);
+      room.image_name = data.image_name || '';
     }
-    if (res.ok) {
-      showNotification('success', `${label} saved`);
-      modal.remove();
-      _activateSidebarTab('resources');
-    } else { showError('Failed to save'); }
+    if (!room.name) { showError(t('name')||'Name required'); return; }
+    const res = await apiPut('/api/rooms', room);
+    if (!res.ok) { showError('Failed to save'); return; }
+
+    // Upload image if selected
+    const imgFile = document.getElementById('rmImageFile')?.files?.[0];
+    const roomId = isEdit ? data.id : (await (async () => {
+      // For new rooms, fetch the room list to find the one we just created
+      const rooms = await apiGet('/api/rooms');
+      const found = rooms?.find(r => r.name === room.name && r.type === room.type);
+      return found?.id;
+    })());
+    if (imgFile && roomId) {
+      const fd = new FormData();
+      fd.append('image', imgFile);
+      await api('POST', `/api/rooms/${roomId}/image`, fd);
+    }
+
+    showNotification('success', `${label} ${t('saved')||'saved'}`);
+    modal.remove();
+    _activateSidebarTab('resources');
   });
 }
 

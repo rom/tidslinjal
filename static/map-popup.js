@@ -254,15 +254,19 @@ async function loadResourceLayers() {
       if (!coords) return;
       const layer = layerMap[r.type] || _roomsLayer;
       const color = colorMap[r.type] || '#27ae60';
-      const icon = iconMap[r.type] || '🏠';
+      const icon = r.icon || iconMap[r.type] || '🏠';
+      const markerHtml = r.image_name
+        ? `<div style="width:32px;height:32px;border-radius:50%;border:2px solid ${color};overflow:hidden"><img src="/api/rooms/${r.id}/image" style="width:100%;height:100%;object-fit:cover"></div>`
+        : `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px">${icon}</div>`;
       const marker = L.marker(coords, {
         icon: L.divIcon({
           className: 'resource-marker',
-          html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px">${icon}</div>`,
-          iconSize: [28, 28], iconAnchor: [14, 14]
+          html: markerHtml,
+          iconSize: [32, 32], iconAnchor: [16, 16]
         })
       });
-      marker.bindPopup(`<b>${escH(r.name)}</b><br>${escH(r.type)}<br>${escH(r.location||'')}${r.capacity ? '<br>Capacity: '+r.capacity : ''}`);
+      const popupImg = r.image_name ? `<img src="/api/rooms/${r.id}/image" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px">` : '';
+      marker.bindPopup(`${popupImg}<b>${icon} ${escH(r.name)}</b><br>${escH(r.type)}<br>${escH(r.location||'')}${r.capacity ? '<br>Capacity: '+r.capacity : ''}${r.description ? '<br><em>'+escH(r.description)+'</em>' : ''}`);
       marker.bindTooltip(r.name, { direction: 'top', offset: [0, -14] });
       layer.addLayer(marker);
     });
