@@ -485,6 +485,7 @@ function tick() {
 
 /* ── Countdown timer system ── */
 let _countdowns = []; // { id, label, targetTime, totalMs, continueUp, playSound, paused, pausedRemaining, acknowledged }
+window._countdowns = _countdowns; // expose for detached windows
 let _nextCountdownId = 1;
 let _cdAudioCtx = null;
 
@@ -530,7 +531,8 @@ function addCountdownForEvent(ev, minutesBefore) {
 }
 
 function removeCountdown(id) {
-  _countdowns = _countdowns.filter(cd => cd.id !== id);
+  const idx = _countdowns.findIndex(cd => cd.id === id);
+  if (idx !== -1) _countdowns.splice(idx, 1);
   renderCountdowns();
 }
 

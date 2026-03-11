@@ -6685,9 +6685,18 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 	hasConfidentialRead := app.userHasCapability(user, "confidential_read")
 	isAdmin := user.Role == RoleAdmin
 	for _, e := range entries {
-		if e.Confidential && !hasConfidentialRead {
-			// Hide the decision text, but show that a confidential entry exists
-			e.Decision = "[CONFIDENTIAL]"
+		if e.Confidential && !hasConfidentialRead && !isAdmin {
+			// For confidential entries, only expose: timestamp, who decided, and confidential flag
+			e.Decision = ""
+			e.Title = ""
+			e.ReviewComment = ""
+			e.Attachments = nil
+			e.ExecutorType = ""
+			e.ExecutorValue = ""
+			e.ExecutorLabel = ""
+			e.RequestedOfType = ""
+			e.RequestedOfValue = ""
+			e.RequestedOfLabel = ""
 		}
 		if isAdmin || e.LogType == "general" || e.UserID == user.ID {
 			visible = append(visible, e)
