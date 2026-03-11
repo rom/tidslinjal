@@ -119,6 +119,10 @@ type User struct {
 	WebCalToken string `json:"webcal_token,omitempty"`
 	// Blocked: admin can block a user from logging in (even via OIDC)
 	Blocked bool `json:"blocked,omitempty"`
+	// Location: user's physical location (free text, e.g. "Stockholm, Sweden")
+	Location  string  `json:"location,omitempty"`
+	Latitude  float64 `json:"latitude,omitempty"`
+	Longitude float64 `json:"longitude,omitempty"`
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
@@ -149,6 +153,9 @@ type UserPublic struct {
 	LastLoginDomain  string     `json:"last_login_domain,omitempty"`
 	IsOIDC           bool       `json:"is_oidc,omitempty"`
 	Blocked          bool       `json:"blocked,omitempty"`
+	Location         string     `json:"location,omitempty"`
+	Latitude         float64    `json:"latitude,omitempty"`
+	Longitude        float64    `json:"longitude,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -177,6 +184,9 @@ func (u *User) Public() UserPublic {
 		LastLoginDomain:  u.LastLoginDomain,
 		IsOIDC:           u.IsOIDC,
 		Blocked:          u.Blocked,
+		Location:         u.Location,
+		Latitude:         u.Latitude,
+		Longitude:        u.Longitude,
 	}
 }
 
@@ -229,6 +239,7 @@ type UserPreferences struct {
 	DateFormat      string       `json:"date_format,omitempty"`    // iso | uk | fr | sv
 	ExtraClocks     []ExtraClock `json:"extra_clocks,omitempty"`   // additional timezone clocks
 	ShowEventIcons  *bool        `json:"show_event_icons,omitempty"` // nil = true (default on)
+	ViewSpacing     float64      `json:"view_spacing,omitempty"`     // 1 | 1.5 | 2 — row spacing multiplier
 }
 
 // Group is a named set of users used for layer sharing
@@ -608,6 +619,12 @@ type DecisionLogEntry struct {
 	LogType        string    `json:"log_type"`        // private | group | general
 	GroupID        int64     `json:"group_id,omitempty"` // if log_type=group
 	Confidential   bool      `json:"confidential"`    // only visible to users with confidential_read right
+	// Decision request workflow
+	Status         string    `json:"status,omitempty"`          // "" (decided) | "requested" | "approved" | "rejected"
+	ReviewedBy     int64     `json:"reviewed_by,omitempty"`     // user who approved/rejected
+	ReviewedByName string    `json:"reviewed_by_name,omitempty"`
+	ReviewedAt     *time.Time `json:"reviewed_at,omitempty"`
+	ReviewComment  string    `json:"review_comment,omitempty"`
 }
 
 // AutoReportSchedule defines a server-side scheduled report

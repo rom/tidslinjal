@@ -1,4 +1,28 @@
 'use strict';
+
+/* ── Seven-segment digit builder ── */
+// Segment map: which segments are ON for each digit (a,b,c,d,e,f,g)
+const SEG_MAP = {
+  '0':[1,1,1,1,1,1,0], '1':[0,1,1,0,0,0,0], '2':[1,1,0,1,1,0,1],
+  '3':[1,1,1,1,0,0,1], '4':[0,1,1,0,0,1,1], '5':[1,0,1,1,0,1,1],
+  '6':[1,0,1,1,1,1,1], '7':[1,1,1,0,0,0,0], '8':[1,1,1,1,1,1,1],
+  '9':[1,1,1,1,0,1,1], '-':[0,0,0,0,0,0,1]
+};
+
+function buildSeg7(val) {
+  const segs = SEG_MAP[val] || [0,0,0,0,0,0,0];
+  const segNames = ['sa h','sb v','sc v','sd h','se v','sf v','sg h'];
+  return `<span class="seg7">${segNames.map((cls,i) =>
+    `<i class="${cls}${segs[i]?'':' off'}"></i>`
+  ).join('')}</span>`;
+}
+
+function buildSeg7Time(h, m, s) {
+  const p = v => String(v).padStart(2,'0');
+  const hh=p(h), mm=p(m), ss=p(s);
+  return `<span class="seg7-display">${buildSeg7(hh[0])}${buildSeg7(hh[1])}<span class="seg7-colon"><i></i><i></i></span>${buildSeg7(mm[0])}${buildSeg7(mm[1])}<span class="seg7-colon"><i></i><i></i></span>${buildSeg7(ss[0])}${buildSeg7(ss[1])}</span>`;
+}
+
 /* ── State ── */
 let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
 const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
@@ -251,7 +275,7 @@ function rebuildClocks() {
   } else if (clockMode === 'vcr') {
     html += `<div class="clock-card vcr-card" id="card-main">
       <div class="clock-label vcr-label clock-label-click" id="main-label" title="${toggleTip}">${isUTC?'UTC/Z':escH(_t('clock_local'))}</div>
-      <div class="clock-time vcr-time"><span id="vcr-main-h">--</span><span class="vcr-colon">:</span><span id="vcr-main-m">--</span><span class="vcr-colon">:</span><span id="vcr-main-s">--</span></div>
+      <div class="clock-time vcr-time" id="vcr-main-seg">${buildSeg7Time(0,0,0)}</div>
       <div class="clock-date vcr-date" id="main-date"></div>
       <div class="clock-tz vcr-tz" id="main-tz"></div>
     </div>`;
@@ -275,7 +299,7 @@ function rebuildClocks() {
       html += `<div class="clock-card vcr-card" id="card-${ec.id}">
         <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
         <div class="clock-label vcr-label">${escH(ec.label||ec.timezone)}</div>
-        <div class="clock-time vcr-time"><span id="vcr-ec-${ec.id}-h">--</span><span class="vcr-colon">:</span><span id="vcr-ec-${ec.id}-m">--</span><span class="vcr-colon">:</span><span id="vcr-ec-${ec.id}-s">--</span></div>
+        <div class="clock-time vcr-time" id="vcr-ec-${ec.id}-seg">${buildSeg7Time(0,0,0)}</div>
         <div class="clock-tz vcr-tz" id="ec-${ec.id}-tz"></div>
       </div>`;
     } else {
@@ -329,9 +353,7 @@ function tick() {
     updateAnalog('svg-main', h, m, s);
     updateDeadlineIndicators('svg-main', isUTC);
   } else if (clockMode === 'vcr') {
-    const vh=document.getElementById('vcr-main-h'); if(vh)vh.textContent=pad(h);
-    const vm=document.getElementById('vcr-main-m'); if(vm)vm.textContent=pad(m);
-    const vs=document.getElementById('vcr-main-s'); if(vs)vs.textContent=pad(s);
+    const segEl=document.getElementById('vcr-main-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(h,m,s);
   } else {
     const t=document.getElementById('main-time'); if(t)t.textContent=timeStr;
   }
@@ -349,9 +371,7 @@ function tick() {
       if (clockMode === 'analog') {
         updateAnalog('svg-'+ec.id, ecH, ecM, ecS);
       } else if (clockMode === 'vcr') {
-        const vh=document.getElementById('vcr-ec-'+ec.id+'-h'); if(vh)vh.textContent=pad(ecH);
-        const vm=document.getElementById('vcr-ec-'+ec.id+'-m'); if(vm)vm.textContent=pad(ecM);
-        const vs=document.getElementById('vcr-ec-'+ec.id+'-s'); if(vs)vs.textContent=pad(ecS);
+        const segEl=document.getElementById('vcr-ec-'+ec.id+'-seg'); if(segEl) segEl.innerHTML=buildSeg7Time(ecH,ecM,ecS);
       } else {
         const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent=ecTStr;
       }

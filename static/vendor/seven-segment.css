@@ -1,0 +1,68 @@
+/*
+ * Seven-segment display simulation for VCR clock mode.
+ * Each digit is rendered using CSS-painted segments.
+ * Usage: <span class="seg7" data-digit="8"></span>
+ */
+
+.seg7-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.seg7 {
+  position: relative;
+  display: inline-block;
+  /* Default sizing — overridden by parent's font-size via em units */
+  width: 0.6em;
+  height: 1em;
+}
+
+/* Each segment is a pseudo-element or child span */
+.seg7 i {
+  position: absolute;
+  display: block;
+  background: currentColor;
+  transition: opacity 0.05s;
+}
+
+/* Horizontal segments (a, d, g) */
+.seg7 i.h {
+  left: 10%;
+  right: 10%;
+  height: 8%;
+}
+.seg7 i.sa { top: 0; }         /* segment a - top */
+.seg7 i.sd { bottom: 0; }      /* segment d - bottom */
+.seg7 i.sg { top: 46%; }       /* segment g - middle */
+
+/* Vertical segments (b, c, e, f) */
+.seg7 i.v {
+  width: 10%;
+  top: 0;
+  bottom: 0;
+}
+.seg7 i.sf { left: 0; top: 4%; bottom: 52%; }   /* segment f - top-left */
+.seg7 i.sb { right: 0; top: 4%; bottom: 52%; }  /* segment b - top-right */
+.seg7 i.se { left: 0; top: 52%; bottom: 4%; }   /* segment e - bottom-left */
+.seg7 i.sc { right: 0; top: 52%; bottom: 4%; }  /* segment c - bottom-right */
+
+/* Off segments glow dimly (ghosted) */
+.seg7 i.off { opacity: 0.08; }
+
+/* Colon separator */
+.seg7-colon {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25em;
+  width: 0.25em;
+  height: 1em;
+}
+.seg7-colon i {
+  width: 0.12em;
+  height: 0.12em;
+  border-radius: 50%;
+  background: currentColor;
+}
