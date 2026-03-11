@@ -353,6 +353,12 @@ select.ctrl-select:focus { border-color: var(--accent); }
   line-height: 1.3;
 }
 .event-block:hover { transform: translateX(1px); box-shadow: 0 2px 8px var(--shadow); z-index: 6; }
+body.hover-zoom-enabled .event-block:hover {
+  transform: scale(1.15);
+  transform-origin: left top;
+  z-index: 50;
+  box-shadow: 0 4px 16px var(--shadow-lg, rgba(0,0,0,.3));
+}
 .event-block .ev-title  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event-block .ev-time   { font-size: var(--fs-xs); opacity: .8; white-space: nowrap; }
 .event-block .ev-creator { font-size: var(--fs-xs); opacity: .65; }
