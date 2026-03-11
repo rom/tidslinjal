@@ -701,6 +701,16 @@ type DecisionLogEntry struct {
 	ReviewedByName    string    `json:"reviewed_by_name,omitempty"`
 	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
 	ReviewComment     string    `json:"review_comment,omitempty"`
+	// File attachments
+	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
+}
+
+// DecisionAttachment is a file attached to a decision log entry
+type DecisionAttachment struct {
+	Filename   string `json:"filename"`
+	StoredName string `json:"stored_name"`
+	Size       int64  `json:"size"`
+	MimeType   string `json:"mime_type"`
 }
 
 // AutoReportSchedule defines a server-side scheduled report

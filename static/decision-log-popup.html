@@ -25,6 +25,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .dl-entry-header { display:flex; justify-content:space-between; align-items:flex-start; }
 .dl-meta { color:var(--text-dim); font-size:11px; margin-left:6px; }
 .dl-text { margin-top:4px; white-space:pre-wrap; font-size:13px; }
+.dl-attachments { margin-top:4px; display:flex; gap:6px; flex-wrap:wrap; }
+.dl-attachments a { font-size:11px; color:var(--accent); text-decoration:none; }
+.dl-attachments a:hover { text-decoration:underline; }
 .badge { font-size:10px; padding:1px 6px; border-radius:3px; font-weight:700; margin-left:6px; color:#fff; }
 .badge-requested { background:#E67E22; }
 .badge-approved { background:#27AE60; }
@@ -33,7 +36,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .dl-add { padding:12px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
 .dl-add textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:5px;
   color:var(--text); padding:8px; font-size:13px; resize:vertical; }
-.dl-add select, .dl-add input { background:var(--bg); border:1px solid var(--border); border-radius:5px;
+.dl-add select, .dl-add input[type="text"] { background:var(--bg); border:1px solid var(--border); border-radius:5px;
   color:var(--text); padding:4px 8px; font-size:11px; }
 .dl-add .btn-primary { background:var(--accent); color:#fff; border:none; border-radius:5px; padding:4px 12px;
   font-size:11px; cursor:pointer; }
@@ -46,21 +49,24 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 </head>
 <body class="theme-dark">
 <div class="dl-toolbar">
-  <span class="page-header">📋 Tidslinjal — Decision Log</span>
+  <span class="page-header" id="dlHeaderTitle">📋 Tidslinjal — Decision Log</span>
   <span style="flex:1"></span>
-  <button class="btn" id="btnRefresh" title="Refresh">🔄 Refresh</button>
+  <button class="btn" id="btnRefresh" title="Refresh">🔄 <span id="lblRefresh">Refresh</span></button>
 </div>
 <div class="dl-add" id="dlAddPanel" style="display:none">
   <textarea id="dlNewDecision" rows="2" placeholder="Enter decision..."></textarea>
   <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
     <select id="dlLogType">
-      <option value="general">General (all)</option>
-      <option value="group">Group/Unit only</option>
-      <option value="private">Private</option>
+      <option value="general" id="optGeneral">General (all)</option>
+      <option value="group" id="optGroup">Group/Unit only</option>
+      <option value="private" id="optPrivate">Private</option>
     </select>
     <select id="dlGroupId" style="display:none"></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim)">
-      <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)"> Confidential
+      <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)"> <span id="lblConfidential">Confidential</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer">
+      📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
     </label>
     <button class="btn-primary" id="btnAdd">Add Decision</button>
     <button class="btn-secondary" id="btnRequest">Request Decision</button>
@@ -75,6 +81,7 @@ let userRole = '';
 let userId = 0;
 let groups = [];
 let users = [];
+let _t = {}; // i18n translations
 
 function escHtml(s) {
   const d = document.createElement('div');
@@ -82,13 +89,21 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
+function t(key) {
+  return _t[key] || key;
+}
+
 async function api(method, path, body) {
   const opts = { method, headers: {} };
-  if (body !== undefined) {
+  if (body !== undefined && !(body instanceof FormData)) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
+  } else if (body instanceof FormData) {
+    opts.body = body;
   }
-  return fetch(path, opts);
+  const res = await fetch(path, opts);
+  if (res.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
+  return res;
 }
 
 async function loadEntries() {
@@ -102,14 +117,14 @@ async function loadEntries() {
 function render() {
   const el = document.getElementById('dlEntries');
   if (!entries.length) {
-    el.innerHTML = '<div class="dl-empty">No decisions recorded yet.</div>';
+    el.innerHTML = '<div class="dl-empty">' + escHtml(t('decision_log_empty')) + '</div>';
     return;
   }
   const canReview = ['admin','oplead','staffofficer','staffofficer_full','teamlead'].includes(userRole);
   const isAdmin = userRole === 'admin';
   el.innerHTML = entries.slice().reverse().map(e => {
     const ts = new Date(e.timestamp).toLocaleString();
-    const confBadge = e.confidential ? ' <span style="color:var(--danger);font-weight:700">🔒 CONFIDENTIAL</span>' : '';
+    const confBadge = e.confidential ? ' <span style="color:var(--danger);font-weight:700">🔒 ' + escHtml(t('confidential')) + '</span>' : '';
     const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
     let statusBadge = '';
     let reviewSection = '';
@@ -118,9 +133,9 @@ function render() {
       statusBadge = '<span class="badge badge-requested">REQUESTED' + targetInfo + '</span>';
       if (canReview) {
         reviewSection = '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-          '<input type="text" data-review-id="' + e.id + '" placeholder="Comment..." style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">' +
-          '<button class="btn-primary" data-approve="' + e.id + '" style="padding:2px 8px;font-size:11px">✓ Approve</button>' +
-          '<button class="btn-danger" data-reject="' + e.id + '" style="padding:2px 8px;font-size:11px">✗ Reject</button>' +
+          '<input type="text" data-review-id="' + e.id + '" placeholder="' + escHtml(t('review_comment')) + '" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">' +
+          '<button class="btn-primary" data-approve="' + e.id + '" style="padding:2px 8px;font-size:11px">✓ ' + escHtml(t('btn_approve')) + '</button>' +
+          '<button class="btn-danger" data-reject="' + e.id + '" style="padding:2px 8px;font-size:11px">✗ ' + escHtml(t('btn_reject')) + '</button>' +
           '</div>';
       }
     } else if (e.status === 'approved') {
@@ -131,7 +146,10 @@ function render() {
       if (e.reviewed_by_name) reviewSection = '<div class="dl-review">✗ ' + escHtml(e.reviewed_by_name) + (e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : '') + (e.review_comment ? ': ' + escHtml(e.review_comment) : '') + '</div>';
     }
     const delBtn = isAdmin ? ' <button class="btn-danger" data-delete="' + e.id + '" style="padding:1px 6px;font-size:10px">×</button>' : '';
-    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + reviewSection + '</div>';
+    const attachSection = (e.attachments && e.attachments.length) ? '<div class="dl-attachments">' + e.attachments.map(a =>
+      '<a href="/api/decision-log/' + e.id + '/attachment/' + encodeURIComponent(a.stored_name) + '" target="_blank" title="' + escHtml(a.filename) + '">📎 ' + escHtml(a.filename) + '</a>'
+    ).join('') + '</div>' : '';
+    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + attachSection + reviewSection + '</div>';
   }).join('');
   bindEntryActions();
 }
@@ -139,7 +157,7 @@ function render() {
 function bindEntryActions() {
   document.querySelectorAll('[data-delete]').forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm('Delete this decision log entry?')) return;
+      if (!confirm(t('decision_delete_confirm'))) return;
       await api('DELETE', '/api/decision-log/' + btn.dataset.delete);
       loadEntries();
     };
@@ -162,16 +180,75 @@ function bindEntryActions() {
   });
 }
 
+async function uploadAttachments(entryId) {
+  const fileInput = document.getElementById('dlAttachFile');
+  if (!fileInput?.files?.length) return;
+  for (const f of fileInput.files) {
+    const fd = new FormData();
+    fd.append('file', f);
+    await api('POST', '/api/decision-log/' + entryId + '/attachment', fd);
+  }
+  fileInput.value = '';
+}
+
 function initFromOpener() {
-  if (!opener || !opener.state) return;
-  const s = opener.state;
-  userRole = s.user?.role || '';
-  userId = s.user?.id || 0;
-  groups = s.groups || [];
-  users = s.users || [];
-  // Apply theme
-  const theme = s.preferences?.theme || 'dark';
-  document.body.className = 'theme-' + theme;
+  if (!opener || !opener.state) return false;
+  try {
+    const s = opener.state;
+    userRole = s.user?.role || '';
+    userId = s.user?.id || 0;
+    groups = s.groups || [];
+    users = s.users || [];
+    // Load i18n translations
+    if (opener.TRANSLATIONS) {
+      const lang = s.preferences?.language || 'en';
+      _t = opener.TRANSLATIONS[lang] || opener.TRANSLATIONS.en || {};
+    }
+    // Apply theme
+    const theme = s.preferences?.theme || 'dark';
+    document.body.className = 'theme-' + theme;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function initFromAPI() {
+  try {
+    const res = await fetch('/api/auth/me');
+    if (!res.ok) return false;
+    const me = await res.json();
+    userRole = me.role || '';
+    userId = me.id || 0;
+    // Fetch groups
+    try { const r = await fetch('/api/groups'); if (r.ok) groups = await r.json() || []; } catch {}
+    // Fetch users
+    try { const r = await fetch('/api/users'); if (r.ok) users = await r.json() || []; } catch {}
+    return true;
+  } catch { return false; }
+}
+
+function applyI18n() {
+  const el = (id, key, fallback) => {
+    const e = document.getElementById(id);
+    if (e) e.textContent = _t[key] || fallback || key;
+  };
+  el('dlHeaderTitle', 'decision_log_title', '📋 Tidslinjal — Decision Log');
+  // Prefix with icon
+  const hdr = document.getElementById('dlHeaderTitle');
+  if (hdr && _t.decision_log_title) hdr.textContent = '📋 Tidslinjal — ' + _t.decision_log_title;
+  el('lblRefresh', 'btn_refresh', 'Refresh');
+  el('lblConfidential', 'confidential', 'Confidential');
+  el('btnAdd', 'btn_add_decision', 'Add Decision');
+  el('btnRequest', 'btn_request_decision', 'Request Decision');
+  const ta = document.getElementById('dlNewDecision');
+  if (ta) ta.placeholder = _t.decision_log_placeholder || 'Enter decision...';
+  el('optGeneral', 'decision_log_general', 'General (all)');
+  el('optGroup', 'decision_log_group', 'Group/Unit only');
+  el('optPrivate', 'decision_log_private', 'Private');
+}
+
+function setupUI() {
   // Show add panel if user can write
   const canWrite = userRole === 'admin' ||
     ['teamlead','oplead','staffofficer','staffofficer_full'].includes(userRole);
@@ -184,30 +261,45 @@ function initFromOpener() {
       groupSel.style.display = this.value === 'group' ? '' : 'none';
     };
   }
+  applyI18n();
 }
 
 document.getElementById('btnRefresh').onclick = loadEntries;
 
 document.getElementById('btnAdd').onclick = async () => {
   const text = document.getElementById('dlNewDecision').value.trim();
-  if (!text) return alert('Decision text is required');
+  if (!text) return alert(_t.decision_required || 'Decision text is required');
   const logType = document.getElementById('dlLogType').value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
   const confidential = document.getElementById('dlConfidential').checked;
   const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential });
-  if (res.ok) { document.getElementById('dlNewDecision').value = ''; loadEntries(); }
-  else { const err = await res.json().catch(() => ({})); alert(err.error || 'Failed to add decision'); }
+  if (res.ok) {
+    const created = await res.json().catch(() => null);
+    if (created) await uploadAttachments(created.id);
+    document.getElementById('dlNewDecision').value = '';
+    loadEntries();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    alert(err.error || 'Failed to add decision');
+  }
 };
 
 document.getElementById('btnRequest').onclick = async () => {
   const text = document.getElementById('dlNewDecision').value.trim();
-  if (!text) return alert('Decision request text is required');
+  if (!text) return alert(_t.decision_required || 'Decision request text is required');
   const logType = document.getElementById('dlLogType').value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
   const confidential = document.getElementById('dlConfidential').checked;
   const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested' });
-  if (res.ok) { document.getElementById('dlNewDecision').value = ''; loadEntries(); }
-  else { const err = await res.json().catch(() => ({})); alert(err.error || 'Failed to request decision'); }
+  if (res.ok) {
+    const created = await res.json().catch(() => null);
+    if (created) await uploadAttachments(created.id);
+    document.getElementById('dlNewDecision').value = '';
+    loadEntries();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    alert(err.error || 'Failed to request decision');
+  }
 };
 
 // Listen for theme changes from parent
@@ -220,8 +312,15 @@ window.addEventListener('message', e => {
 // Auto-refresh every 30 seconds
 setInterval(loadEntries, 30000);
 
-initFromOpener();
-loadEntries();
+// Init: try opener first, fall back to API
+(async () => {
+  const gotOpener = initFromOpener();
+  if (!gotOpener) {
+    await initFromAPI();
+  }
+  setupUI();
+  loadEntries();
+})();
 </script>
 </body>
 </html>

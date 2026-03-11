@@ -2526,7 +2526,7 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          ${role === 'admin' ? toolBtn('🔧', 'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -2538,7 +2538,7 @@ function renderSidebar() {
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
           ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
-          ${role === 'admin' ? toolBtn('🔄', 'Gradual Backup', 'openGradualBackupModal()') : ''}
+          ${role === 'admin' ? toolBtn('🔄', t('btn_gradual_backup')||'Gradual Backup', 'openGradualBackupModal()') : ''}
         </div>
       </div>
     `;
@@ -4247,6 +4247,23 @@ function updateUILabels() {
   setElText('lbl-btn-cancel', t('btn_cancel'));
   setElText('btnSaveEvent', t('btn_save'));
   setElText('btnDeleteEvent', t('btn_delete'));
+  setElText('lbl-ev-title', t('ev_title') || 'Title');
+  setElText('lbl-ev-type', t('ev_type') || 'Type');
+  setElText('lbl-ev-color', t('ev_color') || 'Color');
+  setElText('lbl-ev-start', t('ev_start') || 'Start');
+  setElText('lbl-ev-end', t('ev_end') || 'End');
+  setElText('lbl-ev-layer', t('ev_layer') || 'Layer');
+  setElText('lbl-ev-status', t('ev_status') || 'Status');
+  setElText('lbl-ev-desc', t('ev_description') || 'Description');
+  setElText('lbl-ev-location', t('ev_location') || 'Physical Location');
+  setElText('lbl-ev-contact-type', t('ev_contact_type') || 'Contact type');
+  setElText('lbl-ev-virtual-type', t('ev_virtual_type') || 'Virtual meeting platform');
+  setElText('lbl-ev-participant', t('ev_participant') || 'Participant');
+  setElText('lbl-ev-allday', t('ev_allday') || 'Day-only (no specific time)');
+  setElText('lbl-ev-recurring', t('ev_recurring') || 'Recurring');
+  setElText('lbl-ev-pattern', t('ev_pattern') || 'Pattern');
+  setElText('lbl-ev-recend', t('ev_rec_end') || 'Recurrence End');
+  setElText('lbl-ev-attach', t('ev_attachment') || 'Attachment');
   setElText('lbl-ev-responsible', t('ev_responsible') || 'Responsible');
   setElText('lbl-ev-invited', t('ev_invited') || 'Invited (notify on creation)');
   setElText('lbl-report-layers', t('report_layers') || 'Layers to include');
@@ -6087,7 +6104,10 @@ async function openDecisionLogModal() {
                 <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)">
                 ${t('confidential')||'Confidential'}
               </label>
-              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add')||'Add Decision'}</button>
+              <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
+                📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
+              </label>
+              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
@@ -6170,8 +6190,8 @@ function _renderDecisionLogEntries() {
         reviewSection = `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
             style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
-          <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-arg-el>✓ Approve</button>
-          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="rejected" data-arg-el>✗ Reject</button>
+          <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="rejected" data-arg-el>✗ ${t('btn_reject')||'Reject'}</button>
         </div>`;
       }
     } else if (e.status === 'approved') {
@@ -6191,6 +6211,9 @@ function _renderDecisionLogEntries() {
         ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
       </div>
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
+      ${(e.attachments && e.attachments.length) ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${e.attachments.map(a =>
+        `<a href="/api/decision-log/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none" title="${escHtml(a.filename)}">📎 ${escHtml(a.filename)}</a>`
+      ).join('')}</div>` : ''}
       ${reviewSection}
     </div>`;
   }).join('');
@@ -6204,6 +6227,17 @@ async function addDecisionLogEntry() {
   const confidential = document.getElementById('dlConfidential')?.checked || false;
   const res = await apiPost('/api/decision-log', {decision: text, log_type: logType, group_id: groupId, confidential});
   if (res.ok) {
+    const created = await res.json().catch(() => null);
+    // Upload attachments if any
+    const fileInput = document.getElementById('dlAttachFile');
+    if (created && fileInput?.files?.length) {
+      for (const f of fileInput.files) {
+        const fd = new FormData();
+        fd.append('file', f);
+        await api('POST', `/api/decision-log/${created.id}/attachment`, fd);
+      }
+      fileInput.value = '';
+    }
     await _loadDecisionLog();
     const el = document.getElementById('dlEntries');
     if (el) el.innerHTML = _renderDecisionLogEntries();
@@ -6249,6 +6283,17 @@ async function requestDecision() {
     requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel
   });
   if (res.ok) {
+    const created = await res.json().catch(() => null);
+    // Upload attachments if any
+    const fileInput = document.getElementById('dlAttachFile');
+    if (created && fileInput?.files?.length) {
+      for (const f of fileInput.files) {
+        const fd = new FormData();
+        fd.append('file', f);
+        await api('POST', `/api/decision-log/${created.id}/attachment`, fd);
+      }
+      fileInput.value = '';
+    }
     await _loadDecisionLog();
     const el = document.getElementById('dlEntries');
     if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }

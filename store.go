@@ -3094,6 +3094,25 @@ func (s *Store) UpdateDecisionLogEntry(entry DecisionLogEntry) error {
 	return fmt.Errorf("decision log entry %d not found", entry.ID)
 }
 
+func (s *Store) AddDecisionLogAttachment(entryID int64, att DecisionAttachment) error {
+	s.mu.Lock()
+	found := false
+	for i := range s.decisionLog {
+		if s.decisionLog[i].ID == entryID {
+			s.decisionLog[i].Attachments = append(s.decisionLog[i].Attachments, att)
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("decision log entry %d not found", entryID)
+	}
+	snap := append([]DecisionLogEntry(nil), s.decisionLog...)
+	s.mu.Unlock()
+	return s.persist("decision_log.json", snap)
+}
+
 // ── Map Locations ───────────────────────────────────────────────────────────
 
 func (s *Store) GetMapLocations() []MapLocation {
