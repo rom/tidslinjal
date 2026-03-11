@@ -1700,6 +1700,15 @@ async function deletePhase(id) {
 
 // ── renderSidebar ─────────────────────────────────────────────────────────
 // ── Sidebar ────────────────────────────────────────────────────────────────
+function _bindResSubTabs(el) {
+  el.querySelectorAll('[data-res-sub]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.dataset.resSubTab = btn.dataset.resSub;
+      renderSidebar();
+    });
+  });
+}
+
 function renderSidebar() {
   const tab  = state.sidebarTab;
   const el   = document.getElementById('sidebarContent');
@@ -1906,59 +1915,120 @@ function renderSidebar() {
         </div>
       </div>` : ''}
     `;
-  } else if (tab === 'users' && state.user && state.user.role==='admin') {
+  } else if (tab === 'resources' && state.user && state.user.role==='admin') {
     const canSeeLoc = userHasCapability('see_location');
-    apiGet('/api/users').then(users => {
-      el.innerHTML = `
+    const gl = getGroupLabel();
+    // Sub-tab state
+    const resSubTab = el.dataset.resSubTab || 'users';
+    const subBtn = (key, label, icon) =>
+      `<button class="toggle-btn${resSubTab===key?' active':''}" data-res-sub="${key}">${icon} ${label}</button>`;
+    let subTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
+      ${subBtn('users', t('tab_users')||'Users', '👤')}
+      ${subBtn('groups', gl.plural, '👥')}
+      ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
+      ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
+    </div>`;
+    if (resSubTab === 'users') {
+      apiGet('/api/users').then(users => {
+        el.innerHTML = subTabBar + `
+          <div class="sidebar-section">
+            <div class="sidebar-section-title">
+              ${t('tab_users')}
+              <button class="btn btn-primary btn-sm" data-action="openUserModal" data-arg="null">${t('btn_add')}</button>
+            </div>
+            <div class="user-list">
+              ${(users||[]).map(u => `
+                <div class="user-item">
+                  <div class="user-name">
+                    <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
+                    <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
+                  </div>
+                  <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
+                  ${u.can_lock?'<span title="Can lock">🔒</span>':''}
+                  ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
+                  <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>✏️</button>
+                </div>`).join('')}
+            </div>
+          </div>
+          <div class="sidebar-section">
+            <div class="sidebar-section-title">🛡 ${t('role_editor_title')||'Role Editor'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('role_editor_desc')||'Edit role display names and capabilities.'}</p>
+            <button class="btn btn-secondary btn-sm" data-action="openRoleEditor">🛡 ${t('role_editor_title')||'Role Editor'}…</button>
+          </div>`;
+        _bindResSubTabs(el);
+        _bindActions(el);
+      });
+    } else if (resSubTab === 'groups') {
+      el.innerHTML = subTabBar + `
         <div class="sidebar-section">
           <div class="sidebar-section-title">
-            ${t('tab_users')}
-            <button class="btn btn-primary btn-sm" data-action="openUserModal" data-arg="null">${t('btn_add')}</button>
+            👥 ${gl.plural}
+            <button class="btn btn-primary btn-sm" data-action="openGroupModal" data-arg="null">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
           </div>
-          <div class="user-list">
-            ${(users||[]).map(u => `
-              <div class="user-item">
-                <div class="user-name">
-                  <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
-                  <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
+          <div class="group-list">
+            ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
+            ${state.groups.map(g => `
+              <div class="group-item">
+                <div class="group-name">
+                  <div>${escHtml(g.name)}</div>
+                  ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
                 </div>
-                <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
-                ${u.can_lock?'<span title="Can lock">🔒</span>':''}
-                ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
-                <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}">👥</button>
+                <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit">✏️</button>
               </div>`).join('')}
           </div>
-        </div>
-        <div class="sidebar-section">
-          <div class="sidebar-section-title">🛡 ${t('role_editor_title')||'Role Editor'}</div>
-          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('role_editor_desc')||'Edit role display names and capabilities.'}</p>
-          <button class="btn btn-secondary btn-sm" data-action="openRoleEditor">🛡 ${t('role_editor_title')||'Role Editor'}…</button>
-        </div>
-      `;
-      _bindActions(el);
-    });
-  } else if (tab === 'groups' && state.user && hasRole2(state.user.role,'teamlead')) {
-    const gl = getGroupLabel();
-    el.innerHTML = `
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">
-          👥 ${gl.plural}
-          <button class="btn btn-primary btn-sm" data-action="openGroupModal" data-arg="null">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
-        </div>
-        <div class="group-list">
-          ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
-          ${state.groups.map(g => `
-            <div class="group-item">
-              <div class="group-name">
-                <div>${escHtml(g.name)}</div>
-                ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
-              </div>
-              <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}">👥</button>
-              <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit">✏️</button>
-            </div>`).join('')}
-        </div>
-      </div>
-    `;
+        </div>`;
+      _bindResSubTabs(el);
+    } else if (resSubTab === 'resource_list') {
+      // Resource list: shows all users, groups, and rooms in a combined view
+      apiGet('/api/users').then(users => {
+        const allResources = [];
+        (users||[]).forEach(u => allResources.push({type:'user', name: u.display_name||u.username, role: u.role, detail: '@'+u.username}));
+        state.groups.forEach(g => allResources.push({type:'group', name: g.name, detail: g.description||''}));
+        el.innerHTML = subTabBar + `
+          <div class="sidebar-section">
+            <div class="sidebar-section-title">📋 ${t('resource_list')||'Resource List'}</div>
+            <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+              <thead><tr style="background:var(--bg3)">
+                <th style="padding:4px 8px;text-align:left">${t('resource_type')||'Type'}</th>
+                <th style="padding:4px 8px;text-align:left">${t('resource_name')||'Name'}</th>
+                <th style="padding:4px 8px;text-align:left">${t('resource_detail')||'Detail'}</th>
+              </tr></thead><tbody>
+              ${allResources.map(r => `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:4px 8px">${r.type==='user'?'👤':'👥'} ${r.type}</td>
+                <td style="padding:4px 8px">${escHtml(r.name)}</td>
+                <td style="padding:4px 8px;color:var(--text-dim)">${escHtml(r.detail)}${r.role?' <span class="role-badge role-'+r.role+'">'+getRoleDisplayName(r.role)+'</span>':''}</td>
+              </tr>`).join('')}
+              </tbody></table>
+          </div>`;
+        _bindResSubTabs(el);
+      });
+    } else if (resSubTab === 'resource_plan') {
+      // Resource plan: shows who is assigned to what events
+      apiGet('/api/users').then(users => {
+        const evByUser = {};
+        (state.events||[]).forEach(ev => {
+          const key = ev.participant || ev.user_name || 'Unassigned';
+          if (!evByUser[key]) evByUser[key] = [];
+          evByUser[key].push(ev);
+        });
+        const userNames = Object.keys(evByUser).sort();
+        el.innerHTML = subTabBar + `
+          <div class="sidebar-section">
+            <div class="sidebar-section-title">📅 ${t('resource_plan')||'Resource Plan'}</div>
+            ${userNames.length === 0 ? '<p style="color:var(--text-dim);font-size:var(--fs-sm)">No event assignments found.</p>' : ''}
+            ${userNames.map(name => `
+              <div style="margin-bottom:10px">
+                <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:4px">👤 ${escHtml(name)} <span style="color:var(--text-dim);font-weight:400">(${evByUser[name].length})</span></div>
+                ${evByUser[name].sort((a,b)=>new Date(a.start_time)-new Date(b.start_time)).slice(0,10).map(ev => `
+                  <div style="font-size:var(--fs-xs);padding:2px 0 2px 12px;color:var(--text-dim)">
+                    ${fmtDateTime(new Date(ev.start_time))} — ${escHtml(ev.title)}
+                  </div>`).join('')}
+              </div>`).join('')}
+          </div>`;
+        _bindResSubTabs(el);
+      });
+    }
   } else if (tab === 'phases' && state.user && hasRole2(state.user.role, 'teamlead')) {
     el.innerHTML = `
       <div class="sidebar-section">
@@ -2534,6 +2604,7 @@ function renderSidebar() {
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
           ${(isTeamLead || isAdminOrOplead || userHasCapability('critical_line_analysis')) ? toolBtn('📈', t('btn_critical_line')||'Critical Line', 'openCriticalLineModal()') : ''}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
@@ -4217,11 +4288,7 @@ function updateUILabels() {
   // Sidebar tabs — use dynamic group terminology for the groups tab
   const gl = getGroupLabel();
   document.querySelectorAll('.sidebar-tab').forEach(tab => {
-    if (tab.dataset.tab === 'groups') {
-      tab.textContent = '👥 ' + gl.plural;
-    } else {
-      tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
-    }
+    tab.textContent = t('tab_'+tab.dataset.tab) || tab.dataset.tab;
   });
 
   // Invited filter "Groups" button uses group terminology
@@ -5564,6 +5631,53 @@ async function generateReport() {
     </tr>`).join('')}
     </tbody></table>
     ${!events.some(ev => ev.depends_on && ev.depends_on.length) ? '<p style="color:#888;margin-top:8px">No event dependencies defined yet. Add dependencies via the event editor.</p>' : ''}`;
+
+  } else if (type === 'decisions') {
+    // Decisions report: all decision log entries
+    try {
+      const dlEntries = await apiGet('/api/decision-log') || [];
+      const decided = dlEntries.filter(e => !e.status || e.status === 'approved');
+      const requested = dlEntries.filter(e => e.status === 'requested');
+      const rejected = dlEntries.filter(e => e.status === 'rejected');
+      html += `<h2>${t('report_decisions_decided')||'Decisions Made'} (${decided.length})</h2>
+      <table><thead><tr><th>#</th><th>${t('report_decisions_seq')||'Seq'}</th><th>${t('report_decisions_decision')||'Decision'}</th><th>${t('report_decisions_by')||'By'}</th><th>${t('report_decisions_time')||'Time'}</th><th>${t('report_decisions_approved_at')||'Decided At'}</th></tr></thead><tbody>
+      ${decided.map((e,i) => `<tr>
+        <td>${i+1}</td>
+        <td>${escHtml(e.sequence_number||'')}</td>
+        <td>${escHtml(e.decision)}</td>
+        <td>${escHtml(e.display_name || e.user_name)}</td>
+        <td>${fmtDateTime(new Date(e.timestamp))}</td>
+        <td>${e.decided_at ? fmtDateTime(new Date(e.decided_at)) : e.reviewed_at ? fmtDateTime(new Date(e.reviewed_at)) : '—'}</td>
+      </tr>`).join('')}
+      </tbody></table>`;
+      if (requested.length) {
+        html += `<h2>${t('report_decisions_pending')||'Pending Decisions'} (${requested.length})</h2>
+        <table><thead><tr><th>#</th><th>${t('report_decisions_seq')||'Seq'}</th><th>${t('report_decisions_request')||'Request'}</th><th>${t('report_decisions_by')||'By'}</th><th>${t('report_decisions_requested_at')||'Requested At'}</th><th>${t('report_decisions_target')||'Requested Of'}</th></tr></thead><tbody>
+        ${requested.map((e,i) => `<tr>
+          <td>${i+1}</td>
+          <td>${escHtml(e.sequence_number||'')}</td>
+          <td>${escHtml(e.decision)}</td>
+          <td>${escHtml(e.display_name || e.user_name)}</td>
+          <td>${e.requested_at ? fmtDateTime(new Date(e.requested_at)) : fmtDateTime(new Date(e.timestamp))}</td>
+          <td>${escHtml(e.requested_of_label||'')}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      }
+      if (rejected.length) {
+        html += `<h2>${t('report_decisions_rejected')||'Rejected Decisions'} (${rejected.length})</h2>
+        <table><thead><tr><th>#</th><th>${t('report_decisions_decision')||'Decision'}</th><th>${t('report_decisions_by')||'By'}</th><th>${t('report_decisions_reviewed_by')||'Reviewed By'}</th><th>${t('report_decisions_comment')||'Comment'}</th></tr></thead><tbody>
+        ${rejected.map((e,i) => `<tr>
+          <td>${i+1}</td>
+          <td>${escHtml(e.decision)}</td>
+          <td>${escHtml(e.display_name || e.user_name)}</td>
+          <td>${escHtml(e.reviewed_by_name||'')}</td>
+          <td>${escHtml(e.review_comment||'')}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      }
+    } catch(err) {
+      html += '<p>Failed to load decision log data.</p>';
+    }
 
   } else {
     // timeline snapshot
@@ -8188,3 +8302,57 @@ async function requestPushPermission() {
     if (modal) observer.observe(modal, { attributes: true });
   });
 })();
+
+// ── Task-Time Matrix ──────────────────────────────────────────────────────────
+function openTaskTimeMatrix() {
+  const el = document.getElementById('taskTimeMatrixContent');
+  if (!el) return;
+  const events = (state.events || []).filter(ev => ev.start_time && ev.title);
+  if (!events.length) {
+    el.innerHTML = '<p style="color:var(--text-dim)">No events to display in the matrix.</p>';
+    openModal('taskTimeMatrixModal');
+    return;
+  }
+  // Determine time range: each column = 1 hour block between earliest start and latest end
+  const sorted = events.slice().sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
+  let minT = new Date(sorted[0].start_time);
+  let maxT = new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time);
+  // Round to hour boundaries
+  minT = new Date(minT.getFullYear(), minT.getMonth(), minT.getDate(), minT.getHours());
+  maxT = new Date(maxT.getFullYear(), maxT.getMonth(), maxT.getDate(), maxT.getHours()+1);
+  const hours = [];
+  for (let t = new Date(minT); t < maxT; t = new Date(t.getTime() + 3600000)) {
+    hours.push(new Date(t));
+    if (hours.length > 168) break; // max 1 week
+  }
+  if (hours.length === 0) { el.innerHTML = '<p style="color:var(--text-dim)">No valid time range.</p>'; openModal('taskTimeMatrixModal'); return; }
+  // Build table header
+  let html = '<table style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:140px;text-align:left">Task</th>';
+  const dateOpts = {hour:'2-digit',hour12:false};
+  hours.forEach(h => {
+    const dayChanged = h.getHours() === 0;
+    const lbl = dayChanged ? h.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' 00' : String(h.getHours()).padStart(2,'0');
+    html += `<th style="padding:3px 2px;min-width:28px;text-align:center;border-left:${dayChanged?'2':'1'}px solid var(--border);font-weight:${dayChanged?700:400};color:${dayChanged?'var(--accent)':'var(--text-dim)'}">${lbl}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  // One row per event
+  const etMap = {};
+  (state.eventTypes||[]).forEach(et => etMap[et.id] = et);
+  sorted.forEach(ev => {
+    const evStart = new Date(ev.start_time).getTime();
+    const evEnd = new Date(ev.end_time || ev.start_time).getTime();
+    const et = etMap[ev.event_type_id];
+    const color = et?.color || ev.color || 'var(--accent)';
+    html += `<tr><td style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="${escHtml(ev.title)}">${escHtml(ev.title)}</td>`;
+    hours.forEach(h => {
+      const hStart = h.getTime();
+      const hEnd = hStart + 3600000;
+      const active = evStart < hEnd && evEnd > hStart;
+      html += `<td style="padding:0;border-left:1px solid var(--border);${active ? 'background:'+color+';opacity:0.8' : ''}">&nbsp;</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+  openModal('taskTimeMatrixModal');
+}

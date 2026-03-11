@@ -206,8 +206,7 @@
         <button class="sidebar-tab" data-tab="tools" data-i18n="tab_tools">Tools</button>
         <button class="sidebar-tab" data-tab="alarms" data-i18n="tab_alarms">Alarms</button>
         <button class="sidebar-tab" data-tab="layers" data-i18n="tab_layers">Layers</button>
-        <button class="sidebar-tab admin-only" data-tab="users" style="display:none" data-i18n="tab_users">Users</button>
-        <button class="sidebar-tab admin-only" data-tab="groups" style="display:none" data-i18n="tab_groups">Groups</button>
+        <button class="sidebar-tab admin-only" data-tab="resources" style="display:none" data-i18n="tab_resources">Resources</button>
         <button class="sidebar-tab teamlead-only" data-tab="audit" style="display:none" data-i18n="tab_audit">Audit</button>
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
         <button class="sidebar-tab admin-only" data-tab="integrations" style="display:none" data-i18n="tab_integrations">🔌 Integrations</button>
@@ -1221,6 +1220,7 @@
             <option value="responsible" id="lbl-report-responsible">Responsible / Resource Report</option>
             <option value="planned_vs_actual" id="lbl-report-pva">Planned vs. Actual</option>
             <option value="critical_path" id="lbl-report-cp">Critical Path Analysis</option>
+            <option value="decisions" id="lbl-report-decisions">Decision Log Report</option>
           </select>
         </div>
         <div class="form-group">
@@ -1505,6 +1505,24 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close-modal="pvaModal">Close</button>
       <button class="btn btn-primary" id="btnExportPVA">📄 Export Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task-Time Matrix Modal -->
+<div class="modal-overlay" id="taskTimeMatrixModal">
+  <div class="modal modal-wide" style="max-width:960px">
+    <div class="modal-header">
+      <h2>📊 Task-Time Matrix</h2>
+      <button class="modal-close" data-close-modal="taskTimeMatrixModal">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow:auto;max-height:70vh">
+      <div id="taskTimeMatrixContent">
+        <p style="color:var(--text-dim);font-size:var(--fs-sm)">Loading…</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close-modal="taskTimeMatrixModal">Close</button>
     </div>
   </div>
 </div>
