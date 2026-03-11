@@ -581,6 +581,15 @@ function renderEventBlocks(days, slotH) {
 // ── Current time line ───────────────────────────────────────────────────────
 function getNow() {
   if (state.timelinePaused && state.pausedAt) return state.pausedAt;
+  const ex = state.exercise;
+  if (ex && ex.artificial_time_enabled && ex.artificial_time && ex.artificial_time_set_at) {
+    const artTime = new Date(ex.artificial_time).getTime();
+    const setAt   = new Date(ex.artificial_time_set_at).getTime();
+    if (!isNaN(artTime) && !isNaN(setAt)) {
+      const offset = artTime - setAt;
+      return new Date(Date.now() + offset);
+    }
+  }
   return new Date();
 }
 

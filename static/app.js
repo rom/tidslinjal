@@ -443,7 +443,7 @@ function renderListView() {
   const prefs = state.preferences || {};
   const redLineEnabled = prefs.red_line_enabled;
   const redLineColor = prefs.red_line_color || '#E74C3C';
-  const now = new Date();
+  const now = typeof getNow === 'function' ? getNow() : new Date();
   let redLineInserted = false;
 
   tbody.innerHTML = events.map(ev => {

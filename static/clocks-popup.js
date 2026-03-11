@@ -34,6 +34,21 @@ let _lastLang = '';
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
+/* ── Artificial time offset: read from opener's state ── */
+function _getEffectiveNow() {
+  try {
+    const ex = window.opener?.state?.exercise;
+    if (ex && ex.artificial_time_enabled && ex.artificial_time && ex.artificial_time_set_at) {
+      const artTime = new Date(ex.artificial_time).getTime();
+      const setAt   = new Date(ex.artificial_time_set_at).getTime();
+      if (!isNaN(artTime) && !isNaN(setAt)) {
+        return new Date(Date.now() + (artTime - setAt));
+      }
+    }
+  } catch(e) {}
+  return new Date();
+}
+
 /* ── i18n: read translations from opener ── */
 function _t(key) {
   try {
@@ -339,7 +354,7 @@ function tick() {
   syncTheme();
   syncLanguage();
   const {isUTC, extra} = getClockData();
-  const now = new Date();
+  const now = _getEffectiveNow();
   const locale = _getLocale();
 
   if (1 + extra.length !== _lastClockCount || clockMode !== _lastMode) {
@@ -375,7 +390,7 @@ function tick() {
 
   extra.forEach(ec => {
     try {
-      const ecTime = new Date();
+      const ecTime = _getEffectiveNow();
       const ecH = parseInt(ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecM = parseInt(ecTime.toLocaleTimeString('en-GB',{minute:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
       const ecS = parseInt(ecTime.toLocaleTimeString('en-GB',{second:'2-digit',hour12:false,timeZone:ec.timezone}),10)||0;
