@@ -67,6 +67,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Fysiskt möte", LabelFR: "Réunion physique", Icon: "🏢"},
 	{Key: "pause", Label: "Pause", Color: "#95A5A6", IsSystem: true, Icon: "⏸",
 		LabelSV: "Paus", LabelFR: "Pause"},
+	{Key: "timed_event", Label: "Timed Event", Color: "#E74C3C", IsSystem: true, Icon: "⏱",
+		LabelSV: "Tidsstyrd händelse", LabelFR: "Événement chronométré"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -328,6 +330,11 @@ type Event struct {
 	MeetingURL string `json:"meeting_url,omitempty"` // auto-generated Teams/Zoom link
 	// Countdown timer: minutes before event start to begin countdown (0 = no countdown)
 	CountdownBeforeMinutes int `json:"countdown_before_minutes,omitempty"`
+	// Timed event fields
+	TimedDurationMinutes    int    `json:"timed_duration_minutes,omitempty"`    // duration in minutes for timed_event type
+	TimedAlarms             string `json:"timed_alarms,omitempty"`             // comma-separated alarm points, e.g. "5,10,50%"
+	TimedContinueAfter      bool   `json:"timed_continue_after"`               // continue counting (with +) after timer completes
+	TimedPreShowMinutes     int    `json:"timed_pre_show_minutes,omitempty"`   // minutes before start to show detached timer (1/2/5)
 }
 
 // EventComment is a comment on an event

@@ -886,9 +886,239 @@ try {
   document.getElementById('btnTzZulu').classList.toggle('active', _localIsUTC);
 } catch(e) {}
 
+// ── Timed Events ────────────────────────────────────────────────────────────
+let _timedEvents = []; // { id, eventId, label, startTime, durationMs, alarms (parsed), continueAfter, preShowMs, state, detachedWin, alarmsFired }
+let _timedEventsLoaded = false;
+
+function loadTimedEvents() {
+  try {
+    const events = window.opener?.state?.events || [];
+    const now = Date.now();
+    events.forEach(ev => {
+      if (ev.event_type !== 'timed_event' || !ev.timed_duration_minutes || !ev.start_time) return;
+      const start = new Date(ev.start_time).getTime();
+      if (isNaN(start)) return;
+      const dur = ev.timed_duration_minutes * 60000;
+      const endTime = start + dur;
+      const preShow = (ev.timed_pre_show_minutes || 5) * 60000;
+      // Only load events that haven't ended more than 1 hour ago (if continue_after)
+      if (!ev.timed_continue_after && now > endTime) return;
+      if (ev.timed_continue_after && now > endTime + 3600000) return;
+      // Don't load if more than preShow + 60 min before start
+      if (now < start - preShow - 3600000) return;
+      // Avoid duplicates
+      if (_timedEvents.find(t => t.eventId === ev.id)) return;
+      // Parse alarms
+      const alarms = (ev.timed_alarms || '').split(',').filter(Boolean).map(a => {
+        a = a.trim();
+        if (a.endsWith('%')) return { type: 'pct', value: parseFloat(a) };
+        return { type: 'min', value: parseFloat(a) };
+      });
+      _timedEvents.push({
+        id: 'te-' + ev.id,
+        eventId: ev.id,
+        label: ev.title,
+        startTime: start,
+        durationMs: dur,
+        alarms: alarms,
+        continueAfter: ev.timed_continue_after !== false,
+        preShowMs: preShow,
+        state: now < start ? 'waiting' : (now < endTime ? 'running' : 'overtime'),
+        detachedWin: null,
+        alarmsFired: {},
+        acknowledged: false
+      });
+    });
+    _timedEventsLoaded = true;
+  } catch(e) { console.error('loadTimedEvents', e); }
+}
+
+function tickTimedEvents() {
+  const now = Date.now();
+  const theme = document.body.className || 'theme-dark';
+  _timedEvents.forEach(te => {
+    const elapsed = now - te.startTime;
+    const remaining = te.durationMs - elapsed;
+
+    // Auto-show detached window before start
+    if (te.state === 'waiting' && now >= te.startTime - te.preShowMs && !te.detachedWin) {
+      te.detachedWin = openTimedEventWindow(te, theme);
+    }
+    // Transition to running
+    if (te.state === 'waiting' && now >= te.startTime) {
+      te.state = 'running';
+    }
+    // Check alarms
+    if (te.state === 'running') {
+      te.alarms.forEach((alarm, i) => {
+        if (te.alarmsFired[i]) return;
+        let trigger = false;
+        if (alarm.type === 'min' && remaining <= alarm.value * 60000 && remaining > 0) trigger = true;
+        if (alarm.type === 'pct') {
+          const pctUsed = (elapsed / te.durationMs) * 100;
+          if (pctUsed >= alarm.value) trigger = true;
+        }
+        if (trigger) {
+          te.alarmsFired[i] = true;
+          const label = alarm.type === 'min' ? alarm.value + ' min left' : alarm.value + '% used';
+          fireTimedAlarm(te, label);
+        }
+      });
+    }
+    // Transition to overtime or completed
+    if (te.state === 'running' && remaining <= 0) {
+      te.state = te.continueAfter ? 'overtime' : 'completed';
+      fireTimedAlarm(te, 'Time completed!');
+    }
+    // Update detached window
+    if (te.detachedWin && !te.detachedWin.closed) {
+      updateTimedEventWindow(te);
+    } else if (te.detachedWin && te.detachedWin.closed) {
+      te.detachedWin = null;
+    }
+  });
+}
+
+function fireTimedAlarm(te, label) {
+  playCdAlarm('klaxon');
+  // Flash the detached window if open
+  if (te.detachedWin && !te.detachedWin.closed) {
+    try {
+      const body = te.detachedWin.document.body;
+      body.classList.add('te-flash');
+      setTimeout(() => body.classList.remove('te-flash'), 3000);
+    } catch(e) {}
+  }
+}
+
+function openTimedEventWindow(te, theme) {
+  const w = window.open('', 'te-' + te.eventId + '-' + Date.now(), 'width=450,height=280,menubar=no,toolbar=no');
+  if (!w) return null;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>⏱ ${escH(te.label)}</title>
+<style>
+body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252;--success:#2ecc71}
+body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b;--success:#27ae60}
+body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252;--success:#2ecc71}
+body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252;--success:#2ecc71}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:8px;transition:background .3s}
+.te-label{font-size:1.1rem;color:var(--text-dim);text-align:center}
+.te-status{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em}
+.te-time{font-size:3.5rem;font-variant-numeric:tabular-nums;font-weight:700;transition:color .3s}
+.te-progress{width:80%;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.te-progress-bar{height:100%;background:var(--accent);transition:width .5s,background .3s;border-radius:4px}
+.te-overtime .te-time{color:var(--danger)}
+.te-overtime .te-progress-bar{background:var(--danger)}
+.te-waiting .te-time{color:var(--text-dim)}
+.te-waiting .te-status{color:var(--accent)}
+.te-controls{display:flex;gap:8px;margin-top:4px}
+.te-controls button{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:.9rem}
+.te-controls button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.te-flash{animation:teFlash 0.5s ease-in-out 6}
+@keyframes teFlash{0%,100%{background:var(--bg)}50%{background:var(--danger)}}
+</style></head><body class="${theme}">
+<div class="te-label" id="teLabel">⏱ ${escH(te.label)}</div>
+<div class="te-status" id="teStatus">Waiting...</div>
+<div class="te-time" id="teTime">--:--:--</div>
+<div class="te-progress"><div class="te-progress-bar" id="teBar" style="width:0%"></div></div>
+<div class="te-controls">
+  <button id="btnPause">⏸</button>
+  <button id="btnReset">↺</button>
+  <button id="btnAck" style="display:none;background:var(--danger);color:#fff;border-color:var(--danger)">✓ Acknowledge</button>
+</div>
+<script>
+let paused = false, pausedAt = 0;
+const teId = '${te.id}';
+function pad(n){return String(n).padStart(2,'0');}
+document.getElementById('btnPause').onclick = () => {
+  try {
+    const te = window.opener._timedEvents?.find(t => t.id === teId);
+    if (!te) return;
+    if (!paused) { paused = true; pausedAt = Date.now(); }
+    else { te.startTime += (Date.now() - pausedAt); paused = false; }
+    document.getElementById('btnPause').textContent = paused ? '▶' : '⏸';
+  } catch(e) {}
+};
+document.getElementById('btnReset').onclick = () => {
+  try {
+    const te = window.opener._timedEvents?.find(t => t.id === teId);
+    if (!te) return;
+    te.startTime = Date.now();
+    te.state = 'running';
+    te.alarmsFired = {};
+    te.acknowledged = false;
+    paused = false;
+    document.getElementById('btnPause').textContent = '⏸';
+    document.getElementById('btnAck').style.display = 'none';
+  } catch(e) {}
+};
+document.getElementById('btnAck').onclick = () => {
+  try {
+    const te = window.opener._timedEvents?.find(t => t.id === teId);
+    if (te) te.acknowledged = true;
+    document.getElementById('btnAck').style.display = 'none';
+    document.body.classList.remove('te-flash');
+  } catch(e) {}
+};
+<\/script></body></html>`);
+  w.document.close();
+  return w;
+}
+window._timedEvents = _timedEvents;
+
+function updateTimedEventWindow(te) {
+  try {
+    const w = te.detachedWin;
+    if (!w || w.closed) return;
+    const now = Date.now();
+    const elapsed = now - te.startTime;
+    const remaining = te.durationMs - elapsed;
+    const pct = Math.min(100, Math.max(0, (elapsed / te.durationMs) * 100));
+
+    const timeEl = w.document.getElementById('teTime');
+    const statusEl = w.document.getElementById('teStatus');
+    const barEl = w.document.getElementById('teBar');
+    const ackBtn = w.document.getElementById('btnAck');
+
+    if (te.state === 'waiting') {
+      const untilStart = te.startTime - now;
+      const s = Math.floor(untilStart / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (timeEl) timeEl.textContent = '-' + pad(h) + ':' + pad(m) + ':' + pad(sec);
+      if (statusEl) statusEl.textContent = 'Starting in...';
+      if (barEl) barEl.style.width = '0%';
+      w.document.body.className = w.document.body.className.replace(/te-\w+/g, '') + ' te-waiting';
+    } else if (te.state === 'running') {
+      const s = Math.max(0, Math.floor(remaining / 1000));
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (timeEl) timeEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(sec);
+      if (statusEl) statusEl.textContent = 'In progress';
+      if (barEl) barEl.style.width = pct + '%';
+      w.document.body.className = w.document.body.className.replace(/te-\w+/g, '');
+    } else if (te.state === 'overtime') {
+      const overMs = elapsed - te.durationMs;
+      const s = Math.floor(overMs / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      if (timeEl) timeEl.textContent = '+' + pad(h) + ':' + pad(m) + ':' + pad(sec);
+      if (statusEl) statusEl.textContent = 'Overtime';
+      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--danger)'; }
+      w.document.body.className = w.document.body.className.replace(/te-\w+/g, '') + ' te-overtime';
+      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
+    } else if (te.state === 'completed') {
+      if (timeEl) timeEl.textContent = '00:00:00';
+      if (statusEl) statusEl.textContent = 'Completed';
+      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--success)'; }
+      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
+    }
+  } catch(e) {}
+}
+
 // Initial build + start ticking
 rebuildClocks();
 applySize(2);
 loadEventCountdowns();
+loadTimedEvents();
 tick();
-setInterval(function() { tick(); tickCountdowns(); }, 1000);
+setInterval(function() { tick(); tickCountdowns(); tickTimedEvents(); }, 1000);
+// Reload timed events periodically
+setInterval(loadTimedEvents, 30000);

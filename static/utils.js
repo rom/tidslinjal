@@ -364,6 +364,20 @@ function detachClock() {
   }, 800);
 }
 
+// Auto-open clock popup for approaching timed events
+setInterval(() => {
+  if (_clockPopout && !_clockPopout.closed) return; // already open
+  if (!window.state || !window.state.events) return;
+  const now = Date.now();
+  const hasApproaching = window.state.events.some(ev => {
+    if (ev.event_type !== 'timed_event' || !ev.timed_duration_minutes || !ev.start_time) return false;
+    const start = new Date(ev.start_time).getTime();
+    const preShow = (ev.timed_pre_show_minutes || 5) * 60000;
+    return now >= start - preShow && now <= start + ev.timed_duration_minutes * 60000;
+  });
+  if (hasApproaching) detachClock();
+}, 10000);
+
 // City → IANA timezone hint table (supplement to IANA search)
 const _TZ_CITY_MAP = [
   ['London','Europe/London'],['Paris','Europe/Paris'],['Berlin','Europe/Berlin'],
