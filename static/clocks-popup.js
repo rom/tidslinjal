@@ -47,7 +47,7 @@ let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
 const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
 const sizeLabels  = ['XS','S','M','L','XL'];
 let currentStyle = '';
-let showDigits = false;
+let showDigits = true;
 let vcrColor = 'red';
 let _lastLang = '';
 let _localIsUTC = null; // null = follow opener, true/false = local override
@@ -418,7 +418,10 @@ function tick() {
   if (isUTC) {
     h=now.getUTCHours(); m=now.getUTCMinutes(); s=now.getUTCSeconds();
     if (_hourFormat === '12') {
-      timeStr = formatHour12(h,m,s) + ' Z';
+      // ZULU 12h: no colons, e.g. "012233 PM Z"
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      timeStr = pad(h12)+pad(m)+pad(s)+' '+ampm+' Z';
     } else {
       timeStr = pad(h)+pad(m)+pad(s)+'Z';
     }
@@ -573,6 +576,61 @@ function resetCountdown(id) {
   renderCountdowns();
 }
 
+function detachCountdown(id) {
+  const cd = _countdowns.find(c => c.id === id);
+  if (!cd) return;
+  const theme = document.body.className || 'theme-dark';
+  const w = window.open('', 'cd-' + id + '-' + Date.now(), 'width=400,height=250,menubar=no,toolbar=no');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Countdown — ${escH(cd.label)}</title>
+<link rel="stylesheet" href="/static/vendor/seven-segment.css">
+<style>
+body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252}
+body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b}
+body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252}
+body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px}
+.cd-label{font-size:1.2rem;color:var(--text-dim)}
+.cd-time{font-size:4rem;font-variant-numeric:tabular-nums;font-weight:700}
+.cd-controls{display:flex;gap:8px}
+.cd-controls button{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:1rem}
+.cd-controls button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cd-overtime{color:var(--danger)}
+.cd-blink{animation:cdb 1.2s step-end infinite}
+@keyframes cdb{0%,100%{opacity:1}50%{opacity:.3}}
+</style></head><body class="${theme}">
+<div class="cd-label" id="cdLabel">${escH(cd.label)}</div>
+<div class="cd-time" id="cdTime">00:00:00</div>
+<div class="cd-controls">
+  <button id="btnPause">${cd.paused ? '\u25B6' : '\u23F8'}</button>
+  <button id="btnReset">\u21BA</button>
+</div>
+<script>
+const cdId = ${cd.id};
+function pad(n){return String(n).padStart(2,'0');}
+function tick(){
+  try {
+    const cd = window.opener._countdowns?.find(c=>c.id===cdId);
+    if(!cd){document.getElementById('cdTime').textContent='--:--:--';return;}
+    let ms,isOT=false;
+    if(cd.paused){ms=Math.max(0,cd.pausedRemaining);}
+    else{const rem=cd.targetTime-Date.now();if(rem>0){ms=rem;}else{isOT=cd.continueUp;ms=isOT?-rem:0;}}
+    const ts=Math.floor(ms/1000),h=Math.floor(ts/3600),m=Math.floor((ts%3600)/60),s=ts%60;
+    const el=document.getElementById('cdTime');
+    el.textContent=(isOT?'+':'')+pad(h)+':'+pad(m)+':'+pad(s);
+    el.classList.toggle('cd-overtime',isOT);
+    el.classList.toggle('cd-blink',cd.paused);
+    document.getElementById('btnPause').textContent=cd.paused?'\u25B6':'\u23F8';
+  }catch(e){}
+}
+document.getElementById('btnPause').onclick=()=>{try{window.opener.togglePauseCountdown(cdId);window.opener.renderCountdowns();}catch(e){}};
+document.getElementById('btnReset').onclick=()=>{try{window.opener.resetCountdown(cdId);}catch(e){}};
+setInterval(tick,200);tick();
+<\/script></body></html>`);
+  w.document.close();
+}
+
 function playCdAlarm() {
   try {
     if (!_cdAudioCtx) _cdAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -602,6 +660,7 @@ function renderCountdowns() {
     const isExpired = !cd.paused && Date.now() >= cd.targetTime;
     const classes = ['clock-card', 'countdown-card'];
     if (clockMode === 'vcr') classes.push('vcr-card');
+    if (cd.paused) classes.push('cd-paused');
     if (isExpired && !cd.acknowledged) classes.push('cd-expired');
     if (isExpired && cd.continueUp) classes.push('cd-counting-up');
 
@@ -624,6 +683,7 @@ function renderCountdowns() {
       <div class="countdown-controls">
         <button data-cd-pause="${cd.id}">${cd.paused ? '▶' : '⏸'}</button>
         <button data-cd-reset="${cd.id}">↺</button>
+        <button data-cd-detach="${cd.id}" title="Detach to own window">⧉</button>
         ${isExpired && !cd.acknowledged ? `<button data-cd-ack="${cd.id}" style="background:var(--danger,#e05252);color:#fff;border-color:var(--danger,#e05252)">✓ Acknowledge</button>` : ''}
       </div>
     </div>`;
@@ -641,6 +701,9 @@ function renderCountdowns() {
   });
   wrap.querySelectorAll('[data-cd-ack]').forEach(btn => {
     btn.addEventListener('click', () => acknowledgeCountdown(parseInt(btn.dataset.cdAck, 10)));
+  });
+  wrap.querySelectorAll('[data-cd-detach]').forEach(btn => {
+    btn.addEventListener('click', () => detachCountdown(parseInt(btn.dataset.cdDetach, 10)));
   });
 }
 
@@ -680,16 +743,21 @@ function displayCountdownTime(id, ms, isOvertime) {
   const el = document.getElementById('cd-time-' + id);
   if (!el) return;
   if (clockMode === 'vcr') {
-    el.innerHTML = buildSeg7Time(h, m, s);
+    el.innerHTML = (isOvertime ? buildSeg7Text('+') : '') + buildSeg7Time(h, m, s);
   } else {
     el.textContent = prefix + pad(h) + ':' + pad(m) + ':' + pad(s);
   }
-  // Update card classes for expired state
+  // Update card classes and overtime color
   const card = document.getElementById('cd-card-' + id);
   if (card) {
     const cd = _countdowns.find(c => c.id === id);
     if (cd && cd.expired && !cd.acknowledged) {
       card.classList.add('cd-expired');
+    }
+    if (isOvertime) {
+      el.style.color = 'var(--danger,#e05252)';
+    } else {
+      el.style.color = '';
     }
   }
 }

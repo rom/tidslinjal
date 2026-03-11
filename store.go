@@ -122,6 +122,7 @@ func (s *Store) load() error {
 	s.loadFile("locks.json", &s.locks)
 	s.loadFile("sessions.json", &s.sessions)
 	s.loadFile("audit.json", &s.audit)
+	s.exercise = ExerciseSettings{IncludeWeekends: true} // default to including weekends
 	s.loadFile("exercise.json", &s.exercise)
 	s.loadFile("comments.json", &s.comments)
 	s.loadFile("phases.json", &s.phases)
@@ -415,7 +416,7 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 	s.comments = nil
 	s.phases = nil
 	s.roleConfigs = nil
-	s.exercise = ExerciseSettings{}
+	s.exercise = ExerciseSettings{IncludeWeekends: true}
 	s.nextGroupID = 0
 	s.nextLayerID = 0
 	s.nextEventID = 0
@@ -452,7 +453,7 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 		{"comments.json", []EventComment{}},
 		{"phases.json", []ExercisePhase{}},
 		{"templates.json", s.templates},
-		{"exercise.json", ExerciseSettings{}},
+		{"exercise.json", ExerciseSettings{IncludeWeekends: true}},
 		{"roles.json", []RoleConfig{}},
 	} {
 		if err := s.saveFile(file.name, file.val); err != nil {
@@ -2238,7 +2239,7 @@ func (s *Store) ResetDatabase() error {
 	s.nextPhaseID = 0
 	s.templates = nil
 	s.nextTemplateID = 0
-	s.exercise = ExerciseSettings{}
+	s.exercise = ExerciseSettings{IncludeWeekends: true}
 
 	// Save all cleared files
 	files := map[string]interface{}{

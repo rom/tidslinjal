@@ -5140,40 +5140,13 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	// Decision Log
-	mux.HandleFunc("/api/decision-log", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			app.requireAuth(app.handleListDecisionLog)(w, r)
-		case http.MethodPost:
-			app.requireAuth(app.handleAddDecisionLogEntry)(w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-	mux.HandleFunc("/api/decision-log/", func(w http.ResponseWriter, r *http.Request) {
-		// Check for attachment sub-path: /api/decision-log/{id}/attachment
-		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
-		if len(parts) >= 2 && parts[1] == "attachment" {
-			switch r.Method {
-			case http.MethodPost:
-				app.requireAuth(app.handleDecisionLogAttachment)(w, r)
-			case http.MethodGet:
-				app.handleDecisionLogAttachmentDownload(w, r)
-			default:
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			}
-			return
-		}
-		switch r.Method {
-		case http.MethodDelete:
-			app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry)(w, r)
-		case http.MethodPut:
-			app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry)(w, r)
-		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	// Decision Log — use Go 1.22+ method-based routing for clarity
+	mux.HandleFunc("GET /api/decision-log", app.requireAuth(app.handleListDecisionLog))
+	mux.HandleFunc("POST /api/decision-log", app.requireAuth(app.handleAddDecisionLogEntry))
+	mux.HandleFunc("DELETE /api/decision-log/{id}", app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry))
+	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
+	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireAuth(app.handleDecisionLogAttachment))
+	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", app.handleDecisionLogAttachmentDownload)
 
 	// Map Locations
 	mux.HandleFunc("/api/map-locations", func(w http.ResponseWriter, r *http.Request) {
@@ -6506,8 +6479,9 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}
+	now := time.Now()
 	entry := DecisionLogEntry{
-		Timestamp:         time.Now(),
+		Timestamp:         now,
 		UserID:            user.ID,
 		UserName:          user.Username,
 		DisplayName:       user.DisplayName,
@@ -6520,15 +6494,38 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		RequestedOfValue:  req.RequestedOfValue,
 		RequestedOfLabel:  req.RequestedOfLabel,
 	}
+	if req.Status == "requested" {
+		entry.RequestedAt = &now
+	} else {
+		entry.DecidedAt = &now
+	}
 	created, err := app.store.AddDecisionLogEntry(entry)
 	if err != nil {
 		jsonError(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
+	// Generate sequence number from exercise name + sequential ID
+	seqPrefix := "DEC"
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		// Use uppercase abbreviation of exercise name
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		seqPrefix = abbr
+	}
+	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
+	_ = app.store.UpdateDecisionLogEntry(created)
+	auditAction := "created"
+	auditSummary := fmt.Sprintf("Decision %s added: %.50s", created.SequenceNumber, req.Decision)
+	if req.Status == "requested" {
+		auditAction = "requested"
+		auditSummary = fmt.Sprintf("Decision %s requested: %.50s", created.SequenceNumber, req.Decision)
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
-		Action: "created", EntityType: "decision_log", EntityID: created.ID,
-		Summary: fmt.Sprintf("Added decision log entry: %.50s", req.Decision),
+		Action: auditAction, EntityType: "decision_log", EntityID: created.ID,
+		Summary: auditSummary,
 	})
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -6536,8 +6533,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 }
 
 func (app *App) handleDeleteDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
-	id, err := strconv.ParseInt(parts[0], 10, 64)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -6555,16 +6551,7 @@ func (app *App) handleDeleteDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 }
 
 func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
-	if r.Method != http.MethodPut {
-		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
-	if len(parts) < 2 || parts[1] != "review" {
-		jsonError(w, "invalid path", http.StatusBadRequest)
-		return
-	}
-	id, err := strconv.ParseInt(parts[0], 10, 64)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -6602,6 +6589,9 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	}
 	found.ReviewedAt = &now
 	found.ReviewComment = req.Comment
+	if req.Status == "approved" {
+		found.DecidedAt = &now
+	}
 	if err := app.store.UpdateDecisionLogEntry(*found); err != nil {
 		jsonError(w, "failed to update", http.StatusInternalServerError)
 		return
@@ -6615,8 +6605,7 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 }
 
 func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Request, user *User) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
-	id, err := strconv.ParseInt(parts[0], 10, 64)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -6671,13 +6660,7 @@ func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Reque
 }
 
 func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *http.Request) {
-	// Path: /api/decision-log/{id}/attachment/{storedName}
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/decision-log/"), "/")
-	if len(parts) < 3 {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	storedName := filepath.Base(parts[2])
+	storedName := filepath.Base(r.PathValue("filename"))
 	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
 	if _, err := os.Stat(filePath); err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)

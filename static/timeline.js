@@ -142,7 +142,9 @@ function toDayNumber(date) {
 }
 
 function synthDayHeader(date) {
-  return 'Day ' + toDayNumber(date);
+  const dayNum = toDayNumber(date);
+  const dayLabel = t('synth_day') || 'Day';
+  return dayLabel + ' ' + dayNum;
 }
 
 function updateSyntheticUI() {

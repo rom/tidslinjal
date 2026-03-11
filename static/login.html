@@ -30,6 +30,19 @@
       Local login is disabled — please use SSO to sign in.
     </div>
 
+    <!-- SSO / OIDC section — shown first if OIDC is configured -->
+    <div id="oidcSection" style="display:none">
+      <a href="/auth/oidc/login" class="sso-login-btn" id="ssoLoginBtn">
+        <span id="ssoSpinner" class="spinner" style="display:none"></span>
+        <span>🔐</span>
+        <span>Sign in with SSO</span>
+      </a>
+      <div class="sso-provider-name" id="ssoProviderName"></div>
+      <div class="sso-divider">
+        <hr><span>or sign in with username</span><hr>
+      </div>
+    </div>
+
     <!-- Login form -->
     <form id="loginForm" class="login-form">
       <div class="form-group">
@@ -108,19 +121,6 @@
       <button type="submit" class="btn btn-primary btn-full">Register</button>
       <div class="login-switch"><a id="backToLoginFromReg">← Back to login</a></div>
     </form>
-
-    <!-- SSO / OIDC section — shown dynamically if OIDC is configured -->
-    <div id="oidcSection" style="display:none">
-      <div class="sso-divider">
-        <hr><span>or sign in with SSO</span><hr>
-      </div>
-      <a href="/auth/oidc/login" class="sso-login-btn" id="ssoLoginBtn">
-        <span id="ssoSpinner" class="spinner" style="display:none"></span>
-        <span>🔐</span>
-        <span>Sign in with SSO</span>
-      </a>
-      <div class="sso-provider-name" id="ssoProviderName"></div>
-    </div>
 
     <!-- Register link — shown dynamically if registration is enabled -->
     <div id="registerSection" style="display:none;margin-top:12px;text-align:center;font-size:13px">

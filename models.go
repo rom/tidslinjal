@@ -684,6 +684,7 @@ type MapLocation struct {
 // DecisionLogEntry represents a single entry in the decision log
 type DecisionLogEntry struct {
 	ID             int64     `json:"id"`
+	SequenceNumber string    `json:"sequence_number,omitempty"` // e.g. "EX-AURORA-001"
 	Timestamp      time.Time `json:"timestamp"`
 	UserID         int64     `json:"user_id"`
 	UserName       string    `json:"user_name"`
@@ -693,14 +694,16 @@ type DecisionLogEntry struct {
 	GroupID        int64     `json:"group_id,omitempty"` // if log_type=group
 	Confidential   bool      `json:"confidential"`    // only visible to users with confidential_read right
 	// Decision request workflow
-	Status            string    `json:"status,omitempty"`              // "" (decided) | "requested" | "approved" | "rejected"
-	RequestedOfType   string    `json:"requested_of_type,omitempty"`   // "role" | "group" | "person"
-	RequestedOfValue  string    `json:"requested_of_value,omitempty"`  // role key, group id, or user id
-	RequestedOfLabel  string    `json:"requested_of_label,omitempty"`  // display name of target
-	ReviewedBy        int64     `json:"reviewed_by,omitempty"`         // user who approved/rejected
-	ReviewedByName    string    `json:"reviewed_by_name,omitempty"`
+	Status            string     `json:"status,omitempty"`              // "" (decided) | "requested" | "approved" | "rejected"
+	RequestedAt       *time.Time `json:"requested_at,omitempty"`        // when decision was requested
+	RequestedOfType   string     `json:"requested_of_type,omitempty"`   // "role" | "group" | "person"
+	RequestedOfValue  string     `json:"requested_of_value,omitempty"`  // role key, group id, or user id
+	RequestedOfLabel  string     `json:"requested_of_label,omitempty"`  // display name of target
+	ReviewedBy        int64      `json:"reviewed_by,omitempty"`         // user who approved/rejected
+	ReviewedByName    string     `json:"reviewed_by_name,omitempty"`
 	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
-	ReviewComment     string    `json:"review_comment,omitempty"`
+	ReviewComment     string     `json:"review_comment,omitempty"`
+	DecidedAt         *time.Time `json:"decided_at,omitempty"`          // when decision was actually made/approved
 	// File attachments
 	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
 }
