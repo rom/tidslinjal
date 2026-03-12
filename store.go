@@ -2165,8 +2165,40 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 	if !ok {
 		return 0, fmt.Errorf("template not found")
 	}
-	logDebug("[template] ApplyTemplate: name=%q items=%d phases=%d locks=%d base=%s",
-		tmpl.Name, len(tmpl.Items), len(tmpl.Phases), len(tmpl.Locks), baseTime.Format(time.RFC3339))
+	logDebug("[template] ApplyTemplate: name=%q items=%d phases=%d locks=%d layers=%d base=%s",
+		tmpl.Name, len(tmpl.Items), len(tmpl.Phases), len(tmpl.Locks), len(tmpl.Layers), baseTime.Format(time.RFC3339))
+
+	// Create template-defined layers and build name→ID map
+	layerMap := map[string]*int64{}
+	for _, tl := range tmpl.Layers {
+		if tl.Name == "" {
+			continue
+		}
+		vis := tl.Visibility
+		if vis == "" {
+			vis = "shared"
+		}
+		perm := tl.Permission
+		if perm == "" {
+			perm = "readwrite"
+		}
+		created, err := s.CreateLayer(Layer{
+			Name:       tl.Name,
+			Color:      tl.Color,
+			Visibility: vis,
+			Permission: perm,
+			OwnerID:    createdBy,
+			OwnerName:  createdByName,
+		})
+		if err != nil {
+			logDebug("[template] failed to create layer %q: %v", tl.Name, err)
+			continue
+		}
+		lid := created.ID
+		layerMap[tl.Name] = &lid
+		logDebug("[template] created layer %q id=%d", tl.Name, lid)
+	}
+
 	count := 0
 	for _, item := range tmpl.Items {
 		start := baseTime.Add(time.Duration(item.StartOffsetMin) * time.Minute)
@@ -2174,6 +2206,13 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 		if item.DurationMin > 0 {
 			e := start.Add(time.Duration(item.DurationMin) * time.Minute)
 			end = &e
+		}
+		// Determine layer: per-item layer takes precedence over default layerID
+		itemLayerID := layerID
+		if item.Layer != "" {
+			if lid, ok := layerMap[item.Layer]; ok {
+				itemLayerID = lid
+			}
 		}
 		ev := Event{
 			Title:             item.Title,
@@ -2187,7 +2226,7 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, crea
 			RecurrencePattern: item.RecurrencePattern,
 			Participant:       item.Participant,
 			Status:            StatusPlanned,
-			LayerID:           layerID,
+			LayerID:           itemLayerID,
 			CreatedBy:         createdBy,
 			CreatedByName:     createdByName,
 		}

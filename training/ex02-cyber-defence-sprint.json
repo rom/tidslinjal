@@ -5,6 +5,29 @@
   "day_start_hour": 8,
   "day_end_hour": 17,
   "scope": "public",
+  "layers": [
+    {
+      "name": "injects",
+      "description": "Red team injects and attack triggers",
+      "color": "#C0392B",
+      "visibility": "shared",
+      "permission": "readwrite"
+    },
+    {
+      "name": "sitreps",
+      "description": "Situation reports and status updates",
+      "color": "#1ABC9C",
+      "visibility": "shared",
+      "permission": "readwrite"
+    },
+    {
+      "name": "decisions",
+      "description": "Key decisions taken during the exercise",
+      "color": "#27AE60",
+      "visibility": "shared",
+      "permission": "readwrite"
+    }
+  ],
   "phases": [
     {
       "name": "Setup & Reconnaissance",
@@ -73,7 +96,8 @@
       "color": "#C0392B",
       "description": "Red team initiates reconnaissance via port scanning and service enumeration. Blue team should detect via IDS alerts.",
       "start_offset_min": 60,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "injects"
     },
     {
       "title": "Blue: Anomaly Detection Alert",
@@ -89,7 +113,8 @@
       "color": "#C0392B",
       "description": "Red team launches targeted phishing campaign at three user accounts. Blue team should identify via email gateway logs.",
       "start_offset_min": 120,
-      "duration_min": 30
+      "duration_min": 30,
+      "layer": "injects"
     },
     {
       "title": "Decision: Isolate Subnet",
@@ -97,7 +122,8 @@
       "color": "#27AE60",
       "description": "Blue team lead must decide: isolate the affected subnet to prevent lateral movement, accepting service disruption.",
       "start_offset_min": 120,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "decisions"
     },
     {
       "title": "SITREP 1 — Blue Team Status",
@@ -105,7 +131,8 @@
       "color": "#1ABC9C",
       "description": "Blue team reports current threat status, actions taken, impacted systems, and recommended next steps.",
       "start_offset_min": 120,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "sitreps"
     },
     {
       "title": "Vulnerability Analysis",
@@ -129,7 +156,8 @@
       "color": "#C0392B",
       "description": "Red team attempts lateral movement from compromised workstation to file server using credential harvesting.",
       "start_offset_min": 180,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "injects"
     },
     {
       "title": "Log Analysis — Forensics",
@@ -145,7 +173,8 @@
       "color": "#1ABC9C",
       "description": "Comprehensive incident report: compromise scope, affected assets, containment status, estimated recovery time.",
       "start_offset_min": 240,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "sitreps"
     },
     {
       "title": "INJECT: Red — Data Exfiltration Attempt",
@@ -153,7 +182,8 @@
       "color": "#C0392B",
       "description": "Red team attempts to exfiltrate simulated sensitive data via encrypted channel to external C2 server.",
       "start_offset_min": 300,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "injects"
     },
     {
       "title": "Decision: Network Segmentation",
@@ -161,7 +191,8 @@
       "color": "#27AE60",
       "description": "Decision to implement emergency network segmentation to prevent exfiltration. Accept partial service outage.",
       "start_offset_min": 300,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "decisions"
     },
     {
       "title": "System Hardening",
