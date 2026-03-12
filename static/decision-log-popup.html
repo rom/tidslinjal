@@ -55,6 +55,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 </div>
 <div class="dl-add" id="dlAddPanel" style="display:none">
   <textarea id="dlNewDecision" rows="2" placeholder="Enter decision..."></textarea>
+  <input type="text" id="dlReason" placeholder="Reason or background (optional)" style="width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:6px 8px;font-size:12px">
   <div style="display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap">
     <select id="dlLogType">
       <option value="general" id="optGeneral">General (all)</option>
@@ -64,6 +65,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <select id="dlGroupId" style="display:none"></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim)">
       <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)"> <span id="lblConfidential">Confidential</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim)">
+      <input type="checkbox" id="dlCoSignRequired" style="accent-color:var(--accent)"> <span id="lblCoSign">👁👁 Four eyes</span>
     </label>
     <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);cursor:pointer">
       📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
@@ -130,7 +134,7 @@ function render() {
     let reviewSection = '';
     if (e.status === 'requested') {
       const targetInfo = e.requested_of_label ? ' → ' + escHtml(e.requested_of_label) : '';
-      statusBadge = '<span class="badge badge-requested">REQUESTED' + targetInfo + '</span>';
+      statusBadge = '<span class="badge badge-requested">PENDING' + targetInfo + '</span>';
       if (canReview) {
         reviewSection = '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
           '<input type="text" data-review-id="' + e.id + '" placeholder="' + escHtml(t('review_comment')) + '" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">' +
@@ -139,17 +143,31 @@ function render() {
           '</div>';
       }
     } else if (e.status === 'approved') {
-      statusBadge = '<span class="badge badge-approved">APPROVED</span>';
+      statusBadge = '<span class="badge badge-approved">DECIDED</span>';
       if (e.reviewed_by_name) reviewSection = '<div class="dl-review">✓ ' + escHtml(e.reviewed_by_name) + (e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : '') + (e.review_comment ? ': ' + escHtml(e.review_comment) : '') + '</div>';
     } else if (e.status === 'rejected') {
       statusBadge = '<span class="badge badge-rejected">REJECTED</span>';
       if (e.reviewed_by_name) reviewSection = '<div class="dl-review">✗ ' + escHtml(e.reviewed_by_name) + (e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : '') + (e.review_comment ? ': ' + escHtml(e.review_comment) : '') + '</div>';
     }
+    // Reason/background
+    const reasonSection = e.reason ? '<div style="margin-top:4px;font-size:12px;color:var(--text-dim);font-style:italic;border-left:3px solid var(--accent);padding-left:8px">' + escHtml(e.reason) + '</div>' : '';
+    // Four-eyes co-sign info
+    let coSignSection = '';
+    if (e.co_sign_required) {
+      if (e.co_signed_by_name) {
+        coSignSection = '<div style="margin-top:4px;font-size:11px;color:var(--text-dim)">👁👁 Co-signed by ' + escHtml(e.co_signed_by_name) + (e.co_signed_at ? ' — ' + new Date(e.co_signed_at).toLocaleString() : '') + (e.co_sign_comment ? ': ' + escHtml(e.co_sign_comment) : '') + '</div>';
+      } else {
+        coSignSection = '<div style="margin-top:4px;font-size:11px;color:#E67E22">👁👁 Co-sign required (pending)</div>';
+        if (canReview && e.user_id !== userId) {
+          coSignSection += '<div style="margin-top:4px;display:flex;gap:6px;align-items:center"><input type="text" data-cosign-id="' + e.id + '" placeholder="Co-sign comment" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px"><button class="btn-primary" data-cosign="' + e.id + '" style="padding:2px 8px;font-size:11px">👁👁 Co-sign</button></div>';
+        }
+      }
+    }
     const delBtn = isAdmin ? ' <button class="btn-danger" data-delete="' + e.id + '" style="padding:1px 6px;font-size:10px">×</button>' : '';
     const attachSection = (e.attachments && e.attachments.length) ? '<div class="dl-attachments">' + e.attachments.map(a =>
       '<a href="/api/decision-log/' + e.id + '/attachment/' + encodeURIComponent(a.stored_name) + '" target="_blank" title="' + escHtml(a.filename) + '">📎 ' + escHtml(a.filename) + '</a>'
     ).join('') + '</div>' : '';
-    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + attachSection + reviewSection + '</div>';
+    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + reasonSection + attachSection + coSignSection + reviewSection + '</div>';
   }).join('');
   bindEntryActions();
 }
@@ -175,6 +193,14 @@ function bindEntryActions() {
       const id = btn.dataset.reject;
       const comment = document.querySelector('[data-review-id="' + id + '"]')?.value || '';
       await api('PUT', '/api/decision-log/' + id + '/review', { status: 'rejected', comment });
+      loadEntries();
+    };
+  });
+  document.querySelectorAll('[data-cosign]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.cosign;
+      const comment = document.querySelector('[data-cosign-id="' + id + '"]')?.value || '';
+      await api('PUT', '/api/decision-log/' + id + '/cosign', { comment });
       loadEntries();
     };
   });
@@ -277,11 +303,15 @@ document.getElementById('btnAdd').onclick = async () => {
   const logType = document.getElementById('dlLogType').value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
   const confidential = document.getElementById('dlConfidential').checked;
-  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential });
+  const reason = document.getElementById('dlReason').value.trim();
+  const coSignRequired = document.getElementById('dlCoSignRequired').checked;
+  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential, reason, co_sign_required: coSignRequired });
   if (res.ok) {
     const created = await res.json().catch(() => null);
     if (created) await uploadAttachments(created.id);
     document.getElementById('dlNewDecision').value = '';
+    document.getElementById('dlReason').value = '';
+    document.getElementById('dlCoSignRequired').checked = false;
     loadEntries();
   } else {
     const err = await res.json().catch(() => ({}));
@@ -295,11 +325,15 @@ document.getElementById('btnRequest').onclick = async () => {
   const logType = document.getElementById('dlLogType').value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId').value || '0') : 0;
   const confidential = document.getElementById('dlConfidential').checked;
-  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested' });
+  const reason = document.getElementById('dlReason').value.trim();
+  const coSignRequired = document.getElementById('dlCoSignRequired').checked;
+  const res = await api('POST', '/api/decision-log', { decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested', reason, co_sign_required: coSignRequired });
   if (res.ok) {
     const created = await res.json().catch(() => null);
     if (created) await uploadAttachments(created.id);
     document.getElementById('dlNewDecision').value = '';
+    document.getElementById('dlReason').value = '';
+    document.getElementById('dlCoSignRequired').checked = false;
     loadEntries();
   } else {
     const err = await res.json().catch(() => ({}));

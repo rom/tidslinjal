@@ -737,6 +737,14 @@ type DecisionLogEntry struct {
 	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
 	ReviewComment     string     `json:"review_comment,omitempty"`
 	DecidedAt         *time.Time `json:"decided_at,omitempty"`          // when decision was actually made/approved
+	// Reason / background for the decision
+	Reason            string     `json:"reason,omitempty"`
+	// Four-eyes / grandfather co-sign
+	CoSignRequired    bool       `json:"co_sign_required,omitempty"`     // true if a co-signer is needed
+	CoSignedBy        int64      `json:"co_signed_by,omitempty"`         // user who co-signed
+	CoSignedByName    string     `json:"co_signed_by_name,omitempty"`
+	CoSignedAt        *time.Time `json:"co_signed_at,omitempty"`
+	CoSignComment     string     `json:"co_sign_comment,omitempty"`
 	// File attachments
 	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
 }
@@ -850,6 +858,23 @@ type LogBookAttachment struct {
 	StoredName string `json:"stored_name"`
 	Size       int64  `json:"size"`
 	MimeType   string `json:"mime_type,omitempty"`
+}
+
+// PersonReadyCheckParticipant is a participant in a person ready check
+type PersonReadyCheckParticipant struct {
+	UserID   int64  `json:"user_id"`
+	UserName string `json:"user_name"`
+	Status   string `json:"status"` // pending | ready | not_ready
+}
+
+// PersonReadyCheck tracks a per-participant readiness request
+type PersonReadyCheck struct {
+	ID            int64                         `json:"id"`
+	CreatedBy     int64                         `json:"created_by"`
+	CreatedByName string                        `json:"created_by_name"`
+	EventID       *int64                        `json:"event_id,omitempty"`
+	Participants  []PersonReadyCheckParticipant `json:"participants"`
+	CreatedAt     time.Time                     `json:"created_at"`
 }
 
 type EventLogEntry struct {

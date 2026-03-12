@@ -524,6 +524,13 @@
         <input type="text" id="eventPhysicalLocation" placeholder="Room, address, building…">
         <input type="text" id="eventLocationAddress" placeholder="Street address (for geocoding / map lookup)…" style="margin-top:6px">
       </div>
+      <!-- Resource / Room selector -->
+      <div class="form-group" id="resourceSelectGroup">
+        <label>🏢 Resource / Room</label>
+        <select id="eventResourceSelect" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <option value="">— None —</option>
+        </select>
+      </div>
       <!-- Contact / virtual meeting info (shown for non-physical meeting types) -->
       <div id="contactInfoGroup" style="display:none">
         <div class="form-row">
@@ -661,6 +668,10 @@
           </div>
         </div>
         <div id="eventInvitedList" class="group-picker" style="margin-top:4px"></div>
+        <div class="form-check" style="margin-top:8px">
+          <input type="checkbox" id="eventRequestReadyCheck">
+          <label for="eventRequestReadyCheck" style="font-size:var(--fs-sm)">🙋 Request Person Ready Check from invited participants</label>
+        </div>
       </div>
       <div class="form-group">
         <label id="lbl-ev-attach">Attachment <small style="color:var(--text-dim)">(optional)</small></label>
