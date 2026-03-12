@@ -433,7 +433,10 @@ function renderListView() {
   const statusFil  = document.getElementById('listStatusFilter')?.value || '';
   const typeFil    = document.getElementById('listTypeFilter')?.value || '';
 
+  const hl = state.preferences.hidden_layers || [];
   let events = (state.events || []).filter(ev => {
+    if (isTypeHidden(ev.event_type)) return false;
+    if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
     if (statusFil && ev.status !== statusFil) return false;
     if (typeFil   && ev.event_type !== typeFil) return false;
     if (search) {

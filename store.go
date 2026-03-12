@@ -66,6 +66,7 @@ type Store struct {
 	trustRealms          []TrustRealm
 	rooms                []Room
 	customResourceTypes  []CustomResourceType
+	personReadyChecks    []PersonReadyCheck
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -91,6 +92,7 @@ type Store struct {
 	nextEventLogID           int64
 	nextLogBookID            int64
 	nextCustomResTypeID      int64
+	nextPersonReadyCheckID   int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -155,6 +157,7 @@ func (s *Store) load() error {
 	s.loadFile("custom_resource_types.json", &s.customResourceTypes)
 	s.loadFile("event_log.json", &s.eventLog)
 	s.loadFile("log_book.json", &s.logBook)
+	s.loadFile("person_ready_checks.json", &s.personReadyChecks)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -303,6 +306,11 @@ func (s *Store) load() error {
 	for _, x := range s.logBook {
 		if x.ID > s.nextLogBookID {
 			s.nextLogBookID = x.ID
+		}
+	}
+	for _, x := range s.personReadyChecks {
+		if x.ID > s.nextPersonReadyCheckID {
+			s.nextPersonReadyCheckID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -3272,6 +3280,40 @@ func (s *Store) AddDecisionLogAttachment(entryID int64, att DecisionAttachment) 
 	snap := append([]DecisionLogEntry(nil), s.decisionLog...)
 	s.mu.Unlock()
 	return s.persist("decision_log.json", snap)
+}
+
+// ── Person Ready Checks ─────────────────────────────────────────────────────
+
+func (s *Store) GetPersonReadyChecks() []PersonReadyCheck {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]PersonReadyCheck, len(s.personReadyChecks))
+	copy(out, s.personReadyChecks)
+	return out
+}
+
+func (s *Store) AddPersonReadyCheck(check PersonReadyCheck) (PersonReadyCheck, error) {
+	s.mu.Lock()
+	s.nextPersonReadyCheckID++
+	check.ID = s.nextPersonReadyCheckID
+	s.personReadyChecks = append(s.personReadyChecks, check)
+	snap := append([]PersonReadyCheck(nil), s.personReadyChecks...)
+	s.mu.Unlock()
+	return check, s.persist("person_ready_checks.json", snap)
+}
+
+func (s *Store) UpdatePersonReadyCheck(check PersonReadyCheck) error {
+	s.mu.Lock()
+	for i, c := range s.personReadyChecks {
+		if c.ID == check.ID {
+			s.personReadyChecks[i] = check
+			snap := append([]PersonReadyCheck(nil), s.personReadyChecks...)
+			s.mu.Unlock()
+			return s.persist("person_ready_checks.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("person ready check %d not found", check.ID)
 }
 
 // ── Event Log ───────────────────────────────────────────────────────────────

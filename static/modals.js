@@ -304,6 +304,20 @@ function openEventModal(ev, defaultStart, defaultEnd) {
     });
   }
 
+  // Populate resource/room selector
+  const resSel = document.getElementById('eventResourceSelect');
+  if (resSel) {
+    const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥'};
+    apiGet('/api/rooms').then(rooms => {
+      const enabled = (rooms || []).filter(r => r.enabled !== false);
+      resSel.innerHTML = '<option value="">— None —</option>' +
+        enabled.map(r => {
+          const icon = r.icon || typeIcons[r.type] || '📦';
+          return `<option value="${r.id}" ${ev && ev.room_id === r.id ? 'selected' : ''}>${icon} ${escHtml(r.name)}${r.location ? ' ('+escHtml(r.location)+')' : ''}</option>`;
+        }).join('');
+    }).catch(() => {});
+  }
+
   // Clear attachment input on each open
   const attachFile = document.getElementById('eventAttachFile');
   if (attachFile) attachFile.value = '';
@@ -503,6 +517,8 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     virtual_meeting_type: document.getElementById('eventVirtualMeetingType')?.value || '',
     latitude:           document.getElementById('eventLatitude')?.value ? parseFloat(document.getElementById('eventLatitude').value) : null,
     longitude:          document.getElementById('eventLongitude')?.value ? parseFloat(document.getElementById('eventLongitude').value) : null,
+    room_id:                (() => { const v = document.getElementById('eventResourceSelect')?.value; return v ? parseInt(v, 10) : null; })(),
+    room_name:              (() => { const sel = document.getElementById('eventResourceSelect'); return sel && sel.value ? sel.options[sel.selectedIndex]?.textContent?.trim() || '' : ''; })(),
     countdown_before_minutes: parseInt(document.getElementById('eventCountdownBefore')?.value, 10) || 0,
     timed_duration_minutes: typeVal === 'timed_event' ? (parseInt(document.getElementById('timedDuration')?.value, 10) || 30) : 0,
     timed_alarms: typeVal === 'timed_event' ? (document.getElementById('timedAlarms')?.value || '') : '',
@@ -574,6 +590,11 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
           }
         }
       }
+    }
+    // Create person ready check if requested
+    const prcCb = document.getElementById('eventRequestReadyCheck');
+    if (prcCb && prcCb.checked && invUserIDs.length > 0) {
+      await apiPost('/api/person-ready-check', { participant_ids: invUserIDs, event_id: eventID });
     }
     closeModal('eventModal');
     await refreshAll();
@@ -3109,6 +3130,8 @@ function renderSidebar() {
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
+          ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -4830,6 +4853,129 @@ async function runReadyCheck() {
   _bindActions(modal);
 }
 
+// ── Ready Check popup (wraps existing runReadyCheck) ────────────────────────
+function openReadyCheckPopup() {
+  runReadyCheck();
+}
+
+// ── Person Ready Check ─────────────────────────────────────────────────────
+// Tracks per-participant readiness with traffic-light status
+let _personReadyChecks = []; // { id, event_id?, created_by, participants: [{user_id, user_name, status}], created_at }
+
+async function openPersonReadyCheckPopup() {
+  const isCreator = hasRole2(state.user.role, 'teamlead');
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <h3>🙋 ${t('person_ready_check_title')||'Person Ready Check'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto" id="personReadyCheckBody">
+        <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+          ${t('person_ready_check_desc')||'Request all participants to confirm their readiness. Each participant shows as a traffic light: green = ready, red = not ready, yellow = pending.'}
+        </p>
+        <div id="prcActiveChecks"></div>
+        ${isCreator ? `
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+          <h4 style="font-size:var(--fs-sm);margin-bottom:8px">${t('prc_new_check')||'New Ready Check'}</h4>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_select_participants')||'Select participants'}:</label>
+            <div id="prcParticipantList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+              ${(state.users||[]).filter(u => u.id !== state.user.id).map(u => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="prc-user-cb" value="${u.id}" style="margin-right:4px">
+                  👤 ${escHtml(u.display_name||u.username)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnCreatePRC">${t('prc_send_request')||'Send Ready Check Request'}</button>
+        </div>` : ''}
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+
+  // Load existing checks
+  _loadPersonReadyChecks(modal);
+
+  // Create new check button
+  const createBtn = modal.querySelector('#btnCreatePRC');
+  if (createBtn) {
+    createBtn.addEventListener('click', async () => {
+      const selected = [...modal.querySelectorAll('.prc-user-cb:checked')].map(cb => parseInt(cb.value, 10));
+      if (selected.length === 0) { showError(t('prc_no_participants')||'Select at least one participant'); return; }
+      const res = await apiPost('/api/person-ready-check', { participant_ids: selected });
+      if (res.ok) {
+        showNotification('success', t('prc_sent')||'Ready check request sent');
+        _loadPersonReadyChecks(modal);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to create ready check');
+      }
+    });
+  }
+}
+
+async function _loadPersonReadyChecks(modal) {
+  const container = modal.querySelector('#prcActiveChecks');
+  if (!container) return;
+  try {
+    const checks = await apiGet('/api/person-ready-check');
+    _personReadyChecks = checks || [];
+  } catch { _personReadyChecks = []; }
+
+  if (_personReadyChecks.length === 0) {
+    container.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);text-align:center;padding:16px">${t('prc_no_active')||'No active ready checks.'}</div>`;
+    return;
+  }
+
+  container.innerHTML = _personReadyChecks.map(check => {
+    const isMyCheck = check.created_by === state.user.id;
+    const participants = check.participants || [];
+    return `
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px;background:var(--bg3)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-weight:600;font-size:var(--fs-sm)">${t('prc_ready_check')||'Ready Check'} #${check.id}</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${new Date(check.created_at).toLocaleString()}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${participants.map(p => {
+            const color = p.status === 'ready' ? '#27AE60' : p.status === 'not_ready' ? '#E74C3C' : '#F39C12';
+            const icon = p.status === 'ready' ? '🟢' : p.status === 'not_ready' ? '🔴' : '🟡';
+            const isMe = p.user_id === state.user.id;
+            return `<div style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius);border:1px solid ${color}">
+              <span style="font-size:16px">${icon}</span>
+              <span style="font-size:var(--fs-xs)">${escHtml(p.user_name)}</span>
+              ${isMe && p.status === 'pending' ? `
+                <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#27AE60;color:#fff;border:none;border-radius:3px;margin-left:4px" data-prc-respond="${check.id}" data-prc-status="ready">✓</button>
+                <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#E74C3C;color:#fff;border:none;border-radius:3px" data-prc-respond="${check.id}" data-prc-status="not_ready">✗</button>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Bind response buttons
+  container.querySelectorAll('[data-prc-respond]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const checkId = parseInt(btn.dataset.prcRespond, 10);
+      const status = btn.dataset.prcStatus;
+      const res = await apiPut(`/api/person-ready-check/${checkId}/respond`, { status });
+      if (res.ok) {
+        _loadPersonReadyChecks(modal);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to respond');
+      }
+    });
+  });
+}
+
 // Symbol palettes for each resource type
 const _resourceSymbols = {
   room: ['🏠','🚪','🛋','📐','🪑','🖥','📽','🎙','📞','🏫','🏥','🏛','🏗','🔬','🧪'],
@@ -5045,6 +5191,7 @@ function toggleLayer(id) {
   // Immediate visual update, save in background
   renderSidebar();
   renderTimeline();
+  if (typeof renderListView === 'function') renderListView();
   const pop = document.getElementById('layerPopover');
   if (pop && pop.style.display !== 'none') renderLayerPopover();
   savePreferences(); // fire-and-forget
@@ -5055,6 +5202,7 @@ function toggleAllLayers() {
   // Immediate visual update, save in background
   renderSidebar();
   renderTimeline();
+  if (typeof renderListView === 'function') renderListView();
   const pop = document.getElementById('layerPopover');
   if (pop && pop.style.display !== 'none') renderLayerPopover();
   savePreferences(); // fire-and-forget
@@ -7064,11 +7212,17 @@ async function openDecisionLogModal() {
                 <input type="checkbox" id="dlConfidential" style="accent-color:var(--accent)">
                 ${t('confidential')||'Confidential'}
               </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim)">
+                <input type="checkbox" id="dlCoSignRequired" style="accent-color:var(--accent)">
+                👁👁 ${t('four_eyes')||'Four eyes'}
+              </label>
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
                 📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
               </label>
               <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
             </div>
+            <input type="text" id="dlReason" placeholder="${t('decision_reason_placeholder')||'Reason or background (optional)'}"
+              style="width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs)">
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('decision_executor')||'Executor'}:</span>
               <select id="dlExecutorType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
@@ -7176,7 +7330,7 @@ function _renderDecisionLogEntries() {
     let reviewSection = '';
     if (e.status === 'requested') {
       const targetInfo = e.requested_of_label ? ` → ${escHtml(e.requested_of_label)}` : '';
-      statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REQUESTED${targetInfo}</span>`;
+      statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">PENDING${targetInfo}</span>`;
       if (canReview) {
         reviewSection = `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
@@ -7186,11 +7340,29 @@ function _renderDecisionLogEntries() {
         </div>`;
       }
     } else if (e.status === 'approved') {
-      statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">APPROVED</span>`;
+      statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DECIDED</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     } else if (e.status === 'rejected') {
       statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REJECTED</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+    }
+    // Reason / background
+    const reasonHtml = e.reason ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim);font-style:italic;border-left:3px solid var(--accent);padding-left:8px">${escHtml(e.reason)}</div>` : '';
+    // Four-eyes co-sign
+    let coSignHtml = '';
+    if (e.co_sign_required) {
+      if (e.co_signed_by_name) {
+        coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">👁👁 Co-signed by ${escHtml(e.co_signed_by_name)}${e.co_signed_at ? ' — ' + new Date(e.co_signed_at).toLocaleString() : ''}${e.co_sign_comment ? ': ' + escHtml(e.co_sign_comment) : ''}</div>`;
+      } else {
+        coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:#E67E22">👁👁 Co-sign required (pending)</div>`;
+        if (canReview && e.user_id !== state.user?.id) {
+          coSignHtml += `<div style="margin-top:4px;display:flex;gap:6px;align-items:center">
+            <input type="text" id="dlCoSignComment_${e.id}" placeholder="Co-sign comment"
+              style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+            <button class="btn btn-sm" style="background:var(--accent);color:#fff;padding:2px 8px;font-size:11px" data-action="coSignDecision" data-arg="${e.id}">👁👁 Co-sign</button>
+          </div>`;
+        }
+      }
     }
     const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
     const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
@@ -7206,9 +7378,11 @@ function _renderDecisionLogEntries() {
       </div>
       ${titleHtml}
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
+      ${reasonHtml}
       ${(e.attachments && e.attachments.length) ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${e.attachments.map(a =>
         `<a href="/api/decision-log/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none" title="${escHtml(a.filename)}">📎 ${escHtml(a.filename)}</a>`
       ).join('')}</div>` : ''}
+      ${coSignHtml}
       ${reviewSection}
     </div>`;
   }).join('');
@@ -7225,8 +7399,11 @@ async function addDecisionLogEntry() {
   const executorValueEl = document.getElementById('dlExecutorValue');
   const executorValue = executorType ? (executorValueEl?.value || '') : '';
   const executorLabel = executorType ? (executorValueEl?.selectedOptions?.[0]?.textContent || executorValue) : '';
+  const reason = document.getElementById('dlReason')?.value?.trim() || '';
+  const coSignRequired = document.getElementById('dlCoSignRequired')?.checked || false;
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
-    executor_type: executorType, executor_value: executorValue, executor_label: executorLabel});
+    executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
+    reason, co_sign_required: coSignRequired});
   if (res.ok) {
     const created = await res.json().catch(() => null);
     // Upload attachments if any
@@ -7322,6 +7499,21 @@ async function reviewDecision(el) {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to review decision');
+  }
+}
+
+async function coSignDecision(id) {
+  if (typeof id !== 'number') id = parseInt(id, 10);
+  const comment = document.getElementById('dlCoSignComment_' + id)?.value?.trim() || '';
+  const res = await api('PUT', `/api/decision-log/${id}/cosign`, {comment});
+  if (res.ok) {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+    showNotification('success', t('decision_co_signed')||'Decision co-signed');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to co-sign decision');
   }
 }
 

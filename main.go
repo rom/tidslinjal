@@ -5325,6 +5325,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/decision-log", app.requireAuth(app.handleAddDecisionLogEntry))
 	mux.HandleFunc("DELETE /api/decision-log/{id}", app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
+	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireAuth(app.handleDecisionLogAttachment))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", app.handleDecisionLogAttachmentDownload)
 
@@ -5587,6 +5588,25 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/ready-check", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			app.requireAuth(app.handleReadyCheck)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Person Ready Check ──
+	mux.HandleFunc("/api/person-ready-check", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetPersonReadyChecks)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleCreatePersonReadyCheck)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/person-ready-check/{id}/respond", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			app.requireAuth(app.handleRespondPersonReadyCheck)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -6766,6 +6786,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorType      string `json:"executor_type"`       // "role" | "group" | "person"
 		ExecutorValue     string `json:"executor_value"`
 		ExecutorLabel     string `json:"executor_label"`
+		Reason            string `json:"reason"`
+		CoSignRequired    bool   `json:"co_sign_required"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -6806,6 +6828,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorType:      req.ExecutorType,
 		ExecutorValue:     req.ExecutorValue,
 		ExecutorLabel:     req.ExecutorLabel,
+		Reason:            req.Reason,
+		CoSignRequired:    req.CoSignRequired,
 	}
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
@@ -6948,6 +6972,63 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		UserID: user.ID, UserName: user.Username,
 		Action: req.Status, EntityType: "decision_log", EntityID: id,
 		Summary: reviewSummary,
+	})
+	jsonOK(w, found)
+}
+
+func (app *App) handleCoSignDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Comment string `json:"comment"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	entries := app.store.GetDecisionLog()
+	var found *DecisionLogEntry
+	for i := range entries {
+		if entries[i].ID == id {
+			found = &entries[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "entry not found", http.StatusNotFound)
+		return
+	}
+	if !found.CoSignRequired {
+		jsonError(w, "co-sign not required for this entry", http.StatusBadRequest)
+		return
+	}
+	if found.CoSignedBy != 0 {
+		jsonError(w, "already co-signed", http.StatusConflict)
+		return
+	}
+	if found.UserID == user.ID {
+		jsonError(w, "cannot co-sign your own decision", http.StatusForbidden)
+		return
+	}
+	now := time.Now()
+	found.CoSignedBy = user.ID
+	found.CoSignedByName = user.DisplayName
+	if found.CoSignedByName == "" {
+		found.CoSignedByName = user.Username
+	}
+	found.CoSignedAt = &now
+	found.CoSignComment = req.Comment
+	if err := app.store.UpdateDecisionLogEntry(*found); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "co_signed", EntityType: "decision_log", EntityID: id,
+		Summary: fmt.Sprintf("co-signed decision #%d", id),
 	})
 	jsonOK(w, found)
 }
@@ -7370,6 +7451,108 @@ func (app *App) handleReadyCheck(w http.ResponseWriter, r *http.Request, user *U
 		"epoch":       es.Epoch,
 	}
 	jsonOK(w, result)
+}
+
+// ── Person Ready Check handlers ─────────────────────────────────────────────
+
+func (app *App) handleGetPersonReadyChecks(w http.ResponseWriter, r *http.Request, user *User) {
+	checks := app.store.GetPersonReadyChecks()
+	jsonOK(w, checks)
+}
+
+func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		ParticipantIDs []int64 `json:"participant_ids"`
+		EventID        *int64  `json:"event_id,omitempty"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if len(req.ParticipantIDs) == 0 {
+		jsonError(w, "at least one participant required", http.StatusBadRequest)
+		return
+	}
+	participants := make([]PersonReadyCheckParticipant, 0, len(req.ParticipantIDs))
+	for _, uid := range req.ParticipantIDs {
+		u, ok := app.store.GetUserByID(uid)
+		name := ""
+		if ok && u != nil {
+			name = u.DisplayName
+			if name == "" {
+				name = u.Username
+			}
+		}
+		participants = append(participants, PersonReadyCheckParticipant{
+			UserID:   uid,
+			UserName: name,
+			Status:   "pending",
+		})
+	}
+	check := PersonReadyCheck{
+		CreatedBy:     user.ID,
+		CreatedByName: user.DisplayName,
+		EventID:       req.EventID,
+		Participants:  participants,
+		CreatedAt:     time.Now(),
+	}
+	if check.CreatedByName == "" {
+		check.CreatedByName = user.Username
+	}
+	created, err := app.store.AddPersonReadyCheck(check)
+	if err != nil {
+		jsonError(w, "failed to create ready check", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, created)
+}
+
+func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Status string `json:"status"` // "ready" or "not_ready"
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Status != "ready" && req.Status != "not_ready" {
+		jsonError(w, "status must be 'ready' or 'not_ready'", http.StatusBadRequest)
+		return
+	}
+	checks := app.store.GetPersonReadyChecks()
+	var found *PersonReadyCheck
+	for i := range checks {
+		if checks[i].ID == id {
+			found = &checks[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "ready check not found", http.StatusNotFound)
+		return
+	}
+	updated := false
+	for j := range found.Participants {
+		if found.Participants[j].UserID == user.ID {
+			found.Participants[j].Status = req.Status
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		jsonError(w, "you are not a participant in this ready check", http.StatusForbidden)
+		return
+	}
+	if err := app.store.UpdatePersonReadyCheck(*found); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, found)
 }
 
 func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, user *User) {
