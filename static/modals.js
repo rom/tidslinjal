@@ -2257,6 +2257,8 @@ function renderSidebar() {
     const resSubTab = el.dataset.resSubTab || 'users';
     const subBtn = (key, label, icon) =>
       `<button class="toggle-btn${resSubTab===key?' active':''}" data-res-sub="${key}">${icon} ${label}</button>`;
+    // Build sub-tab bar with built-in types + custom types
+    const customTypes = state._customResourceTypes || [];
     let subTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px;flex-wrap:wrap">
       ${subBtn('users', t('tab_users')||'Users', '👤')}
       ${subBtn('groups', gl.plural, '👥')}
@@ -2264,9 +2266,20 @@ function renderSidebar() {
       ${subBtn('buildings', t('resource_buildings')||'Buildings', '🏢')}
       ${subBtn('computers', t('resource_computer_services')||'IT Services', '💻')}
       ${subBtn('datacenters', t('resource_data_centers')||'Data Centers', '🖥')}
+      ${customTypes.map(ct => subBtn('custom_'+ct.key, ct.label, ct.icon||'📦')).join('')}
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
+      ${subBtn('manage_types', t('manage_resource_types')||'Manage Types', '⚙')}
     </div>`;
+    // Load custom resource types if not cached
+    if (!state._customResourceTypes) {
+      apiGet('/api/custom-resource-types').then(types => {
+        state._customResourceTypes = types || [];
+        renderSidebar();
+      });
+      el.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:8px">Loading…</div>`;
+      return;
+    }
     if (resSubTab === 'users') {
       apiGet('/api/users').then(users => {
         el.innerHTML = subTabBar + `
@@ -2277,7 +2290,7 @@ function renderSidebar() {
             </div>
             <div class="user-list">
               ${(users||[]).map(u => `
-                <div class="user-item">
+                <div class="user-item" style="cursor:pointer" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>
                   <div class="user-name">
                     <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                     <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
@@ -2285,7 +2298,7 @@ function renderSidebar() {
                   <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                   ${u.can_lock?'<span title="Can lock">🔒</span>':''}
                   ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
-                  <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>✏️</button>
+                  <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el data-stop-prop>✏️</button>
                 </div>`).join('')}
             </div>
           </div>
@@ -2307,34 +2320,46 @@ function renderSidebar() {
           <div class="group-list">
             ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
             ${state.groups.map(g => `
-              <div class="group-item">
+              <div class="group-item" style="cursor:pointer" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el>
                 <div class="group-name">
                   <div>${escHtml(g.name)}</div>
                   ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
                 </div>
-                <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}">👥</button>
-                <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit">✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}" data-stop-prop>👥</button>
+                <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit" data-stop-prop>✏️</button>
               </div>`).join('')}
           </div>
         </div>`;
       _bindResSubTabs(el);
-    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters') {
-      const typeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center'};
-      const labelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers'};
-      const iconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥'};
-      const roomType = typeMap[resSubTab];
+      _bindActions(el);
+    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab.startsWith('custom_')) {
+      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center'};
+      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers'};
+      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥'};
+      let roomType, sectionLabel, sectionIcon;
+      if (resSubTab.startsWith('custom_')) {
+        const customKey = resSubTab.replace('custom_', '');
+        const ct = customTypes.find(c => c.key === customKey);
+        roomType = customKey;
+        sectionLabel = ct ? ct.label : customKey;
+        sectionIcon = ct ? (ct.icon||'📦') : '📦';
+      } else {
+        roomType = builtinTypeMap[resSubTab];
+        sectionLabel = builtinLabelMap[resSubTab];
+        sectionIcon = builtinIconMap[resSubTab];
+      }
       apiGet('/api/rooms').then(rooms => {
         const filtered = (rooms||[]).filter(r => r.type === roomType);
         el.innerHTML = subTabBar + `
           <div class="sidebar-section">
-            <div class="sidebar-section-title">${iconMap[resSubTab]} ${labelMap[resSubTab]}
+            <div class="sidebar-section-title">${sectionIcon} ${sectionLabel}
               <button class="btn btn-primary btn-sm" data-action="openRoomModal" data-arg='{"type":"${roomType}"}'  data-arg-el>${t('btn_add')||'Add'}</button>
             </div>
-            ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${labelMap[resSubTab].toLowerCase()} yet.</p>` : ''}
+            ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${sectionLabel.toLowerCase()} yet.</p>` : ''}
             ${filtered.map(r => `
-              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;cursor:pointer" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el>
                 ${r.image_name ? `<img src="/api/rooms/${r.id}/image" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border)">` :
-                  `<span style="font-size:24px;width:48px;text-align:center">${r.icon || iconMap[resSubTab]}</span>`}
+                  `<span style="font-size:24px;width:48px;text-align:center">${r.icon || sectionIcon}</span>`}
                 <div style="flex:1;min-width:0">
                   <div style="font-size:var(--fs-sm);font-weight:600">${r.icon && !r.image_name ? r.icon+' ' : ''}${escHtml(r.name)}</div>
                   ${r.sub_type ? `<div style="font-size:var(--fs-xs);color:var(--accent);font-weight:600">${t('room_type_'+r.sub_type)||r.sub_type.replace(/_/g,' ')}</div>` : ''}
@@ -2342,12 +2367,40 @@ function renderSidebar() {
                   ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
                 </div>
-                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el>✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el data-stop-prop>✏️</button>
               </div>`).join('')}
           </div>`;
         _bindResSubTabs(el);
         _bindActions(el);
       });
+    } else if (resSubTab === 'manage_types') {
+      // Manage custom resource types
+      el.innerHTML = subTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">⚙ ${t('manage_resource_types')||'Manage Resource Types'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('manage_resource_types_desc')||'Create custom resource categories. Resources of each type appear as their own tab.'}</p>
+          <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:10px">
+            <label class="form-label" style="font-size:var(--fs-xs)">${t('resource_type_key')||'Key (machine name)'}</label>
+            <input class="form-input" id="crtKey" placeholder="e.g. vehicle" style="margin-bottom:4px;font-size:var(--fs-sm)">
+            <label class="form-label" style="font-size:var(--fs-xs)">${t('resource_type_label')||'Display Name'}</label>
+            <input class="form-input" id="crtLabel" placeholder="e.g. Vehicles" style="margin-bottom:4px;font-size:var(--fs-sm)">
+            <label class="form-label" style="font-size:var(--fs-xs)">${t('resource_type_icon')||'Icon (emoji)'}</label>
+            <input class="form-input" id="crtIcon" placeholder="e.g. 🚗" style="margin-bottom:6px;font-size:var(--fs-sm);width:60px">
+            <button class="btn btn-primary btn-sm" data-action="saveCustomResourceType">${t('btn_add')||'Add'}</button>
+          </div>
+          ${customTypes.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('no_custom_types')||'No custom resource types defined yet.'}</p>` : ''}
+          ${customTypes.map(ct => `
+            <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+              <span style="font-size:20px">${ct.icon||'📦'}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:var(--fs-sm);font-weight:600">${escHtml(ct.label)}</div>
+                <div style="font-size:var(--fs-xs);color:var(--text-dim)">key: ${escHtml(ct.key)}</div>
+              </div>
+              <button class="btn btn-danger btn-sm" data-action="deleteCustomResourceType" data-arg="${ct.id}" style="padding:2px 8px;font-size:var(--fs-xs)">✕</button>
+            </div>`).join('')}
+        </div>`;
+      _bindResSubTabs(el);
+      _bindActions(el);
     } else if (resSubTab === 'resource_list') {
       // Resource list: shows all users, groups, and rooms in a combined view
       Promise.all([apiGet('/api/users'), apiGet('/api/rooms').catch(()=>[])]).then(([users, rooms]) => {
@@ -3415,6 +3468,34 @@ function renderSidebar() {
         <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
+      ${state.user && hasRole2(state.user.role, 'oplead') ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">✅ ${t('ready_check_title')||'Ready Check'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('ready_check_desc')||'Verify that all activities have been moved from "planned" status before the operation starts. Useful to confirm all preparations are complete.'}</p>
+        <div class="form-check" style="margin-bottom:6px">
+          <input type="checkbox" id="rcEnabled" ${ex.ready_check_enabled?'checked':''}>
+          <label for="rcEnabled" style="font-size:var(--fs-sm)">${t('ready_check_enable')||'Enable ready check'}</label>
+        </div>
+        <div style="margin-bottom:6px">
+          <div class="form-check" style="margin-bottom:4px">
+            <input type="radio" name="rcMode" id="rcModeAbsolute" value="absolute" ${!ex.ready_check_use_offset?'checked':''}>
+            <label for="rcModeAbsolute" style="font-size:var(--fs-sm)">${t('ready_check_absolute')||'At specific time'}</label>
+          </div>
+          <input type="datetime-local" id="rcAbsoluteTime" value="${ex.ready_check_time ? fmtDateInput(new Date(ex.ready_check_time)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+          <div class="form-check" style="margin-bottom:4px">
+            <input type="radio" name="rcMode" id="rcModeOffset" value="offset" ${ex.ready_check_use_offset?'checked':''}>
+            <label for="rcModeOffset" style="font-size:var(--fs-sm)">${t('ready_check_offset')||'Minutes before epoch'}</label>
+          </div>
+          <input type="number" id="rcOffsetMins" min="0" value="${ex.ready_check_offset_mins||60}" placeholder="60"
+            style="width:100px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);margin-left:4px">${t('minutes')||'minutes'}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" data-action="saveReadyCheckSettings">${t('btn_save')||'Save'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="runReadyCheck">▶ ${t('ready_check_run')||'Run Now'}</button>
+        </div>
+      </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section" id="enrollmentSettingsSection">
         <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
@@ -3621,6 +3702,7 @@ async function saveExercise() {
   const exIndex          = parseInt(document.getElementById('exIndex')?.value || '0', 10);
   const artTimeEnabled   = document.getElementById('exArtificialTimeEnabled')?.checked || false;
   const artTimeVal       = document.getElementById('exArtificialTime')?.value;
+  const ex = state.exercise || {};
   const payload = {
     enabled,
     epoch: epoch ? new Date(epoch).toISOString() : '',
@@ -3628,10 +3710,15 @@ async function saveExercise() {
     label,
     day_hours_only: dayHrsOnly,
     include_weekends: includeWeekends,
-    group_label: state.exercise?.group_label || 'group',
+    group_label: ex.group_label || 'group',
     ex_index: exIndex,
     artificial_time_enabled: artTimeEnabled,
     artificial_time: artTimeVal ? new Date(artTimeVal).toISOString() : '',
+    // Preserve ready check settings
+    ready_check_enabled: ex.ready_check_enabled || false,
+    ready_check_time: ex.ready_check_time || '',
+    ready_check_offset_mins: ex.ready_check_offset_mins || 0,
+    ready_check_use_offset: ex.ready_check_use_offset || false,
   };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
@@ -3642,6 +3729,32 @@ async function saveExercise() {
   } else {
     const err = await res.json();
     showError(err.error);
+  }
+}
+
+// ── Ready Check settings ───────────────────────────────────────────────────
+
+async function saveReadyCheckSettings() {
+  const ex = state.exercise || {};
+  const rcEnabled = document.getElementById('rcEnabled')?.checked || false;
+  const rcUseOffset = document.getElementById('rcModeOffset')?.checked || false;
+  const rcTimeVal = document.getElementById('rcAbsoluteTime')?.value;
+  const rcOffsetMins = parseInt(document.getElementById('rcOffsetMins')?.value || '60', 10);
+  const payload = {
+    ...ex,
+    ready_check_enabled: rcEnabled,
+    ready_check_use_offset: rcUseOffset,
+    ready_check_time: rcTimeVal ? new Date(rcTimeVal).toISOString() : '',
+    ready_check_offset_mins: rcOffsetMins,
+  };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    showNotification('success', t('notif_saved')||'Saved');
+    renderSidebar();
+  } else {
+    const err = await res.json().catch(()=>({}));
+    showError(err.error || 'Failed to save');
   }
 }
 
@@ -4642,6 +4755,81 @@ async function deleteRoom(id) {
   if (res.ok) { showNotification('success','Room deleted'); _loadRoomList(); }
 }
 
+// ── Custom Resource Type actions ────────────────────────────────────────────
+
+async function saveCustomResourceType() {
+  const key = (document.getElementById('crtKey')?.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const label = (document.getElementById('crtLabel')?.value || '').trim();
+  const icon = (document.getElementById('crtIcon')?.value || '').trim() || '📦';
+  if (!key || !label) { showError(t('resource_type_key_label_required')||'Key and display name are required.'); return; }
+  const res = await apiPut('/api/custom-resource-types', { key, label, icon });
+  if (res.ok) {
+    state._customResourceTypes = null; // force reload
+    showNotification('success', (t('resource_type_saved')||'Resource type saved'));
+    renderSidebar();
+  } else {
+    const err = await res.json().catch(()=>({}));
+    showError(err.error || 'Failed to save');
+  }
+}
+
+async function deleteCustomResourceType(id) {
+  if (!confirm(t('confirm_delete_resource_type')||'Delete this resource type? Resources of this type will remain but the tab will be removed.')) return;
+  const res = await api('DELETE', `/api/custom-resource-types/${id}`, null);
+  if (res.ok) {
+    state._customResourceTypes = null; // force reload
+    showNotification('success', (t('resource_type_deleted')||'Resource type deleted'));
+    renderSidebar();
+  }
+}
+
+// ── Ready Check action ──────────────────────────────────────────────────────
+
+async function runReadyCheck() {
+  const res = await apiGet('/api/ready-check');
+  if (!res) { showError('Failed to run ready check'); return; }
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  const notReady = res.not_ready || [];
+  modal.innerHTML = `
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header" style="background:${res.ready ? 'var(--success,#27AE60)' : 'var(--warning,#E67E22)'};border-radius:var(--radius) var(--radius) 0 0">
+        <h3 style="color:#fff">${res.ready ? '✅ ' + (t('ready_check_pass')||'All Clear') : '⚠ ' + (t('ready_check_fail')||'Not Ready')}</h3>
+        <button class="modal-close" style="color:#fff" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+        <p style="font-size:var(--fs-sm);margin-bottom:8px">
+          ${res.ready
+            ? (t('ready_check_pass_desc')||'All activities have been moved from "planned" status. Preparations appear complete.')
+            : (t('ready_check_fail_desc')||'The following activities are still in "planned" status:')}
+        </p>
+        ${notReady.length > 0 ? `
+          <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+            <thead><tr style="background:var(--bg3)">
+              <th style="padding:4px 8px;text-align:left">ID</th>
+              <th style="padding:4px 8px;text-align:left">${t('lv_title')||'Title'}</th>
+              <th style="padding:4px 8px;text-align:left">${t('lv_status')||'Status'}</th>
+              <th style="padding:4px 8px;text-align:left">${t('lv_start')||'Start'}</th>
+            </tr></thead>
+            <tbody>${notReady.map(ev => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:4px 8px">#${ev.id}</td>
+                <td style="padding:4px 8px">${escHtml(ev.title)}</td>
+                <td style="padding:4px 8px"><span class="status-badge status-planned">${ev.status}</span></td>
+                <td style="padding:4px 8px;color:var(--text-dim)">${ev.start_time ? fmtDateTime(new Date(ev.start_time)) : '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : ''}
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${t('ready_check_total')||'Total activities'}: ${res.total}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+}
+
 // Symbol palettes for each resource type
 const _resourceSymbols = {
   room: ['🏠','🚪','🛋','📐','🪑','🖥','📽','🎙','📞','🏫','🏥','🏛','🏗','🔬','🧪'],
@@ -4654,7 +4842,12 @@ function openRoomModal(argJson) {
   const data = typeof argJson === 'string' ? JSON.parse(argJson) : (argJson || {});
   const isEdit = !!data.id;
   const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center'};
-  const label = typeLabel[data.type] || 'Resource';
+  // Look up custom resource type label if not a built-in type
+  let label = typeLabel[data.type] || 'Resource';
+  if (!typeLabel[data.type] && state._customResourceTypes) {
+    const ct = state._customResourceTypes.find(c => c.key === data.type);
+    if (ct) label = ct.label;
+  }
   const symbols = _resourceSymbols[data.type] || _resourceSymbols.room;
   const currentIcon = data.icon || '';
   const hasImage = isEdit && data.image_name;

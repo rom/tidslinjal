@@ -5564,6 +5564,34 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// ── Custom Resource Types ──
+	mux.HandleFunc("/api/custom-resource-types", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListCustomResourceTypes)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveCustomResourceType)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/custom-resource-types/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleDeleteCustomResourceType)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Ready Check ──
+	mux.HandleFunc("/api/ready-check", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleReadyCheck)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Free/Busy lookup ──
 	mux.HandleFunc("/api/free-busy", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -7266,6 +7294,82 @@ func (app *App) handleDeleteRoom(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Custom Resource Type handlers ────────────────────────────────────────────
+
+func (app *App) handleListCustomResourceTypes(w http.ResponseWriter, r *http.Request, user *User) {
+	types := app.store.GetCustomResourceTypes()
+	if types == nil {
+		types = []CustomResourceType{}
+	}
+	jsonOK(w, types)
+}
+
+func (app *App) handleSaveCustomResourceType(w http.ResponseWriter, r *http.Request, user *User) {
+	var crt CustomResourceType
+	if err := decode(r, &crt); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if crt.Key == "" || crt.Label == "" {
+		jsonError(w, "key and label required", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveCustomResourceType(crt); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "updated", EntityType: "custom_resource_type",
+		Summary: fmt.Sprintf("Saved custom resource type: %s", crt.Label),
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleDeleteCustomResourceType(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/custom-resource-types/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteCustomResourceType(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Ready Check handler ─────────────────────────────────────────────────────
+
+func (app *App) handleReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
+	es := app.store.GetExerciseSettings()
+	// Get all events by using a very wide time range
+	farPast := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	farFuture := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
+	events := app.store.GetEventsInRange(farPast, farFuture)
+	var notReady []map[string]interface{}
+	for _, ev := range events {
+		if string(ev.Status) == string(StatusPlanned) {
+			notReady = append(notReady, map[string]interface{}{
+				"id":         ev.ID,
+				"title":      ev.Title,
+				"status":     ev.Status,
+				"start_time": ev.StartTime,
+				"layer_id":   ev.LayerID,
+			})
+		}
+	}
+	result := map[string]interface{}{
+		"ready":       len(notReady) == 0,
+		"total":       len(events),
+		"not_ready":   notReady,
+		"check_time":  es.ReadyCheckTime,
+		"epoch":       es.Epoch,
+	}
+	jsonOK(w, result)
 }
 
 func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, user *User) {
