@@ -146,7 +146,8 @@ function updateEventModalContactVisibility() {
   const isPhysical = typeVal === 'physical_meeting';
   const physGroup = document.getElementById('physicalLocationGroup');
   const contactGroup = document.getElementById('contactInfoGroup');
-  if (physGroup) physGroup.style.display = isPhysical ? '' : 'none';
+  // Physical location available for all event types
+  if (physGroup) physGroup.style.display = typeVal ? '' : 'none';
   if (contactGroup) contactGroup.style.display = (!isPhysical && typeVal) ? '' : 'none';
   onContactTypeChange();
 }
@@ -1918,6 +1919,8 @@ function detachSidebar() {
     return;
   }
   const sidebar = document.getElementById('sidebar');
+  // Save sidebar content BEFORE hiding (so innerHTML is populated)
+  const sidebarHTML = sidebar.innerHTML;
   sidebar.classList.add('hidden');
   const w = window.open('', 'tidslinjal-sidebar-' + Date.now(),
     'width=350,height=700,menubar=no,toolbar=no,scrollbars=yes');
@@ -1939,7 +1942,7 @@ body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Sego
   <span style="flex:1"></span>
   <span style="font-size:11px;color:var(--text-dim)">Tidslinjal Menu</span>
 </div>
-<div class="detached-sidebar" id="detachedWrap"></div>
+<div class="detached-sidebar" id="detachedWrap">${sidebarHTML.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/<\/script/gi,'<\\/script')}</div>
 <script>
 document.getElementById('btnReattach').onclick = () => {
   try { window.opener._reattachSidebar(); } catch(e) {}
@@ -1949,6 +1952,8 @@ document.getElementById('btnReattach').onclick = () => {
 function syncContent() {
   try {
     const wrap = document.getElementById('detachedWrap');
+    // Re-render sidebar in opener (even though hidden, it updates innerHTML)
+    try { window.opener.renderSidebar(); } catch(e) {}
     const srcSidebar = window.opener.document.getElementById('sidebar');
     if (srcSidebar && wrap) {
       wrap.innerHTML = srcSidebar.innerHTML;
@@ -5784,6 +5789,8 @@ async function handleTemplateFileLoad(input) {
       operation_mode: tmpl.operation_mode || undefined,
       group_label:    tmpl.group_label    || undefined,
       user_label:     tmpl.user_label     || undefined,
+      layers:         tmpl.layers         || undefined,
+      groups:         tmpl.groups         || undefined,
     };
     dbg('[template] importing %o: items=%o phases=%o locks=%o scope=%o',
       tmpl.name, tmpl.items.length, (tmpl.phases||[]).length, (tmpl.locks||[]).length, scope);

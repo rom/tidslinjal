@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (_clockPopout && !_clockPopout.closed) { _clockPopout.focus(); }
     else { _setClockAreaDetached(false); }
   });
-  on('#btnOpenDetachedClock', 'click', function () { openDetachedClock(); });
+  // btnOpenDetachedClock removed — only ⧉ (btnDetachClock) is used now
   on('#btnAddClock',    'click', function () { openAddClockPopover(this); });
   on('#btnDetachClock', 'click', function () { detachClock(); });
   on('#clockDisplay',   'click', function () { toggleClockTZ(); });

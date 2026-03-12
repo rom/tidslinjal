@@ -103,7 +103,6 @@
         ⧉ <span>Clocks detached</span>
       </div>
       <div class="clock-area" id="clockArea">
-        <button class="btn btn-ghost btn-icon clock-add-btn" id="btnOpenDetachedClock" title="Open detached clock window" style="font-size:14px">⏱</button>
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnAddClock" title="Add timezone clock">+</button>
         <button class="btn btn-ghost btn-icon clock-add-btn" id="btnDetachClock" title="Detach clocks to separate window" style="font-size:13px">⧉</button>
         <div id="extraClocksContainer" style="display:contents"></div>
@@ -183,13 +182,13 @@
       <table id="list-view-table" style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
         <thead>
           <tr style="background:var(--bg3);position:sticky;top:0;z-index:1">
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="title">Title <span id="listSort-title"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="event_type">Type <span id="listSort-event_type"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="status">Status <span id="listSort-status"></span></th>
-            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="start_time">Start <span id="listSort-start_time">▲</span></th>
-            <th style="padding:8px 10px;text-align:left">End</th>
-            <th style="padding:8px 10px;text-align:left">Responsible</th>
-            <th style="padding:8px 10px;text-align:left">Actions</th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="title" data-i18n="lv_title">Title <span id="listSort-title"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="event_type" data-i18n="lv_type">Type <span id="listSort-event_type"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="status" data-i18n="lv_status">Status <span id="listSort-status"></span></th>
+            <th style="padding:8px 10px;text-align:left;cursor:pointer;user-select:none" data-sort="start_time" data-i18n="lv_start">Start <span id="listSort-start_time">▲</span></th>
+            <th style="padding:8px 10px;text-align:left" data-i18n="lv_end">End</th>
+            <th style="padding:8px 10px;text-align:left" data-i18n="lv_responsible">Responsible</th>
+            <th style="padding:8px 10px;text-align:left" data-i18n="lv_actions">Actions</th>
           </tr>
         </thead>
         <tbody id="list-view-tbody"></tbody>

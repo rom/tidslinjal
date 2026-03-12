@@ -827,6 +827,24 @@ const TRANSLATIONS = {
     settings_ingest_api:     'Inbound Ingestion API',
     settings_ingest_api_desc: 'External systems can push events into Tidslinjal via the Ingestion API. Authenticate with an API key.',
     settings_ingest_format:  'JSON payload with title, start, end, type fields',
+
+    // List view
+    lv_title:        'Title',
+    lv_type:         'Type',
+    lv_status:       'Status',
+    lv_start:        'Start',
+    lv_end:          'End',
+    lv_responsible:  'Responsible',
+    lv_actions:      'Actions',
+    lv_view:         'View',
+    lv_edit:         'Edit',
+    lv_delete:       'Delete',
+    lv_all_statuses: 'All statuses',
+    lv_all_types:    'All types',
+    lv_search:       'Search…',
+    lv_now:          'Now',
+    lv_confirm_delete: 'Delete this event?',
+    lv_no_responsible: '—',
   },
 
   sv: {
@@ -1583,6 +1601,24 @@ const TRANSLATIONS = {
     settings_connectors:     'Kopplingar / Tillägg',
     settings_event_bus:      'Utgående händelsebuss',
     settings_ingest_api:     'Inkommande inmatnings-API',
+
+    // List view
+    lv_title:        'Titel',
+    lv_type:         'Typ',
+    lv_status:       'Status',
+    lv_start:        'Start',
+    lv_end:          'Slut',
+    lv_responsible:  'Ansvarig',
+    lv_actions:      'Åtgärder',
+    lv_view:         'Visa',
+    lv_edit:         'Redigera',
+    lv_delete:       'Radera',
+    lv_all_statuses: 'Alla statusar',
+    lv_all_types:    'Alla typer',
+    lv_search:       'Sök…',
+    lv_now:          'Nu',
+    lv_confirm_delete: 'Radera denna händelse?',
+    lv_no_responsible: '—',
   },
 
   fr: {
@@ -2338,6 +2374,24 @@ const TRANSLATIONS = {
     settings_connectors:     'Connecteurs / Plugins',
     settings_event_bus:      'Bus d\'événements sortant',
     settings_ingest_api:     'API d\'ingestion entrante',
+
+    // List view
+    lv_title:        'Titre',
+    lv_type:         'Type',
+    lv_status:       'Statut',
+    lv_start:        'Début',
+    lv_end:          'Fin',
+    lv_responsible:  'Responsable',
+    lv_actions:      'Actions',
+    lv_view:         'Voir',
+    lv_edit:         'Modifier',
+    lv_delete:       'Supprimer',
+    lv_all_statuses: 'Tous les statuts',
+    lv_all_types:    'Tous les types',
+    lv_search:       'Rechercher…',
+    lv_now:          'Maintenant',
+    lv_confirm_delete: 'Supprimer cet événement ?',
+    lv_no_responsible: '—',
   }
 };
 

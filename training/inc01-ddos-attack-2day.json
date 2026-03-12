@@ -70,7 +70,9 @@
       "color": "#E74C3C",
       "visibility": "groups",
       "permission": "readwrite",
-      "group_index": [0]
+      "group_index": [
+        0
+      ]
     },
     {
       "name": "Network Ops",
@@ -78,7 +80,9 @@
       "color": "#3498DB",
       "visibility": "groups",
       "permission": "readwrite",
-      "group_index": [1]
+      "group_index": [
+        1
+      ]
     },
     {
       "name": "Management",
@@ -86,7 +90,9 @@
       "color": "#8E44AD",
       "visibility": "groups",
       "permission": "read",
-      "group_index": [2]
+      "group_index": [
+        2
+      ]
     }
   ],
   "locks": [
@@ -117,7 +123,8 @@
       "description": "SOC Team monitoring tools (Darktrace / Splunk SIEM) trigger high-severity alert. Inbound traffic volume exceeds 50 Gbps threshold. Internet-facing web portal and API gateway experiencing severe degradation. T=0 established.",
       "start_offset_min": 0,
       "duration_min": 0,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "SOC Operations"
     },
     {
       "title": "SOC Incident Triage",
@@ -126,7 +133,8 @@
       "description": "SOC Team conducts initial triage. Confirms volumetric DDoS attack — not internal misconfiguration. Identifies attack vectors: UDP flood and HTTP GET flood. Activates Incident Response Plan IRP-NET-001. Incident Commander designated.",
       "start_offset_min": 0,
       "duration_min": 30,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "SOC Operations"
     },
     {
       "title": "Management Notification",
@@ -135,7 +143,8 @@
       "description": "Incident Commander notifies Management (CISO, IT Director) via secure messaging. Initial impact assessment: public-facing services degraded, customer-facing portal unreachable. Estimated service impact communicated.",
       "start_offset_min": 15,
       "duration_min": 0,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "Management"
     },
     {
       "title": "ISP Emergency Contact",
@@ -144,7 +153,8 @@
       "description": "Network Team contacts ISP (Tier-1 upstream carrier) via 24/7 NOC hotline. Requests upstream traffic filtering and null-routing of attack source prefixes. Provides attack traffic samples and BGP prefix information. Reference: ISP Incident Ticket #AUTO-OPEN.",
       "start_offset_min": 30,
       "duration_min": 30,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "Network Ops"
     },
     {
       "title": "CDN DDoS Protection Activated",
@@ -153,7 +163,8 @@
       "description": "Network Team activates Cloudflare Under Attack Mode via API. DNS records updated to route all traffic through Cloudflare scrubbing centres. Rate limiting rules applied. Magic Transit BGP announcement initiated for full network-layer protection.",
       "start_offset_min": 45,
       "duration_min": 45,
-      "alarm_lead_time": 5
+      "alarm_lead_time": 5,
+      "layer": "Network Ops"
     },
     {
       "title": "Internal Traffic Scrubbing — WAF Rules",
@@ -162,7 +173,8 @@
       "description": "SOC Team deploys emergency WAF rules on F5 BIG-IP and Palo Alto NGFW. Blocks identified attack source ASNs. Implements challenge pages for suspicious IP ranges. Enables geo-blocking for high-volume attack origin countries.",
       "start_offset_min": 60,
       "duration_min": 60,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "SOC Operations"
     },
     {
       "title": "ISP Upstream Filtering Confirmed",
@@ -171,7 +183,8 @@
       "description": "ISP NOC confirms upstream null-routing applied. Attack traffic reduced by approximately 60% at ingress. Residual traffic still impacting services. ISP escalating to upstream carrier (Tier-0) for additional filtering capacity.",
       "start_offset_min": 90,
       "duration_min": 0,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "Network Ops"
     },
     {
       "title": "Management Briefing — Hour 2",
@@ -180,7 +193,8 @@
       "description": "Incident Commander briefs Management team (CISO, CTO, Communications). Topics: attack profile, current mitigation status, customer impact, estimated restoration timeline, public communications decision. Management authorises continued CDN spend and ISP escalation.",
       "start_offset_min": 120,
       "duration_min": 30,
-      "alarm_lead_time": 15
+      "alarm_lead_time": 15,
+      "layer": "Management"
     },
     {
       "title": "Service Partial Restoration",
@@ -198,7 +212,8 @@
       "description": "SOC Team submits Situation Report 1 to Management and stakeholders. Contents: attack vector analysis, mitigation effectiveness (traffic volume before/after), service availability metrics, resource consumption, next steps. Distribution: CISO, CTO, IT Director, Communications team.",
       "start_offset_min": 240,
       "duration_min": 0,
-      "alarm_lead_time": 10
+      "alarm_lead_time": 10,
+      "layer": "SOC Operations"
     },
     {
       "title": "Akamai Prolexic Escalation",
@@ -207,7 +222,8 @@
       "description": "Network Team and Incident Commander decide to escalate to Akamai Prolexic for additional scrubbing capacity. Attack sustained at 80 Gbps — Cloudflare capacity approaching limits. Akamai emergency onboarding initiated. BGP re-announcement to Akamai scrubbing centres.",
       "start_offset_min": 360,
       "duration_min": 60,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "Network Ops"
     },
     {
       "title": "Day 1 Evening SITREP",
@@ -225,7 +241,8 @@
       "description": "SOC Team A formally hands over to Night Team B. Handover brief covers: current attack status, active mitigations in place, escalation contacts, Cloudflare and Akamai dashboard credentials, ISP ticket reference numbers, and Management notification protocol.",
       "start_offset_min": 720,
       "duration_min": 30,
-      "alarm_lead_time": 15
+      "alarm_lead_time": 15,
+      "layer": "SOC Operations"
     },
     {
       "title": "Overnight Monitoring — Automated Watch",
@@ -234,7 +251,8 @@
       "description": "SOC Night Team B monitors automated dashboards (Splunk, Cloudflare Analytics, Akamai Control Centre). Alerting thresholds set for attack re-surge. On-call Network Team available within 15 minutes for escalation.",
       "start_offset_min": 750,
       "duration_min": 690,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "SOC Operations"
     },
     {
       "title": "Day 2 Morning Shift Handover",
@@ -243,7 +261,8 @@
       "description": "SOC Night Team B hands over to Day Team A. Overnight summary: attack volume reduced significantly, no re-surge events. ISP upstream filtering still active. Akamai Prolexic routing maintained. Management morning briefing scheduled.",
       "start_offset_min": 1440,
       "duration_min": 30,
-      "alarm_lead_time": 15
+      "alarm_lead_time": 15,
+      "layer": "SOC Operations"
     },
     {
       "title": "Management Morning Briefing — Day 2",
@@ -252,7 +271,8 @@
       "description": "Incident Commander briefs Management on overnight developments. Decision point: maintain full scrubbing infrastructure or begin phased reduction. Communications team updates on customer notifications sent. Management authorises incremental mitigation reduction with monitoring.",
       "start_offset_min": 1500,
       "duration_min": 30,
-      "alarm_lead_time": 15
+      "alarm_lead_time": 15,
+      "layer": "Management"
     },
     {
       "title": "Phased Mitigation Reduction",
@@ -261,7 +281,8 @@
       "description": "Network Team begins phased reduction of emergency mitigations. Step 1: Remove geo-blocking rules. Step 2: Reduce ISP null-routing scope. Cloudflare and Akamai scrubbing maintained. SOC monitors for attack re-surge at each step.",
       "start_offset_min": 2160,
       "duration_min": 120,
-      "alarm_lead_time": 0
+      "alarm_lead_time": 0,
+      "layer": "Network Ops"
     },
     {
       "title": "Full Service Restoration",
@@ -288,7 +309,8 @@
       "description": "Incident Commander submits formal Post-Incident Report to Management and CISO. Report includes: executive summary, attack timeline, technical analysis, mitigation effectiveness, financial impact, recommendations for DDoS resilience improvements (anycast infrastructure, permanent Akamai contract, ISP SLA review).",
       "start_offset_min": 2880,
       "duration_min": 0,
-      "alarm_lead_time": 60
+      "alarm_lead_time": 60,
+      "layer": "Management"
     }
   ]
 }

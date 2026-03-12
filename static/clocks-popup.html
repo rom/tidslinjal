@@ -42,17 +42,20 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .sz-md .clock-time { font-size:52px; }
 .sz-lg .clock-time { font-size:72px; } .sz-lg .clock-card { padding:20px 32px 18px; min-width:240px; }
 .sz-xl .clock-time { font-size:96px; } .sz-xl .clock-card { padding:24px 40px 22px; min-width:300px; }
+.sz-xxl .clock-time { font-size:140px; } .sz-xxl .clock-card { padding:32px 52px 28px; min-width:400px; }
 /* VCR mode gets larger sizing for boldness */
 .sz-xs .vcr-time { font-size:34px; }
 .sz-sm .vcr-time { font-size:46px; }
 .sz-md .vcr-time { font-size:62px; }
 .sz-lg .vcr-time { font-size:86px; }
 .sz-xl .vcr-time { font-size:110px; }
+.sz-xxl .vcr-time { font-size:160px; }
 /* ── Analog clock ── */
 .analog-wrap { width:120px; height:120px; margin:0 auto 4px; }
 .analog-face { width:100%; height:100%; }
 .sz-lg .analog-wrap { width:160px; height:160px; }
 .sz-xl .analog-wrap { width:200px; height:200px; }
+.sz-xxl .analog-wrap { width:280px; height:280px; }
 /* ── Remove button ── */
 .clock-remove { position:absolute; top:6px; right:8px; background:none; border:none;
   color:var(--text-dim); font-size:15px; cursor:pointer; line-height:1; padding:2px 5px;
@@ -86,7 +89,8 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 .vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
 @keyframes vcr-blink { 50% { opacity:0; } }
 /* ── Countdown cards ── */
-.countdown-card { position:relative; }
+.countdown-card { position:relative; background:color-mix(in srgb, var(--accent) 8%, var(--bg2)); border-color:color-mix(in srgb, var(--accent) 25%, var(--border)); }
+.timer-card { position:relative; background:color-mix(in srgb, #2ecc71 8%, var(--bg2)); border-color:color-mix(in srgb, #2ecc71 25%, var(--border)); }
 .countdown-time { font-variant-numeric:tabular-nums; line-height:1.1; }
 .countdown-controls { display:flex; gap:4px; margin-top:6px; justify-content:center; }
 .countdown-controls button { background:var(--bg3); border:1px solid var(--border); border-radius:5px;
@@ -123,7 +127,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   <button class="btn-tb" id="btnAnalog" data-mode="analog">Analog</button>
   <button class="btn-tb" id="btnVCR" data-mode="vcr">VCR</button>
   <label>Size</label>
-  <input type="range" id="sizeSlider" min="0" max="4" value="2" step="1">
+  <input type="range" id="sizeSlider" min="0" max="5" value="2" step="1">
   <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
   <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
   <label>TZ</label>
@@ -133,6 +137,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   <button class="btn-tb active" id="btnFmt24" data-fmt="24">24h</button>
   <button class="btn-tb" id="btnFmt12" data-fmt="12">12h</button>
   <button class="btn-tb" id="btnAddCountdown" title="Add countdown timer">⏱ Countdown</button>
+  <button class="btn-tb" id="btnAddTimer" title="Add stopwatch timer">⏲ Timer</button>
   <label id="lblVcrColor" style="display:none">VCR Color</label>
   <select id="selVcrColor" style="display:none">
     <option value="red">Red</option>
@@ -196,6 +201,21 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   </div>
 </div>
 <div id="countdownOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
+<div class="clocks-wrap" id="timerWrap"></div>
+<!-- Timer setup popover -->
+<div id="timerPopover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  <div style="font-weight:700;color:var(--accent);margin-bottom:12px;font-size:14px">Add Stopwatch Timer</div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Label</label>
+    <input type="text" id="tmrLabel" placeholder="e.g. Exercise duration" maxlength="40"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+    <button class="btn-tb" id="tmrCancel">Cancel</button>
+    <button class="btn-tb active" id="tmrStart">Start Timer</button>
+  </div>
+</div>
+<div id="timerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
 <script src="/static/clocks-popup.js"></script>
 </body>
 </html>
