@@ -64,8 +64,9 @@ function resolveCountryCoords(locationStr) {
 /* ── i18n: read translations from opener ── */
 function _t(key) {
   try {
-    const lang = window.opener?.state?.preferences?.language || 'en';
-    const TR = window.opener?.TRANSLATIONS;
+    var op = getOpener();
+    const lang = op?.state?.preferences?.language || 'en';
+    const TR = op?.TRANSLATIONS;
     if (TR && TR[lang] && TR[lang][key]) return TR[lang][key];
     if (TR && TR.en && TR.en[key]) return TR.en[key];
   } catch(e) {}
@@ -84,7 +85,8 @@ function _t(key) {
 const _themeClasses = ['theme-dark','theme-light','theme-city-camo','theme-urban-camo'];
 function syncTheme() {
   try {
-    const t = window.opener?.state?.preferences?.theme || 'dark';
+    var op = getOpener();
+    const t = op?.state?.preferences?.theme || 'dark';
     _themeClasses.forEach(c => document.body.classList.remove(c));
     document.body.classList.add('theme-' + t);
   } catch(e) {}
@@ -94,7 +96,8 @@ function syncTheme() {
 let _lastLang = '';
 function syncLanguage() {
   try {
-    const lang = window.opener?.state?.preferences?.language || 'en';
+    var op = getOpener();
+    const lang = op?.state?.preferences?.language || 'en';
     if (lang === _lastLang) return;
     _lastLang = lang;
     document.title = 'Tidslinjal \u2014 ' + _t('map_title');
@@ -135,6 +138,11 @@ const TILE_LAYERS = {
     attr:'&copy; CartoDB' }
 };
 
+/* ── Safe opener access ── */
+function getOpener() {
+  try { return window.opener && !window.opener.closed ? window.opener : null; } catch(e) { return null; }
+}
+
 /* ── State ── */
 let _map = null;
 let _tileLayer = null;
@@ -147,10 +155,10 @@ let _roomsLayer = null;
 let _buildingsLayer = null;
 let _computersLayer = null;
 let _dataCentersLayer = null;
-let _showRooms = false;
-let _showBuildings = false;
-let _showComputers = false;
-let _showDataCenters = false;
+let _showRooms = true;
+let _showBuildings = true;
+let _showComputers = true;
+let _showDataCenters = true;
 
 /* ── Initialize map ── */
 function initMapProjection() {
@@ -161,11 +169,11 @@ function initMapProjection() {
   _meetingsLayer = L.layerGroup().addTo(_map);
   // Users layer
   _usersLayer = L.layerGroup().addTo(_map);
-  // Resource layers
-  _roomsLayer = L.layerGroup();
-  _buildingsLayer = L.layerGroup();
-  _computersLayer = L.layerGroup();
-  _dataCentersLayer = L.layerGroup();
+  // Resource layers — added to map by default
+  _roomsLayer = L.layerGroup().addTo(_map);
+  _buildingsLayer = L.layerGroup().addTo(_map);
+  _computersLayer = L.layerGroup().addTo(_map);
+  _dataCentersLayer = L.layerGroup().addTo(_map);
 
   loadMeetings();
   loadUsers();
@@ -187,9 +195,17 @@ function setTileLayer(key) {
 }
 
 /* ── Load physical meeting events ── */
-function loadMeetings() {
+async function loadMeetings() {
   try {
-    const events = window.opener?.state?.events;
+    var op = getOpener();
+    var events = op?.state?.events;
+    // Fallback to API if opener is not available
+    if (!events) {
+      try {
+        const res = await fetch('/api/events');
+        if (res.ok) events = await res.json();
+      } catch(e) {}
+    }
     if (!events) return;
     _meetingsLayer.clearLayers();
     events.forEach(ev => {
@@ -210,9 +226,17 @@ function loadMeetings() {
 }
 
 /* ── Load user locations ── */
-function loadUsers() {
+async function loadUsers() {
   try {
-    const users = window.opener?.state?.users;
+    var op = getOpener();
+    var users = op?.state?.users;
+    // Fallback to API if opener is not available
+    if (!users) {
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) users = await res.json();
+      } catch(e) {}
+    }
     if (!users) return;
     _usersLayer.clearLayers();
     users.forEach(u => {
@@ -507,9 +531,24 @@ document.getElementById('btnDataCenters').addEventListener('click', function() {
 
 document.getElementById('btnFitAll').addEventListener('click', fitAll);
 
-// Set initial active state
+// Set initial active state for all layers
 document.getElementById('btnMeetings').classList.add('active');
 document.getElementById('btnUsers').classList.add('active');
+document.getElementById('btnRooms').classList.add('active');
+document.getElementById('btnBuildings').classList.add('active');
+document.getElementById('btnComputers').classList.add('active');
+document.getElementById('btnDataCenters').classList.add('active');
+
+/* ── BroadcastChannel theme sync ── */
+try {
+  var _mapBC = new BroadcastChannel('tidslinjal-sync');
+  _mapBC.onmessage = function(e) {
+    if (e.data && e.data.type === 'theme') {
+      _themeClasses.forEach(c => document.body.classList.remove(c));
+      document.body.classList.add('theme-' + (e.data.theme || 'dark'));
+    }
+  };
+} catch(e) {}
 
 /* ── Init ── */
 syncTheme();
