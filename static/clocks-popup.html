@@ -112,9 +112,19 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 .clock-label-click { cursor:pointer; user-select:none; }
 .clock-label-click:hover { text-decoration:underline; }
 /* ── Timer progress bar ── */
-.timer-progress { width:90%; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:6px auto 2px; border:1px solid var(--border); }
-.timer-progress-bar { height:100%; background:#2ecc71; transition:width .5s,background .3s; border-radius:3px; }
+.timer-progress { width:90%; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:6px auto 2px; border:1px solid var(--border); cursor:ns-resize; }
+.timer-progress-bar { height:100%; background:#2ecc71; transition:width .5s,background .3s; border-radius:3px; pointer-events:none; }
 .timer-overtime .timer-progress-bar { background:var(--danger,#e05252); }
+/* ── Lap time history ── */
+.lap-list { font-size:10px; color:var(--text-dim); max-height:80px; overflow-y:auto; margin:4px auto 0; width:90%; text-align:left; }
+.lap-list .lap-row { display:flex; justify-content:space-between; padding:1px 0; border-bottom:1px solid var(--border); }
+.lap-list .lap-row:last-child { border-bottom:none; }
+.lap-list .lap-num { color:var(--accent); min-width:28px; }
+.lap-list .lap-split { color:var(--text); font-variant-numeric:tabular-nums; }
+.lap-list .lap-total { color:var(--text-dim); font-variant-numeric:tabular-nums; }
+.lap-export-row { display:flex; gap:4px; justify-content:center; margin-top:3px; }
+.lap-export-row button { background:var(--bg3); border:1px solid var(--border); border-radius:4px; color:var(--text-dim); padding:1px 6px; font-size:9px; cursor:pointer; }
+.lap-export-row button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
 /* ── Color picker row ── */
 .color-row { display:flex; align-items:center; gap:6px; }
 .color-row label { font-size:10px; color:var(--text-dim); min-width:24px; }
