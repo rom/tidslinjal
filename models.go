@@ -508,6 +508,7 @@ type TemplateItem struct {
 	RecurrencePattern string               `json:"recurrence_pattern"`
 	Participant       string               `json:"participant"`
 	Attachments       []TemplateAttachment `json:"attachments,omitempty"`
+	Layer             string               `json:"layer,omitempty"` // layer name (matched against template Layers)
 	// Alarm settings: if AlarmLeadTime > 0, an alarm is created for the applying user
 	AlarmLeadTime     int                  `json:"alarm_lead_time,omitempty"`  // minutes before event; 0 = no alarm
 	AlarmSound        string               `json:"alarm_sound,omitempty"`      // optional sound name
