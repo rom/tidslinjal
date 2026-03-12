@@ -253,6 +253,54 @@ func (s *Store) DeleteRoom(id int64) error {
 	return fmt.Errorf("room %d not found", id)
 }
 
+// ── Custom Resource Types ──────────────────────────────────────────────────
+
+func (s *Store) GetCustomResourceTypes() []CustomResourceType {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]CustomResourceType, len(s.customResourceTypes))
+	copy(result, s.customResourceTypes)
+	return result
+}
+
+func (s *Store) SaveCustomResourceType(crt CustomResourceType) error {
+	s.mu.Lock()
+	if crt.ID == 0 {
+		s.nextCustomResTypeID++
+		crt.ID = s.nextCustomResTypeID
+		s.customResourceTypes = append(s.customResourceTypes, crt)
+	} else {
+		found := false
+		for i := range s.customResourceTypes {
+			if s.customResourceTypes[i].ID == crt.ID {
+				s.customResourceTypes[i] = crt
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.customResourceTypes = append(s.customResourceTypes, crt)
+		}
+	}
+	snap := append([]CustomResourceType(nil), s.customResourceTypes...)
+	s.mu.Unlock()
+	return s.persist("custom_resource_types.json", snap)
+}
+
+func (s *Store) DeleteCustomResourceType(id int64) error {
+	s.mu.Lock()
+	for i := range s.customResourceTypes {
+		if s.customResourceTypes[i].ID == id {
+			s.customResourceTypes = append(s.customResourceTypes[:i], s.customResourceTypes[i+1:]...)
+			snap := append([]CustomResourceType(nil), s.customResourceTypes...)
+			s.mu.Unlock()
+			return s.persist("custom_resource_types.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("custom resource type %d not found", id)
+}
+
 func (s *Store) GetRoomBookings(roomID int64, from, to time.Time) []RoomBooking {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -65,6 +65,7 @@ type Store struct {
 	federatedIdPs        []FederatedIdP
 	trustRealms          []TrustRealm
 	rooms                []Room
+	customResourceTypes  []CustomResourceType
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -89,6 +90,7 @@ type Store struct {
 	nextRoomID               int64
 	nextEventLogID           int64
 	nextLogBookID            int64
+	nextCustomResTypeID      int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -150,6 +152,7 @@ func (s *Store) load() error {
 	s.loadFile("federated_idps.json", &s.federatedIdPs)
 	s.loadFile("trust_realms.json", &s.trustRealms)
 	s.loadFile("rooms.json", &s.rooms)
+	s.loadFile("custom_resource_types.json", &s.customResourceTypes)
 	s.loadFile("event_log.json", &s.eventLog)
 	s.loadFile("log_book.json", &s.logBook)
 
@@ -285,6 +288,11 @@ func (s *Store) load() error {
 	for _, x := range s.rooms {
 		if x.ID > s.nextRoomID {
 			s.nextRoomID = x.ID
+		}
+	}
+	for _, x := range s.customResourceTypes {
+		if x.ID > s.nextCustomResTypeID {
+			s.nextCustomResTypeID = x.ID
 		}
 	}
 	for _, x := range s.eventLog {

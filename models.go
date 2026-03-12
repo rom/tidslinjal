@@ -625,7 +625,7 @@ type TrustRealm struct {
 type Room struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
-	Type        string    `json:"type"`       // room | building | computer_service | data_center | vehicle | equipment
+	Type        string    `json:"type"`       // room | building | computer_service | data_center | vehicle | equipment | <custom>
 	SubType     string    `json:"sub_type,omitempty"` // meeting_room | video_room | aula | studio | server_room | depot | ...
 	Location    string    `json:"location,omitempty"`
 	Capacity    int       `json:"capacity,omitempty"`
@@ -635,6 +635,14 @@ type Room struct {
 	ImageName   string    `json:"image_name,omitempty"` // uploaded image filename (stored)
 	Enabled     bool      `json:"enabled"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// CustomResourceType defines a user-created resource category (e.g. "Vehicles", "Radios").
+type CustomResourceType struct {
+	ID    int64  `json:"id"`
+	Key   string `json:"key"`   // machine-readable key, e.g. "vehicle"
+	Label string `json:"label"` // display name, e.g. "Vehicles"
+	Icon  string `json:"icon"`  // emoji icon for the tab button
 }
 
 // RoomBooking represents a reservation of a room/resource for a time period
@@ -682,6 +690,11 @@ type ExerciseSettings struct {
 	ArtificialTimeEnabled bool   `json:"artificial_time_enabled"`           // whether artificial time is active
 	ArtificialTimeSetAt   string `json:"artificial_time_set_at,omitempty"`  // ISO8601: real wall-clock time when artificial_time was set
 	LastTemplate          string `json:"last_template,omitempty"`           // name of the last applied template
+	// Ready check: verify all activities changed from "planned" before a set time
+	ReadyCheckEnabled     bool   `json:"ready_check_enabled"`               // whether ready check is active
+	ReadyCheckTime        string `json:"ready_check_time,omitempty"`        // ISO8601: when to run the ready check
+	ReadyCheckOffsetMins  int    `json:"ready_check_offset_mins,omitempty"` // minutes before epoch to check (alternative to absolute time)
+	ReadyCheckUseOffset   bool   `json:"ready_check_use_offset"`            // if true, use offset from epoch instead of absolute time
 }
 
 // MapLocation represents a named geographic position (HQ, base, POI, etc.)
