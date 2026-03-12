@@ -380,8 +380,14 @@
         <input type="datetime-local" id="applyTemplateBase">
         <small style="color:var(--text-dim)">All template events, phases and locks are scheduled relative to this moment.</small>
       </div>
-      <div class="form-group">
-        <label>Target layer <small style="color:var(--text-dim)">(optional — overrides original)</small></label>
+      <div class="form-group" id="applyTemplateLayerModeGroup">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="applyTemplateMultiLayer" checked style="accent-color:var(--accent)">
+          Use template layers <small style="color:var(--text-dim)">(events placed on their defined layers)</small>
+        </label>
+      </div>
+      <div class="form-group" id="applyTemplateSingleLayerGroup" style="display:none">
+        <label>Target layer <small style="color:var(--text-dim)">(all events go to this layer)</small></label>
         <select id="applyTemplateLayer"><option value="">Master Timeline</option></select>
       </div>
     </div>

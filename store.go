@@ -2160,17 +2160,23 @@ func (s *Store) CheckOverlaps(start time.Time, end *time.Time, responsibleID *in
 
 // ApplyTemplate creates events from a template offset by baseTime; returns count created.
 // It also copies any template attachments to the newly created events.
-func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, createdBy int64, createdByName string) (int, error) {
+func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, useTemplateLayers bool, createdBy int64, createdByName string) (int, error) {
 	tmpl, ok := s.GetTemplate(id)
 	if !ok {
 		return 0, fmt.Errorf("template not found")
 	}
-	logDebug("[template] ApplyTemplate: name=%q items=%d phases=%d locks=%d layers=%d base=%s",
-		tmpl.Name, len(tmpl.Items), len(tmpl.Phases), len(tmpl.Locks), len(tmpl.Layers), baseTime.Format(time.RFC3339))
+	logDebug("[template] ApplyTemplate: name=%q items=%d phases=%d locks=%d layers=%d useTemplateLayers=%v base=%s",
+		tmpl.Name, len(tmpl.Items), len(tmpl.Phases), len(tmpl.Locks), len(tmpl.Layers), useTemplateLayers, baseTime.Format(time.RFC3339))
 
-	// Create template-defined layers and build name→ID map
+	// Create template-defined layers and build name→ID map (only if useTemplateLayers is true)
 	layerMap := map[string]*int64{}
+	if !useTemplateLayers {
+		logDebug("[template] useTemplateLayers=false, all events go to single layer=%v", layerID)
+	}
 	for _, tl := range tmpl.Layers {
+		if !useTemplateLayers {
+			break
+		}
 		if tl.Name == "" {
 			continue
 		}
