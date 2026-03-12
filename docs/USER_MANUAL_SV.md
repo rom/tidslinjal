@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 4.0.0**
+**Version 6.0.0**
 
 ---
 
@@ -22,8 +22,16 @@
 14. [Inställningar](#14-inställningar)
 15. [Export och rapporter](#15-export-och-rapporter)
 16. [Adminvy](#16-adminvy)
-17. [Tangentbords- och musgenvägar](#17-tangentbords--och-musgenvägar)
-18. [Felsökning](#18-felsökning)
+17. [Klockor, nedräkningar och tidtagare](#17-klockor-nedräkningar-och-tidtagare)
+18. [Beslutslogg](#18-beslutslogg)
+19. [Loggbok](#19-loggbok)
+20. [Resurshantering](#20-resurshantering)
+21. [Kartprojektion](#21-kartprojektion)
+22. [Avtagbara fönster](#22-avtagbara-fönster)
+23. [Integrationer och anslutningar](#23-integrationer-och-anslutningar)
+24. [Mallar](#24-mallar)
+25. [Tangentbords- och musgenvägar](#25-tangentbords--och-musgenvägar)
+26. [Felsökning](#26-felsökning)
 
 ---
 
@@ -493,7 +501,7 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 
 | Inställning | Alternativ |
 |---|---|
-| **Tema** | Mörkt / Ljust |
+| **Tema** | Mörkt / Ljust / City Camo / Urban Camo |
 | **Storlek** | Liten / Normal / Stor / Enorm |
 | **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
 | **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
@@ -573,7 +581,138 @@ Navigera till `/admin-view` (kräver rollen **Admin**) för en dedikerad adminis
 
 ---
 
-## 17. Tangentbords- och musgenvägar
+## 17. Klockor, nedräkningar och tidtagare
+
+### Tidszonsklockorna
+Klockan i sidhuvudet visar lokal realtid. Klicka **+** för att lägga till extra tidszoner för distribuerade team. Klicka **⧉** för att frigöra alla klockor till ett separat fönster.
+
+### VCR sjusegmentdisplay
+Klockorna visas i retro VCR-stil med sjusegmentdisplay. Segmentfärger och tjocklek kan konfigureras.
+
+### Nedräkningstimer
+Skapa nedräkningstimer som räknar ner till en måltid:
+- Klicka **+ Nedräkning** i klockornas verktygsfält
+- Ställ in måltid eller välj från en händelses start/sluttid
+- Nedräkningen visar kvarvarande tid med en **framstegsindikator**
+- Ett larm utlöses när nedräkningen når noll
+- Klicka **ACK** för att bekräfta
+
+### Tidtagare
+Skapa tidtagare som räknar uppåt:
+- Klicka **+ Tidtagare** i klockornas verktygsfält
+- Konfigurera: varaktighet (timmar/minuter/sekunder), förinställda knappar (5/10/15/30/60 min)
+- Välj om tidtagaren ska stoppa eller fortsätta efter måltiden
+- Aktivera ljudlarm vid måltid
+- Tidtagaren visar en **framstegsindikator** med övertidsmarkering
+
+### Färgväljare
+Klockornas verktygsfält innehåller färgväljare:
+| Väljare | Styr |
+|---|---|
+| **BG** | Bakgrundsfärg |
+| **CD** | Nedräkningens accentfärg |
+| **TM** | Tidtagarens accentfärg |
+
+---
+
+## 18. Beslutslogg
+Beslutsloggen ger strukturerad spårning av beslut som fattas under operationer eller övningar.
+
+### Skapa ett beslut
+1. Klicka **+ Nytt beslut**
+2. Fyll i titel, beskrivning, status och ansvarig
+3. Bifoga filer vid behov
+4. Klicka **Spara**
+
+### Beslutsstatus
+| Status | Beskrivning |
+|---|---|
+| **Föreslagen** | Beslut har lagts fram |
+| **Godkänd** | Beslut har godkänts |
+| **Avvisad** | Beslut har avvisats |
+
+---
+
+## 19. Loggbok
+Loggboken ger en kronologisk registrering av operativa händelser, observationer och anteckningar.
+- Öppna **Loggbok** från sidofältet (fliken Loggar)
+- Klicka **+ Ny post** för att lägga till en loggpost
+- Poster tidsstämplas och kopplas till skaparen
+
+---
+
+## 20. Resurshantering
+Hantera operativa resurser (rum, byggnader, IT-tjänster, datacenter) från sidofältet.
+
+### Resurstyper
+| Typ | Beskrivning |
+|---|---|
+| **Rum** | Mötesrum, operationscentraler |
+| **Byggnader** | Fysiska byggnader och anläggningar |
+| **IT-tjänster** | IT-infrastruktur, servrar, nätverk |
+| **Datacenter** | Datacenteranläggningar |
+
+### Skapa en resurs
+1. Öppna fliken **Resurser** i sidofältet
+2. Välj resurstyp
+3. Klicka **+ Lägg till**
+4. Fyll i namn, beskrivning, plats (lat/lng), bild och symbol
+5. Klicka **Spara**
+
+---
+
+## 21. Kartprojektion
+Kartprojektionen ger en interaktiv geografisk vy över möten, användare och resurser.
+
+- **Kartlager** — byt mellan OpenStreetMap, Topografisk, Satellit och Mörk
+- **Resursöverlägg** — visa/dölj rum, byggnader, IT-tjänster och datacenter
+- **Adresssökning** — geokoda en adress och zooma till platsen
+- **GeoJSON/KML-import** — ladda externa geografiska datafiler
+- **Anpassa alla** — automazooma för att visa alla synliga markörer
+
+---
+
+## 22. Avtagbara fönster
+Flera vyer kan frigöras till separata webbläsarfönster:
+| Fönster | Beskrivning |
+|---|---|
+| **Klockor** | Alla klockor, nedräkningar och tidtagare |
+| **Sidofält** | Fullständigt sidofält med alla flikar |
+| **Beslutslogg** | Beslutsloggvy |
+| **Kartprojektion** | Interaktiv karta med alla överlägg |
+
+Tema, språk och data synkroniseras automatiskt via BroadcastChannel.
+
+---
+
+## 23. Integrationer och anslutningar
+
+### Integreringsramverk
+Fliken Integrationer (Admin/Ops Lead) ger:
+- **OIDC SSO** — Single Sign-On-konfiguration
+- **SMTP-post** — utgående e-post för larm och rapporter
+- **Microsoft Teams** — webhook-integration
+- **Zoom** — möteslänksintegration
+- **API-nycklar** — generera bearer-tokens
+
+### Händelseanslutningar
+| Anslutning | Beskrivning |
+|---|---|
+| **STIX/TAXII** | Importera cyberhot-underrättelseflöden |
+| **Syslog** | Ta emot syslog-meddelanden som händelser |
+
+---
+
+## 24. Mallar
+Spara och återanvänd uppsättningar av händelser, faser, lås, grupper och lager:
+- **Spara** — välj datumintervall; händelser lagras med relativa offset
+- **Tillämpa** — ange STARTEX/T=0; alla händelser återskapas; lager per händelse stöds
+- **Importera** — ladda `.json`-mallfiler
+- 31 exempelmallar ingår: 20 övningsmallar och 11 incidentmallar
+
+---
+
+## 25. Tangentbords- och musgenvägar
 
 ### Mus
 
@@ -601,7 +740,7 @@ Navigera till `/admin-view` (kräver rollen **Admin**) för en dedikerad adminis
 
 ---
 
-## 18. Felsökning
+## 26. Felsökning
 
 ### Kan inte logga in
 - Kontrollera användarnamn och lösenord (standard: `admin` / `admin`)
@@ -633,4 +772,4 @@ Navigera till `/admin-view` (kräver rollen **Admin**) för en dedikerad adminis
 
 ---
 
-*Tidslinjal v4.0.0 — Samarbetsbaserad operativ tidslinje*
+*Tidslinjal v6.0.0 — Samarbetsbaserad operativ tidslinje*

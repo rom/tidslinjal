@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 4.0.0**
+**Version 6.0.0**
 
 ---
 
@@ -22,8 +22,16 @@
 14. [Settings](#14-settings)
 15. [Export & Reports](#15-export--reports)
 16. [Admin View](#16-admin-view)
-17. [Keyboard & Mouse Shortcuts](#17-keyboard--mouse-shortcuts)
-18. [Troubleshooting](#18-troubleshooting)
+17. [Clocks, Countdowns & Timers](#17-clocks-countdowns--timers)
+18. [Decision Log](#18-decision-log)
+19. [Log Book](#19-log-book)
+20. [Resource Management](#20-resource-management)
+21. [Map Projection](#21-map-projection)
+22. [Detachable Windows](#22-detachable-windows)
+23. [Integrations & Connectors](#23-integrations--connectors)
+24. [Templates](#24-templates)
+25. [Keyboard & Mouse Shortcuts](#25-keyboard--mouse-shortcuts)
+26. [Troubleshooting](#26-troubleshooting)
 
 ---
 
@@ -38,6 +46,16 @@ Key capabilities:
 - Exercise support with STARTEX/ENDEX and synthetic "Day N / T+H" time
 - Real-time alarm notifications via Server-Sent Events
 - Export to ICS, JSON, and CSV
+- Countdown timers and stopwatch timers with progress bars and alarms
+- Decision log with status workflow and attachments
+- Log book for chronological operational records
+- Resource management (rooms, buildings, IT services, data centers)
+- Interactive map projection with resource overlays and address search
+- Detachable windows for clocks, sidebar, decision log, and map
+- Integration framework with STIX/TAXII and syslog connectors
+- VCR seven-segment digital clock display with color customization
+- Artificial time system for exercise time offsets
+- Offline sync mode and federation support
 
 ---
 
@@ -118,7 +136,7 @@ Click the **🔑** button in the header. Enter your current password, then your 
 
 **Timeline grid** — days left-to-right, time top-to-bottom. Events appear as colored blocks.
 
-**Sidebar** — Legend, Alarms, Layers, Users (admin), Groups (admin), Audit (Team Lead+), Phases (Team Lead+), Settings tabs. Toggle with the ☰ button.
+**Sidebar** — Legend, Tools, Alarms, Layers, Resources, Logs, Users (admin), Groups (admin), Audit (Team Lead+), Phases (Team Lead+), Integrations (Admin/Ops Lead), Settings tabs. Toggle with the ☰ button. The sidebar can be detached to a separate window.
 
 ---
 
@@ -534,7 +552,7 @@ Open the **Settings** sidebar tab to configure your preferences.
 
 | Setting | Options |
 |---|---|
-| **Theme** | Dark / Light |
+| **Theme** | Dark / Light / City Camo / Urban Camo |
 | **Display size** | Small / Normal / Large / Huge |
 | **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
 | **Date/time format** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
@@ -682,7 +700,239 @@ The **Reset to empty** action clears all events, layers, groups, and users (exce
 
 ---
 
-## 17. Keyboard & Mouse Shortcuts
+## 17. Clocks, Countdowns & Timers
+
+### Multi-Timezone Clocks
+
+The header displays a primary real-time clock. Click **+** to add extra timezone clocks for parallel visibility across distributed teams. Each clock shows a label, live time, and timezone abbreviation.
+
+Click the **⧉** button to detach all clocks into a separate browser window — useful for displaying on a secondary monitor during exercises.
+
+### VCR Seven-Segment Display
+
+The clock display uses a retro VCR-style seven-segment digital display. Segment colors and thickness are configurable. A text display mode is also available for showing exercise labels.
+
+### Countdown Timers
+
+Create countdown timers that count down to a specific target time:
+
+1. Click **+ Countdown** in the clock toolbar
+2. Set the target time or select from an event's start/end time
+3. The countdown displays remaining time with a **progress bar** showing percentage complete
+4. When the countdown reaches zero, an alarm notification fires
+5. Click **ACK** to acknowledge the expired countdown
+
+Countdown timers show a visual progress bar that fills as time progresses. When the countdown expires, the progress bar turns red (overtime styling).
+
+### Stopwatch Timers
+
+Create stopwatch timers that count up from zero:
+
+1. Click **+ Timer** in the clock toolbar
+2. Configure the timer:
+   - **Duration** — set target hours, minutes, and seconds, or use preset buttons (5/10/15/30/60 min)
+   - **Continue after target** — choose whether the timer stops or continues counting when the target is reached
+   - **Sound alarm** — enable an audible alarm at target time with selectable sound type
+3. Click **Start** to begin the timer
+
+Timers display a **progress bar** showing elapsed time vs. target duration. If "continue after target" is enabled, the progress bar switches to an overtime indicator when the target is exceeded.
+
+### Color Pickers
+
+The clock toolbar includes color picker inputs for customizing the display:
+
+| Picker | Controls |
+|---|---|
+| **BG** | Background color of the clock display |
+| **CD** | Countdown timer accent color |
+| **TM** | Stopwatch timer accent color |
+
+Color changes apply immediately and are saved per session.
+
+### Detaching Timers
+
+Each countdown and timer can be detached to its own standalone browser window by clicking the **⧉** button on the timer card. The detached window shows the timer with its progress bar, controls, and live updates.
+
+---
+
+## 18. Decision Log
+
+The decision log provides structured tracking of decisions made during operations or exercises.
+
+### Accessing the Decision Log
+
+Open the **Decision Log** from the sidebar or the Tools menu. It can also be detached to a standalone browser window.
+
+### Creating a Decision
+
+1. Click **+ New Decision**
+2. Fill in the decision details:
+   - **Title** — short description of the decision
+   - **Description** — detailed context and rationale
+   - **Status** — Proposed, Approved, or Rejected
+   - **Responsible** — person or role accountable
+3. Optionally attach files
+4. Click **Save**
+
+### Decision Status Workflow
+
+| Status | Description |
+|---|---|
+| **Proposed** | Decision has been raised for consideration |
+| **Approved** | Decision has been approved and is in effect |
+| **Rejected** | Decision was rejected with documented reason |
+
+### Decision Log Permissions
+
+- All authenticated users can view decisions
+- Read/Write+ users can create and edit decisions
+- Team Lead+ can approve or reject decisions
+
+---
+
+## 19. Log Book
+
+The log book provides a chronological record of operational events, observations, and notes.
+
+### Using the Log Book
+
+1. Open the **Log Book** from the sidebar Logs tab
+2. Click **+ New Entry** to add a log entry
+3. Enter the log text and optionally tag it with a category
+4. Entries are timestamped and attributed to the creating user
+
+Log entries are displayed in reverse chronological order. The log book is useful for maintaining a running record during exercises or live incidents.
+
+---
+
+## 20. Resource Management
+
+Manage operational resources (rooms, buildings, IT services, data centers) from the sidebar.
+
+### Resource Types
+
+| Type | Description |
+|---|---|
+| **Rooms** | Meeting rooms, operations centers, command posts |
+| **Buildings** | Physical buildings and facilities |
+| **Computer Services** | IT infrastructure, servers, networks |
+| **Data Centers** | Data center facilities |
+
+### Creating a Resource
+
+1. Open the **Resources** tab in the sidebar
+2. Select the resource type tab (Rooms / Buildings / IT / DC)
+3. Click **+ Add**
+4. Fill in details:
+   - **Name** and **Description**
+   - **Location** — latitude/longitude (for map display)
+   - **Image** — upload a photo or diagram
+   - **Symbol/Icon** — select a map marker icon
+5. Click **Save**
+
+### Resource Map Integration
+
+Resources with location coordinates appear as markers on the Map Projection (see [Section 21](#21-map-projection)). Each resource type has its own layer that can be toggled on/off.
+
+---
+
+## 21. Map Projection
+
+The map projection provides an interactive geographic view of meetings, users, and resources.
+
+### Opening the Map
+
+Click **Map** in the toolbar or detach it to a separate window for use on a secondary monitor.
+
+### Map Features
+
+- **Tile layers** — switch between OpenStreetMap, Topographic, Satellite, and Dark themes
+- **Resource overlays** — toggle layers for Rooms, Buildings, IT Services, and Data Centers
+- **Meeting markers** — physical meetings with coordinates are shown on the map
+- **User markers** — user locations are plotted when available
+- **Address search** — type an address to geocode and zoom to the location
+- **GeoJSON/KML import** — load external geographic data files as overlays
+- **Fit All** — auto-zoom to show all visible markers
+- **Legend** — color-coded legend showing marker types
+
+### Overlay Layers
+
+Click **Layers** in the map toolbar to toggle individual resource layers:
+
+| Layer | Markers |
+|---|---|
+| **Meetings** | Physical meeting locations |
+| **Users** | User locations (from geolocation) |
+| **Rooms** | Room resources |
+| **Buildings** | Building resources |
+| **IT** | Computer service resources |
+| **DC** | Data center resources |
+
+---
+
+## 22. Detachable Windows
+
+Several views can be detached to standalone browser windows for multi-monitor setups:
+
+| Window | Detach From | Description |
+|---|---|---|
+| **Clocks** | ⧉ button in header | All clocks, countdowns, and timers |
+| **Sidebar** | ⧉ button on sidebar | Full sidebar with all tabs |
+| **Decision Log** | Tools menu or sidebar | Decision log view |
+| **Map Projection** | Map toolbar | Interactive map with all overlays |
+
+### Cross-Window Synchronization
+
+Detached windows stay synchronized with the main window:
+
+- **Theme** — changes propagate via BroadcastChannel API
+- **Language** — translations update across all windows
+- **Data** — countdowns, timers, and other data sync with the main window
+- **Fallback** — if the main window is closed or navigated away, detached windows fall back to API-based data loading
+
+---
+
+## 23. Integrations & Connectors
+
+### Integration Framework
+
+The Integrations sidebar tab (Admin/Ops Lead) provides:
+
+- **OIDC SSO** — configure Single Sign-On with any OIDC provider
+- **SMTP Mail** — outgoing email for alarms, reports, invitations, password reset
+- **Microsoft Teams** — webhook integration for meeting deep-links
+- **Zoom** — meeting link integration
+- **API Keys** — generate bearer tokens for external tool integration
+
+### Event Connectors
+
+| Connector | Description |
+|---|---|
+| **STIX/TAXII** | Ingest cyber threat intelligence feeds as timeline events |
+| **Syslog** | Receive syslog messages and convert to timeline events |
+
+Connectors are configured in the Integrations tab and process incoming data through the event bus, which routes events to the timeline with configurable mapping rules.
+
+### Ingestion API
+
+External systems can push events via the REST ingestion API endpoint. Events are validated, mapped to timeline event types, and created automatically.
+
+---
+
+## 24. Templates
+
+Save and reuse sets of events, phases, locks, groups, and layers:
+
+- **Save** — choose a date range; events, phases, and locks within that range are stored with relative offsets; groups, layers, roles, theme, language, operation mode, and terminology labels are optionally saved
+- **Apply** — enter the STARTEX/T=0 datetime; all events recreated with offsets; per-item layer assignment supported; multi-layer default when applying
+- **Import from file** — load `.json` template files from disk or from `example-templates/`
+- **Scope** — Private (your eyes only) or Public (visible to all users)
+
+31 example templates are included: 20 exercise templates (EX-01 through EX-20) and 11 incident response templates (INC-01 through INC-11).
+
+---
+
+## 25. Keyboard & Mouse Shortcuts
 
 ### Mouse
 
@@ -710,7 +960,7 @@ The **Reset to empty** action clears all events, layers, groups, and users (exce
 
 ---
 
-## 18. Troubleshooting
+## 26. Troubleshooting
 
 ### Cannot log in
 - Check username and password (default: `admin` / `admin`)
@@ -748,4 +998,4 @@ The **Legend** sidebar tab includes a **System** info panel showing language, us
 
 ---
 
-*Tidslinjal v4.0.0 — Collaborative Operational Timeline*
+*Tidslinjal v6.0.0 — Collaborative Operational Timeline*

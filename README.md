@@ -84,7 +84,47 @@ Client-side computation of the longest dependency chain across all events. Highl
 
 ### Map Integration
 
-Physical Meeting events with a latitude/longitude can be opened in an interactive **Leaflet.js map modal**, showing the event location on an OpenStreetMap tile layer.
+Physical Meeting events with a latitude/longitude can be opened in an interactive **Leaflet.js map modal**, showing the event location on an OpenStreetMap tile layer. The map also supports:
+
+- **Detachable map window** — open the full map projection in a separate browser window
+- **Resource overlays** — rooms, buildings, IT services, and data centers plotted as map markers with layer toggles
+- **Multiple tile layers** — OpenStreetMap, Topographic, Satellite, and Dark themes
+- **Address search** — geocoded address lookup with zoom-to-location
+- **GeoJSON/KML import** — load external geographic data files onto the map
+- **User & meeting markers** — display user locations and physical meeting locations
+- **Fit All** — auto-zoom to show all visible markers
+
+### Decision Log
+
+A structured decision-tracking system accessible from the sidebar:
+
+- Decisions with title, description, rationale, status, and responsible person
+- Status workflow: Proposed → Approved / Rejected
+- File attachments on decisions
+- Detachable to a standalone browser window
+- Full i18n support (EN/SV/FR)
+
+### Log Book
+
+Chronological activity log for recording operational events, observations, and notes during exercises or incidents.
+
+### Resource Management
+
+Manage operational resources from the sidebar Resources tab:
+
+- **Resource types** — Rooms, Buildings, Computer Services, Data Centers
+- **Resource details** — name, description, location (lat/lng), image upload, symbol/icon selection
+- **Map integration** — resources displayed as overlay markers on the map projection
+- **Room types** — categorize rooms by function
+
+### Countdown & Timer System
+
+Enhanced clock system with countdown timers and stopwatch timers:
+
+- **Countdown timers** — set target time or duration; visual progress bar; alarm on expiry; acknowledge workflow; detachable to standalone window
+- **Stopwatch timers** — configurable target duration (hours/minutes/seconds); preset buttons (5/10/15/30/60 min); option to stop or continue after target; audible alarm with sound selection; progress bar with overtime indicator; detachable to standalone window
+- **Color pickers** — customize background, countdown accent, and timer accent colors from the clock toolbar
+- **VCR seven-segment display** — retro digital clock styling with configurable colors and segment thickness
 
 ### Layers
 
@@ -689,8 +729,49 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
-### Latest
+### v6.0.0 — Detachable Windows, Timers & Resources
 
+- **Timer clock enhancements** — configurable target duration with hours/minutes/seconds inputs, preset buttons (5/10/15/30/60 min), option to stop or continue after reaching target, audible alarm with selectable sound type, progress bar showing elapsed vs. target
+- **Countdown progress bars** — visual progress indicator on all countdown timers showing time remaining vs. total duration, with overtime styling
+- **Color pickers for clocks** — toolbar color inputs for background (BG), countdown accent (CD), and timer accent (TM) colors; changes apply in real time
+- **Detachable timer windows** — each timer can be detached to its own standalone browser window with live progress bar and controls
+- **Detached sidebar fix** — replaced fragile `document.write()` injection with safe DOM-based approach; fixed duplicate window opening; added periodic closure detection with automatic reattach
+- **Detached decision log fix** — safe `getOpener()` helper with API fallback; BroadcastChannel theme sync; periodic theme sync from opener; robust initialization that falls back to `/api/decision-log` when opener is unavailable
+- **Detached map projection fix** — safe `getOpener()` helper; all resource layers (rooms, buildings, IT services, data centers) now visible by default; async data loading with API fallback; BroadcastChannel theme sync
+- **Resource management** — rooms, buildings, computer services, and data centers with image upload, symbol/icon selection, and map pin integration; resource list in sidebar
+- **Map projection improvements** — address search with geocoding; tile layer selector (OSM, topo, satellite, dark); overlay layer panel; GeoJSON/KML file import; user and meeting location markers; fit-all button
+- **Decision log** — structured decision tracking with status workflow (proposed → approved / rejected); attachments support; i18n translations; detachable to standalone window; routing and permissions
+- **Log book** — chronological activity log for operations
+- **Task-time matrix** — cross-reference view of tasks vs. time periods
+- **Timed events** — events with precise timing controls
+- **Countdown timer defaults** — improved default behavior and acknowledge workflow
+- **VCR seven-segment display** — retro-style digital clock with configurable colors and thicker segments; VCR text display mode
+- **Artificial time system** — exercise time recalibrates all clocks with relative offset; all extra clocks adjust accordingly
+- **Enhanced role editor** — column-select for bulk capability toggling; tooltips; new rights and translations
+- **List view status dots** — colored status indicators in list/table view
+- **Country geolocation** — user location detection by country for map display
+- **Offline sync mode** — local changes queued and synced when connectivity returns
+- **Federation support** — cross-instance event sharing
+- **Per-item layer assignment in templates** — individual events can be assigned to specific layers when saving templates; multi-layer default when applying
+- **Audit log enhancements** — mail send logging; SMTP debug logging; comprehensive action tracking
+- **Confidential event filtering** — events marked confidential are filtered from unauthorized users
+- **Room types** — categorization of room resources
+- **@mention autocomplete** — type `@` in comments to get username suggestions
+- **Detachable sidebar menu** — open the sidebar in a separate window; content syncs with main window
+- **Export completeness** — improved export coverage for all event fields
+- **Pause event type** — new event type for marking pauses in the timeline
+- **Timeline styling** — customizable timeline appearance settings
+- **Logs tab** — dedicated sidebar tab for viewing logs
+- **i18n elapsed time** — localized elapsed time formatting
+- **Hover zoom setting** — configurable zoom level on event hover
+- **BroadcastChannel cross-window sync** — theme, language, and time format synchronized across all open windows via BroadcastChannel API
+- **Security hardening** — CSP compliance; extracted inline scripts; input validation improvements
+
+### v5.0.0 — Integrations & Connectors
+
+- **Integration framework** — connectors, event bus, ingestion API, routing, and metrics
+- **STIX/TAXII connector** — ingest cyber threat intelligence feeds
+- **Syslog connector** — receive syslog events for incident timelines
 - **Default port 443 for HTTPS** — when TLS is configured (via flags, env vars, or saved admin settings), port 443 is used by default instead of 8443
 - **Tools tab renamed and repositioned** — "Tools" tab is now second in the sidebar (after "Legend") for faster access
 - **Auto reports renamed** — "Auto reports" label in the Tools panel (was "Auto Report")
