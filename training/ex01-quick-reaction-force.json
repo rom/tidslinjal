@@ -56,7 +56,9 @@
       "color": "#E67E22",
       "visibility": "groups",
       "permission": "readwrite",
-      "group_index": [0]
+      "group_index": [
+        0
+      ]
     },
     {
       "name": "Bravo Ops",
@@ -64,7 +66,9 @@
       "color": "#3498DB",
       "visibility": "groups",
       "permission": "readwrite",
-      "group_index": [1]
+      "group_index": [
+        1
+      ]
     },
     {
       "name": "Intel",
@@ -72,7 +76,9 @@
       "color": "#1ABC9C",
       "visibility": "groups",
       "permission": "read",
-      "group_index": [2]
+      "group_index": [
+        2
+      ]
     }
   ],
   "locks": [
@@ -106,7 +112,8 @@
       "color": "#1ABC9C",
       "description": "Intelligence cell submits the initial threat picture including known hostile elements and likely courses of action.",
       "start_offset_min": 0,
-      "duration_min": 30
+      "duration_min": 30,
+      "layer": "Intel"
     },
     {
       "title": "QRF Alpha: Ready Check",
@@ -114,7 +121,8 @@
       "color": "#00ACC1",
       "description": "Team Alpha reports readiness status — personnel, equipment, comms, vehicle status.",
       "start_offset_min": 60,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "Alpha Ops"
     },
     {
       "title": "INJECT: Perimeter Breach — Alpha",
@@ -122,7 +130,8 @@
       "color": "#C0392B",
       "description": "Exercise inject: hostile element has breached the northern perimeter of the secured facility. QRF Alpha is ordered to respond.",
       "start_offset_min": 60,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "Alpha Ops"
     },
     {
       "title": "QRF Alpha Deployment",
@@ -130,7 +139,8 @@
       "color": "#E67E22",
       "description": "QRF Team Alpha deploys to the northern perimeter. Establish cordon, assess situation, request fire support if needed.",
       "start_offset_min": 60,
-      "duration_min": 120
+      "duration_min": 120,
+      "layer": "Alpha Ops"
     },
     {
       "title": "QRF Bravo: Stand-to",
@@ -138,7 +148,8 @@
       "color": "#E67E22",
       "description": "Team Bravo placed on immediate notice to move (NTM15) in support of Team Alpha or secondary incident.",
       "start_offset_min": 60,
-      "duration_min": 30
+      "duration_min": 30,
+      "layer": "Bravo Ops"
     },
     {
       "title": "SITREP 1 — Incident Alpha",
@@ -146,7 +157,8 @@
       "color": "#1ABC9C",
       "description": "Situation report on Incident Alpha. Alpha team reports contact, request for reinforcement, ammunition status.",
       "start_offset_min": 120,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "Alpha Ops"
     },
     {
       "title": "INJECT: Hostile Vehicle — Bravo",
@@ -154,7 +166,8 @@
       "color": "#C0392B",
       "description": "Exercise inject: a suspicious vehicle is reported approaching the eastern checkpoint. Possible secondary hostile element.",
       "start_offset_min": 150,
-      "duration_min": 0
+      "duration_min": 0,
+      "layer": "Bravo Ops"
     },
     {
       "title": "QRF Bravo Deployment",
@@ -162,7 +175,8 @@
       "color": "#E67E22",
       "description": "QRF Team Bravo deploys to eastern checkpoint. Contain the vehicle, conduct search, report findings.",
       "start_offset_min": 150,
-      "duration_min": 120
+      "duration_min": 120,
+      "layer": "Bravo Ops"
     },
     {
       "title": "Escalation Decision Point",
@@ -194,7 +208,8 @@
       "color": "#27AE60",
       "description": "QRF Alpha confirms northern perimeter secure. Hostile element neutralised (simulated). Area clear for follow-on forces.",
       "start_offset_min": 300,
-      "duration_min": 60
+      "duration_min": 60,
+      "layer": "Alpha Ops"
     },
     {
       "title": "Bravo: Vehicle Cleared",
@@ -202,7 +217,8 @@
       "color": "#27AE60",
       "description": "QRF Bravo confirms vehicle and occupants cleared. No hostile intent confirmed. Checkpoint returned to normal.",
       "start_offset_min": 330,
-      "duration_min": 60
+      "duration_min": 60,
+      "layer": "Bravo Ops"
     },
     {
       "title": "Post-Incident Assessment",

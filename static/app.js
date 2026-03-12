@@ -366,8 +366,27 @@ function toggleListView() {
     if (timeline) timeline.style.display = 'none';
     if (listView)  listView.style.display = '';
     if (btn)       { btn.textContent = '📅 Calendar'; btn.classList.add('active'); }
+    // i18n for list view toolbar
+    const searchEl = document.getElementById('listSearch');
+    if (searchEl) searchEl.placeholder = '🔍 ' + t('lv_search');
+    const statusEl = document.getElementById('listStatusFilter');
+    if (statusEl) {
+      statusEl.options[0].textContent = t('lv_all_statuses');
+      for (let i = 1; i < statusEl.options.length; i++) {
+        const v = statusEl.options[i].value;
+        statusEl.options[i].textContent = t('status_' + v) || v;
+      }
+    }
+    // i18n for table headers
+    document.querySelectorAll('#list-view-table th[data-i18n]').forEach(th => {
+      const key = th.dataset.i18n;
+      const sortSpan = th.querySelector('span[id^="listSort-"]');
+      th.textContent = t(key);
+      if (sortSpan) th.appendChild(sortSpan);
+    });
     // Populate type filter
     const typeEl = document.getElementById('listTypeFilter');
+    if (typeEl) typeEl.options[0].textContent = t('lv_all_types');
     if (typeEl && typeEl.options.length <= 1) {
       const _listTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
         instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
@@ -442,6 +461,10 @@ function renderListView() {
     responded_to:'var(--yellow)', rejected:'var(--red)'
   };
 
+  const canEdit = state.user && hasRole2(state.user.role, 'readwrite');
+  const eventTypes = state.eventTypes || [];
+  const users = state.users || [];
+
   // Red time line marker in list view
   const prefs = state.preferences || {};
   const redLineEnabled = prefs.red_line_enabled;
@@ -456,21 +479,45 @@ function renderListView() {
       if ((_listSortAsc && evTime > now) || (!_listSortAsc && evTime < now)) {
         redLineInserted = true;
         marker = `<tr class="list-red-line"><td colspan="7" style="padding:0;position:relative;height:2px;background:${redLineColor}">
-          <span style="position:absolute;left:8px;top:-8px;font-size:9px;color:${redLineColor};background:var(--bg2);padding:0 4px">▶ Now</span>
+          <span style="position:absolute;left:8px;top:-8px;font-size:9px;color:${redLineColor};background:var(--bg2);padding:0 4px">▶ ${t('lv_now')}</span>
         </td></tr>`;
       }
     }
     const isStrikethrough = ev.status === 'cancelled' || ev.status === 'rejected';
     const strikeStyle = isStrikethrough ? 'text-decoration:line-through;opacity:0.7;' : '';
+
+    // Event type label
+    const etMatch = eventTypes.find(et => et.key === ev.event_type);
+    const etLabel = etMatch ? (etMatch.label || etMatch.key) : (ev.event_type || '');
+
+    // Event type dropdown (editable)
+    const typeCell = canEdit ?
+      `<select class="list-type-sel" data-ev-type="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 6px;font-size:inherit;cursor:pointer">
+        ${eventTypes.map(et =>
+          `<option value="${et.key}" ${ev.event_type===et.key?'selected':''}>${escHtml(et.label||et.key)}</option>`
+        ).join('')}
+      </select>` :
+      escHtml(etLabel);
+
+    // Responsible dropdown (editable)
+    const responsibleCell = canEdit ?
+      `<select class="list-resp-sel" data-ev-resp="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 6px;font-size:inherit;cursor:pointer;max-width:140px">
+        <option value="" ${!ev.responsible_id?'selected':''}>${t('lv_no_responsible')}</option>
+        ${users.map(u =>
+          `<option value="${u.id}" ${ev.responsible_id===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`
+        ).join('')}
+      </select>` :
+      escHtml(ev.responsible_name || ev.created_by_name || t('lv_no_responsible'));
+
     return marker + `
     <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
       </td>
-      <td style="padding:8px 10px">${escHtml(ev.event_type)}</td>
-      <td style="padding:8px 10px">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[ev.status]||'var(--text-dim)'};margin-right:5px;vertical-align:middle"></span>${state.user && hasRole2(state.user.role, 'readwrite') ?
+      <td style="padding:8px 10px">${typeCell}</td>
+      <td style="padding:8px 10px;white-space:nowrap">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[ev.status]||'var(--text-dim)'};margin-right:5px;vertical-align:middle"></span>${canEdit ?
           `<select class="list-status-sel" data-ev-status="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:${statusColors[ev.status]||'var(--text)'};padding:2px 6px;font-size:inherit;cursor:pointer">
             ${['planned','active','completed','rejected','cancelled'].map(s =>
               `<option value="${s}" ${(ev.status||'planned')===s?'selected':''} style="color:var(--text)">${t('status_'+s)||s}</option>`
@@ -480,11 +527,11 @@ function renderListView() {
       </td>
       <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}</td>
       <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
-      <td style="padding:8px 10px">${escHtml(ev.responsible_name || ev.created_by_name || '')}</td>
-      <td style="padding:8px 10px">
-        <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">View</button>
-        ${state.user && hasRole2(state.user.role, 'readwrite') ?
-          `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">Edit</button>` : ''}
+      <td style="padding:8px 10px">${responsibleCell}</td>
+      <td style="padding:8px 10px;white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">${t('lv_view')}</button>
+        ${canEdit ? `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">${t('lv_edit')}</button>` : ''}
+        ${canEdit ? `<button class="btn btn-secondary btn-sm" style="margin-left:4px;color:var(--red,#e74c3c)" data-ev-del="${ev.id}">${t('lv_delete')}</button>` : ''}
       </td>
     </tr>
   `; }).join('');
@@ -502,13 +549,53 @@ function renderListView() {
   tbody.querySelectorAll('button[data-ev-edit]').forEach(btn => {
     btn.addEventListener('click', e => { e.stopPropagation(); const ev = state.events.find(x => x.id === parseInt(btn.dataset.evEdit, 10)); if (ev) openEventModal(ev); });
   });
+  // Delete button
+  tbody.querySelectorAll('button[data-ev-del]').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const evId = parseInt(btn.dataset.evDel, 10);
+      if (!confirm(t('lv_confirm_delete'))) return;
+      const ev = state.events.find(x => x.id === evId);
+      if (ev) pushUndo('delete_event', { ...ev });
+      const res = await apiDel(`/api/events/${evId}`);
+      if (res.ok) { await refreshAll(); showNotification('success', t('notif_status_changed')); }
+      else { const err = await res.json(); showError(err.error); }
+    });
+  });
+  // Status change
   tbody.querySelectorAll('select[data-ev-status]').forEach(sel => {
     sel.addEventListener('click', e => e.stopPropagation());
     sel.addEventListener('change', async e => {
       e.stopPropagation();
       const evId = parseInt(sel.dataset.evStatus, 10);
-      const newStatus = sel.value;
-      await patchEventStatus(evId, newStatus, '');
+      await patchEventStatus(evId, sel.value, '');
+    });
+  });
+  // Event type change
+  tbody.querySelectorAll('select[data-ev-type]').forEach(sel => {
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('change', async e => {
+      e.stopPropagation();
+      const evId = parseInt(sel.dataset.evType, 10);
+      const ev = state.events.find(x => x.id === evId);
+      if (!ev) return;
+      const res = await apiPut(`/api/events/${evId}`, { ...ev, event_type: sel.value });
+      if (res.ok) { await refreshAll(); } else { const err = await res.json(); showError(err.error); }
+    });
+  });
+  // Responsible change
+  tbody.querySelectorAll('select[data-ev-resp]').forEach(sel => {
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('change', async e => {
+      e.stopPropagation();
+      const evId = parseInt(sel.dataset.evResp, 10);
+      const ev = state.events.find(x => x.id === evId);
+      if (!ev) return;
+      const newRespId = sel.value ? parseInt(sel.value, 10) : null;
+      const newRespUser = users.find(u => u.id === newRespId);
+      const payload = { ...ev, responsible_id: newRespId, responsible_name: newRespUser ? (newRespUser.display_name || newRespUser.username) : '' };
+      const res = await apiPut(`/api/events/${evId}`, payload);
+      if (res.ok) { await refreshAll(); } else { const err = await res.json(); showError(err.error); }
     });
   });
 }

@@ -44,8 +44,8 @@ function buildSeg7Text(str) {
 
 /* ── State ── */
 let clockMode = 'digital'; // 'digital' | 'analog' | 'vcr'
-const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl'];
-const sizeLabels  = ['XS','S','M','L','XL'];
+const sizeClasses = ['sz-xs','sz-sm','sz-md','sz-lg','sz-xl','sz-xxl'];
+const sizeLabels  = ['XS','S','M','L','XL','XXL'];
 let currentStyle = '';
 let showDigits = true;
 let vcrColor = 'red';
@@ -604,13 +604,19 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .cd-overtime{color:var(--danger)}
 .cd-blink{animation:cdb 1.2s step-end infinite}
 @keyframes cdb{0%,100%{opacity:1}50%{opacity:.3}}
-</style></head><body class="${theme}">
+.cd-size-bar{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text-dim)}
+.cd-size-bar input[type=range]{width:100px;cursor:pointer}
+.cd-sz-xs .cd-time{font-size:2rem} .cd-sz-sm .cd-time{font-size:3rem}
+.cd-sz-md .cd-time{font-size:4rem} .cd-sz-lg .cd-time{font-size:5.5rem}
+.cd-sz-xl .cd-time{font-size:7rem} .cd-sz-xxl .cd-time{font-size:10rem}
+</style></head><body class="${theme} cd-sz-md">
 <div class="cd-label" id="cdLabel">${escH(cd.label)}</div>
 <div class="cd-time" id="cdTime">00:00:00</div>
 <div class="cd-controls">
   <button id="btnPause">${cd.paused ? '\u25B6' : '\u23F8'}</button>
   <button id="btnReset">\u21BA</button>
 </div>
+<div class="cd-size-bar"><span>Size:</span><input type="range" id="cdSizeSlider" min="0" max="5" value="2" step="1"><span id="cdSizeLbl">M</span></div>
 <script>
 const cdId = ${cd.id};
 function pad(n){return String(n).padStart(2,'0');}
@@ -631,6 +637,13 @@ function tick(){
 }
 document.getElementById('btnPause').onclick=()=>{try{window.opener.togglePauseCountdown(cdId);window.opener.renderCountdowns();}catch(e){}};
 document.getElementById('btnReset').onclick=()=>{try{window.opener.resetCountdown(cdId);}catch(e){}};
+const cdSzCls=['cd-sz-xs','cd-sz-sm','cd-sz-md','cd-sz-lg','cd-sz-xl','cd-sz-xxl'];
+const cdSzLbl=['XS','S','M','L','XL','XXL'];
+document.getElementById('cdSizeSlider').oninput=function(){
+  const v=parseInt(this.value,10);
+  document.body.className=document.body.className.replace(/cd-sz-\\S+/g,'').trim()+' '+cdSzCls[v];
+  document.getElementById('cdSizeLbl').textContent=cdSzLbl[v];
+};
 setInterval(tick,200);tick();
 <\/script></body></html>`);
   w.document.close();
@@ -886,6 +899,125 @@ try {
   document.getElementById('btnTzZulu').classList.toggle('active', _localIsUTC);
 } catch(e) {}
 
+// ── Stopwatch Timer system ──────────────────────────────────────────────────
+let _timers = []; // { id, label, startTime, paused, pausedElapsed }
+let _nextTimerId = 1;
+
+function addTimer(label) {
+  const tm = {
+    id: _nextTimerId++,
+    label: label || 'Timer',
+    startTime: Date.now(),
+    paused: false,
+    pausedElapsed: 0
+  };
+  _timers.push(tm);
+  renderTimers();
+}
+
+function removeTimer(id) {
+  const idx = _timers.findIndex(t => t.id === id);
+  if (idx !== -1) _timers.splice(idx, 1);
+  renderTimers();
+}
+
+function togglePauseTimer(id) {
+  const tm = _timers.find(t => t.id === id);
+  if (!tm) return;
+  if (tm.paused) {
+    tm.startTime = Date.now() - tm.pausedElapsed;
+    tm.paused = false;
+  } else {
+    tm.pausedElapsed = Date.now() - tm.startTime;
+    tm.paused = true;
+  }
+}
+
+function resetTimer(id) {
+  const tm = _timers.find(t => t.id === id);
+  if (!tm) return;
+  tm.startTime = Date.now();
+  tm.paused = false;
+  tm.pausedElapsed = 0;
+  renderTimers();
+}
+
+function renderTimers() {
+  const wrap = document.getElementById('timerWrap');
+  if (!wrap) return;
+  if (_timers.length === 0) { wrap.innerHTML = ''; return; }
+  let html = '';
+  _timers.forEach(tm => {
+    const classes = ['clock-card', 'timer-card'];
+    if (clockMode === 'vcr') classes.push('vcr-card');
+    if (tm.paused) classes.push('cd-paused');
+    let timeDisplay;
+    if (clockMode === 'vcr') {
+      timeDisplay = `<div class="clock-time vcr-time countdown-time" id="tm-time-${tm.id}">${buildSeg7Time(0,0,0)}</div>`;
+    } else {
+      timeDisplay = `<div class="clock-time countdown-time" id="tm-time-${tm.id}">00:00:00</div>`;
+    }
+    const labelHtml = clockMode === 'vcr'
+      ? `<div class="clock-label vcr-label">${buildSeg7Text(tm.label)}</div>`
+      : `<div class="clock-label">${escH(tm.label)}</div>`;
+    html += `<div class="${classes.join(' ')}" id="tm-card-${tm.id}">
+      <button class="clock-remove" title="Remove" data-rm-tm="${tm.id}">&times;</button>
+      ${labelHtml}
+      ${timeDisplay}
+      <div class="countdown-controls">
+        <button data-tm-pause="${tm.id}">${tm.paused ? '▶' : '⏸'}</button>
+        <button data-tm-reset="${tm.id}">↺</button>
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-tm]').forEach(btn => {
+    btn.addEventListener('click', () => removeTimer(parseInt(btn.dataset.rmTm, 10)));
+  });
+  wrap.querySelectorAll('[data-tm-pause]').forEach(btn => {
+    btn.addEventListener('click', () => { togglePauseTimer(parseInt(btn.dataset.tmPause, 10)); renderTimers(); });
+  });
+  wrap.querySelectorAll('[data-tm-reset]').forEach(btn => {
+    btn.addEventListener('click', () => resetTimer(parseInt(btn.dataset.tmReset, 10)));
+  });
+}
+
+function tickTimers() {
+  _timers.forEach(tm => {
+    const elapsed = tm.paused ? tm.pausedElapsed : (Date.now() - tm.startTime);
+    const totalSec = Math.floor(elapsed / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const el = document.getElementById('tm-time-' + tm.id);
+    if (!el) return;
+    if (clockMode === 'vcr') {
+      el.innerHTML = buildSeg7Time(h, m, s);
+    } else {
+      el.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+    }
+  });
+}
+
+// Timer popover bindings
+function showTimerPopover() {
+  document.getElementById('timerPopover').style.display = '';
+  document.getElementById('timerOverlay').style.display = '';
+}
+function hideTimerPopover() {
+  document.getElementById('timerPopover').style.display = 'none';
+  document.getElementById('timerOverlay').style.display = 'none';
+}
+document.getElementById('btnAddTimer').addEventListener('click', showTimerPopover);
+document.getElementById('tmrCancel').addEventListener('click', hideTimerPopover);
+document.getElementById('timerOverlay').addEventListener('click', hideTimerPopover);
+document.getElementById('tmrStart').addEventListener('click', function() {
+  const label = document.getElementById('tmrLabel').value.trim();
+  addTimer(label);
+  hideTimerPopover();
+  document.getElementById('tmrLabel').value = '';
+});
+
 // ── Timed Events ────────────────────────────────────────────────────────────
 let _timedEvents = []; // { id, eventId, label, startTime, durationMs, alarms (parsed), continueAfter, preShowMs, state, detachedWin, alarmsFired }
 let _timedEventsLoaded = false;
@@ -1001,7 +1133,7 @@ body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent
 body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252;--success:#2ecc71}
 body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252;--success:#2ecc71}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:8px;transition:background .3s}
+body{background:color-mix(in srgb, var(--accent) 6%, var(--bg));color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:8px;transition:background .3s}
 .te-label{font-size:1.1rem;color:var(--text-dim);text-align:center}
 .te-status{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em}
 .te-time{font-size:3.5rem;font-variant-numeric:tabular-nums;font-weight:700;transition:color .3s}
@@ -1060,6 +1192,50 @@ document.getElementById('btnAck').onclick = () => {
     document.body.classList.remove('te-flash');
   } catch(e) {}
 };
+// Self-contained tick loop — keeps working even if opener reference breaks
+setInterval(() => {
+  try {
+    const te = window.opener?._timedEvents?.find(t => t.id === teId);
+    if (!te) return;
+    const now = Date.now();
+    const elapsed = now - te.startTime;
+    const remaining = te.durationMs - elapsed;
+    const pct = Math.min(100, Math.max(0, (elapsed / te.durationMs) * 100));
+    const timeEl = document.getElementById('teTime');
+    const statusEl = document.getElementById('teStatus');
+    const barEl = document.getElementById('teBar');
+    const ackBtn = document.getElementById('btnAck');
+    if (te.state === 'waiting') {
+      const s = Math.floor((te.startTime - now) / 1000);
+      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+      if (timeEl) timeEl.textContent = '-'+pad(h)+':'+pad(m)+':'+pad(sec);
+      if (statusEl) statusEl.textContent = 'Starting in...';
+      if (barEl) barEl.style.width = '0%';
+      document.body.className = document.body.className.replace(/te-\\w+/g,'') + ' te-waiting';
+    } else if (te.state === 'running') {
+      const s = Math.max(0, Math.floor(remaining/1000));
+      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+      if (timeEl) timeEl.textContent = pad(h)+':'+pad(m)+':'+pad(sec);
+      if (statusEl) statusEl.textContent = 'In progress';
+      if (barEl) barEl.style.width = pct+'%';
+      document.body.className = document.body.className.replace(/te-\\w+/g,'');
+    } else if (te.state === 'overtime') {
+      const overMs = elapsed - te.durationMs;
+      const s = Math.floor(overMs/1000);
+      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+      if (timeEl) timeEl.textContent = '+'+pad(h)+':'+pad(m)+':'+pad(sec);
+      if (statusEl) statusEl.textContent = 'Overtime';
+      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--danger)'; }
+      document.body.className = document.body.className.replace(/te-\\w+/g,'') + ' te-overtime';
+      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
+    } else if (te.state === 'completed') {
+      if (timeEl) timeEl.textContent = '00:00:00';
+      if (statusEl) statusEl.textContent = 'Completed';
+      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--success)'; }
+      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
+    }
+  } catch(e) {}
+}, 500);
 <\/script></body></html>`);
   w.document.close();
   return w;
@@ -1119,6 +1295,6 @@ applySize(2);
 loadEventCountdowns();
 loadTimedEvents();
 tick();
-setInterval(function() { tick(); tickCountdowns(); tickTimedEvents(); }, 1000);
+setInterval(function() { tick(); tickCountdowns(); tickTimers(); tickTimedEvents(); }, 1000);
 // Reload timed events periodically
 setInterval(loadTimedEvents, 30000);

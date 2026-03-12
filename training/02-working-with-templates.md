@@ -29,7 +29,8 @@ All events use **time offsets** (minutes from T=0). When you load a template, yo
 2. The Templates panel shows all saved templates.
 3. Click **▶ Apply** next to a template.
 4. Set the **T=0 start date and time** (STARTEX / incident start).
-5. Click **Load Template**.
+5. **Multi-layer loading:** If the template defines layers, the "Use template layers" checkbox is checked by default. This creates separate layers (e.g., *injects*, *sitreps*, *decisions*) and assigns events to them automatically. Uncheck to load everything into a single layer.
+6. Click **Load Template**.
 
 ### From a file (importing)
 
@@ -147,13 +148,34 @@ For advanced users creating templates from scratch, see the existing files in `e
       "description": "...",
       "start_offset_min": 60,
       "duration_min": 120,
-      "alarm_lead_time": 15
+      "alarm_lead_time": 15,
+      "layer": "injects"
     }
   ]
 }
 ```
 
 For `operation_mode`, use `"exercise"` for exercises or `"incident"` for incident response.
+
+### Per-item layer assignment
+
+Each item can include a `"layer"` field whose value matches a layer name from the template's `"layers"` array. When loaded with multi-layer mode (default), events are automatically placed into their assigned layers:
+
+```json
+{
+  "layers": [
+    { "name": "injects", "color": "#C0392B", "visibility": "shared", "permission": "readwrite" },
+    { "name": "sitreps", "color": "#1ABC9C", "visibility": "shared", "permission": "readwrite" }
+  ],
+  "items": [
+    { "title": "INJECT: Port Scan", "layer": "injects", "start_offset_min": 60, ... },
+    { "title": "SITREP 1", "layer": "sitreps", "start_offset_min": 120, ... },
+    { "title": "Briefing", "start_offset_min": 0, ... }
+  ]
+}
+```
+
+Events without a `"layer"` field go to the master timeline (no layer). See `ex02-cyber-defence-sprint.json` for a complete example.
 
 ---
 

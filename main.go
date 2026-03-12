@@ -6801,14 +6801,24 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
 	_ = app.store.UpdateDecisionLogEntry(created)
 	auditAction := "created"
-	decisionText := req.Decision
-	if req.Title != "" {
-		decisionText = req.Title + ": " + req.Decision
-	}
-	auditSummary := fmt.Sprintf("Decision %s added: %s", created.SequenceNumber, decisionText)
-	if req.Status == "requested" {
-		auditAction = "requested"
-		auditSummary = fmt.Sprintf("Decision %s requested: %s", created.SequenceNumber, decisionText)
+	var auditSummary string
+	if req.Confidential {
+		// Confidential decisions: log ONLY ID, user, time — no text at all
+		auditSummary = fmt.Sprintf("Decision %s created (confidential)", created.SequenceNumber)
+		if req.Status == "requested" {
+			auditAction = "requested"
+			auditSummary = fmt.Sprintf("Decision %s requested (confidential)", created.SequenceNumber)
+		}
+	} else {
+		decisionText := req.Decision
+		if req.Title != "" {
+			decisionText = req.Title + ": " + req.Decision
+		}
+		auditSummary = fmt.Sprintf("Decision %s added: %s", created.SequenceNumber, decisionText)
+		if req.Status == "requested" {
+			auditAction = "requested"
+			auditSummary = fmt.Sprintf("Decision %s requested: %s", created.SequenceNumber, decisionText)
+		}
 	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
@@ -6902,10 +6912,14 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "failed to update", http.StatusInternalServerError)
 		return
 	}
+	reviewSummary := fmt.Sprintf("%s decision %s (#%d): %s — %s", req.Status, found.SequenceNumber, id, found.Decision, req.Comment)
+	if found.Confidential {
+		reviewSummary = fmt.Sprintf("%s decision %s (#%d) (confidential)", req.Status, found.SequenceNumber, id)
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
 		Action: req.Status, EntityType: "decision_log", EntityID: id,
-		Summary: fmt.Sprintf("%s decision %s (#%d): %s — %s", req.Status, found.SequenceNumber, id, found.Decision, req.Comment),
+		Summary: reviewSummary,
 	})
 	jsonOK(w, found)
 }
