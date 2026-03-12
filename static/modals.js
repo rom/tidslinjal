@@ -1812,9 +1812,14 @@ function _bindLogSubTabs(el) {
   });
 }
 
+let _detachedDecisionLogWin = null;
 function detachDecisionLog() {
-  window.open('/static/decision-log-popup.html', 'tidslinjal-decisionlog-' + Date.now(),
-    'width=600,height=700,menubar=no,toolbar=no');
+  if (_detachedDecisionLogWin && !_detachedDecisionLogWin.closed) {
+    _detachedDecisionLogWin.focus();
+    return;
+  }
+  _detachedDecisionLogWin = window.open('/static/decision-log-popup.html', 'tidslinjal-decisionlog',
+    'width=600,height=700,menubar=no,toolbar=no,scrollbars=yes');
 }
 
 // Event log: external events received via SSE/webhook
@@ -1922,68 +1927,115 @@ function detachSidebar() {
   // Save sidebar content BEFORE hiding (so innerHTML is populated)
   const sidebarHTML = sidebar.innerHTML;
   sidebar.classList.add('hidden');
-  const w = window.open('', 'tidslinjal-sidebar-' + Date.now(),
+  const w = window.open('', 'tidslinjal-sidebar',
     'width=350,height=700,menubar=no,toolbar=no,scrollbars=yes');
   if (!w) { sidebar.classList.remove('hidden'); return; }
   _detachedSidebarWin = w;
   const theme = document.body.className || '';
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Menu</title>
-<link rel="stylesheet" href="/static/style.css">
-<style>
-body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif}
-.detached-sidebar{display:flex;flex-direction:column;height:100vh}
-.detached-sidebar .sidebar-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}
-.detached-sidebar .sidebar-content{flex:1;overflow-y:auto;padding:12px}
-.reattach-bar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}
-.reattach-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
-</style></head><body class="${theme}">
-<div class="reattach-bar">
-  <button id="btnReattach">⬅ ${t('btn_reattach_menu')||'Reattach Menu'}</button>
-  <span style="flex:1"></span>
-  <span style="font-size:11px;color:var(--text-dim)">Tidslinjal Menu</span>
-</div>
-<div class="detached-sidebar" id="detachedWrap">${sidebarHTML.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/<\/script/gi,'<\\/script')}</div>
-<script>
-document.getElementById('btnReattach').onclick = () => {
-  try { window.opener._reattachSidebar(); } catch(e) {}
-  window.close();
-};
-// Sync tabs from opener
-function syncContent() {
-  try {
-    const wrap = document.getElementById('detachedWrap');
-    // Re-render sidebar in opener (even though hidden, it updates innerHTML)
-    try { window.opener.renderSidebar(); } catch(e) {}
-    const srcSidebar = window.opener.document.getElementById('sidebar');
-    if (srcSidebar && wrap) {
-      wrap.innerHTML = srcSidebar.innerHTML;
+  const reattachLabel = t('btn_reattach_menu') || 'Reattach Menu';
+  // Write document shell first (no dynamic content in template)
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal \u2014 Menu</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>' +
+    'body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif}' +
+    '.detached-sidebar{display:flex;flex-direction:column;height:calc(100vh - 38px);overflow-y:auto}' +
+    '.detached-sidebar .sidebar-tabs{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap}' +
+    '.detached-sidebar .sidebar-content{flex:1;overflow-y:auto;padding:12px}' +
+    '.reattach-bar{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border)}' +
+    '.reattach-bar button{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}' +
+    '</style></head><body class="' + escHtml(theme) + '">' +
+    '<div class="reattach-bar">' +
+    '<button id="btnReattach">\u2B05 ' + escHtml(reattachLabel) + '</button>' +
+    '<span style="flex:1"></span>' +
+    '<span style="font-size:11px;color:var(--text-dim)">Tidslinjal Menu</span>' +
+    '</div>' +
+    '<div class="detached-sidebar" id="detachedWrap"></div>' +
+    '</body></html>');
+  w.document.close();
+
+  // Inject sidebar content safely via DOM (not template literal)
+  const wrapEl = w.document.getElementById('detachedWrap');
+  if (wrapEl) wrapEl.innerHTML = sidebarHTML;
+
+  // Bind reattach button
+  w.document.getElementById('btnReattach').onclick = function() {
+    try { window._reattachSidebar(); } catch(e) {}
+    w.close();
+  };
+
+  // Sync + rebind function
+  function syncContent() {
+    try {
+      if (!w || w.closed) return;
+      const wrap = w.document.getElementById('detachedWrap');
+      if (!wrap) return;
+      // Re-render sidebar in opener
+      try { renderSidebar(); } catch(e) {}
+      const srcSidebar = document.getElementById('sidebar');
+      if (srcSidebar) {
+        wrap.innerHTML = srcSidebar.innerHTML;
+      }
       // Re-bind tab clicks to talk to opener
-      wrap.querySelectorAll('.sidebar-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          try { window.opener.state.sidebarTab = tab.dataset.tab; window.opener.renderSidebar(); } catch(e) {}
+      wrap.querySelectorAll('.sidebar-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          try { state.sidebarTab = tab.dataset.tab; renderSidebar(); } catch(e) {}
           setTimeout(syncContent, 100);
         });
       });
       // Re-bind all data-action buttons
-      wrap.querySelectorAll('[data-action]').forEach(el => {
-        el.addEventListener('click', () => {
+      wrap.querySelectorAll('[data-action]').forEach(function(el) {
+        el.addEventListener('click', function(evt) {
           try {
-            const fn = el.dataset.action;
-            const arg = el.dataset.arg;
-            if (window.opener[fn]) window.opener[fn](arg === 'null' ? null : arg);
+            var fn = el.dataset.action;
+            var arg = el.dataset.arg;
+            if (typeof window[fn] === 'function') window[fn](arg === 'null' ? null : arg);
           } catch(e) {}
         });
       });
+      // Re-bind sub-tab buttons
+      wrap.querySelectorAll('[data-res-sub]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          try {
+            var el = wrap.closest('[data-resSubTab]') || wrap;
+            el.dataset.resSubTab = btn.dataset.resSub;
+            renderSidebar();
+            setTimeout(syncContent, 100);
+          } catch(e) {}
+        });
+      });
+      wrap.querySelectorAll('[data-log-sub]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          try {
+            var el = wrap.closest('[data-logSubTab]') || wrap;
+            el.dataset.logSubTab = btn.dataset.logSub;
+            renderSidebar();
+            setTimeout(syncContent, 100);
+          } catch(e) {}
+        });
+      });
+      // Re-bind selects and inputs to proxy change events
+      wrap.querySelectorAll('select[data-action-change]').forEach(function(sel) {
+        sel.addEventListener('change', function() {
+          try {
+            var fn = sel.dataset.actionChange;
+            if (typeof window[fn] === 'function') window[fn](sel.value);
+          } catch(e) {}
+        });
+      });
+    } catch(e) {}
+  }
+  syncContent();
+  var _sidebarSyncInterval = setInterval(function() {
+    if (!w || w.closed) {
+      clearInterval(_sidebarSyncInterval);
+      _reattachSidebar();
+      return;
     }
-  } catch(e) {}
-}
-syncContent();
-setInterval(syncContent, 2000);
-window.addEventListener('beforeunload', () => {
-  try { window.opener._reattachSidebar(); } catch(e) {}
-});
-<\/script></body></html>`);
-  w.document.close();
+    syncContent();
+  }, 2000);
+  w.addEventListener('beforeunload', function() {
+    try { _reattachSidebar(); } catch(e) {}
+  });
 }
 
 function _reattachSidebar() {
@@ -7090,14 +7142,17 @@ function openDetachedDecisionLog() {
 }
 
 // ── Map Window (detached) ────────────────────────────────────────────────────
-let _mapPopouts = [];
+let _mapPopout = null;
 
 function openDetachedMap() {
+  if (_mapPopout && !_mapPopout.closed) {
+    _mapPopout.focus();
+    return;
+  }
   const w = Math.min(window.screen.availWidth, 1024);
   const h = Math.min(window.screen.availHeight - 100, 700);
-  const mapWin = window.open('/static/map-popup.html', 'tidslinjal-map-' + Date.now(),
+  _mapPopout = window.open('/static/map-popup.html', 'tidslinjal-map',
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
-  if (mapWin) _mapPopouts.push(mapWin);
 }
 
 // ── Critical Line Analysis ──────────────────────────────────────────────────

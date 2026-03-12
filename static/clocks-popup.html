@@ -111,6 +111,14 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 /* ── Clickable label ── */
 .clock-label-click { cursor:pointer; user-select:none; }
 .clock-label-click:hover { text-decoration:underline; }
+/* ── Timer progress bar ── */
+.timer-progress { width:90%; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:6px auto 2px; border:1px solid var(--border); }
+.timer-progress-bar { height:100%; background:#2ecc71; transition:width .5s,background .3s; border-radius:3px; }
+.timer-overtime .timer-progress-bar { background:var(--danger,#e05252); }
+/* ── Color picker row ── */
+.color-row { display:flex; align-items:center; gap:6px; }
+.color-row label { font-size:10px; color:var(--text-dim); min-width:24px; }
+.color-row input[type=color] { width:28px; height:22px; border:1px solid var(--border); border-radius:4px; background:var(--bg3); cursor:pointer; padding:1px; }
 </style>
 </head>
 <body class="theme-dark sz-md">
@@ -145,6 +153,14 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     <option value="blue">Blue</option>
     <option value="orange">Orange</option>
   </select>
+  <span class="color-row">
+    <label title="Background color">BG</label>
+    <input type="color" id="colorBg" value="#1a1d23" title="Background color">
+    <label title="Countdown color">CD</label>
+    <input type="color" id="colorCountdown" value="#4a9eff" title="Countdown accent color">
+    <label title="Timer color">TM</label>
+    <input type="color" id="colorTimer" value="#2ecc71" title="Timer accent color">
+  </span>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
 <div class="clocks-wrap" id="countdownWrap"></div>
@@ -209,6 +225,45 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Label</label>
     <input type="text" id="tmrLabel" placeholder="e.g. Exercise duration" maxlength="40"
       style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Target duration (optional — enables progress bar)</label>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="number" id="tmrHours" min="0" max="999" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">h</span>
+      <input type="number" id="tmrMinutes" min="0" max="59" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">m</span>
+      <input type="number" id="tmrSeconds" min="0" max="59" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+      <span style="font-size:11px;color:var(--text-dim)">s</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+      <button class="btn-tb tmr-preset" data-m="15">15m</button>
+      <button class="btn-tb tmr-preset" data-m="30">30m</button>
+      <button class="btn-tb tmr-preset" data-m="45">45m</button>
+      <button class="btn-tb tmr-preset" data-h="1">1h</button>
+      <button class="btn-tb tmr-preset" data-h="2">2h</button>
+      <button class="btn-tb tmr-preset" data-h="4">4h</button>
+    </div>
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="tmrContinueAfter" checked> Continue counting after reaching target
+    </label>
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="tmrPlaySound" checked> Play sound alarm at target
+    </label>
+    <div id="tmrSoundRow" style="margin-top:4px;display:flex;align-items:center;gap:6px">
+      <select id="tmrSoundType" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">
+        <option value="beep">Beep (3× short)</option>
+        <option value="klaxon">Klaxon</option>
+        <option value="bell">Bell</option>
+        <option value="siren">Siren</option>
+        <option value="chime">Chime</option>
+      </select>
+      <button class="btn-tb" id="tmrSoundPreview" style="font-size:10px;padding:2px 8px">▶ Test</button>
+    </div>
   </div>
   <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
     <button class="btn-tb" id="tmrCancel">Cancel</button>

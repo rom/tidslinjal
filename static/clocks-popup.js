@@ -108,6 +108,16 @@ function syncTheme() {
     }
   } catch(e) {}
 }
+// BroadcastChannel theme sync (works even if opener is lost)
+try {
+  var _clocksBC = new BroadcastChannel('tidslinjal-sync');
+  _clocksBC.onmessage = function(e) {
+    if (e.data && e.data.type === 'theme') {
+      var cls = 'theme-' + (e.data.theme || 'dark');
+      document.body.className = document.body.className.replace(/theme-\S+/g, '').trim() + ' ' + cls;
+    }
+  };
+} catch(e) {}
 
 /* ── Language sync: update toolbar labels when language changes ── */
 function syncLanguage() {
@@ -506,6 +516,7 @@ function addCountdown(label, hours, minutes, seconds, continueUp, playSound, sou
     expired: false
   };
   _countdowns.push(cd);
+  window._countdowns = _countdowns;
   renderCountdowns();
 }
 
@@ -527,12 +538,14 @@ function addCountdownForEvent(ev, minutesBefore) {
     expired: false
   };
   _countdowns.push(cd);
+  window._countdowns = _countdowns;
   renderCountdowns();
 }
 
 function removeCountdown(id) {
   const idx = _countdowns.findIndex(cd => cd.id === id);
   if (idx !== -1) _countdowns.splice(idx, 1);
+  window._countdowns = _countdowns;
   renderCountdowns();
 }
 
@@ -567,7 +580,9 @@ function acknowledgeCountdown(id) {
     }
   } catch(e) {}
   // Remove the countdown after acknowledgement
-  _countdowns = _countdowns.filter(c => c.id !== id);
+  const ackIdx = _countdowns.findIndex(c => c.id === id);
+  if (ackIdx !== -1) _countdowns.splice(ackIdx, 1);
+  window._countdowns = _countdowns;
   renderCountdowns();
 }
 
@@ -604,6 +619,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .cd-overtime{color:var(--danger)}
 .cd-blink{animation:cdb 1.2s step-end infinite}
 @keyframes cdb{0%,100%{opacity:1}50%{opacity:.3}}
+.cd-progress{width:80%;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border);margin:6px 0}
+.cd-progress-bar{height:100%;background:var(--accent);transition:width .5s,background .3s;border-radius:4px}
 .cd-size-bar{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text-dim)}
 .cd-size-bar input[type=range]{width:100px;cursor:pointer}
 .cd-sz-xs .cd-time{font-size:2rem} .cd-sz-sm .cd-time{font-size:3rem}
@@ -612,6 +629,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 </style></head><body class="${theme} cd-sz-md">
 <div class="cd-label" id="cdLabel">${escH(cd.label)}</div>
 <div class="cd-time" id="cdTime">00:00:00</div>
+<div class="cd-progress"><div class="cd-progress-bar" id="cdBar" style="width:0%"></div></div>
 <div class="cd-controls">
   <button id="btnPause">${cd.paused ? '\u25B6' : '\u23F8'}</button>
   <button id="btnReset">\u21BA</button>
@@ -633,6 +651,9 @@ function tick(){
     el.classList.toggle('cd-overtime',isOT);
     el.classList.toggle('cd-blink',cd.paused);
     document.getElementById('btnPause').textContent=cd.paused?'\u25B6':'\u23F8';
+    // Update progress bar
+    const bar=document.getElementById('cdBar');
+    if(bar&&cd.totalMs>0){const elapsed=cd.totalMs-(cd.paused?cd.pausedRemaining:(cd.targetTime-Date.now()));const pct=isOT?100:Math.min(100,Math.max(0,(elapsed/cd.totalMs)*100));bar.style.width=pct+'%';if(isOT)bar.style.background='var(--danger)';}
   }catch(e){}
 }
 document.getElementById('btnPause').onclick=()=>{try{window.opener.togglePauseCountdown(cdId);window.opener.renderCountdowns();}catch(e){}};
@@ -722,10 +743,14 @@ function renderCountdowns() {
       ? `<div class="clock-label vcr-label">${buildSeg7Text(cd.label)}</div>`
       : `<div class="clock-label">${escH(lblText)}</div>`;
 
+    // Countdown progress bar
+    const cdProgressHtml = `<div class="timer-progress"><div class="timer-progress-bar" id="cd-bar-${cd.id}" style="width:0%;background:var(--countdown-color,var(--accent,#4a9eff))"></div></div>`;
+
     html += `<div class="${classes.join(' ')}" id="cd-card-${cd.id}">
       <button class="clock-remove" title="Remove" data-rm-cd="${cd.id}">&times;</button>
       ${labelHtml}
       ${timeDisplay}
+      ${cdProgressHtml}
       <div class="countdown-controls">
         <button data-cd-pause="${cd.id}">${cd.paused ? '▶' : '⏸'}</button>
         <button data-cd-reset="${cd.id}">↺</button>
@@ -804,6 +829,18 @@ function displayCountdownTime(id, ms, isOvertime) {
       el.style.color = 'var(--danger,#e05252)';
     } else {
       el.style.color = '';
+    }
+    // Update countdown progress bar
+    if (cd) {
+      const barEl = document.getElementById('cd-bar-' + id);
+      if (barEl) {
+        const elapsed = cd.totalMs - ms;
+        const pct = isOvertime ? 100 : Math.min(100, Math.max(0, (elapsed / cd.totalMs) * 100));
+        barEl.style.width = pct + '%';
+        if (isOvertime) {
+          barEl.style.background = 'var(--danger,#e05252)';
+        }
+      }
     }
   }
 }
@@ -900,24 +937,33 @@ try {
 } catch(e) {}
 
 // ── Stopwatch Timer system ──────────────────────────────────────────────────
-let _timers = []; // { id, label, startTime, paused, pausedElapsed }
+let _timers = []; // { id, label, startTime, paused, pausedElapsed, targetMs, continueAfter, playSound, soundType, alarmFired }
+window._timers = _timers; // expose for detached windows
 let _nextTimerId = 1;
 
-function addTimer(label) {
+function addTimer(label, hours, minutes, seconds, continueAfter, playSound, soundType) {
+  const targetMs = ((hours || 0) * 3600 + (minutes || 0) * 60 + (seconds || 0)) * 1000;
   const tm = {
     id: _nextTimerId++,
     label: label || 'Timer',
     startTime: Date.now(),
     paused: false,
-    pausedElapsed: 0
+    pausedElapsed: 0,
+    targetMs: targetMs > 0 ? targetMs : 0,
+    continueAfter: continueAfter !== false,
+    playSound: playSound !== false,
+    soundType: soundType || 'beep',
+    alarmFired: false
   };
   _timers.push(tm);
+  window._timers = _timers;
   renderTimers();
 }
 
 function removeTimer(id) {
   const idx = _timers.findIndex(t => t.id === id);
   if (idx !== -1) _timers.splice(idx, 1);
+  window._timers = _timers;
   renderTimers();
 }
 
@@ -948,25 +994,36 @@ function renderTimers() {
   if (_timers.length === 0) { wrap.innerHTML = ''; return; }
   let html = '';
   _timers.forEach(tm => {
+    const elapsed = tm.paused ? tm.pausedElapsed : (Date.now() - tm.startTime);
+    const isOverTarget = tm.targetMs > 0 && elapsed >= tm.targetMs;
     const classes = ['clock-card', 'timer-card'];
     if (clockMode === 'vcr') classes.push('vcr-card');
     if (tm.paused) classes.push('cd-paused');
+    if (isOverTarget && !tm.continueAfter) classes.push('cd-expired');
+    if (isOverTarget) classes.push('timer-overtime');
     let timeDisplay;
     if (clockMode === 'vcr') {
       timeDisplay = `<div class="clock-time vcr-time countdown-time" id="tm-time-${tm.id}">${buildSeg7Time(0,0,0)}</div>`;
     } else {
       timeDisplay = `<div class="clock-time countdown-time" id="tm-time-${tm.id}">00:00:00</div>`;
     }
+    const elapsedTxt = isOverTarget ? ' (OVER TARGET)' : '';
     const labelHtml = clockMode === 'vcr'
       ? `<div class="clock-label vcr-label">${buildSeg7Text(tm.label)}</div>`
-      : `<div class="clock-label">${escH(tm.label)}</div>`;
+      : `<div class="clock-label">${escH(tm.label + elapsedTxt)}</div>`;
+    // Progress bar (only if targetMs > 0)
+    const progressHtml = tm.targetMs > 0
+      ? `<div class="timer-progress"><div class="timer-progress-bar" id="tm-bar-${tm.id}" style="width:0%;background:var(--timer-color,#2ecc71)"></div></div>`
+      : '';
     html += `<div class="${classes.join(' ')}" id="tm-card-${tm.id}">
       <button class="clock-remove" title="Remove" data-rm-tm="${tm.id}">&times;</button>
       ${labelHtml}
       ${timeDisplay}
+      ${progressHtml}
       <div class="countdown-controls">
         <button data-tm-pause="${tm.id}">${tm.paused ? '▶' : '⏸'}</button>
         <button data-tm-reset="${tm.id}">↺</button>
+        <button data-tm-detach="${tm.id}" title="Detach to own window">⧉</button>
       </div>
     </div>`;
   });
@@ -980,12 +1037,34 @@ function renderTimers() {
   wrap.querySelectorAll('[data-tm-reset]').forEach(btn => {
     btn.addEventListener('click', () => resetTimer(parseInt(btn.dataset.tmReset, 10)));
   });
+  wrap.querySelectorAll('[data-tm-detach]').forEach(btn => {
+    btn.addEventListener('click', () => detachTimer(parseInt(btn.dataset.tmDetach, 10)));
+  });
 }
 
 function tickTimers() {
   _timers.forEach(tm => {
     const elapsed = tm.paused ? tm.pausedElapsed : (Date.now() - tm.startTime);
-    const totalSec = Math.floor(elapsed / 1000);
+    const isOverTarget = tm.targetMs > 0 && elapsed >= tm.targetMs;
+
+    // Fire alarm when first reaching target
+    if (isOverTarget && !tm.alarmFired) {
+      tm.alarmFired = true;
+      if (tm.playSound) playCdAlarm(tm.soundType);
+      renderTimers(); // Re-render for overtime styling
+    }
+
+    // If stop at target (not continueAfter) and reached target, freeze at target time
+    let displayMs = elapsed;
+    if (isOverTarget && !tm.continueAfter) {
+      displayMs = tm.targetMs;
+      if (!tm.paused) {
+        tm.pausedElapsed = tm.targetMs;
+        tm.paused = true;
+      }
+    }
+
+    const totalSec = Math.floor(displayMs / 1000);
     const h = Math.floor(totalSec / 3600);
     const m = Math.floor((totalSec % 3600) / 60);
     const s = totalSec % 60;
@@ -996,7 +1075,106 @@ function tickTimers() {
     } else {
       el.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
     }
+
+    // Update progress bar
+    if (tm.targetMs > 0) {
+      const barEl = document.getElementById('tm-bar-' + tm.id);
+      if (barEl) {
+        const pct = Math.min(100, (elapsed / tm.targetMs) * 100);
+        barEl.style.width = pct + '%';
+        if (isOverTarget) {
+          barEl.style.background = 'var(--danger,#e05252)';
+        }
+      }
+    }
+
+    // Overtime color on time display
+    if (isOverTarget) {
+      el.style.color = 'var(--danger,#e05252)';
+    } else {
+      el.style.color = '';
+    }
   });
+}
+
+function detachTimer(id) {
+  const tm = _timers.find(t => t.id === id);
+  if (!tm) return;
+  const theme = document.body.className || 'theme-dark';
+  const hasTarget = tm.targetMs > 0;
+  const w = window.open('', 'tm-' + id + '-' + Date.now(), 'width=400,height=' + (hasTarget ? '280' : '250') + ',menubar=no,toolbar=no');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timer — ${escH(tm.label)}</title>
+<link rel="stylesheet" href="/static/vendor/seven-segment.css">
+<style>
+body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252}
+body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b}
+body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252}
+body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px}
+.tm-label{font-size:1.2rem;color:var(--text-dim)}
+.tm-time{font-size:4rem;font-variant-numeric:tabular-nums;font-weight:700}
+.tm-progress{width:80%;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.tm-progress-bar{height:100%;background:#2ecc71;transition:width .5s,background .3s;border-radius:4px}
+.tm-overtime .tm-time{color:var(--danger)}
+.tm-overtime .tm-progress-bar{background:var(--danger)}
+.tm-controls{display:flex;gap:8px}
+.tm-controls button{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:1rem}
+.tm-controls button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tm-blink{animation:tmb 1.2s step-end infinite}
+@keyframes tmb{0%,100%{opacity:1}50%{opacity:.3}}
+.tm-size-bar{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text-dim)}
+.tm-size-bar input[type=range]{width:100px;cursor:pointer}
+.tm-sz-xs .tm-time{font-size:2rem}.tm-sz-sm .tm-time{font-size:3rem}
+.tm-sz-md .tm-time{font-size:4rem}.tm-sz-lg .tm-time{font-size:5.5rem}
+.tm-sz-xl .tm-time{font-size:7rem}.tm-sz-xxl .tm-time{font-size:10rem}
+</style></head><body class="${theme} tm-sz-md${tm.targetMs > 0 ? '' : ''}">
+<div class="tm-label" id="tmLabel">${escH(tm.label)}</div>
+<div class="tm-time" id="tmTime">00:00:00</div>
+${hasTarget ? '<div class="tm-progress"><div class="tm-progress-bar" id="tmBar" style="width:0%"></div></div>' : ''}
+<div class="tm-controls">
+  <button id="btnPause">${tm.paused ? '\u25B6' : '\u23F8'}</button>
+  <button id="btnReset">\u21BA</button>
+</div>
+<div class="tm-size-bar"><span>Size:</span><input type="range" id="tmSizeSlider" min="0" max="5" value="2" step="1"><span id="tmSizeLbl">M</span></div>
+<script>
+const tmId = ${tm.id};
+const hasTarget = ${hasTarget};
+const targetMs = ${tm.targetMs};
+function pad(n){return String(n).padStart(2,'0');}
+function tick(){
+  try {
+    const tm = window.opener._timers?.find(t=>t.id===tmId);
+    if(!tm){document.getElementById('tmTime').textContent='--:--:--';return;}
+    const elapsed = tm.paused ? tm.pausedElapsed : (Date.now() - tm.startTime);
+    const isOver = hasTarget && elapsed >= targetMs;
+    const displayMs = (isOver && !tm.continueAfter) ? targetMs : elapsed;
+    const ts=Math.floor(displayMs/1000),h=Math.floor(ts/3600),m=Math.floor((ts%3600)/60),s=ts%60;
+    const el=document.getElementById('tmTime');
+    el.textContent=pad(h)+':'+pad(m)+':'+pad(s);
+    el.classList.toggle('tm-blink',tm.paused);
+    if(isOver)el.style.color='var(--danger)';else el.style.color='';
+    if(hasTarget){
+      const bar=document.getElementById('tmBar');
+      if(bar){bar.style.width=Math.min(100,(elapsed/targetMs)*100)+'%';if(isOver)bar.style.background='var(--danger)';}
+      document.body.classList.toggle('tm-overtime',isOver);
+    }
+    document.getElementById('btnPause').textContent=tm.paused?'\u25B6':'\u23F8';
+  }catch(e){}
+}
+document.getElementById('btnPause').onclick=()=>{try{window.opener.togglePauseTimer(tmId);window.opener.renderTimers();}catch(e){}};
+document.getElementById('btnReset').onclick=()=>{try{window.opener.resetTimer(tmId);}catch(e){}};
+const tmSzCls=['tm-sz-xs','tm-sz-sm','tm-sz-md','tm-sz-lg','tm-sz-xl','tm-sz-xxl'];
+const tmSzLbl=['XS','S','M','L','XL','XXL'];
+document.getElementById('tmSizeSlider').oninput=function(){
+  const v=parseInt(this.value,10);
+  document.body.className=document.body.className.replace(/tm-sz-\\S+/g,'').trim()+' '+tmSzCls[v];
+  document.getElementById('tmSizeLbl').textContent=tmSzLbl[v];
+};
+setInterval(tick,200);tick();
+<\\/script></body></html>`);
+  w.document.close();
 }
 
 // Timer popover bindings
@@ -1013,9 +1191,38 @@ document.getElementById('tmrCancel').addEventListener('click', hideTimerPopover)
 document.getElementById('timerOverlay').addEventListener('click', hideTimerPopover);
 document.getElementById('tmrStart').addEventListener('click', function() {
   const label = document.getElementById('tmrLabel').value.trim();
-  addTimer(label);
+  const hours = parseInt(document.getElementById('tmrHours').value, 10) || 0;
+  const minutes = parseInt(document.getElementById('tmrMinutes').value, 10) || 0;
+  const seconds = parseInt(document.getElementById('tmrSeconds').value, 10) || 0;
+  const continueAfter = document.getElementById('tmrContinueAfter').checked;
+  const playSound = document.getElementById('tmrPlaySound').checked;
+  const soundType = document.getElementById('tmrSoundType')?.value || 'beep';
+  addTimer(label, hours, minutes, seconds, continueAfter, playSound, soundType);
   hideTimerPopover();
   document.getElementById('tmrLabel').value = '';
+  document.getElementById('tmrHours').value = '0';
+  document.getElementById('tmrMinutes').value = '0';
+  document.getElementById('tmrSeconds').value = '0';
+});
+// Timer preset buttons
+document.querySelectorAll('.tmr-preset').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    const h = parseInt(btn.dataset.h, 10) || 0;
+    const m = parseInt(btn.dataset.m, 10) || 0;
+    document.getElementById('tmrHours').value = h;
+    document.getElementById('tmrMinutes').value = m;
+    document.getElementById('tmrSeconds').value = '0';
+  });
+});
+// Timer sound preview
+document.getElementById('tmrSoundPreview')?.addEventListener('click', function() {
+  const st = document.getElementById('tmrSoundType')?.value || 'beep';
+  playCdAlarm(st);
+});
+// Timer sound row show/hide
+document.getElementById('tmrPlaySound')?.addEventListener('change', function() {
+  const row = document.getElementById('tmrSoundRow');
+  if (row) row.style.display = this.checked ? '' : 'none';
 });
 
 // ── Timed Events ────────────────────────────────────────────────────────────
@@ -1288,6 +1495,36 @@ function updateTimedEventWindow(te) {
     }
   } catch(e) {}
 }
+
+// ── Color pickers ────────────────────────────────────────────────────────────
+document.getElementById('colorBg')?.addEventListener('input', function() {
+  document.body.style.background = this.value;
+});
+document.getElementById('colorCountdown')?.addEventListener('input', function() {
+  document.documentElement.style.setProperty('--countdown-color', this.value);
+  document.querySelectorAll('.countdown-card').forEach(card => {
+    card.style.background = `color-mix(in srgb, ${this.value} 8%, var(--bg2))`;
+    card.style.borderColor = `color-mix(in srgb, ${this.value} 25%, var(--border))`;
+  });
+});
+document.getElementById('colorTimer')?.addEventListener('input', function() {
+  document.documentElement.style.setProperty('--timer-color', this.value);
+  document.querySelectorAll('.timer-card').forEach(card => {
+    card.style.background = `color-mix(in srgb, ${this.value} 8%, var(--bg2))`;
+    card.style.borderColor = `color-mix(in srgb, ${this.value} 25%, var(--border))`;
+  });
+  document.querySelectorAll('.timer-progress-bar').forEach(bar => {
+    if (!bar.closest('.timer-overtime')) bar.style.background = this.value;
+  });
+});
+// Set initial color picker values from current theme
+try {
+  const cs = getComputedStyle(document.body);
+  const bgInput = document.getElementById('colorBg');
+  if (bgInput) bgInput.value = cs.getPropertyValue('--bg').trim() || '#1a1d23';
+  const cdInput = document.getElementById('colorCountdown');
+  if (cdInput) cdInput.value = cs.getPropertyValue('--accent').trim() || '#4a9eff';
+} catch(e) {}
 
 // Initial build + start ticking
 rebuildClocks();

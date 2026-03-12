@@ -191,24 +191,29 @@ async function uploadAttachments(entryId) {
   fileInput.value = '';
 }
 
+function getOpener() {
+  try { return window.opener && !window.opener.closed ? window.opener : null; } catch(e) { return null; }
+}
+
 function initFromOpener() {
-  if (!opener || !opener.state) return false;
+  var op = getOpener();
+  if (!op || !op.state) return false;
   try {
-    const s = opener.state;
+    const s = op.state;
     userRole = s.user?.role || '';
     userId = s.user?.id || 0;
     groups = s.groups || [];
     users = s.users || [];
     // Load i18n translations
-    if (opener.TRANSLATIONS) {
+    if (op.TRANSLATIONS) {
       const lang = s.preferences?.language || 'en';
-      _t = opener.TRANSLATIONS[lang] || opener.TRANSLATIONS.en || {};
+      _t = op.TRANSLATIONS[lang] || op.TRANSLATIONS.en || {};
     }
     // Apply theme
     const theme = s.preferences?.theme || 'dark';
     document.body.className = 'theme-' + theme;
     return true;
-  } catch {
+  } catch(e) {
     return false;
   }
 }
@@ -303,19 +308,43 @@ document.getElementById('btnRequest').onclick = async () => {
 };
 
 // Listen for theme changes from parent
-window.addEventListener('message', e => {
-  if (e.data?.type === 'theme') {
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'theme') {
     document.body.className = 'theme-' + (e.data.theme || 'dark');
   }
 });
 
+// BroadcastChannel theme sync (works even if opener is lost)
+try {
+  var _dlBC = new BroadcastChannel('tidslinjal-sync');
+  _dlBC.onmessage = function(e) {
+    if (e.data && e.data.type === 'theme') {
+      document.body.className = 'theme-' + (e.data.theme || 'dark');
+    }
+  };
+} catch(e) {}
+
 // Auto-refresh every 30 seconds
 setInterval(loadEntries, 30000);
 
-// Init: try opener first, fall back to API
+// Periodic theme sync from opener
+setInterval(function() {
+  var op = getOpener();
+  if (op && op.state && op.state.preferences) {
+    var theme = op.state.preferences.theme || 'dark';
+    if (document.body.className !== 'theme-' + theme) {
+      document.body.className = 'theme-' + theme;
+    }
+  }
+}, 3000);
+
+// Init: try opener first, always fall back to API for auth/role if needed
 (async () => {
-  const gotOpener = initFromOpener();
+  var gotOpener = initFromOpener();
   if (!gotOpener) {
+    await initFromAPI();
+  } else if (!userRole) {
+    // Opener was available but role wasn't set — fetch from API too
     await initFromAPI();
   }
   setupUI();
