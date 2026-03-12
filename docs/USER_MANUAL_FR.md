@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 4.0.0**
+**Version 6.0.0**
 
 ---
 
@@ -22,8 +22,16 @@
 14. [Paramètres](#14-paramètres)
 15. [Export et rapports](#15-export-et-rapports)
 16. [Vue Admin](#16-vue-admin)
-17. [Raccourcis clavier et souris](#17-raccourcis-clavier-et-souris)
-18. [Dépannage](#18-dépannage)
+17. [Horloges, comptes à rebours et chronomètres](#17-horloges-comptes-à-rebours-et-chronomètres)
+18. [Journal des décisions](#18-journal-des-décisions)
+19. [Journal de bord](#19-journal-de-bord)
+20. [Gestion des ressources](#20-gestion-des-ressources)
+21. [Projection cartographique](#21-projection-cartographique)
+22. [Fenêtres détachables](#22-fenêtres-détachables)
+23. [Intégrations et connecteurs](#23-intégrations-et-connecteurs)
+24. [Modèles](#24-modèles)
+25. [Raccourcis clavier et souris](#25-raccourcis-clavier-et-souris)
+26. [Dépannage](#26-dépannage)
 
 ---
 
@@ -488,7 +496,7 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 
 | Réglage | Options |
 |---|---|
-| **Thème** | Sombre / Clair |
+| **Thème** | Sombre / Clair / City Camo / Urban Camo |
 | **Taille d'affichage** | Petit / Normal / Grand / Énorme |
 | **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
 | **Format date/heure** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
@@ -591,7 +599,137 @@ Naviguez vers `/admin-view` (nécessite le rôle **Admin**) pour un tableau de b
 
 ---
 
-## 17. Raccourcis clavier et souris
+## 17. Horloges, comptes à rebours et chronomètres
+
+### Horloges multi-fuseaux
+L'horloge principale affiche l'heure locale. Cliquez **+** pour ajouter des fuseaux horaires supplémentaires. Cliquez **⧉** pour détacher les horloges dans une fenêtre séparée.
+
+### Affichage VCR à sept segments
+Les horloges utilisent un affichage numérique rétro à sept segments. Les couleurs et l'épaisseur des segments sont configurables.
+
+### Compte à rebours
+Créez des comptes à rebours vers un temps cible :
+- Cliquez **+ Compte à rebours** dans la barre d'outils des horloges
+- Définissez le temps cible ou sélectionnez depuis un événement
+- Le compte à rebours affiche le temps restant avec une **barre de progression**
+- Une alarme se déclenche à zéro
+- Cliquez **ACK** pour acquitter
+
+### Chronomètres
+Créez des chronomètres qui comptent vers le haut :
+- Cliquez **+ Chronomètre** dans la barre d'outils
+- Configurez : durée (heures/minutes/secondes), boutons prédéfinis (5/10/15/30/60 min)
+- Choisissez d'arrêter ou continuer après la cible
+- Activez l'alarme sonore à la cible
+- Le chronomètre affiche une **barre de progression** avec indicateur de dépassement
+
+### Sélecteurs de couleurs
+| Sélecteur | Contrôle |
+|---|---|
+| **BG** | Couleur d'arrière-plan |
+| **CD** | Couleur d'accent du compte à rebours |
+| **TM** | Couleur d'accent du chronomètre |
+
+---
+
+## 18. Journal des décisions
+Suivi structuré des décisions prises pendant les opérations ou exercices.
+
+### Créer une décision
+1. Cliquez **+ Nouvelle décision**
+2. Remplissez le titre, la description, le statut et le responsable
+3. Joignez des fichiers si nécessaire
+4. Cliquez **Enregistrer**
+
+### Statuts des décisions
+| Statut | Description |
+|---|---|
+| **Proposée** | Décision soumise pour examen |
+| **Approuvée** | Décision approuvée et en vigueur |
+| **Rejetée** | Décision rejetée avec motif |
+
+---
+
+## 19. Journal de bord
+Le journal de bord fournit un enregistrement chronologique des événements opérationnels et observations.
+- Ouvrez le **Journal de bord** depuis l'onglet Journaux
+- Cliquez **+ Nouvelle entrée** pour ajouter une entrée
+- Les entrées sont horodatées et attribuées à l'utilisateur
+
+---
+
+## 20. Gestion des ressources
+Gérez les ressources opérationnelles depuis le panneau latéral.
+
+### Types de ressources
+| Type | Description |
+|---|---|
+| **Salles** | Salles de réunion, centres d'opérations |
+| **Bâtiments** | Bâtiments et installations physiques |
+| **Services informatiques** | Infrastructure IT, serveurs, réseaux |
+| **Centres de données** | Installations de centres de données |
+
+### Créer une ressource
+1. Ouvrez l'onglet **Ressources**
+2. Sélectionnez le type de ressource
+3. Cliquez **+ Ajouter**
+4. Remplissez nom, description, emplacement, image et symbole
+5. Cliquez **Enregistrer**
+
+---
+
+## 21. Projection cartographique
+La projection cartographique offre une vue géographique interactive.
+
+- **Couches de carte** — OpenStreetMap, Topographique, Satellite et Sombre
+- **Superpositions** — basculer salles, bâtiments, services IT et centres de données
+- **Recherche d'adresse** — géocodage et zoom vers l'emplacement
+- **Import GeoJSON/KML** — charger des fichiers de données géographiques
+- **Ajuster tout** — zoom automatique pour montrer tous les marqueurs
+
+---
+
+## 22. Fenêtres détachables
+Plusieurs vues peuvent être détachées dans des fenêtres séparées :
+| Fenêtre | Description |
+|---|---|
+| **Horloges** | Toutes les horloges, comptes à rebours et chronomètres |
+| **Panneau latéral** | Panneau latéral complet avec tous les onglets |
+| **Journal des décisions** | Vue du journal des décisions |
+| **Carte** | Carte interactive avec toutes les superpositions |
+
+La synchronisation thème/langue/données se fait via BroadcastChannel.
+
+---
+
+## 23. Intégrations et connecteurs
+
+### Cadre d'intégration
+L'onglet Intégrations (Admin/Ops Lead) offre :
+- **OIDC SSO** — authentification unique
+- **Courrier SMTP** — e-mail sortant pour alarmes et rapports
+- **Microsoft Teams** — intégration webhook
+- **Zoom** — intégration de liens de réunion
+- **Clés API** — générer des tokens bearer
+
+### Connecteurs d'événements
+| Connecteur | Description |
+|---|---|
+| **STIX/TAXII** | Importer des flux de renseignement sur les cybermenaces |
+| **Syslog** | Recevoir des messages syslog comme événements |
+
+---
+
+## 24. Modèles
+Enregistrez et réutilisez des ensembles d'événements, phases, verrous, groupes et couches :
+- **Enregistrer** — sélectionnez une plage de dates ; les événements sont stockés avec des décalages relatifs
+- **Appliquer** — entrez STARTEX/T=0 ; tous les événements sont recréés ; assignation par couche supportée
+- **Importer** — chargez des fichiers `.json`
+- 31 modèles exemples inclus : 20 exercices et 11 réponses aux incidents
+
+---
+
+## 25. Raccourcis clavier et souris
 
 ### Souris
 
@@ -619,7 +757,7 @@ Naviguez vers `/admin-view` (nécessite le rôle **Admin**) pour un tableau de b
 
 ---
 
-## 18. Dépannage
+## 26. Dépannage
 
 ### Impossible de se connecter
 - Vérifiez le nom d'utilisateur et le mot de passe (par défaut : `admin` / `admin`)
@@ -651,4 +789,4 @@ Naviguez vers `/admin-view` (nécessite le rôle **Admin**) pour un tableau de b
 
 ---
 
-*Tidslinjal v4.0.0 — Chronologie opérationnelle collaborative*
+*Tidslinjal v6.0.0 — Chronologie opérationnelle collaborative*

@@ -1786,6 +1786,14 @@
         <a class="help-toc-link" href="#h-smtp">✉ SMTP / Mail</a>
         <a class="help-toc-link" href="#h-mattermost">💬 Mattermost</a>
         <a class="help-toc-link" href="#h-apikeys">🗝 API Keys</a>
+        <a class="help-toc-link" href="#h-countdown">⏱ Countdowns</a>
+        <a class="help-toc-link" href="#h-timers">⏲ Timers</a>
+        <a class="help-toc-link" href="#h-decisionlog">⚖ Decision Log</a>
+        <a class="help-toc-link" href="#h-logbook">📓 Log Book</a>
+        <a class="help-toc-link" href="#h-resources">🏗 Resources</a>
+        <a class="help-toc-link" href="#h-map">🗺 Map</a>
+        <a class="help-toc-link" href="#h-detach">🪟 Detachable Windows</a>
+        <a class="help-toc-link" href="#h-connectors">🔌 Connectors</a>
         <a class="help-toc-link" href="#h-shortcuts">⌨ Shortcuts</a>
       </div>
 
@@ -2163,6 +2171,10 @@
               <li>The detached window dynamically reflects changes to the clock list — no need to reopen it.</li>
             </ul>
             <p>Additional clocks are saved per user and persist across sessions.</p>
+            <h4>VCR seven-segment display</h4>
+            <p>The clock display uses a retro VCR-style seven-segment digital format. Segment colors and thickness are configurable. A text display mode shows exercise labels or custom text.</p>
+            <h4>Countdown &amp; timer clocks</h4>
+            <p>The detached clock window also hosts <b>countdown timers</b> and <b>stopwatch timers</b> with progress bars, alarms, and color customization. See the dedicated help sections for details.</p>
           </div>
         </div>
 
@@ -2304,6 +2316,174 @@
               <li>Upload a <b>profile photo</b> (shown on hover over your name, and in the Users panel).</li>
               <li><b>WebCal token</b>: generate a personal iCalendar feed URL for subscribing to events in external calendar apps (Outlook, Google Calendar, Apple Calendar).</li>
               <li>NATO J-staff designations (e.g. J3, J5) are shown as badges and can be assigned by admins.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-countdown">
+          <div class="help-section-icon">⏱</div>
+          <div class="help-section-body">
+            <h3>Countdown Timers</h3>
+            <p>Countdown timers count down to a specific target time, with visual progress tracking and alarm notifications.</p>
+            <h4>Creating a countdown</h4>
+            <ol>
+              <li>Click <b>+ Countdown</b> in the clock toolbar (detached clock window or header clocks).</li>
+              <li>Set the target time, or select from an event's start/end time.</li>
+              <li>The countdown displays remaining time with a <b>progress bar</b> showing percentage complete.</li>
+            </ol>
+            <h4>Countdown features</h4>
+            <ul class="help-list">
+              <li>Visual <b>progress bar</b> fills as time progresses toward the target.</li>
+              <li>When the countdown reaches zero, an <b>alarm notification</b> fires with an audible alert.</li>
+              <li>Click <b>ACK</b> to acknowledge the expired countdown and dismiss the alarm.</li>
+              <li>Expired countdowns show <b>overtime styling</b> (red progress bar) if not acknowledged.</li>
+              <li>Each countdown can be <b>detached</b> to its own standalone window via the ⧉ button.</li>
+              <li>Countdowns sync across all open windows (main and detached).</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-timers">
+          <div class="help-section-icon">⏲</div>
+          <div class="help-section-body">
+            <h3>Stopwatch Timers</h3>
+            <p>Stopwatch timers count up from zero with an optional target duration, progress bar, and alarm.</p>
+            <h4>Creating a timer</h4>
+            <ol>
+              <li>Click <b>+ Timer</b> in the clock toolbar.</li>
+              <li>Set the target duration using hours/minutes/seconds inputs, or use <b>preset buttons</b> (5, 10, 15, 30, or 60 minutes).</li>
+              <li>Choose whether the timer should <b>stop</b> or <b>continue</b> after reaching the target.</li>
+              <li>Optionally enable a <b>sound alarm</b> with selectable sound type.</li>
+              <li>Click <b>Start</b> to begin timing.</li>
+            </ol>
+            <h4>Timer features</h4>
+            <ul class="help-list">
+              <li>Visual <b>progress bar</b> shows elapsed time vs. target duration.</li>
+              <li>If "continue after target" is enabled, the progress bar switches to an <b>overtime indicator</b> when the target is exceeded.</li>
+              <li>Pause and resume controls are available during timing.</li>
+              <li>Each timer can be <b>detached</b> to its own standalone window via the ⧉ button.</li>
+            </ul>
+            <h4>Color customization</h4>
+            <p>Use the color pickers in the clock toolbar to customize display colors:</p>
+            <ul class="help-list">
+              <li><b>BG</b> — Background color of the clock display area.</li>
+              <li><b>CD</b> — Accent color for countdown timers.</li>
+              <li><b>TM</b> — Accent color for stopwatch timers.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-decisionlog">
+          <div class="help-section-icon">⚖</div>
+          <div class="help-section-body">
+            <h3>Decision Log</h3>
+            <p>The decision log provides structured tracking of decisions made during operations or exercises.</p>
+            <ul class="help-list">
+              <li>Access the decision log from the <b>sidebar</b> or the <b>Tools</b> menu.</li>
+              <li>Click <b>+ New Decision</b> to create a decision entry with title, description, rationale, and responsible person.</li>
+              <li>Decisions follow a status workflow: <b>Proposed → Approved / Rejected</b>.</li>
+              <li>Attach files to decisions for supporting documentation.</li>
+              <li>Team Lead+ can approve or reject decisions.</li>
+              <li>The decision log can be <b>detached</b> to a standalone browser window for multi-monitor use.</li>
+              <li>Full i18n support — available in English, Swedish, and French.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-logbook">
+          <div class="help-section-icon">📓</div>
+          <div class="help-section-body">
+            <h3>Log Book</h3>
+            <p>The log book maintains a chronological record of operational events, observations, and notes during exercises or incidents.</p>
+            <ul class="help-list">
+              <li>Open the <b>Log Book</b> from the sidebar <b>Logs</b> tab.</li>
+              <li>Click <b>+ New Entry</b> to add a timestamped log entry.</li>
+              <li>Entries are automatically attributed to the creating user with a timestamp.</li>
+              <li>Entries display in reverse chronological order for easy review.</li>
+              <li>Useful for maintaining a running operations record, shift handover notes, or incident observations.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-resources">
+          <div class="help-section-icon">🏗</div>
+          <div class="help-section-body">
+            <h3>Resource Management</h3>
+            <p>Manage operational resources — rooms, buildings, IT services, and data centers — from the sidebar.</p>
+            <h4>Resource types</h4>
+            <ul class="help-list">
+              <li><b>Rooms</b> — Meeting rooms, operations centers, command posts. Supports room type categorization.</li>
+              <li><b>Buildings</b> — Physical buildings and facilities.</li>
+              <li><b>Computer Services</b> — IT infrastructure, servers, and network resources.</li>
+              <li><b>Data Centers</b> — Data center facilities.</li>
+            </ul>
+            <h4>Creating resources</h4>
+            <ol>
+              <li>Open the <b>Resources</b> tab in the sidebar.</li>
+              <li>Select the resource type sub-tab.</li>
+              <li>Click <b>+ Add</b> to create a new resource.</li>
+              <li>Fill in name, description, location (latitude/longitude), upload an image, and select a map symbol/icon.</li>
+              <li>Click <b>Save</b>.</li>
+            </ol>
+            <p>Resources with location coordinates appear as markers on the <b>Map Projection</b> and can be toggled by type.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-map">
+          <div class="help-section-icon">🗺</div>
+          <div class="help-section-body">
+            <h3>Map Projection</h3>
+            <p>The map projection provides an interactive geographic view of meetings, users, and resources using Leaflet.js.</p>
+            <ul class="help-list">
+              <li>Open from the <b>Map</b> toolbar button or detach to a separate window.</li>
+              <li><b>Tile layers</b> — switch between OpenStreetMap, Topographic, Satellite, and Dark map styles.</li>
+              <li><b>Resource overlays</b> — toggle visibility of Rooms (🏠), Buildings (🏢), IT Services (💻), and Data Centers (🖥) as map markers.</li>
+              <li><b>Meeting markers</b> — physical meetings with coordinates are plotted automatically.</li>
+              <li><b>User markers</b> — user locations shown when geolocation data is available.</li>
+              <li><b>Address search</b> — type an address in the search bar to geocode and zoom to that location.</li>
+              <li><b>GeoJSON/KML import</b> — click Import to load external geographic data files as overlay layers.</li>
+              <li><b>Fit All</b> — auto-zoom to show all visible markers on the map.</li>
+              <li><b>Layers panel</b> — click Layers to toggle individual overlay layers on/off.</li>
+              <li>The map legend shows color-coded marker types for reference.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-detach">
+          <div class="help-section-icon">🪟</div>
+          <div class="help-section-body">
+            <h3>Detachable Windows</h3>
+            <p>Several views can be detached to standalone browser windows — ideal for multi-monitor setups during exercises or incident response.</p>
+            <h4>Detachable views</h4>
+            <ul class="help-list">
+              <li><b>Clocks</b> — Click ⧉ in the header to detach all clocks, countdowns, and timers to a separate window.</li>
+              <li><b>Sidebar</b> — Click ⧉ on the sidebar to open it in its own window with all tabs.</li>
+              <li><b>Decision Log</b> — Detach from the Tools menu or sidebar.</li>
+              <li><b>Map Projection</b> — Open the map in a separate window for a dedicated geographic display.</li>
+              <li><b>Individual Timers</b> — Each countdown or stopwatch timer can be detached individually.</li>
+            </ul>
+            <h4>Cross-window synchronization</h4>
+            <ul class="help-list">
+              <li>Theme changes propagate to all detached windows automatically.</li>
+              <li>Language settings sync across all windows.</li>
+              <li>Data updates (new events, timer ticks) are reflected in real time.</li>
+              <li>If the main window is closed, detached windows fall back to API-based data loading.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-connectors">
+          <div class="help-section-icon">🔌</div>
+          <div class="help-section-body">
+            <h3>Event Connectors</h3>
+            <p>Tidslinjal includes an integration framework for ingesting events from external systems.</p>
+            <ul class="help-list">
+              <li><b>STIX/TAXII connector</b> — ingest cyber threat intelligence feeds and automatically create timeline events from threat indicators.</li>
+              <li><b>Syslog connector</b> — receive syslog messages and convert them to timeline events for incident timelines.</li>
+              <li>Connectors are configured in the <b>Integrations</b> sidebar tab (Admin / Ops Lead).</li>
+              <li>Incoming data is processed through the <b>event bus</b> with configurable routing and mapping rules.</li>
+              <li>The <b>ingestion API</b> endpoint allows external systems to push events directly via REST.</li>
+              <li>Connector metrics are available for monitoring throughput and errors.</li>
             </ul>
           </div>
         </div>
