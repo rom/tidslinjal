@@ -5618,10 +5618,28 @@ function openApplyTemplateDialog(id) {
     const tmpl = (state.templates || []).find(t => t.id === id);
     const name = tmpl ? tmpl.name : `Template ${id}`;
     const itemCount = tmpl ? (tmpl.item_count || 0) : 0;
-    dbg('[template] openApplyTemplateDialog id=%o name=%o items=%o', id, name, itemCount);
+    const hasLayers = tmpl && tmpl.layers && tmpl.layers.length > 0;
+    dbg('[template] openApplyTemplateDialog id=%o name=%o items=%o hasLayers=%o', id, name, itemCount, hasLayers);
+    const layerInfo = hasLayers ? ` (${tmpl.layers.length} layer${tmpl.layers.length!==1?'s':''}: ${tmpl.layers.map(l=>l.name).join(', ')})` : '';
     document.getElementById('applyTemplateInfo').textContent =
-      `Apply template "${name}" — ${itemCount} event${itemCount!==1?'s':''}`;
+      `Apply template "${name}" — ${itemCount} event${itemCount!==1?'s':''}${layerInfo}`;
     document.getElementById('applyTemplateBase').value = fmtDateInput(new Date());
+    // Multi-layer toggle
+    const multiChk = document.getElementById('applyTemplateMultiLayer');
+    const modeGroup = document.getElementById('applyTemplateLayerModeGroup');
+    const singleGroup = document.getElementById('applyTemplateSingleLayerGroup');
+    if (hasLayers) {
+      modeGroup.style.display = '';
+      multiChk.checked = true;
+      singleGroup.style.display = 'none';
+    } else {
+      modeGroup.style.display = 'none';
+      multiChk.checked = false;
+      singleGroup.style.display = '';
+    }
+    multiChk.onchange = () => {
+      singleGroup.style.display = multiChk.checked ? 'none' : '';
+    };
     // Populate layer select
     const layerSel = document.getElementById('applyTemplateLayer');
     layerSel.innerHTML = `<option value="">Master Timeline</option>` +
@@ -5638,10 +5656,12 @@ function openApplyTemplateDialog(id) {
 async function confirmApplyTemplate(id) {
   const baseVal  = document.getElementById('applyTemplateBase').value;
   if (!baseVal) { showError('Please select a base date/time.', 'Validation'); return; }
+  const multiLayer = document.getElementById('applyTemplateMultiLayer')?.checked || false;
   const layerVal = document.getElementById('applyTemplateLayer').value;
   const payload  = {
     base_time: new Date(baseVal).toISOString(),
-    layer_id:  layerVal ? parseInt(layerVal, 10) : null,
+    layer_id:  !multiLayer && layerVal ? parseInt(layerVal, 10) : null,
+    use_template_layers: multiLayer,
   };
   dbg('[template] confirmApplyTemplate id=%o payload=%o', id, payload);
   let res;

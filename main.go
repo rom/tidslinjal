@@ -3948,8 +3948,9 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	}
 
 	var req struct {
-		BaseTime time.Time `json:"base_time"`
-		LayerID  *int64    `json:"layer_id"`
+		BaseTime          time.Time `json:"base_time"`
+		LayerID           *int64    `json:"layer_id"`
+		UseTemplateLayers *bool     `json:"use_template_layers"` // nil/true = use per-item layers from template; false = force all to LayerID
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -3975,9 +3976,10 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	if displayName == "" {
 		displayName = user.Username
 	}
-	logDebug("[template] Applying template id=%d name=%q base=%s layer=%v user=%s",
-		id, tmpl.Name, req.BaseTime.Format(time.RFC3339), req.LayerID, displayName)
-	count, err := app.store.ApplyTemplate(id, req.BaseTime, req.LayerID, user.ID, displayName)
+	useTemplateLayers := req.UseTemplateLayers == nil || *req.UseTemplateLayers // default true
+	logDebug("[template] Applying template id=%d name=%q base=%s layer=%v useTemplateLayers=%v user=%s",
+		id, tmpl.Name, req.BaseTime.Format(time.RFC3339), req.LayerID, useTemplateLayers, displayName)
+	count, err := app.store.ApplyTemplate(id, req.BaseTime, req.LayerID, useTemplateLayers, user.ID, displayName)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
