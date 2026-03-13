@@ -1254,7 +1254,7 @@ func (app *App) handleOIDCSettings(w http.ResponseWriter, r *http.Request, user 
 		if cfg.Enabled && cfg.Issuer != "" && cfg.ClientID != "" {
 			if err := app.configureOIDC(cfg.Issuer, cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL); err != nil {
 				log.Printf("[WARN] OIDC reconfiguration failed: %v", err)
-				jsonError(w, "OIDC configuration error: "+err.Error(), http.StatusBadGateway)
+				jsonError(w, "OIDC configuration error — check server logs for details", http.StatusBadGateway)
 				return
 			}
 			app.oidcExclusive = cfg.Exclusive
@@ -3333,7 +3333,7 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 // ── Version ────────────────────────────────────────────────────────────────────
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "debug": debug})
+	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub})
 }
 
 // ── Integration Status ─────────────────────────────────────────────────────────
@@ -5701,7 +5701,7 @@ func (app *App) handleTestMail(w http.ResponseWriter, r *http.Request, user *Use
 			Action: "mail_test_failed", EntityType: "mail", EntityID: 0,
 			Summary: fmt.Sprintf("Mail test failed to %s: %s", to, err.Error()),
 		})
-		jsonError(w, "Mail test failed: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "Mail test failed — check server logs for details", http.StatusInternalServerError)
 		return
 	}
 	app.store.LogAudit(AuditEntry{
@@ -5923,13 +5923,13 @@ func (app *App) handleSaveTLSConfig(w http.ResponseWriter, r *http.Request, user
 	// Validate paths exist if provided
 	if cfg.CertFile != "" {
 		if _, err := os.Stat(cfg.CertFile); err != nil {
-			jsonError(w, fmt.Sprintf("cert file not accessible: %v", err), http.StatusBadRequest)
+			jsonError(w, "cert file not accessible", http.StatusBadRequest)
 			return
 		}
 	}
 	if cfg.KeyFile != "" {
 		if _, err := os.Stat(cfg.KeyFile); err != nil {
-			jsonError(w, fmt.Sprintf("key file not accessible: %v", err), http.StatusBadRequest)
+			jsonError(w, "key file not accessible", http.StatusBadRequest)
 			return
 		}
 	}
@@ -7975,8 +7975,8 @@ func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Reques
 
 // handleGradualBackupDownload handles GET /api/admin/gradual-backup/download/{filename}
 func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Request, user *User) {
-	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/")
-	if filename == "" || strings.ContainsAny(filename, "/\\") {
+	filename := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/"))
+	if filename == "" || filename == "." || filename == ".." {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -7999,8 +7999,8 @@ func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Reque
 
 // handleGradualBackupDelete handles DELETE /api/admin/gradual-backup/snapshots/{filename}
 func (app *App) handleGradualBackupDelete(w http.ResponseWriter, r *http.Request, user *User) {
-	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/")
-	if filename == "" || strings.ContainsAny(filename, "/\\") {
+	filename := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/"))
+	if filename == "" || filename == "." || filename == ".." {
 		jsonError(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -8992,8 +8992,6 @@ func main() {
 		log.Printf("    label          : %q", ex.Label)
 		log.Printf("    epoch (STARTEX): %s", ex.Epoch)
 	}
-
-	log.Printf("  Default credentials: admin / admin")
 
 	// Syslog
 	sysCfgDisplay := app.store.GetSyslogConfig()
