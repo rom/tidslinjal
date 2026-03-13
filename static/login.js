@@ -1,5 +1,9 @@
 'use strict';
 
+function escHtmlLogin(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 let regMode = 'off';
 let oidcConfig = null;
 
@@ -287,7 +291,7 @@ document.getElementById('forgotForm').addEventListener('submit', async (e) => {
     if (res.ok) {
       if (data.token) {
         succEl.innerHTML = 'Reset token generated. Please send this to the user:<br>' +
-          '<code style="word-break:break-all;font-size:11px">' + data.token + '</code><br>' +
+          '<code style="word-break:break-all;font-size:11px">' + escHtmlLogin(data.token) + '</code><br>' +
           '<small>They can use it at <a id="forgotResetLink" style="cursor:pointer;color:var(--accent)">Reset password</a></small>';
         succEl.style.display = 'block';
         document.getElementById('forgotResetLink').addEventListener('click', function() {
