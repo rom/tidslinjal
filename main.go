@@ -744,7 +744,8 @@ func jsonError(w http.ResponseWriter, msg string, code int) {
 }
 
 func decode(r *http.Request, v interface{}) error {
-	return json.NewDecoder(r.Body).Decode(v)
+	// Limit request body to 1 MB to prevent memory exhaustion attacks.
+	return json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(v)
 }
 
 func generateID() (string, error) {
@@ -793,6 +794,8 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	loginClientIP := clientIP(r)
 	user, ok := app.store.GetUserByUsername(req.Username)
 	if !ok {
+		// Perform a dummy bcrypt comparison to prevent timing-based user enumeration.
+		bcrypt.CompareHashAndPassword([]byte("$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"), []byte(req.Password)) //nolint:errcheck
 		app.audit(0, "system", "login_failed", "user", 0,
 			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
@@ -871,7 +874,7 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("User %q logged out from %s", user.Username, ip))
 		logVerbose("logout: user=%q ip=%s", user.Username, ip)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", Expires: time.Unix(0, 0)})
+	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", HttpOnly: true, Secure: app.secureMode, SameSite: http.SameSiteLaxMode, Expires: time.Unix(0, 0)})
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -1251,7 +1254,7 @@ func (app *App) handleOIDCSettings(w http.ResponseWriter, r *http.Request, user 
 		if cfg.Enabled && cfg.Issuer != "" && cfg.ClientID != "" {
 			if err := app.configureOIDC(cfg.Issuer, cfg.ClientID, cfg.ClientSecret, cfg.RedirectURL); err != nil {
 				log.Printf("[WARN] OIDC reconfiguration failed: %v", err)
-				jsonError(w, "OIDC configuration error: "+err.Error(), http.StatusBadGateway)
+				jsonError(w, "OIDC configuration error — check server logs for details", http.StatusBadGateway)
 				return
 			}
 			app.oidcExclusive = cfg.Exclusive
@@ -3330,7 +3333,7 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 // ── Version ────────────────────────────────────────────────────────────────────
 
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "debug": debug})
+	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub})
 }
 
 // ── Integration Status ─────────────────────────────────────────────────────────
@@ -4700,7 +4703,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 
 	// Admin operations
-	mux.HandleFunc("/api/admin/reset", app.requireAuth(app.handleAdminReset))
+	mux.HandleFunc("/api/admin/reset", app.requireRole(RoleAdmin, app.handleAdminReset))
 	mux.HandleFunc("/api/admin/registration", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			// Public: expose only the mode (not the invitation code) so login page can check
@@ -4715,12 +4718,12 @@ func (app *App) routes() http.Handler {
 			}
 			return
 		}
-		app.requireAuth(app.handleRegistrationSettings)(w, r)
+		app.requireRole(RoleAdmin, app.handleRegistrationSettings)(w, r)
 	})
-	mux.HandleFunc("/api/admin/invitations", app.requireAuth(app.handleInvitations))
-	mux.HandleFunc("/api/admin/invitations/", app.requireAuth(app.handleDeleteInvitation))
-	mux.HandleFunc("/api/admin/oidc", app.requireAuth(app.handleOIDCSettings))
-	mux.HandleFunc("/api/admin/oidc/test", app.requireAuth(app.handleOIDCTest))
+	mux.HandleFunc("/api/admin/invitations", app.requireRole(RoleAdmin, app.handleInvitations))
+	mux.HandleFunc("/api/admin/invitations/", app.requireRole(RoleAdmin, app.handleDeleteInvitation))
+	mux.HandleFunc("/api/admin/oidc", app.requireRole(RoleAdmin, app.handleOIDCSettings))
+	mux.HandleFunc("/api/admin/oidc/test", app.requireRole(RoleAdmin, app.handleOIDCTest))
 	mux.HandleFunc("/api/admin/sessions", app.requireRole(RoleAdmin, app.handleAdminSessions))
 	mux.HandleFunc("/api/admin/sessions/", app.requireRole(RoleAdmin, app.handleAdminDeleteSession))
 	mux.HandleFunc("/api/admin/bulk/status", app.requireRole(RoleAdmin, app.handleAdminBulkStatus))
@@ -5698,7 +5701,7 @@ func (app *App) handleTestMail(w http.ResponseWriter, r *http.Request, user *Use
 			Action: "mail_test_failed", EntityType: "mail", EntityID: 0,
 			Summary: fmt.Sprintf("Mail test failed to %s: %s", to, err.Error()),
 		})
-		jsonError(w, "Mail test failed: "+err.Error(), http.StatusInternalServerError)
+		jsonError(w, "Mail test failed — check server logs for details", http.StatusInternalServerError)
 		return
 	}
 	app.store.LogAudit(AuditEntry{
@@ -5920,13 +5923,13 @@ func (app *App) handleSaveTLSConfig(w http.ResponseWriter, r *http.Request, user
 	// Validate paths exist if provided
 	if cfg.CertFile != "" {
 		if _, err := os.Stat(cfg.CertFile); err != nil {
-			jsonError(w, fmt.Sprintf("cert file not accessible: %v", err), http.StatusBadRequest)
+			jsonError(w, "cert file not accessible", http.StatusBadRequest)
 			return
 		}
 	}
 	if cfg.KeyFile != "" {
 		if _, err := os.Stat(cfg.KeyFile); err != nil {
-			jsonError(w, fmt.Sprintf("key file not accessible: %v", err), http.StatusBadRequest)
+			jsonError(w, "key file not accessible", http.StatusBadRequest)
 			return
 		}
 	}
@@ -7972,8 +7975,8 @@ func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Reques
 
 // handleGradualBackupDownload handles GET /api/admin/gradual-backup/download/{filename}
 func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Request, user *User) {
-	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/")
-	if filename == "" || strings.ContainsAny(filename, "/\\") {
+	filename := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/download/"))
+	if filename == "" || filename == "." || filename == ".." {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -7983,14 +7986,21 @@ func (app *App) handleGradualBackupDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	// Sanitise filename for Content-Disposition to prevent header injection.
+	safeFilename := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, filename)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeFilename))
 	http.ServeFile(w, r, snapPath)
 }
 
 // handleGradualBackupDelete handles DELETE /api/admin/gradual-backup/snapshots/{filename}
 func (app *App) handleGradualBackupDelete(w http.ResponseWriter, r *http.Request, user *User) {
-	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/")
-	if filename == "" || strings.ContainsAny(filename, "/\\") {
+	filename := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/snapshots/"))
+	if filename == "" || filename == "." || filename == ".." {
 		jsonError(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -8982,8 +8992,6 @@ func main() {
 		log.Printf("    label          : %q", ex.Label)
 		log.Printf("    epoch (STARTEX): %s", ex.Epoch)
 	}
-
-	log.Printf("  Default credentials: admin / admin")
 
 	// Syslog
 	sysCfgDisplay := app.store.GetSyslogConfig()

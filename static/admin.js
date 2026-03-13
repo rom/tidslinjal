@@ -1,6 +1,10 @@
 'use strict';
 window.state = { preferences: { language: 'en', theme: 'light', size: 'small' } };
 
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 async function api(path, opts) {
   const r = await fetch(path, opts);
   if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
@@ -63,13 +67,13 @@ async function loadAdmin() {
       if (u.blocked) statusCell = '<span class="badge" style="background:rgba(231,76,60,.2);color:#e74c3c">⛔ Blocked</span>';
       let actions = '';
       if (!u.vetted && !u.blocked) actions += `<button class="btn btn-primary btn-sm" data-action="vet" data-user-id="${u.id}" style="margin-right:4px">Approve</button>`;
-      if (!u.blocked && u.role !== 'admin') actions += `<button class="btn btn-danger btn-sm" data-action="block" data-user-id="${u.id}" data-username="${u.username}">Block</button>`;
+      if (!u.blocked && u.role !== 'admin') actions += `<button class="btn btn-danger btn-sm" data-action="block" data-user-id="${u.id}" data-username="${escHtml(u.username)}">Block</button>`;
       if (u.blocked) actions += `<button class="btn btn-secondary btn-sm" data-action="unblock" data-user-id="${u.id}">Unblock</button>`;
       return `<tr>
         <td>${u.id}</td>
-        <td>${u.username}${u.is_oidc ? ' <span title="OIDC user" style="font-size:10px;color:var(--accent)">SSO</span>' : ''}</td>
-        <td>${u.display_name||''}</td>
-        <td style="font-size:11px">${u.email||'—'}</td>
+        <td>${escHtml(u.username)}${u.is_oidc ? ' <span title="OIDC user" style="font-size:10px;color:var(--accent)">SSO</span>' : ''}</td>
+        <td>${escHtml(u.display_name||'')}</td>
+        <td style="font-size:11px">${escHtml(u.email||'—')}</td>
         <td>${roleBadge(u.role)}</td>
         <td>${u.can_lock ? '✓' : ''}</td>
         <td>${statusCell}</td>
@@ -126,9 +130,9 @@ async function loadInvitations() {
     }
     el.innerHTML = invs.map(inv => `
       <div class="inv-item">
-        <span class="inv-code">${inv.code}</span>
-        <span style="color:var(--text-dim);flex:1">${inv.note||''}</span>
-        ${inv.used ? `<span style="color:var(--green);font-size:11px">✓ Used by ${inv.used_by||'?'}</span>` : '<span style="color:var(--accent);font-size:11px">Available</span>'}
+        <span class="inv-code">${escHtml(inv.code)}</span>
+        <span style="color:var(--text-dim);flex:1">${escHtml(inv.note||'')}</span>
+        ${inv.used ? `<span style="color:var(--green);font-size:11px">✓ Used by ${escHtml(inv.used_by||'?')}</span>` : '<span style="color:var(--accent);font-size:11px">Available</span>'}
         <button class="btn btn-danger btn-sm" data-action="delete-invitation" data-invitation-id="${inv.id}">✕</button>
       </div>`).join('');
   } catch(e) { console.error(e); }
@@ -275,7 +279,7 @@ async function loadSessions() {
       <thead><tr><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">User</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Session ID</th><th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:left">Expires</th><th></th></tr></thead>
       <tbody>` + sessions.map(s => `
         <tr>
-          <td style="padding:6px 8px;border-bottom:1px solid var(--border)">${s.display_name||s.username||s.user_id}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid var(--border)">${escHtml(s.display_name||s.username||s.user_id)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">${(s.id||'').substring(0,12)}…</td>
           <td style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px">${fmtDT(s.expires_at)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid var(--border)"><button class="btn btn-danger btn-sm" data-action="terminate-session" data-session-id="${s.id}">Terminate</button></td>
