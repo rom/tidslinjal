@@ -7652,6 +7652,18 @@ func (app *App) handleReadyCheck(w http.ResponseWriter, r *http.Request, user *U
 		"check_time":  es.ReadyCheckTime,
 		"epoch":       es.Epoch,
 	}
+
+	// Audit log for ready check execution
+	readyStatus := "NOT READY"
+	if len(notReady) == 0 {
+		readyStatus = "READY"
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "ready_check", EntityType: "system", EntityID: 0,
+		Summary: fmt.Sprintf("Performed system ready check: %s (%d total events, %d not ready)", readyStatus, len(events), len(notReady)),
+	})
+
 	jsonOK(w, result)
 }
 
@@ -7722,11 +7734,19 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// Create an audit log entry
+	// Create an audit log entry with participant details
+	participantNames := make([]string, 0, len(created.Participants))
+	for _, p := range created.Participants {
+		if p.UserName != "" {
+			participantNames = append(participantNames, p.UserName)
+		} else {
+			participantNames = append(participantNames, fmt.Sprintf("user#%d", p.UserID))
+		}
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "create_prc", EntityType: "person_ready_check", EntityID: created.ID,
-		Summary: fmt.Sprintf("Created person ready check with %d participants", len(created.Participants)),
+		Summary: fmt.Sprintf("Created person ready check targeting %d participants: %s", len(created.Participants), strings.Join(participantNames, ", ")),
 	})
 }
 
@@ -7776,6 +7796,13 @@ func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Req
 		return
 	}
 	jsonOK(w, found)
+
+	// Audit log for PRC response
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "respond_prc", EntityType: "person_ready_check", EntityID: found.ID,
+		Summary: fmt.Sprintf("Responded '%s' to ready check created by %s", req.Status, found.CreatedByName),
+	})
 
 	// Broadcast SSE event for the updated PRC
 	updatedData, _ := json.Marshal(found)
