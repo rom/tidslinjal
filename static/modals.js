@@ -2013,7 +2013,7 @@ async function _loadPollsterLog(container) {
       let detailHtml = '';
       if ((poll.responses || []).length > 0) {
         detailHtml = (poll.questions || []).map((q, qi) => {
-          const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+          const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
           if (q.type === 'scale' || q.type === 'scale_0_3') {
             const counts = [0,0,0,0];
             answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
@@ -6212,7 +6212,7 @@ async function openPollModal() {
           body: JSON.stringify({ title, questions: mappedQs, target_type: targetType, target_ids: targetIds })
         });
         if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-        showSuccess(t('poll_created')||'Poll created successfully');
+        showNotification('success',t('poll_created')||'Poll created successfully');
         _loadPolls(modal);
       } catch (e) { showError(e.message); }
     });
@@ -6360,7 +6360,7 @@ async function _loadPolls(modal) {
             body: JSON.stringify({ answers })
           });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-          showSuccess(t('poll_response_saved')||'Response saved');
+          showNotification('success',t('poll_response_saved')||'Response saved');
           _loadPolls(modal);
         } catch (e) { showError(e.message); }
       });
@@ -6373,7 +6373,7 @@ async function _loadPolls(modal) {
         try {
           const res = await fetch(`/api/polls/${pollId}/close`, { method: 'PUT' });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-          showSuccess(t('poll_closed_success')||'Poll closed');
+          showNotification('success',t('poll_closed_success')||'Poll closed');
           _loadPolls(modal);
         } catch (e) { showError(e.message); }
       });
@@ -8280,7 +8280,7 @@ async function generateReport() {
           if ((poll.questions || []).length && (poll.responses || []).length) {
             html += '<table><thead><tr><th>Question</th><th>Type</th><th>Summary</th></tr></thead><tbody>';
             (poll.questions || []).forEach((q, qi) => {
-              const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+              const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
               let summary = '';
               if (q.type === 'scale' || q.type === 'scale_0_3') {
                 const counts = [0,0,0,0];
