@@ -29,6 +29,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .page-header { font-size:11px; color:var(--text-dim); letter-spacing:.12em; text-transform:uppercase; }
 /* ── Map container ── */
 #mapProjection { flex:1; width:100%; }
+/* ── PDF container (hidden by default) ── */
+#pdfContainer { flex:1; width:100%; display:none; }
+#pdfContainer iframe { width:100%; height:100%; border:none; }
 /* ── Legend panel ── */
 .map-legend { position:absolute; bottom:24px; right:12px; z-index:1001; background:var(--bg2);
   border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px;
@@ -50,11 +53,50 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   padding:20px; text-align:center; min-width:300px; }
 .import-overlay.open { display:block; }
 .import-overlay input[type=file] { margin:10px 0; }
+/* ── Overlay controls bar ── */
+.overlay-controls { display:flex; align-items:center; gap:6px; }
+.overlay-controls select { max-width:160px; }
+/* ── Add Item Dialog ── */
+.add-item-dialog { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:1003; background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:20px; min-width:320px; }
+.add-item-dialog.open { display:block; }
+.add-item-dialog h4 { font-size:12px; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:.08em; }
+.add-item-dialog label { font-size:11px; color:var(--text-dim); display:block; margin-top:8px; margin-bottom:2px; }
+.add-item-dialog select, .add-item-dialog input { width:100%; background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:4px 8px; font-size:11px; }
+.add-item-dialog .dialog-buttons { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
+/* ── Map overlay item markers ── */
+.map-overlay-item { background:transparent; border:none; }
+/* ── Upload map dialog ── */
+.upload-map-dialog { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:1003; background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:20px; min-width:340px; }
+.upload-map-dialog.open { display:block; }
+.upload-map-dialog h4 { font-size:12px; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:.08em; }
+.upload-map-dialog label { font-size:11px; color:var(--text-dim); display:block; margin-top:8px; margin-bottom:2px; }
+.upload-map-dialog select, .upload-map-dialog input { width:100%; background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:4px 8px; font-size:11px; }
+.upload-map-dialog .dialog-buttons { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
+/* ── New overlay dialog ── */
+.new-overlay-dialog { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:1003; background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:20px; min-width:300px; }
+.new-overlay-dialog.open { display:block; }
+.new-overlay-dialog h4 { font-size:12px; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:.08em; }
+.new-overlay-dialog label { font-size:11px; color:var(--text-dim); display:block; margin-top:8px; margin-bottom:2px; }
+.new-overlay-dialog input { width:100%; background:var(--bg3); border:1px solid var(--border);
+  border-radius:5px; color:var(--text); padding:4px 8px; font-size:11px; }
+.new-overlay-dialog .dialog-buttons { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
 </style>
 </head>
 <body class="theme-dark">
 <div class="map-toolbar">
   <span class="page-header">Tidslinjal — Map Projection</span>
+  <label id="lblMapSource">Map</label>
+  <select id="mapSelector">
+    <option value="">OpenStreetMap (Live)</option>
+  </select>
   <label id="lblTileLayer">Tile Layer</label>
   <select id="selTileLayer">
     <option value="osm">OpenStreetMap</option>
@@ -62,20 +104,28 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <option value="satellite">Satellite</option>
     <option value="dark">Dark</option>
   </select>
+  <button class="btn-map" id="btnUploadMap" title="Upload a map file">Upload Map</button>
   <button class="btn-map" id="btnLayers" title="Toggle overlay layers">Layers</button>
   <button class="btn-map" id="btnImport" title="Import GeoJSON or KML file">Import</button>
   <button class="btn-map" id="btnMeetings" title="Show physical meetings">Meetings</button>
   <button class="btn-map" id="btnUsers" title="Show user locations">Users</button>
-  <button class="btn-map" id="btnRooms" title="Show rooms">🏠 Rooms</button>
-  <button class="btn-map" id="btnBuildings" title="Show buildings">🏢 Buildings</button>
-  <button class="btn-map" id="btnComputers" title="Show computer services">💻 IT</button>
-  <button class="btn-map" id="btnDataCenters" title="Show data centers">🖥 DC</button>
+  <button class="btn-map" id="btnRooms" title="Show rooms">&#127968; Rooms</button>
+  <button class="btn-map" id="btnBuildings" title="Show buildings">&#127970; Buildings</button>
+  <button class="btn-map" id="btnComputers" title="Show computer services">&#128187; IT</button>
+  <button class="btn-map" id="btnDataCenters" title="Show data centers">&#128421; DC</button>
   <button class="btn-map" id="btnFitAll" title="Fit all markers in view">Fit All</button>
+  <div class="overlay-controls" id="overlayControls" style="display:none">
+    <select id="overlaySelector"><option value="">Select overlay...</option></select>
+    <button class="btn-map" id="btnAddOverlay" title="New overlay">+</button>
+    <button class="btn-map" id="btnLockOverlay" title="Lock/Unlock" style="display:none">Lock</button>
+    <button class="btn-map" id="btnAddItem" title="Add resource to overlay">Add Item</button>
+  </div>
   <span style="flex:1"></span>
   <input type="text" id="addressSearch" placeholder="Search address..." style="min-width:180px;flex:1;max-width:300px" title="Type an address to search and zoom">
-  <button class="btn-map" id="btnSearch" title="Search address">🔍</button>
+  <button class="btn-map" id="btnSearch" title="Search address">&#128269;</button>
 </div>
 <div id="mapProjection"></div>
+<div id="pdfContainer"><iframe id="pdfFrame"></iframe></div>
 <div class="map-legend" id="mapLegend">
   <h4>Legend</h4>
   <div id="legendContent"></div>
@@ -90,6 +140,64 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <br>
   <button class="btn-map" id="btnDoImport">Import</button>
   <button class="btn-map" id="btnCancelImport">Cancel</button>
+</div>
+<!-- Upload map dialog -->
+<div class="upload-map-dialog" id="uploadMapDialog">
+  <h4>Upload Map File</h4>
+  <label>Name</label>
+  <input type="text" id="uploadMapName" placeholder="Map name">
+  <label>Description</label>
+  <input type="text" id="uploadMapDesc" placeholder="Description (optional)">
+  <label>Type</label>
+  <select id="uploadMapType">
+    <option value="geographical">Geographical</option>
+    <option value="floor_plan">Floor Plan</option>
+    <option value="network">Network</option>
+    <option value="electrical">Electrical</option>
+    <option value="custom">Custom</option>
+  </select>
+  <label>File (image, PDF, or GeoJSON)</label>
+  <input type="file" id="uploadMapFile" accept=".jpg,.jpeg,.png,.svg,.pdf,.geojson,.json">
+  <div class="dialog-buttons">
+    <button class="btn-map" id="btnCancelUploadMap">Cancel</button>
+    <button class="btn-map" id="btnDoUploadMap">Upload</button>
+  </div>
+</div>
+<!-- New overlay dialog -->
+<div class="new-overlay-dialog" id="newOverlayDialog">
+  <h4>New Overlay</h4>
+  <label>Name</label>
+  <input type="text" id="newOverlayName" placeholder="Overlay name">
+  <div class="dialog-buttons">
+    <button class="btn-map" id="btnCancelNewOverlay">Cancel</button>
+    <button class="btn-map" id="btnDoNewOverlay">Create</button>
+  </div>
+</div>
+<!-- Add item dialog -->
+<div class="add-item-dialog" id="addItemDialog">
+  <h4>Add Item to Overlay</h4>
+  <label>Type</label>
+  <select id="itemType">
+    <option value="user">User</option>
+    <option value="group">Group/Team</option>
+    <option value="building">Building</option>
+    <option value="service">Computer Service</option>
+    <option value="custom">Custom</option>
+  </select>
+  <label>Reference</label>
+  <select id="itemRef"><option value="">-- select --</option></select>
+  <label>Label</label>
+  <input id="itemLabel" placeholder="Label text">
+  <label>Color</label>
+  <input id="itemColor" type="color" value="#4A90D9">
+  <label>Icon</label>
+  <input id="itemIcon" placeholder="Emoji or symbol" value="">
+  <label>Notes</label>
+  <input id="itemNotes" placeholder="Notes (optional)">
+  <div class="dialog-buttons">
+    <button class="btn-map" id="btnCancelAddItem">Cancel</button>
+    <button class="btn-map" id="btnPlaceItem">Place on Map</button>
+  </div>
 </div>
 <script src="/static/vendor/leaflet.js"></script>
 <script src="/static/map-popup.js"></script>

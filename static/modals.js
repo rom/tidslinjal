@@ -184,7 +184,8 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   document.getElementById('eventId').value = ev ? ev.id : '';
   document.getElementById('eventTitle').value = ev ? ev.title : '';
   document.getElementById('eventDescription').value = ev ? (ev.description||'') : '';
-  document.getElementById('eventColor').value = ev ? (ev.color||'#4A90D9') : '#4A90D9';
+  const evTypeColor = ev && ev.event_type ? (state.eventTypes.find(t => t.key === ev.event_type) || {}).color : null;
+  document.getElementById('eventColor').value = ev ? (ev.color || evTypeColor || '#4A90D9') : '#4A90D9';
 
   // Type select — sorted alphabetically by display label
   const typeSelect = document.getElementById('eventType');
@@ -3370,6 +3371,9 @@ function renderSidebar() {
       }
     }).catch(() => {});
     _bindActions(el);
+  } else if (tab === 'references') {
+    _renderReferencesTab(el);
+
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -5791,6 +5795,25 @@ function connectSSE() {
       } catch { /* ignore */ }
       renderSidebar();
     } catch { /* ignore parse errors */ }
+  });
+  // Personal notification
+  es.addEventListener('personal_notification', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Play bell sound
+      _playNotifBellSound();
+      // Browser notification
+      if (Notification.permission === 'granted') {
+        try { new Notification('Tidslinjal', { body: `${data.title}\n${data.body}`, icon: '/static/favicon.ico', tag: `notif-${data.id}` }); } catch {}
+      }
+      // Toast
+      showNotification('info', `${data.title}: ${data.body}`);
+      // Update badge
+      _notifUnreadCount++;
+      _updateNotifBadge();
+      // If panel is open, re-render
+      if (_notifPanelOpen) _renderNotifPanel();
+    } catch {}
   });
   // Decision assignment notification
   es.addEventListener('decision_assigned', e => {
@@ -9785,4 +9808,292 @@ ${content}
 
 function _printTaskTimeMatrix() {
   _detachTaskTimeMatrix();
+}
+
+// ── Personal Notifications ─────────────────────────────────────────────────
+let _notifUnreadCount = 0;
+let _notifPanelOpen = false;
+let _notifCache = [];
+
+function _playNotifBellSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    // Two-tone bell chime
+    for (let i = 0; i < 2; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = i === 0 ? 880 : 1100;
+      gain.gain.setValueAtTime(0.3, now + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.3);
+      osc.start(now + i * 0.15);
+      osc.stop(now + i * 0.15 + 0.31);
+    }
+    setTimeout(() => ctx.close(), 2000);
+  } catch {}
+}
+
+function _updateNotifBadge() {
+  const badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  if (_notifUnreadCount > 0) {
+    badge.textContent = _notifUnreadCount > 99 ? '99+' : _notifUnreadCount;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+async function _loadNotifications() {
+  try {
+    const data = await apiGet('/api/personal-notifications');
+    if (data) {
+      _notifCache = data;
+      _notifUnreadCount = data.filter(n => !n.read).length;
+      _updateNotifBadge();
+    }
+  } catch {}
+}
+
+function _formatNotifTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function _renderNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+
+  const typeIcons = { event: '📋', prc: '✅', alarm: '⏰', timer: '⏱', system: '🔧' };
+
+  let html = '<div class="notif-panel-header"><span>Notifications</span></div>';
+  if (_notifCache.length === 0) {
+    html += '<div class="notif-empty">No notifications</div>';
+  } else {
+    for (const n of _notifCache) {
+      const icon = typeIcons[n.type] || '🔔';
+      const unreadClass = n.read ? '' : ' unread';
+      const ackBtn = n.acknowledged ? '' :
+        `<div class="notif-item-actions"><button class="notif-ack-btn" onclick="_ackNotification(${n.id}); event.stopPropagation();">Acknowledge</button></div>`;
+      html += `<div class="notif-item${unreadClass}" data-notif-id="${n.id}">
+        <div class="notif-item-title">${icon} ${escHtml(n.title)}</div>
+        <div class="notif-item-body">${escHtml(n.body)}</div>
+        <div class="notif-item-time">${_formatNotifTime(n.created_at)}</div>
+        ${ackBtn}
+      </div>`;
+    }
+  }
+  panel.innerHTML = html;
+}
+
+function _toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  _notifPanelOpen = !_notifPanelOpen;
+  if (_notifPanelOpen) {
+    _loadNotifications().then(() => _renderNotifPanel());
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+async function _ackNotification(id) {
+  try {
+    await apiPost(`/api/personal-notifications/${id}/ack`, {});
+    // Update cache
+    for (const n of _notifCache) {
+      if (n.id === id) {
+        n.acknowledged = true;
+        n.read = true;
+        break;
+      }
+    }
+    _notifUnreadCount = _notifCache.filter(n => !n.read).length;
+    _updateNotifBadge();
+    _renderNotifPanel();
+  } catch {}
+}
+
+// Init: wire up button click and load initial data
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('btnNotifications');
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _toggleNotifPanel();
+    });
+  }
+  // Close panel when clicking outside
+  document.addEventListener('click', (e) => {
+    if (_notifPanelOpen) {
+      const panel = document.getElementById('notifPanel');
+      const btn = document.getElementById('btnNotifications');
+      if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+        _notifPanelOpen = false;
+        panel.style.display = 'none';
+      }
+    }
+  });
+  // Load notifications on page load (after a short delay to let auth settle)
+  setTimeout(() => _loadNotifications(), 1500);
+});
+
+// ── References Tab ──────────────────────────────────────────────────────────
+
+function _renderReferencesTab(el) {
+  const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
+  el.innerHTML = `
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">
+        ${t('references_title') || 'References'}
+        ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
+      </div>
+      <input type="text" id="refSearch" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+      <select id="refCategoryFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+        <option value="">${t('all_categories') || 'All categories'}</option>
+        <option value="handbook">Handbook</option>
+        <option value="sop">SOP</option>
+        <option value="policy">Policy</option>
+        <option value="map">Map</option>
+        <option value="reference">Reference</option>
+        <option value="other">Other</option>
+      </select>
+      <div id="refList" style="max-height:60vh;overflow-y:auto"></div>
+    </div>`;
+  _loadAndRenderReferences();
+  const addBtn = document.getElementById('btnAddReference');
+  if (addBtn) addBtn.addEventListener('click', () => _openReferenceUploadModal());
+  const searchEl = document.getElementById('refSearch');
+  if (searchEl) searchEl.addEventListener('input', () => _filterReferences());
+  const catEl = document.getElementById('refCategoryFilter');
+  if (catEl) catEl.addEventListener('change', () => _filterReferences());
+}
+
+async function _loadAndRenderReferences() {
+  try {
+    const res = await fetch('/api/references');
+    if (!res.ok) return;
+    state.references = await res.json() || [];
+  } catch (e) { state.references = []; }
+  _filterReferences();
+}
+
+function _filterReferences() {
+  const listEl = document.getElementById('refList');
+  if (!listEl) return;
+  const search = (document.getElementById('refSearch')?.value || '').toLowerCase();
+  const cat = document.getElementById('refCategoryFilter')?.value || '';
+  const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
+  const refs = (state.references || []).filter(r => {
+    if (cat && r.category !== cat) return false;
+    if (search && !(r.title + ' ' + (r.description || '') + ' ' + (r.tags || []).join(' ')).toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if (refs.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:12px 0">No references found.</div>';
+    return;
+  }
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', other:'#95A5A6' };
+  listEl.innerHTML = refs.map(r => {
+    const sizeKB = r.size ? (r.size / 1024).toFixed(1) + ' KB' : '';
+    return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:${catColors[r.category] || '#95A5A6'};color:#fff;text-transform:uppercase;margin-right:6px">${escHtml(r.category || 'other')}</span>
+          <b style="font-size:var(--fs-base)">${escHtml(r.title)}</b>
+        </div>
+        <div style="display:flex;gap:4px">
+          <a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">Download</a>
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" onclick="if(confirm('Delete this reference?'))_deleteReference(${r.id})">Delete</button>` : ''}
+        </div>
+      </div>
+      ${r.description ? `<div style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:4px">${escHtml(r.description)}</div>` : ''}
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">${escHtml(r.original_name || '')} · ${sizeKB} · ${escHtml(r.uploaded_by_name || '')}</div>
+      ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(t => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:3px">${escHtml(t)}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function _deleteReference(id) {
+  try {
+    const res = await fetch('/api/references/' + id, { method: 'DELETE' });
+    if (res.ok) _loadAndRenderReferences();
+  } catch (e) { console.warn('[deleteReference]', e); }
+}
+
+function _openReferenceUploadModal() {
+  // Build and show a simple upload modal
+  let modal = document.getElementById('referenceUploadModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'referenceUploadModal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h3>Upload Reference Document</h3>
+          <button class="modal-close" data-close-ref-modal>×</button>
+        </div>
+        <div class="modal-body">
+          <label>Title</label>
+          <input type="text" id="refUpTitle" class="form-input" placeholder="Document title">
+          <label style="margin-top:8px">Description</label>
+          <input type="text" id="refUpDesc" class="form-input" placeholder="Description (optional)">
+          <label style="margin-top:8px">Category</label>
+          <select id="refUpCategory" class="form-input">
+            <option value="handbook">Handbook</option>
+            <option value="sop">SOP</option>
+            <option value="policy">Policy</option>
+            <option value="map">Map</option>
+            <option value="reference">Reference</option>
+            <option value="other">Other</option>
+          </select>
+          <label style="margin-top:8px">Tags (comma-separated)</label>
+          <input type="text" id="refUpTags" class="form-input" placeholder="tag1, tag2, ...">
+          <label style="margin-top:8px">File</label>
+          <input type="file" id="refUpFile" class="form-input">
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-ref-modal>Cancel</button>
+          <button class="btn btn-primary" id="btnDoUploadRef">Upload</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-close-ref-modal]').forEach(b => b.addEventListener('click', () => modal.style.display = 'none'));
+    document.getElementById('btnDoUploadRef').addEventListener('click', _handleReferenceUpload);
+  }
+  // Reset form
+  document.getElementById('refUpTitle').value = '';
+  document.getElementById('refUpDesc').value = '';
+  document.getElementById('refUpTags').value = '';
+  document.getElementById('refUpFile').value = '';
+  modal.style.display = 'flex';
+}
+
+async function _handleReferenceUpload() {
+  const title = document.getElementById('refUpTitle').value.trim();
+  const file = document.getElementById('refUpFile').files[0];
+  if (!title || !file) { alert('Title and file are required'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', title);
+  fd.append('description', document.getElementById('refUpDesc').value.trim());
+  fd.append('category', document.getElementById('refUpCategory').value);
+  const tags = document.getElementById('refUpTags').value.trim();
+  if (tags) fd.append('tags', tags);
+  try {
+    const res = await fetch('/api/references', { method: 'POST', body: fd });
+    if (!res.ok) { const t = await res.text(); alert('Upload failed: ' + t); return; }
+    document.getElementById('referenceUploadModal').style.display = 'none';
+    _loadAndRenderReferences();
+  } catch (e) { alert('Upload error: ' + e.message); }
 }

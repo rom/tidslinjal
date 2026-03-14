@@ -244,31 +244,36 @@ function toggleClockTZ() {
 }
 
 function updateClock() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  let h, m, s, dateStr, tzLabel, timeStr;
-  if (_clockUTC) {
-    h = now.getUTCHours(); m = now.getUTCMinutes(); s = now.getUTCSeconds();
-    dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
-    // Zulu format: no colons, "Z" suffix
-    timeStr = `${pad(h)}${pad(m)}${pad(s)}Z`;
-    tzLabel = 'UTC/Z';
-  } else {
-    h = now.getHours(); m = now.getMinutes(); s = now.getSeconds();
-    dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-    timeStr = `${pad(h)}:${pad(m)}:${pad(s)}`;
-    // Show short timezone name
-    try {
-      tzLabel = now.toLocaleTimeString(getLocale(), {timeZoneName:'short'}).split(' ').pop();
-    } catch { tzLabel = ''; }
+  try {
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    let h, m, s, dateStr, tzLabel, timeStr;
+    if (_clockUTC) {
+      h = now.getUTCHours(); m = now.getUTCMinutes(); s = now.getUTCSeconds();
+      dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
+      // Zulu format: no colons, "Z" suffix
+      timeStr = `${pad(h)}${pad(m)}${pad(s)}Z`;
+      tzLabel = 'UTC/Z';
+    } else {
+      h = now.getHours(); m = now.getMinutes(); s = now.getSeconds();
+      dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+      timeStr = `${pad(h)}:${pad(m)}:${pad(s)}`;
+      // Show short timezone name
+      try {
+        tzLabel = now.toLocaleTimeString(getLocale(), {timeZoneName:'short'}).split(' ').pop();
+      } catch { tzLabel = ''; }
+    }
+    const timeEl = document.getElementById('clockTime');
+    if (timeEl) timeEl.textContent = timeStr;
+    const dateEl = document.getElementById('clockDate');
+    if (dateEl) dateEl.textContent = dateStr;
+    const tzEl = document.getElementById('clockTZ');
+    if (tzEl) tzEl.textContent = tzLabel;
+    updateExtraClocks(now);
+  } catch (e) {
+    // Prevent exceptions from killing the setInterval
+    console.warn('[updateClock]', e);
   }
-  const timeEl = document.getElementById('clockTime');
-  if (timeEl) timeEl.textContent = timeStr;
-  const dateEl = document.getElementById('clockDate');
-  if (dateEl) dateEl.textContent = dateStr;
-  const tzEl = document.getElementById('clockTZ');
-  if (tzEl) tzEl.textContent = tzLabel;
-  updateExtraClocks(now);
 }
 
 // ── Extra timezone clocks ───────────────────────────────────────────────────

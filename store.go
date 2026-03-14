@@ -67,6 +67,9 @@ type Store struct {
 	rooms                []Room
 	customResourceTypes  []CustomResourceType
 	personReadyChecks    []PersonReadyCheck
+	notifications        []Notification
+	mapResources         []MapResource
+	referenceDocs        []ReferenceDoc
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -93,6 +96,9 @@ type Store struct {
 	nextLogBookID            int64
 	nextCustomResTypeID      int64
 	nextPersonReadyCheckID   int64
+	nextNotificationID       int64
+	nextMapResourceID        int64
+	nextReferenceDocID       int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -110,6 +116,12 @@ func NewStore(dataDir string) (*Store, error) {
 	}
 	if err := os.MkdirAll(filepath.Join(dataDir, "attachments"), 0700); err != nil {
 		return nil, fmt.Errorf("create attachments dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataDir, "map_resources"), 0700); err != nil {
+		return nil, fmt.Errorf("create map_resources dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataDir, "references"), 0700); err != nil {
+		return nil, fmt.Errorf("create references dir: %w", err)
 	}
 	if err := s.load(); err != nil {
 		return nil, fmt.Errorf("load data: %w", err)
@@ -158,6 +170,9 @@ func (s *Store) load() error {
 	s.loadFile("event_log.json", &s.eventLog)
 	s.loadFile("log_book.json", &s.logBook)
 	s.loadFile("person_ready_checks.json", &s.personReadyChecks)
+	s.loadFile("notifications.json", &s.notifications)
+	s.loadFile("map_resources.json", &s.mapResources)
+	s.loadFile("references.json", &s.referenceDocs)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -311,6 +326,21 @@ func (s *Store) load() error {
 	for _, x := range s.personReadyChecks {
 		if x.ID > s.nextPersonReadyCheckID {
 			s.nextPersonReadyCheckID = x.ID
+		}
+	}
+	for _, x := range s.notifications {
+		if x.ID > s.nextNotificationID {
+			s.nextNotificationID = x.ID
+		}
+	}
+	for _, x := range s.mapResources {
+		if x.ID > s.nextMapResourceID {
+			s.nextMapResourceID = x.ID
+		}
+	}
+	for _, x := range s.referenceDocs {
+		if x.ID > s.nextReferenceDocID {
+			s.nextReferenceDocID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -3027,6 +3057,7 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 		"comments.json", "phases.json", "templates.json", "roles.json",
 		"registration.json", "invitations.json", "filter_presets.json",
 		"event_versions.json", "auto_report_schedules.json",
+		"map_resources.json", "references.json",
 	}
 	for _, fn := range files {
 		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
@@ -3436,4 +3467,213 @@ func (s *Store) DeleteMapLocation(id int64) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("map location %d not found", id)
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+func (s *Store) AddNotification(n Notification) (Notification, error) {
+	s.mu.Lock()
+	s.nextNotificationID++
+	n.ID = s.nextNotificationID
+	n.CreatedAt = time.Now()
+	s.notifications = append(s.notifications, n)
+	// Cap at 5000 entries — drop oldest first
+	if len(s.notifications) > 5000 {
+		s.notifications = s.notifications[len(s.notifications)-5000:]
+	}
+	snap := append([]Notification(nil), s.notifications...)
+	s.mu.Unlock()
+	return n, s.persist("notifications.json", snap)
+}
+
+func (s *Store) GetNotificationsForUser(userID int64, limit int) []Notification {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	// Collect user's notifications, unacknowledged first, newest first
+	var unacked, acked []Notification
+	for i := len(s.notifications) - 1; i >= 0; i-- {
+		n := s.notifications[i]
+		if n.UserID != userID {
+			continue
+		}
+		if !n.Acknowledged {
+			unacked = append(unacked, n)
+		} else {
+			acked = append(acked, n)
+		}
+	}
+	result := append(unacked, acked...)
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result
+}
+
+func (s *Store) AcknowledgeNotification(id int64) error {
+	s.mu.Lock()
+	for i, n := range s.notifications {
+		if n.ID == id {
+			s.notifications[i].Acknowledged = true
+			s.notifications[i].Read = true
+			snap := append([]Notification(nil), s.notifications...)
+			s.mu.Unlock()
+			return s.persist("notifications.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("notification %d not found", id)
+}
+
+func (s *Store) MarkNotificationRead(id int64) error {
+	s.mu.Lock()
+	for i, n := range s.notifications {
+		if n.ID == id {
+			s.notifications[i].Read = true
+			snap := append([]Notification(nil), s.notifications...)
+			s.mu.Unlock()
+			return s.persist("notifications.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("notification %d not found", id)
+}
+
+func (s *Store) CountUnreadNotifications(userID int64) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	count := 0
+	for _, n := range s.notifications {
+		if n.UserID == userID && !n.Read {
+			count++
+		}
+	}
+	return count
+}
+
+// ── Map Resources ──────────────────────────────────────────────────────────────
+
+func (s *Store) GetMapResources() []MapResource {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]MapResource, len(s.mapResources))
+	copy(out, s.mapResources)
+	return out
+}
+
+func (s *Store) GetMapResource(id int64) (MapResource, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, mr := range s.mapResources {
+		if mr.ID == id {
+			return mr, true
+		}
+	}
+	return MapResource{}, false
+}
+
+func (s *Store) AddMapResource(mr MapResource) (MapResource, error) {
+	s.mu.Lock()
+	s.nextMapResourceID++
+	mr.ID = s.nextMapResourceID
+	s.mapResources = append(s.mapResources, mr)
+	snap := append([]MapResource(nil), s.mapResources...)
+	s.mu.Unlock()
+	return mr, s.persist("map_resources.json", snap)
+}
+
+func (s *Store) UpdateMapResource(mr MapResource) error {
+	s.mu.Lock()
+	for i, m := range s.mapResources {
+		if m.ID == mr.ID {
+			s.mapResources[i] = mr
+			snap := append([]MapResource(nil), s.mapResources...)
+			s.mu.Unlock()
+			return s.persist("map_resources.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("map resource %d not found", mr.ID)
+}
+
+func (s *Store) DeleteMapResource(id int64) error {
+	s.mu.Lock()
+	for i, m := range s.mapResources {
+		if m.ID == id {
+			s.mapResources = append(s.mapResources[:i], s.mapResources[i+1:]...)
+			snap := append([]MapResource(nil), s.mapResources...)
+			s.mu.Unlock()
+			return s.persist("map_resources.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("map resource %d not found", id)
+}
+
+// MapResourceDir returns the path to the map resources file directory.
+func (s *Store) MapResourceDir() string {
+	return filepath.Join(s.dataDir, "map_resources")
+}
+
+// ReferenceDir returns the path to the reference documents file directory.
+func (s *Store) ReferenceDir() string {
+	return filepath.Join(s.dataDir, "references")
+}
+
+// ── Reference Documents ────────────────────────────────────────────────────
+
+func (s *Store) GetReferenceDocs() []ReferenceDoc {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]ReferenceDoc, len(s.referenceDocs))
+	copy(out, s.referenceDocs)
+	return out
+}
+
+func (s *Store) GetReferenceDoc(id int64) (ReferenceDoc, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, rd := range s.referenceDocs {
+		if rd.ID == id {
+			return rd, true
+		}
+	}
+	return ReferenceDoc{}, false
+}
+
+func (s *Store) AddReferenceDoc(rd ReferenceDoc) (ReferenceDoc, error) {
+	s.mu.Lock()
+	s.nextReferenceDocID++
+	rd.ID = s.nextReferenceDocID
+	s.referenceDocs = append(s.referenceDocs, rd)
+	snap := append([]ReferenceDoc(nil), s.referenceDocs...)
+	s.mu.Unlock()
+	return rd, s.persist("references.json", snap)
+}
+
+func (s *Store) UpdateReferenceDoc(rd ReferenceDoc) error {
+	s.mu.Lock()
+	for i, d := range s.referenceDocs {
+		if d.ID == rd.ID {
+			s.referenceDocs[i] = rd
+			snap := append([]ReferenceDoc(nil), s.referenceDocs...)
+			s.mu.Unlock()
+			return s.persist("references.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("reference doc %d not found", rd.ID)
+}
+
+func (s *Store) DeleteReferenceDoc(id int64) error {
+	s.mu.Lock()
+	for i, d := range s.referenceDocs {
+		if d.ID == id {
+			s.referenceDocs = append(s.referenceDocs[:i], s.referenceDocs[i+1:]...)
+			snap := append([]ReferenceDoc(nil), s.referenceDocs...)
+			s.mu.Unlock()
+			return s.persist("references.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("reference doc %d not found", id)
 }

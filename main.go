@@ -345,6 +345,19 @@ func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
 	}
 }
 
+// SendToUser sends an SSE message to all clients for a specific user — O(1) via byUser index.
+func (b *SSEBroker) SendToUser(userID int64, msg SSEMessage) {
+	b.mu.RLock()
+	clients := b.byUser[userID]
+	b.mu.RUnlock()
+	for _, c := range clients {
+		select {
+		case c.broadcast <- msg:
+		default:
+		}
+	}
+}
+
 // ── Webhook worker pool ───────────────────────────────────────────────────────
 
 // webhookConcurrency limits simultaneous outbound HTTP webhook calls so a burst
@@ -703,6 +716,24 @@ func (app *App) audit(userID int64, userName, action, entityType string, entityI
 		Action: action, EntityType: entityType, EntityID: entityID,
 		Summary: summary,
 	})
+}
+
+// notifyUser creates a persistent notification and sends an SSE event to the user.
+func (app *App) notifyUser(userID int64, ntype, title, body, refID string) {
+	n := Notification{
+		UserID: userID,
+		Type:   ntype,
+		Title:  title,
+		Body:   body,
+		RefID:  refID,
+	}
+	created, err := app.store.AddNotification(n)
+	if err != nil {
+		log.Printf("failed to create notification for user %d: %v", userID, err)
+		return
+	}
+	data, _ := json.Marshal(created)
+	app.broker.SendToUser(userID, SSEMessage{Event: "personal_notification", Data: string(data)})
 }
 
 // callWebhookURL enqueues an alarm webhook call through the bounded worker pool.
@@ -2039,6 +2070,14 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		if uid != user.ID {
 			app.broker.Notify(uid, inviteNotif)
 		}
+	}
+
+	// Notify responsible user if set and different from creator
+	if created.ResponsibleID != nil && *created.ResponsibleID != user.ID {
+		app.notifyUser(*created.ResponsibleID, "event",
+			"Assigned: "+created.Title,
+			fmt.Sprintf("You have been assigned as responsible for event %q by %s", created.Title, user.DisplayName),
+			fmt.Sprintf("%d", created.ID))
 	}
 
 	app.broadcastEventChange(user.ID, "created", &created)
@@ -4594,6 +4633,11 @@ func (app *App) runAlarmScheduler() {
 					LeadTime: alarm.LeadTime, Sound: alarm.Sound, Message: msg,
 				}
 				app.broker.Notify(alarm.UserID, notif)
+				// Personal notification for the alarm
+				app.notifyUser(alarm.UserID, "alarm",
+					"Alarm: "+alarm.EventTitle,
+					msg,
+					fmt.Sprintf("%d", alarm.EventID))
 				// Call per-alarm webhook if set
 				if alarm.WebhookURL != "" {
 					app.callWebhookURL(alarm.WebhookURL, "generic", msg, notif)
@@ -5663,6 +5707,28 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// ── Personal Notifications ──
+	mux.HandleFunc("/api/personal-notifications", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetNotifications)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/personal-notifications/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			if strings.HasSuffix(r.URL.Path, "/ack") {
+				app.requireAuth(app.handleAckNotification)(w, r)
+			} else if strings.HasSuffix(r.URL.Path, "/read") {
+				app.requireAuth(app.handleReadNotification)(w, r)
+			} else {
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Free/Busy lookup ──
 	mux.HandleFunc("/api/free-busy", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -5684,8 +5750,93 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// ── Map Resources (uploaded maps + overlays) ──
+	mux.HandleFunc("/api/map-resources", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListMapResources)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleUploadMapResource)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/map-resources/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/map-resources/{id}/file
+		if len(parts) == 4 && parts[3] == "file" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleServeMapResourceFile)(w, r)
+			return
+		}
+		// /api/map-resources/{id}/overlays (GET or PUT)
+		if len(parts) == 4 && parts[3] == "overlays" {
+			if r.Method == http.MethodPut {
+				app.requireAuth(app.handleUpdateMapResourceOverlays)(w, r)
+			} else if r.Method == http.MethodGet {
+				app.requireAuth(app.handleGetMapOverlays)(w, r)
+			} else {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		// /api/map-resources/{id}/overlays/{overlayId}/lock
+		if len(parts) == 6 && parts[3] == "overlays" && parts[5] == "lock" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleLockMapOverlay)(w, r)
+			return
+		}
+		// /api/map-resources/{id}/overlays/{overlayId}/unlock
+		if len(parts) == 6 && parts[3] == "overlays" && parts[5] == "unlock" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleUnlockMapOverlay)(w, r)
+			return
+		}
+		// /api/map-resources/{id}
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetMapResource)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleUpdateMapResourceMeta)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleTeamLead, app.handleDeleteMapResource)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Prometheus metrics (no auth — standard for metrics endpoints) ──
 	mux.HandleFunc("/metrics", app.handleMetrics)
+
+	// ── References ──
+	mux.HandleFunc("/api/references", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListReferences)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleUploadReference)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/references/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/references/{id}/download
+		if len(parts) == 4 && parts[3] == "download" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleDownloadReference)(w, r)
+			return
+		}
+		// /api/references/{id}
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetReference)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleUpdateReference)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleTeamLead, app.handleDeleteReference)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// ── Map projection page ──
 	mux.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
@@ -7556,6 +7707,27 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	jsonOK(w, created)
+
+	// Broadcast SSE event for the new PRC so all clients can update
+	prcData, _ := json.Marshal(created)
+	app.broker.BroadcastAll(SSEMessage{Event: "prc_new_check", Data: string(prcData)})
+
+	// Notify each participant via personal notification
+	for _, p := range created.Participants {
+		if p.UserID != user.ID {
+			app.notifyUser(p.UserID, "prc",
+				"Ready Check",
+				fmt.Sprintf("You have been included in a ready check by %s", check.CreatedByName),
+				fmt.Sprintf("%d", created.ID))
+		}
+	}
+
+	// Create an audit log entry
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "create_prc", EntityType: "person_ready_check", EntityID: created.ID,
+		Summary: fmt.Sprintf("Created person ready check with %d participants", len(created.Participants)),
+	})
 }
 
 func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
@@ -7604,6 +7776,284 @@ func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Req
 		return
 	}
 	jsonOK(w, found)
+
+	// Broadcast SSE event for the updated PRC
+	updatedData, _ := json.Marshal(found)
+	app.broker.BroadcastAll(SSEMessage{Event: "prc_update", Data: string(updatedData)})
+}
+
+// ── Personal Notification handlers ──────────────────────────────────────────
+
+func (app *App) handleGetNotifications(w http.ResponseWriter, r *http.Request, user *User) {
+	notifs := app.store.GetNotificationsForUser(user.ID, 50)
+	if notifs == nil {
+		notifs = []Notification{}
+	}
+	jsonOK(w, notifs)
+}
+
+func (app *App) handleAckNotification(w http.ResponseWriter, r *http.Request, user *User) {
+	// Path: /api/personal-notifications/{id}/ack
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	if len(parts) < 2 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[len(parts)-2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.AcknowledgeNotification(id); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]bool{"ok": true})
+}
+
+func (app *App) handleReadNotification(w http.ResponseWriter, r *http.Request, user *User) {
+	// Path: /api/personal-notifications/{id}/read
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	if len(parts) < 2 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[len(parts)-2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.MarkNotificationRead(id); err != nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]bool{"ok": true})
+}
+
+// ── Map Resource handlers ──────────────────────────────────────────────────────
+
+func (app *App) handleListMapResources(w http.ResponseWriter, r *http.Request, user *User) {
+	resources := app.store.GetMapResources()
+	if resources == nil {
+		resources = []MapResource{}
+	}
+	jsonOK(w, resources)
+}
+
+func (app *App) handleUploadMapResource(w http.ResponseWriter, r *http.Request, user *User) {
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		jsonError(w, "file too large (max 50 MB)", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonError(w, "file field missing", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	name := r.FormValue("name")
+	if name == "" {
+		name = header.Filename
+	}
+	mapType := r.FormValue("map_type")
+	if mapType == "" {
+		mapType = "custom"
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	allowed := map[string]bool{".pdf": true, ".svg": true, ".jpg": true, ".jpeg": true, ".png": true, ".json": true, ".geojson": true}
+	if !allowed[ext] {
+		jsonError(w, "unsupported file type; allowed: PDF, SVG, JPG, PNG, JSON, GeoJSON", http.StatusBadRequest)
+		return
+	}
+
+	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(header.Filename))
+	destPath := filepath.Join(app.store.MapResourceDir(), storedName)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	written, err := io.Copy(dst, file)
+	dst.Close()
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+
+	ct := header.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+
+	mr := MapResource{
+		Name:          name,
+		Description:   r.FormValue("description"),
+		MapType:       mapType,
+		Filename:      storedName,
+		OriginalName:  header.Filename,
+		ContentType:   ct,
+		Size:          written,
+		CreatedBy:     user.ID,
+		CreatedByName: user.DisplayName,
+		CreatedAt:     time.Now(),
+	}
+
+	created, err := app.store.AddMapResource(mr)
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save map resource", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "created", EntityType: "map_resource", EntityID: created.ID,
+		Summary: fmt.Sprintf("Uploaded map resource: %s", created.Name),
+	})
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, created)
+}
+
+func (app *App) handleDeleteMapResource(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-resources/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// Remove the stored file
+	if mr.Filename != "" {
+		os.Remove(filepath.Join(app.store.MapResourceDir(), mr.Filename))
+	}
+	if err := app.store.DeleteMapResource(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "deleted", EntityType: "map_resource", EntityID: id,
+		Summary: fmt.Sprintf("Deleted map resource: %s", mr.Name),
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (app *App) handleMapResourceFile(w http.ResponseWriter, r *http.Request) {
+	// Path: /api/map-resources/{id}/file
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.SplitN(path, "/", 2)
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok || mr.Filename == "" {
+		http.NotFound(w, r)
+		return
+	}
+	filePath := filepath.Join(app.store.MapResourceDir(), mr.Filename)
+	http.ServeFile(w, r, filePath)
+}
+
+func (app *App) handleGetMapOverlays(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-resources/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	overlays := mr.Overlays
+	if overlays == nil {
+		overlays = []MapOverlay{}
+	}
+	jsonOK(w, overlays)
+}
+
+func (app *App) handleSaveMapOverlays(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-resources/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	var overlays []MapOverlay
+	if err := json.NewDecoder(r.Body).Decode(&overlays); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	mr.Overlays = overlays
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleLockMapOverlay(w http.ResponseWriter, r *http.Request, user *User) {
+	// Path: /api/map-resources/{id}/overlays/{overlayId}/lock
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid map resource id", http.StatusBadRequest)
+		return
+	}
+	overlayID := parts[2]
+
+	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "no lock permission", http.StatusForbidden)
+		return
+	}
+
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	found := false
+	for i, ov := range mr.Overlays {
+		if ov.ID == overlayID {
+			if ov.Locked {
+				jsonError(w, "overlay already locked", http.StatusConflict)
+				return
+			}
+			mr.Overlays[i].Locked = true
+			mr.Overlays[i].LockedBy = user.ID
+			found = true
+			break
+		}
+	}
+	if !found {
+		jsonError(w, "overlay not found", http.StatusNotFound)
+		return
+	}
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
 }
 
 func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, user *User) {
@@ -8811,6 +9261,349 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	logVerbose("OIDC login success: user=%s role=%s", username, user.Role)
 	logDebug("OIDC: session created id=%s expires=%s", sessID, sess.ExpiresAt.Format(time.RFC3339))
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+// ── Additional Map Resource handlers ───────────────────────────────────────────
+
+func (app *App) handleGetMapResource(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleServeMapResourceFile(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	filePath := filepath.Join(app.store.MapResourceDir(), mr.Filename)
+	w.Header().Set("Content-Type", mr.ContentType)
+	safeDisp := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, mr.OriginalName)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, safeDisp))
+	http.ServeFile(w, r, filePath)
+}
+
+func (app *App) handleUpdateMapResourceMeta(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Name        *string `json:"name"`
+		Description *string `json:"description"`
+		MapType     *string `json:"map_type"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Name != nil {
+		mr.Name = *req.Name
+	}
+	if req.Description != nil {
+		mr.Description = *req.Description
+	}
+	if req.MapType != nil {
+		mr.MapType = *req.MapType
+	}
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleUpdateMapResourceOverlays(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	var overlays []MapOverlay
+	if err := decode(r, &overlays); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	mr.Overlays = overlays
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleUnlockMapOverlay(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	overlayID := parts[4]
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	found := false
+	for i := range mr.Overlays {
+		if mr.Overlays[i].ID == overlayID {
+			if !mr.Overlays[i].Locked {
+				jsonError(w, "overlay not locked", http.StatusConflict)
+				return
+			}
+			// Only the locker or teamlead+ can unlock
+			if mr.Overlays[i].LockedBy != user.ID && !hasRole(user.Role, RoleTeamLead) {
+				jsonError(w, "only the lock owner or team lead can unlock", http.StatusForbidden)
+				return
+			}
+			mr.Overlays[i].Locked = false
+			mr.Overlays[i].LockedBy = 0
+			found = true
+			break
+		}
+	}
+	if !found {
+		jsonError(w, "overlay not found", http.StatusNotFound)
+		return
+	}
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+// ── Reference Document handlers ────────────────────────────────────────────────
+
+func (app *App) handleListReferences(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetReferenceDocs())
+}
+
+func (app *App) handleGetReference(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rd, ok := app.store.GetReferenceDoc(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, rd)
+}
+
+func (app *App) handleUploadReference(w http.ResponseWriter, r *http.Request, user *User) {
+	if err := r.ParseMultipartForm(50 << 20); err != nil { // 50 MB
+		jsonError(w, "file too large (max 50 MB)", http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonError(w, "file field missing", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	safeFilename := filepath.Base(header.Filename)
+	if safeFilename == "." || safeFilename == "/" {
+		safeFilename = "upload"
+	}
+	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeFilename)
+	destPath := filepath.Join(app.store.ReferenceDir(), storedName)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+	written, err := io.Copy(dst, file)
+	dst.Close()
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save file", http.StatusInternalServerError)
+		return
+	}
+
+	mimeType := mime.TypeByExtension(filepath.Ext(header.Filename))
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+
+	title := r.FormValue("title")
+	if title == "" {
+		title = safeFilename
+	}
+
+	category := r.FormValue("category")
+	if category == "" {
+		category = "other"
+	}
+
+	var tags []string
+	if t := r.FormValue("tags"); t != "" {
+		for _, tag := range strings.Split(t, ",") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tags = append(tags, tag)
+			}
+		}
+	}
+
+	rd := ReferenceDoc{
+		Title:          title,
+		Description:    r.FormValue("description"),
+		Category:       category,
+		Filename:       storedName,
+		OriginalName:   safeFilename,
+		ContentType:    mimeType,
+		Size:           written,
+		UploadedBy:     user.ID,
+		UploadedByName: user.DisplayName,
+		UploadedAt:     time.Now(),
+		Tags:           tags,
+	}
+
+	created, err := app.store.AddReferenceDoc(rd)
+	if err != nil {
+		os.Remove(destPath)
+		jsonError(w, "failed to save reference", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, created)
+}
+
+func (app *App) handleDownloadReference(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rd, ok := app.store.GetReferenceDoc(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	filePath := filepath.Join(app.store.ReferenceDir(), rd.Filename)
+	w.Header().Set("Content-Type", rd.ContentType)
+	safeDisp := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, rd.OriginalName)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
+	http.ServeFile(w, r, filePath)
+}
+
+func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rd, ok := app.store.GetReferenceDoc(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Title       *string  `json:"title"`
+		Description *string  `json:"description"`
+		Category    *string  `json:"category"`
+		Tags        []string `json:"tags"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Title != nil {
+		rd.Title = *req.Title
+	}
+	if req.Description != nil {
+		rd.Description = *req.Description
+	}
+	if req.Category != nil {
+		rd.Category = *req.Category
+	}
+	if req.Tags != nil {
+		rd.Tags = req.Tags
+	}
+	if err := app.store.UpdateReferenceDoc(rd); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, rd)
+}
+
+func (app *App) handleDeleteReference(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rd, ok := app.store.GetReferenceDoc(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// Remove file from disk
+	os.Remove(filepath.Join(app.store.ReferenceDir(), rd.Filename))
+	if err := app.store.DeleteReferenceDoc(id); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────

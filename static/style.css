@@ -1428,3 +1428,98 @@ body.light-mode { --danger: #c0392b; }
   border-bottom: 1px solid var(--border);
   font-size: var(--fs-sm);
 }
+
+/* ── Personal Notification Bell & Panel ───────────────────────────────── */
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--red, #e74c3c);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 8px;
+  text-align: center;
+  padding: 0 4px;
+  pointer-events: none;
+}
+.notif-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+  padding: 0;
+}
+.notif-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+  transition: background 0.15s;
+}
+.notif-item:hover {
+  background: var(--bg3);
+}
+.notif-item.unread {
+  border-left: 3px solid var(--accent);
+}
+.notif-item-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-bright);
+}
+.notif-item-body {
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+.notif-item-time {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.notif-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.notif-ack-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.notif-ack-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.notif-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}

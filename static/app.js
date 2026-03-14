@@ -252,11 +252,11 @@ async function init() {
 
   // Clock
   updateClock();
-  setInterval(updateClock, 1000);
+  state._clockInterval = setInterval(updateClock, 1000);
 
   // Auto-refresh
-  setInterval(refreshAll, 60000);
-  setInterval(() => updateCurrentTimeLine(getDays(), getSlotHeight()), 30000);
+  state._refreshInterval = setInterval(refreshAll, 60000);
+  state._timeLineInterval = setInterval(() => updateCurrentTimeLine(getDays(), getSlotHeight()), 30000);
 
   // Auto-report checker (every 5 minutes)
   checkAutoReports();
@@ -283,11 +283,26 @@ async function init() {
   setupSidebarResize();
   setupContextMenus();
 
-  // Clean up drag state when tab loses focus (e.g. alt-tab during drag)
+  // Handle tab focus/blur — restart timers that browsers throttle in background
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       // Release any mouse-button-held state by dispatching a synthetic mouseup
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    } else {
+      // Tab became visible again — restart timers that may have been throttled
+      updateClock();
+      if (state._clockInterval) clearInterval(state._clockInterval);
+      state._clockInterval = setInterval(updateClock, 1000);
+
+      if (state._timeLineInterval) clearInterval(state._timeLineInterval);
+      updateCurrentTimeLine(getDays(), getSlotHeight());
+      state._timeLineInterval = setInterval(() => updateCurrentTimeLine(getDays(), getSlotHeight()), 30000);
+
+      if (state._refreshInterval) clearInterval(state._refreshInterval);
+      state._refreshInterval = setInterval(refreshAll, 60000);
+
+      // Refresh data since we may have missed SSE events while backgrounded
+      refreshAll();
     }
   });
 
@@ -507,10 +522,12 @@ function renderListView() {
       </select>` :
       escHtml(ev.responsible_name || ev.created_by_name || t('lv_no_responsible'));
 
+    const _etMatch = eventTypes.find(et => et.key === ev.event_type);
+    const _evColor = ev.color || (_etMatch ? _etMatch.color : 'var(--accent)');
     return marker + `
     <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${ev.color||'var(--accent)'};margin-right:6px;vertical-align:middle"></span>
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${_evColor};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
       </td>
       <td style="padding:8px 10px">${typeCell}</td>
