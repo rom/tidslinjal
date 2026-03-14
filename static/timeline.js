@@ -527,7 +527,8 @@ function renderEventBlocks(days, slotH) {
         const block = document.createElement('div');
         block.className = 'event-block';
         block.dataset.evId = ev.id;
-        block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${ev.color||'#4A90D9'};border-left-color:${borderL};cursor:grab;`;
+        const evColor = ev.color || (evTypeDef ? evTypeDef.color : '#4A90D9');
+        block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${evColor};border-left-color:${borderL};cursor:grab;`;
         if (ev.status === 'cancelled') block.style.opacity = '0.45';
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
@@ -616,7 +617,12 @@ function getNow() {
 }
 
 function updateCurrentTimeLine(days, slotH) {
+  try { _updateCurrentTimeLineInner(days, slotH); }
+  catch (e) { console.warn('[updateCurrentTimeLine]', e); }
+}
+function _updateCurrentTimeLineInner(days, slotH) {
   const line = document.getElementById('current-time-line');
+  if (!line) return;
   const p    = state.preferences;
 
   if (!p.red_line_enabled) { line.style.display='none'; return; }

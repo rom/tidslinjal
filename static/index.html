@@ -96,6 +96,14 @@
     </div>
 
     <div class="header-right">
+      <!-- Personal Notifications Bell -->
+      <div style="position:relative;display:inline-block;margin-right:8px">
+        <button id="btnNotifications" class="btn btn-ghost btn-icon" title="Notifications" style="position:relative;font-size:18px;cursor:pointer">
+          🔔
+          <span id="notifBadge" class="notif-badge" style="display:none">0</span>
+        </button>
+        <div id="notifPanel" class="notif-panel" style="display:none"></div>
+      </div>
       <div id="exerciseBadge" style="display:none" class="exercise-badge"></div>
       <!-- Shown when clocks are detached to separate window -->
       <div id="clockDetachedIndicator" style="display:none;align-items:center;gap:6px;cursor:pointer;opacity:.7;font-size:12px;color:var(--accent)"
@@ -210,6 +218,7 @@
         <button class="sidebar-tab teamlead-only" data-tab="phases" style="display:none" data-i18n="tab_phases">Phases</button>
         <button class="sidebar-tab admin-only" data-tab="integrations" style="display:none" data-i18n="tab_integrations">🔌 Integrations</button>
         <button class="sidebar-tab admin-only" data-tab="security" style="display:none" data-i18n="tab_security">🛡 Security</button>
+        <button class="sidebar-tab" data-tab="references" data-i18n="tab_references">References</button>
         <button class="sidebar-tab" data-tab="settings" data-i18n="tab_settings">Settings</button>
         <button class="sidebar-tab sidebar-detach-btn" id="btnDetachSidebar" title="Detach menu to separate window">⧉</button>
       </div>

@@ -890,3 +890,70 @@ type EventLogEntry struct {
 	UserID    int64     `json:"user_id,omitempty"`
 	UserName  string    `json:"user_name,omitempty"`
 }
+
+// Notification is a persistent personal notification for a user
+type Notification struct {
+	ID           int64     `json:"id"`
+	UserID       int64     `json:"user_id"`
+	Type         string    `json:"type"`              // event | prc | alarm | timer | system
+	Title        string    `json:"title"`
+	Body         string    `json:"body"`
+	RefID        string    `json:"ref_id,omitempty"`  // reference entity ID
+	Read         bool      `json:"read"`
+	Acknowledged bool      `json:"acknowledged"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// MapResource represents an uploaded map file (geographical, network, etc.)
+type MapResource struct {
+	ID            int64        `json:"id"`
+	Name          string       `json:"name"`
+	Description   string       `json:"description,omitempty"`
+	MapType       string       `json:"map_type"`      // geographical | network | electrical | floor_plan | custom
+	Filename      string       `json:"filename"`       // stored filename on disk
+	OriginalName  string       `json:"original_name"`  // original upload filename
+	ContentType   string       `json:"content_type"`   // MIME type
+	Size          int64        `json:"size"`
+	CreatedBy     int64        `json:"created_by"`
+	CreatedByName string       `json:"created_by_name"`
+	CreatedAt     time.Time    `json:"created_at"`
+	Overlays      []MapOverlay `json:"overlays,omitempty"`
+}
+
+// MapOverlay is a layer of resources placed on a map
+type MapOverlay struct {
+	ID       string           `json:"id"`
+	Name     string           `json:"name"`
+	Locked   bool             `json:"locked"`
+	LockedBy int64            `json:"locked_by,omitempty"`
+	Items    []MapOverlayItem `json:"items"`
+}
+
+// MapOverlayItem is a resource placed on a map overlay
+type MapOverlayItem struct {
+	ID    string  `json:"id"`
+	Type  string  `json:"type"`            // user | group | building | service | custom
+	RefID string  `json:"ref_id,omitempty"` // reference to user ID, group ID, etc.
+	Label string  `json:"label"`
+	X     float64 `json:"x"`              // position as percentage of map width
+	Y     float64 `json:"y"`              // position as percentage of map height
+	Icon  string  `json:"icon,omitempty"`
+	Color string  `json:"color,omitempty"`
+	Notes string  `json:"notes,omitempty"`
+}
+
+// ReferenceDoc is a document/file stored in the reference library
+type ReferenceDoc struct {
+	ID             int64     `json:"id"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description,omitempty"`
+	Category       string    `json:"category"` // handbook | sop | policy | map | reference | other
+	Filename       string    `json:"filename"`
+	OriginalName   string    `json:"original_name"`
+	ContentType    string    `json:"content_type"`
+	Size           int64     `json:"size"`
+	UploadedBy     int64     `json:"uploaded_by"`
+	UploadedByName string    `json:"uploaded_by_name"`
+	UploadedAt     time.Time `json:"uploaded_at"`
+	Tags           []string  `json:"tags,omitempty"`
+}

@@ -160,6 +160,17 @@ let _showBuildings = true;
 let _showComputers = true;
 let _showDataCenters = true;
 
+/* ── Map resource / overlay state ── */
+let _mapResources = [];
+let _currentMapResourceId = '';  // '' = OSM live
+let _currentMapResource = null;
+let _imageOverlayLayer = null;
+let _geojsonOverlayLayer = null;
+let _overlayItemsLayer = null;   // Leaflet layer group for overlay items
+let _currentOverlay = null;
+let _isImageMap = false;
+let _originalCRS = null;
+
 /* ── Initialize map ── */
 function initMapProjection() {
   _map = L.map('mapProjection', { zoomControl: true }).setView([51.505, -0.09], 4);
@@ -554,6 +565,7 @@ try {
 syncTheme();
 syncLanguage();
 initMapProjection();
+loadMapResources();
 
 // Poll for theme/language changes
 setInterval(function() { syncTheme(); syncLanguage(); }, 2000);
@@ -611,3 +623,405 @@ document.getElementById('addressSearch').addEventListener('keydown', function(e)
     searchAddress(this.value);
   }
 });
+
+/* ── Map Resources & Overlays ────────────────────────────────────────────── */
+
+async function loadMapResources() {
+  try {
+    const res = await fetch('/api/map-resources');
+    if (!res.ok) return;
+    _mapResources = await res.json();
+    const sel = document.getElementById('mapSelector');
+    if (!sel) return;
+    // Keep first "OpenStreetMap" option, remove the rest
+    while (sel.options.length > 1) sel.remove(1);
+    (_mapResources || []).forEach(mr => {
+      const opt = document.createElement('option');
+      opt.value = String(mr.id);
+      opt.textContent = mr.name + ' (' + mr.map_type + ')';
+      sel.appendChild(opt);
+    });
+  } catch (e) { console.warn('[loadMapResources]', e); }
+}
+
+document.getElementById('mapSelector').addEventListener('change', function() {
+  switchMap(this.value);
+});
+
+function switchMap(mapResourceId) {
+  _currentMapResourceId = mapResourceId;
+  _currentOverlay = null;
+  _clearOverlayItems();
+
+  const overlayCtrl = document.getElementById('overlayControls');
+  const pdfContainer = document.getElementById('pdfContainer');
+  const mapEl = document.getElementById('mapProjection');
+  const tileCtrl = document.getElementById('selTileLayer');
+
+  if (!mapResourceId) {
+    // Switch back to OSM live
+    _currentMapResource = null;
+    _isImageMap = false;
+    if (_imageOverlayLayer) { _map.removeLayer(_imageOverlayLayer); _imageOverlayLayer = null; }
+    if (_geojsonOverlayLayer) { _map.removeLayer(_geojsonOverlayLayer); _geojsonOverlayLayer = null; }
+    pdfContainer.style.display = 'none';
+    mapEl.style.display = '';
+    tileCtrl.disabled = false;
+    if (overlayCtrl) overlayCtrl.style.display = 'none';
+    // Restore tile layer
+    if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
+    _map.invalidateSize();
+    loadUsers();
+    loadMeetings();
+    return;
+  }
+
+  const mr = (_mapResources || []).find(m => String(m.id) === String(mapResourceId));
+  if (!mr) return;
+  _currentMapResource = mr;
+  const fileUrl = '/api/map-resources/' + mr.id + '/file';
+  const ct = (mr.content_type || '').toLowerCase();
+
+  if (ct === 'application/pdf') {
+    // Show PDF in iframe
+    mapEl.style.display = 'none';
+    pdfContainer.style.display = '';
+    document.getElementById('pdfFrame').src = fileUrl;
+    if (overlayCtrl) overlayCtrl.style.display = 'none';
+    return;
+  }
+
+  // Image-based map (PNG, JPG, SVG)
+  pdfContainer.style.display = 'none';
+  mapEl.style.display = '';
+  _map.invalidateSize();
+
+  if (ct.startsWith('image/') || ct === 'image/svg+xml') {
+    _showImageMap(fileUrl, mr);
+  } else if (ct === 'application/json' || ct === 'application/geo+json' || mr.original_name.endsWith('.geojson')) {
+    _showGeoJSONMap(fileUrl, mr);
+  }
+
+  // Show overlay controls for this map
+  if (overlayCtrl) overlayCtrl.style.display = 'flex';
+  _loadOverlays(mr);
+}
+
+function _showImageMap(url, mr) {
+  _isImageMap = true;
+  // Remove OSM tile layer and existing overlays
+  if (_tileLayer) { _map.removeLayer(_tileLayer); _tileLayer = null; }
+  if (_imageOverlayLayer) { _map.removeLayer(_imageOverlayLayer); _imageOverlayLayer = null; }
+  _usersLayer.clearLayers();
+  _meetingsLayer.clearLayers();
+
+  const img = new Image();
+  img.onload = function() {
+    const h = img.naturalHeight || 800;
+    const w = img.naturalWidth || 1200;
+    const bounds = [[0, 0], [h, w]];
+    // Reinitialize map with CRS.Simple
+    const center = [h / 2, w / 2];
+    _map.options.crs = L.CRS.Simple;
+    _map.setMaxBounds([[-h * 0.1, -w * 0.1], [h * 1.1, w * 1.1]]);
+    _imageOverlayLayer = L.imageOverlay(url, bounds).addTo(_map);
+    _map.fitBounds(bounds);
+    // Re-init overlay items layer
+    if (!_overlayItemsLayer) {
+      _overlayItemsLayer = L.layerGroup().addTo(_map);
+    }
+  };
+  img.src = url;
+  document.getElementById('selTileLayer').disabled = true;
+}
+
+function _showGeoJSONMap(url, mr) {
+  _isImageMap = false;
+  if (_geojsonOverlayLayer) { _map.removeLayer(_geojsonOverlayLayer); _geojsonOverlayLayer = null; }
+  // Restore tile layer if removed
+  if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
+  fetch(url).then(r => r.json()).then(data => {
+    _geojsonOverlayLayer = L.geoJSON(data, {
+      style: { color: '#3498DB', weight: 2, fillOpacity: 0.2 }
+    }).addTo(_map);
+    _map.fitBounds(_geojsonOverlayLayer.getBounds());
+  }).catch(e => console.warn('[GeoJSON load]', e));
+}
+
+function _loadOverlays(mr) {
+  const sel = document.getElementById('overlaySelector');
+  if (!sel) return;
+  while (sel.options.length > 1) sel.remove(1);
+  (mr.overlays || []).forEach(ov => {
+    const opt = document.createElement('option');
+    opt.value = ov.id;
+    opt.textContent = ov.name + (ov.locked ? ' [locked]' : '');
+    sel.appendChild(opt);
+  });
+  sel.value = '';
+}
+
+document.getElementById('overlaySelector').addEventListener('change', function() {
+  _selectOverlay(this.value);
+});
+
+function _selectOverlay(overlayId) {
+  _clearOverlayItems();
+  if (!_currentMapResource || !overlayId) {
+    _currentOverlay = null;
+    document.getElementById('btnLockOverlay').style.display = 'none';
+    document.getElementById('btnAddItem').style.display = 'none';
+    return;
+  }
+  _currentOverlay = (_currentMapResource.overlays || []).find(o => o.id === overlayId) || null;
+  if (!_currentOverlay) return;
+
+  document.getElementById('btnLockOverlay').style.display = '';
+  document.getElementById('btnLockOverlay').textContent = _currentOverlay.locked ? 'Unlock' : 'Lock';
+  document.getElementById('btnAddItem').style.display = _currentOverlay.locked ? 'none' : '';
+
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _clearOverlayItems() {
+  if (_overlayItemsLayer) _overlayItemsLayer.clearLayers();
+}
+
+function _renderOverlayItems(overlay) {
+  _clearOverlayItems();
+  if (!_overlayItemsLayer) {
+    _overlayItemsLayer = L.layerGroup().addTo(_map);
+  }
+  (overlay.items || []).forEach(item => {
+    const typeIcons = { user: '👤', group: '👥', building: '🏢', service: '💻', custom: '📍' };
+    const icon = item.icon || typeIcons[item.type] || '📍';
+    const marker = L.marker([item.y, item.x], {
+      draggable: !overlay.locked,
+      icon: L.divIcon({
+        className: 'map-overlay-item',
+        html: '<div style="background:' + (item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
+          icon + ' ' + escH(item.label) +
+          (item.notes ? '<br><small style="opacity:.8">' + escH(item.notes) + '</small>' : '') +
+          '</div>',
+        iconSize: null,
+        iconAnchor: [0, 0]
+      })
+    });
+
+    if (!overlay.locked) {
+      marker.on('dragend', function(e) {
+        const pos = e.target.getLatLng();
+        item.x = pos.lng;
+        item.y = pos.lat;
+        _saveOverlay();
+      });
+    }
+
+    // Right-click to edit/delete
+    marker.on('contextmenu', function(e) {
+      L.DomEvent.stopPropagation(e);
+      const popup = L.popup({ closeButton: true, className: 'overlay-item-popup' })
+        .setLatLng(e.latlng)
+        .setContent(
+          '<div style="font-size:11px">' +
+          '<b>' + escH(item.label) + '</b>' +
+          (item.notes ? '<br>' + escH(item.notes) : '') +
+          '<br><br>' +
+          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_editOverlayItem(\'' + item.id + '\')">Edit</a> | ') +
+          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_deleteOverlayItem(\'' + item.id + '\')">Delete</a>') +
+          '</div>'
+        )
+        .openOn(_map);
+    });
+
+    marker.addTo(_overlayItemsLayer);
+  });
+}
+
+async function _saveOverlay() {
+  if (!_currentMapResource || !_currentOverlay) return;
+  try {
+    const overlays = _currentMapResource.overlays || [];
+    const idx = overlays.findIndex(o => o.id === _currentOverlay.id);
+    if (idx >= 0) overlays[idx] = _currentOverlay;
+    await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(overlays)
+    });
+  } catch (e) { console.warn('[saveOverlay]', e); }
+}
+
+/* ── Upload map ── */
+document.getElementById('btnUploadMap').addEventListener('click', function() {
+  document.getElementById('uploadMapDialog').classList.add('open');
+});
+document.getElementById('btnCancelUploadMap').addEventListener('click', function() {
+  document.getElementById('uploadMapDialog').classList.remove('open');
+});
+document.getElementById('btnDoUploadMap').addEventListener('click', async function() {
+  const name = document.getElementById('uploadMapName').value.trim();
+  const file = document.getElementById('uploadMapFile').files[0];
+  if (!name || !file) { alert('Name and file are required'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('name', name);
+  fd.append('description', document.getElementById('uploadMapDesc').value.trim());
+  fd.append('map_type', document.getElementById('uploadMapType').value);
+  try {
+    const res = await fetch('/api/map-resources', { method: 'POST', body: fd });
+    if (!res.ok) { const t = await res.text(); alert('Upload failed: ' + t); return; }
+    document.getElementById('uploadMapDialog').classList.remove('open');
+    document.getElementById('uploadMapName').value = '';
+    document.getElementById('uploadMapDesc').value = '';
+    document.getElementById('uploadMapFile').value = '';
+    await loadMapResources();
+  } catch (e) { alert('Upload error: ' + e.message); }
+});
+
+/* ── New overlay ── */
+document.getElementById('btnAddOverlay').addEventListener('click', function() {
+  if (!_currentMapResource) return;
+  document.getElementById('newOverlayDialog').classList.add('open');
+});
+document.getElementById('btnCancelNewOverlay').addEventListener('click', function() {
+  document.getElementById('newOverlayDialog').classList.remove('open');
+});
+document.getElementById('btnDoNewOverlay').addEventListener('click', async function() {
+  const name = document.getElementById('newOverlayName').value.trim();
+  if (!name) { alert('Name required'); return; }
+  const newOv = { id: 'ov_' + Date.now(), name: name, locked: false, locked_by: 0, items: [] };
+  if (!_currentMapResource.overlays) _currentMapResource.overlays = [];
+  _currentMapResource.overlays.push(newOv);
+  await _saveOverlays();
+  document.getElementById('newOverlayDialog').classList.remove('open');
+  document.getElementById('newOverlayName').value = '';
+  _loadOverlays(_currentMapResource);
+  document.getElementById('overlaySelector').value = newOv.id;
+  _selectOverlay(newOv.id);
+});
+
+async function _saveOverlays() {
+  if (!_currentMapResource) return;
+  try {
+    await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_currentMapResource.overlays || [])
+    });
+  } catch (e) { console.warn('[saveOverlays]', e); }
+}
+
+/* ── Lock/Unlock overlay ── */
+document.getElementById('btnLockOverlay').addEventListener('click', async function() {
+  if (!_currentMapResource || !_currentOverlay) return;
+  var action = _currentOverlay.locked ? 'unlock' : 'lock';
+  try {
+    const res = await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays/' + _currentOverlay.id + '/' + action, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      _currentOverlay.locked = !_currentOverlay.locked;
+      this.textContent = _currentOverlay.locked ? 'Unlock' : 'Lock';
+      document.getElementById('btnAddItem').style.display = _currentOverlay.locked ? 'none' : '';
+      _renderOverlayItems(_currentOverlay);
+    } else {
+      var err = await res.json().catch(function() { return {}; });
+      alert(err.error || 'Failed to toggle lock');
+    }
+  } catch (e) { console.warn('[toggleLock]', e); }
+});
+
+/* ── Add item to overlay ── */
+document.getElementById('btnAddItem').addEventListener('click', function() {
+  if (!_currentOverlay || _currentOverlay.locked) return;
+  _populateItemRefSelector(document.getElementById('itemType').value);
+  document.getElementById('addItemDialog').classList.add('open');
+});
+document.getElementById('btnCancelAddItem').addEventListener('click', function() {
+  document.getElementById('addItemDialog').classList.remove('open');
+});
+document.getElementById('itemType').addEventListener('change', function() {
+  _populateItemRefSelector(this.value);
+});
+
+async function _populateItemRefSelector(type) {
+  const sel = document.getElementById('itemRef');
+  sel.innerHTML = '<option value="">-- select --</option>';
+  try {
+    if (type === 'user') {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const users = await res.json();
+        (users || []).forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = String(u.id);
+          opt.textContent = u.display_name || u.username;
+          sel.appendChild(opt);
+        });
+      }
+    } else if (type === 'group') {
+      const res = await fetch('/api/groups');
+      if (res.ok) {
+        const groups = await res.json();
+        (groups || []).forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = String(g.id);
+          opt.textContent = g.name;
+          sel.appendChild(opt);
+        });
+      }
+    }
+  } catch (e) { console.warn('[populateRef]', e); }
+}
+
+document.getElementById('btnPlaceItem').addEventListener('click', function() {
+  if (!_currentOverlay || _currentOverlay.locked) return;
+  const label = document.getElementById('itemLabel').value.trim();
+  if (!label) { alert('Label is required'); return; }
+  const center = _map.getCenter();
+  const newItem = {
+    id: 'item_' + Date.now(),
+    type: document.getElementById('itemType').value,
+    ref_id: document.getElementById('itemRef').value,
+    label: label,
+    x: center.lng,
+    y: center.lat,
+    icon: document.getElementById('itemIcon').value.trim(),
+    color: document.getElementById('itemColor').value,
+    notes: document.getElementById('itemNotes').value.trim()
+  };
+  if (!_currentOverlay.items) _currentOverlay.items = [];
+  _currentOverlay.items.push(newItem);
+  _saveOverlay();
+  _renderOverlayItems(_currentOverlay);
+  document.getElementById('addItemDialog').classList.remove('open');
+  // Reset form
+  document.getElementById('itemLabel').value = '';
+  document.getElementById('itemIcon').value = '';
+  document.getElementById('itemNotes').value = '';
+});
+
+/* ── Edit/Delete overlay items (called from popup links) ── */
+function _editOverlayItem(itemId) {
+  if (!_currentOverlay) return;
+  const item = (_currentOverlay.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  _map.closePopup();
+  const newLabel = prompt('Label:', item.label);
+  if (newLabel === null) return;
+  item.label = newLabel;
+  const newNotes = prompt('Notes:', item.notes || '');
+  if (newNotes !== null) item.notes = newNotes;
+  _saveOverlay();
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _deleteOverlayItem(itemId) {
+  if (!_currentOverlay) return;
+  if (!confirm('Delete this item?')) return;
+  _map.closePopup();
+  _currentOverlay.items = (_currentOverlay.items || []).filter(i => i.id !== itemId);
+  _saveOverlay();
+  _renderOverlayItems(_currentOverlay);
+}
