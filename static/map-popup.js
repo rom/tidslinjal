@@ -281,7 +281,7 @@ async function loadResourceLayers() {
     const rooms = await fetch('/api/rooms').then(r => r.ok ? r.json() : []);
     const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer};
     const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9'};
-    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥'};
+    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧'};
     Object.values(layerMap).forEach(l => l.clearLayers());
     (rooms || []).forEach(r => {
       if (!r.location) return;
@@ -561,11 +561,389 @@ try {
   };
 } catch(e) {}
 
+/* ── Multi-map tabs ── */
+let _openMaps = [{ id: '', label: '🗺 OSM' }]; // tabs currently open
+let _activeTabId = '';
+
+function _renderMapTabs() {
+  const container = document.getElementById('mapTabs');
+  if (!container) return;
+  container.innerHTML = '';
+  _openMaps.forEach(tab => {
+    const div = document.createElement('div');
+    div.className = 'map-tab' + (tab.id === _activeTabId ? ' active' : '');
+    div.dataset.mapId = tab.id;
+    div.title = tab.label;
+    div.innerHTML = escH(tab.label) + (tab.id ? '<span class="tab-close" data-close-tab="' + tab.id + '"> ×</span>' : '');
+    div.addEventListener('click', (e) => {
+      if (e.target.dataset.closeTab !== undefined) return;
+      _activeTabId = tab.id;
+      switchMap(tab.id);
+      _renderMapTabs();
+    });
+    const closeBtn = div.querySelector('[data-close-tab]');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _openMaps = _openMaps.filter(t => t.id !== tab.id);
+        if (_activeTabId === tab.id) {
+          _activeTabId = _openMaps.length > 0 ? _openMaps[0].id : '';
+          switchMap(_activeTabId);
+        }
+        _renderMapTabs();
+      });
+    }
+    container.appendChild(div);
+  });
+}
+
+// Override map selector to open new tabs instead of replacing
+document.getElementById('mapSelector').removeEventListener('change', function(){});
+document.getElementById('mapSelector').addEventListener('change', function() {
+  const mapId = this.value;
+  // Add tab if not already open
+  if (!_openMaps.find(t => t.id === String(mapId))) {
+    const mr = (_mapResources || []).find(m => String(m.id) === String(mapId));
+    _openMaps.push({ id: String(mapId), label: mr ? mr.name : 'Map' });
+  }
+  _activeTabId = String(mapId);
+  switchMap(mapId);
+  _renderMapTabs();
+});
+
+/* ── Legend toggle ── */
+let _legendVisible = true;
+document.getElementById('btnToggleLegend').addEventListener('click', function() {
+  _legendVisible = !_legendVisible;
+  const legend = document.getElementById('mapLegend');
+  if (legend) legend.style.display = _legendVisible ? '' : 'none';
+  this.classList.toggle('active', _legendVisible);
+});
+
+/* ── Enhanced zoom for image maps ── */
+function _enhanceZoom() {
+  if (!_map) return;
+  // Allow more zoom levels for image maps
+  if (_isImageMap) {
+    _map.setMinZoom(-3);
+    _map.setMaxZoom(8);
+  }
+}
+
+/* ── PDF controls ── */
+let _pdfScale = 1;
+document.getElementById('pdfZoomIn').addEventListener('click', function() {
+  _pdfScale = Math.min(_pdfScale + 0.25, 4);
+  _applyPdfZoom();
+});
+document.getElementById('pdfZoomOut').addEventListener('click', function() {
+  _pdfScale = Math.max(_pdfScale - 0.25, 0.25);
+  _applyPdfZoom();
+});
+document.getElementById('pdfFitWidth').addEventListener('click', function() {
+  _pdfScale = 1;
+  _applyPdfZoom();
+});
+document.getElementById('pdfOpenNew').addEventListener('click', function() {
+  const frame = document.getElementById('pdfFrame');
+  if (frame && frame.src) window.open(frame.src, '_blank');
+});
+function _applyPdfZoom() {
+  const frame = document.getElementById('pdfFrame');
+  if (frame) {
+    frame.style.transform = 'scale(' + _pdfScale + ')';
+    frame.style.transformOrigin = 'top left';
+    frame.style.width = (100 / _pdfScale) + '%';
+    frame.style.height = (100 / _pdfScale) + '%';
+  }
+}
+
+/* ── Drawing tools state ── */
+let _drawMode = null; // null | 'pen' | 'line' | 'rect' | 'circle' | 'highlight' | 'needle' | 'symbol' | 'erase'
+let _drawingsLayer = null; // L.layerGroup for drawings
+let _drawHistory = []; // for undo
+let _drawColor = '#FF0000';
+let _drawWidth = 3;
+let _tempDrawPath = null;
+let _drawStart = null;
+let _isDrawing = false;
+
+function _initDrawingLayer() {
+  if (!_drawingsLayer) {
+    _drawingsLayer = L.layerGroup().addTo(_map);
+  }
+}
+
+document.getElementById('btnToggleDraw').addEventListener('click', function() {
+  const toolbar = document.getElementById('drawToolbar');
+  const vis = toolbar.style.display === 'none';
+  toolbar.style.display = vis ? 'flex' : 'none';
+  this.classList.toggle('active', vis);
+  if (!vis) _setDrawMode(null);
+});
+
+function _setDrawMode(mode) {
+  _drawMode = mode;
+  ['btnDrawPen','btnDrawLine','btnDrawRect','btnDrawCircle','btnDrawHighlight','btnDropNeedle','btnDropSymbol','btnDrawErase'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('active', false);
+  });
+  const modeMap = { pen:'btnDrawPen', line:'btnDrawLine', rect:'btnDrawRect', circle:'btnDrawCircle',
+    highlight:'btnDrawHighlight', needle:'btnDropNeedle', symbol:'btnDropSymbol', erase:'btnDrawErase' };
+  if (mode && modeMap[mode]) document.getElementById(modeMap[mode])?.classList.add('active');
+
+  // Toggle map dragging
+  if (_map) {
+    if (mode && mode !== 'erase') {
+      _map.dragging.disable();
+      document.getElementById('mapProjection').style.cursor = 'crosshair';
+    } else {
+      _map.dragging.enable();
+      document.getElementById('mapProjection').style.cursor = '';
+    }
+  }
+}
+
+document.getElementById('btnDrawPen').addEventListener('click', () => _setDrawMode(_drawMode === 'pen' ? null : 'pen'));
+document.getElementById('btnDrawLine').addEventListener('click', () => _setDrawMode(_drawMode === 'line' ? null : 'line'));
+document.getElementById('btnDrawRect').addEventListener('click', () => _setDrawMode(_drawMode === 'rect' ? null : 'rect'));
+document.getElementById('btnDrawCircle').addEventListener('click', () => _setDrawMode(_drawMode === 'circle' ? null : 'circle'));
+document.getElementById('btnDrawHighlight').addEventListener('click', () => _setDrawMode(_drawMode === 'highlight' ? null : 'highlight'));
+document.getElementById('btnDropNeedle').addEventListener('click', () => _setDrawMode(_drawMode === 'needle' ? null : 'needle'));
+document.getElementById('btnDropSymbol').addEventListener('click', () => _setDrawMode(_drawMode === 'symbol' ? null : 'symbol'));
+document.getElementById('btnDrawErase').addEventListener('click', () => _setDrawMode(_drawMode === 'erase' ? null : 'erase'));
+document.getElementById('btnDrawOff').addEventListener('click', () => _setDrawMode(null));
+document.getElementById('drawColor').addEventListener('input', function() { _drawColor = this.value; });
+document.getElementById('drawWidth').addEventListener('input', function() { _drawWidth = parseInt(this.value, 10); });
+
+document.getElementById('btnDrawUndo').addEventListener('click', function() {
+  if (_drawHistory.length === 0) return;
+  const last = _drawHistory.pop();
+  if (_drawingsLayer) _drawingsLayer.removeLayer(last);
+  _saveDrawings();
+});
+
+// Drawing event handlers on the map
+function _initDrawEvents() {
+  _initDrawingLayer();
+  let penPoints = [];
+
+  _map.on('mousedown', function(e) {
+    if (!_drawMode) return;
+    _isDrawing = true;
+    _drawStart = e.latlng;
+
+    if (_drawMode === 'pen' || _drawMode === 'highlight') {
+      penPoints = [e.latlng];
+      const opts = { color: _drawColor, weight: _drawMode === 'highlight' ? _drawWidth * 3 : _drawWidth, opacity: _drawMode === 'highlight' ? 0.4 : 1 };
+      _tempDrawPath = L.polyline(penPoints, opts).addTo(_drawingsLayer);
+    }
+    if (_drawMode === 'needle') {
+      const marker = L.marker(e.latlng, {
+        icon: L.divIcon({
+          className: 'draw-pin',
+          html: '<div style="font-size:24px;text-shadow:0 1px 3px rgba(0,0,0,.5)">📌</div>',
+          iconSize: [24, 24], iconAnchor: [4, 24]
+        })
+      });
+      marker.addTo(_drawingsLayer);
+      marker.on('click', function() {
+        if (_drawMode === 'erase') { _drawingsLayer.removeLayer(marker); _saveDrawings(); }
+      });
+      _drawHistory.push(marker);
+      _isDrawing = false;
+      _saveDrawings();
+    }
+    if (_drawMode === 'symbol') {
+      const symIcon = document.getElementById('itemIcon')?.value || '📍';
+      const marker = L.marker(e.latlng, {
+        icon: L.divIcon({
+          className: 'draw-symbol',
+          html: '<div style="font-size:20px;text-shadow:0 1px 2px rgba(0,0,0,.4)">' + symIcon + '</div>',
+          iconSize: [24, 24], iconAnchor: [12, 12]
+        })
+      });
+      marker.addTo(_drawingsLayer);
+      marker.on('click', function() {
+        if (_drawMode === 'erase') { _drawingsLayer.removeLayer(marker); _saveDrawings(); }
+      });
+      _drawHistory.push(marker);
+      _isDrawing = false;
+      _saveDrawings();
+    }
+    if (_drawMode === 'erase') {
+      _isDrawing = false;
+    }
+  });
+
+  _map.on('mousemove', function(e) {
+    if (!_isDrawing || !_drawMode) return;
+    if ((_drawMode === 'pen' || _drawMode === 'highlight') && _tempDrawPath) {
+      penPoints.push(e.latlng);
+      _tempDrawPath.setLatLngs(penPoints);
+    }
+  });
+
+  _map.on('mouseup', function(e) {
+    if (!_isDrawing || !_drawMode) return;
+    _isDrawing = false;
+
+    if ((_drawMode === 'pen' || _drawMode === 'highlight') && _tempDrawPath) {
+      _drawHistory.push(_tempDrawPath);
+      _tempDrawPath = null;
+      _saveDrawings();
+    }
+    if (_drawMode === 'line' && _drawStart) {
+      const line = L.polyline([_drawStart, e.latlng], { color: _drawColor, weight: _drawWidth }).addTo(_drawingsLayer);
+      line.on('click', function() { if (_drawMode === 'erase') { _drawingsLayer.removeLayer(line); _saveDrawings(); } });
+      _drawHistory.push(line);
+      _drawStart = null;
+      _saveDrawings();
+    }
+    if (_drawMode === 'rect' && _drawStart) {
+      const bounds = L.latLngBounds(_drawStart, e.latlng);
+      const rect = L.rectangle(bounds, { color: _drawColor, weight: _drawWidth, fillOpacity: 0.1 }).addTo(_drawingsLayer);
+      rect.on('click', function() { if (_drawMode === 'erase') { _drawingsLayer.removeLayer(rect); _saveDrawings(); } });
+      _drawHistory.push(rect);
+      _drawStart = null;
+      _saveDrawings();
+    }
+    if (_drawMode === 'circle' && _drawStart) {
+      const radius = _drawStart.distanceTo(e.latlng);
+      const circle = L.circle(_drawStart, { radius: Math.max(radius, 10), color: _drawColor, weight: _drawWidth, fillOpacity: 0.1 }).addTo(_drawingsLayer);
+      circle.on('click', function() { if (_drawMode === 'erase') { _drawingsLayer.removeLayer(circle); _saveDrawings(); } });
+      _drawHistory.push(circle);
+      _drawStart = null;
+      _saveDrawings();
+    }
+  });
+}
+
+/* ── Save / Load drawings ── */
+async function _saveDrawings() {
+  if (!_currentMapResource || !_drawingsLayer) return;
+  const drawings = [];
+  _drawingsLayer.eachLayer(layer => {
+    if (layer instanceof L.Marker) {
+      const ll = layer.getLatLng();
+      const html = layer.options.icon?.options?.html || '';
+      drawings.push({ type: 'marker', lat: ll.lat, lng: ll.lng, html: html });
+    } else if (layer instanceof L.Rectangle) {
+      const b = layer.getBounds();
+      drawings.push({ type: 'rect', bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], color: layer.options.color, weight: layer.options.weight });
+    } else if (layer instanceof L.Circle) {
+      const ll = layer.getLatLng();
+      drawings.push({ type: 'circle', lat: ll.lat, lng: ll.lng, radius: layer.getRadius(), color: layer.options.color, weight: layer.options.weight });
+    } else if (layer instanceof L.Polyline) {
+      drawings.push({ type: 'polyline', latlngs: layer.getLatLngs().map(p => [p.lat, p.lng]), color: layer.options.color, weight: layer.options.weight, opacity: layer.options.opacity || 1 });
+    }
+  });
+  try {
+    await fetch('/api/map-resources/' + _currentMapResource.id + '/drawings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(drawings)
+    });
+  } catch (e) { console.warn('[saveDrawings]', e); }
+}
+
+async function _loadDrawings(mapResource) {
+  _initDrawingLayer();
+  _drawingsLayer.clearLayers();
+  _drawHistory = [];
+  if (!mapResource) return;
+  try {
+    const res = await fetch('/api/map-resources/' + mapResource.id + '/drawings');
+    if (!res.ok) return;
+    const drawings = await res.json();
+    (drawings || []).forEach(d => {
+      let layer;
+      if (d.type === 'marker') {
+        layer = L.marker([d.lat, d.lng], {
+          icon: L.divIcon({ className: 'draw-pin', html: d.html, iconSize: [24, 24], iconAnchor: [12, 12] })
+        });
+      } else if (d.type === 'polyline') {
+        layer = L.polyline(d.latlngs, { color: d.color, weight: d.weight, opacity: d.opacity || 1 });
+      } else if (d.type === 'rect') {
+        layer = L.rectangle(d.bounds, { color: d.color, weight: d.weight, fillOpacity: 0.1 });
+      } else if (d.type === 'circle') {
+        layer = L.circle([d.lat, d.lng], { radius: d.radius, color: d.color, weight: d.weight, fillOpacity: 0.1 });
+      }
+      if (layer) {
+        layer.addTo(_drawingsLayer);
+        layer.on('click', function() { if (_drawMode === 'erase') { _drawingsLayer.removeLayer(layer); _saveDrawings(); } });
+        _drawHistory.push(layer);
+      }
+    });
+  } catch (e) { console.warn('[loadDrawings]', e); }
+}
+
+/* ── Map lock (whole map, not just overlay) ── */
+let _mapLocked = false;
+
+document.getElementById('btnLockMap').addEventListener('click', async function() {
+  if (!_currentMapResource) return;
+  try {
+    const action = _mapLocked ? 'unlock' : 'lock';
+    const res = await fetch('/api/map-resources/' + _currentMapResource.id + '/' + action, { method: 'POST' });
+    if (res.ok) {
+      _mapLocked = !_mapLocked;
+      this.textContent = _mapLocked ? '🔓 Unlock' : '🔒 Lock';
+      _applyMapLock();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Failed to toggle lock');
+    }
+  } catch (e) { console.warn('[lockMap]', e); }
+});
+
+function _applyMapLock() {
+  const drawToolbar = document.getElementById('drawToolbar');
+  const btnToggleDraw = document.getElementById('btnToggleDraw');
+  const btnAddItem = document.getElementById('btnAddItem');
+  if (_mapLocked) {
+    if (drawToolbar) drawToolbar.style.display = 'none';
+    if (btnToggleDraw) btnToggleDraw.style.display = 'none';
+    if (btnAddItem) btnAddItem.style.display = 'none';
+    _setDrawMode(null);
+  } else {
+    if (btnToggleDraw) btnToggleDraw.style.display = '';
+    if (btnAddItem) btnAddItem.style.display = '';
+  }
+}
+
+/* ── Per-map legend ── */
+function updateLegendForMap(mr) {
+  const el = document.getElementById('legendContent');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!mr) {
+    // Default OSM legend
+    updateLegend();
+    return;
+  }
+  const items = [];
+  // Add overlay items as legend entries
+  (mr.overlays || []).forEach(ov => {
+    items.push({ color: '#4A90D9', label: ov.name + (ov.locked ? ' 🔒' : '') });
+    (ov.items || []).forEach(item => {
+      items.push({ color: item.color || '#4A90D9', label: (item.icon || '📍') + ' ' + item.label });
+    });
+  });
+  if (items.length === 0) {
+    items.push({ color: '#888', label: 'No items on this map' });
+  }
+  items.forEach(it => {
+    el.innerHTML += '<div class="legend-item"><span class="legend-dot" style="background:' + it.color + '"></span>' + escH(it.label) + '</div>';
+  });
+}
+
 /* ── Init ── */
 syncTheme();
 syncLanguage();
 initMapProjection();
 loadMapResources();
+_initDrawEvents();
 
 // Poll for theme/language changes
 setInterval(function() { syncTheme(); syncLanguage(); }, 2000);
@@ -668,11 +1046,16 @@ function switchMap(mapResourceId) {
     mapEl.style.display = '';
     tileCtrl.disabled = false;
     if (overlayCtrl) overlayCtrl.style.display = 'none';
+    document.getElementById('btnLockMap').style.display = 'none';
     // Restore tile layer
     if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
     _map.invalidateSize();
     loadUsers();
     loadMeetings();
+    // Clear drawings layer for OSM
+    if (_drawingsLayer) _drawingsLayer.clearLayers();
+    _drawHistory = [];
+    updateLegend();
     return;
   }
 
@@ -705,6 +1088,18 @@ function switchMap(mapResourceId) {
   // Show overlay controls for this map
   if (overlayCtrl) overlayCtrl.style.display = 'flex';
   _loadOverlays(mr);
+
+  // Load drawings for this map
+  _loadDrawings(mr);
+
+  // Show lock button and update state
+  document.getElementById('btnLockMap').style.display = '';
+  _mapLocked = mr.locked || false;
+  document.getElementById('btnLockMap').textContent = _mapLocked ? '🔓 Unlock' : '🔒 Lock';
+  _applyMapLock();
+
+  // Update per-map legend
+  updateLegendForMap(mr);
 }
 
 function _showImageMap(url, mr) {
@@ -721,9 +1116,11 @@ function _showImageMap(url, mr) {
     const w = img.naturalWidth || 1200;
     const bounds = [[0, 0], [h, w]];
     // Reinitialize map with CRS.Simple
-    const center = [h / 2, w / 2];
     _map.options.crs = L.CRS.Simple;
-    _map.setMaxBounds([[-h * 0.1, -w * 0.1], [h * 1.1, w * 1.1]]);
+    // Allow generous zoom range for large images
+    _map.setMinZoom(-5);
+    _map.setMaxZoom(8);
+    _map.setMaxBounds([[-h * 0.5, -w * 0.5], [h * 1.5, w * 1.5]]);
     _imageOverlayLayer = L.imageOverlay(url, bounds).addTo(_map);
     _map.fitBounds(bounds);
     // Re-init overlay items layer
@@ -817,9 +1214,20 @@ function _renderOverlayItems(overlay) {
       });
     }
 
-    // Right-click to edit/delete
+    // Click to select (for bulk ops)
+    marker.on('click', function(e) {
+      if (_drawMode === 'erase') return;
+      if (e.originalEvent && e.originalEvent.ctrlKey) {
+        _toggleSelectItem(item.id);
+        _renderBulkOpsBar();
+        return;
+      }
+    });
+
+    // Right-click to edit/delete/move
     marker.on('contextmenu', function(e) {
       L.DomEvent.stopPropagation(e);
+      const isSelected = _selectedItems.has(item.id);
       const popup = L.popup({ closeButton: true, className: 'overlay-item-popup' })
         .setLatLng(e.latlng)
         .setContent(
@@ -828,7 +1236,12 @@ function _renderOverlayItems(overlay) {
           (item.notes ? '<br>' + escH(item.notes) : '') +
           '<br><br>' +
           (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_editOverlayItem(\'' + item.id + '\')">Edit</a> | ') +
-          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_deleteOverlayItem(\'' + item.id + '\')">Delete</a>') +
+          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_deleteOverlayItem(\'' + item.id + '\')">Delete</a> | ') +
+          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_moveItemToOverlay(\'' + item.id + '\')">Move to Layer</a> | ') +
+          (overlay.locked ? '' : '<a href="#" onclick="event.preventDefault();_moveItemToMap(\'' + item.id + '\')">Move to Map</a>') +
+          (item.group_items ? '<br><a href="#" onclick="event.preventDefault();_ungroupItem(\'' + item.id + '\')">Ungroup</a>' : '') +
+          '<br><a href="#" onclick="event.preventDefault();_toggleSelectItem(\'' + item.id + '\');_renderBulkOpsBar();_map.closePopup()">' + (isSelected ? 'Deselect' : 'Select') + '</a>' +
+          '<br><small style="color:#888">Ctrl+Click to multi-select</small>' +
           '</div>'
         )
         .openOn(_map);
@@ -975,6 +1388,39 @@ async function _populateItemRefSelector(type) {
   } catch (e) { console.warn('[populateRef]', e); }
 }
 
+// Populate symbol set picker
+(function() {
+  const sel = document.getElementById('symbolSetPicker');
+  if (!sel) return;
+  Object.keys(MAP_SYMBOL_SETS).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = MAP_SYMBOL_SETS[key].label;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function() {
+    const grid = document.getElementById('symbolGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const set = MAP_SYMBOL_SETS[this.value];
+    if (!set) return;
+    set.symbols.forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = s.label;
+      btn.textContent = s.icon;
+      btn.style.cssText = 'width:28px;height:28px;font-size:16px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
+      btn.addEventListener('click', () => {
+        document.getElementById('itemIcon').value = s.icon;
+        if (!document.getElementById('itemLabel').value.trim()) {
+          document.getElementById('itemLabel').value = s.label;
+        }
+      });
+      grid.appendChild(btn);
+    });
+  });
+})();
+
 document.getElementById('btnPlaceItem').addEventListener('click', function() {
   if (!_currentOverlay || _currentOverlay.locked) return;
   const label = document.getElementById('itemLabel').value.trim();
@@ -1002,6 +1448,157 @@ document.getElementById('btnPlaceItem').addEventListener('click', function() {
   document.getElementById('itemNotes').value = '';
 });
 
+/* ── Comprehensive Symbol Datasets for Map Items ── */
+const MAP_SYMBOL_SETS = {
+  nato_common: {
+    label: 'NATO Common',
+    symbols: [
+      // Unit types / function symbols represented with text labels
+      { icon: '⬡', label: 'HQ' }, { icon: '⬢', label: 'Unit' },
+      { icon: '⊕', label: 'Friendly' }, { icon: '◇', label: 'Hostile' },
+      { icon: '□', label: 'Neutral' }, { icon: '△', label: 'Unknown' },
+      { icon: '⬠', label: 'Assumed Friendly' },
+      // Infantry & ground
+      { icon: '🔫', label: 'Infantry' }, { icon: '🎯', label: 'Target' },
+      { icon: '💣', label: 'Explosive' }, { icon: '🛡', label: 'Defence' },
+      { icon: '⚔', label: 'Combat' }, { icon: '🗡', label: 'Attack' },
+      // Movement & logistics
+      { icon: '➡', label: 'Advance' }, { icon: '⬆', label: 'Move North' },
+      { icon: '⬇', label: 'Move South' }, { icon: '⬅', label: 'Move West' },
+      { icon: '↗', label: 'Move NE' }, { icon: '↘', label: 'Move SE' },
+      { icon: '🔄', label: 'Rotate' }, { icon: '⏹', label: 'Halt' },
+      { icon: '🏳', label: 'Surrender' }, { icon: '🚩', label: 'Flag' },
+      // Support
+      { icon: '🏥', label: 'Medical' }, { icon: '⛽', label: 'Supply' },
+      { icon: '📡', label: 'Signal' }, { icon: '🔧', label: 'Maintenance' },
+      { icon: '🛞', label: 'Transport' }, { icon: '🪖', label: 'Military' },
+    ]
+  },
+  nato_military: {
+    label: 'NATO Military Map',
+    symbols: [
+      // Obstacles & engineering
+      { icon: '🚧', label: 'Roadblock' }, { icon: '⛔', label: 'No Entry' },
+      { icon: '🪤', label: 'Minefield' }, { icon: '🌉', label: 'Bridge' },
+      { icon: '🏗', label: 'Engineering' }, { icon: '💥', label: 'IED/Mine' },
+      // Boundaries
+      { icon: '═══', label: 'Boundary' }, { icon: '---', label: 'Phase Line' },
+      { icon: '···', label: 'LoD' }, { icon: '▬▬▬', label: 'FEBA' },
+      // Air & naval
+      { icon: '✈', label: 'Fixed Wing' }, { icon: '🚁', label: 'Rotary Wing' },
+      { icon: '🛩', label: 'UAV' }, { icon: '🚀', label: 'Missile' },
+      { icon: '⚓', label: 'Naval' }, { icon: '🚢', label: 'Ship' },
+      { icon: '🛟', label: 'SAR' },
+      // C2 & intelligence
+      { icon: '🎖', label: 'Command' }, { icon: '📋', label: 'Orders' },
+      { icon: '👁', label: 'Observation' }, { icon: '🔍', label: 'Recon' },
+      { icon: '📍', label: 'Waypoint' }, { icon: '⭐', label: 'Key Terrain' },
+      { icon: '🏴', label: 'Enemy' }, { icon: '🟦', label: 'Friendly Force' },
+      { icon: '🟥', label: 'Enemy Force' }, { icon: '🟨', label: 'Neutral' },
+      { icon: '🟩', label: 'Civilian' },
+    ]
+  },
+  swedish_military: {
+    label: 'Swedish Military',
+    symbols: [
+      { icon: '🇸🇪', label: 'Swedish' },
+      { icon: '⊞', label: 'Förband' }, { icon: '⊟', label: 'Stab' },
+      { icon: '🛡', label: 'Försvar' }, { icon: '⚔', label: 'Anfall' },
+      { icon: '🏥', label: 'Sjukvård' }, { icon: '📡', label: 'Signal' },
+      { icon: '🔧', label: 'Underhåll' }, { icon: '🚛', label: 'Transport' },
+      { icon: '🔫', label: 'Infanteri' }, { icon: '🎯', label: 'Artilleri' },
+      { icon: '🪖', label: 'Soldat' }, { icon: '🏴', label: 'Fiende' },
+      { icon: '🚧', label: 'Hinder' }, { icon: '🌉', label: 'Bro' },
+      { icon: '💥', label: 'Minor' }, { icon: '⛽', label: 'Drivmedel' },
+      { icon: '🏕', label: 'Förläggning' }, { icon: '📍', label: 'Samlingsplats' },
+      { icon: '👁', label: 'Spaning' }, { icon: '🔭', label: 'Observation' },
+      { icon: '🚁', label: 'Helikopter' }, { icon: '⚓', label: 'Marin' },
+    ]
+  },
+  cyber_security: {
+    label: 'Cyber Security',
+    symbols: [
+      // Network
+      { icon: '🖥', label: 'Server' }, { icon: '💻', label: 'Workstation' },
+      { icon: '📡', label: 'Network' }, { icon: '🌐', label: 'Internet' },
+      { icon: '🛜', label: 'WiFi' }, { icon: '📶', label: 'Signal' },
+      { icon: '🔌', label: 'Connection' }, { icon: '🖧', label: 'Switch' },
+      // Security
+      { icon: '🔒', label: 'Secured' }, { icon: '🔓', label: 'Unsecured' },
+      { icon: '🔐', label: 'Encrypted' }, { icon: '🔑', label: 'Key/Auth' },
+      { icon: '🛡', label: 'Firewall' }, { icon: '⚠', label: 'Alert' },
+      { icon: '🚨', label: 'Incident' }, { icon: '💀', label: 'Compromised' },
+      { icon: '🐛', label: 'Malware' }, { icon: '🕷', label: 'Threat' },
+      { icon: '🦠', label: 'Virus' }, { icon: '🎣', label: 'Phishing' },
+      { icon: '🕵', label: 'Attacker' }, { icon: '👤', label: 'User' },
+      // Infrastructure
+      { icon: '☁', label: 'Cloud' }, { icon: '🗄', label: 'Database' },
+      { icon: '💾', label: 'Storage' }, { icon: '📧', label: 'Email' },
+      { icon: '🔗', label: 'Link' }, { icon: '📊', label: 'SIEM' },
+      { icon: '🧰', label: 'Tools' }, { icon: '📋', label: 'Log' },
+      { icon: '🤖', label: 'Bot/Auto' }, { icon: '🧠', label: 'AI/ML' },
+      // Status
+      { icon: '✅', label: 'Patched' }, { icon: '❌', label: 'Vulnerable' },
+      { icon: '🟢', label: 'Online' }, { icon: '🔴', label: 'Offline' },
+      { icon: '🟡', label: 'Degraded' }, { icon: '⏳', label: 'Pending' },
+    ]
+  },
+  people: {
+    label: 'People & Roles',
+    symbols: [
+      { icon: '👤', label: 'Person' }, { icon: '👥', label: 'Group' },
+      { icon: '🧑‍✈️', label: 'Pilot' }, { icon: '🧑‍🚒', label: 'Firefighter' },
+      { icon: '👮', label: 'Police' }, { icon: '🧑‍⚕️', label: 'Medic' },
+      { icon: '🧑‍🔧', label: 'Engineer' }, { icon: '🧑‍💻', label: 'IT Specialist' },
+      { icon: '🧑‍🏫', label: 'Instructor' }, { icon: '🧑‍🔬', label: 'Scientist' },
+      { icon: '💂', label: 'Guard' }, { icon: '🪖', label: 'Soldier' },
+      { icon: '🎖', label: 'Officer' }, { icon: '👷', label: 'Worker' },
+      { icon: '🧑‍🦽', label: 'Casualty' }, { icon: '🏃', label: 'Runner' },
+      { icon: '🤝', label: 'Meeting' }, { icon: '📢', label: 'Briefing' },
+      { icon: '🙋', label: 'Volunteer' }, { icon: '🕵', label: 'Intelligence' },
+    ]
+  },
+  emojis_general: {
+    label: 'General Symbols',
+    symbols: [
+      { icon: '📍', label: 'Location' }, { icon: '🏠', label: 'House' },
+      { icon: '🏢', label: 'Building' }, { icon: '🏭', label: 'Factory' },
+      { icon: '⛪', label: 'Church' }, { icon: '🏫', label: 'School' },
+      { icon: '🏥', label: 'Hospital' }, { icon: '🏛', label: 'Government' },
+      { icon: '🏟', label: 'Stadium' }, { icon: '🌳', label: 'Forest' },
+      { icon: '⛰', label: 'Mountain' }, { icon: '🌊', label: 'Water' },
+      { icon: '🌉', label: 'Bridge' }, { icon: '🛤', label: 'Rail' },
+      { icon: '🛣', label: 'Highway' }, { icon: '✈', label: 'Airport' },
+      { icon: '🚉', label: 'Station' }, { icon: '⚡', label: 'Power' },
+      { icon: '🔥', label: 'Fire' }, { icon: '💧', label: 'Water Supply' },
+      { icon: '🌡', label: 'Temperature' }, { icon: '🌤', label: 'Weather' },
+      { icon: '⏰', label: 'Time' }, { icon: '📞', label: 'Communication' },
+      { icon: '🔔', label: 'Alert' }, { icon: '❗', label: 'Urgent' },
+      { icon: '❓', label: 'Unknown' }, { icon: '✓', label: 'Verified' },
+      { icon: '🚩', label: 'Flag' }, { icon: '⭐', label: 'Important' },
+      { icon: '💎', label: 'High Value' }, { icon: '🗺', label: 'Map' },
+    ]
+  },
+  vehicles_transport: {
+    label: 'Vehicles & Transport',
+    symbols: [
+      { icon: '🚗', label: 'Car' }, { icon: '🚙', label: 'SUV' },
+      { icon: '🚐', label: 'Van' }, { icon: '🚌', label: 'Bus' },
+      { icon: '🚑', label: 'Ambulance' }, { icon: '🚒', label: 'Fire Truck' },
+      { icon: '🚓', label: 'Police Car' }, { icon: '🚔', label: 'Patrol' },
+      { icon: '🛻', label: 'Pickup' }, { icon: '🚚', label: 'Truck' },
+      { icon: '🚛', label: 'Semi' }, { icon: '🚜', label: 'Tractor' },
+      { icon: '🏍', label: 'Motorcycle' }, { icon: '🚲', label: 'Bicycle' },
+      { icon: '✈', label: 'Airplane' }, { icon: '🛩', label: 'Light Aircraft' },
+      { icon: '🚁', label: 'Helicopter' }, { icon: '🚀', label: 'Rocket' },
+      { icon: '🚂', label: 'Train' }, { icon: '🚢', label: 'Ship' },
+      { icon: '⛵', label: 'Sailboat' }, { icon: '🚤', label: 'Speedboat' },
+      { icon: '🛥', label: 'Motor Boat' }, { icon: '⛴', label: 'Ferry' },
+      { icon: '🛶', label: 'Canoe' }, { icon: '🚧', label: 'Roadblock' },
+    ]
+  }
+};
+
 /* ── Edit/Delete overlay items (called from popup links) ── */
 function _editOverlayItem(itemId) {
   if (!_currentOverlay) return;
@@ -1013,6 +1610,8 @@ function _editOverlayItem(itemId) {
   item.label = newLabel;
   const newNotes = prompt('Notes:', item.notes || '');
   if (newNotes !== null) item.notes = newNotes;
+  const newIcon = prompt('Icon:', item.icon || '');
+  if (newIcon !== null) item.icon = newIcon;
   _saveOverlay();
   _renderOverlayItems(_currentOverlay);
 }
@@ -1024,4 +1623,132 @@ function _deleteOverlayItem(itemId) {
   _currentOverlay.items = (_currentOverlay.items || []).filter(i => i.id !== itemId);
   _saveOverlay();
   _renderOverlayItems(_currentOverlay);
+}
+
+/* ── Item group selection for bulk operations ── */
+let _selectedItems = new Set();
+
+function _toggleSelectItem(itemId) {
+  if (_selectedItems.has(itemId)) _selectedItems.delete(itemId);
+  else _selectedItems.add(itemId);
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _deleteSelectedItems() {
+  if (!_currentOverlay || _selectedItems.size === 0) return;
+  if (!confirm('Delete ' + _selectedItems.size + ' selected items?')) return;
+  _currentOverlay.items = (_currentOverlay.items || []).filter(i => !_selectedItems.has(i.id));
+  _selectedItems.clear();
+  _saveOverlay();
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _groupSelectedItems() {
+  if (!_currentOverlay || _selectedItems.size < 2) { alert('Select at least 2 items to group'); return; }
+  const groupName = prompt('Group name:', 'Group');
+  if (!groupName) return;
+  const items = (_currentOverlay.items || []).filter(i => _selectedItems.has(i.id));
+  // Calculate center position
+  const avgX = items.reduce((s, i) => s + i.x, 0) / items.length;
+  const avgY = items.reduce((s, i) => s + i.y, 0) / items.length;
+  // Create group item
+  const groupItem = {
+    id: 'grp_' + Date.now(),
+    type: 'group',
+    label: groupName,
+    x: avgX, y: avgY,
+    icon: '📦',
+    color: '#8E44AD',
+    notes: 'Group of: ' + items.map(i => i.label).join(', '),
+    group_items: items.map(i => i.id)
+  };
+  // Remove individual items, add group
+  _currentOverlay.items = (_currentOverlay.items || []).filter(i => !_selectedItems.has(i.id));
+  _currentOverlay.items.push(groupItem);
+  _selectedItems.clear();
+  _saveOverlay();
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _ungroupItem(itemId) {
+  if (!_currentOverlay) return;
+  const item = (_currentOverlay.items || []).find(i => i.id === itemId);
+  if (!item || !item.group_items) return;
+  // Ungroup is a notification only - items were already removed
+  alert('Group "' + item.label + '" ungrouped. The original items were merged into this group.');
+  _map.closePopup();
+}
+
+function _moveItemToOverlay(itemId) {
+  if (!_currentOverlay || !_currentMapResource) return;
+  const overlays = (_currentMapResource.overlays || []).filter(o => o.id !== _currentOverlay.id);
+  if (overlays.length === 0) { alert('No other overlays available'); return; }
+  const names = overlays.map((o, i) => (i + 1) + '. ' + o.name).join('\n');
+  const choice = prompt('Move to overlay:\n' + names + '\n\nEnter number:', '1');
+  if (!choice) return;
+  const idx = parseInt(choice, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= overlays.length) { alert('Invalid selection'); return; }
+  const targetOverlay = overlays[idx];
+  const item = (_currentOverlay.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  _map.closePopup();
+  // Remove from current overlay
+  _currentOverlay.items = (_currentOverlay.items || []).filter(i => i.id !== itemId);
+  // Add to target overlay
+  if (!targetOverlay.items) targetOverlay.items = [];
+  targetOverlay.items.push(item);
+  _saveOverlays();
+  _renderOverlayItems(_currentOverlay);
+}
+
+function _moveItemToMap(itemId) {
+  if (!_currentOverlay || !_currentMapResource) return;
+  const otherMaps = (_mapResources || []).filter(m => String(m.id) !== String(_currentMapResource.id));
+  if (otherMaps.length === 0) { alert('No other maps available'); return; }
+  const names = otherMaps.map((m, i) => (i + 1) + '. ' + m.name).join('\n');
+  const choice = prompt('Move to map:\n' + names + '\n\nEnter number:', '1');
+  if (!choice) return;
+  const idx = parseInt(choice, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= otherMaps.length) { alert('Invalid selection'); return; }
+  const targetMap = otherMaps[idx];
+  const item = (_currentOverlay.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  _map.closePopup();
+  // Remove from current overlay
+  _currentOverlay.items = (_currentOverlay.items || []).filter(i => i.id !== itemId);
+  // Add to first overlay of target map (or create one)
+  if (!targetMap.overlays || targetMap.overlays.length === 0) {
+    targetMap.overlays = [{ id: 'ov_' + Date.now(), name: 'Default', locked: false, locked_by: 0, items: [item] }];
+  } else {
+    if (!targetMap.overlays[0].items) targetMap.overlays[0].items = [];
+    targetMap.overlays[0].items.push(item);
+  }
+  // Save both maps
+  _saveOverlays();
+  fetch('/api/map-resources/' + targetMap.id + '/overlays', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(targetMap.overlays)
+  }).catch(e => console.warn('[moveItemToMap]', e));
+  _renderOverlayItems(_currentOverlay);
+}
+
+/* ── Bulk operations bar ── */
+function _renderBulkOpsBar() {
+  let bar = document.getElementById('bulkOpsBar');
+  if (_selectedItems.size === 0) {
+    if (bar) bar.style.display = 'none';
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'bulkOpsBar';
+    bar.style.cssText = 'position:absolute;bottom:60px;left:50%;transform:translateX(-50%);z-index:1002;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;display:flex;gap:6px;align-items:center;font-size:11px';
+    document.body.appendChild(bar);
+  }
+  bar.style.display = 'flex';
+  bar.innerHTML = '<span>' + _selectedItems.size + ' selected</span>' +
+    '<button class="btn-map" onclick="_groupSelectedItems()">Group</button>' +
+    '<button class="btn-map" onclick="_deleteSelectedItems()">Delete</button>' +
+    '<button class="btn-map" onclick="_selectedItems.clear();_renderOverlayItems(_currentOverlay)">Clear</button>';
 }

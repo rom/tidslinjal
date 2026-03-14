@@ -3516,6 +3516,18 @@ func (s *Store) GetNotificationsForUser(userID int64, limit int) []Notification 
 	return result
 }
 
+func (s *Store) GetNotification(id int64) (*Notification, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, n := range s.notifications {
+		if n.ID == id {
+			copy := n
+			return &copy, nil
+		}
+	}
+	return nil, fmt.Errorf("notification %d not found", id)
+}
+
 func (s *Store) AcknowledgeNotification(id int64) error {
 	s.mu.Lock()
 	for i, n := range s.notifications {
@@ -3799,6 +3811,9 @@ func (s *Store) CreateReferenceLink(title, description, category, tags, refType,
 		UploadedByName: userName,
 		UploadedAt:     time.Now(),
 		Tags:           tagList,
+		RefType:        refType,
+		URL:            url,
+		Content:        content,
 	}
 	s.referenceDocs = append(s.referenceDocs, rd)
 	snap := append([]ReferenceDoc(nil), s.referenceDocs...)
