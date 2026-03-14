@@ -549,15 +549,27 @@ function renderListView() {
   });
 
   // Sort
-  events.sort((a, b) => {
-    let va = a[_listSortKey] || '';
-    let vb = b[_listSortKey] || '';
-    if (_listSortKey === 'start_time' || _listSortKey === 'end_time') { va = new Date(va || 0); vb = new Date(vb || 0); }
-    if (typeof va === 'string' && typeof vb === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
-    if (va < vb) return _listSortAsc ? -1 : 1;
-    if (va > vb) return _listSortAsc ?  1 : -1;
-    return 0;
-  });
+  if (_listSortKey === '_custom') {
+    const customOrder = state.preferences.list_custom_order || [];
+    events.sort((a, b) => {
+      const ia = customOrder.indexOf(a.id);
+      const ib = customOrder.indexOf(b.id);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  } else {
+    events.sort((a, b) => {
+      let va = a[_listSortKey] || '';
+      let vb = b[_listSortKey] || '';
+      if (_listSortKey === 'start_time' || _listSortKey === 'end_time') { va = new Date(va || 0); vb = new Date(vb || 0); }
+      if (typeof va === 'string' && typeof vb === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return _listSortAsc ? -1 : 1;
+      if (va > vb) return _listSortAsc ?  1 : -1;
+      return 0;
+    });
+  }
 
   if (countEl) countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
 
@@ -607,21 +619,24 @@ function renderListView() {
       </select>` :
       escHtml(etLabel);
 
-    // Responsible dropdown (editable)
+    // Responsible dropdown (editable) — default to creator if no responsible set
+    const effRespId = ev.responsible_id || ev.created_by || null;
+    const effRespName = ev.responsible_name || ev.created_by_name || '';
     const responsibleCell = canEdit ?
       `<select class="list-resp-sel" data-ev-resp="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 6px;font-size:inherit;cursor:pointer;max-width:140px">
-        <option value="" ${!ev.responsible_id?'selected':''}>${t('lv_no_responsible')}</option>
+        <option value="" ${!effRespId?'selected':''}>${t('lv_no_responsible')}</option>
         ${users.map(u =>
-          `<option value="${u.id}" ${ev.responsible_id===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`
+          `<option value="${u.id}" ${effRespId===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`
         ).join('')}
       </select>` :
-      escHtml(ev.responsible_name || ev.created_by_name || t('lv_no_responsible'));
+      escHtml(effRespName || t('lv_no_responsible'));
 
     const _etMatch = eventTypes.find(et => et.key === ev.event_type);
-    const _evColor = ev.color || (_etMatch ? _etMatch.color : 'var(--accent)');
+    const _rawColor = ev.color || (_etMatch ? _etMatch.color : 'var(--accent)');
+    const _evColor = typeof cbSafeColor === 'function' ? cbSafeColor(_rawColor) : _rawColor;
     return marker + `
-    <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
-      <td style="padding:8px 10px;text-align:center;color:var(--text-dim);font-size:var(--fs-xs);width:40px">${_seqNum}</td>
+    <tr data-ev-row="${ev.id}" ${canEdit ? 'draggable="true"' : ''} style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
+      <td style="padding:8px 10px;text-align:center;color:var(--text-dim);font-size:var(--fs-xs);width:40px">${canEdit ? '<span style="cursor:grab;margin-right:2px;opacity:.4">⠿</span>' : ''}${_seqNum}</td>
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${_evColor};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
@@ -709,4 +724,68 @@ function renderListView() {
       if (res.ok) { await refreshAll(); } else { const err = await res.json(); showError(err.error); }
     });
   });
+
+  // Drag-to-reorder rows
+  if (canEdit) {
+    let _dragRow = null;
+    tbody.querySelectorAll('tr[data-ev-row][draggable]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        _dragRow = row;
+        row.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', row.dataset.evRow);
+      });
+      row.addEventListener('dragend', () => {
+        row.style.opacity = '';
+        _dragRow = null;
+        tbody.querySelectorAll('tr').forEach(r => {
+          r.style.borderTop = '';
+          r.style.borderBottom = '';
+        });
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!_dragRow || _dragRow === row) return;
+        tbody.querySelectorAll('tr').forEach(r => { r.style.borderTop = ''; r.style.borderBottom = ''; });
+        const rect = row.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) {
+          row.style.borderTop = '2px solid var(--accent)';
+        } else {
+          row.style.borderBottom = '2px solid var(--accent)';
+        }
+      });
+      row.addEventListener('dragleave', () => {
+        row.style.borderTop = '';
+        row.style.borderBottom = '';
+      });
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!_dragRow || _dragRow === row) return;
+        const rect = row.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) {
+          tbody.insertBefore(_dragRow, row);
+        } else {
+          tbody.insertBefore(_dragRow, row.nextSibling);
+        }
+        // Update sequence numbers
+        let seq = 0;
+        tbody.querySelectorAll('tr[data-ev-row]').forEach(r => {
+          seq++;
+          const firstTd = r.querySelector('td');
+          if (firstTd) {
+            const grabSpan = firstTd.querySelector('span') ? '<span style="cursor:grab;margin-right:2px;opacity:.4">⠿</span>' : '';
+            firstTd.innerHTML = grabSpan + seq;
+          }
+        });
+        // Save custom order to preferences
+        const orderedIds = [...tbody.querySelectorAll('tr[data-ev-row]')].map(r => parseInt(r.dataset.evRow, 10));
+        state.preferences.list_custom_order = orderedIds;
+        _listSortKey = '_custom';
+        if (typeof savePreferences === 'function') savePreferences();
+      });
+    });
+  }
 }

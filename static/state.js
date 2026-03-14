@@ -99,3 +99,40 @@ function isLayerActive(id) {
 function isLayerHidden(id) {
   return (state.preferences.hidden_layers || []).includes(id);
 }
+
+// ── Color-blind safe color remapping for event types ────────────────────────
+const _cbColorMap = {
+  protanopia: {
+    '#C0392B': '#D55E00', '#E74C3C': '#D55E00',
+    '#27AE60': '#009E73', '#2ECC71': '#009E73',
+    '#F39C12': '#E69F00', '#E67E22': '#E69F00',
+    '#4A90D9': '#0072B2',
+    '#9B59B6': '#CC79A7',
+    '#1ABC9C': '#56B4E9', '#00ACC1': '#56B4E9',
+    '#D35400': '#D55E00',
+    '#95A5A6': '#95A5A6', '#7F8C8D': '#7F8C8D',
+  },
+  tritanopia: {
+    '#C0392B': '#E74C3C', '#E74C3C': '#E74C3C',
+    '#27AE60': '#2ECC71', '#2ECC71': '#2ECC71',
+    '#F39C12': '#D55E00', '#E67E22': '#D55E00',
+    '#4A90D9': '#CC79A7',
+    '#9B59B6': '#009E73',
+    '#1ABC9C': '#E69F00', '#00ACC1': '#E69F00',
+    '#D35400': '#D55E00',
+    '#95A5A6': '#95A5A6', '#7F8C8D': '#7F8C8D',
+  }
+};
+_cbColorMap.deuteranopia = _cbColorMap.protanopia;
+
+function cbSafeColor(color) {
+  const mode = (state.preferences || {}).color_blind_mode || 'off';
+  if (mode === 'off' || !color) return color;
+  const map = _cbColorMap[mode];
+  if (!map) return color;
+  const upper = color.toUpperCase();
+  for (const [from, to] of Object.entries(map)) {
+    if (upper === from.toUpperCase()) return to;
+  }
+  return color;
+}

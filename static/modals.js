@@ -2152,6 +2152,54 @@ async function deleteLogBookEntry(id) {
   }
 }
 
+// ── Log Book modal (accessible from Tools) ──
+function openLogBookModal() {
+  const cats = [
+    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
+    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
+    {v:'incident',l:t('lb_incident')||'Special incident'},
+    {v:'directive',l:t('lb_directive')||'Directive'},
+    {v:'decision',l:t('lb_decision')||'Decision'},
+    {v:'action',l:t('lb_action')||'Action taken'},
+    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
+    {v:'situation',l:t('lb_situation')||'Situation change'},
+    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
+    {v:'other',l:t('lb_other')||'Other'}
+  ];
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:700px">
+      <div class="modal-header">
+        <h3>📖 ${t('tab_log_book')||'Log Book'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
+          <select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
+            ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
+          </select>
+          <input type="text" id="lbSubject" placeholder="${t('lb_subject')||'Subject'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
+          <textarea id="lbBody" rows="2" placeholder="${t('lb_body')||'Details (optional)'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
+              📎 <input type="file" id="lbAttachFile" style="max-width:120px;font-size:10px" multiple>
+            </label>
+            <span style="flex:1"></span>
+            <button class="btn btn-primary btn-sm" data-action="addLogBookEntry">${t('btn_add')||'Add'}</button>
+          </div>
+        </div>
+        <div id="logBookEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('lb_loading')||'Loading…'}</em></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  _loadLogBook();
+}
+
 // Detach sidebar into separate window
 let _detachedSidebarWin = null;
 function detachSidebar() {
@@ -2320,7 +2368,7 @@ function renderSidebar() {
               instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
             const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
             return `<div class="legend-item${hidden?' hidden-type':''}" data-action="toggleType" data-arg="${et.key}">
-              <div class="legend-swatch" style="background:${et.color}"></div>
+              <div class="legend-swatch" style="background:${cbSafeColor(et.color)}"></div>
               ${etIcon ? `<span class="legend-type-icon">${etIcon}</span>` : ''}
               <span class="legend-label">${escHtml(lbl)}</span>
               <span class="legend-eye">${hidden?'👁‍🗨':'👁'}</span>
@@ -2328,16 +2376,6 @@ function renderSidebar() {
                 `<button class="btn btn-ghost btn-icon" style="font-size:11px;padding:0 3px" data-edit-etype='${escAttr(JSON.stringify(et))}' data-stop-prop-only>✏️</button>` : ''}
             </div>`;
           }).join('')}
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('info_connection')||'Connection'}</div>
-        <div style="font-size:var(--fs-sm);display:flex;align-items:center;gap:8px;padding:4px 0">
-          ${window._offlineModeForced
-            ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b"></span><span style="color:#f59e0b;font-weight:600">' + (t('info_forced_offline')||'Forced Offline') + '</span>'
-            : navigator.onLine
-              ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></span><span style="color:#22c55e;font-weight:600">' + (t('info_online')||'Online') + '</span>'
-              : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red,#E74C3C)"></span><span style="color:var(--red,#E74C3C);font-weight:600">' + (t('info_offline')||'Offline') + '</span>'}
         </div>
       </div>
       <div class="sidebar-section">
@@ -3412,6 +3450,7 @@ function renderSidebar() {
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
+          ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
           ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
@@ -3749,14 +3788,17 @@ function renderSidebar() {
         <div class="form-check" style="margin-bottom:6px">
           <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
           <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
+          <span title="${t('settings_exercise_enable_info')||'Enable the synthetic time display, showing H+N elapsed time on the timeline.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent);margin-left:4px">ℹ️</span>
         </div>
         <div class="form-check" style="margin-bottom:8px">
           <input type="checkbox" id="exDayHoursOnly" ${ex.day_hours_only?'checked':''}>
           <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
+          <span title="${t('settings_synth_day_only_info')||'Only count daytime hours in synthetic elapsed time. Night hours are skipped.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent);margin-left:4px">ℹ️</span>
         </div>
         <div class="form-check" style="margin-bottom:8px">
           <input type="checkbox" id="exIncludeWeekends" ${ex.include_weekends!==false?'checked':''}>
-          <label for="exIncludeWeekends" style="font-size:var(--fs-sm)" title="${t('settings_include_weekends_desc')||'Show weekends on the timeline and count them in synthetic time'}">${t('settings_include_weekends')||'Include weekends'}</label>
+          <label for="exIncludeWeekends" style="font-size:var(--fs-sm)">${t('settings_include_weekends')||'Include weekends'}</label>
+          <span title="${t('settings_include_weekends_info')||'Show weekends on the timeline and count them in synthetic time calculations.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent);margin-left:4px">ℹ️</span>
         </div>
         <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
@@ -4009,30 +4051,35 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="include_weekends"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_include_weekends')||'Include weekends'}
+          <span title="${t('settings_include_weekends_info')||'Show weekends on the timeline and count them in synthetic time calculations.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         ${synthActive() ? `
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
           <input type="checkbox" id="prefSynthLabel2" ${p.synth_label?'checked':''} data-action="setSynthLabelPref" data-event="change" data-arg-checked
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_synth_label')||'Show H+N label on red line'}
+          <span title="${t('settings_synth_label_info')||'Shows elapsed time (H+N) label next to the current-time line.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefSynthDayOnly2" ${ex.day_hours_only?'checked':''}
             data-action="setPref" data-event="change" data-pref-checked="synth_day_hours_only"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('synth_day_hours_only')||'Synthetic time: day hours only'}
+          <span title="${t('settings_synth_day_only_info')||'Only count daytime hours in synthetic elapsed time. Night hours are skipped.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>` : ''}
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
           <input type="checkbox" id="prefShowDayOfYear" ${p.show_day_of_year?'checked':''}
             data-action="setPref" data-event="change" data-pref-checked="show_day_of_year"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_day_of_year')||'Show day-of-year number (1–365)'}
+          <span title="${t('settings_show_day_of_year_info')||'Display the ordinal day number (1–365) in the timeline header.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
           <input type="checkbox" id="prefShowWeekNumbers" ${p.show_week_numbers?'checked':''}
             data-action="setPref" data-event="change" data-pref-checked="show_week_numbers"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_week_numbers')||'Show week numbers'}
+          <span title="${t('settings_show_week_numbers_info')||'Display ISO week numbers (W1–W52) in the timeline header.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         ${p.show_week_numbers ? `
         <div style="margin-top:4px;margin-left:22px">
