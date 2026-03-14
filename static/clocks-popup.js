@@ -93,7 +93,7 @@ function _getLang() {
 }
 
 function _getLocale() {
-  const m = { en:'en-GB', sv:'sv-SE', fr:'fr-FR' };
+  const m = { en:'en-GB', sv:'sv-SE', fr:'fr-FR', fi:'fi-FI', da:'da-DK' };
   return m[_getLang()] || 'en-GB';
 }
 
@@ -115,6 +115,14 @@ try {
     if (e.data && e.data.type === 'theme') {
       var cls = 'theme-' + (e.data.theme || 'dark');
       document.body.className = document.body.className.replace(/theme-\S+/g, '').trim() + ' ' + cls;
+    }
+    if (e.data && e.data.type === 'time-format') {
+      _hourFormat = e.data.time_format === '12h' ? '12' : '24';
+      var btn24 = document.getElementById('btnFmt24');
+      var btn12 = document.getElementById('btnFmt12');
+      if (btn24) btn24.classList.toggle('active', _hourFormat === '24');
+      if (btn12) btn12.classList.toggle('active', _hourFormat === '12');
+      tick();
     }
   };
 } catch(e) {}
@@ -1723,6 +1731,12 @@ try {
   if (bgInput) bgInput.value = cs.getPropertyValue('--bg').trim() || '#1a1d23';
   const cdInput = document.getElementById('colorCountdown');
   if (cdInput) cdInput.value = cs.getPropertyValue('--accent').trim() || '#4a9eff';
+} catch(e) {}
+
+// Sync time format from opener
+try {
+  var _opTf = window.opener?.state?.preferences?.time_format;
+  if (_opTf === '12h') _hourFormat = '12';
 } catch(e) {}
 
 // Initial build + start ticking

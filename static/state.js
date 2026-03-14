@@ -46,6 +46,8 @@ window.state = {
     workspace_presets:   [],
     welcome_url:         '',
     help_url:            '',
+    training_url:        '',
+    demo_url:            '',
   },
   resolution:    'hour',
   range:         'week',

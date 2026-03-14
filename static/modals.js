@@ -2071,6 +2071,11 @@ function detachSidebar() {
     openDetachedResources();
     return;
   }
+  // If on references tab, open standalone references popup
+  if (state.sidebarTab === 'references') {
+    openDetachedReferences();
+    return;
+  }
   if (_detachedSidebarWin && !_detachedSidebarWin.closed) {
     _detachedSidebarWin.focus();
     return;
@@ -3622,6 +3627,7 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' >SV</button>
           <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' >FR</button>
           <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' >FI</button>
+          <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' >DA</button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -3675,6 +3681,13 @@ function renderSidebar() {
         <div class="toggle-btn-group">
           <button class="toggle-btn${(p.time_format||'24h')==='24h'?' active':''}" data-action="setPref" data-args='["time_format","24h"]'>${t('time_format_24h')}</button>
           <button class="toggle-btn${p.time_format==='12h'?' active':''}" data-action="setPref" data-args='["time_format","12h"]'>${t('time_format_12h')}</button>
+        </div>
+        <div style="margin-top:8px">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_time_separator')||'Time Separator'}</span>
+          <div class="toggle-btn-group" style="margin-top:4px">
+            <button class="toggle-btn${(p.time_separator||'colon')==='colon'?' active':''}" data-action="setPref" data-args='["time_separator","colon"]'>${t('time_sep_colon')||': separation'}</button>
+            <button class="toggle-btn${p.time_separator==='dot'?' active':''}" data-action="setPref" data-args='["time_separator","dot"]'>${t('time_sep_dot')||'. separation'}</button>
+          </div>
         </div>
       </div>
       <div class="sidebar-section">
@@ -3793,6 +3806,14 @@ function renderSidebar() {
         <div class="sidebar-section-title" style="margin-top:6px">${t('settings_help_url')||'Help URL'}</div>
         <input type="url" value="${escHtml(p.help_url||'')}" placeholder="https://..."
           data-action="setPrefInput" data-event="change" data-pref-key="help_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_training_url')||'Training URL'}</div>
+        <input type="url" value="${escHtml(p.training_url||'')}" placeholder="https://..."
+          data-action="setPrefInput" data-event="change" data-pref-key="training_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_demo_url')||'Demo URL'}</div>
+        <input type="url" value="${escHtml(p.demo_url||'')}" placeholder="https://..."
+          data-action="setPrefInput" data-event="change" data-pref-key="demo_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
       </div>
       <div class="sidebar-section">
@@ -5513,7 +5534,7 @@ async function openPersonReadyCheckPopup() {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
-    <div class="modal" style="max-width:640px">
+    <div class="modal" style="max-width:700px">
       <div class="modal-header">
         <h3>🙋 ${t('person_ready_check_title')||'Person Ready Check'}</h3>
         <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
@@ -5522,9 +5543,8 @@ async function openPersonReadyCheckPopup() {
         <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
           ${t('person_ready_check_desc')||'Request all participants to confirm their readiness. Each participant shows as a traffic light: green = ready, red = not ready, yellow = pending.'}
         </p>
-        <div id="prcActiveChecks"></div>
         ${isCreator ? `
-        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
+        <div style="border:1px solid var(--accent);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2))">
           <h4 style="font-size:var(--fs-sm);margin-bottom:8px">${t('prc_new_check')||'New Ready Check'}</h4>
           <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('prc_select_mode')||'Select by'}:</label>
@@ -5533,6 +5553,10 @@ async function openPersonReadyCheckPopup() {
               <button class="toggle-btn" id="prcModeGroup" data-prc-mode="group">${t('prc_mode_group')||'Group / Team'}</button>
               <button class="toggle-btn" id="prcModeRole" data-prc-mode="role">${t('prc_mode_role')||'Role'}</button>
             </div>
+            <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:3px;margin-left:auto">
+              <input type="checkbox" id="prcSelectAll" style="accent-color:var(--accent);width:12px;height:12px">
+              <span style="font-weight:600">${t('prc_select_all')||'Select all'}</span>
+            </label>
           </div>
           <div id="prcIndividualSection">
             <div style="margin-bottom:6px;display:flex;gap:8px;align-items:center">
@@ -5541,10 +5565,11 @@ async function openPersonReadyCheckPopup() {
                 <input type="checkbox" id="prcOnlineOnly" style="accent-color:var(--accent);width:12px;height:12px">
                 <span style="color:var(--accent);font-weight:600">🟢 ${t('prc_filter_online')||'Online only'}</span>
               </label>
+              <input type="text" id="prcUserSearch" placeholder="${t('prc_search_users')||'Search users...'}" style="margin-left:auto;padding:3px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);width:140px">
             </div>
-            <div id="prcParticipantList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+            <div id="prcParticipantList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
               ${(state.users||[]).filter(u => u.id !== state.user.id).map(u => `
-                <label class="group-chip prc-user-chip" style="cursor:pointer;font-size:var(--fs-xs)" data-online="${u.availability && u.availability !== 'away' ? 'true' : 'false'}" data-user-id="${u.id}">
+                <label class="group-chip prc-user-chip" style="cursor:pointer;font-size:var(--fs-xs)" data-online="${u.availability && u.availability !== 'away' ? 'true' : 'false'}" data-user-id="${u.id}" data-user-name="${escHtml((u.display_name||u.username).toLowerCase())}">
                   <input type="checkbox" class="prc-user-cb" value="${u.id}" style="margin-right:4px">
                   ${u.availability === 'busy' ? '🟡' : u.availability === 'dnd' ? '🔴' : u.availability === 'away' ? '⚪' : '🟢'} ${escHtml(u.display_name||u.username)}
                 </label>`).join('')}
@@ -5552,7 +5577,7 @@ async function openPersonReadyCheckPopup() {
           </div>
           <div id="prcGroupSection" style="display:none">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_send_to_group')||'Send to group/team'}:</label>
-            <div id="prcGroupList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+            <div id="prcGroupList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
               ${(state.groups||[]).map(g => `
                 <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                   <input type="checkbox" class="prc-group-cb" value="${g.id}" style="margin-right:4px">
@@ -5562,7 +5587,7 @@ async function openPersonReadyCheckPopup() {
           </div>
           <div id="prcRoleSection" style="display:none">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_send_to_role')||'Send to role'}:</label>
-            <div id="prcRoleList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+            <div id="prcRoleList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
               ${[...new Set((state.users||[]).map(u => u.role).filter(Boolean))].map(role => `
                 <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                   <input type="checkbox" class="prc-role-cb" value="${role}" style="margin-right:4px">
@@ -5570,8 +5595,16 @@ async function openPersonReadyCheckPopup() {
                 </label>`).join('')}
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" id="btnCreatePRC" style="margin-top:8px">${t('prc_send_request')||'Send Ready Check Request'}</button>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" id="btnCreatePRC">${t('prc_send_request')||'Send Ready Check Request'}</button>
+            <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--text-dim)">
+              <input type="checkbox" id="prcTimedCheck" style="accent-color:var(--accent);width:12px;height:12px">
+              ${t('prc_timed_check')||'Timed Ready Check'}
+            </label>
+            <input type="datetime-local" id="prcTimedDateTime" style="display:none;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
         </div>` : ''}
+        <div id="prcActiveChecks"></div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
@@ -5602,14 +5635,38 @@ async function openPersonReadyCheckPopup() {
   const onlineFilter = modal.querySelector('#prcOnlineOnly');
   if (onlineFilter) {
     onlineFilter.addEventListener('change', () => {
-      const onlyOnline = onlineFilter.checked;
-      modal.querySelectorAll('.prc-user-chip').forEach(chip => {
-        if (onlyOnline && chip.dataset.online !== 'true') {
-          chip.style.display = 'none';
-        } else {
-          chip.style.display = '';
-        }
+      _prcFilterUsers(modal);
+    });
+  }
+
+  // User search filter
+  const userSearch = modal.querySelector('#prcUserSearch');
+  if (userSearch) {
+    userSearch.addEventListener('input', () => _prcFilterUsers(modal));
+  }
+
+  // Select all checkbox
+  const selectAll = modal.querySelector('#prcSelectAll');
+  if (selectAll) {
+    selectAll.addEventListener('change', () => {
+      const checked = selectAll.checked;
+      modal.querySelectorAll('.prc-user-cb').forEach(cb => {
+        const chip = cb.closest('.prc-user-chip');
+        if (chip && chip.style.display !== 'none') cb.checked = checked;
       });
+    });
+  }
+
+  // Timed check toggle
+  const timedCheck = modal.querySelector('#prcTimedCheck');
+  const timedDateTime = modal.querySelector('#prcTimedDateTime');
+  if (timedCheck && timedDateTime) {
+    timedCheck.addEventListener('change', () => {
+      timedDateTime.style.display = timedCheck.checked ? '' : 'none';
+      if (timedCheck.checked && !timedDateTime.value) {
+        const d = new Date(); d.setMinutes(d.getMinutes() + 30);
+        timedDateTime.value = fmtDateInput(d);
+      }
     });
   }
 
@@ -5638,9 +5695,20 @@ async function openPersonReadyCheckPopup() {
         });
       }
       if (selected.length === 0) { showError(t('prc_no_participants')||'Select at least one participant'); return; }
-      const res = await apiPost('/api/person-ready-check', { participant_ids: selected });
+      const isTimed = modal.querySelector('#prcTimedCheck')?.checked || false;
+      const timedAt = isTimed ? modal.querySelector('#prcTimedDateTime')?.value : null;
+      if (isTimed && !timedAt) { showError(t('prc_timed_required')||'Please select a date and time for the timed check'); return; }
+      const body = { participant_ids: selected };
+      if (isTimed && timedAt) {
+        body.scheduled_at = new Date(timedAt).toISOString();
+      }
+      const res = await apiPost('/api/person-ready-check', body);
       if (res.ok) {
-        showNotification('success', t('prc_sent')||'Ready check request sent');
+        if (isTimed) {
+          showNotification('success', t('prc_timed_scheduled')||'Timed ready check scheduled');
+        } else {
+          showNotification('success', t('prc_sent')||'Ready check request sent');
+        }
         _loadPersonReadyChecks(modal);
       } else {
         const err = await res.json().catch(() => ({}));
@@ -5663,25 +5731,64 @@ async function _loadPersonReadyChecks(modal) {
     return;
   }
 
-  container.innerHTML = _personReadyChecks.map(check => {
+  // Display checks in reverse chronological order (newest first)
+  const sortedChecks = [..._personReadyChecks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  container.innerHTML = sortedChecks.map(check => {
     const isMyCheck = check.created_by === state.user.id;
     const participants = check.participants || [];
+    const checkTime = new Date(check.created_at);
+    const readyCount = participants.filter(p => p.status === 'ready').length;
+    const notReadyCount = participants.filter(p => p.status === 'not_ready').length;
+    const pendingCount = participants.filter(p => p.status === 'pending').length;
+    const isScheduled = check.scheduled_at && new Date(check.scheduled_at) > new Date();
+    // Sort participants: pending first (actionable), then by response time
+    const sortedParticipants = [...participants].sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      // Among responded, sort by response time (newest first)
+      if (a.responded_at && b.responded_at) return new Date(b.responded_at) - new Date(a.responded_at);
+      return 0;
+    });
+    // For large groups, show summary and collapsible details
+    const isLargeGroup = participants.length > 20;
     return `
       <div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px;background:var(--bg3)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:600;font-size:var(--fs-sm)">${t('prc_ready_check')||'Ready Check'} #${check.id}</span>
-          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${new Date(check.created_at).toLocaleString()}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+          <span style="font-weight:600;font-size:var(--fs-sm)">
+            ${isScheduled ? '⏰ ' : ''}${t('prc_ready_check')||'Ready Check'} #${check.id}
+          </span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${checkTime.toLocaleString()}</span>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${participants.map(p => {
+        <div style="font-size:var(--fs-xs);margin-bottom:8px;display:flex;gap:12px;color:var(--text-dim)">
+          <span>🟢 ${readyCount}</span> <span>🔴 ${notReadyCount}</span> <span>🟡 ${pendingCount}</span>
+          <span style="margin-left:auto">${t('prc_total')||'Total'}: ${participants.length}</span>
+          ${isScheduled ? `<span style="color:var(--accent)">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${new Date(check.scheduled_at).toLocaleString()}</span>` : ''}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;${isLargeGroup ? 'max-height:200px;overflow-y:auto' : ''}">
+          ${sortedParticipants.map(p => {
             const color = p.status === 'ready' ? '#27AE60' : p.status === 'not_ready' ? '#E74C3C' : '#F39C12';
             const icon = p.status === 'ready' ? '🟢' : p.status === 'not_ready' ? '🔴' : '🟡';
             const isMe = p.user_id === state.user.id;
-            return `<div style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius);border:1px solid ${color}">
-              <span style="font-size:16px">${icon}</span>
-              <span style="font-size:var(--fs-xs)">${escHtml(p.user_name)}</span>
+            // Calculate response time difference from check creation
+            let responseInfo = '';
+            if (p.responded_at) {
+              const respTime = new Date(p.responded_at);
+              const diffMs = respTime - checkTime;
+              const diffSec = Math.floor(diffMs / 1000);
+              const diffMin = Math.floor(diffSec / 60);
+              const diffH = Math.floor(diffMin / 60);
+              let diffStr = '';
+              if (diffH > 0) diffStr = `${diffH}h ${diffMin % 60}m`;
+              else if (diffMin > 0) diffStr = `${diffMin}m ${diffSec % 60}s`;
+              else diffStr = `${diffSec}s`;
+              responseInfo = `<span style="font-size:9px;color:var(--text-dim);margin-left:2px" title="${respTime.toLocaleString()}">(+${diffStr})</span>`;
+            }
+            return `<div style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;background:var(--bg2);border-radius:var(--radius);border:1px solid ${color};font-size:var(--fs-xs)">
+              <span>${icon}</span>
+              <span>${escHtml(p.user_name)}</span>${responseInfo}
               ${isMe && p.status === 'pending' ? `
-                <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#27AE60;color:#fff;border:none;border-radius:3px;margin-left:4px" data-prc-respond="${check.id}" data-prc-status="ready">✓</button>
+                <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#27AE60;color:#fff;border:none;border-radius:3px;margin-left:2px" data-prc-respond="${check.id}" data-prc-status="ready">✓</button>
                 <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#E74C3C;color:#fff;border:none;border-radius:3px" data-prc-respond="${check.id}" data-prc-status="not_ready">✗</button>` : ''}
             </div>`;
           }).join('')}
@@ -5706,6 +5813,17 @@ async function _loadPersonReadyChecks(modal) {
 }
 
 // ── PRC Popup (shown to participants when a ready check is created) ──────────
+function _prcFilterUsers(modal) {
+  const onlyOnline = modal.querySelector('#prcOnlineOnly')?.checked || false;
+  const searchTerm = (modal.querySelector('#prcUserSearch')?.value || '').toLowerCase();
+  modal.querySelectorAll('.prc-user-chip').forEach(chip => {
+    let hidden = false;
+    if (onlyOnline && chip.dataset.online !== 'true') hidden = true;
+    if (searchTerm && chip.dataset.userName && !chip.dataset.userName.includes(searchTerm)) hidden = true;
+    chip.style.display = hidden ? 'none' : '';
+  });
+}
+
 function _showPRCPopup(check) {
   // Prevent duplicate popups for same check
   if (document.getElementById('prcPopup_' + check.id)) return;
@@ -5917,7 +6035,15 @@ async function setPref(key, value) {
   await savePreferences();
   renderSidebar();
   renderTimeline();
+  if (typeof renderListView === 'function') renderListView();
   updateUILabels();
+  // Broadcast time_format / time_separator changes to detached windows
+  if (key === 'time_format' || key === 'time_separator') {
+    updateClock();
+    if (typeof _broadcastSync === 'function') {
+      _broadcastSync({ type: 'time-format', time_format: state.preferences.time_format, time_separator: state.preferences.time_separator });
+    }
+  }
 }
 
 async function setPrefSelect() {
@@ -7039,6 +7165,27 @@ async function confirmApplyTemplate(id) {
       if (r.user_label)     state.exercise.user_label     = r.user_label;
     }
     await refreshAll();
+    // Auto-expand day hours if template events fall outside current day hours
+    const dayStart = state.preferences.day_start_hour || 0;
+    const dayEnd   = state.preferences.day_end_hour || 24;
+    let needsExpand = false;
+    let minH = dayStart, maxH = dayEnd;
+    (state.events || []).forEach(ev => {
+      const st = new Date(ev.start_time);
+      const en = ev.end_time ? new Date(ev.end_time) : null;
+      if (st.getHours() < minH) { minH = st.getHours(); needsExpand = true; }
+      if (en && (en.getHours() > maxH || (en.getHours() === 0 && en.getMinutes() === 0))) { maxH = Math.min(24, en.getHours() || 24); needsExpand = true; }
+    });
+    if (needsExpand && (minH < dayStart || maxH > dayEnd)) {
+      state.preferences.day_start_hour = minH;
+      state.preferences.day_end_hour = Math.max(maxH, dayEnd);
+      if (!state.preferences.show_out_of_hours) {
+        state.preferences.show_out_of_hours = true;
+      }
+      applyPreferences();
+      await savePreferences();
+      showNotification('info', t('template_hours_expanded') || 'Day hours expanded to show all template activities');
+    }
     const nameSuffix = r.exercise_name ? ` — exercise: ${r.exercise_name}` : '';
     showNotification('success', `Created ${r.created || 0} event${(r.created||0)!==1?'s':''} from template${nameSuffix}`);
   } else {
@@ -8490,6 +8637,19 @@ function openDetachedResources() {
   const w = Math.min(window.screen.availWidth, 600);
   const h = Math.min(window.screen.availHeight - 100, 700);
   _resourcesPopout = window.open('/static/resources-popup.html', 'tidslinjal-resources',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+}
+
+// ── References Window (detached) ────────────────────────────────────────────
+let _referencesPopout = null;
+function openDetachedReferences() {
+  if (_referencesPopout && !_referencesPopout.closed) {
+    _referencesPopout.focus();
+    return;
+  }
+  const w = Math.min(window.screen.availWidth, 700);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _referencesPopout = window.open('/static/references-popup.html', 'tidslinjal-references',
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
 }
 
@@ -10787,9 +10947,16 @@ function _renderReferencesTab(el) {
         <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
         <option value="other">Other</option>
       </select>
+      <div id="refGitActions" style="display:none;margin-bottom:8px;display:flex;gap:6px;align-items:center">
+        <button class="btn btn-secondary btn-sm" id="btnRefGitSave" style="font-size:10px">💾 ${t('ref_git_save')||'Save to Git'}</button>
+        <button class="btn btn-secondary btn-sm" id="btnRefGitLoad" style="font-size:10px">📥 ${t('ref_git_load')||'Load from Git'}</button>
+        <span id="refGitStatus" style="font-size:var(--fs-xs);color:var(--text-dim)"></span>
+      </div>
       <div id="refList" style="max-height:60vh;overflow-y:auto"></div>
     </div>`;
   _loadAndRenderReferences();
+  // Check if GitHub is enabled for refs
+  _checkRefGitIntegration();
   const addBtn = document.getElementById('btnAddReference');
   if (addBtn) addBtn.addEventListener('click', () => _openReferenceUploadModal());
   const searchEl = document.getElementById('refSearch');
@@ -10804,6 +10971,8 @@ async function _loadAndRenderReferences() {
     if (!res.ok) return;
     state.references = await res.json() || [];
   } catch (e) { state.references = []; }
+  // Ensure default user manual reference exists
+  _ensureDefaultUserManualRef();
   // Populate autocomplete suggestions from available reference titles and filenames
   const dl = document.getElementById('refSearchSuggestions');
   if (dl) {
@@ -10858,11 +11027,11 @@ function _filterReferences() {
         </div>
         <div style="display:flex;gap:4px">
           ${r.ref_type === 'url' ? `<a href="${escHtml(r.url || '')}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:10px">🔗 Open</a>` :
-            r.ref_type === 'local' ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="alert(document.getElementById('refLocal_${r.id}')?.textContent||'')">📄 View</button><span id="refLocal_${r.id}" style="display:none">${escHtml(r.content || '')}</span>` :
+            r.ref_type === 'local' ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-view-local="${r.id}">📄 View</button><span id="refLocal_${r.id}" style="display:none">${escHtml(r.content || '')}</span>` :
             `<a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">${t('detail_download')||'Download'}</a>`}
-          ${r.checksum_md5 ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="_showRefChecksums(${r.id})" title="${t('ref_checksums')}">#️⃣</button>` : ''}
-          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="_openRefEditModal(${r.id})">✏️</button>` : ''}
-          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" onclick="if(confirm('Delete this reference?'))_deleteReference(${r.id})">${t('btn_delete')}</button>` : ''}
+          ${r.checksum_md5 ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-checksums="${r.id}" title="${t('ref_checksums')}">#️⃣</button>` : ''}
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-edit="${r.id}">✏️</button>` : ''}
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" data-ref-delete="${r.id}">${t('btn_delete')}</button>` : ''}
         </div>
       </div>
       ${r.description ? `<div style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:4px">${escHtml(r.description)}</div>` : ''}
@@ -10877,6 +11046,24 @@ function _filterReferences() {
       ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(tg => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:3px">${escHtml(tg)}</span>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
+  // Bind reference action buttons (CSP-safe, no inline onclick)
+  listEl.querySelectorAll('[data-ref-view-local]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const content = document.getElementById('refLocal_' + btn.dataset.refViewLocal)?.textContent || '';
+      alert(content);
+    });
+  });
+  listEl.querySelectorAll('[data-ref-checksums]').forEach(btn => {
+    btn.addEventListener('click', () => _showRefChecksums(parseInt(btn.dataset.refChecksums, 10)));
+  });
+  listEl.querySelectorAll('[data-ref-edit]').forEach(btn => {
+    btn.addEventListener('click', () => _openRefEditModal(parseInt(btn.dataset.refEdit, 10)));
+  });
+  listEl.querySelectorAll('[data-ref-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(t('ref_delete_confirm') || 'Delete this reference?')) _deleteReference(parseInt(btn.dataset.refDelete, 10));
+    });
+  });
 }
 
 async function _deleteReference(id) {
@@ -10884,6 +11071,60 @@ async function _deleteReference(id) {
     const res = await fetch('/api/references/' + id, { method: 'DELETE' });
     if (res.ok) _loadAndRenderReferences();
   } catch (e) { console.warn('[deleteReference]', e); }
+}
+
+async function _checkRefGitIntegration() {
+  const gitActions = document.getElementById('refGitActions');
+  if (!gitActions) return;
+  try {
+    const status = state._integrationStatus || await apiGet('/api/status').catch(() => null);
+    if (status && status.github_enabled) {
+      gitActions.style.display = '';
+      const saveBtn = document.getElementById('btnRefGitSave');
+      const loadBtn = document.getElementById('btnRefGitLoad');
+      const statusEl = document.getElementById('refGitStatus');
+      if (saveBtn) saveBtn.addEventListener('click', async () => {
+        saveBtn.textContent = '⏳...';
+        try {
+          const res = await api('POST', '/api/references/git/save');
+          statusEl.textContent = res.ok ? '✓ Saved' : '✗ Failed';
+        } catch { statusEl.textContent = '✗ Error'; }
+        saveBtn.textContent = '💾 ' + (t('ref_git_save')||'Save to Git');
+      });
+      if (loadBtn) loadBtn.addEventListener('click', async () => {
+        loadBtn.textContent = '⏳...';
+        try {
+          const res = await api('POST', '/api/references/git/load');
+          if (res.ok) { statusEl.textContent = '✓ Loaded'; _loadAndRenderReferences(); }
+          else statusEl.textContent = '✗ Failed';
+        } catch { statusEl.textContent = '✗ Error'; }
+        loadBtn.textContent = '📥 ' + (t('ref_git_load')||'Load from Git');
+      });
+    } else {
+      gitActions.style.display = 'none';
+    }
+  } catch { gitActions.style.display = 'none'; }
+}
+
+async function _ensureDefaultUserManualRef() {
+  // Check if the Tidslinjal user manual reference already exists
+  const refs = state.references || [];
+  const hasManual = refs.some(r =>
+    r.title === 'Tidslinjal User Manual' ||
+    (r.tags && r.tags.includes('User manual') && r.tags.includes('Tidslinjal'))
+  );
+  if (!hasManual) {
+    try {
+      await api('POST', '/api/references/link', {
+        title: 'Tidslinjal User Manual',
+        description: 'Official Tidslinjal user manual and documentation.',
+        category: 'handbook',
+        tags: 'User manual, documentation, Tidslinjal',
+        ref_type: 'url',
+        url: 'https://tidslinjal.cyberladan.se/docs/user-manual',
+      });
+    } catch { /* ignore — server might not support this endpoint yet */ }
+  }
 }
 
 function _openReferenceUploadModal() {
@@ -11069,9 +11310,10 @@ async function _handleReferenceUpload() {
     if (tags) fd.append('tags', tags);
     const lang = document.getElementById('refUpLang')?.value || '';
     if (lang) fd.append('language', lang);
-    const owner = document.getElementById('refUpOwner')?.value?.trim() || '';
+    const currentUserName = state.user?.display_name || state.user?.username || '';
+    const owner = document.getElementById('refUpOwner')?.value?.trim() || currentUserName;
     if (owner) fd.append('owner', owner);
-    const custodian = document.getElementById('refUpCustodian')?.value?.trim() || '';
+    const custodian = document.getElementById('refUpCustodian')?.value?.trim() || currentUserName;
     if (custodian) fd.append('custodian', custodian);
     const copyMode = document.getElementById('refUpCopyMode')?.value || '';
     if (copyMode) fd.append('copy_mode', copyMode);
@@ -11102,11 +11344,12 @@ function _showRefChecksums(id) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal" style="max-width:520px">
-    <div class="modal-header"><h3>${t('ref_checksums') || 'File Checksums'} — ${escHtml(ref.title)}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+    <div class="modal-header"><h3>${t('ref_checksums') || 'File Checksums'} — ${escHtml(ref.title)}</h3><button class="modal-close" data-close-overlay>×</button></div>
     <div class="modal-body"><table style="width:100%">${rows.join('')}</table></div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('btn_close') || 'Close'}</button></div>
+    <div class="modal-footer"><button class="btn btn-secondary" data-close-overlay>${t('btn_close') || 'Close'}</button></div>
   </div>`;
   document.body.appendChild(overlay);
+  overlay.querySelectorAll('[data-close-overlay]').forEach(b => b.addEventListener('click', () => overlay.remove()));
 }
 
 function _openRefEditModal(id) {
@@ -11117,7 +11360,7 @@ function _openRefEditModal(id) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal" style="max-width:460px">
-    <div class="modal-header"><h3>${t('ref_edit_title') || 'Edit Reference'}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+    <div class="modal-header"><h3>${t('ref_edit_title') || 'Edit Reference'}</h3><button class="modal-close" data-close-overlay>×</button></div>
     <div class="modal-body">
       <label>${t('ref_title') || 'Title'}</label>
       <input type="text" id="refEditTitle" class="form-input" value="${escHtml(ref.title || '')}">
@@ -11135,11 +11378,12 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditTags" class="form-input" value="${escHtml((ref.tags || []).join(', '))}">
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('btn_cancel') || 'Cancel'}</button>
+      <button class="btn btn-secondary" data-close-overlay>${t('btn_cancel') || 'Cancel'}</button>
       <button class="btn btn-primary" id="btnSaveRefEdit">${t('btn_save') || 'Save'}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  overlay.querySelectorAll('[data-close-overlay]').forEach(b => b.addEventListener('click', () => overlay.remove()));
   document.getElementById('btnSaveRefEdit').addEventListener('click', async () => {
     const body = {
       title: document.getElementById('refEditTitle').value.trim(),
