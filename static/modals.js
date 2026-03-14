@@ -8559,6 +8559,20 @@ const DEFAULT_ROLE_CONFIGS = [
   { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, confidential_read: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true, manage_integrations: true } },
 ];
 
+// Merge saved role configs with built-in defaults so capabilities work even
+// when the admin has never opened the Role Editor (roles.json is empty).
+function mergeRoleConfigs(saved) {
+  const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key);
+  const merged = DEFAULT_ROLE_CONFIGS.map(def => {
+    const s = (saved || []).find(c => c.key === def.key);
+    return s ? { ...def, ...s } : { ...def };
+  });
+  for (const c of (saved || [])) {
+    if (!builtinKeys.includes(c.key) && c.key !== 'admin') merged.push(c);
+  }
+  return merged;
+}
+
 // Ordered list of all capabilities shown in role editor
 const ALL_CAPABILITIES = [
   'see_groups', 'see_users', 'view_events', 'create_events', 'edit_own', 'edit_all', 'delete_events',
@@ -8575,15 +8589,7 @@ async function openRoleEditor() {
     configs = data || [];
   } catch { /* use defaults */ }
 
-  // Merge defaults with saved; append any extra custom roles from server
-  const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key);
-  const merged = DEFAULT_ROLE_CONFIGS.map(def => {
-    const saved = configs.find(c => c.key === def.key);
-    return saved ? { ...def, ...saved } : { ...def };
-  });
-  for (const c of configs) {
-    if (!builtinKeys.includes(c.key) && c.key !== 'admin') merged.push(c);
-  }
+  const merged = mergeRoleConfigs(configs);
   state.roleConfigs = merged;
   state._roleEditorCustomCounter = 0;
 

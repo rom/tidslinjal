@@ -118,7 +118,9 @@ async function init() {
   state.layers      = layers  || [];
   state.groups      = groups  || [];
   state.users       = users   || [];
-  state.roleConfigs = roles   || [];
+  // Merge saved role configs with built-in defaults so capabilities
+  // work even when the admin has never opened the Role Editor.
+  state.roleConfigs = mergeRoleConfigs(roles || []);
 
   applyPreferences();
 
