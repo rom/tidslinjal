@@ -395,6 +395,11 @@ body.hover-zoom-enabled .event-block:hover {
   content: ''; position: absolute; left: calc(var(--time-col-w) - 5px); top: calc(-1 * (var(--line-width) / 2) - 4px);
   width: 10px; height: 10px; border-radius: 50%; background: var(--line-color);
 }
+#current-time-line .ctl-now-label {
+  position: absolute; left: calc(var(--time-col-w) + 8px); top: calc(-1 * (var(--line-width) / 2) - 7px);
+  font-size: 9px; color: var(--line-color); background: var(--bg2); padding: 0 4px;
+  pointer-events: none; white-space: nowrap; font-weight: 600; z-index: 16;
+}
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
 #sidebar {
@@ -579,8 +584,14 @@ textarea { resize: vertical; min-height: 70px; }
 }
 @keyframes notif-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* Today marker dot */
-.today-marker { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--red); margin-left: 4px; vertical-align: middle; }
+/* Today marker — prominent pill badge instead of small dot */
+.today-marker {
+  display: inline-block; padding: 1px 6px; border-radius: 8px;
+  background: var(--red); color: #fff; font-size: 9px; font-weight: 700;
+  margin-left: 6px; vertical-align: middle; line-height: 1.4; letter-spacing: 0.3px;
+  animation: today-pulse 2s ease-in-out infinite;
+}
+@keyframes today-pulse { 0%,100% { opacity: 1; } 50% { opacity: .7; } }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

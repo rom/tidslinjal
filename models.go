@@ -942,6 +942,35 @@ type MapOverlayItem struct {
 	Notes string  `json:"notes,omitempty"`
 }
 
+// RateLimitSettings stores configurable rate limit thresholds
+type RateLimitSettings struct {
+	LoginLimit         int `json:"login_limit"`
+	RegistrationLimit  int `json:"registration_limit"`
+	PasswordResetLimit int `json:"password_reset_limit"`
+}
+
+// GeoblockingSettings stores geoblocking configuration
+type GeoblockingSettings struct {
+	Enabled   bool     `json:"enabled"`
+	Mode      string   `json:"mode"`      // "allow" or "block"
+	Countries []string `json:"countries"` // ISO 3166-1 alpha-2 codes
+}
+
+// EncryptionSettings stores backup encryption configuration
+type EncryptionSettings struct {
+	Enabled bool `json:"enabled"`
+}
+
+// TestStats holds test case / unit test statistics for admin view
+type TestStats struct {
+	TestCases  int `json:"test_cases"`
+	UnitTests  int `json:"unit_tests"`
+	Passed     int `json:"passed"`
+	Failed     int `json:"failed"`
+	Skipped    int `json:"skipped"`
+	Coverage   float64 `json:"coverage"`
+}
+
 // ReferenceDoc is a document/file stored in the reference library
 type ReferenceDoc struct {
 	ID             int64     `json:"id"`

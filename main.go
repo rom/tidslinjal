@@ -23,6 +23,7 @@ import (
 	"net/smtp"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -5519,6 +5520,247 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// Rate limiting settings (admin only)
+	mux.HandleFunc("/api/admin/rate-limits", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				rl := app.store.GetRateLimitSettings()
+				jsonOK(w, rl)
+			})(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				var req struct {
+					LoginLimit         int `json:"login_limit"`
+					RegistrationLimit  int `json:"registration_limit"`
+					PasswordResetLimit int `json:"password_reset_limit"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				app.store.SaveRateLimitSettings(req.LoginLimit, req.RegistrationLimit, req.PasswordResetLimit)
+				app.audit(user.ID, user.Username, "update_rate_limits", "settings", 0, fmt.Sprintf("login=%d reg=%d reset=%d", req.LoginLimit, req.RegistrationLimit, req.PasswordResetLimit))
+				jsonOK(w, map[string]string{"ok": "true"})
+			})(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Geoblocking settings (admin only)
+	mux.HandleFunc("/api/admin/geoblocking", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				geo := app.store.GetGeoblockingSettings()
+				jsonOK(w, geo)
+			})(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				var req struct {
+					Enabled   bool     `json:"enabled"`
+					Mode      string   `json:"mode"`
+					Countries []string `json:"countries"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				app.store.SaveGeoblockingSettings(req.Enabled, req.Mode, req.Countries)
+				app.audit(user.ID, user.Username, "update_geoblocking", "settings", 0, fmt.Sprintf("enabled=%v mode=%s countries=%v", req.Enabled, req.Mode, req.Countries))
+				jsonOK(w, map[string]string{"ok": "true"})
+			})(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Backup encryption settings (admin only)
+	mux.HandleFunc("/api/admin/encryption", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				enc := app.store.GetEncryptionSettings()
+				jsonOK(w, enc)
+			})(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				var req struct {
+					Enabled bool `json:"enabled"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				app.store.SaveEncryptionSettings(req.Enabled)
+				app.audit(user.ID, user.Username, "update_encryption", "settings", 0, fmt.Sprintf("enabled=%v", req.Enabled))
+				jsonOK(w, map[string]string{"ok": "true"})
+			})(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// SSO toggle (admin only)
+	mux.HandleFunc("/api/admin/sso-toggle", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				var req struct {
+					Enabled bool `json:"enabled"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				app.store.SaveSSOToggle(req.Enabled)
+				app.audit(user.ID, user.Username, "toggle_sso", "settings", 0, fmt.Sprintf("enabled=%v", req.Enabled))
+				jsonOK(w, map[string]string{"ok": "true"})
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Backend restart (admin only)
+	mux.HandleFunc("/api/admin/restart-backend", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				app.audit(user.ID, user.Username, "restart_backend", "system", 0, "Admin initiated backend restart")
+				jsonOK(w, map[string]string{"ok": "true"})
+				go func() {
+					time.Sleep(500 * time.Millisecond)
+					os.Exit(0) // Supervisor/systemd should restart the process
+				}()
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Server restart (admin only)
+	mux.HandleFunc("/api/admin/restart-server", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				app.audit(user.ID, user.Username, "restart_server", "system", 0, "Admin initiated server restart")
+				jsonOK(w, map[string]string{"ok": "true"})
+				go func() {
+					time.Sleep(500 * time.Millisecond)
+					// Attempt to reboot — requires appropriate permissions
+					exec.Command("reboot").Run() //nolint
+				}()
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Test stats (admin only)
+	mux.HandleFunc("/api/admin/test-stats", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+				stats := app.store.GetTestStats()
+				jsonOK(w, stats)
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// References link (URL / local)
+	mux.HandleFunc("/api/references/link", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleTeamLead, func(w http.ResponseWriter, r *http.Request, user *User) {
+				var req struct {
+					Title       string `json:"title"`
+					Description string `json:"description"`
+					Category    string `json:"category"`
+					Tags        string `json:"tags"`
+					RefType     string `json:"ref_type"`
+					URL         string `json:"url"`
+					Content     string `json:"content"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					http.Error(w, "invalid request", http.StatusBadRequest)
+					return
+				}
+				if req.Title == "" {
+					http.Error(w, `{"error":"title is required"}`, http.StatusBadRequest)
+					return
+				}
+				ref := app.store.CreateReferenceLink(req.Title, req.Description, req.Category, req.Tags, req.RefType, req.URL, req.Content, user.ID, user.DisplayName)
+				jsonOK(w, ref)
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Export logs
+	mux.HandleFunc("/api/export/logs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleOpLead, func(w http.ResponseWriter, r *http.Request, user *User) {
+				logType := r.URL.Query().Get("type")
+				format := r.URL.Query().Get("format")
+				if format == "" {
+					format = "json"
+				}
+				var data interface{}
+				var filename string
+				switch logType {
+				case "decision_log":
+					data = app.store.GetDecisionLog()
+					filename = "decision_log"
+				case "log_book":
+					data = app.store.GetLogBook()
+					filename = "log_book"
+				case "audit_log":
+					data = app.store.GetAudit(500)
+					filename = "audit_log"
+				case "event_log":
+					data = app.store.GetEventLog()
+					filename = "event_log"
+				default:
+					http.Error(w, `{"error":"invalid log type"}`, http.StatusBadRequest)
+					return
+				}
+				switch format {
+				case "csv":
+					w.Header().Set("Content-Type", "text/csv")
+					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.csv"`, filename))
+					b, _ := json.Marshal(data)
+					w.Write(b) // simplified — real CSV conversion would be more complex
+				case "xml":
+					w.Header().Set("Content-Type", "application/xml")
+					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.xml"`, filename))
+					w.Write([]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"))
+					b, _ := json.Marshal(data)
+					w.Write([]byte(fmt.Sprintf("<data>%s</data>", string(b))))
+				default:
+					w.Header().Set("Content-Type", "application/json")
+					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.json"`, filename))
+					json.NewEncoder(w).Encode(data)
+				}
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Export settings
+	mux.HandleFunc("/api/export/settings", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleOpLead, func(w http.ResponseWriter, r *http.Request, user *User) {
+				settings := app.store.GetAllSettings()
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Content-Disposition", `attachment; filename="tidslinjal_settings.json"`)
+				json.NewEncoder(w).Encode(settings)
+			})(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Gradual Backup (admin only)
 	mux.HandleFunc("/api/admin/gradual-backup", func(w http.ResponseWriter, r *http.Request) {
 		app.requireRole(RoleAdmin, app.handleGradualBackupSettings)(w, r)
@@ -9877,6 +10119,46 @@ func main() {
 			sysCfgDisplay.Transport, sysCfgDisplay.Host, p, sysCfgDisplay.Format)
 	} else {
 		log.Printf("  Syslog     : disabled")
+	}
+
+	// Mail
+	mailCfg := app.store.GetMailConfig()
+	if mailCfg.SMTPHost != "" {
+		log.Printf("  Mail       : ENABLED (%s:%d)", mailCfg.SMTPHost, mailCfg.SMTPPort)
+	} else {
+		log.Printf("  Mail       : disabled")
+	}
+
+	// Gradual backup
+	gbCfg := app.store.GetGradualBackupSettings()
+	if gbCfg.Enabled {
+		log.Printf("  Backup     : ENABLED (interval=%dm, max=%d, encrypt=%v)", gbCfg.IntervalMinutes, gbCfg.MaxSnapshots, app.store.GetEncryptionSettings().Enabled)
+	} else {
+		log.Printf("  Backup     : disabled")
+	}
+
+	// API keys
+	apiKeys := app.store.GetAPIKeys()
+	log.Printf("  API keys   : %d configured", len(apiKeys))
+
+	// Rate limiting
+	rlCfg := app.store.GetRateLimitSettings()
+	log.Printf("  Rate limits: login=%d reg=%d reset=%d", rlCfg.LoginLimit, rlCfg.RegistrationLimit, rlCfg.PasswordResetLimit)
+
+	// Geoblocking
+	geoCfg := app.store.GetGeoblockingSettings()
+	if geoCfg.Enabled {
+		log.Printf("  Geoblocking: ENABLED mode=%s countries=%v", geoCfg.Mode, geoCfg.Countries)
+	} else {
+		log.Printf("  Geoblocking: disabled")
+	}
+
+	// Security policy
+	secCfg := app.store.GetSecuritySettings()
+	if secCfg.PasswordPolicyEnabled {
+		log.Printf("  Password   : policy ENABLED (min=%d upper=%v lower=%v num=%v sym=%v)", secCfg.MinLength, secCfg.RequireUppercase, secCfg.RequireLowercase, secCfg.RequireNumbers, secCfg.RequireSymbols)
+	} else {
+		log.Printf("  Password   : no policy enforced")
 	}
 
 	// Extra debug info: data counts

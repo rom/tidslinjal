@@ -2289,6 +2289,23 @@ function renderSidebar() {
         </div>
       </div>
       ${(() => {
+        // Test statistics panel — admin only
+        if (state.user && state.user.role === 'admin') {
+          const ts = state._testStats || null;
+          if (ts) {
+            return `<div class="sidebar-section">
+              <div class="sidebar-section-title">🧪 ${t('legend_test_stats')||'Test Statistics'}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
+                <span style="color:var(--text-dim)">${t('legend_test_cases')||'Test cases'}:</span><span>${ts.test_cases || 0}</span>
+                <span style="color:var(--text-dim)">${t('legend_unit_tests')||'Unit tests'}:</span><span>${ts.unit_tests || 0}</span>
+                <span style="color:var(--text-dim)">${t('legend_tests_run')||'Tests performed'}:</span><span>${ts.tests_run || 0}</span>
+              </div>
+            </div>`;
+          }
+        }
+        return '';
+      })()}
+      ${(() => {
         // Integration status panel — admin only
         const st = (state.user && state.user.role === 'admin') ? (state._integrationStatus || null) : null;
         if (!st) return '';
@@ -3296,38 +3313,54 @@ function renderSidebar() {
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔒 ${t('security_tls')||'TLS / HTTPS Configuration'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          ${t('security_tls_desc')||'Configure TLS certificate and key file paths for HTTPS.'}
-          CLI flags <code>--tls-cert</code> / <code>--tls-key</code> and environment variables
-          <code>TLS_CERT</code> / <code>TLS_KEY</code> always take priority over settings stored here.
-        </p>
-        <div id="secTlsCurrentStatus" style="margin-bottom:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
+        <div id="secTlsCurrentStatus" style="margin-bottom:8px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
           ${t('checking')||'Checking TLS status…'}
         </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_cert_file')||'Certificate File (cert.pem)'}</label>
-          <input type="text" id="secTlsCertFile" placeholder="/etc/ssl/certs/tidslinjal.crt"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secTlsEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('security_tls_enabled')||'Enable TLS'}
+        </label>
+        <button class="btn btn-secondary btn-sm" id="secTlsToggleDetails" data-action="toggleSecTlsDetails" style="margin-bottom:8px">${t('security_tls_details')||'Show Details'}</button>
+        <div id="secTlsDetails" style="display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+            ${t('security_tls_desc')||'Configure TLS certificate and key file paths for HTTPS.'}
+          </p>
+          <div class="form-group" style="margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_cert_file')||'Certificate File (cert.pem)'}</label>
+            <input type="text" id="secTlsCertFile" placeholder="/etc/ssl/certs/tidslinjal.crt"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div class="form-group" style="margin-bottom:6px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_key_file')||'Private Key File (key.pem)'}</label>
+            <input type="text" id="secTlsKeyFile" placeholder="/etc/ssl/private/tidslinjal.key"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div style="padding:8px 10px;border-radius:var(--radius);background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+            ⚠️ ${t('security_tls_restart')||'Changes to TLS configuration require a server restart to take effect.'}
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="saveTLSConfig">${t('btn_save')||'Save'} TLS</button>
         </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_key_file')||'Private Key File (key.pem)'}</label>
-          <input type="text" id="secTlsKeyFile" placeholder="/etc/ssl/private/tidslinjal.key"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div style="padding:8px 10px;border-radius:var(--radius);background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          ⚠️ ${t('security_tls_restart')||'Changes to TLS configuration require a server restart to take effect.'}
-        </div>
-        <button class="btn btn-secondary btn-sm" data-action="saveTLSConfig">${t('btn_save')||'Save'} TLS</button>
       </div>
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔐 ${t('security_oidc')||'Single Sign-On (OIDC)'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          ${t('security_oidc_desc')||'OIDC/SSO configuration is managed in the Integrations tab. Summary of current status:'}
-        </p>
-        <div id="secOidcStatus" style="padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim)">
+        <div id="secOidcStatus" style="padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           ${t('checking')||'Checking…'}
         </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secSsoEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('security_sso_enabled')||'Enable SSO'}
+        </label>
+        <button class="btn btn-secondary btn-sm" id="secOidcToggleDetails" data-action="toggleSecOidcDetails" style="margin-bottom:8px">${t('security_oidc_details')||'Show Details'}</button>
+        <div id="secOidcDetails" style="display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+            ${t('security_oidc_desc')||'OIDC/SSO configuration. Full configuration is in the Integrations tab.'}
+          </p>
+          <div id="secOidcDetailContent" style="font-size:var(--fs-xs);padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim)">
+            ${t('checking')||'Loading…'}
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecSsoEnabled" style="margin-top:4px">${t('btn_save')||'Save'}</button>
       </div>
 
       <div class="sidebar-section">
@@ -3335,18 +3368,113 @@ function renderSidebar() {
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           ${t('security_rate_limiting_desc')||'Built-in per-IP rate limiting protects authentication endpoints against brute-force attacks.'}
         </p>
-        <div style="font-size:var(--fs-xs);padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);line-height:1.8">
-          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_login')||'Login'}:</strong></span><span>10 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_registration')||'Registration'}:</strong></span><span>5 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
-          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_password_reset')||'Password Reset'}:</strong></span><span>5 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
+        <div style="font-size:var(--fs-xs);display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;margin-bottom:8px">
+          <label style="font-weight:600">${t('security_login')||'Login'}:</label>
+          <input type="number" id="secRateLogin" min="1" max="1000" value="10" style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+          <label style="font-weight:600">${t('security_registration')||'Registration'}:</label>
+          <input type="number" id="secRateReg" min="1" max="1000" value="5" style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+          <label style="font-weight:600">${t('security_password_reset')||'Password Reset'}:</label>
+          <input type="number" id="secRateReset" min="1" max="1000" value="5" style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
         </div>
+        <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_per_minute')||'requests / minute / IP'}</span>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecRateLimits" style="margin-top:6px">${t('security_rate_save')||'Save Rate Limits'}</button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🌐 ${t('security_geoblocking')||'Geoblocking'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_geoblocking_desc')||'Restrict access by geographic location using IP-based geoblocking.'}
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secGeoEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('security_geo_enabled')||'Enable geoblocking'}
+        </label>
+        <div style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_geo_mode')||'Mode'}</label>
+          <select id="secGeoMode" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <option value="allowlist">${t('security_geo_allowlist')||'Allowlist (only these countries)'}</option>
+            <option value="blocklist">${t('security_geo_blocklist')||'Blocklist (block these countries)'}</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_geo_countries')||'Country codes (comma-separated, e.g. SE,NO,FI)'}</label>
+          <input type="text" id="secGeoCountries" placeholder="SE,NO,FI,DK"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecGeoblock">${t('security_geo_save')||'Save Geoblocking'}</button>
       </div>
 
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔑 ${t('security_password_policy')||'Password Policy'}</div>
-        <div id="secPasswordPolicy" style="font-size:var(--fs-xs);padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim)">
-          ${t('checking')||'Checking…'}
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable Password Quality Policy
+        </label>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_min_length')||'Minimum Length'}</label>
+          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> ${t('security_require_uppercase')||'Require uppercase (A–Z)'}
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> ${t('security_require_lowercase')||'Require lowercase (a–z)'}
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> ${t('security_require_numbers')||'Require numbers (0–9)'}
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
+            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> ${t('security_require_symbols')||'Require symbols (!@#…)'}
+          </label>
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Policy</button>
+      </div>
+
+      <div class="sidebar-section" id="enrollmentSettingsSection">
+        <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>
+        <div class="toggle-btn-group" style="flex-wrap:wrap;gap:4px" id="enrollModeGroup">
+          ${[['off','Off'],['open','Open'],['generic_invitation','Shared code'],['personal_invitation','Personal invite'],['vetted','Vetted'],['oidc_auto_enroll','SSO auto']].map(([v,l]) =>
+            `<button class="toggle-btn" id="enrollBtn_${v}" data-action="setEnrollMode" data-arg="${v}">${l}</button>`
+          ).join('')}
+        </div>
+        <div id="enrollCodeGroup" style="margin-top:8px;display:none">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="enrollCodeInput" placeholder="Shared invite code"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
+          </div>
+        </div>
+        <div id="enrollVettedInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">New users must be approved by an admin.</p>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
+        </div>
+        <div id="enrollPersonalInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Users must be invited individually with a unique code.</p>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
+        </div>
+        <div id="enrollOpenInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Anyone can create an account freely.</p>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
+        </div>
+        <div id="enrollOffInfo" style="margin-top:8px;display:none">
+          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Registration is disabled. Only admins can create accounts.</p>
+          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 ${t('security_encryption')||'Backup Encryption'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_encryption_desc')||'Backups are encrypted with AES-256-GCM using PBKDF2-SHA256 key derivation (100,000 iterations).'}
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secEncryptionEnabled" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('security_encryption_toggle')||'Enable backup encryption'}
+        </label>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecEncryption">${t('btn_save')||'Save'}</button>
       </div>
 
       <div class="sidebar-section">
@@ -3367,27 +3495,23 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">📋 ${t('security_sessions')||'Active Sessions'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
-          ${t('security_sessions_desc')||'Session cookies use HttpOnly, Secure (HTTPS), and SameSite=Lax attributes for protection against XSS and CSRF.'}
+          ${t('security_sessions_desc')||'Session cookies use HttpOnly, Secure (HTTPS), and SameSite=Lax attributes.'}
         </p>
         <div style="font-size:var(--fs-xs);padding:6px 8px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim)">
           ${t('security_session_info')||'Sessions expire after inactivity. Token-based authentication with cryptographically random IDs.'}
         </div>
-      </div>
-
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">🔒 ${t('security_encryption')||'Backup Encryption'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim)">
-          ${t('security_encryption_desc')||'Backups are encrypted with AES-256-GCM using PBKDF2-SHA256 key derivation (100,000 iterations). The admin password hash is used as key material.'}
-        </p>
       </div>
     `;
     // Load TLS status for security tab
     apiGet('/api/tls/status').then(tls => {
       const el = document.getElementById('secTlsCurrentStatus');
       if (el) {
-        el.innerHTML = tls && tls.configured
+        const configured = tls && tls.configured;
+        el.innerHTML = configured
           ? `<span style="color:#27AE60">✅ ${t('security_tls_active')||'TLS is active'}</span> — ${escHtml(tls.cert_file||'')}`
-          : `<span style="color:var(--red,#E74C3C)">❌ ${t('security_tls_inactive')||'TLS not configured'}</span> — ${t('security_tls_inactive_desc')||'HTTPS is not enabled. Configure certificate paths below or use a reverse proxy.'}`;
+          : `<span style="color:var(--red,#E74C3C)">❌ ${t('security_tls_inactive')||'TLS not configured'}</span> — ${t('security_tls_inactive_desc')||'HTTPS is not enabled.'}`;
+        const enableCb = document.getElementById('secTlsEnabled');
+        if (enableCb) enableCb.checked = !!configured;
         if (tls) {
           const certInput = document.getElementById('secTlsCertFile');
           const keyInput = document.getElementById('secTlsKeyFile');
@@ -3398,27 +3522,60 @@ function renderSidebar() {
     }).catch(() => {});
     // Load OIDC status
     apiGet('/api/oidc/config').then(oidc => {
-      const el = document.getElementById('secOidcStatus');
-      if (el) {
-        el.innerHTML = oidc && oidc.issuer
-          ? `<span style="color:#27AE60">✅ ${t('security_oidc_active')||'OIDC configured'}</span><br>${t('security_oidc_issuer')||'Issuer'}: ${escHtml(oidc.issuer)}${oidc.exclusive_mode ? '<br><strong>' + (t('security_oidc_exclusive')||'Exclusive mode — local login disabled for non-admins') + '</strong>' : ''}`
+      const statusEl = document.getElementById('secOidcStatus');
+      const enableCb = document.getElementById('secSsoEnabled');
+      const detailEl = document.getElementById('secOidcDetailContent');
+      const configured = oidc && oidc.issuer;
+      if (statusEl) {
+        statusEl.innerHTML = configured
+          ? `<span style="color:#27AE60">✅ ${t('security_oidc_active')||'OIDC configured'}</span> — ${escHtml(oidc.issuer)}${oidc.exclusive_mode ? ' <strong>(Exclusive)</strong>' : ''}`
           : `<span style="color:var(--text-dim)">— ${t('security_oidc_not_configured')||'OIDC not configured'}</span>`;
+      }
+      if (enableCb) enableCb.checked = !!configured && oidc.sso_enabled !== false;
+      if (detailEl && configured) {
+        detailEl.innerHTML = `
+          <div>${t('security_oidc_issuer')||'Issuer'}: <strong>${escHtml(oidc.issuer)}</strong></div>
+          <div>Client ID: <strong>${escHtml(oidc.client_id || '***')}</strong></div>
+          <div>Redirect URL: <strong>${escHtml(oidc.redirect_url || '')}</strong></div>
+          <div>Exclusive: <strong>${oidc.exclusive_mode ? 'Yes' : 'No'}</strong></div>
+          <div>Default role: <strong>${escHtml(oidc.default_role || 'teammember')}</strong></div>`;
+      } else if (detailEl) {
+        detailEl.innerHTML = `<span style="color:var(--text-dim)">${t('security_oidc_not_configured')||'Not configured'}</span>`;
       }
     }).catch(() => {});
     // Load password policy
     apiGet('/api/security/policy').then(policy => {
       const el = document.getElementById('secPasswordPolicy');
       if (el && policy) {
-        const minLen = policy.min_length || 8;
-        el.innerHTML = `
-          <div>${t('security_min_length')||'Minimum length'}: <strong>${minLen}</strong></div>
-          ${policy.require_uppercase ? `<div>✓ ${t('security_require_uppercase')||'Requires uppercase'}</div>` : ''}
-          ${policy.require_lowercase ? `<div>✓ ${t('security_require_lowercase')||'Requires lowercase'}</div>` : ''}
-          ${policy.require_numbers ? `<div>✓ ${t('security_require_numbers')||'Requires numbers'}</div>` : ''}
-          ${policy.require_symbols ? `<div>✓ ${t('security_require_symbols')||'Requires symbols'}</div>` : ''}
-        `;
+        // Already have form fields, just update them
       }
     }).catch(() => {});
+    // Load rate limiting settings
+    apiGet('/api/admin/rate-limits').then(rl => {
+      if (!rl) return;
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      setVal('secRateLogin', rl.login_limit || 10);
+      setVal('secRateReg', rl.registration_limit || 5);
+      setVal('secRateReset', rl.password_reset_limit || 5);
+    }).catch(() => {});
+    // Load geoblocking settings
+    apiGet('/api/admin/geoblocking').then(geo => {
+      if (!geo) return;
+      const setCb = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      setCb('secGeoEnabled', geo.enabled);
+      setVal('secGeoMode', geo.mode || 'allowlist');
+      setVal('secGeoCountries', (geo.countries || []).join(','));
+    }).catch(() => {});
+    // Load backup encryption settings
+    apiGet('/api/admin/encryption').then(enc => {
+      if (!enc) return;
+      const cb = document.getElementById('secEncryptionEnabled');
+      if (cb) cb.checked = enc.enabled !== false;
+    }).catch(() => {});
+    // Init enrollment UI (moved from settings)
+    setTimeout(_initEnrollmentUI, 0);
+    setTimeout(_initSecuritySettingsUI, 0);
     _bindActions(el);
   } else if (tab === 'references') {
     _renderReferencesTab(el);
@@ -3795,84 +3952,24 @@ function renderSidebar() {
         </div>
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
-      <div class="sidebar-section" id="enrollmentSettingsSection">
-        <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>
-        <div class="toggle-btn-group" style="flex-wrap:wrap;gap:4px" id="enrollModeGroup">
-          ${[['off','🚫 Off'],['open','🌐 Open'],['vetted','🔍 Vetted'],['generic_invitation','📧 Invite Code'],['personal_invitation','🎫 Personal Invite']].map(([v,l]) =>
-            `<button class="toggle-btn" id="enrollBtn_${v}" data-action="setEnrollMode" data-arg="${v}">${l}</button>`
-          ).join('')}
-        </div>
-        <div id="enrollCodeGroup" style="margin-top:8px;display:none">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Generic Invitation Code:</label>
-          <div style="display:flex;gap:6px;margin-top:4px">
-            <input type="text" id="enrollCodeInput" placeholder="Shared invite code"
-              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
-          </div>
-        </div>
-        <div id="enrollVettedInfo" style="margin-top:8px;display:none">
-          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Users self-register but cannot log in until an admin approves them. Pending users appear in the Users tab.</p>
-          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
-        </div>
-        <div id="enrollPersonalInfo" style="margin-top:8px;display:none">
-          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Each user needs a unique personal invitation code. Manage codes in the Admin panel.</p>
-          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
-          <a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">Admin Panel…</a>
-        </div>
-        <div id="enrollOpenInfo" style="margin-top:8px;display:none">
-          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Anyone can register and immediately log in. Use with caution.</p>
-          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
-        </div>
-        <div id="enrollOffInfo" style="margin-top:8px;display:none">
-          <p style="font-size:var(--fs-xs);color:var(--text-dim)">Self-registration is disabled. Only admins can create accounts.</p>
-          <button class="btn btn-secondary btn-sm" data-action="saveEnrollSettings">Save</button>
-        </div>
-      </div>` : ''}
-      ${state.user && state.user.role==='admin' ? `
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">🔐 Password Policy</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          Enforce password quality requirements for all local accounts.
-          OIDC/SSO accounts are always excluded.
-        </p>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
-          <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
-          Enable Password Quality Policy
-        </label>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">Minimum Length</label>
-          <input type="number" id="secMinLength" placeholder="8" min="4" max="128" value="8"
-            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqUpper" style="accent-color:var(--accent)"> Require uppercase (A–Z)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqLower" style="accent-color:var(--accent)"> Require lowercase (a–z)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqNumbers" style="accent-color:var(--accent)"> Require numbers (0–9)
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-xs)">
-            <input type="checkbox" id="secReqSymbols" style="accent-color:var(--accent)"> Require symbols (!@#…)
-          </label>
-        </div>
-        <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">Save Policy</button>
-      </div>` : ''}
-      ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
-        <button class="btn btn-danger btn-sm" data-action="resetDatabase">${t('settings_reset')||'Reset to Empty'}</button>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div>
+            <button class="btn btn-danger btn-sm" data-action="resetDatabase">${t('settings_reset')||'Reset to Empty'}</button>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('settings_reset_desc')||'Removes all data except the audit trail.'}</p>
+          </div>
+          <div>
+            <button class="btn btn-danger btn-sm" data-action="restartBackend">${t('danger_restart_backend')||'Restart Backend'}</button>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('danger_restart_backend_desc')||'Restart the Tidslinjal backend service.'}</p>
+          </div>
+          <div>
+            <button class="btn btn-danger btn-sm" data-action="restartServer">${t('danger_restart_server')||'Restart Server'}</button>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${t('danger_restart_server_desc')||'Restart the server host. All services will be temporarily unavailable.'}</p>
+          </div>
+        </div>
       </div>` : ''}
     `;
-    // After DOM injection, initialise dynamic state for enrollment settings
-    if (state.user && state.user.role === 'admin') {
-      setTimeout(_initEnrollmentUI, 0);
-      setTimeout(_initSecuritySettingsUI, 0);
-    }
   }
   // Bind all data-action handlers on the sidebar (CSP-safe)
   _bindActions(el);
@@ -4804,6 +4901,102 @@ async function saveSecuritySettings() {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to save password policy');
+  }
+}
+
+// ── Security tab action handlers ──────────────────────────────────────────────
+function toggleSecTlsDetails() {
+  const det = document.getElementById('secTlsDetails');
+  const btn = document.getElementById('secTlsToggleDetails');
+  if (det && btn) {
+    const show = det.style.display === 'none';
+    det.style.display = show ? '' : 'none';
+    btn.textContent = show ? (t('security_tls_hide_details')||'Hide Details') : (t('security_tls_details')||'Show Details');
+  }
+}
+
+function toggleSecOidcDetails() {
+  const det = document.getElementById('secOidcDetails');
+  const btn = document.getElementById('secOidcToggleDetails');
+  if (det && btn) {
+    const show = det.style.display === 'none';
+    det.style.display = show ? '' : 'none';
+    btn.textContent = show ? (t('security_oidc_hide_details')||'Hide Details') : (t('security_oidc_details')||'Show Details');
+  }
+}
+
+async function saveSecSsoEnabled() {
+  const enabled = document.getElementById('secSsoEnabled')?.checked || false;
+  const res = await api('PUT', '/api/admin/sso-toggle', { enabled });
+  if (res.ok) {
+    showNotification('success', t('security_sso_saved')||'SSO settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save SSO settings');
+  }
+}
+
+async function saveSecRateLimits() {
+  const val = id => parseInt(document.getElementById(id)?.value || '0', 10);
+  const payload = {
+    login_limit: val('secRateLogin') || 10,
+    registration_limit: val('secRateReg') || 5,
+    password_reset_limit: val('secRateReset') || 5,
+  };
+  const res = await api('PUT', '/api/admin/rate-limits', payload);
+  if (res.ok) {
+    showNotification('success', t('security_rate_saved')||'Rate limiting settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save rate limits');
+  }
+}
+
+async function saveSecGeoblock() {
+  const enabled = document.getElementById('secGeoEnabled')?.checked || false;
+  const mode = document.getElementById('secGeoMode')?.value || 'allowlist';
+  const countries = (document.getElementById('secGeoCountries')?.value || '').split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
+  const res = await api('PUT', '/api/admin/geoblocking', { enabled, mode, countries });
+  if (res.ok) {
+    showNotification('success', t('security_geo_saved')||'Geoblocking settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save geoblocking settings');
+  }
+}
+
+async function saveSecEncryption() {
+  const enabled = document.getElementById('secEncryptionEnabled')?.checked || false;
+  const res = await api('PUT', '/api/admin/encryption', { enabled });
+  if (res.ok) {
+    showNotification('success', t('security_encryption_saved')||'Backup encryption settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save encryption settings');
+  }
+}
+
+async function restartBackend() {
+  if (!confirm(t('danger_restart_confirm')||'Are you sure you want to restart? This will interrupt all active sessions.')) return;
+  const res = await api('POST', '/api/admin/restart-backend', {});
+  if (res.ok) {
+    showNotification('success', 'Backend restart initiated. Reconnecting…');
+    setTimeout(() => { window.location.reload(); }, 3000);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to restart backend');
+  }
+}
+
+async function restartServer() {
+  if (!confirm(t('danger_server_confirm')||'Are you sure you want to restart the server? ALL services will be down temporarily.')) return;
+  const res = await api('POST', '/api/admin/restart-server', {});
+  if (res.ok) {
+    showNotification('success', 'Server restart initiated. Please wait…');
+    setTimeout(() => { window.location.reload(); }, 10000);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to restart server');
   }
 }
 
@@ -5987,6 +6180,17 @@ function openExportModal() {
   // Toggle chip style on checkbox change
   document.querySelectorAll('.export-cat-cb').forEach(cb => {
     cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+  });
+  // Bind new export buttons
+  document.getElementById('btnExportKML')?.addEventListener('click', () => { window.location.href = '/api/export?format=kml'; closeModal('exportModal'); });
+  document.getElementById('btnExportXML')?.addEventListener('click', () => { window.location.href = '/api/export?format=xml'; closeModal('exportModal'); });
+  document.getElementById('btnExportLog')?.addEventListener('click', () => {
+    const logType = document.getElementById('exportLogType')?.value || 'decision_log';
+    const format = document.getElementById('exportLogFormat')?.value || 'json';
+    window.location.href = `/api/export/logs?type=${logType}&format=${format}`;
+  });
+  document.getElementById('btnExportSettings')?.addEventListener('click', () => {
+    window.location.href = '/api/export/settings';
   });
   openModal('exportModal');
 }
@@ -7533,6 +7737,14 @@ async function openDecisionLogModal() {
                 <input type="checkbox" id="dlCoSignRequired" style="accent-color:var(--accent)">
                 👁👁 ${t('four_eyes')||'Four eyes'}
               </label>
+              <div id="dlCoSignTargetGroup" style="display:none;margin-left:4px">
+                <select id="dlCoSignTarget" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:120px">
+                  <option value="">${t('cosign_target_anyone')||'Anyone eligible'}</option>
+                  ${(state.users||[]).filter(u => u.id !== state.user?.id && hasRole2(u.role, 'teamlead')).map(u =>
+                    `<option value="${u.id}">${escHtml(u.display_name||u.username)}</option>`
+                  ).join('')}
+                </select>
+              </div>
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
                 📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
               </label>
@@ -7582,6 +7794,12 @@ async function openDecisionLogModal() {
   const groupIdEl = document.getElementById('dlGroupId');
   if (logTypeEl && groupIdEl) {
     logTypeEl.onchange = () => { groupIdEl.style.display = logTypeEl.value === 'group' ? '' : 'none'; };
+  }
+  // Show/hide cosign target selector
+  const coSignCb = document.getElementById('dlCoSignRequired');
+  const coSignTarget = document.getElementById('dlCoSignTargetGroup');
+  if (coSignCb && coSignTarget) {
+    coSignCb.onchange = () => { coSignTarget.style.display = coSignCb.checked ? '' : 'none'; };
   }
   // Request Decision target selector logic
   const targetTypeEl = document.getElementById('dlTargetType');
@@ -7718,9 +7936,14 @@ async function addDecisionLogEntry() {
   const executorLabel = executorType ? (executorValueEl?.selectedOptions?.[0]?.textContent || executorValue) : '';
   const reason = document.getElementById('dlReason')?.value?.trim() || '';
   const coSignRequired = document.getElementById('dlCoSignRequired')?.checked || false;
+  const coSignTargetId = coSignRequired ? (document.getElementById('dlCoSignTarget')?.value || '') : '';
+  const coSignTargetUser = coSignTargetId ? (state.users||[]).find(u => u.id === parseInt(coSignTargetId, 10)) : null;
+  const coSignTargetName = coSignTargetUser ? (coSignTargetUser.display_name || coSignTargetUser.username) : '';
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
     executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
-    reason, co_sign_required: coSignRequired});
+    reason, co_sign_required: coSignRequired,
+    co_sign_target_id: coSignTargetId ? parseInt(coSignTargetId, 10) : null,
+    co_sign_target_name: coSignTargetName});
   if (res.ok) {
     const created = await res.json().catch(() => null);
     // Upload attachments if any
@@ -9856,7 +10079,7 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
     if (hours.length > 336) break; // max 2 weeks
   }
   if (hours.length === 0) { el.innerHTML = `<p style="color:var(--text-dim)">${t('ttm_no_range')||'No valid time range.'}</p>`; return; }
-  let html = `<table class="ttm-table" style="border-collapse:collapse;font-size:11px;width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left">${t('ttm_task')||'Task'}</th>`;
+  let html = `<table class="ttm-table" style="border-collapse:collapse;font-size:var(--fs-sm,11px);width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left">${t('ttm_task')||'Task'}</th>`;
   hours.forEach(h => {
     const dayChanged = h.getHours() === 0;
     const lbl = dayChanged ? h.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' 00' : String(h.getHours()).padStart(2,'0');
@@ -9882,6 +10105,63 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
+
+  // ── Current time line in task-time matrix ──
+  const p = state.preferences || {};
+  if (p.red_line_enabled !== false) {
+    const now = typeof getNow === 'function' ? getNow() : new Date();
+    const nowMs = now.getTime();
+    if (nowMs >= minT.getTime() && nowMs <= maxT.getTime()) {
+      const table = el.querySelector('.ttm-table');
+      if (table) {
+        const headerCells = table.querySelectorAll('thead th');
+        // Find which column the current time falls into
+        for (let i = 0; i < hours.length; i++) {
+          const hStart = hours[i].getTime();
+          const hEnd = hStart + 3600000;
+          if (nowMs >= hStart && nowMs < hEnd) {
+            const fraction = (nowMs - hStart) / 3600000;
+            const colIdx = i + 1; // +1 for the task name column
+            const lineColor = p.red_line_color || '#E74C3C';
+            const lineWidth = p.red_line_width || 2;
+            const lineStyle = p.red_line_style || 'solid';
+            // Add a marker line via CSS overlay
+            table.style.position = 'relative';
+            const marker = document.createElement('div');
+            marker.className = 'ttm-now-line';
+            marker.style.cssText = `position:absolute;top:0;bottom:0;width:${lineWidth}px;border-left:${lineWidth}px ${lineStyle} ${lineColor};z-index:5;pointer-events:none`;
+            // Calculate left position based on column offset
+            const thEl = headerCells[colIdx];
+            if (thEl) {
+              const tableRect = table.getBoundingClientRect();
+              const thRect = thEl.getBoundingClientRect();
+              const leftPx = (thRect.left - tableRect.left) + (thRect.width * fraction);
+              marker.style.left = leftPx + 'px';
+              // Now label
+              const label = document.createElement('span');
+              label.textContent = '▶ ' + (t('ttm_now') || 'Now');
+              label.style.cssText = `position:absolute;top:-2px;left:2px;font-size:9px;color:${lineColor};background:var(--bg2);padding:0 3px;white-space:nowrap;z-index:6`;
+              marker.appendChild(label);
+              table.parentElement.style.position = 'relative';
+              table.parentElement.appendChild(marker);
+              // Recalculate on scroll
+              const wrapper = el;
+              const recalc = () => {
+                const tr2 = table.getBoundingClientRect();
+                const th2 = thEl.getBoundingClientRect();
+                marker.style.left = ((th2.left - tr2.left) + (th2.width * fraction)) + 'px';
+                marker.style.top = '0';
+                marker.style.height = table.offsetHeight + 'px';
+              };
+              wrapper.addEventListener('scroll', recalc);
+              setTimeout(recalc, 50);
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 
 function openTaskTimeMatrix() {
@@ -10088,6 +10368,8 @@ function _renderReferencesTab(el) {
         <option value="policy">Policy</option>
         <option value="map">Map</option>
         <option value="reference">Reference</option>
+        <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
+        <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
         <option value="other">Other</option>
       </select>
       <div id="refList" style="max-height:60vh;overflow-y:auto"></div>
@@ -10125,7 +10407,7 @@ function _filterReferences() {
     listEl.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:12px 0">No references found.</div>';
     return;
   }
-  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', other:'#95A5A6' };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
   listEl.innerHTML = refs.map(r => {
     const sizeKB = r.size ? (r.size / 1024).toFixed(1) + ' KB' : '';
     return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px">
@@ -10135,7 +10417,9 @@ function _filterReferences() {
           <b style="font-size:var(--fs-base)">${escHtml(r.title)}</b>
         </div>
         <div style="display:flex;gap:4px">
-          <a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">Download</a>
+          ${r.ref_type === 'url' ? `<a href="${escHtml(r.url || '')}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:10px">🔗 Open</a>` :
+            r.ref_type === 'local' ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="alert(document.getElementById('refLocal_${r.id}')?.textContent||'')">📄 View</button><span id="refLocal_${r.id}" style="display:none">${escHtml(r.content || '')}</span>` :
+            `<a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">Download</a>`}
           ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" onclick="if(confirm('Delete this reference?'))_deleteReference(${r.id})">Delete</button>` : ''}
         </div>
       </div>
@@ -10161,12 +10445,18 @@ function _openReferenceUploadModal() {
     modal.id = 'referenceUploadModal';
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal" style="max-width:420px">
+      <div class="modal" style="max-width:460px">
         <div class="modal-header">
-          <h3>Upload Reference Document</h3>
+          <h3>${t('ref_add_title') || 'Add Reference'}</h3>
           <button class="modal-close" data-close-ref-modal>×</button>
         </div>
         <div class="modal-body">
+          <label style="font-weight:600;margin-bottom:4px">Type</label>
+          <div class="toggle-btn-group" style="margin-bottom:8px">
+            <button class="toggle-btn active" id="refTypeFile" data-ref-type="file">${t('ref_type_file') || 'Upload File'}</button>
+            <button class="toggle-btn" id="refTypeUrl" data-ref-type="url">${t('ref_type_url') || 'Link / URL'}</button>
+            <button class="toggle-btn" id="refTypeLocal" data-ref-type="local">${t('ref_type_local') || 'Local Resource'}</button>
+          </div>
           <label>Title</label>
           <input type="text" id="refUpTitle" class="form-input" placeholder="Document title">
           <label style="margin-top:8px">Description</label>
@@ -10178,45 +10468,121 @@ function _openReferenceUploadModal() {
             <option value="policy">Policy</option>
             <option value="map">Map</option>
             <option value="reference">Reference</option>
+            <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
+            <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
             <option value="other">Other</option>
           </select>
           <label style="margin-top:8px">Tags (comma-separated)</label>
           <input type="text" id="refUpTags" class="form-input" placeholder="tag1, tag2, ...">
-          <label style="margin-top:8px">File</label>
-          <input type="file" id="refUpFile" class="form-input">
+          <div id="refFileGroup">
+            <label style="margin-top:8px">File</label>
+            <input type="file" id="refUpFile" class="form-input">
+          </div>
+          <div id="refUrlGroup" style="display:none">
+            <label style="margin-top:8px">${t('ref_url_label') || 'URL'}</label>
+            <input type="url" id="refUpUrl" class="form-input" placeholder="${t('ref_url_placeholder') || 'https://example.com/document'}">
+          </div>
+          <div id="refLocalGroup" style="display:none">
+            <label style="margin-top:8px">${t('ref_local_content') || 'Content'}</label>
+            <textarea id="refUpLocalContent" class="form-input" rows="4" placeholder="${t('ref_local_placeholder') || 'Enter content directly…'}" style="resize:vertical"></textarea>
+          </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-close-ref-modal>Cancel</button>
-          <button class="btn btn-primary" id="btnDoUploadRef">Upload</button>
+          <button class="btn btn-secondary" data-close-ref-modal>${t('btn_cancel') || 'Cancel'}</button>
+          <button class="btn btn-primary" id="btnDoUploadRef">${t('btn_save') || 'Save'}</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
     modal.querySelectorAll('[data-close-ref-modal]').forEach(b => b.addEventListener('click', () => modal.style.display = 'none'));
     document.getElementById('btnDoUploadRef').addEventListener('click', _handleReferenceUpload);
+    // Ref type toggle
+    modal.querySelectorAll('[data-ref-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modal.querySelectorAll('[data-ref-type]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const ty = btn.dataset.refType;
+        document.getElementById('refFileGroup').style.display = ty === 'file' ? '' : 'none';
+        document.getElementById('refUrlGroup').style.display = ty === 'url' ? '' : 'none';
+        document.getElementById('refLocalGroup').style.display = ty === 'local' ? '' : 'none';
+      });
+    });
   }
   // Reset form
   document.getElementById('refUpTitle').value = '';
   document.getElementById('refUpDesc').value = '';
   document.getElementById('refUpTags').value = '';
-  document.getElementById('refUpFile').value = '';
+  const refUpFile = document.getElementById('refUpFile');
+  if (refUpFile) refUpFile.value = '';
+  const refUpUrl = document.getElementById('refUpUrl');
+  if (refUpUrl) refUpUrl.value = '';
+  const refUpLocal = document.getElementById('refUpLocalContent');
+  if (refUpLocal) refUpLocal.value = '';
+  // Reset type toggle to file
+  modal.querySelectorAll('[data-ref-type]').forEach(b => b.classList.remove('active'));
+  const fileBtn = document.getElementById('refTypeFile');
+  if (fileBtn) fileBtn.classList.add('active');
+  document.getElementById('refFileGroup').style.display = '';
+  document.getElementById('refUrlGroup').style.display = 'none';
+  document.getElementById('refLocalGroup').style.display = 'none';
   modal.style.display = 'flex';
 }
 
 async function _handleReferenceUpload() {
   const title = document.getElementById('refUpTitle').value.trim();
-  const file = document.getElementById('refUpFile').files[0];
-  if (!title || !file) { alert('Title and file are required'); return; }
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('title', title);
-  fd.append('description', document.getElementById('refUpDesc').value.trim());
-  fd.append('category', document.getElementById('refUpCategory').value);
-  const tags = document.getElementById('refUpTags').value.trim();
-  if (tags) fd.append('tags', tags);
-  try {
-    const res = await fetch('/api/references', { method: 'POST', body: fd });
-    if (!res.ok) { const t = await res.text(); alert('Upload failed: ' + t); return; }
-    document.getElementById('referenceUploadModal').style.display = 'none';
-    _loadAndRenderReferences();
-  } catch (e) { alert('Upload error: ' + e.message); }
+  if (!title) { alert(t('ref_title_required') || 'Title is required'); return; }
+  // Determine active type
+  const activeType = document.querySelector('[data-ref-type].active')?.dataset?.refType || 'file';
+
+  if (activeType === 'url') {
+    // URL reference
+    const url = document.getElementById('refUpUrl')?.value?.trim() || '';
+    if (!url) { alert('URL is required'); return; }
+    const body = {
+      title, url,
+      description: document.getElementById('refUpDesc').value.trim(),
+      category: document.getElementById('refUpCategory').value,
+      tags: document.getElementById('refUpTags').value.trim(),
+      ref_type: 'url'
+    };
+    try {
+      const res = await api('POST', '/api/references/link', body);
+      if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      document.getElementById('referenceUploadModal').style.display = 'none';
+      _loadAndRenderReferences();
+    } catch (e) { alert('Error: ' + e.message); }
+  } else if (activeType === 'local') {
+    // Local/inline resource
+    const content = document.getElementById('refUpLocalContent')?.value?.trim() || '';
+    if (!content) { alert('Content is required'); return; }
+    const body = {
+      title, content,
+      description: document.getElementById('refUpDesc').value.trim(),
+      category: document.getElementById('refUpCategory').value,
+      tags: document.getElementById('refUpTags').value.trim(),
+      ref_type: 'local'
+    };
+    try {
+      const res = await api('POST', '/api/references/link', body);
+      if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      document.getElementById('referenceUploadModal').style.display = 'none';
+      _loadAndRenderReferences();
+    } catch (e) { alert('Error: ' + e.message); }
+  } else {
+    // File upload (original behavior)
+    const file = document.getElementById('refUpFile').files[0];
+    if (!file) { alert('File is required'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('title', title);
+    fd.append('description', document.getElementById('refUpDesc').value.trim());
+    fd.append('category', document.getElementById('refUpCategory').value);
+    const tags = document.getElementById('refUpTags').value.trim();
+    if (tags) fd.append('tags', tags);
+    try {
+      const res = await fetch('/api/references', { method: 'POST', body: fd });
+      if (!res.ok) { const txt = await res.text(); alert('Upload failed: ' + txt); return; }
+      document.getElementById('referenceUploadModal').style.display = 'none';
+      _loadAndRenderReferences();
+    } catch (e) { alert('Upload error: ' + e.message); }
+  }
 }

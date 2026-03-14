@@ -221,7 +221,7 @@ function renderTimeline() {
     }
     html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" data-center-day="${day.toISOString()}" title="Click to center this day" style="cursor:pointer">
       <div class="tl-day-name">${dayName}${doyHtml}</div>
-      <div class="tl-day-date">${dayDate}${isToday?'<span class="today-marker"></span>':''}${weekHtml}</div>
+      <div class="tl-day-date">${dayDate}${isToday?`<span class="today-marker">${t('today')||'Today'}</span>`:''}${weekHtml}</div>
     </div>`;
   });
 
@@ -654,6 +654,15 @@ function _updateCurrentTimeLineInner(days, slotH) {
   const topPx = _headerH + ((nowMin - startOff) / getSlotMinutes()) * _slotH;
   line.style.display = 'block';
   line.style.top = topPx+'px';
+
+  // "▶ Now" label on the current-time line (calendar/timeline mode, like list view)
+  let nowLabel = line.querySelector('.ctl-now-label');
+  if (!nowLabel) {
+    nowLabel = document.createElement('span');
+    nowLabel.className = 'ctl-now-label';
+    line.appendChild(nowLabel);
+  }
+  nowLabel.textContent = '▶ ' + (t('cal_now') || 'Now');
 
   // Synthetic H+N label
   let existingLabel = document.getElementById('synthTimeLabel');
