@@ -88,6 +88,17 @@ body.vcr-blue   { --vcr-fg:#44aaff; --vcr-glow1:rgba(68,170,255,.9); --vcr-glow2
 body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:rgba(255,100,0,.5); --vcr-ghost:rgba(255,136,0,.12); --vcr-dim:#885500; --vcr-dim2:#664400; --vcr-border:#3a2200; }
 .vcr-colon { display:inline-block; animation:vcr-blink 1s step-start infinite; }
 @keyframes vcr-blink { 50% { opacity:0; } }
+/* ── Synthetic clock card ── */
+.synth-card { background:#1a0508 !important; border-color:#5c1a1a !important; }
+.synth-card .clock-label { color:#ff4444 !important; }
+.synth-card .clock-time { color:#ff4444 !important; text-shadow:0 0 8px rgba(255,68,68,.6); }
+.synth-card .clock-tz { color:#cc3333 !important; }
+.synth-card .clock-date { color:#aa3333 !important; }
+.synth-card.vcr-card { background:#0a0000 !important; border-color:#4a0000 !important; }
+.synth-card .vcr-time { color:#ff4444 !important; text-shadow:0 0 10px rgba(255,68,68,.9),0 0 24px rgba(255,0,0,.6),0 0 48px rgba(255,0,0,.25) !important; }
+.synth-card .vcr-label { color:#cc3333 !important; text-shadow:0 0 6px rgba(255,0,0,.3) !important; }
+.synth-card .vcr-tz { color:#cc3333 !important; text-shadow:0 0 6px rgba(255,0,0,.3) !important; }
+.synth-card .vcr-date { color:#993333 !important; text-shadow:0 0 4px rgba(255,0,0,.2) !important; }
 /* ── Countdown cards ── */
 .countdown-card { position:relative; background:color-mix(in srgb, var(--accent) 8%, var(--bg2)); border-color:color-mix(in srgb, var(--accent) 25%, var(--border)); }
 .timer-card { position:relative; background:color-mix(in srgb, #2ecc71 8%, var(--bg2)); border-color:color-mix(in srgb, #2ecc71 25%, var(--border)); }
@@ -156,6 +167,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   <button class="btn-tb" id="btnFmt12" data-fmt="12">12h</button>
   <button class="btn-tb" id="btnAddCountdown" title="Add countdown timer">⏱ Countdown</button>
   <button class="btn-tb" id="btnAddTimer" title="Add stopwatch timer">⏲ Timer</button>
+  <button class="btn-tb" id="btnAddSynth" title="Add synthetic exercise clock">⏱ Synthetic</button>
   <label id="lblVcrColor" style="display:none">VCR Color</label>
   <select id="selVcrColor" style="display:none">
     <option value="red">Red</option>

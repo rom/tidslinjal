@@ -6003,6 +6003,53 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// ── Polls / Multipoll ──
+	mux.HandleFunc("/api/polls", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetPolls)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleCreatePoll)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/polls/log", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetPollLog)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/polls/default-questions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetDefaultPollQuestions)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/polls/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetPoll)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/polls/{id}/respond", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			app.requireAuth(app.handleRespondPoll)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/polls/{id}/close", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			app.requireAuth(app.handleClosePoll)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Personal Notifications ──
 	mux.HandleFunc("/api/personal-notifications", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -8136,6 +8183,307 @@ func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Req
 	// Broadcast SSE event for the updated PRC
 	updatedData, _ := json.Marshal(found)
 	app.broker.BroadcastAll(SSEMessage{Event: "prc_update", Data: string(updatedData)})
+}
+
+// ── Poll / Multipoll handlers ───────────────────────────────────────────────
+
+func (app *App) handleGetPolls(w http.ResponseWriter, r *http.Request, user *User) {
+	polls := app.store.GetPolls()
+	if polls == nil {
+		polls = []Poll{}
+	}
+	jsonOK(w, polls)
+}
+
+func (app *App) handleGetDefaultPollQuestions(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, DefaultPollQuestions())
+}
+
+func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Title       string         `json:"title"`
+		Description string         `json:"description"`
+		TargetType  string         `json:"target_type"`
+		TargetIDs   []string       `json:"target_ids"`
+		Questions   []PollQuestion `json:"questions"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Title == "" {
+		jsonError(w, "title is required", http.StatusBadRequest)
+		return
+	}
+	if req.TargetType != "user" && req.TargetType != "group" && req.TargetType != "role" {
+		jsonError(w, "target_type must be 'user', 'group', or 'role'", http.StatusBadRequest)
+		return
+	}
+	if len(req.TargetIDs) == 0 {
+		jsonError(w, "at least one target required", http.StatusBadRequest)
+		return
+	}
+	questions := req.Questions
+	if len(questions) == 0 {
+		questions = DefaultPollQuestions()
+	}
+	creatorName := user.DisplayName
+	if creatorName == "" {
+		creatorName = user.Username
+	}
+	poll := Poll{
+		CreatedBy:     user.ID,
+		CreatedByName: creatorName,
+		CreatedAt:     time.Now(),
+		Title:         req.Title,
+		Description:   req.Description,
+		TargetType:    req.TargetType,
+		TargetIDs:     req.TargetIDs,
+		Questions:     questions,
+		Responses:     []PollResponse{},
+		Status:        "open",
+	}
+	created, err := app.store.AddPoll(poll)
+	if err != nil {
+		jsonError(w, "failed to create poll", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, created)
+
+	// Broadcast SSE
+	pollData, _ := json.Marshal(created)
+	app.broker.BroadcastAll(SSEMessage{Event: "poll_new", Data: string(pollData)})
+
+	// Notify targeted users
+	targetUserIDs := app.resolvePollTargets(created)
+	for _, uid := range targetUserIDs {
+		if uid != user.ID {
+			app.notifyUser(uid, "poll",
+				"New Poll: "+created.Title,
+				fmt.Sprintf("You have been included in a poll by %s", creatorName),
+				fmt.Sprintf("%d", created.ID))
+		}
+	}
+
+	// Audit log
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "create_poll", EntityType: "poll", EntityID: created.ID,
+		Summary: fmt.Sprintf("Created poll '%s' targeting %s: %s", created.Title, created.TargetType, strings.Join(created.TargetIDs, ", ")),
+	})
+}
+
+func (app *App) handleGetPoll(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	poll, ok := app.store.GetPollByID(id)
+	if !ok {
+		jsonError(w, "poll not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, poll)
+}
+
+func (app *App) handleRespondPoll(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Answers []struct {
+			QuestionID string `json:"question_id"`
+			Answer     string `json:"answer"`
+		} `json:"answers"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if len(req.Answers) == 0 {
+		jsonError(w, "at least one answer required", http.StatusBadRequest)
+		return
+	}
+
+	poll, ok := app.store.GetPollByID(id)
+	if !ok {
+		jsonError(w, "poll not found", http.StatusNotFound)
+		return
+	}
+	if poll.Status != "open" {
+		jsonError(w, "poll is closed", http.StatusBadRequest)
+		return
+	}
+
+	// Check that user is in the target list
+	targetUserIDs := app.resolvePollTargets(*poll)
+	isTarget := false
+	for _, uid := range targetUserIDs {
+		if uid == user.ID {
+			isTarget = true
+			break
+		}
+	}
+	if !isTarget {
+		jsonError(w, "you are not a target of this poll", http.StatusForbidden)
+		return
+	}
+
+	// Build a set of valid question IDs
+	validQIDs := make(map[string]bool)
+	for _, q := range poll.Questions {
+		validQIDs[q.ID] = true
+	}
+
+	userName := user.DisplayName
+	if userName == "" {
+		userName = user.Username
+	}
+	now := time.Now()
+
+	// Remove any previous responses from this user for these questions, then add new ones
+	for _, ans := range req.Answers {
+		if !validQIDs[ans.QuestionID] {
+			continue
+		}
+		// Remove old response for this user+question
+		filtered := make([]PollResponse, 0, len(poll.Responses))
+		for _, resp := range poll.Responses {
+			if !(resp.UserID == user.ID && resp.QuestionID == ans.QuestionID) {
+				filtered = append(filtered, resp)
+			}
+		}
+		poll.Responses = filtered
+		// Add new response
+		poll.Responses = append(poll.Responses, PollResponse{
+			UserID:     user.ID,
+			UserName:   userName,
+			QuestionID: ans.QuestionID,
+			Answer:     ans.Answer,
+			AnsweredAt: now,
+		})
+	}
+
+	if err := app.store.UpdatePoll(*poll); err != nil {
+		jsonError(w, "failed to update poll", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, poll)
+
+	// Audit log
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "respond_poll", EntityType: "poll", EntityID: poll.ID,
+		Summary: fmt.Sprintf("Responded to poll '%s' with %d answers", poll.Title, len(req.Answers)),
+	})
+
+	// Broadcast SSE
+	updatedData, _ := json.Marshal(poll)
+	app.broker.BroadcastAll(SSEMessage{Event: "poll_update", Data: string(updatedData)})
+}
+
+func (app *App) handleClosePoll(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	poll, ok := app.store.GetPollByID(id)
+	if !ok {
+		jsonError(w, "poll not found", http.StatusNotFound)
+		return
+	}
+	// Only creator or admin can close
+	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "only the creator or an admin can close this poll", http.StatusForbidden)
+		return
+	}
+	if poll.Status == "closed" {
+		jsonError(w, "poll is already closed", http.StatusBadRequest)
+		return
+	}
+	now := time.Now()
+	poll.Status = "closed"
+	poll.ClosedAt = &now
+
+	if err := app.store.UpdatePoll(*poll); err != nil {
+		jsonError(w, "failed to close poll", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, poll)
+
+	// Audit log
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "close_poll", EntityType: "poll", EntityID: poll.ID,
+		Summary: fmt.Sprintf("Closed poll '%s' (%d responses)", poll.Title, len(poll.Responses)),
+	})
+
+	// Broadcast SSE
+	closedData, _ := json.Marshal(poll)
+	app.broker.BroadcastAll(SSEMessage{Event: "poll_closed", Data: string(closedData)})
+}
+
+func (app *App) handleGetPollLog(w http.ResponseWriter, r *http.Request, user *User) {
+	polls := app.store.GetPolls()
+	var closed []Poll
+	for _, p := range polls {
+		if p.Status == "closed" {
+			closed = append(closed, p)
+		}
+	}
+	if closed == nil {
+		closed = []Poll{}
+	}
+	jsonOK(w, closed)
+}
+
+// resolvePollTargets returns the list of user IDs targeted by a poll
+func (app *App) resolvePollTargets(poll Poll) []int64 {
+	seen := make(map[int64]bool)
+	var result []int64
+	switch poll.TargetType {
+	case "user":
+		for _, idStr := range poll.TargetIDs {
+			uid, err := strconv.ParseInt(idStr, 10, 64)
+			if err == nil {
+				if !seen[uid] {
+					seen[uid] = true
+					result = append(result, uid)
+				}
+			}
+		}
+	case "group":
+		for _, idStr := range poll.TargetIDs {
+			gid, err := strconv.ParseInt(idStr, 10, 64)
+			if err == nil {
+				members := app.store.GetGroupMembers(gid)
+				for _, m := range members {
+					if !seen[m.UserID] {
+						seen[m.UserID] = true
+						result = append(result, m.UserID)
+					}
+				}
+			}
+		}
+	case "role":
+		users := app.store.GetUsers()
+		for _, u := range users {
+			for _, roleStr := range poll.TargetIDs {
+				if string(u.Role) == roleStr {
+					if !seen[u.ID] {
+						seen[u.ID] = true
+						result = append(result, u.ID)
+					}
+					break
+				}
+			}
+		}
+	}
+	return result
 }
 
 // ── Personal Notification handlers ──────────────────────────────────────────

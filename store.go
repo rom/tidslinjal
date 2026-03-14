@@ -69,6 +69,7 @@ type Store struct {
 	rooms                []Room
 	customResourceTypes  []CustomResourceType
 	personReadyChecks    []PersonReadyCheck
+	polls                []Poll
 	notifications        []Notification
 	mapResources         []MapResource
 	referenceDocs        []ReferenceDoc
@@ -101,6 +102,7 @@ type Store struct {
 	nextLogBookID            int64
 	nextCustomResTypeID      int64
 	nextPersonReadyCheckID   int64
+	nextPollID               int64
 	nextNotificationID       int64
 	nextMapResourceID        int64
 	nextReferenceDocID       int64
@@ -179,6 +181,7 @@ func (s *Store) load() error {
 	s.loadFile("event_log.json", &s.eventLog)
 	s.loadFile("log_book.json", &s.logBook)
 	s.loadFile("person_ready_checks.json", &s.personReadyChecks)
+	s.loadFile("polls.json", &s.polls)
 	s.loadFile("notifications.json", &s.notifications)
 	s.loadFile("map_resources.json", &s.mapResources)
 	s.loadFile("references.json", &s.referenceDocs)
@@ -339,6 +342,11 @@ func (s *Store) load() error {
 	for _, x := range s.personReadyChecks {
 		if x.ID > s.nextPersonReadyCheckID {
 			s.nextPersonReadyCheckID = x.ID
+		}
+	}
+	for _, x := range s.polls {
+		if x.ID > s.nextPollID {
+			s.nextPollID = x.ID
 		}
 	}
 	for _, x := range s.notifications {
@@ -2483,6 +2491,8 @@ func (s *Store) ResetDatabase() error {
 	s.nextLogBookID = 0
 	s.personReadyChecks = nil
 	s.nextPersonReadyCheckID = 0
+	s.polls = nil
+	s.nextPollID = 0
 	s.notifications = nil
 	s.nextNotificationID = 0
 	s.mapResources = nil
@@ -2524,6 +2534,7 @@ func (s *Store) ResetDatabase() error {
 		"event_log.json":              s.eventLog,
 		"log_book.json":               s.logBook,
 		"person_ready_checks.json":    s.personReadyChecks,
+		"polls.json":                  s.polls,
 		"notifications.json":          s.notifications,
 		"map_resources.json":          s.mapResources,
 		"map_locations.json":          s.mapLocations,
@@ -3433,6 +3444,52 @@ func (s *Store) UpdatePersonReadyCheck(check PersonReadyCheck) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("person ready check %d not found", check.ID)
+}
+
+// ── Polls ───────────────────────────────────────────────────────────────────
+
+func (s *Store) GetPolls() []Poll {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Poll, len(s.polls))
+	copy(out, s.polls)
+	return out
+}
+
+func (s *Store) GetPollByID(id int64) (*Poll, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.polls {
+		if s.polls[i].ID == id {
+			p := s.polls[i]
+			return &p, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Store) AddPoll(poll Poll) (Poll, error) {
+	s.mu.Lock()
+	s.nextPollID++
+	poll.ID = s.nextPollID
+	s.polls = append(s.polls, poll)
+	snap := append([]Poll(nil), s.polls...)
+	s.mu.Unlock()
+	return poll, s.persist("polls.json", snap)
+}
+
+func (s *Store) UpdatePoll(poll Poll) error {
+	s.mu.Lock()
+	for i, p := range s.polls {
+		if p.ID == poll.ID {
+			s.polls[i] = poll
+			snap := append([]Poll(nil), s.polls...)
+			s.mu.Unlock()
+			return s.persist("polls.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("poll %d not found", poll.ID)
 }
 
 // ── Event Log ───────────────────────────────────────────────────────────────
