@@ -6032,6 +6032,27 @@ func (app *App) routes() http.Handler {
 			app.requireAuth(app.handleUnlockMapOverlay)(w, r)
 			return
 		}
+		// /api/map-resources/{id}/lock
+		if len(parts) == 4 && parts[3] == "lock" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleLockMap)(w, r)
+			return
+		}
+		// /api/map-resources/{id}/unlock
+		if len(parts) == 4 && parts[3] == "unlock" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleUnlockMap)(w, r)
+			return
+		}
+		// /api/map-resources/{id}/drawings
+		if len(parts) == 4 && parts[3] == "drawings" {
+			if r.Method == http.MethodGet {
+				app.requireAuth(app.handleGetMapDrawings)(w, r)
+			} else if r.Method == http.MethodPut {
+				app.requireAuth(app.handleUpdateMapDrawings)(w, r)
+			} else {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
 		// /api/map-resources/{id}
 		switch r.Method {
 		case http.MethodGet:
@@ -8073,6 +8094,28 @@ func (app *App) handleAckNotification(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// If this is a PRC notification, also respond "ready" to the linked ready check
+	notif, nErr := app.store.GetNotification(id)
+	if nErr == nil && notif != nil && notif.Type == "prc" && notif.RefID != "" {
+		prcID, parseErr := strconv.ParseInt(notif.RefID, 10, 64)
+		if parseErr == nil {
+			checks := app.store.GetPersonReadyChecks()
+			for i := range checks {
+				if checks[i].ID == prcID {
+					for j := range checks[i].Participants {
+						if checks[i].Participants[j].UserID == user.ID && checks[i].Participants[j].Status == "pending" {
+							checks[i].Participants[j].Status = "ready"
+							_ = app.store.UpdatePersonReadyCheck(checks[i])
+							updatedData, _ := json.Marshal(checks[i])
+							app.broker.BroadcastAll(SSEMessage{Event: "prc_update", Data: string(updatedData)})
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+	}
 	if err := app.store.AcknowledgeNotification(id); err != nil {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
@@ -8323,6 +8366,108 @@ func (app *App) handleLockMapOverlay(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 	jsonOK(w, mr)
+}
+
+func (app *App) handleLockMap(w http.ResponseWriter, r *http.Request, user *User) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.Split(path, "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "no map lock permission", http.StatusForbidden)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	mr.Locked = true
+	mr.LockedBy = user.ID
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleUnlockMap(w http.ResponseWriter, r *http.Request, user *User) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.Split(path, "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "no map lock permission", http.StatusForbidden)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	mr.Locked = false
+	mr.LockedBy = 0
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, mr)
+}
+
+func (app *App) handleGetMapDrawings(w http.ResponseWriter, r *http.Request, user *User) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.Split(path, "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	drawings := mr.Drawings
+	if drawings == nil {
+		drawings = []MapDrawing{}
+	}
+	jsonOK(w, drawings)
+}
+
+func (app *App) handleUpdateMapDrawings(w http.ResponseWriter, r *http.Request, user *User) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
+	parts := strings.Split(path, "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	mr, ok := app.store.GetMapResource(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "map is locked", http.StatusForbidden)
+		return
+	}
+	var drawings []MapDrawing
+	if err := json.NewDecoder(r.Body).Decode(&drawings); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	mr.Drawings = drawings
+	if err := app.store.UpdateMapResource(mr); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]bool{"ok": true})
 }
 
 func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, user *User) {

@@ -918,6 +918,23 @@ type MapResource struct {
 	CreatedByName string       `json:"created_by_name"`
 	CreatedAt     time.Time    `json:"created_at"`
 	Overlays      []MapOverlay `json:"overlays,omitempty"`
+	Locked        bool         `json:"locked"`                // whole-map lock
+	LockedBy      int64        `json:"locked_by,omitempty"`   // user who locked
+	Drawings      []MapDrawing `json:"drawings,omitempty"`    // freehand drawings, shapes, pins
+}
+
+// MapDrawing is a drawing element on a map (polyline, shape, marker)
+type MapDrawing struct {
+	Type    string      `json:"type"`              // polyline | rect | circle | marker
+	LatLngs [][]float64 `json:"latlngs,omitempty"` // for polyline
+	Bounds  [][]float64 `json:"bounds,omitempty"`  // for rect
+	Lat     float64     `json:"lat,omitempty"`     // for circle/marker
+	Lng     float64     `json:"lng,omitempty"`
+	Radius  float64     `json:"radius,omitempty"`  // for circle
+	Color   string      `json:"color,omitempty"`
+	Weight  int         `json:"weight,omitempty"`
+	Opacity float64     `json:"opacity,omitempty"`
+	HTML    string      `json:"html,omitempty"`    // for marker icon
 }
 
 // MapOverlay is a layer of resources placed on a map
@@ -976,7 +993,7 @@ type ReferenceDoc struct {
 	ID             int64     `json:"id"`
 	Title          string    `json:"title"`
 	Description    string    `json:"description,omitempty"`
-	Category       string    `json:"category"` // handbook | sop | policy | map | reference | other
+	Category       string    `json:"category"` // handbook | sop | policy | map | reference | checklist | faq | objectives | other
 	Filename       string    `json:"filename"`
 	OriginalName   string    `json:"original_name"`
 	ContentType    string    `json:"content_type"`
@@ -985,4 +1002,7 @@ type ReferenceDoc struct {
 	UploadedByName string    `json:"uploaded_by_name"`
 	UploadedAt     time.Time `json:"uploaded_at"`
 	Tags           []string  `json:"tags,omitempty"`
+	RefType        string    `json:"ref_type,omitempty"`  // file | url | local
+	URL            string    `json:"url,omitempty"`       // URL for url-type references
+	Content        string    `json:"content,omitempty"`   // inline content for local-type references
 }

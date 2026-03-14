@@ -5445,12 +5445,64 @@ async function _loadPersonReadyChecks(modal) {
   });
 }
 
+// ── PRC Popup (shown to participants when a ready check is created) ──────────
+function _showPRCPopup(check) {
+  // Prevent duplicate popups for same check
+  if (document.getElementById('prcPopup_' + check.id)) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'prcPopup_' + check.id;
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '10001';
+  const participants = (check.participants || []).map(p => {
+    const color = p.status === 'ready' ? '#27AE60' : p.status === 'not_ready' ? '#E74C3C' : '#F39C12';
+    const icon = p.status === 'ready' ? '🟢' : p.status === 'not_ready' ? '🔴' : '🟡';
+    return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:var(--bg2);border:1px solid ${color};border-radius:var(--radius);font-size:var(--fs-xs);margin:2px">${icon} ${escHtml(p.user_name)}</span>`;
+  }).join('');
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;animation:slideIn .25s ease">
+      <div class="modal-header" style="background:#F39C12;color:#000">
+        <h3 style="color:#000">🙋 Ready Check Required</h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:var(--fs-sm);margin-bottom:8px">
+          <b>${escHtml(check.created_by_name || '')}</b> has requested a readiness check.
+        </p>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">Please confirm your readiness status.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px">${participants}</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-primary" id="prcPopupReady_${check.id}" style="background:#27AE60;border-color:#27AE60;padding:8px 24px;font-size:14px">✓ Ready</button>
+          <button class="btn btn-secondary" id="prcPopupNotReady_${check.id}" style="background:#E74C3C;border-color:#E74C3C;color:#fff;padding:8px 24px;font-size:14px">✗ Not Ready</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const respond = async (status) => {
+    try {
+      const res = await apiPut(`/api/person-ready-check/${check.id}/respond`, { status });
+      if (res.ok) {
+        overlay.remove();
+        showNotification('success', status === 'ready' ? 'Marked as ready' : 'Marked as not ready');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to respond');
+      }
+    } catch (e) { showError('Error: ' + e.message); }
+  };
+  document.getElementById('prcPopupReady_' + check.id).addEventListener('click', () => respond('ready'));
+  document.getElementById('prcPopupNotReady_' + check.id).addEventListener('click', () => respond('not_ready'));
+  // Play notification sound
+  _playNotifBellSound();
+}
+
 // Symbol palettes for each resource type
 const _resourceSymbols = {
   room: ['🏠','🚪','🛋','📐','🪑','🖥','📽','🎙','📞','🏫','🏥','🏛','🏗','🔬','🧪'],
   building: ['🏢','🏬','🏭','🏗','🏛','🏤','🏣','🏦','🏨','🏩','🏪','🏫','🏥','⛪','🕌','🕍','🛕','⛩','🏰','🏯','🗼','🏚','🏘','🏙','🌆','🌇','🌃','🗽','🏟','⛲'],
   computer_service: ['💻','🖥','🖨','🖱','⌨','💾','💿','📀','🔌','📡','📶','🌐','🔒','🔑','🛡','⚙','🔧','🧰','📊','📈','🗄','🗃','📁','📂','📧','📨','🔗','🧮','☁','🔄','📲','📱','🤖','🧠','🔬','📟','🎛','📺','🎮','🕹','🌍','🔐','🛜','📳','🏧'],
-  data_center: ['🖥','🗄','💾','📡','🔌','⚡','❄','🌡','🔒','🛡','🏗','🏢','📊','🔄','☁','🌐','📶','🧊','🔧','⚙','🖧','📦','🗃','🔋','💡','🌀','🎚','🎛','📟','🧰']
+  data_center: ['🖥','🗄','💾','📡','🔌','⚡','❄','🌡','🔒','🛡','🏗','🏢','📊','🔄','☁','🌐','📶','🧊','🔧','⚙','🖧','📦','🗃','🔋','💡','🌀','🎚','🎛','📟','🧰'],
+  vehicle: ['🚗','🚙','🚕','🚌','🚎','🚐','🚑','🚒','🚓','🚔','🚘','🚍','🚖','🛻','🚚','🚛','🚜','✈️','🛩','🚁','🚂','🚃','🚄','🚅','🚆','🚇','🚈','🚉','🚊','🛤','⛵','🛶','🚤','🛳','⛴','🛥','🏍','🛵','🚲','🛴','🛞','⛽','🚧'],
+  equipment: ['🔧','🔨','⚒','🛠','⛏','🔩','⚙','🧰','🪛','🪚','📦','📮','🔐','🔒','🔓','📟','📠','📺','📻','📡','🔋','🔌','💡','🕯','🧲','🧯','🪜','🧱','⛓','🪝','🎖','🏅','🔭','🔬','🧪','⚗','🩺','💉','🩹','⚖','🧭','📐','📏']
 };
 
 function openRoomModal(argJson) {
@@ -6055,6 +6107,29 @@ function connectSSE() {
       _updateNotifBadge();
       // If panel is open, re-render
       if (_notifPanelOpen) _renderNotifPanel();
+    } catch {}
+  });
+  // Person Ready Check popup — show modal for participants
+  es.addEventListener('prc_new_check', e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (!state.user) return;
+      const me = (data.participants || []).find(p => p.user_id === state.user.id);
+      if (!me || me.status !== 'pending') return;
+      _showPRCPopup(data);
+    } catch {}
+  });
+  es.addEventListener('prc_update', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // If there's an open PRC popup for this check, refresh it
+      const popup = document.getElementById('prcPopup_' + data.id);
+      if (popup) {
+        const me = (data.participants || []).find(p => p.user_id === state.user.id);
+        if (me && me.status !== 'pending') {
+          popup.remove(); // Already responded
+        }
+      }
     } catch {}
   });
   // Decision assignment notification
@@ -10360,7 +10435,8 @@ function _renderReferencesTab(el) {
         ${t('references_title') || 'References'}
         ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
       </div>
-      <input type="text" id="refSearch" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+      <input type="text" id="refSearch" list="refSearchSuggestions" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)" autocomplete="off">
+      <datalist id="refSearchSuggestions"></datalist>
       <select id="refCategoryFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
         <option value="">${t('all_categories') || 'All categories'}</option>
         <option value="handbook">Handbook</option>
@@ -10368,6 +10444,7 @@ function _renderReferencesTab(el) {
         <option value="policy">Policy</option>
         <option value="map">Map</option>
         <option value="reference">Reference</option>
+        <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
         <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
         <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
         <option value="other">Other</option>
@@ -10389,6 +10466,26 @@ async function _loadAndRenderReferences() {
     if (!res.ok) return;
     state.references = await res.json() || [];
   } catch (e) { state.references = []; }
+  // Populate autocomplete suggestions from available reference titles and filenames
+  const dl = document.getElementById('refSearchSuggestions');
+  if (dl) {
+    const seen = new Set();
+    dl.innerHTML = '';
+    (state.references || []).forEach(r => {
+      [r.title, r.original_name].filter(Boolean).forEach(v => {
+        if (!seen.has(v.toLowerCase())) {
+          seen.add(v.toLowerCase());
+          dl.innerHTML += `<option value="${escHtml(v)}">`;
+        }
+      });
+      (r.tags || []).forEach(tag => {
+        if (!seen.has(tag.toLowerCase())) {
+          seen.add(tag.toLowerCase());
+          dl.innerHTML += `<option value="${escHtml(tag)}">`;
+        }
+      });
+    });
+  }
   _filterReferences();
 }
 
@@ -10407,7 +10504,7 @@ function _filterReferences() {
     listEl.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:12px 0">No references found.</div>';
     return;
   }
-  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
   listEl.innerHTML = refs.map(r => {
     const sizeKB = r.size ? (r.size / 1024).toFixed(1) + ' KB' : '';
     return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px">
@@ -10468,6 +10565,7 @@ function _openReferenceUploadModal() {
             <option value="policy">Policy</option>
             <option value="map">Map</option>
             <option value="reference">Reference</option>
+            <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
             <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
             <option value="other">Other</option>
