@@ -811,4 +811,120 @@ Enregistrez et réutilisez des ensembles d'événements, phases, verrous, groupe
 
 ---
 
-*Tidslinjal v6.0.0 — Chronologie opérationnelle collaborative*
+## 27. Références et bibliothèque de documents
+
+La bibliothèque de documents permet de centraliser les références opérationnelles.
+
+### Télécharger des références
+
+Trois modes de téléchargement sont disponibles :
+- **Fichier** — télécharger un fichier depuis votre ordinateur
+- **URL** — référencer un document par son adresse web
+- **Texte local** — saisir du contenu texte directement
+
+### Métadonnées
+
+Chaque référence possède les métadonnées suivantes : titre, description, catégorie, étiquettes, langue, propriétaire, gardien et mode de copie.
+
+### Catégories
+
+| Catégorie | Description |
+|---|---|
+| **Manuel** | Manuels d'utilisation et guides |
+| **SOP** | Procédures opérationnelles standard |
+| **Politique** | Documents de politique |
+| **Carte** | Cartes et plans |
+| **Référence** | Documents de référence |
+| **Liste de contrôle** | Listes de vérification |
+| **FAQ** | Questions fréquemment posées |
+| **Objectifs** | Documents d'objectifs |
+| **Autre** | Autres documents |
+
+### Détection automatique du type de fichier
+
+Le type de fichier est détecté automatiquement lors du téléchargement.
+
+### Modes de copie
+
+| Mode | Description |
+|---|---|
+| **Copie centrale** | Le fichier est stocké sur le serveur central |
+| **Copie locale** | Le fichier est copié localement |
+| **Afficher le lien** | Seul le lien vers le document est conservé |
+
+### Téléchargement en masse
+
+Téléchargez plusieurs fichiers simultanément via le bouton **Téléchargement en masse**.
+
+### Modal de modification des métadonnées
+
+Cliquez sur un document pour ouvrir le modal de modification des métadonnées et mettre à jour les informations.
+
+### Sommes de contrôle cryptographiques
+
+Les sommes de contrôle suivantes sont calculées pour chaque fichier :
+- **MD5**
+- **SHA-1**
+- **SHA-256**
+- **SHA-512**
+
+Cliquez sur le bouton **Sommes de contrôle** pour afficher le modal d'affichage des sommes de contrôle d'un document.
+
+### Recherche et filtrage
+
+Utilisez la barre de recherche et les filtres par catégorie pour retrouver rapidement vos documents.
+
+---
+
+## 28. Accessibilité
+
+### Mode haut contraste
+
+Le mode haut contraste peut être superposé sur tout thème existant. Il renforce la visibilité des éléments suivants :
+- Lignes de grille
+- Marqueurs temporels
+- Bandes de phase
+- Verrous
+- Événements sélectionnés
+
+Activez-le depuis **Paramètres → Mode haut contraste**.
+
+### Palettes daltoniens
+
+Trois palettes adaptées sont disponibles :
+
+| Palette | Type de déficience |
+|---|---|
+| **Protanopie** | Déficience rouge-vert |
+| **Deutéranopie** | Déficience vert-rouge |
+| **Tritanopie** | Déficience bleu-jaune |
+
+Sélectionnez une palette depuis **Paramètres → Palette daltoniens**.
+
+---
+
+## 29. Préréglages d'espace de travail
+
+Les préréglages d'espace de travail permettent d'enregistrer et de restaurer rapidement votre configuration de vue.
+
+### Enregistrer un préréglage
+
+Un préréglage nommé capture les paramètres suivants :
+- Vue active
+- Intervalle d'affichage
+- Résolution
+- Niveau de zoom
+- Couches masquées
+- Onglet latéral sélectionné
+
+### Charger un préréglage
+
+Cliquez sur un préréglage enregistré pour le charger en un clic et restaurer tous les paramètres associés.
+
+### Supprimer des préréglages
+
+Supprimez les préréglages dont vous n'avez plus besoin depuis la liste des préréglages.
+
+---
+
+*Tidslinjal v6.1.0 — Chronologie opérationnelle collaborative*

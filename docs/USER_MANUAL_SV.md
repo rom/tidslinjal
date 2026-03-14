@@ -794,4 +794,125 @@ Spara och återanvänd uppsättningar av händelser, faser, lås, grupper och la
 
 ---
 
-*Tidslinjal v6.0.0 — Samarbetsbaserad operativ tidslinje*
+## 27. Referenser och dokumentbibliotek
+
+Referensbiblioteket gör det möjligt att hantera dokument och länkar kopplade till operationer och övningar.
+
+### Ladda upp referenser
+
+Ladda upp referenser som fil, URL eller lokal text. Systemet stöder massuppladdning (flera filer samtidigt) och automatisk filtypsdetektering.
+
+### Referensmetadata
+
+Varje referens har följande metadata:
+
+| Fält | Beskrivning |
+|---|---|
+| **Titel** | Referensens namn |
+| **Beskrivning** | Kort sammanfattning |
+| **Kategori** | Klassificering (se nedan) |
+| **Taggar** | Fritext-taggar för sökning |
+| **Språk** | Dokumentets språk |
+| **Ägare** | Ansvarig person |
+| **Förvaltare** | Person som underhåller dokumentet |
+| **Kopieringsläge** | Hur dokumentet lagras (se nedan) |
+
+### Kategorier
+
+| Kategori |
+|---|
+| Handbok |
+| SOP |
+| Policy |
+| Karta |
+| Referens |
+| Checklista |
+| FAQ |
+| Mål |
+| Övrigt |
+
+### Kopieringslägen
+
+| Läge | Beskrivning |
+|---|---|
+| **Central kopia** | Filen lagras centralt på servern |
+| **Lokal kopia** | Filen lagras lokalt hos användaren |
+| **Visa länk** | Ingen kopia — bara en länk till originalkällan |
+
+### Redigera referensmetadata
+
+Klicka på en referens för att öppna detaljvyn. Klicka **Redigera** för att ändra metadata.
+
+### Kryptografiska kontrollsummor
+
+Systemet beräknar automatiskt kryptografiska kontrollsummor för uppladdade filer:
+
+| Algoritm |
+|---|
+| MD5 |
+| SHA-1 |
+| SHA-256 |
+| SHA-512 |
+
+Klicka på **Visa kontrollsummor** för att öppna kontrollsummemodalen med alla beräknade värden.
+
+### Sök och filtrering
+
+Använd sökfältet och kategorifilter för att hitta referenser. Filtrera på kategori, taggar och fritext.
+
+---
+
+## 28. Tillgänglighet
+
+### Högkontrastläge
+
+Högkontrastläge kan läggas ovanpå valfritt tema och förstärker synligheten för:
+- Rutnätslinjer
+- Tidsmarkörer
+- Fasband
+- Låsöverlägg
+- Markerade händelser
+
+Aktivera via **Inställningar → Tema och display → Högkontrastläge**.
+
+### Färgblindspaletter
+
+Tre färgblindspaletter finns tillgängliga:
+
+| Palett | Typ |
+|---|---|
+| **Protanopi** | Rödgrön färgblindhet |
+| **Deuteranopi** | Grönröd färgblindhet |
+| **Tritanopi** | Blågul färgblindhet |
+
+Aktivera via **Inställningar → Tema och display → Färgblindpalett**.
+
+Högkontrastläge och färgblindspaletter kan aktiveras samtidigt.
+
+---
+
+## 29. Arbetsytans förval
+
+Spara och återställ namngivna arbetsyteförval för snabb åtkomst till dina vanligaste vyer.
+
+### Spara ett förval
+
+Ett förval sparar följande inställningar:
+- Vy (grid, lista, loggbok, beslut, karta, rapporter)
+- Intervall
+- Upplösning
+- Zoomnivå
+- Dolda lager
+- Sidopanelsflik
+
+### Ladda ett förval
+
+Klicka på ett sparat förval för att omedelbart tillämpa alla sparade inställningar med ett klick.
+
+### Ta bort ett förval
+
+Klicka **Ta bort** bredvid ett förval för att radera det.
+
+---
+
+*Tidslinjal v6.1.0 — Samarbetsbaserad operativ tidslinje*

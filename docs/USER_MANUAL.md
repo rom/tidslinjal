@@ -1014,10 +1014,149 @@ Save and reuse sets of events, phases, locks, groups, and layers:
 
 ---
 
+## 27. References & Document Library
+
+The References section provides a centralized document library for managing operational reference materials.
+
+### Uploading References
+
+Add references in three ways:
+- **File upload** — upload a document from your computer (bulk upload of multiple files is supported)
+- **URL** — link to an external document or resource
+- **Local text** — create a reference from inline text
+
+Automated file type detection identifies the document format on upload.
+
+### Reference Metadata
+
+Each reference includes the following metadata:
+
+| Field | Description |
+|---|---|
+| **Title** | Display name of the reference |
+| **Description** | Summary or notes about the content |
+| **Category** | Classification of the document (see below) |
+| **Tags** | Free-form tags for search and filtering |
+| **Language** | Language of the document |
+| **Owner** | Person or organization that owns the document |
+| **Custodian** | Person responsible for maintaining the document |
+| **Copy mode** | How the document is stored (see below) |
+
+### Categories
+
+| Category | Description |
+|---|---|
+| **Handbook** | Operational handbooks and guides |
+| **SOP** | Standard operating procedures |
+| **Policy** | Organizational policies |
+| **Map** | Geographic or situational maps |
+| **Reference** | General reference material |
+| **Checklist** | Operational checklists |
+| **FAQ** | Frequently asked questions |
+| **Objectives** | Mission or exercise objectives |
+| **Other** | Uncategorized documents |
+
+### Copy Modes
+
+| Mode | Description |
+|---|---|
+| **Central copy** | File is uploaded and stored on the server |
+| **Local copy** | File is stored locally on the user's machine |
+| **Show link** | Only the URL is stored; the document is accessed externally |
+
+### Editing References
+
+Click a reference to open the **reference edit modal** where you can update any metadata field.
+
+### Cryptographic Checksums
+
+Each uploaded file has cryptographic checksums computed automatically. Open the **checksum viewer modal** to see:
+- **MD5**
+- **SHA-1**
+- **SHA-256**
+- **SHA-512**
+
+Checksums can be used to verify document integrity and detect unauthorized modifications.
+
+### Search and Filtering
+
+Use the search bar to find references by title, description, or tags. Filter by category using the category dropdown.
+
+### Actions
+
+- **Download** — download the reference file to your computer
+- **Delete** — remove the reference from the library (requires appropriate permissions)
+
+---
+
+## 28. Accessibility
+
+Tidslinjal provides accessibility features to ensure usability for users with visual impairments or color vision deficiencies.
+
+### High-Contrast Mode
+
+High-contrast mode is a visual overlay that can be layered on top of any theme (Dark, Light, City Camo, Urban Camo). When enabled, it boosts the visibility of:
+- Grid lines
+- Time markers
+- Phase bands
+- Lock overlays
+- Selected events
+
+### Color-Blind Palettes
+
+Three color-blind palettes are available, each remapping accent and status colors to distinguishable alternatives:
+
+| Palette | Condition | Description |
+|---|---|---|
+| **Protanopia** | Red-green color blindness | Remaps red-green distinctions to distinguishable alternatives |
+| **Deuteranopia** | Green-red color blindness | Remaps green-red distinctions to distinguishable alternatives |
+| **Tritanopia** | Blue-yellow color blindness | Remaps blue-yellow distinctions to distinguishable alternatives |
+
+### Combining Modes
+
+High-contrast mode and color-blind palettes can be enabled simultaneously for maximum accessibility.
+
+### Configuration
+
+Both settings are located in the **Settings** sidebar tab under Theme & Display.
+
+---
+
+## 29. Workspace Presets
+
+Workspace presets let you save and restore complete working configurations with one click.
+
+### Saving a Preset
+
+1. Configure your workspace (view, range, resolution, zoom, layers, sidebar tab)
+2. Open **Settings** and navigate to **Workspace Presets**
+3. Click **Save Preset** and enter a name
+4. The preset captures:
+   - Current view
+   - Range
+   - Resolution
+   - Zoom level
+   - Hidden layers
+   - Sidebar tab
+
+### Loading a Preset
+
+Click any saved preset to restore the complete working posture in one action.
+
+### Deleting a Preset
+
+Remove presets that are no longer needed from the preset list.
+
+### Feature Toggle
+
+The workspace presets feature can be enabled or disabled in **Settings**.
+
+---
+
 ### Legend — System Info & GitHub Link
 
 The **Legend** sidebar tab includes a **System** info panel showing language, user count, group count, active layers, synthetic time state, last template, and version number. Server uptime and start time are also shown in the legend panel. If the server is built with a GitHub link configured, a direct link to the repository appears at the bottom of the legend.
 
 ---
 
-*Tidslinjal v6.0.0 — Collaborative Operational Timeline*
+*Tidslinjal v6.1.0 — Collaborative Operational Timeline*
