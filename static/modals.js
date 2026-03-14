@@ -2172,7 +2172,7 @@ function renderSidebar() {
               <span class="legend-label">${escHtml(lbl)}</span>
               <span class="legend-eye">${hidden?'👁‍🗨':'👁'}</span>
               ${state.user&&(state.user.role==='admin'||(et.created_by&&et.created_by===state.user.id)) ?
-                `<button class="btn btn-ghost btn-icon" style="font-size:11px;padding:0 3px" data-edit-etype='${JSON.stringify(et)}' data-stop-prop-only>✏️</button>` : ''}
+                `<button class="btn btn-ghost btn-icon" style="font-size:11px;padding:0 3px" data-edit-etype='${escAttr(JSON.stringify(et))}' data-stop-prop-only>✏️</button>` : ''}
             </div>`;
           }).join('')}
         </div>
@@ -2323,7 +2323,7 @@ function renderSidebar() {
               <div class="layer-swatch" style="background:${l.color||'#4A90D9'}"></div>
               <span class="layer-name">${escHtml(l.name)}</span>
               <span class="layer-vis">${l.visibility}</span>
-              <button class="btn btn-ghost btn-icon" style="font-size:11px" data-edit-layer='${JSON.stringify(l)}' data-stop-prop-only>✏️</button>
+              <button class="btn btn-ghost btn-icon" style="font-size:11px" data-edit-layer='${escAttr(JSON.stringify(l))}' data-stop-prop-only>✏️</button>
             </div>`;
           }).join('')}
         </div>
@@ -2383,7 +2383,7 @@ function renderSidebar() {
             </div>
             <div class="user-list">
               ${(users||[]).map(u => `
-                <div class="user-item" style="cursor:pointer;flex-wrap:wrap" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>
+                <div class="user-item" style="cursor:pointer;flex-wrap:wrap" data-action="openUserModal" data-arg='${escAttr(JSON.stringify(u))}' data-arg-el>
                   <div class="user-name" style="min-width:120px">
                     <div>${u.blocked ? '<span title="${t("user_blocked")||"Blocked"}" style="color:var(--red,#E74C3C)">🚫 </span>' : ''}${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                     <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
@@ -2396,7 +2396,7 @@ function renderSidebar() {
                     <span title="${t('user_last_login')||'Last login'}">${t('user_last_login')||'Last login'}: ${u.last_login_at ? fmtDateTime(new Date(u.last_login_at)) : '—'}</span>
                     <span title="${t('user_login_count')||'Logins'}">${t('user_login_count')||'Logins'}: ${u.login_count || 0}</span>
                   </div>
-                  <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el data-stop-prop>✏️</button>
+                  <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${escAttr(JSON.stringify(u))}' data-arg-el data-stop-prop>✏️</button>
                 </div>`).join('')}
             </div>
           </div>
@@ -2418,13 +2418,13 @@ function renderSidebar() {
           <div class="group-list">
             ${state.groups.length===0 ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">No ${gl.plural.toLowerCase()} yet.</div>` : ''}
             ${state.groups.map(g => `
-              <div class="group-item" style="cursor:pointer" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el>
+              <div class="group-item" style="cursor:pointer" data-action="openGroupModal" data-arg='${escAttr(JSON.stringify(g))}' data-arg-el>
                 <div class="group-name">
                   <div>${escHtml(g.name)}</div>
                   ${g.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(g.description)}</div>` : ''}
                 </div>
-                <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${JSON.stringify(g)}' data-arg-el title="${t('groups_members')}" data-stop-prop>👥</button>
-                <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${JSON.stringify(g)}' data-arg-el title="Edit" data-stop-prop>✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openMemberModal" data-arg='${escAttr(JSON.stringify(g))}' data-arg-el title="${t('groups_members')}" data-stop-prop>👥</button>
+                <button class="btn btn-ghost btn-icon" data-action="openGroupModal" data-arg='${escAttr(JSON.stringify(g))}' data-arg-el title="Edit" data-stop-prop>✏️</button>
               </div>`).join('')}
           </div>
         </div>`;
@@ -2455,7 +2455,7 @@ function renderSidebar() {
             </div>
             ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${sectionLabel.toLowerCase()} yet.</p>` : ''}
             ${filtered.map(r => `
-              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;cursor:pointer" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el>
+              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;cursor:pointer" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}' data-arg-el>
                 ${r.image_name ? `<img src="/api/rooms/${r.id}/image" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border)">` :
                   `<span style="font-size:24px;width:48px;text-align:center">${r.icon || sectionIcon}</span>`}
                 <div style="flex:1;min-width:0">
@@ -2465,7 +2465,7 @@ function renderSidebar() {
                   ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
                 </div>
-                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${JSON.stringify(r)}' data-arg-el data-stop-prop>✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}' data-arg-el data-stop-prop>✏️</button>
               </div>`).join('')}
           </div>`;
         _bindResSubTabs(el);
@@ -2659,7 +2659,7 @@ function renderSidebar() {
                 <div style="font-size:var(--fs-sm);font-weight:600;color:var(--text)">${escHtml(ph.name)}</div>
                 <div style="font-size:var(--fs-xs);color:var(--text-dim)">${fmtDateTime(new Date(ph.start_time))} – ${fmtDateTime(new Date(ph.end_time))}</div>
                 <div style="display:flex;gap:4px;margin-top:4px">
-                  <button class="btn btn-ghost btn-sm" data-action="openPhaseModal" data-arg='${JSON.stringify(ph)}' data-arg-el>✏️</button>
+                  <button class="btn btn-ghost btn-sm" data-action="openPhaseModal" data-arg='${escAttr(JSON.stringify(ph))}' data-arg-el>✏️</button>
                   <button class="btn btn-danger btn-sm" data-action="deletePhase" data-arg="${ph.id}">✕</button>
                 </div>
               </div>`).join('')}
