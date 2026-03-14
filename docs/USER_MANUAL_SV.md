@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 6.0.0**
+**Version 6.1.0**
 
 ---
 
@@ -32,6 +32,9 @@
 24. [Mallar](#24-mallar)
 25. [Tangentbords- och musgenvägar](#25-tangentbords--och-musgenvägar)
 26. [Felsökning](#26-felsökning)
+27. [Referenser och dokumentbibliotek](#27-referenser-och-dokumentbibliotek)
+28. [Tillgänglighet](#28-tillgänglighet)
+29. [Arbetsytans förval](#29-arbetsytans-förval)
 
 ---
 
@@ -46,6 +49,11 @@ Nyckelfunktioner:
 - Övningsstöd med STARTEX/ENDEX och syntetisk "Dag N / T+T" tid
 - Larmeddelanden i realtid via Server-Sent Events
 - Export till ICS, JSON och CSV
+- DTG (Date-Time Group) militärt datumformat
+- Högkontrastläge och färgblindsanpassade paletter
+- Finskt (Suomi) språkstöd
+- Referensdokumenthantering med kontrollsummor
+- Arbetsytans förval
 
 ---
 
@@ -379,6 +387,7 @@ När ett larm utlöses visas en notifieringspanel överst på skärmen:
 - **Stäng** — tar bort notifieringen utan kvittering.
 - **📋 Visa händelse** — öppnar händelsens detaljvy direkt från larmet.
 - **✓ ACK** — kvitterar larmet och stoppar eskalering.
+- **Gå till möte**-knapp — om händelsen är ett möte med URL (Teams/Zoom) visas en knapp i larmnotifieringen som öppnar mötet direkt.
 
 Okvitterade larm eskalerar — de blir orange, sedan pulserande röda var 60:e sekund.
 
@@ -503,10 +512,22 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 |---|---|
 | **Tema** | Mörkt / Ljust / City Camo / Urban Camo |
 | **Storlek** | Liten / Normal / Stor / Enorm |
-| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
-| **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
+| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
+| **Tidsformat** | 24h / 12h |
+| **Högkontrastläge** | På / Av |
+| **Färgblindpalett** | Av / Protanopi / Deuteranopi / Tritanopi |
+| **Standardlandningsvy** | Grid / Lista / Loggbok / Beslut / Karta / Rapporter |
+| **Autofölj nu** | På / Av |
+| **Standardintervall** | Dag / 3 Dagar / Vecka / 2 Veckor / Månad |
+| **Standardupplösning** | 10 min / 15 min / Timme / Dag |
+| **Veckan börjar** | Måndag / Söndag |
+| **Tooltipfördröjning** | Direkt / 200 ms / 500 ms |
+| **Bekräfta dra-flytt** | På / Av |
+| **Standard händelsetyp** | valfri konfigurerad typ |
+| **Välkomstbanner** | visas vid första inloggning |
 
-Språket kan också ändras direkt med flaggknapparna (🇬🇧 🇸🇪 🇫🇷) i verktygsfältet.
+Språket kan också ändras direkt med flaggknapparna (🇬🇧 🇸🇪 🇫🇷 🇫🇮) i verktygsfältet.
 
 ### Datum-/tidsformat och dagstimmar
 
@@ -667,6 +688,7 @@ Kartprojektionen ger en interaktiv geografisk vy över möten, användare och re
 - **Kartlager** — byt mellan OpenStreetMap, Topografisk, Satellit och Mörk
 - **Resursöverlägg** — visa/dölj rum, byggnader, IT-tjänster och datacenter
 - **Adresssökning** — geokoda en adress och zooma till platsen
+- **Symbolväljare** — välj militära och operativa kartsymboler för resurser och händelser
 - **GeoJSON/KML-import** — ladda externa geografiska datafiler
 - **Anpassa alla** — automazooma för att visa alla synliga markörer
 
