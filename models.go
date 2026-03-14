@@ -436,6 +436,18 @@ type Alarm struct {
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
+// DayLabel is a custom label displayed at the top of a day column
+type DayLabel struct {
+	ID         int64    `json:"id"`
+	Date       string   `json:"date"`       // YYYY-MM-DD format
+	Label      string   `json:"label"`       // e.g. "Training Day", "Exercise"
+	Color      string   `json:"color"`       // text color, e.g. "#ffffff"
+	Background string   `json:"background"`  // background color, e.g. "#4A90D9"
+	FontSize   string   `json:"font_size"`   // CSS font size, e.g. "12px", "var(--fs-xs)"
+	FontWeight string   `json:"font_weight"` // CSS font weight, e.g. "bold", "600"
+	CreatedBy  int64    `json:"created_by"`
+}
+
 // LockedSlot represents a time slot locked by admin/designated user
 type LockedSlot struct {
 	ID           int64     `json:"id"`

@@ -23,11 +23,12 @@ async function apiPut(p, b)     { return api('PUT', p, b); }
 async function apiDel(p)        { return api('DELETE', p); }
 
 // ── Data fetchers ───────────────────────────────────────────────────────────
-async function fetchPhases()   { state.phases    = await apiGet('/api/phases')  || []; }
-async function fetchLocks()    { state.locks     = await apiGet('/api/locks')   || []; }
-async function fetchAlarms()   { state.alarms    = await apiGet('/api/alarms')  || []; }
-async function fetchLayers()   { state.layers    = await apiGet('/api/layers')  || []; }
-async function fetchGroups()   { state.groups    = await apiGet('/api/groups')  || []; }
+async function fetchPhases()    { state.phases    = await apiGet('/api/phases')    || []; }
+async function fetchLocks()     { state.locks     = await apiGet('/api/locks')     || []; }
+async function fetchAlarms()    { state.alarms    = await apiGet('/api/alarms')    || []; }
+async function fetchLayers()    { state.layers    = await apiGet('/api/layers')    || []; }
+async function fetchGroups()    { state.groups    = await apiGet('/api/groups')    || []; }
+async function fetchDayLabels() { state.dayLabels = await apiGet('/api/day-labels')|| []; }
 
 async function fetchEvents() {
   const from = state.startDate.toISOString();
@@ -50,7 +51,7 @@ async function refreshAll() {
   }
   _refreshInFlight = (async () => {
     try {
-      await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases()]);
+      await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases(), fetchDayLabels()]);
       if (typeof _listViewActive !== 'undefined' && _listViewActive) {
         renderListView();
       } else {
