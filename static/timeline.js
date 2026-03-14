@@ -528,7 +528,8 @@ function renderEventBlocks(days, slotH) {
         const block = document.createElement('div');
         block.className = 'event-block';
         block.dataset.evId = ev.id;
-        const evColor = ev.color || (evTypeDef ? evTypeDef.color : '#4A90D9');
+        const _rawColor = ev.color || (evTypeDef ? evTypeDef.color : '#4A90D9');
+        const evColor = typeof cbSafeColor === 'function' ? cbSafeColor(_rawColor) : _rawColor;
         block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${evColor};border-left-color:${borderL};cursor:grab;`;
         if (ev.status === 'cancelled') block.style.opacity = '0.45';
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
