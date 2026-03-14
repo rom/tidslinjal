@@ -1393,18 +1393,89 @@ async function openUserModal(user) {
   delBtn.style.display = isEdit ? '' : 'none';
   delBtn.onclick = isEdit ? () => deleteUser(user.id) : null;
 
-  // User info panel (created_at + SSO badge)
+  // User info panel (created_at, last login, login count, blocked status, SSO badge, profile info)
   const uUserInfo = document.getElementById('uUserInfo');
   if (uUserInfo) {
     if (isEdit && user) {
-      const createdStr = user.created_at
-        ? new Date(user.created_at).toLocaleString()
-        : '—';
+      const createdStr = user.created_at ? fmtDateTime(new Date(user.created_at)) : '—';
+      const lastLoginStr = user.last_login_at ? fmtDateTime(new Date(user.last_login_at)) : '—';
+      const loginCountStr = user.login_count || 0;
       const ssoNote = user.is_oidc
-        ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:3px;background:var(--accent-muted,rgba(0,120,255,.12));color:var(--accent);border:1px solid var(--accent);font-weight:600">🔗 SSO / OIDC — auto enrolled</span><br>This account was automatically created via Single Sign-On (OIDC). The identity is managed by the external identity provider.`
+        ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:3px;background:var(--accent-muted,rgba(0,120,255,.12));color:var(--accent);border:1px solid var(--accent);font-weight:600">🔗 SSO / OIDC — auto enrolled</span><br>${t('user_sso_note')||'This account was automatically created via Single Sign-On (OIDC). The identity is managed by the external identity provider.'}`
         : '';
-      uUserInfo.innerHTML = `<strong>Created:</strong> ${escHtml(createdStr)}${ssoNote ? '<br>' + ssoNote : ''}`;
+      const blockedBadge = user.blocked
+        ? `<span style="display:inline-block;margin-top:4px;padding:2px 8px;border-radius:3px;background:rgba(231,76,60,.15);color:var(--red,#E74C3C);border:1px solid var(--red,#E74C3C);font-weight:600">🚫 ${t('user_account_blocked')||'Account Blocked'}</span>`
+        : '';
+      const profileInfo = [
+        user.title ? `<strong>${t('user_title')||'Title'}:</strong> ${escHtml(user.title)}` : '',
+        user.rank ? `<strong>${t('user_rank')||'Rank'}:</strong> ${escHtml(user.rank)}` : '',
+        user.job_role ? `<strong>${t('user_job_role')||'Role/Position'}:</strong> ${escHtml(user.job_role)}` : '',
+        user.expertise ? `<strong>${t('user_expertise')||'Expertise'}:</strong> ${escHtml(user.expertise)}` : '',
+        user.telephone ? `<strong>${t('user_telephone')||'Telephone'}:</strong> ${escHtml(user.telephone)}` : '',
+        user.cellular ? `<strong>${t('user_cellular')||'Cellular'}:</strong> ${escHtml(user.cellular)}` : '',
+        user.mattermost_handle ? `<strong>Mattermost:</strong> ${escHtml(user.mattermost_handle)}` : '',
+        user.discord_handle ? `<strong>Discord:</strong> ${escHtml(user.discord_handle)}` : '',
+        user.signal_handle ? `<strong>Signal:</strong> ${escHtml(user.signal_handle)}` : '',
+        user.location ? `<strong>${t('user_location')||'Location'}:</strong> ${escHtml(user.location)}` : '',
+      ].filter(Boolean);
+      uUserInfo.innerHTML = `
+        <strong>${t('user_created_at')||'Created'}:</strong> ${escHtml(createdStr)}<br>
+        <strong>${t('user_last_login')||'Last login'}:</strong> ${lastLoginStr}<br>
+        <strong>${t('user_login_count')||'Logins'}:</strong> ${loginCountStr}<br>
+        ${profileInfo.length ? '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' + profileInfo.join('<br>') : ''}
+        ${blockedBadge ? '<br>' + blockedBadge : ''}
+        ${ssoNote ? '<br>' + ssoNote : ''}
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${user.blocked
+            ? `<button class="btn btn-secondary btn-sm" id="btnUnblockUser" title="${t('user_unblock_desc')||'Allow this user to log in again'}">🔓 ${t('user_unblock')||'Unblock'}</button>`
+            : `<button class="btn btn-danger btn-sm" id="btnBlockUser" title="${t('user_block_desc')||'Prevent this user from logging in'}">🚫 ${t('user_block')||'Block'}</button>`
+          }
+          <button class="btn btn-secondary btn-sm" id="btnLoginHistory" title="${t('user_login_history_desc')||'View recent login activity for this user'}">📋 ${t('user_login_history')||'Login History'}</button>
+        </div>
+        <div id="uLoginHistoryPanel" style="display:none;margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px"></div>
+      `;
       uUserInfo.style.display = '';
+      // Bind block/unblock and login history buttons
+      const btnBlock = document.getElementById('btnBlockUser');
+      const btnUnblock = document.getElementById('btnUnblockUser');
+      if (btnBlock) btnBlock.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(t('confirm_block_user')||`Block user "${user.username}"? They will not be able to log in.`)) return;
+        const res = await apiPost(`/api/users/${user.id}/block`);
+        if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('user_blocked_success')||'User blocked'); }
+        else { const err = await res.json(); showError(err.error); }
+      });
+      if (btnUnblock) btnUnblock.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const res = await apiPost(`/api/users/${user.id}/unblock`);
+        if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('user_unblocked_success')||'User unblocked'); }
+        else { const err = await res.json(); showError(err.error); }
+      });
+      const btnHistory = document.getElementById('btnLoginHistory');
+      if (btnHistory) btnHistory.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const panel = document.getElementById('uLoginHistoryPanel');
+        if (!panel) return;
+        if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+        panel.innerHTML = `<em style="color:var(--text-dim)">${t('loading')||'Loading…'}</em>`;
+        panel.style.display = '';
+        try {
+          const entries = await apiGet(`/api/users/${user.id}/login-history`);
+          if (!entries || entries.length === 0) {
+            panel.innerHTML = `<em style="color:var(--text-dim)">${t('user_no_login_history')||'No login history found.'}</em>`;
+          } else {
+            panel.innerHTML = entries.map(e => {
+              const actionLabel = {login: t('audit_login')||'Login', login_failed: t('audit_login_failed')||'Login Failed', login_blocked: t('audit_login_blocked')||'Login Blocked'}[e.action] || e.action;
+              const color = e.action === 'login' ? 'var(--green,#27AE60)' : 'var(--red,#E74C3C)';
+              return `<div style="display:flex;gap:8px;align-items:center;padding:2px 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:10px;color:var(--text-dim)">${fmtDateTime(new Date(e.timestamp))}</span>
+                <span style="font-size:10px;font-weight:600;color:${color}">${actionLabel}</span>
+                <span style="font-size:10px;color:var(--text-dim);flex:1">${escHtml(e.summary||'')}</span>
+              </div>`;
+            }).join('');
+          }
+        } catch { panel.innerHTML = `<em style="color:var(--red)">Error loading login history.</em>`; }
+      });
     } else {
       uUserInfo.style.display = 'none';
       uUserInfo.innerHTML = '';
@@ -2311,14 +2382,19 @@ function renderSidebar() {
             </div>
             <div class="user-list">
               ${(users||[]).map(u => `
-                <div class="user-item" style="cursor:pointer" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>
-                  <div class="user-name">
-                    <div>${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
+                <div class="user-item" style="cursor:pointer;flex-wrap:wrap" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el>
+                  <div class="user-name" style="min-width:120px">
+                    <div>${u.blocked ? '<span title="${t("user_blocked")||"Blocked"}" style="color:var(--red,#E74C3C)">🚫 </span>' : ''}${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                     <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
                   </div>
                   <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                   ${u.can_lock?'<span title="Can lock">🔒</span>':''}
                   ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
+                  <div style="width:100%;display:flex;gap:10px;font-size:10px;color:var(--text-dim);margin-top:2px;padding-left:2px;flex-wrap:wrap">
+                    <span title="${t('user_created_at')||'Created'}">${t('user_created_at')||'Created'}: ${u.created_at ? fmtDateTime(new Date(u.created_at)) : '—'}</span>
+                    <span title="${t('user_last_login')||'Last login'}">${t('user_last_login')||'Last login'}: ${u.last_login_at ? fmtDateTime(new Date(u.last_login_at)) : '—'}</span>
+                    <span title="${t('user_login_count')||'Logins'}">${t('user_login_count')||'Logins'}: ${u.login_count || 0}</span>
+                  </div>
                   <button class="btn btn-ghost btn-icon" data-action="openUserModal" data-arg='${JSON.stringify(u)}' data-arg-el data-stop-prop>✏️</button>
                 </div>`).join('')}
             </div>
@@ -2499,9 +2575,17 @@ function renderSidebar() {
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
             <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="oninput">
             <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
-              <option value="">All actions</option>
-              <option value="created">created</option><option value="updated">updated</option><option value="deleted">deleted</option>
-              <option value="status_changed">status_changed</option><option value="login">login</option><option value="login_failed">login_failed</option><option value="reset">reset</option>
+              <option value="">${t('audit_all_actions')||'All actions'}</option>
+              <option value="created">${t('audit_created')||'Created'}</option>
+              <option value="updated">${t('audit_updated')||'Updated'}</option>
+              <option value="deleted">${t('audit_deleted')||'Deleted'}</option>
+              <option value="status_changed">${t('audit_status_changed')||'Status Changed'}</option>
+              <option value="login">${t('audit_login')||'Login'}</option>
+              <option value="login_failed">${t('audit_login_failed')||'Login Failed'}</option>
+              <option value="login_blocked">${t('audit_login_blocked')||'Login Blocked'}</option>
+              <option value="blocked">${t('audit_user_blocked')||'User Blocked'}</option>
+              <option value="unblocked">${t('audit_user_unblocked')||'User Unblocked'}</option>
+              <option value="reset">${t('audit_reset')||'Reset'}</option>
             </select>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
@@ -2588,14 +2672,17 @@ function renderSidebar() {
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
           <input type="text" id="auditSearch" placeholder="🔍 Search…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="oninput">
           <select id="auditFilterAction" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
-            <option value="">All actions</option>
-            <option value="created">created</option>
-            <option value="updated">updated</option>
-            <option value="deleted">deleted</option>
-            <option value="status_changed">status_changed</option>
-            <option value="login">login</option>
-            <option value="login_failed">login_failed</option>
-            <option value="reset">reset</option>
+            <option value="">${t('audit_all_actions')||'All actions'}</option>
+            <option value="created">${t('audit_created')||'Created'}</option>
+            <option value="updated">${t('audit_updated')||'Updated'}</option>
+            <option value="deleted">${t('audit_deleted')||'Deleted'}</option>
+            <option value="status_changed">${t('audit_status_changed')||'Status Changed'}</option>
+            <option value="login">${t('audit_login')||'Login'}</option>
+            <option value="login_failed">${t('audit_login_failed')||'Login Failed'}</option>
+            <option value="login_blocked">${t('audit_login_blocked')||'Login Blocked'}</option>
+            <option value="blocked">${t('audit_user_blocked')||'User Blocked'}</option>
+            <option value="unblocked">${t('audit_user_unblocked')||'User Unblocked'}</option>
+            <option value="reset">${t('audit_reset')||'Reset'}</option>
           </select>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
@@ -3148,6 +3235,141 @@ function renderSidebar() {
         </div>
       </div>
     `;
+  } else if (tab === 'security' && state.user && state.user.role === 'admin') {
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🛡 ${t('tab_security')||'Security'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_overview_desc')||'Security configuration and status overview for Tidslinjal.'}
+        </p>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 ${t('security_tls')||'TLS / HTTPS Configuration'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_tls_desc')||'Configure TLS certificate and key file paths for HTTPS.'}
+          CLI flags <code>--tls-cert</code> / <code>--tls-key</code> and environment variables
+          <code>TLS_CERT</code> / <code>TLS_KEY</code> always take priority over settings stored here.
+        </p>
+        <div id="secTlsCurrentStatus" style="margin-bottom:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
+          ${t('checking')||'Checking TLS status…'}
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_cert_file')||'Certificate File (cert.pem)'}</label>
+          <input type="text" id="secTlsCertFile" placeholder="/etc/ssl/certs/tidslinjal.crt"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_key_file')||'Private Key File (key.pem)'}</label>
+          <input type="text" id="secTlsKeyFile" placeholder="/etc/ssl/private/tidslinjal.key"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div style="padding:8px 10px;border-radius:var(--radius);background:rgba(255,165,0,.12);border:1px solid rgba(255,165,0,.4);font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ⚠️ ${t('security_tls_restart')||'Changes to TLS configuration require a server restart to take effect.'}
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveTLSConfig">${t('btn_save')||'Save'} TLS</button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔐 ${t('security_oidc')||'Single Sign-On (OIDC)'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_oidc_desc')||'OIDC/SSO configuration is managed in the Integrations tab. Summary of current status:'}
+        </p>
+        <div id="secOidcStatus" style="padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim)">
+          ${t('checking')||'Checking…'}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🚦 ${t('security_rate_limiting')||'Rate Limiting'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_rate_limiting_desc')||'Built-in per-IP rate limiting protects authentication endpoints against brute-force attacks.'}
+        </p>
+        <div style="font-size:var(--fs-xs);padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);line-height:1.8">
+          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_login')||'Login'}:</strong></span><span>10 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_registration')||'Registration'}:</strong></span><span>5 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
+          <div style="display:flex;justify-content:space-between"><span><strong>${t('security_password_reset')||'Password Reset'}:</strong></span><span>5 ${t('security_per_minute')||'requests / minute / IP'}</span></div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔑 ${t('security_password_policy')||'Password Policy'}</div>
+        <div id="secPasswordPolicy" style="font-size:var(--fs-xs);padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim)">
+          ${t('checking')||'Checking…'}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🛡 ${t('security_headers_title')||'Security Headers'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('security_headers_desc')||'The following security headers are automatically applied to all responses:'}
+        </p>
+        <div style="font-size:11px;padding:8px 10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);line-height:1.8;font-family:monospace">
+          <div>X-Frame-Options: <strong>DENY</strong></div>
+          <div>X-Content-Type-Options: <strong>nosniff</strong></div>
+          <div>Referrer-Policy: <strong>strict-origin-when-cross-origin</strong></div>
+          <div>Content-Security-Policy: <strong>default-src 'self'; …</strong></div>
+          <div>Permissions-Policy: <strong>camera=(), microphone=(), …</strong></div>
+          <div style="color:var(--accent)">Strict-Transport-Security: <strong>max-age=63072000</strong> (HTTPS only)</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📋 ${t('security_sessions')||'Active Sessions'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('security_sessions_desc')||'Session cookies use HttpOnly, Secure (HTTPS), and SameSite=Lax attributes for protection against XSS and CSRF.'}
+        </p>
+        <div style="font-size:var(--fs-xs);padding:6px 8px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);color:var(--text-dim)">
+          ${t('security_session_info')||'Sessions expire after inactivity. Token-based authentication with cryptographically random IDs.'}
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 ${t('security_encryption')||'Backup Encryption'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim)">
+          ${t('security_encryption_desc')||'Backups are encrypted with AES-256-GCM using PBKDF2-SHA256 key derivation (100,000 iterations). The admin password hash is used as key material.'}
+        </p>
+      </div>
+    `;
+    // Load TLS status for security tab
+    apiGet('/api/tls/status').then(tls => {
+      const el = document.getElementById('secTlsCurrentStatus');
+      if (el) {
+        el.innerHTML = tls && tls.configured
+          ? `<span style="color:#27AE60">✅ ${t('security_tls_active')||'TLS is active'}</span> — ${escHtml(tls.cert_file||'')}`
+          : `<span style="color:var(--red,#E74C3C)">❌ ${t('security_tls_inactive')||'TLS not configured'}</span> — ${t('security_tls_inactive_desc')||'HTTPS is not enabled. Configure certificate paths below or use a reverse proxy.'}`;
+        if (tls) {
+          const certInput = document.getElementById('secTlsCertFile');
+          const keyInput = document.getElementById('secTlsKeyFile');
+          if (certInput && tls.cert_file) certInput.value = tls.cert_file;
+          if (keyInput && tls.key_file) keyInput.value = tls.key_file;
+        }
+      }
+    }).catch(() => {});
+    // Load OIDC status
+    apiGet('/api/oidc/config').then(oidc => {
+      const el = document.getElementById('secOidcStatus');
+      if (el) {
+        el.innerHTML = oidc && oidc.issuer
+          ? `<span style="color:#27AE60">✅ ${t('security_oidc_active')||'OIDC configured'}</span><br>${t('security_oidc_issuer')||'Issuer'}: ${escHtml(oidc.issuer)}${oidc.exclusive_mode ? '<br><strong>' + (t('security_oidc_exclusive')||'Exclusive mode — local login disabled for non-admins') + '</strong>' : ''}`
+          : `<span style="color:var(--text-dim)">— ${t('security_oidc_not_configured')||'OIDC not configured'}</span>`;
+      }
+    }).catch(() => {});
+    // Load password policy
+    apiGet('/api/security/policy').then(policy => {
+      const el = document.getElementById('secPasswordPolicy');
+      if (el && policy) {
+        const minLen = policy.min_length || 8;
+        el.innerHTML = `
+          <div>${t('security_min_length')||'Minimum length'}: <strong>${minLen}</strong></div>
+          ${policy.require_uppercase ? `<div>✓ ${t('security_require_uppercase')||'Requires uppercase'}</div>` : ''}
+          ${policy.require_lowercase ? `<div>✓ ${t('security_require_lowercase')||'Requires lowercase'}</div>` : ''}
+          ${policy.require_numbers ? `<div>✓ ${t('security_require_numbers')||'Requires numbers'}</div>` : ''}
+          ${policy.require_symbols ? `<div>✓ ${t('security_require_symbols')||'Requires symbols'}</div>` : ''}
+        `;
+      }
+    }).catch(() => {});
+    _bindActions(el);
   } else if (tab === 'settings') {
     const p  = state.preferences;
     const ex = state.exercise || {};
@@ -4060,14 +4282,15 @@ async function openProfileModal() {
       ? `<p>Groups/Units: ${groups.map(g => `<strong>${escHtml(g.name)}</strong> (${g.role})`).join(', ')}</p>`
       : '';
     const lastLogin = u.last_login_at
-      ? `<p>Last login: ${new Date(u.last_login_at).toLocaleString()}${u.last_login_domain ? ` from <em>${escHtml(u.last_login_domain)}</em>` : u.last_login_ip ? ` from ${escHtml(u.last_login_ip)}` : ''}</p>`
+      ? `<p>${t('user_last_login')||'Last login'}: ${fmtDateTime(new Date(u.last_login_at))}${u.last_login_domain ? ` ${t('from')||'from'} <em>${escHtml(u.last_login_domain)}</em>` : u.last_login_ip ? ` ${t('from')||'from'} ${escHtml(u.last_login_ip)}` : ''}</p>`
       : '';
     const accountType = u.is_oidc
-      ? `<p>Account type: <span style="color:var(--accent)">SSO / OIDC</span></p>`
-      : `<p>Account type: Local account</p>`;
+      ? `<p>${t('user_account_type')||'Account type'}: <span style="color:var(--accent)">SSO / OIDC</span></p>`
+      : `<p>${t('user_account_type')||'Account type'}: ${t('user_local_account')||'Local account'}</p>`;
     info.innerHTML = `
-      <p>Member since: ${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</p>
-      ${u.nato_designations && u.nato_designations.length ? `<p>NATO Designations: ${u.nato_designations.join(', ')}</p>` : ''}
+      <p>${t('user_member_since')||'Member since'}: ${u.created_at ? fmtDateTime(new Date(u.created_at)) : '—'}</p>
+      <p>${t('user_login_count')||'Logins'}: ${u.login_count || 0}</p>
+      ${u.nato_designations && u.nato_designations.length ? `<p>${t('user_nato_designations')||'NATO Designations'}: ${u.nato_designations.join(', ')}</p>` : ''}
       ${groupList}
       ${lastLogin}
       ${accountType}
@@ -9365,11 +9588,20 @@ async function refreshAuditLog() {
     container.innerHTML = `<em style="color:var(--text-dim)">${t('audit_empty')||'No entries found.'}</em>`;
     return;
   }
+  const _auditActionLabels = {
+    created: t('audit_created')||'Created', updated: t('audit_updated')||'Updated',
+    deleted: t('audit_deleted')||'Deleted', status_changed: t('audit_status_changed')||'Status Changed',
+    login: t('audit_login')||'Login', login_failed: t('audit_login_failed')||'Login Failed',
+    login_blocked: t('audit_login_blocked')||'Login Blocked', reset: t('audit_reset')||'Reset',
+    verified: t('audit_verified')||'Verified', rejected: t('audit_rejected')||'Rejected',
+    blocked: t('audit_user_blocked')||'User Blocked', unblocked: t('audit_user_unblocked')||'User Unblocked',
+    acknowledged: t('audit_acknowledged')||'Acknowledged',
+  };
   container.innerHTML = `<div class="audit-list">${entries.map(e => `
     <div class="audit-item">
       <span class="audit-ts">${fmtDateTime(new Date(e.timestamp))}</span>
       <span class="audit-user">${escHtml(e.user_name)}</span>
-      <span class="audit-action audit-action-${e.action}">${escHtml(e.action)}</span>
+      <span class="audit-action audit-action-${e.action}">${escHtml(_auditActionLabels[e.action] || e.action)}</span>
       <span class="audit-summary">${escHtml(e.summary)}</span>
     </div>`).join('')}
   </div>`;

@@ -855,6 +855,7 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			fullUser.LastLoginAt = u.LastLoginAt
 			fullUser.LastLoginIP = u.LastLoginIP
 			fullUser.LastLoginDomain = u.LastLoginDomain
+			fullUser.LoginCount++
 			app.store.UpdateUser(*fullUser) //nolint
 		}
 	}(*user, loginClientIP)
@@ -5032,6 +5033,39 @@ func (app *App) routes() http.Handler {
 			app.requireRole(RoleAdmin, app.handleUnblockUser)(w, r)
 			return
 		}
+		// /api/users/:id/login-history — returns recent login audit entries for a user
+		if len(parts) == 4 && parts[3] == "login-history" && r.Method == http.MethodGet {
+			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, admin *User) {
+				pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+				if len(pathParts) < 4 {
+					jsonError(w, "missing id", http.StatusBadRequest)
+					return
+				}
+				userID, err := strconv.ParseInt(pathParts[2], 10, 64)
+				if err != nil {
+					jsonError(w, "invalid id", http.StatusBadRequest)
+					return
+				}
+				_, ok := app.store.GetUserByID(userID)
+				if !ok {
+					jsonError(w, "user not found", http.StatusNotFound)
+					return
+				}
+				allEntries := app.store.GetAudit(0) // all entries, newest first
+				var loginEntries []AuditEntry
+				for _, e := range allEntries {
+					if e.EntityType == "user" && e.EntityID == userID &&
+						(e.Action == "login" || e.Action == "login_failed" || e.Action == "login_blocked") {
+						loginEntries = append(loginEntries, e)
+						if len(loginEntries) >= 100 {
+							break
+						}
+					}
+				}
+				jsonOK(w, loginEntries)
+			})(w, r)
+			return
+		}
 		switch r.Method {
 		case http.MethodPut:
 			app.requireAuth(app.handleUpdateUser)(w, r)
@@ -8755,6 +8789,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			fullUser.LastLoginIP = u.LastLoginIP
 			fullUser.LastLoginDomain = u.LastLoginDomain
 			fullUser.IsOIDC = true
+			fullUser.LoginCount++
 			app.store.UpdateUser(*fullUser) //nolint
 		}
 	}(*user, r.RemoteAddr)
