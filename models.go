@@ -116,6 +116,7 @@ type User struct {
 	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
 	LastLoginIP     string     `json:"last_login_ip,omitempty"`
 	LastLoginDomain string     `json:"last_login_domain,omitempty"`
+	LoginCount      int        `json:"login_count"`
 	IsOIDC          bool       `json:"is_oidc,omitempty"` // true if this account was created via OIDC
 	// WebCal subscription token (unique per user, for calendar sync)
 	WebCalToken string `json:"webcal_token,omitempty"`
@@ -152,6 +153,7 @@ type UserPublic struct {
 	Telephone        string     `json:"telephone,omitempty"`
 	Cellular         string     `json:"cellular,omitempty"`
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	LoginCount  int        `json:"login_count"`
 	IsOIDC      bool       `json:"is_oidc,omitempty"`
 	Blocked          bool       `json:"blocked,omitempty"`
 	Location         string     `json:"location,omitempty"`
@@ -182,6 +184,7 @@ func (u *User) Public() UserPublic {
 		Telephone:        u.Telephone,
 		Cellular:         u.Cellular,
 		LastLoginAt: u.LastLoginAt,
+		LoginCount:  u.LoginCount,
 		IsOIDC:      u.IsOIDC,
 		Blocked:          u.Blocked,
 		Location:         u.Location,

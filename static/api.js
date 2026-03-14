@@ -56,7 +56,13 @@ async function refreshAll() {
       } else {
         renderTimeline();
       }
-      renderSidebar();
+      // Preserve sidebar filter state (audit log, logbook, etc.) across refreshes
+      // triggered by SSE events — only re-render if the current tab benefits from it.
+      const curTab = state.sidebarTab;
+      const skipTabs = new Set(['audit', 'logs']);
+      if (!skipTabs.has(curTab)) {
+        renderSidebar();
+      }
       updateSyntheticUI();
     } catch (err) {
       if (err.message !== 'offline') console.error('[refreshAll]', err);
