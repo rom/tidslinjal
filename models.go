@@ -231,7 +231,7 @@ type UserPreferences struct {
 	UserID          int64    `json:"user_id"`
 	Theme           string   `json:"theme"`           // dark | light
 	Size            string   `json:"size"`            // small | normal | large | huge
-	Language        string   `json:"language"`        // en | sv | fr
+	Language        string   `json:"language"`        // en | sv | fr | fi
 	DayStartHour    int      `json:"day_start_hour"`  // 0-23
 	DayEndHour      int      `json:"day_end_hour"`    // 1-24  (exclusive)
 	HiddenTypes     []string `json:"hidden_types"`    // event type keys to hide
@@ -246,7 +246,7 @@ type UserPreferences struct {
 	RedLineWidth    int      `json:"red_line_width,omitempty"`
 	RedLineStyle    string   `json:"red_line_style,omitempty"` // solid | dashed | dotted
 	SynthLabel      bool         `json:"synth_label"`              // show H+N label on red line
-	DateFormat      string       `json:"date_format,omitempty"`    // iso | uk | fr | sv
+	DateFormat      string       `json:"date_format,omitempty"`    // iso | uk | fr | sv | dtg
 	ExtraClocks     []ExtraClock `json:"extra_clocks,omitempty"`   // additional timezone clocks
 	ShowEventIcons  *bool        `json:"show_event_icons,omitempty"` // nil = true (default on)
 	ViewSpacing     float64      `json:"view_spacing,omitempty"`     // 1 | 1.5 | 2 — row spacing multiplier
@@ -254,6 +254,35 @@ type UserPreferences struct {
 	ShowWeekNumbers bool         `json:"show_week_numbers,omitempty"` // show week numbers on calendar
 	WeekNumberStyle string       `json:"week_number_style,omitempty"` // "iso" (1-52) or "year_week" (Y-WW)
 	PushEventChanges *bool       `json:"push_event_changes,omitempty"` // browser notifications for event changes
+	// v6.1.0 additions
+	TimeFormat         string   `json:"time_format,omitempty"`          // 24h | 12h (default: 24h)
+	HighContrast       bool     `json:"high_contrast,omitempty"`        // high-contrast accessibility overlay
+	ColorBlindMode     string   `json:"color_blind_mode,omitempty"`     // off | protanopia | deuteranopia | tritanopia
+	DefaultLandingView string   `json:"default_landing_view,omitempty"` // grid | list | log_book | decisions | map | reports
+	AutoFollowNow      *bool    `json:"auto_follow_now,omitempty"`      // auto-scroll grid to current time
+	DefaultRange       string   `json:"default_range,omitempty"`        // day|3days|week|2weeks|month — startup range
+	DefaultResolution  string   `json:"default_resolution,omitempty"`   // ten|quarter|hour|day — default slot size
+	WeekStartDay       string   `json:"week_start_day,omitempty"`       // monday | sunday (default: monday)
+	TooltipDelay       int      `json:"tooltip_delay,omitempty"`        // 0 | 200 | 500 ms hover delay
+	ConfirmDragMove    *bool    `json:"confirm_drag_move,omitempty"`    // confirm before drag-reschedule
+	DefaultEventType   string   `json:"default_event_type,omitempty"`   // per-user default event type key
+	WorkspacePresetsEnabled *bool `json:"workspace_presets_enabled,omitempty"` // enable workspace presets feature
+	WorkspacePresets   []WorkspacePreset `json:"workspace_presets,omitempty"`  // saved workspace presets
+	WelcomeURL         string   `json:"welcome_url,omitempty"`          // default welcome URL for banner
+	HelpURL            string   `json:"help_url,omitempty"`             // default help URL for banner
+}
+
+// WorkspacePreset stores a full "working posture" that can be restored with one click
+type WorkspacePreset struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	View         string `json:"view,omitempty"`         // grid | list
+	Range        string `json:"range,omitempty"`        // day|week|etc.
+	Resolution   string `json:"resolution,omitempty"`   // hour|ten|quarter|day
+	ZoomFactor   float64 `json:"zoom_factor,omitempty"`
+	HiddenLayers []int64 `json:"hidden_layers,omitempty"`
+	Filters      map[string]interface{} `json:"filters,omitempty"`
+	SidebarTab   string `json:"sidebar_tab,omitempty"`
 }
 
 // Group is a named set of users used for layer sharing
@@ -1011,4 +1040,15 @@ type ReferenceDoc struct {
 	RefType        string    `json:"ref_type,omitempty"`  // file | url | local
 	URL            string    `json:"url,omitempty"`       // URL for url-type references
 	Content        string    `json:"content,omitempty"`   // inline content for local-type references
+	// v6.1.0 additions
+	Language       string    `json:"language,omitempty"`       // language of the reference (en|sv|fr|fi|de|no|da etc.)
+	DetectedType   string    `json:"detected_type,omitempty"` // auto-detected file type (e.g. "pdf", "docx")
+	CopyMode       string    `json:"copy_mode,omitempty"`     // central | local | link
+	Owner          string    `json:"owner,omitempty"`          // document owner
+	Custodian      string    `json:"custodian,omitempty"`      // document custodian
+	ReferenceCount int       `json:"reference_count,omitempty"` // number of times referenced
+	ChecksumMD5    string    `json:"checksum_md5,omitempty"`
+	ChecksumSHA1   string    `json:"checksum_sha1,omitempty"`
+	ChecksumSHA256 string    `json:"checksum_sha256,omitempty"`
+	ChecksumSHA512 string    `json:"checksum_sha512,omitempty"`
 }

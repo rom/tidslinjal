@@ -6,8 +6,11 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
@@ -3396,8 +3399,12 @@ func (app *App) handleSaveExercise(w http.ResponseWriter, r *http.Request, user 
 
 // ── Version ────────────────────────────────────────────────────────────────────
 
+// serverStartTime records when the server process started
+var serverStartTime = time.Now()
+
 func handleVersion(w http.ResponseWriter, r *http.Request) {
-	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub})
+	uptime := time.Since(serverStartTime).Truncate(time.Second).String()
+	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "uptime": uptime, "started_at": serverStartTime.Format(time.RFC3339)})
 }
 
 // ── Integration Status ─────────────────────────────────────────────────────────
@@ -6127,12 +6134,24 @@ func (app *App) routes() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/references/bulk", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleTeamLead, app.handleBulkUploadReferences)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/api/references/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
 		// /api/references/{id}/download
 		if len(parts) == 4 && parts[3] == "download" && r.Method == http.MethodGet {
 			app.requireAuth(app.handleDownloadReference)(w, r)
+			return
+		}
+		// /api/references/{id}/checksums
+		if len(parts) == 4 && parts[3] == "checksums" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleReferenceChecksums)(w, r)
 			return
 		}
 		// /api/references/{id}
@@ -9959,6 +9978,24 @@ func (app *App) handleUploadReference(w http.ResponseWriter, r *http.Request, us
 		}
 	}
 
+	// Compute checksums for the uploaded file
+	var csumMD5, csumSHA1, csumSHA256, csumSHA512 string
+	if fdata, ferr := os.ReadFile(destPath); ferr == nil {
+		csumMD5 = fmt.Sprintf("%x", md5.Sum(fdata))
+		csumSHA1 = fmt.Sprintf("%x", sha1.Sum(fdata))
+		h256 := sha256.Sum256(fdata)
+		csumSHA256 = hex.EncodeToString(h256[:])
+		h512 := sha512.Sum512(fdata)
+		csumSHA512 = hex.EncodeToString(h512[:])
+	}
+
+	// Detect file type from extension
+	detectedType := ""
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(safeFilename)), ".")
+	if ext != "" {
+		detectedType = ext
+	}
+
 	rd := ReferenceDoc{
 		Title:          title,
 		Description:    r.FormValue("description"),
@@ -9971,6 +10008,15 @@ func (app *App) handleUploadReference(w http.ResponseWriter, r *http.Request, us
 		UploadedByName: user.DisplayName,
 		UploadedAt:     time.Now(),
 		Tags:           tags,
+		Language:       r.FormValue("language"),
+		DetectedType:   detectedType,
+		CopyMode:       r.FormValue("copy_mode"),
+		Owner:          r.FormValue("owner"),
+		Custodian:      r.FormValue("custodian"),
+		ChecksumMD5:    csumMD5,
+		ChecksumSHA1:   csumSHA1,
+		ChecksumSHA256: csumSHA256,
+		ChecksumSHA512: csumSHA512,
 	}
 
 	created, err := app.store.AddReferenceDoc(rd)
@@ -10027,6 +10073,10 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 		Description *string  `json:"description"`
 		Category    *string  `json:"category"`
 		Tags        []string `json:"tags"`
+		Language    *string  `json:"language"`
+		CopyMode   *string  `json:"copy_mode"`
+		Owner      *string  `json:"owner"`
+		Custodian  *string  `json:"custodian"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -10043,6 +10093,18 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 	}
 	if req.Tags != nil {
 		rd.Tags = req.Tags
+	}
+	if req.Language != nil {
+		rd.Language = *req.Language
+	}
+	if req.CopyMode != nil {
+		rd.CopyMode = *req.CopyMode
+	}
+	if req.Owner != nil {
+		rd.Owner = *req.Owner
+	}
+	if req.Custodian != nil {
+		rd.Custodian = *req.Custodian
 	}
 	if err := app.store.UpdateReferenceDoc(rd); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -10069,6 +10131,131 @@ func (app *App) handleDeleteReference(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleBulkUploadReferences handles uploading multiple reference files at once
+func (app *App) handleBulkUploadReferences(w http.ResponseWriter, r *http.Request, user *User) {
+	if err := r.ParseMultipartForm(200 << 20); err != nil { // 200 MB
+		jsonError(w, "files too large (max 200 MB total)", http.StatusBadRequest)
+		return
+	}
+	files := r.MultipartForm.File["files"]
+	if len(files) == 0 {
+		jsonError(w, "no files provided", http.StatusBadRequest)
+		return
+	}
+	category := r.FormValue("category")
+	if category == "" {
+		category = "other"
+	}
+	language := r.FormValue("language")
+	owner := r.FormValue("owner")
+	custodian := r.FormValue("custodian")
+
+	var results []ReferenceDoc
+	for _, header := range files {
+		file, err := header.Open()
+		if err != nil {
+			continue
+		}
+		safeFilename := filepath.Base(header.Filename)
+		if safeFilename == "." || safeFilename == "/" {
+			safeFilename = "upload"
+		}
+		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeFilename)
+		destPath := filepath.Join(app.store.ReferenceDir(), storedName)
+		dst, err := os.Create(destPath)
+		if err != nil {
+			file.Close()
+			continue
+		}
+		written, err := io.Copy(dst, file)
+		dst.Close()
+		file.Close()
+		if err != nil {
+			os.Remove(destPath)
+			continue
+		}
+		mimeType := mime.TypeByExtension(filepath.Ext(header.Filename))
+		if mimeType == "" {
+			mimeType = "application/octet-stream"
+		}
+		// Compute checksums
+		var csumMD5, csumSHA1, csumSHA256, csumSHA512 string
+		if fdata, ferr := os.ReadFile(destPath); ferr == nil {
+			csumMD5 = fmt.Sprintf("%x", md5.Sum(fdata))
+			csumSHA1 = fmt.Sprintf("%x", sha1.Sum(fdata))
+			h256 := sha256.Sum256(fdata)
+			csumSHA256 = hex.EncodeToString(h256[:])
+			h512 := sha512.Sum512(fdata)
+			csumSHA512 = hex.EncodeToString(h512[:])
+		}
+		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(safeFilename)), ".")
+		rd := ReferenceDoc{
+			Title:          safeFilename,
+			Category:       category,
+			Filename:       storedName,
+			OriginalName:   safeFilename,
+			ContentType:    mimeType,
+			Size:           written,
+			UploadedBy:     user.ID,
+			UploadedByName: user.DisplayName,
+			UploadedAt:     time.Now(),
+			Language:       language,
+			DetectedType:   ext,
+			Owner:          owner,
+			Custodian:      custodian,
+			ChecksumMD5:    csumMD5,
+			ChecksumSHA1:   csumSHA1,
+			ChecksumSHA256: csumSHA256,
+			ChecksumSHA512: csumSHA512,
+		}
+		created, err := app.store.AddReferenceDoc(rd)
+		if err != nil {
+			os.Remove(destPath)
+			continue
+		}
+		results = append(results, created)
+	}
+	jsonOK(w, map[string]any{"uploaded": len(results), "references": results})
+}
+
+// handleReferenceChecksums returns checksums for a specific reference
+func (app *App) handleReferenceChecksums(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 3 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rd, ok := app.store.GetReferenceDoc(id)
+	if !ok {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// If checksums are missing, compute them now
+	if rd.ChecksumMD5 == "" {
+		filePath := filepath.Join(app.store.ReferenceDir(), rd.Filename)
+		if fdata, ferr := os.ReadFile(filePath); ferr == nil {
+			rd.ChecksumMD5 = fmt.Sprintf("%x", md5.Sum(fdata))
+			rd.ChecksumSHA1 = fmt.Sprintf("%x", sha1.Sum(fdata))
+			h256 := sha256.Sum256(fdata)
+			rd.ChecksumSHA256 = hex.EncodeToString(h256[:])
+			h512 := sha512.Sum512(fdata)
+			rd.ChecksumSHA512 = hex.EncodeToString(h512[:])
+			_ = app.store.UpdateReferenceDoc(rd)
+		}
+	}
+	jsonOK(w, map[string]string{
+		"md5":    rd.ChecksumMD5,
+		"sha1":   rd.ChecksumSHA1,
+		"sha256": rd.ChecksumSHA256,
+		"sha512": rd.ChecksumSHA512,
+	})
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────

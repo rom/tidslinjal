@@ -210,7 +210,8 @@ function renderTimeline() {
     }
     // Week number
     let weekHtml = '';
-    if (state.preferences.show_week_numbers && day.getDay() === 1) {
+    const weekStartDow = state.preferences?.week_start_day === 'sunday' ? 0 : 1;
+    if (state.preferences.show_week_numbers && day.getDay() === weekStartDow) {
       const d = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
       d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
       const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -886,6 +887,13 @@ function setupDragToReschedule() {
     if (isEventLocked(ev)) {
       showError('This event is in a locked time slot and cannot be moved.');
       dragEvId = null; dragOrigEl = null; return;
+    }
+
+    // Confirm drag-move if user preference is set
+    if (state.preferences?.confirm_drag_move) {
+      if (!confirm(t('confirm_drag_move_prompt') || 'Move this event to the new time?')) {
+        dragEvId = null; dragOrigEl = null; return;
+      }
     }
 
     // Check if this event is part of a multi-selection
