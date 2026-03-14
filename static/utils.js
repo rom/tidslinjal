@@ -45,15 +45,22 @@ function fmtDTG(d) {
   return `${dd}${hh}${mm}Z${mon}${yy}`;
 }
 
+function _getTimeSeparator() {
+  return (state?.preferences?.time_separator === 'dot') ? '.' : ':';
+}
+function _applyTimeSep(str) {
+  if (_getTimeSeparator() === '.') return str.replace(/:/g, '.');
+  return str;
+}
 function fmtTime(d) {
   const fmt = state?.preferences?.date_format;
   if (fmt === 'dtg') return fmtDTG(d).slice(2, 7) + 'Z';
-  return d.toLocaleTimeString(getLocale(), {hour:'2-digit', minute:'2-digit', hour12:_is12h()});
+  return _applyTimeSep(d.toLocaleTimeString(getLocale(), {hour:'2-digit', minute:'2-digit', hour12:_is12h()}));
 }
 function fmtDateTime(d) {
   const fmt = state?.preferences?.date_format;
   if (fmt === 'dtg') return fmtDTG(d);
-  return d.toLocaleString(getLocale(), {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:_is12h()});
+  return _applyTimeSep(d.toLocaleString(getLocale(), {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:_is12h()}));
 }
 function fmtFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -291,7 +298,14 @@ function updateClock() {
     } else {
       h = now.getHours(); m = now.getMinutes(); s = now.getSeconds();
       dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-      timeStr = `${pad(h)}:${pad(m)}:${pad(s)}`;
+      const timeSep = (state?.preferences?.time_separator === 'dot') ? '.' : ':';
+      if (_is12h()) {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        timeStr = `${pad(h12)}${timeSep}${pad(m)}${timeSep}${pad(s)} ${ampm}`;
+      } else {
+        timeStr = `${pad(h)}${timeSep}${pad(m)}${timeSep}${pad(s)}`;
+      }
       // Show short timezone name
       try {
         tzLabel = now.toLocaleTimeString(getLocale(), {timeZoneName:'short'}).split(' ').pop();

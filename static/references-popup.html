@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — References</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<style>
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; --red:#e74c3c; --green:#27ae60; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; --red:#c0392b; --green:#27ae60; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; --red:#e05252; --green:#27ae60; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; --red:#e05252; --green:#27ae60; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; display:flex; flex-direction:column; }
+.top-bar { display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+.top-bar .title { font-size:13px; font-weight:700; color:var(--accent); letter-spacing:.05em; flex:1; }
+.top-bar button { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:4px 12px; cursor:pointer; font-size:12px; }
+.top-bar button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.top-bar input, .top-bar select { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:4px 8px; font-size:12px; }
+.ref-content { flex:1; overflow-y:auto; padding:12px; }
+.ref-card { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:10px; margin-bottom:6px; }
+.ref-card:hover { border-color:var(--accent); }
+.ref-tag { display:inline-block; padding:1px 5px; border-radius:3px; font-size:9px; background:var(--bg2); border:1px solid var(--border); margin-right:3px; }
+.ref-cat { display:inline-block; padding:1px 6px; border-radius:3px; font-size:9px; color:#fff; text-transform:uppercase; margin-right:6px; }
+.btn { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:3px 8px; font-size:11px; cursor:pointer; }
+.btn:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.ref-empty { text-align:center; padding:32px 16px; color:var(--text-dim); font-size:13px; }
+.ref-git-bar { display:flex; gap:6px; padding:6px 12px; background:var(--bg2); border-bottom:1px solid var(--border); align-items:center; font-size:11px; }
+</style>
+</head>
+<body class="theme-dark">
+<div class="top-bar">
+  <span class="title" id="refTitle">📚 References</span>
+  <input type="text" id="refSearch" placeholder="Search..." style="width:160px">
+  <select id="refCatFilter">
+    <option value="">All categories</option>
+    <option value="handbook">Handbook</option>
+    <option value="sop">SOP</option>
+    <option value="policy">Policy</option>
+    <option value="map">Map</option>
+    <option value="reference">Reference</option>
+    <option value="checklist">Checklist</option>
+    <option value="faq">FAQ</option>
+    <option value="objectives">Objectives</option>
+    <option value="other">Other</option>
+  </select>
+  <button id="btnRefresh">🔄 Refresh</button>
+</div>
+<div id="gitBar" class="ref-git-bar" style="display:none">
+  <span>GitHub:</span>
+  <button id="btnGitSave" class="btn">💾 Save to Git</button>
+  <button id="btnGitLoad" class="btn">📥 Load from Git</button>
+  <span id="gitStatus" style="color:var(--text-dim);margin-left:auto"></span>
+</div>
+<div class="ref-content" id="refContent"></div>
+<script>
+'use strict';
+const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+let references = [];
+let gitEnabled = false;
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function getOpener() {
+  try { return window.opener && !window.opener.closed ? window.opener : null; } catch(e) { return null; }
+}
+
+function syncTheme() {
+  try {
+    const t = window.opener?.state?.preferences?.theme || 'dark';
+    document.body.className = 'theme-' + t;
+  } catch(e) {}
+}
+
+// BroadcastChannel for theme sync
+try {
+  var _refBC = new BroadcastChannel('tidslinjal-sync');
+  _refBC.onmessage = function(e) {
+    if (e.data && e.data.type === 'theme') {
+      document.body.className = 'theme-' + (e.data.theme || 'dark');
+    }
+  };
+} catch(e) {}
+
+async function loadReferences() {
+  try {
+    const res = await fetch('/api/references');
+    if (res.ok) references = await res.json() || [];
+  } catch { references = []; }
+  render();
+}
+
+async function checkGitIntegration() {
+  try {
+    const res = await fetch('/api/status');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.github_enabled) {
+        gitEnabled = true;
+        document.getElementById('gitBar').style.display = '';
+      }
+    }
+  } catch {}
+}
+
+async function gitSaveRefs() {
+  const btn = document.getElementById('btnGitSave');
+  btn.textContent = '⏳ Saving...';
+  try {
+    const res = await fetch('/api/references/git/save', { method: 'POST' });
+    if (res.ok) {
+      document.getElementById('gitStatus').textContent = '✓ Saved at ' + new Date().toLocaleTimeString();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      document.getElementById('gitStatus').textContent = '✗ ' + (err.error || 'Save failed');
+    }
+  } catch(e) {
+    document.getElementById('gitStatus').textContent = '✗ Error: ' + e.message;
+  }
+  btn.textContent = '💾 Save to Git';
+}
+
+async function gitLoadRefs() {
+  const btn = document.getElementById('btnGitLoad');
+  btn.textContent = '⏳ Loading...';
+  try {
+    const res = await fetch('/api/references/git/load', { method: 'POST' });
+    if (res.ok) {
+      document.getElementById('gitStatus').textContent = '✓ Loaded at ' + new Date().toLocaleTimeString();
+      await loadReferences();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      document.getElementById('gitStatus').textContent = '✗ ' + (err.error || 'Load failed');
+    }
+  } catch(e) {
+    document.getElementById('gitStatus').textContent = '✗ Error: ' + e.message;
+  }
+  btn.textContent = '📥 Load from Git';
+}
+
+function render() {
+  const el = document.getElementById('refContent');
+  const search = (document.getElementById('refSearch')?.value || '').toLowerCase();
+  const cat = document.getElementById('refCatFilter')?.value || '';
+  const filtered = references.filter(r => {
+    if (cat && r.category !== cat) return false;
+    if (search && !(r.title + ' ' + (r.description || '') + ' ' + (r.tags || []).join(' ')).toLowerCase().includes(search)) return false;
+    return true;
+  });
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="ref-empty">No references found.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(r => {
+    const sizeStr = r.size ? (r.size < 1024 ? r.size + ' B' : r.size < 1048576 ? (r.size/1024).toFixed(1) + ' KB' : (r.size/1048576).toFixed(1) + ' MB') : '';
+    const dateStr = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString() : '';
+    return `<div class="ref-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span class="ref-cat" style="background:${catColors[r.category] || '#95A5A6'}">${escHtml(r.category || 'other')}</span>
+          <b>${escHtml(r.title)}</b>
+        </div>
+        <div style="display:flex;gap:4px">
+          ${r.ref_type === 'url' ? `<a href="${escHtml(r.url || '')}" target="_blank" rel="noopener" class="btn">🔗 Open</a>` :
+            `<a href="/api/references/${r.id}/download" target="_blank" class="btn">⬇ Download</a>`}
+        </div>
+      </div>
+      ${r.description ? `<div style="font-size:12px;color:var(--text-dim);margin-top:4px">${escHtml(r.description)}</div>` : ''}
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">
+        ${escHtml(r.original_name || '')} ${sizeStr} · Owner: ${escHtml(r.owner || r.uploaded_by_name || '—')} · Added: ${dateStr}
+      </div>
+      ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(tg => `<span class="ref-tag">${escHtml(tg)}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Events
+document.getElementById('btnRefresh').addEventListener('click', loadReferences);
+document.getElementById('refSearch').addEventListener('input', render);
+document.getElementById('refCatFilter').addEventListener('change', render);
+document.getElementById('btnGitSave').addEventListener('click', gitSaveRefs);
+document.getElementById('btnGitLoad').addEventListener('click', gitLoadRefs);
+
+// Theme sync
+syncTheme();
+setInterval(syncTheme, 3000);
+
+// Init
+loadReferences();
+checkGitIntegration();
+setInterval(loadReferences, 30000);
+</script>
+</body>
+</html>

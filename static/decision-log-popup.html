@@ -251,12 +251,41 @@ async function initFromAPI() {
     const me = await res.json();
     userRole = me.role || '';
     userId = me.id || 0;
-    // Fetch groups
-    try { const r = await fetch('/api/groups'); if (r.ok) groups = await r.json() || []; } catch {}
-    // Fetch users
-    try { const r = await fetch('/api/users'); if (r.ok) users = await r.json() || []; } catch {}
+    // Fetch groups, users, and preferences in parallel
+    const [grpRes, usrRes, prefRes] = await Promise.all([
+      fetch('/api/groups').catch(() => null),
+      fetch('/api/users').catch(() => null),
+      fetch('/api/preferences').catch(() => null),
+    ]);
+    if (grpRes && grpRes.ok) groups = await grpRes.json() || [];
+    if (usrRes && usrRes.ok) users = await usrRes.json() || [];
+    // Load preferences for theme
+    if (prefRes && prefRes.ok) {
+      const prefs = await prefRes.json();
+      if (prefs) {
+        const theme = prefs.theme || 'dark';
+        document.body.className = 'theme-' + theme;
+        // Load i18n if available globally (loaded via script tag)
+        const lang = prefs.language || 'en';
+        if (typeof TRANSLATIONS !== 'undefined') {
+          _t = TRANSLATIONS[lang] || TRANSLATIONS.en || {};
+        }
+      }
+    }
     return true;
   } catch { return false; }
+}
+
+// Dynamically load i18n.js so translations work even without opener
+function _loadI18nScript() {
+  return new Promise(function(resolve) {
+    if (typeof TRANSLATIONS !== 'undefined') { resolve(); return; }
+    var s = document.createElement('script');
+    s.src = '/static/i18n.js';
+    s.onload = resolve;
+    s.onerror = resolve;
+    document.head.appendChild(s);
+  });
 }
 
 function applyI18n() {
@@ -376,6 +405,8 @@ setInterval(function() {
 (async () => {
   var gotOpener = initFromOpener();
   if (!gotOpener) {
+    // Load i18n script so translations work without opener
+    await _loadI18nScript();
     await initFromAPI();
   } else if (!userRole) {
     // Opener was available but role wasn't set — fetch from API too

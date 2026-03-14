@@ -373,8 +373,9 @@ async function init() {
     setTimeout(() => { window.open('/map', 'tidslinjal-map', 'width=1200,height=800,resizable=yes'); }, 200);
   }
 
-  // Welcome banner for first-time users
-  if (!localStorage.getItem('tidslinjal_welcomed')) {
+  // Welcome banner — show if never dismissed OR if user has "show on login" enabled (default=true)
+  const _showOnLogin = localStorage.getItem('tidslinjal_show_welcome');
+  if (_showOnLogin === null || _showOnLogin === '1') {
     _showWelcomeBanner();
   }
 
@@ -404,21 +405,34 @@ function _showWelcomeBanner() {
   const p = state.preferences || {};
   const welcomeURL = p.welcome_url || '';
   const helpURL = p.help_url || '';
+  const trainingURL = p.training_url || '';
+  const demoURL = p.demo_url || '';
+  const urlLinks = [
+    welcomeURL  ? `<a href="${escHtml(welcomeURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🏠 ${t('settings_welcome_url')||'Welcome'}</a>` : '',
+    helpURL     ? `<a href="${escHtml(helpURL)}" target="_blank" rel="noopener" style="color:var(--accent)">📖 ${t('settings_help_url')||'Help'}</a>` : '',
+    trainingURL ? `<a href="${escHtml(trainingURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🎓 ${t('settings_training_url')||'Training'}</a>` : '',
+    demoURL     ? `<a href="${escHtml(demoURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🎬 ${t('settings_demo_url')||'Demo'}</a>` : '',
+  ].filter(Boolean);
   overlay.innerHTML = `
     <div class="modal" style="max-width:520px;padding:32px;text-align:center">
       <h2 style="font-size:var(--fs-xl);margin-bottom:8px;color:var(--text-bright)">${t('welcome_title')}</h2>
       <p style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6">${t('welcome_text')}</p>
-      ${welcomeURL ? `<p style="margin-bottom:8px"><a href="${escHtml(welcomeURL)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(welcomeURL)}</a></p>` : ''}
-      ${helpURL ? `<p style="margin-bottom:16px"><a href="${escHtml(helpURL)}" target="_blank" rel="noopener" style="color:var(--accent)">📖 ${t('settings_help_url')}</a></p>` : ''}
+      ${urlLinks.length ? `<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px">${urlLinks.join('')}</div>` : ''}
+      <label style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:16px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
+        <input type="checkbox" id="welcomeShowOnLogin" checked style="accent-color:var(--accent)">
+        ${t('welcome_show_on_login')||'Show this window when logging in'}
+      </label>
       <button class="btn btn-primary" id="welcomeDismissBtn">${t('welcome_dismiss')}</button>
     </div>
   `;
   document.body.appendChild(overlay);
-  overlay.querySelector('#welcomeDismissBtn').addEventListener('click', () => {
-    localStorage.setItem('tidslinjal_welcomed', '1');
+  const dismissWelcome = () => {
+    const showOnLogin = overlay.querySelector('#welcomeShowOnLogin')?.checked;
+    localStorage.setItem('tidslinjal_show_welcome', showOnLogin ? '1' : '0');
     overlay.remove();
-  });
-  overlay.addEventListener('click', e => { if (e.target === overlay) { localStorage.setItem('tidslinjal_welcomed', '1'); overlay.remove(); } });
+  };
+  overlay.querySelector('#welcomeDismissBtn').addEventListener('click', dismissWelcome);
+  overlay.addEventListener('click', e => { if (e.target === overlay) dismissWelcome(); });
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -465,7 +479,7 @@ function toggleListView() {
       (state.eventTypes || []).forEach(et => {
         const opt = document.createElement('option');
         opt.value = et.key;
-        const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
+        const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : lang==='da'&&et.label_da ? et.label_da : lang==='fi'&&et.label_fi ? et.label_fi : et.label;
         const ico = et.icon || _listTypeIcons[et.key] || '';
         opt.textContent = (ico ? ico + ' ' : '') + lbl;
         typeEl.appendChild(opt);
@@ -564,13 +578,15 @@ function renderListView() {
   const now = typeof getNow === 'function' ? getNow() : new Date();
   let redLineInserted = false;
 
+  let _seqNum = 0;
   tbody.innerHTML = events.map(ev => {
+    _seqNum++;
     let marker = '';
     if (redLineEnabled && !redLineInserted && _listSortKey === 'start_time') {
       const evTime = new Date(ev.start_time);
       if ((_listSortAsc && evTime > now) || (!_listSortAsc && evTime < now)) {
         redLineInserted = true;
-        marker = `<tr class="list-red-line"><td colspan="7" style="padding:0;position:relative;height:2px;background:${redLineColor}">
+        marker = `<tr class="list-red-line"><td colspan="8" style="padding:0;position:relative;height:2px;background:${redLineColor}">
           <span style="position:absolute;left:8px;top:-8px;font-size:9px;color:${redLineColor};background:var(--bg2);padding:0 4px">▶ ${t('lv_now')}</span>
         </td></tr>`;
       }
@@ -605,6 +621,7 @@ function renderListView() {
     const _evColor = ev.color || (_etMatch ? _etMatch.color : 'var(--accent)');
     return marker + `
     <tr data-ev-row="${ev.id}" style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
+      <td style="padding:8px 10px;text-align:center;color:var(--text-dim);font-size:var(--fs-xs);width:40px">${_seqNum}</td>
       <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${_evColor};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
