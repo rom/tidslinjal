@@ -163,6 +163,43 @@ body.size-huge {
   --time-col-w:     80px;
 }
 
+/* ── High-contrast mode (layered on top of any theme) ────────────────────── */
+body.high-contrast {
+  --border:     #ffffff;
+  --text:       #ffffff;
+  --text-dim:   #cccccc;
+  --text-bright:#ffffff;
+}
+body.high-contrast .tl-cell { border-color: rgba(255,255,255,.3) !important; }
+body.high-contrast .tl-row-current { background: rgba(255,255,0,.12) !important; }
+body.high-contrast .event-block { border: 2px solid #fff !important; font-weight: 700; }
+body.high-contrast .event-block.selected { outline: 3px solid #ffff00 !important; }
+body.high-contrast .phase-band { border: 2px solid rgba(255,255,255,.5) !important; }
+body.high-contrast .tl-cell.locked { background: repeating-linear-gradient(45deg,rgba(255,0,0,.15),rgba(255,0,0,.15) 4px,transparent 4px,transparent 10px) !important; }
+body.high-contrast .sidebar-section-title { font-weight: 800; text-decoration: underline; }
+/* Light theme high-contrast overrides */
+body.light-mode.high-contrast {
+  --border:     #000000;
+  --text:       #000000;
+  --text-dim:   #333333;
+  --text-bright:#000000;
+}
+body.light-mode.high-contrast .tl-cell { border-color: rgba(0,0,0,.4) !important; }
+body.light-mode.high-contrast .event-block { border: 2px solid #000 !important; }
+body.light-mode.high-contrast .event-block.selected { outline: 3px solid #0000ff !important; }
+
+/* ── Color-blind safe palettes ───────────────────────────────────────────── */
+/* Protanopia: reds/greens replaced with blue/orange scale */
+body.cb-protanopia { --red: #D55E00; --green: #009E73; --orange: #E69F00; --accent: #0072B2; --purple: #CC79A7; --teal: #56B4E9; }
+/* Deuteranopia: similar to protanopia (most common) */
+body.cb-deuteranopia { --red: #D55E00; --green: #009E73; --orange: #E69F00; --accent: #0072B2; --purple: #CC79A7; --teal: #56B4E9; }
+/* Tritanopia: blue/yellow confusion — use red/green scale */
+body.cb-tritanopia { --red: #E74C3C; --green: #2ECC71; --orange: #D55E00; --accent: #CC79A7; --purple: #009E73; --teal: #E69F00; }
+
+/* ── Tooltip delay variable ──────────────────────────────────────────────── */
+:root { --tooltip-delay: 0ms; }
+.event-block [title] { transition-delay: var(--tooltip-delay); }
+
 html, body {
   height: 100%;
   font-family: 'Segoe UI', system-ui, sans-serif;

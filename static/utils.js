@@ -28,11 +28,32 @@ function fmtDateInput(d) {
   const pad = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+function _is12h() {
+  return state && state.preferences && state.preferences.time_format === '12h';
+}
+
+// Format a date as DTG: DDHHMMZmmmYY (e.g. "141830ZMAR26")
+function fmtDTG(d) {
+  if (!d) return '';
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const pad = n => String(n).padStart(2,'0');
+  const dd = pad(d.getUTCDate());
+  const hh = pad(d.getUTCHours());
+  const mm = pad(d.getUTCMinutes());
+  const mon = months[d.getUTCMonth()];
+  const yy = String(d.getUTCFullYear()).slice(-2);
+  return `${dd}${hh}${mm}Z${mon}${yy}`;
+}
+
 function fmtTime(d) {
-  return d.toLocaleTimeString(getLocale(), {hour:'2-digit', minute:'2-digit', hour12:false});
+  const fmt = state?.preferences?.date_format;
+  if (fmt === 'dtg') return fmtDTG(d).slice(2, 7) + 'Z';
+  return d.toLocaleTimeString(getLocale(), {hour:'2-digit', minute:'2-digit', hour12:_is12h()});
 }
 function fmtDateTime(d) {
-  return d.toLocaleString(getLocale(), {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false});
+  const fmt = state?.preferences?.date_format;
+  if (fmt === 'dtg') return fmtDTG(d);
+  return d.toLocaleString(getLocale(), {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:_is12h()});
 }
 function fmtFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -131,14 +152,22 @@ function isOutOfHours(slotIdx) {
   const endH    = (state.preferences.day_end_hour   || 24) * 60;
   return min < startH || min >= endH;
 }
+function _fmt24or12(h, m) {
+  if (_is12h()) {
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+  }
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
 function slotLabel(slotIdx) {
   if (state.resolution === 'day') return '';
   const minutes = slotIdx * getSlotMinutes();
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
-  if (state.resolution === 'hour') return `${String(h).padStart(2,'0')}:00`;
-  if (m === 0) return `${String(h).padStart(2,'0')}:00`;
-  if (state.resolution === 'quarter' && m === 30) return `${String(h).padStart(2,'0')}:30`;
+  if (state.resolution === 'hour') return _fmt24or12(h, 0);
+  if (m === 0) return _fmt24or12(h, 0);
+  if (state.resolution === 'quarter' && m === 30) return _fmt24or12(h, 30);
   return '';
 }
 function isCurrentSlot(s, e) {

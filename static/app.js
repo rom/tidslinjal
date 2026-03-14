@@ -124,8 +124,8 @@ async function init() {
 
   applyPreferences();
 
-  state.resolution = 'hour';
-  state.range      = state.preferences.default_view || 'week';
+  state.resolution = state.preferences.default_resolution || 'hour';
+  state.range      = state.preferences.default_range || state.preferences.default_view || 'week';
   document.getElementById('rangeSelect').value      = state.range;
   document.getElementById('resolutionSelect').value = state.resolution;
 
@@ -353,6 +353,31 @@ async function init() {
     renderTimeline();
   });
 
+  // Apply default landing view
+  const landingView = state.preferences.default_landing_view || 'grid';
+  if (landingView === 'list' && !_listViewActive) {
+    setTimeout(() => toggleListView(), 50);
+  } else if (landingView === 'log_book') {
+    state.sidebarTab = 'log_book';
+    document.querySelectorAll('.sidebar-tab').forEach(t2 => t2.classList.remove('active'));
+    const lbTab = document.querySelector('.sidebar-tab[data-tab="log_book"]');
+    if (lbTab) lbTab.classList.add('active');
+    renderSidebar();
+  } else if (landingView === 'decisions') {
+    state.sidebarTab = 'decision_log';
+    document.querySelectorAll('.sidebar-tab').forEach(t2 => t2.classList.remove('active'));
+    const dlTab = document.querySelector('.sidebar-tab[data-tab="decision_log"]');
+    if (dlTab) dlTab.classList.add('active');
+    renderSidebar();
+  } else if (landingView === 'map') {
+    setTimeout(() => { window.open('/map', 'tidslinjal-map', 'width=1200,height=800,resizable=yes'); }, 200);
+  }
+
+  // Welcome banner for first-time users
+  if (!localStorage.getItem('tidslinjal_welcomed')) {
+    _showWelcomeBanner();
+  }
+
   // Scroll to current time or day start
   setTimeout(() => {
     const now    = new Date();
@@ -362,6 +387,38 @@ async function init() {
     if (nowMin >= startH && nowMin < endH) scrollToNow();
     else scrollToDayStart();
   }, 200);
+
+  // Auto-follow "Now" — periodically scroll to current time
+  if (state.preferences.auto_follow_now) {
+    state._autoFollowInterval = setInterval(() => {
+      if (state.preferences.auto_follow_now && !_listViewActive) scrollToNow();
+    }, 60000);
+  }
+}
+
+// Welcome banner for first login
+function _showWelcomeBanner() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '9999';
+  const p = state.preferences || {};
+  const welcomeURL = p.welcome_url || '';
+  const helpURL = p.help_url || '';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:520px;padding:32px;text-align:center">
+      <h2 style="font-size:var(--fs-xl);margin-bottom:8px;color:var(--text-bright)">${t('welcome_title')}</h2>
+      <p style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6">${t('welcome_text')}</p>
+      ${welcomeURL ? `<p style="margin-bottom:8px"><a href="${escHtml(welcomeURL)}" target="_blank" rel="noopener" style="color:var(--accent)">${escHtml(welcomeURL)}</a></p>` : ''}
+      ${helpURL ? `<p style="margin-bottom:16px"><a href="${escHtml(helpURL)}" target="_blank" rel="noopener" style="color:var(--accent)">📖 ${t('settings_help_url')}</a></p>` : ''}
+      <button class="btn btn-primary" id="welcomeDismissBtn">${t('welcome_dismiss')}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#welcomeDismissBtn').addEventListener('click', () => {
+    localStorage.setItem('tidslinjal_welcomed', '1');
+    overlay.remove();
+  });
+  overlay.addEventListener('click', e => { if (e.target === overlay) { localStorage.setItem('tidslinjal_welcomed', '1'); overlay.remove(); } });
 }
 
 document.addEventListener('DOMContentLoaded', init);

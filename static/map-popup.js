@@ -776,7 +776,55 @@ document.getElementById('btnDrawRect').addEventListener('click', () => _setDrawM
 document.getElementById('btnDrawCircle').addEventListener('click', () => _setDrawMode(_drawMode === 'circle' ? null : 'circle'));
 document.getElementById('btnDrawHighlight').addEventListener('click', () => _setDrawMode(_drawMode === 'highlight' ? null : 'highlight'));
 document.getElementById('btnDropNeedle').addEventListener('click', () => _setDrawMode(_drawMode === 'needle' ? null : 'needle'));
-document.getElementById('btnDropSymbol').addEventListener('click', () => _setDrawMode(_drawMode === 'symbol' ? null : 'symbol'));
+document.getElementById('btnDropSymbol').addEventListener('click', () => {
+  const newMode = _drawMode === 'symbol' ? null : 'symbol';
+  _setDrawMode(newMode);
+  _showDrawSymbolPicker(newMode === 'symbol');
+});
+
+// Floating symbol picker for the draw-symbol mode
+function _showDrawSymbolPicker(show) {
+  let picker = document.getElementById('drawSymbolPicker');
+  if (!show) { if (picker) picker.style.display = 'none'; return; }
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.id = 'drawSymbolPicker';
+    picker.style.cssText = 'position:fixed;top:60px;right:10px;width:240px;max-height:320px;overflow-y:auto;background:var(--bg2,#1e2d40);border:1px solid var(--border,#2a3f56);border-radius:6px;padding:8px;z-index:2000;box-shadow:0 4px 12px rgba(0,0,0,.4)';
+    // Build symbol grid from all sets
+    let html = '<div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text-bright,#fff)">Pick a symbol</div>';
+    html += '<input id="drawSymbolSearch" placeholder="Search..." style="width:100%;margin-bottom:6px;padding:4px 6px;background:var(--bg3,#333);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">';
+    html += '<div id="drawSymbolGrid" style="display:flex;flex-wrap:wrap;gap:2px">';
+    const allSymbols = [];
+    Object.values(MAP_SYMBOL_SETS).forEach(set => {
+      set.symbols.forEach(s => {
+        if (!allSymbols.find(x => x.icon === s.icon)) allSymbols.push(s);
+      });
+    });
+    allSymbols.forEach(s => {
+      html += `<button type="button" class="draw-sym-btn" data-sym="${s.icon}" title="${s.label}" style="width:28px;height:28px;font-size:16px;border:1px solid var(--border);border-radius:3px;background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">${s.icon}</button>`;
+    });
+    html += '</div>';
+    picker.innerHTML = html;
+    document.body.appendChild(picker);
+    // Click handlers
+    picker.addEventListener('click', function(e) {
+      const btn = e.target.closest('.draw-sym-btn');
+      if (!btn) return;
+      _drawSymbolIcon = btn.dataset.sym;
+      picker.querySelectorAll('.draw-sym-btn').forEach(b => b.style.outline = '');
+      btn.style.outline = '2px solid var(--accent)';
+    });
+    // Search filter
+    picker.querySelector('#drawSymbolSearch').addEventListener('input', function() {
+      const q = this.value.toLowerCase();
+      picker.querySelectorAll('.draw-sym-btn').forEach(b => {
+        b.style.display = (!q || b.title.toLowerCase().includes(q) || b.dataset.sym.includes(q)) ? '' : 'none';
+      });
+    });
+  }
+  picker.style.display = '';
+}
+var _drawSymbolIcon = '📍';
 document.getElementById('btnDrawErase').addEventListener('click', () => _setDrawMode(_drawMode === 'erase' ? null : 'erase'));
 document.getElementById('btnDrawOff').addEventListener('click', () => _setDrawMode(null));
 document.getElementById('drawColor').addEventListener('input', function() { _drawColor = this.value; });
@@ -821,7 +869,7 @@ function _initDrawEvents() {
       _saveDrawings();
     }
     if (_drawMode === 'symbol') {
-      const symIcon = document.getElementById('itemIcon')?.value || '📍';
+      const symIcon = _drawSymbolIcon || document.getElementById('itemIcon')?.value || '📍';
       const marker = L.marker(e.latlng, {
         icon: L.divIcon({
           className: 'draw-symbol',

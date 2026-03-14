@@ -130,9 +130,17 @@ function applyPreferences() {
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');
   if (state.preferences.hover_zoom_enabled !== false) body.classList.add('hover-zoom-enabled');
+  // High contrast mode (separate from theme)
+  if (state.preferences.high_contrast) body.classList.add('high-contrast');
+  // Color-blind safe palette
+  const cbMode = state.preferences.color_blind_mode || 'off';
+  if (cbMode !== 'off') body.classList.add('cb-' + cbMode);
   // Apply view spacing
   const spacing = state.preferences.view_spacing || 1;
   document.documentElement.style.setProperty('--view-spacing', spacing);
+  // Apply tooltip delay
+  const ttDelay = state.preferences.tooltip_delay || 0;
+  document.documentElement.style.setProperty('--tooltip-delay', ttDelay + 'ms');
   updateLangFlags();
   // Broadcast theme to detached windows
   if (typeof _broadcastSync === 'function') {
@@ -2287,6 +2295,8 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_synth_time')||'Synthetic time'}:</span><span>${isSynthActive ? '✓ On' : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_uptime')||'Server Uptime'}:</span><span>${vInfo.uptime || '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_started_at')||'Started'}:</span><span>${vInfo.started_at ? new Date(vInfo.started_at).toLocaleString(getLocale()) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${navigator.onLine ? '<span style="color:#22c55e">● Online</span>' : '<span style="color:var(--red,#E74C3C)">● Offline</span>'}</span>
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
@@ -3611,13 +3621,14 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='en'?' active':''}" data-action="setPref" data-args='["language","en"]' >EN</button>
           <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' >SV</button>
           <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' >FR</button>
+          <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' >FI</button>
         </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
-          ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV']].map(([v,l]) =>
-            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" data-action="setPref" data-args='["date_format","${v}"]' >${l}</button>`
+          ${[['iso','ISO 8601'],['uk','UK'],['fr','FR'],['sv','SV'],['dtg','DTG']].map(([v,l]) =>
+            `<button class="toggle-btn${(p.date_format||'iso')===v?' active':''}" data-action="setPref" data-args='["date_format","${v}"]' title="${v==='dtg'?'Date-Time Group (DDHHMMZmmmYY)':''}">${l}</button>`
           ).join('')}
         </div>
         <div class="hour-range" style="margin-top:10px">
@@ -3658,6 +3669,131 @@ function renderSidebar() {
             }
           </div>
         </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_time_format')||'Time Format'}</div>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.time_format||'24h')==='24h'?' active':''}" data-action="setPref" data-args='["time_format","24h"]'>${t('time_format_24h')}</button>
+          <button class="toggle-btn${p.time_format==='12h'?' active':''}" data-action="setPref" data-args='["time_format","12h"]'>${t('time_format_12h')}</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_week_start')||'Week Starts On'}</div>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.week_start_day||'monday')==='monday'?' active':''}" data-action="setPref" data-args='["week_start_day","monday"]'>${t('week_start_monday')}</button>
+          <button class="toggle-btn${p.week_start_day==='sunday'?' active':''}" data-action="setPref" data-args='["week_start_day","sunday"]'>${t('week_start_sunday')}</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_high_contrast')||'High Contrast'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_high_contrast_desc')}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.high_contrast?'checked':''} data-action="setPref" data-event="change" data-pref-checked="high_contrast"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_high_contrast')||'High Contrast'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_color_blind')||'Color-blind Safe Palette'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_color_blind_desc')}</p>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          <button class="toggle-btn${(p.color_blind_mode||'off')==='off'?' active':''}" data-action="setPref" data-args='["color_blind_mode","off"]'>${t('cb_off')}</button>
+          <button class="toggle-btn${p.color_blind_mode==='protanopia'?' active':''}" data-action="setPref" data-args='["color_blind_mode","protanopia"]'>${t('cb_protanopia')}</button>
+          <button class="toggle-btn${p.color_blind_mode==='deuteranopia'?' active':''}" data-action="setPref" data-args='["color_blind_mode","deuteranopia"]'>${t('cb_deuteranopia')}</button>
+          <button class="toggle-btn${p.color_blind_mode==='tritanopia'?' active':''}" data-action="setPref" data-args='["color_blind_mode","tritanopia"]'>${t('cb_tritanopia')}</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_landing_view')||'Default Landing View'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_landing_view_desc')}</p>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${['grid','list','log_book','decisions','map','reports'].map(v =>
+            `<button class="toggle-btn${(p.default_landing_view||'grid')===v?' active':''}" data-action="setPref" data-args='["default_landing_view","${v}"]'>${t('landing_'+v)||v}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_auto_follow')||'Auto-follow "Now"'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_auto_follow_desc')}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.auto_follow_now?'checked':''} data-action="setPref" data-event="change" data-pref-checked="auto_follow_now"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_auto_follow')||'Auto-follow "Now"'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_range')||'Default Timeline Range'}</div>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${['day','3days','week','2weeks','month'].map(v =>
+            `<button class="toggle-btn${(p.default_range||'week')===v?' active':''}" data-action="setPref" data-args='["default_range","${v}"]'>${t('range_'+v)||v}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_resolution')||'Default Time-slot Resolution'}</div>
+        <div class="toggle-btn-group">
+          ${[['ten','10 min'],['quarter','15 min'],['hour',t('res_hour')],['day',t('res_day')]].map(([v,l]) =>
+            `<button class="toggle-btn${(p.default_resolution||'hour')===v?' active':''}" data-action="setPref" data-args='["default_resolution","${v}"]'>${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_tooltip_delay')||'Tooltip Hover Delay'}</div>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.tooltip_delay||0)===0?' active':''}" data-action="setTooltipDelay" data-arg="0">${t('tooltip_instant')}</button>
+          <button class="toggle-btn${p.tooltip_delay===200?' active':''}" data-action="setTooltipDelay" data-arg="200">${t('tooltip_200ms')}</button>
+          <button class="toggle-btn${p.tooltip_delay===500?' active':''}" data-action="setTooltipDelay" data-arg="500">${t('tooltip_500ms')}</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_confirm_drag')||'Confirm Before Drag-Move'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_confirm_drag_desc')}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.confirm_drag_move?'checked':''} data-action="setPref" data-event="change" data-pref-checked="confirm_drag_move"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_confirm_drag')||'Confirm Before Drag-Move'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_event_type')||'Default Event Type'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_default_event_type_desc')}</p>
+        <select data-action="setPrefSelect" data-event="change" data-pref-key="default_event_type"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <option value=""${!p.default_event_type?' selected':''}>—</option>
+          ${(state.eventTypes||[]).map(et =>
+            `<option value="${et.key}"${p.default_event_type===et.key?' selected':''}>${escHtml(et.label||et.key)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_workspace_presets')||'Workspace Presets'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_workspace_presets_desc')}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" ${p.workspace_presets_enabled?'checked':''} data-action="setPref" data-event="change" data-pref-checked="workspace_presets_enabled"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_workspace_presets')||'Enable Workspace Presets'}
+        </label>
+        ${p.workspace_presets_enabled ? `
+        <div style="margin-bottom:6px">
+          ${(p.workspace_presets||[]).map((ws, i) => `
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:var(--fs-xs)">
+              <span style="flex:1;color:var(--text)">${escHtml(ws.name)}</span>
+              <button class="btn btn-secondary btn-sm" style="padding:1px 6px;font-size:10px" data-action="loadWorkspacePreset" data-arg="${i}">${t('preset_load')}</button>
+              <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteWorkspacePreset" data-arg="${i}">${t('preset_delete')}</button>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-secondary btn-sm" data-action="saveWorkspacePreset">${t('preset_save')||'Save Current'}</button>
+        ` : ''}
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_welcome_url')||'Welcome URL'}</div>
+        <input type="url" value="${escHtml(p.welcome_url||'')}" placeholder="https://..."
+          data-action="setPrefInput" data-event="change" data-pref-key="welcome_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_help_url')||'Help URL'}</div>
+        <input type="url" value="${escHtml(p.help_url||'')}" placeholder="https://..."
+          data-action="setPrefInput" data-event="change" data-pref-key="help_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
@@ -5803,6 +5939,67 @@ async function setViewSpacing(value) {
   renderTimeline();
 }
 
+async function setTooltipDelay(value) {
+  state.preferences.tooltip_delay = parseInt(value, 10) || 0;
+  document.documentElement.style.setProperty('--tooltip-delay', state.preferences.tooltip_delay + 'ms');
+  await savePreferences();
+  renderSidebar();
+}
+
+async function setPrefInput() {
+  const el = event?.target;
+  if (!el) return;
+  const key = el.dataset.prefKey;
+  if (key) state.preferences[key] = el.value;
+  await savePreferences();
+}
+
+// Workspace preset actions
+async function saveWorkspacePreset() {
+  const name = prompt(t('preset_name') || 'Preset Name:');
+  if (!name) return;
+  const presets = state.preferences.workspace_presets || [];
+  const preset = {
+    id: presets.length ? Math.max(...presets.map(p => p.id || 0)) + 1 : 1,
+    name,
+    view: _listViewActive ? 'list' : 'grid',
+    range: state.range,
+    resolution: state.resolution,
+    zoom_factor: state.zoomFactor || 1.0,
+    hidden_layers: [...(state.preferences.hidden_layers || [])],
+    sidebar_tab: state.sidebarTab || 'legend',
+  };
+  state.preferences.workspace_presets = [...presets, preset];
+  await savePreferences();
+  renderSidebar();
+  showNotification('success', t('notif_saved'));
+}
+
+async function loadWorkspacePreset(idx) {
+  const presets = state.preferences.workspace_presets || [];
+  const preset = presets[parseInt(idx, 10)];
+  if (!preset) return;
+  if (preset.range) { state.range = preset.range; document.getElementById('rangeSelect').value = preset.range; }
+  if (preset.resolution) { state.resolution = preset.resolution; document.getElementById('resolutionSelect').value = preset.resolution; }
+  if (preset.zoom_factor) state.zoomFactor = preset.zoom_factor;
+  if (preset.hidden_layers) state.preferences.hidden_layers = [...preset.hidden_layers];
+  if (preset.sidebar_tab) state.sidebarTab = preset.sidebar_tab;
+  if (preset.view === 'list' && !_listViewActive) toggleListView();
+  else if (preset.view === 'grid' && _listViewActive) toggleListView();
+  await savePreferences();
+  renderSidebar();
+  renderTimeline();
+  showNotification('success', t('notif_saved'));
+}
+
+async function deleteWorkspacePreset(idx) {
+  const presets = state.preferences.workspace_presets || [];
+  presets.splice(parseInt(idx, 10), 1);
+  state.preferences.workspace_presets = [...presets];
+  await savePreferences();
+  renderSidebar();
+}
+
 async function setHourPref() {
   const sh = parseInt(document.getElementById('prefStartH').value, 10);
   const eh = parseInt(document.getElementById('prefEndH').value, 10);
@@ -6304,13 +6501,17 @@ function showAlarmNotification(data, level) {
 
   const warnings = level > 0 ? ' ' + '⚠️'.repeat(Math.min(level, 3)) : '';
   const shownAt  = Date.now();
+  // Check if event has a meeting URL
+  const meetingURL = data.meeting_url || data.contact_url || '';
+  const hasMeeting = meetingURL && (meetingURL.startsWith('http://') || meetingURL.startsWith('https://') || meetingURL.startsWith('sip:') || meetingURL.startsWith('tel:'));
   el.innerHTML = `
     <div class="notification-title">${t('notif_alarm_title')}${escHtml(warnings)}</div>
     <div class="notification-msg">${escHtml(data.message)}</div>
     <div class="alarm-since" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">⏱ 0s ago</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm notification-close-btn" data-action="dismissAlarmNotif" data-arg="${data.alarm_id}">Dismiss</button>
+      <button class="btn btn-ghost btn-sm notification-close-btn" data-action="dismissAlarmNotif" data-arg="${data.alarm_id}">${t('alarm_dismiss')||'Dismiss'}</button>
       <button class="btn btn-secondary btn-sm" data-action="openAlarmEvent" data-arg="${data.event_id}">📋 Show event</button>
+      ${hasMeeting ? `<a href="${escHtml(meetingURL)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none">${t('alarm_enter_meeting')}</a>` : ''}
       <button class="btn btn-primary btn-sm" data-action="ackAlarm" data-arg="${data.alarm_id}" data-arg-el>✓ ${t('alarm_ack')}</button>
     </div>
   `;
@@ -10642,24 +10843,38 @@ function _filterReferences() {
     return;
   }
   const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+  const _langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский'};
+  const _copyModeLabels = {central:t('ref_copy_central'),local:t('ref_copy_local'),link:t('ref_copy_link')};
   listEl.innerHTML = refs.map(r => {
-    const sizeKB = r.size ? (r.size / 1024).toFixed(1) + ' KB' : '';
+    const sizeStr = r.size ? fmtFileSize(r.size) : '';
+    const dateStr = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString(getLocale()) : '';
     return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:${catColors[r.category] || '#95A5A6'};color:#fff;text-transform:uppercase;margin-right:6px">${escHtml(r.category || 'other')}</span>
+          ${r.detected_type ? `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--accent);color:#fff;margin-right:4px">${escHtml(r.detected_type.toUpperCase())}</span>` : ''}
+          ${r.language ? `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:4px" title="${t('ref_language')}">${escHtml(_langNames[r.language] || r.language)}</span>` : ''}
           <b style="font-size:var(--fs-base)">${escHtml(r.title)}</b>
         </div>
         <div style="display:flex;gap:4px">
           ${r.ref_type === 'url' ? `<a href="${escHtml(r.url || '')}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:10px">🔗 Open</a>` :
             r.ref_type === 'local' ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="alert(document.getElementById('refLocal_${r.id}')?.textContent||'')">📄 View</button><span id="refLocal_${r.id}" style="display:none">${escHtml(r.content || '')}</span>` :
-            `<a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">Download</a>`}
-          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" onclick="if(confirm('Delete this reference?'))_deleteReference(${r.id})">Delete</button>` : ''}
+            `<a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">${t('detail_download')||'Download'}</a>`}
+          ${r.checksum_md5 ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="_showRefChecksums(${r.id})" title="${t('ref_checksums')}">#️⃣</button>` : ''}
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" onclick="_openRefEditModal(${r.id})">✏️</button>` : ''}
+          ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" onclick="if(confirm('Delete this reference?'))_deleteReference(${r.id})">${t('btn_delete')}</button>` : ''}
         </div>
       </div>
       ${r.description ? `<div style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:4px">${escHtml(r.description)}</div>` : ''}
-      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">${escHtml(r.original_name || '')} · ${sizeKB} · ${escHtml(r.uploaded_by_name || '')}</div>
-      ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(t => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:3px">${escHtml(t)}</span>`).join('')}</div>` : ''}
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px;display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 8px">
+        <span>${escHtml(r.original_name || '')}</span><span>${sizeStr}</span>
+        <span>${t('ref_owner')||'Owner'}:</span><span>${escHtml(r.owner || r.uploaded_by_name || '—')}</span>
+        ${r.custodian ? `<span>${t('ref_custodian')}:</span><span>${escHtml(r.custodian)}</span>` : ''}
+        <span>${t('ref_time_added')||'Added'}:</span><span>${dateStr}</span>
+        ${r.copy_mode ? `<span>${t('ref_copy_mode')}:</span><span>${escHtml(_copyModeLabels[r.copy_mode] || r.copy_mode)}</span>` : ''}
+        ${r.reference_count ? `<span>${t('ref_times_referenced')}:</span><span>${r.reference_count}</span>` : ''}
+      </div>
+      ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(tg => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:3px">${escHtml(tg)}</span>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -10706,6 +10921,18 @@ function _openReferenceUploadModal() {
             <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
             <option value="other">Other</option>
+          </select>
+          <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
+          <select id="refUpLang" class="form-input">
+            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="no">Norsk</option><option value="da">Dansk</option><option value="es">Español</option>
+          </select>
+          <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
+          <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
+          <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
+          <input type="text" id="refUpCustodian" class="form-input" placeholder="${t('ref_custodian_placeholder') || 'Document custodian'}">
+          <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
+          <select id="refUpCopyMode" class="form-input">
+            <option value="">—</option><option value="central">${t('ref_copy_central') || 'Central copy'}</option><option value="local">${t('ref_copy_local') || 'Local copy'}</option><option value="link">${t('ref_copy_link') || 'Show link'}</option>
           </select>
           <label style="margin-top:8px">Tags (comma-separated)</label>
           <input type="text" id="refUpTags" class="form-input" placeholder="tag1, tag2, ...">
@@ -10840,6 +11067,14 @@ async function _handleReferenceUpload() {
     fd.append('category', document.getElementById('refUpCategory').value);
     const tags = document.getElementById('refUpTags').value.trim();
     if (tags) fd.append('tags', tags);
+    const lang = document.getElementById('refUpLang')?.value || '';
+    if (lang) fd.append('language', lang);
+    const owner = document.getElementById('refUpOwner')?.value?.trim() || '';
+    if (owner) fd.append('owner', owner);
+    const custodian = document.getElementById('refUpCustodian')?.value?.trim() || '';
+    if (custodian) fd.append('custodian', custodian);
+    const copyMode = document.getElementById('refUpCopyMode')?.value || '';
+    if (copyMode) fd.append('copy_mode', copyMode);
     try {
       const res = await fetch('/api/references', { method: 'POST', body: fd });
       if (!res.ok) { const txt = await res.text(); alert('Upload failed: ' + txt); return; }
@@ -10847,4 +11082,78 @@ async function _handleReferenceUpload() {
       _loadAndRenderReferences();
     } catch (e) { alert('Upload error: ' + e.message); }
   }
+}
+
+function _showRefChecksums(id) {
+  const ref = (state.references || []).find(r => r.id === id);
+  if (!ref) return;
+  const rows = [];
+  if (ref.checksum_md5) rows.push(`<tr><td style="font-weight:600;padding:2px 8px 2px 0">MD5</td><td style="font-family:monospace;font-size:11px;word-break:break-all">${escHtml(ref.checksum_md5)}</td></tr>`);
+  if (ref.checksum_sha1) rows.push(`<tr><td style="font-weight:600;padding:2px 8px 2px 0">SHA-1</td><td style="font-family:monospace;font-size:11px;word-break:break-all">${escHtml(ref.checksum_sha1)}</td></tr>`);
+  if (ref.checksum_sha256) rows.push(`<tr><td style="font-weight:600;padding:2px 8px 2px 0">SHA-256</td><td style="font-family:monospace;font-size:11px;word-break:break-all">${escHtml(ref.checksum_sha256)}</td></tr>`);
+  if (ref.checksum_sha512) rows.push(`<tr><td style="font-weight:600;padding:2px 8px 2px 0">SHA-512</td><td style="font-family:monospace;font-size:11px;word-break:break-all">${escHtml(ref.checksum_sha512)}</td></tr>`);
+  if (rows.length === 0) {
+    fetch('/api/references/' + id + '/checksums').then(r => r.json()).then(data => {
+      if (data.checksum_md5) { ref.checksum_md5 = data.checksum_md5; ref.checksum_sha1 = data.checksum_sha1; ref.checksum_sha256 = data.checksum_sha256; ref.checksum_sha512 = data.checksum_sha512; _showRefChecksums(id); }
+      else alert(t('ref_no_checksums') || 'No checksums available for this reference.');
+    }).catch(() => alert('Failed to load checksums'));
+    return;
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal" style="max-width:520px">
+    <div class="modal-header"><h3>${t('ref_checksums') || 'File Checksums'} — ${escHtml(ref.title)}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+    <div class="modal-body"><table style="width:100%">${rows.join('')}</table></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('btn_close') || 'Close'}</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function _openRefEditModal(id) {
+  const ref = (state.references || []).find(r => r.id === id);
+  if (!ref) return;
+  const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'no',l:'Norsk'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'}];
+  const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'}];
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal" style="max-width:460px">
+    <div class="modal-header"><h3>${t('ref_edit_title') || 'Edit Reference'}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button></div>
+    <div class="modal-body">
+      <label>${t('ref_title') || 'Title'}</label>
+      <input type="text" id="refEditTitle" class="form-input" value="${escHtml(ref.title || '')}">
+      <label style="margin-top:8px">${t('ref_description') || 'Description'}</label>
+      <input type="text" id="refEditDesc" class="form-input" value="${escHtml(ref.description || '')}">
+      <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
+      <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
+      <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
+      <input type="text" id="refEditOwner" class="form-input" value="${escHtml(ref.owner || '')}">
+      <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
+      <input type="text" id="refEditCustodian" class="form-input" value="${escHtml(ref.custodian || '')}">
+      <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
+      <select id="refEditCopyMode" class="form-input">${_copyOpts.map(o => `<option value="${o.v}"${o.v === (ref.copy_mode || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
+      <label style="margin-top:8px">${t('ref_tags') || 'Tags'} (comma-separated)</label>
+      <input type="text" id="refEditTags" class="form-input" value="${escHtml((ref.tags || []).join(', '))}">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">${t('btn_cancel') || 'Cancel'}</button>
+      <button class="btn btn-primary" id="btnSaveRefEdit">${t('btn_save') || 'Save'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('btnSaveRefEdit').addEventListener('click', async () => {
+    const body = {
+      title: document.getElementById('refEditTitle').value.trim(),
+      description: document.getElementById('refEditDesc').value.trim(),
+      language: document.getElementById('refEditLang').value,
+      owner: document.getElementById('refEditOwner').value.trim(),
+      custodian: document.getElementById('refEditCustodian').value.trim(),
+      copy_mode: document.getElementById('refEditCopyMode').value,
+      tags: document.getElementById('refEditTags').value.trim(),
+    };
+    try {
+      const res = await api('PUT', '/api/references/' + id, body);
+      if (res.ok) { overlay.remove(); _loadAndRenderReferences(); }
+      else { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown')); }
+    } catch (e) { alert('Error: ' + e.message); }
+  });
 }
