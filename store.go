@@ -117,6 +117,10 @@ type Store struct {
 	cachedTestStats   TestStats
 	cachedTestStatsAt time.Time
 
+	// Cached DB stats (filesystem walk is expensive)
+	cachedDBStats     map[string]any
+	cachedDBStatsAt   time.Time
+
 	// writeMu serialises JSON file writes so they never race each other.
 	// It is acquired AFTER s.mu has been released, keeping s.mu hold-time minimal.
 	writeMu sync.Mutex
@@ -440,25 +444,44 @@ func (s *Store) GetAudit(limit int) []AuditEntry {
 }
 
 // GetDBStats returns database statistics for the legend panel.
+// Filesystem walk is cached for 60 seconds to avoid expensive I/O on every call.
 func (s *Store) GetDBStats() map[string]any {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	// Calculate total data directory size
+	// Filesystem walk outside the lock to avoid holding it during I/O
 	var totalSize int64
 	var createdAt time.Time
-	filepath.Walk(s.dataDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
+
+	s.mu.RLock()
+	hasCached := s.cachedDBStats != nil && time.Since(s.cachedDBStatsAt) < 60*time.Second
+	if hasCached {
+		if v, ok := s.cachedDBStats["size_bytes"].(int64); ok {
+			totalSize = v
 		}
-		if !info.IsDir() {
-			totalSize += info.Size()
-			if createdAt.IsZero() || info.ModTime().Before(createdAt) {
-				createdAt = info.ModTime()
+		if v, ok := s.cachedDBStats["created_at"].(string); ok {
+			if t2, err := time.Parse(time.RFC3339, v); err == nil {
+				createdAt = t2
 			}
 		}
-		return nil
-	})
-	return map[string]any{
+	}
+	s.mu.RUnlock()
+
+	if !hasCached {
+		filepath.Walk(s.dataDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !info.IsDir() {
+				totalSize += info.Size()
+				if createdAt.IsZero() || info.ModTime().Before(createdAt) {
+					createdAt = info.ModTime()
+				}
+			}
+			return nil
+		})
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := map[string]any{
 		"created_at":      createdAt.Format(time.RFC3339),
 		"size_bytes":      totalSize,
 		"events":          len(s.events),
@@ -479,6 +502,10 @@ func (s *Store) GetDBStats() map[string]any {
 		"notifications":   len(s.notifications),
 		"reference_docs":  len(s.referenceDocs),
 	}
+	// Cache for next call (avoid filesystem walk)
+	s.cachedDBStats = result
+	s.cachedDBStatsAt = time.Now()
+	return result
 }
 
 // ── Exercise settings ──────────────────────────────────────────────────────────
@@ -1009,6 +1036,16 @@ func (s *Store) GetPreferences(userID int64) UserPreferences {
 		HiddenTypes:  []string{},
 		ActiveLayers: []int64{},
 	}
+}
+
+// getPreferencesLocked returns preferences without acquiring lock (caller must hold lock).
+func (s *Store) getPreferencesLocked(userID int64) UserPreferences {
+	for _, p := range s.preferences {
+		if p.UserID == userID {
+			return p
+		}
+	}
+	return UserPreferences{UserID: userID}
 }
 
 func (s *Store) GetAllPreferences() []UserPreferences {
@@ -1829,9 +1866,11 @@ type ExportData struct {
 	DecisionLog  []DecisionLogEntry `json:"decision_log,omitempty"`
 	Comments     []EventComment     `json:"comments,omitempty"`
 	RoleConfigs  []RoleConfig       `json:"role_configs,omitempty"`
-	MapResources []MapResource      `json:"map_resources,omitempty"`
-	References   []ReferenceDoc     `json:"references,omitempty"`
-	Rooms        []Room             `json:"rooms,omitempty"`
+	MapResources        []MapResource      `json:"map_resources,omitempty"`
+	References          []ReferenceDoc     `json:"references,omitempty"`
+	Rooms               []Room             `json:"rooms,omitempty"`
+	CustomResourceTypes []CustomResourceType `json:"custom_resource_types,omitempty"`
+	ClockSettings       []ExtraClock       `json:"clock_settings,omitempty"`
 }
 
 func (s *Store) GetExportData() ExportData {
@@ -1865,23 +1904,26 @@ func (s *Store) GetExportData() ExportData {
 	copy(referenceDocs, s.referenceDocs)
 	rooms := make([]Room, len(s.rooms))
 	copy(rooms, s.rooms)
+	customResTypes := make([]CustomResourceType, len(s.customResourceTypes))
+	copy(customResTypes, s.customResourceTypes)
 	return ExportData{
-		Version:      AppVersion,
-		ExportAt:     time.Now(),
-		Events:       events,
-		Users:        users,
-		Groups:       groups,
-		Layers:       layers,
-		Alarms:       alarms,
-		Exercise:     s.exercise,
-		Phases:       phases,
-		EventTypes:   eventTypes,
-		DecisionLog:  decisionLog,
-		Comments:     comments,
-		RoleConfigs:  roleConfigs,
-		MapResources: mapResources,
-		References:   referenceDocs,
-		Rooms:        rooms,
+		Version:             AppVersion,
+		ExportAt:            time.Now(),
+		Events:              events,
+		Users:               users,
+		Groups:              groups,
+		Layers:              layers,
+		Alarms:              alarms,
+		Exercise:            s.exercise,
+		Phases:              phases,
+		EventTypes:          eventTypes,
+		DecisionLog:         decisionLog,
+		Comments:            comments,
+		RoleConfigs:         roleConfigs,
+		MapResources:        mapResources,
+		References:          referenceDocs,
+		Rooms:               rooms,
+		CustomResourceTypes: customResTypes,
 	}
 }
 
@@ -1957,6 +1999,22 @@ func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include m
 	if include["rooms"] {
 		out.Rooms = make([]Room, len(s.rooms))
 		copy(out.Rooms, s.rooms)
+	}
+	if include["resources"] || include["custom_resource_types"] {
+		out.CustomResourceTypes = make([]CustomResourceType, len(s.customResourceTypes))
+		copy(out.CustomResourceTypes, s.customResourceTypes)
+		out.MapResources = make([]MapResource, len(s.mapResources))
+		copy(out.MapResources, s.mapResources)
+		out.Rooms = make([]Room, len(s.rooms))
+		copy(out.Rooms, s.rooms)
+	}
+	if include["clock_settings"] {
+		// Export clock settings from the requesting user's preferences
+		prefs := s.getPreferencesLocked(userID)
+		if len(prefs.ExtraClocks) > 0 {
+			out.ClockSettings = make([]ExtraClock, len(prefs.ExtraClocks))
+			copy(out.ClockSettings, prefs.ExtraClocks)
+		}
 	}
 	return out
 }

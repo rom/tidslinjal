@@ -274,6 +274,8 @@ type UserPreferences struct {
 	DemoURL            string   `json:"demo_url,omitempty"`             // demo URL for welcome banner
 	TimeSeparator      string   `json:"time_separator,omitempty"`       // colon | dot (default: colon)
 	ShowLangFlags      *bool    `json:"show_lang_flags,omitempty"`      // show language flags in toolbar (default: true)
+	LogbookHideDecisions bool   `json:"logbook_hide_decisions,omitempty"` // hide 'decision' type from logbook (use decisions log only)
+	ShowClockFlags     *bool    `json:"show_clock_flags,omitempty"`     // show national flags on timezone clocks (default: false)
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click
