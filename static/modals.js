@@ -2013,7 +2013,7 @@ async function _loadPollsterLog(container) {
       let detailHtml = '';
       if ((poll.responses || []).length > 0) {
         detailHtml = (poll.questions || []).map((q, qi) => {
-          const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+          const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
           if (q.type === 'scale' || q.type === 'scale_0_3') {
             const counts = [0,0,0,0];
             answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
@@ -2211,6 +2211,11 @@ function detachSidebar() {
   // If on references tab, open standalone references popup
   if (state.sidebarTab === 'references') {
     openDetachedReferences();
+    return;
+  }
+  // If on tools tab, open standalone tools popup
+  if (state.sidebarTab === 'tools') {
+    openDetachedTools();
     return;
   }
   if (_detachedSidebarWin && !_detachedSidebarWin.closed) {
@@ -3443,7 +3448,10 @@ function renderSidebar() {
       `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="${fnName.replace(/\(\)/,'')}">${icon} ${label}</button>`;
     el.innerHTML = `
       <div class="sidebar-section">
-        <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
+        <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🛠 ${t('tab_tools')||'Tools'}</span>
+          <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedTools" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+        </div>
         <div style="display:flex;flex-direction:column;gap:6px">
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
@@ -6204,7 +6212,7 @@ async function openPollModal() {
           body: JSON.stringify({ title, questions: mappedQs, target_type: targetType, target_ids: targetIds })
         });
         if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-        showSuccess(t('poll_created')||'Poll created successfully');
+        showNotification('success',t('poll_created')||'Poll created successfully');
         _loadPolls(modal);
       } catch (e) { showError(e.message); }
     });
@@ -6243,14 +6251,17 @@ async function _loadPolls(modal) {
     wrap.innerHTML = polls.map(poll => {
       const isOpen = poll.status === 'open';
       const isCreator = poll.created_by === state.user.id;
-      const myResponse = (poll.responses || []).find(r => r.user_id === state.user.id);
+      const myResponses = (poll.responses || []).filter(r => r.user_id === state.user.id);
+      const hasResponded = myResponses.length > 0;
       const totalTargets = (poll.target_ids || []).length || '?';
-      const totalResponses = (poll.responses || []).length;
+      // Count unique users who responded
+      const respondedUsers = new Set((poll.responses || []).map(r => r.user_id));
+      const totalResponses = respondedUsers.size;
       const statusColor = isOpen ? 'var(--accent)' : 'var(--text-dim)';
       const statusText = isOpen ? (t('poll_status_open')||'Open') : (t('poll_status_closed')||'Closed');
 
       let questionsHtml = '';
-      if (isOpen && !myResponse) {
+      if (isOpen && !hasResponded) {
         // Show response form
         questionsHtml = `<div class="poll-respond-form" data-poll-id="${poll.id}" style="margin-top:8px">
           ${(poll.questions || []).map((q, qi) => {
@@ -6273,7 +6284,7 @@ async function _loadPolls(modal) {
           }).join('')}
           <button class="btn btn-primary btn-sm poll-submit-btn" data-poll-id="${poll.id}" style="margin-top:6px">${t('poll_respond')||'Submit Response'}</button>
         </div>`;
-      } else if (myResponse) {
+      } else if (hasResponded) {
         questionsHtml = `<div style="margin-top:6px;font-size:var(--fs-xs);color:var(--accent);font-weight:600">✅ ${t('poll_responded')||'You have responded'}</div>`;
       }
 
@@ -6283,7 +6294,7 @@ async function _loadPolls(modal) {
         summaryHtml = `<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
           <strong>${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</strong>
           ${(poll.questions || []).map((q, qi) => {
-            const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+            const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
             if (q.type === 'scale' || q.type === 'scale_0_3') {
               const counts = [0,0,0,0];
               answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
@@ -6349,7 +6360,7 @@ async function _loadPolls(modal) {
             body: JSON.stringify({ answers })
           });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-          showSuccess(t('poll_response_saved')||'Response saved');
+          showNotification('success',t('poll_response_saved')||'Response saved');
           _loadPolls(modal);
         } catch (e) { showError(e.message); }
       });
@@ -6362,7 +6373,7 @@ async function _loadPolls(modal) {
         try {
           const res = await fetch(`/api/polls/${pollId}/close`, { method: 'PUT' });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
-          showSuccess(t('poll_closed_success')||'Poll closed');
+          showNotification('success',t('poll_closed_success')||'Poll closed');
           _loadPolls(modal);
         } catch (e) { showError(e.message); }
       });
@@ -8269,7 +8280,7 @@ async function generateReport() {
           if ((poll.questions || []).length && (poll.responses || []).length) {
             html += '<table><thead><tr><th>Question</th><th>Type</th><th>Summary</th></tr></thead><tbody>';
             (poll.questions || []).forEach((q, qi) => {
-              const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+              const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
               let summary = '';
               if (q.type === 'scale' || q.type === 'scale_0_3') {
                 const counts = [0,0,0,0];
@@ -9205,6 +9216,70 @@ function openDetachedMap() {
   const h = Math.min(window.screen.availHeight - 100, 700);
   _mapPopout = window.open('/static/map-popup.html', 'tidslinjal-map',
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+}
+
+// ── Detachable Tools Window ──────────────────────────────────────────────────
+let _toolsPopout = null;
+let _toolsPopoutMonitor = null;
+
+function openDetachedTools() {
+  if (_toolsPopout && !_toolsPopout.closed) {
+    _toolsPopout.focus();
+    return;
+  }
+  // Render tools content via the sidebar renderer
+  const tempDiv = document.createElement('div');
+  const prevTab = state.sidebarTab;
+  state.sidebarTab = 'tools';
+  renderSidebar();
+  const srcContent = document.getElementById('sidebarContent');
+  const toolsHTML = srcContent ? srcContent.innerHTML : '';
+  state.sidebarTab = prevTab;
+  renderSidebar();
+
+  const theme = document.body.className || '';
+  const w = Math.min(window.screen.availWidth, 420);
+  const h = Math.min(window.screen.availHeight - 100, 700);
+  _toolsPopout = window.open('', 'tidslinjal-tools',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (!_toolsPopout) return;
+
+  _toolsPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal \u2014 Tools</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>' +
+    'body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif}' +
+    '</style></head><body class="' + escHtml(theme) + '">' +
+    '<div id="toolsWrap"></div>' +
+    '</body></html>');
+  _toolsPopout.document.close();
+
+  const wrapEl = _toolsPopout.document.getElementById('toolsWrap');
+  if (wrapEl) wrapEl.innerHTML = toolsHTML;
+
+  // Bind data-action buttons to opener functions
+  function rebindActions() {
+    if (!_toolsPopout || _toolsPopout.closed) return;
+    const wrap = _toolsPopout.document.getElementById('toolsWrap');
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-action]').forEach(function(el) {
+      el.onclick = function() {
+        try {
+          var fn = el.dataset.action;
+          if (typeof window[fn] === 'function') window[fn]();
+        } catch(e) {}
+      };
+    });
+  }
+  rebindActions();
+
+  if (_toolsPopoutMonitor) clearInterval(_toolsPopoutMonitor);
+  _toolsPopoutMonitor = setInterval(() => {
+    if (!_toolsPopout || _toolsPopout.closed) {
+      clearInterval(_toolsPopoutMonitor);
+      _toolsPopoutMonitor = null;
+      _toolsPopout = null;
+    }
+  }, 1000);
 }
 
 // ── Critical Line Analysis ──────────────────────────────────────────────────
