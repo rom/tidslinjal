@@ -1014,6 +1014,18 @@ _initDrawEvents();
 // Poll for theme/language changes
 setInterval(function() { syncTheme(); syncLanguage(); }, 2000);
 
+// Listen for BroadcastChannel theme messages from main window
+const _mapChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('tidslinjal-sync') : null;
+if (_mapChannel) {
+  _mapChannel.onmessage = function(e) {
+    if (e.data && e.data.type === 'theme') {
+      const theme = e.data.theme || 'dark';
+      _themeClasses.forEach(c => document.body.classList.remove(c));
+      document.body.classList.add('theme-' + theme);
+    }
+  };
+}
+
 /* ── Address search / geocoding ── */
 let _searchMarker = null;
 
@@ -1105,6 +1117,7 @@ function switchMap(mapResourceId) {
   if (!mapResourceId) {
     // Switch back to OSM live
     _currentMapResource = null;
+    const wasImageMap = _isImageMap;
     _isImageMap = false;
     if (_imageOverlayLayer) { _map.removeLayer(_imageOverlayLayer); _imageOverlayLayer = null; }
     if (_geojsonOverlayLayer) { _map.removeLayer(_geojsonOverlayLayer); _geojsonOverlayLayer = null; }
@@ -1113,9 +1126,24 @@ function switchMap(mapResourceId) {
     tileCtrl.disabled = false;
     if (overlayCtrl) overlayCtrl.style.display = 'none';
     document.getElementById('btnLockMap').style.display = 'none';
+    // Restore CRS to default Spherical Mercator if coming from an image map
+    if (wasImageMap) {
+      _map.options.crs = L.CRS.EPSG3857;
+      _map.setMinZoom(0);
+      _map.setMaxZoom(19);
+      _map.setMaxBounds(null);
+      // Remove stale tile layer so it gets re-created with correct CRS
+      if (_tileLayer) { _map.removeLayer(_tileLayer); _tileLayer = null; }
+    }
     // Restore tile layer
     if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
+    // Force tile reload after CRS restoration
     _map.invalidateSize();
+    if (wasImageMap) {
+      _map.setView([51.505, -0.09], 4);
+      // Trigger tile container refresh
+      setTimeout(() => { _map.invalidateSize(); if (_tileLayer) _tileLayer.redraw(); }, 100);
+    }
     loadUsers();
     loadMeetings();
     // Clear drawings layer for OSM

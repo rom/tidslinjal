@@ -2452,7 +2452,7 @@ function renderSidebar() {
             </div>
             <div class="user-list">
               ${(users||[]).map(u => `
-                <div class="user-item" style="cursor:pointer;flex-wrap:wrap" data-action="openUserModal" data-arg='${escAttr(JSON.stringify(u))}' data-arg-el>
+                <div class="user-item" style="cursor:pointer;flex-wrap:wrap${u.blocked ? ';background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.25)' : ''}" data-action="openUserModal" data-arg='${escAttr(JSON.stringify(u))}' data-arg-el>
                   <div class="user-name" style="min-width:120px">
                     <div>${u.blocked ? '<span title="${t("user_blocked")||"Blocked"}" style="color:var(--red,#E74C3C)">🚫 </span>' : ''}${escHtml(u.display_name||u.username)}${u.is_oidc ? ' <span title="SSO / OIDC user" style="font-size:var(--fs-xs);background:var(--accent-muted,rgba(0,120,255,.15));color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 4px;vertical-align:middle;font-weight:600">SSO</span>' : ''}</div>
                     <div style="font-size:var(--fs-xs);color:var(--text-dim)">@${escHtml(u.username)}${canSeeLoc && u.location ? ' · 📍 '+escHtml(u.location) : ''}</div>
@@ -3723,7 +3723,7 @@ function renderSidebar() {
         </div>` : ''}
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'}</div>
+        <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'} <span title="${t('settings_view_spacing_info')||'Adjust the vertical spacing between rows on the timeline.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Vertical spacing multiplier for timeline rows.'}</p>
         <div class="toggle-btn-group">
           <button class="toggle-btn${(p.view_spacing||1)===1?' active':''}" data-action="setViewSpacing" data-arg="1">1×</button>
@@ -3738,6 +3738,7 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="show_event_icons"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_event_icons')||'Show icons on events (type, attachments, etc.)'}
+          <span title="${t('settings_show_event_icons_info')||'Display small icons on timeline events indicating their type, attachments, and other attributes.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
       </div>
       <div class="sidebar-section">
@@ -3747,6 +3748,7 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="hover_zoom_enabled"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_hover_zoom_desc')||'Enlarge calendar events on hover'}
+          <span title="${t('settings_hover_zoom_info')||'When enabled, hovering over a timeline event will enlarge it for easier reading.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
       </div>
       <div class="sidebar-section">
@@ -3755,25 +3757,27 @@ function renderSidebar() {
           <input type="checkbox" id="prefRedLine" ${p.red_line_enabled!==false?'checked':''} data-action="setRedLinePref" data-event="change"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_red_line_enabled')||'Show current-time line'}
+          <span title="${t('settings_red_line_enabled_info')||'Displays a vertical line on the timeline at the current time position.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
           <input type="checkbox" id="prefSynthLabel" ${p.synth_label?'checked':''} data-action="setSynthLabelPref" data-event="change" data-arg-checked
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_synth_label')||'Show H+N label on red line'}
+          <span title="${t('settings_synth_label_info')||'Shows elapsed time (H+N) label next to the current-time line.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:5px 8px;align-items:center;font-size:var(--fs-xs);color:var(--text-dim)">
-          <span>${t('settings_red_line_color')||'Color'}:</span>
+          <span>${t('settings_red_line_color_label')||'Color'}: <span title="${t('settings_red_line_color_label')||'Color of the current-time line.'}" style="cursor:help;color:var(--accent)">ℹ️</span></span>
           <input type="color" id="prefLineColor" value="${p.red_line_color||'#E74C3C'}" data-action="setRedLinePref" data-event="change"
             style="width:32px;height:22px;padding:0;border:none;background:transparent;cursor:pointer">
-          <span>${t('settings_red_line_width')||'Width'}:</span>
-          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||2}" data-action="setRedLinePref" data-event="change"
+          <span>${t('settings_red_line_width_label')||'Width (px)'}: <span title="${t('settings_red_line_width_label')||'Width of the current-time line in pixels.'}" style="cursor:help;color:var(--accent)">ℹ️</span></span>
+          <input type="number" id="prefLineWidth" min="1" max="8" value="${p.red_line_width||5}" data-action="setRedLinePref" data-event="change"
             style="width:52px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
-          <span>${t('settings_red_line_style')||'Style'}:</span>
+          <span>${t('settings_red_line_style_label')||'Line style'}: <span title="${t('settings_red_line_style_label')||'Style of the current-time line.'}" style="cursor:help;color:var(--accent)">ℹ️</span></span>
           <select id="prefLineStyle" data-action="setRedLinePref" data-event="change"
             style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
-            <option value="solid" ${(p.red_line_style||'solid')==='solid'?'selected':''}>Solid</option>
-            <option value="dashed" ${p.red_line_style==='dashed'?'selected':''}>Dashed</option>
-            <option value="dotted" ${p.red_line_style==='dotted'?'selected':''}>Dotted</option>
+            <option value="solid" ${(p.red_line_style||'dashed')==='solid'?'selected':''}>${t('settings_red_line_style_solid')||'Solid'}</option>
+            <option value="dashed" ${(p.red_line_style||'dashed')==='dashed'?'selected':''}>${t('settings_red_line_style_dashed')||'Dashed'}</option>
+            <option value="dotted" ${(p.red_line_style||'dashed')==='dotted'?'selected':''}>${t('settings_red_line_style_dotted')||'Dotted'}</option>
           </select>
         </div>
       </div>
@@ -3797,11 +3801,26 @@ function renderSidebar() {
           <input type="checkbox" ${p.push_alarms!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_alarms"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_alarms')||'Alarm notifications'}
+          <span title="${t('settings_push_alarms_info')||'Receive browser notifications when alarms trigger.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" ${p.push_event_changes!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_event_changes"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_push_event_changes')||'Event changes by other users'}
+          <span title="${t('settings_push_event_info')||'Receive browser notifications when other users modify events.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📅 ${t('settings_auto_busy')||'Auto-busy on activities'} <span title="${t('settings_auto_busy_info')||'When enabled, your status changes to busy during scheduled activities and returns to your previous status afterward.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('settings_auto_busy_desc')||'Automatically set your availability to "busy" while a scheduled activity you are invited to is ongoing.'}
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="prefAutoBusy" ${p.auto_busy_enabled?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="auto_busy_enabled"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_auto_busy')||'Auto-busy on activities'}
+          <span title="${t('settings_auto_busy_info')||'When enabled, your status changes to busy during scheduled activities and returns afterward.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
       </div>
       <div class="sidebar-section">
@@ -3814,13 +3833,14 @@ function renderSidebar() {
             data-action="toggleOfflineMode" data-event="change"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_force_offline')||'Force offline mode'}
+          <span title="${t('settings_force_offline_info')||'Force the application into offline mode, using locally cached data only.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <div id="offlineStatus" style="font-size:var(--fs-xs);padding:4px 8px;background:var(--bg3);border-radius:var(--radius)">
           ${window._offlineMode ? '<span style="color:#e05252">● Offline</span>' : '<span style="color:#27ae60">● Online</span>'}
         </div>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('artificial_time')||'Artificial Time'}</div>
+        <div class="sidebar-section-title">${t('artificial_time')||'Artificial Time'} <span title="${t('settings_artificial_time_info')||'Override the current time for exercise simulation purposes.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
         ${hasRole2(state.user?.role, 'teamlead') ? `
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm)">
@@ -4065,8 +4085,8 @@ async function setOOHPref(val) {
 async function setRedLinePref() {
   state.preferences.red_line_enabled = document.getElementById('prefRedLine')?.checked ?? true;
   state.preferences.red_line_color   = document.getElementById('prefLineColor')?.value || '#E74C3C';
-  state.preferences.red_line_width   = parseInt(document.getElementById('prefLineWidth')?.value || '2', 10);
-  state.preferences.red_line_style   = document.getElementById('prefLineStyle')?.value || 'solid';
+  state.preferences.red_line_width   = parseInt(document.getElementById('prefLineWidth')?.value || '5', 10);
+  state.preferences.red_line_style   = document.getElementById('prefLineStyle')?.value || 'dashed';
   await savePreferences();
   updateCurrentTimeLine(getDays(), getSlotHeight());
 }
@@ -5370,17 +5390,51 @@ async function openPersonReadyCheckPopup() {
         ${isCreator ? `
         <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:12px">
           <h4 style="font-size:var(--fs-sm);margin-bottom:8px">${t('prc_new_check')||'New Ready Check'}</h4>
-          <div style="margin-bottom:8px">
-            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_select_participants')||'Select participants'}:</label>
+          <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('prc_select_mode')||'Select by'}:</label>
+            <div class="toggle-btn-group" style="font-size:10px">
+              <button class="toggle-btn active" id="prcModeIndividual" data-prc-mode="individual">${t('prc_mode_individual')||'Individual'}</button>
+              <button class="toggle-btn" id="prcModeGroup" data-prc-mode="group">${t('prc_mode_group')||'Group / Team'}</button>
+              <button class="toggle-btn" id="prcModeRole" data-prc-mode="role">${t('prc_mode_role')||'Role'}</button>
+            </div>
+          </div>
+          <div id="prcIndividualSection">
+            <div style="margin-bottom:6px;display:flex;gap:8px;align-items:center">
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_select_participants')||'Select participants'}:</label>
+              <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:3px">
+                <input type="checkbox" id="prcOnlineOnly" style="accent-color:var(--accent);width:12px;height:12px">
+                <span style="color:var(--accent);font-weight:600">🟢 ${t('prc_filter_online')||'Online only'}</span>
+              </label>
+            </div>
             <div id="prcParticipantList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
               ${(state.users||[]).filter(u => u.id !== state.user.id).map(u => `
-                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                <label class="group-chip prc-user-chip" style="cursor:pointer;font-size:var(--fs-xs)" data-online="${u.availability && u.availability !== 'away' ? 'true' : 'false'}" data-user-id="${u.id}">
                   <input type="checkbox" class="prc-user-cb" value="${u.id}" style="margin-right:4px">
-                  👤 ${escHtml(u.display_name||u.username)}
+                  ${u.availability === 'busy' ? '🟡' : u.availability === 'dnd' ? '🔴' : u.availability === 'away' ? '⚪' : '🟢'} ${escHtml(u.display_name||u.username)}
                 </label>`).join('')}
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" id="btnCreatePRC">${t('prc_send_request')||'Send Ready Check Request'}</button>
+          <div id="prcGroupSection" style="display:none">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_send_to_group')||'Send to group/team'}:</label>
+            <div id="prcGroupList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+              ${(state.groups||[]).map(g => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="prc-group-cb" value="${g.id}" style="margin-right:4px">
+                  👥 ${escHtml(g.name)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <div id="prcRoleSection" style="display:none">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_send_to_role')||'Send to role'}:</label>
+            <div id="prcRoleList" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
+              ${[...new Set((state.users||[]).map(u => u.role).filter(Boolean))].map(role => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="prc-role-cb" value="${role}" style="margin-right:4px">
+                  🛡 ${getRoleDisplayName(role)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnCreatePRC" style="margin-top:8px">${t('prc_send_request')||'Send Ready Check Request'}</button>
         </div>` : ''}
       </div>
       <div class="modal-footer">
@@ -5393,11 +5447,60 @@ async function openPersonReadyCheckPopup() {
   // Load existing checks
   _loadPersonReadyChecks(modal);
 
+  // PRC mode switching (individual / group / role)
+  modal.querySelectorAll('[data-prc-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('[data-prc-mode]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const mode = btn.dataset.prcMode;
+      const indSec = modal.querySelector('#prcIndividualSection');
+      const grpSec = modal.querySelector('#prcGroupSection');
+      const rolSec = modal.querySelector('#prcRoleSection');
+      if (indSec) indSec.style.display = mode === 'individual' ? '' : 'none';
+      if (grpSec) grpSec.style.display = mode === 'group' ? '' : 'none';
+      if (rolSec) rolSec.style.display = mode === 'role' ? '' : 'none';
+    });
+  });
+
+  // Online filter for individual participants
+  const onlineFilter = modal.querySelector('#prcOnlineOnly');
+  if (onlineFilter) {
+    onlineFilter.addEventListener('change', () => {
+      const onlyOnline = onlineFilter.checked;
+      modal.querySelectorAll('.prc-user-chip').forEach(chip => {
+        if (onlyOnline && chip.dataset.online !== 'true') {
+          chip.style.display = 'none';
+        } else {
+          chip.style.display = '';
+        }
+      });
+    });
+  }
+
   // Create new check button
   const createBtn = modal.querySelector('#btnCreatePRC');
   if (createBtn) {
     createBtn.addEventListener('click', async () => {
-      const selected = [...modal.querySelectorAll('.prc-user-cb:checked')].map(cb => parseInt(cb.value, 10));
+      const activeMode = modal.querySelector('[data-prc-mode].active')?.dataset?.prcMode || 'individual';
+      let selected = [];
+      if (activeMode === 'individual') {
+        selected = [...modal.querySelectorAll('.prc-user-cb:checked')].map(cb => parseInt(cb.value, 10));
+      } else if (activeMode === 'group') {
+        const groupIds = [...modal.querySelectorAll('.prc-group-cb:checked')].map(cb => parseInt(cb.value, 10));
+        // Resolve group members to user IDs
+        const allUsers = state.users || [];
+        for (const gid of groupIds) {
+          try {
+            const members = await apiGet(`/api/groups/${gid}/members`);
+            if (members) members.forEach(m => { if (m.user_id && m.user_id !== state.user.id && !selected.includes(m.user_id)) selected.push(m.user_id); });
+          } catch {}
+        }
+      } else if (activeMode === 'role') {
+        const roles = [...modal.querySelectorAll('.prc-role-cb:checked')].map(cb => cb.value);
+        (state.users || []).forEach(u => {
+          if (roles.includes(u.role) && u.id !== state.user.id && !selected.includes(u.id)) selected.push(u.id);
+        });
+      }
       if (selected.length === 0) { showError(t('prc_no_participants')||'Select at least one participant'); return; }
       const res = await apiPost('/api/person-ready-check', { participant_ids: selected });
       if (res.ok) {
@@ -10613,6 +10716,18 @@ function _openReferenceUploadModal() {
           <div id="refUrlGroup" style="display:none">
             <label style="margin-top:8px">${t('ref_url_label') || 'URL'}</label>
             <input type="url" id="refUpUrl" class="form-input" placeholder="${t('ref_url_placeholder') || 'https://example.com/document'}">
+            <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);cursor:pointer">
+                <input type="checkbox" id="refDownloadLocal" checked style="accent-color:var(--accent)">
+                ${t('ref_download_local') || 'Download local copy'}
+                <span title="${t('ref_download_local_info') || 'Download a local copy of this URL to your browser.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);cursor:pointer">
+                <input type="checkbox" id="refDownloadServer" checked style="accent-color:var(--accent)">
+                ${t('ref_download_server') || 'Save copy to server'}
+                <span title="${t('ref_download_server_info') || 'Save a cached copy of this URL on the Tidslinjal server.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+              </label>
+            </div>
           </div>
           <div id="refLocalGroup" style="display:none">
             <label style="margin-top:8px">${t('ref_local_content') || 'Content'}</label>
@@ -10669,16 +10784,31 @@ async function _handleReferenceUpload() {
     // URL reference
     const url = document.getElementById('refUpUrl')?.value?.trim() || '';
     if (!url) { alert('URL is required'); return; }
+    const downloadLocal = document.getElementById('refDownloadLocal')?.checked ?? true;
+    const downloadServer = document.getElementById('refDownloadServer')?.checked ?? true;
     const body = {
       title, url,
       description: document.getElementById('refUpDesc').value.trim(),
       category: document.getElementById('refUpCategory').value,
       tags: document.getElementById('refUpTags').value.trim(),
-      ref_type: 'url'
+      ref_type: 'url',
+      download_local: downloadLocal,
+      download_server: downloadServer,
     };
     try {
       const res = await api('POST', '/api/references/link', body);
       if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      // Trigger local browser download if option was checked
+      if (downloadLocal && url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.download = title || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
     } catch (e) { alert('Error: ' + e.message); }

@@ -5690,13 +5690,15 @@ func (app *App) routes() http.Handler {
 		if r.Method == http.MethodPost {
 			app.requireRole(RoleTeamLead, func(w http.ResponseWriter, r *http.Request, user *User) {
 				var req struct {
-					Title       string `json:"title"`
-					Description string `json:"description"`
-					Category    string `json:"category"`
-					Tags        string `json:"tags"`
-					RefType     string `json:"ref_type"`
-					URL         string `json:"url"`
-					Content     string `json:"content"`
+					Title          string `json:"title"`
+					Description    string `json:"description"`
+					Category       string `json:"category"`
+					Tags           string `json:"tags"`
+					RefType        string `json:"ref_type"`
+					URL            string `json:"url"`
+					Content        string `json:"content"`
+					DownloadLocal  bool   `json:"download_local"`
+					DownloadServer bool   `json:"download_server"`
 				}
 				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 					http.Error(w, "invalid request", http.StatusBadRequest)
@@ -5707,6 +5709,29 @@ func (app *App) routes() http.Handler {
 					return
 				}
 				ref := app.store.CreateReferenceLink(req.Title, req.Description, req.Category, req.Tags, req.RefType, req.URL, req.Content, user.ID, user.DisplayName)
+				// If download_server is set and URL is provided, fetch and cache the URL content
+				if req.DownloadServer && req.URL != "" && req.RefType == "url" {
+					go func() {
+						resp, err := http.Get(req.URL) //nolint:gosec
+						if err != nil {
+							logVerbose("[reference] failed to download URL %s: %v", req.URL, err)
+							return
+						}
+						defer resp.Body.Close()
+						body, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20)) // 50MB limit
+						if err != nil {
+							logVerbose("[reference] failed to read URL %s: %v", req.URL, err)
+							return
+						}
+						refDir := filepath.Join(app.store.DataDir(), "references")
+						fname := fmt.Sprintf("ref_%d_cached", ref.ID)
+						if err := os.WriteFile(filepath.Join(refDir, fname), body, 0600); err != nil {
+							logVerbose("[reference] failed to save cached copy: %v", err)
+							return
+						}
+						logVerbose("[reference] cached URL %s as %s (%d bytes)", req.URL, fname, len(body))
+					}()
+				}
 				jsonOK(w, ref)
 			})(w, r)
 		} else {
@@ -5759,6 +5784,8 @@ func (app *App) routes() http.Handler {
 					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.json"`, filename))
 					json.NewEncoder(w).Encode(data)
 				}
+				app.audit(user.ID, user.DisplayName, "exported", "logs", 0,
+					fmt.Sprintf("Exported %s log in %s format", logType, format))
 			})(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -5773,6 +5800,8 @@ func (app *App) routes() http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("Content-Disposition", `attachment; filename="tidslinjal_settings.json"`)
 				json.NewEncoder(w).Encode(settings)
+				app.audit(user.ID, user.DisplayName, "exported", "settings", 0,
+					"Exported application settings")
 			})(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -9025,6 +9054,7 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"registration.json", "invitations.json", "oidc.json", "mail.json",
 		"apikeys.json", "filter_presets.json", "event_versions.json",
 		"decision_log.json", "event_log.json", "log_book.json",
+		"map_resources.json", "references.json", "rooms.json", "custom_resource_types.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)
@@ -9101,6 +9131,9 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 		"exercise.json": true, "comments.json": true, "phases.json": true,
 		"templates.json": true, "roles.json": true, "registration.json": true,
 		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
+		"map_resources.json": true, "references.json": true, "rooms.json": true,
+		"custom_resource_types.json": true, "decision_log.json": true,
+		"event_log.json": true, "log_book.json": true,
 	}
 	// Note: users.json, sessions.json, apikeys.json, oidc.json, mail.json excluded for security
 	restored := 0

@@ -1067,6 +1067,63 @@ const TRANSLATIONS = {
     boot_gradual_backup:       'Gradual backup',
     boot_api_keys:             'API keys',
     boot_rate_limits:          'Rate limits',
+
+    // Red line settings (i18n)
+    settings_red_line_enabled: 'Show current-time line',
+    settings_red_line_enabled_info: 'Displays a vertical line on the timeline at the current time position.',
+    settings_synth_label_info: 'Shows elapsed time (H+N) label next to the current-time line.',
+    settings_red_line_color_label: 'Color',
+    settings_red_line_width_label: 'Width (px)',
+    settings_red_line_style_label: 'Line style',
+    settings_red_line_style_solid: 'Solid',
+    settings_red_line_style_dashed: 'Dashed',
+    settings_red_line_style_dotted: 'Dotted',
+
+    // Event icons setting (i18n)
+    settings_event_icons:      'Event Icons',
+    settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
+    settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
+
+    // Hover zoom (i18n)
+    settings_hover_zoom:       'Hover Zoom',
+    settings_hover_zoom_desc:  'Enlarge calendar events on hover',
+    settings_hover_zoom_info:  'When enabled, hovering over a timeline event will enlarge it for easier reading.',
+
+    // View spacing (i18n)
+    settings_view_spacing:     'Vertical Spacing',
+    settings_view_spacing_desc:'Vertical spacing multiplier for timeline rows.',
+    settings_view_spacing_info:'Adjust the vertical spacing between rows on the timeline.',
+
+    // Person ready check additions
+    prc_filter_online:         'Online only',
+    prc_filter_all:            'All users',
+    prc_send_to_group:         'Send to group/team',
+    prc_send_to_role:          'Send to role',
+    prc_select_mode:           'Select by',
+    prc_mode_individual:       'Individual',
+    prc_mode_group:            'Group / Team',
+    prc_mode_role:             'Role',
+
+    // Reference download options
+    ref_download_local:        'Download local copy',
+    ref_download_server:       'Save copy to server',
+    ref_download_local_info:   'Download a local copy of this URL to your browser.',
+    ref_download_server_info:  'Save a cached copy of this URL on the Tidslinjal server.',
+
+    // Auto-busy availability
+    settings_auto_busy:        'Auto-busy on activities',
+    settings_auto_busy_desc:   'Automatically set your availability to "busy" while a scheduled activity you are invited to is ongoing.',
+    settings_auto_busy_info:   'When enabled, your status changes to "busy" during scheduled activities and returns to your previous status afterward.',
+
+    // Push notifications info
+    settings_push_alarms_info: 'Receive browser notifications when alarms trigger.',
+    settings_push_event_info:  'Receive browser notifications when other users modify events.',
+
+    // Offline mode info
+    settings_force_offline_info: 'Force the application into offline mode, using locally cached data only.',
+
+    // Artificial time info
+    settings_artificial_time_info: 'Override the current time for exercise simulation purposes.',
   },
 
   sv: {
@@ -2044,6 +2101,52 @@ const TRANSLATIONS = {
     legend_test_cases:         'Testfall',
     legend_unit_tests:         'Enhetstester',
     legend_tests_run:          'Tester utförda',
+
+    // Red line settings (i18n)
+    settings_red_line_enabled: 'Visa nulägesspår',
+    settings_red_line_enabled_info: 'Visar en vertikal linje på tidslinjen vid aktuell tidpunkt.',
+    settings_synth_label_info: 'Visar förfluten tid (H+N) bredvid nulägeslinjen.',
+    settings_red_line_color_label: 'Färg',
+    settings_red_line_width_label: 'Bredd (px)',
+    settings_red_line_style_label: 'Linjetyp',
+    settings_red_line_style_solid: 'Heldragen',
+    settings_red_line_style_dashed: 'Streckad',
+    settings_red_line_style_dotted: 'Prickad',
+
+    settings_event_icons:      'Händelseikoner',
+    settings_show_event_icons: 'Visa ikoner på händelser (typ, bilagor, etc.)',
+    settings_show_event_icons_info: 'Visar små ikoner på tidslinjehändelser som anger typ, bilagor och andra attribut.',
+
+    settings_hover_zoom:       'Hoverzoom',
+    settings_hover_zoom_desc:  'Förstorar kalenderhändelser vid hovring',
+    settings_hover_zoom_info:  'Vid aktivering förstoras en tidslinjehändelse när du hovrar över den.',
+
+    settings_view_spacing:     'Vertikal avstånd',
+    settings_view_spacing_desc:'Vertikal avståndsmultiplikator för tidslinjerader.',
+    settings_view_spacing_info:'Justera vertikalt avstånd mellan rader på tidslinjen.',
+
+    prc_filter_online:         'Bara online',
+    prc_filter_all:            'Alla användare',
+    prc_send_to_group:         'Skicka till grupp/team',
+    prc_send_to_role:          'Skicka till roll',
+    prc_select_mode:           'Välj per',
+    prc_mode_individual:       'Individuell',
+    prc_mode_group:            'Grupp / Team',
+    prc_mode_role:             'Roll',
+
+    ref_download_local:        'Ladda ner lokal kopia',
+    ref_download_server:       'Spara kopia på server',
+    ref_download_local_info:   'Ladda ner en lokal kopia av denna URL till din webbläsare.',
+    ref_download_server_info:  'Spara en cachad kopia av denna URL på Tidslinjal-servern.',
+
+    settings_auto_busy:        'Automatisk upptagen vid aktiviteter',
+    settings_auto_busy_desc:   'Ställ automatiskt in din tillgänglighet som "upptagen" under en schemalagd aktivitet du är inbjuden till.',
+    settings_auto_busy_info:   'Vid aktivering ändras din status till "upptagen" under schemalagda aktiviteter och återgår efteråt.',
+
+    settings_push_alarms_info: 'Få webbläsaraviseringar när alarm utlöses.',
+    settings_push_event_info:  'Få webbläsaraviseringar när andra användare ändrar händelser.',
+    settings_force_offline_info: 'Tvinga applikationen till offlineläge med lokalt cachad data.',
+    settings_artificial_time_info: 'Åsidosätt aktuell tid för övningssimulering.',
   },
 
   fr: {
@@ -3020,6 +3123,52 @@ const TRANSLATIONS = {
     legend_test_cases:         'Cas de test',
     legend_unit_tests:         'Tests unitaires',
     legend_tests_run:          'Tests effectués',
+
+    // Red line settings (i18n)
+    settings_red_line_enabled: 'Afficher la ligne de temps actuel',
+    settings_red_line_enabled_info: 'Affiche une ligne verticale sur la chronologie à la position actuelle.',
+    settings_synth_label_info: 'Affiche le temps écoulé (H+N) à côté de la ligne de temps actuel.',
+    settings_red_line_color_label: 'Couleur',
+    settings_red_line_width_label: 'Largeur (px)',
+    settings_red_line_style_label: 'Style de ligne',
+    settings_red_line_style_solid: 'Plein',
+    settings_red_line_style_dashed: 'Tirets',
+    settings_red_line_style_dotted: 'Pointillé',
+
+    settings_event_icons:      'Icônes d\'événements',
+    settings_show_event_icons: 'Afficher les icônes sur les événements (type, pièces jointes, etc.)',
+    settings_show_event_icons_info: 'Affiche de petites icônes sur les événements indiquant leur type, pièces jointes et autres attributs.',
+
+    settings_hover_zoom:       'Zoom au survol',
+    settings_hover_zoom_desc:  'Agrandir les événements au survol',
+    settings_hover_zoom_info:  'Lorsqu\'activé, le survol d\'un événement l\'agrandit pour une lecture plus facile.',
+
+    settings_view_spacing:     'Espacement vertical',
+    settings_view_spacing_desc:'Multiplicateur d\'espacement vertical pour les lignes de la chronologie.',
+    settings_view_spacing_info:'Ajuster l\'espacement vertical entre les lignes de la chronologie.',
+
+    prc_filter_online:         'En ligne uniquement',
+    prc_filter_all:            'Tous les utilisateurs',
+    prc_send_to_group:         'Envoyer au groupe/équipe',
+    prc_send_to_role:          'Envoyer au rôle',
+    prc_select_mode:           'Sélectionner par',
+    prc_mode_individual:       'Individuel',
+    prc_mode_group:            'Groupe / Équipe',
+    prc_mode_role:             'Rôle',
+
+    ref_download_local:        'Télécharger une copie locale',
+    ref_download_server:       'Sauvegarder une copie sur le serveur',
+    ref_download_local_info:   'Télécharger une copie locale de cette URL dans votre navigateur.',
+    ref_download_server_info:  'Sauvegarder une copie en cache de cette URL sur le serveur Tidslinjal.',
+
+    settings_auto_busy:        'Occupation auto pendant les activités',
+    settings_auto_busy_desc:   'Définir automatiquement votre disponibilité comme « occupé » pendant une activité planifiée à laquelle vous êtes invité.',
+    settings_auto_busy_info:   'Lorsqu\'activé, votre statut passe à « occupé » pendant les activités planifiées et revient ensuite.',
+
+    settings_push_alarms_info: 'Recevoir des notifications du navigateur lorsque les alarmes se déclenchent.',
+    settings_push_event_info:  'Recevoir des notifications du navigateur lorsque d\'autres utilisateurs modifient des événements.',
+    settings_force_offline_info: 'Forcer l\'application en mode hors ligne avec des données en cache local uniquement.',
+    settings_artificial_time_info: 'Remplacer l\'heure actuelle pour la simulation d\'exercice.',
   }
 };
 

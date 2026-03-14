@@ -1771,6 +1771,9 @@ type ExportData struct {
 	DecisionLog  []DecisionLogEntry `json:"decision_log,omitempty"`
 	Comments     []EventComment     `json:"comments,omitempty"`
 	RoleConfigs  []RoleConfig       `json:"role_configs,omitempty"`
+	MapResources []MapResource      `json:"map_resources,omitempty"`
+	References   []ReferenceDoc     `json:"references,omitempty"`
+	Rooms        []Room             `json:"rooms,omitempty"`
 }
 
 func (s *Store) GetExportData() ExportData {
@@ -1798,20 +1801,29 @@ func (s *Store) GetExportData() ExportData {
 	copy(comments, s.comments)
 	roleConfigs := make([]RoleConfig, len(s.roleConfigs))
 	copy(roleConfigs, s.roleConfigs)
+	mapResources := make([]MapResource, len(s.mapResources))
+	copy(mapResources, s.mapResources)
+	referenceDocs := make([]ReferenceDoc, len(s.referenceDocs))
+	copy(referenceDocs, s.referenceDocs)
+	rooms := make([]Room, len(s.rooms))
+	copy(rooms, s.rooms)
 	return ExportData{
-		Version:     AppVersion,
-		ExportAt:    time.Now(),
-		Events:      events,
-		Users:       users,
-		Groups:      groups,
-		Layers:      layers,
-		Alarms:      alarms,
-		Exercise:    s.exercise,
-		Phases:      phases,
-		EventTypes:  eventTypes,
-		DecisionLog: decisionLog,
-		Comments:    comments,
-		RoleConfigs: roleConfigs,
+		Version:      AppVersion,
+		ExportAt:     time.Now(),
+		Events:       events,
+		Users:        users,
+		Groups:       groups,
+		Layers:       layers,
+		Alarms:       alarms,
+		Exercise:     s.exercise,
+		Phases:       phases,
+		EventTypes:   eventTypes,
+		DecisionLog:  decisionLog,
+		Comments:     comments,
+		RoleConfigs:  roleConfigs,
+		MapResources: mapResources,
+		References:   referenceDocs,
+		Rooms:        rooms,
 	}
 }
 
@@ -1875,6 +1887,18 @@ func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include m
 	if include["role_configs"] && isPrivileged {
 		out.RoleConfigs = make([]RoleConfig, len(s.roleConfigs))
 		copy(out.RoleConfigs, s.roleConfigs)
+	}
+	if include["map_resources"] || include["maps"] {
+		out.MapResources = make([]MapResource, len(s.mapResources))
+		copy(out.MapResources, s.mapResources)
+	}
+	if include["references"] {
+		out.References = make([]ReferenceDoc, len(s.referenceDocs))
+		copy(out.References, s.referenceDocs)
+	}
+	if include["rooms"] {
+		out.Rooms = make([]Room, len(s.rooms))
+		copy(out.Rooms, s.rooms)
 	}
 	return out
 }
