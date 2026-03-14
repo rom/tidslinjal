@@ -350,7 +350,9 @@ function updateExtraClocks(now) {
     const n = now || new Date();
     const pad = x => String(x).padStart(2,'0');
     try {
-      const timeStr = n.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone: ec.timezone});
+      const rawTime = n.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, timeZone: ec.timezone});
+      const sep = _getTimeSeparator();
+      const timeStr = sep === '.' ? rawTime.replace(/:/g, '.') : rawTime;
       const tzAbbr  = n.toLocaleTimeString('en-GB', {timeZoneName:'short', timeZone: ec.timezone}).split(' ').pop();
       const tEl = document.getElementById(`${id}-time`);
       const zEl = document.getElementById(`${id}-tz`);

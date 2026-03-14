@@ -48,6 +48,8 @@ window.state = {
     help_url:            '',
     training_url:        '',
     demo_url:            '',
+    time_separator:      'colon',
+    show_lang_flags:     true,
   },
   resolution:    'hour',
   range:         'week',
