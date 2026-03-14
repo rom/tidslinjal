@@ -142,6 +142,9 @@ function applyPreferences() {
   const ttDelay = state.preferences.tooltip_delay || 0;
   document.documentElement.style.setProperty('--tooltip-delay', ttDelay + 'ms');
   updateLangFlags();
+  // Show/hide language flags in toolbar
+  const langFlagsEl = document.getElementById('langFlags');
+  if (langFlagsEl) langFlagsEl.style.display = state.preferences.show_lang_flags === false ? 'none' : '';
   // Broadcast theme to detached windows
   if (typeof _broadcastSync === 'function') {
     _broadcastSync({ type: 'theme', theme: state.preferences.theme || 'dark' });
@@ -2244,9 +2247,11 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('info_connection')||'Connection'}</div>
         <div style="font-size:var(--fs-sm);display:flex;align-items:center;gap:8px;padding:4px 0">
-          ${navigator.onLine
-            ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></span><span style="color:#22c55e;font-weight:600">Online</span>'
-            : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red,#E74C3C)"></span><span style="color:var(--red,#E74C3C);font-weight:600">Offline</span>'}
+          ${window._offlineModeForced
+            ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b"></span><span style="color:#f59e0b;font-weight:600">' + (t('info_forced_offline')||'Forced Offline') + '</span>'
+            : navigator.onLine
+              ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e"></span><span style="color:#22c55e;font-weight:600">' + (t('info_online')||'Online') + '</span>'
+              : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red,#E74C3C)"></span><span style="color:var(--red,#E74C3C);font-weight:600">' + (t('info_offline')||'Offline') + '</span>'}
         </div>
       </div>
       <div class="sidebar-section">
@@ -2302,7 +2307,7 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_uptime')||'Server Uptime'}:</span><span>${vInfo.uptime || '—'}</span>
           <span style="color:var(--text-dim)">${t('info_started_at')||'Started'}:</span><span>${vInfo.started_at ? new Date(vInfo.started_at).toLocaleString(getLocale()) : '—'}</span>
-          <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${navigator.onLine ? '<span style="color:#22c55e">● Online</span>' : '<span style="color:var(--red,#E74C3C)">● Offline</span>'}</span>
+          <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${window._offlineModeForced ? '<span style="color:#f59e0b">● ' + (t('info_forced_offline')||'Forced Offline') + '</span>' : navigator.onLine ? '<span style="color:#22c55e">● ' + (t('info_online')||'Online') + '</span>' : '<span style="color:var(--red,#E74C3C)">● ' + (t('info_offline')||'Offline') + '</span>'}</span>
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
       </div>
@@ -3629,6 +3634,12 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' >FI</button>
           <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' >DA</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
+          <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_lang_flags"
+            style="accent-color:var(--accent)">
+          ${t('settings_show_lang_flags')||'Show language flags in toolbar'}
+        </label>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>

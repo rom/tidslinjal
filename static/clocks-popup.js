@@ -52,6 +52,7 @@ let vcrColor = 'red';
 let _lastLang = '';
 let _localIsUTC = null; // null = follow opener, true/false = local override
 let _hourFormat = '24'; // '24' | '12'
+let _timeSep = ':';     // ':' | '.'
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
@@ -118,6 +119,7 @@ try {
     }
     if (e.data && e.data.type === 'time-format') {
       _hourFormat = e.data.time_format === '12h' ? '12' : '24';
+      if (e.data.time_separator) _timeSep = e.data.time_separator === 'dot' ? '.' : ':';
       var btn24 = document.getElementById('btnFmt24');
       var btn12 = document.getElementById('btnFmt12');
       if (btn24) btn24.classList.toggle('active', _hourFormat === '24');
@@ -335,7 +337,7 @@ function setHourFormat(fmt) {
 function formatHour12(h, m, s) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
-  return pad(h12) + ':' + pad(m) + ':' + pad(s) + ' ' + ampm;
+  return pad(h12) + _timeSep + pad(m) + _timeSep + pad(s) + ' ' + ampm;
 }
 
 /* ── Remove a clock by calling parent ── */
@@ -450,7 +452,7 @@ function tick() {
     if (_hourFormat === '12') {
       timeStr = formatHour12(h,m,s);
     } else {
-      timeStr = pad(h)+':'+pad(m)+':'+pad(s);
+      timeStr = pad(h)+_timeSep+pad(m)+_timeSep+pad(s);
     }
     dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
     try { tzLabel=now.toLocaleTimeString(locale,{timeZoneName:'short'}).split(' ').pop(); } catch{tzLabel='';}
@@ -482,7 +484,7 @@ function tick() {
       if (_hourFormat === '12') {
         ecTStr = formatHour12(ecH, ecM, ecS);
       } else {
-        ecTStr = ecTime.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:ec.timezone});
+        ecTStr = pad(ecH)+_timeSep+pad(ecM)+_timeSep+pad(ecS);
       }
       const ecTZ = ecTime.toLocaleTimeString('en-GB',{timeZoneName:'short',timeZone:ec.timezone}).split(' ').pop()||ec.timezone;
       const ecDispH = _hourFormat === '12' ? (ecH % 12 || 12) : ecH;
@@ -865,7 +867,7 @@ function displayCountdownTime(id, ms, isOvertime) {
   if (clockMode === 'vcr') {
     el.innerHTML = (isOvertime ? buildSeg7Text('+') : '') + buildSeg7Time(h, m, s);
   } else {
-    el.textContent = prefix + pad(h) + ':' + pad(m) + ':' + pad(s);
+    el.textContent = prefix + pad(h) + _timeSep + pad(m) + _timeSep + pad(s);
   }
   // Update card classes and overtime color
   const card = document.getElementById('cd-card-' + id);
@@ -1211,7 +1213,7 @@ function tickTimers() {
     if (clockMode === 'vcr') {
       el.innerHTML = buildSeg7Time(h, m, s);
     } else {
-      el.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+      el.textContent = pad(h) + _timeSep + pad(m) + _timeSep + pad(s);
     }
 
     // Update progress bar
@@ -1733,10 +1735,12 @@ try {
   if (cdInput) cdInput.value = cs.getPropertyValue('--accent').trim() || '#4a9eff';
 } catch(e) {}
 
-// Sync time format from opener
+// Sync time format and separator from opener
 try {
   var _opTf = window.opener?.state?.preferences?.time_format;
   if (_opTf === '12h') _hourFormat = '12';
+  var _opTs = window.opener?.state?.preferences?.time_separator;
+  if (_opTs === 'dot') _timeSep = '.';
 } catch(e) {}
 
 // Initial build + start ticking

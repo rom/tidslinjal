@@ -270,6 +270,10 @@ type UserPreferences struct {
 	WorkspacePresets   []WorkspacePreset `json:"workspace_presets,omitempty"`  // saved workspace presets
 	WelcomeURL         string   `json:"welcome_url,omitempty"`          // default welcome URL for banner
 	HelpURL            string   `json:"help_url,omitempty"`             // default help URL for banner
+	TrainingURL        string   `json:"training_url,omitempty"`         // training URL for welcome banner
+	DemoURL            string   `json:"demo_url,omitempty"`             // demo URL for welcome banner
+	TimeSeparator      string   `json:"time_separator,omitempty"`       // colon | dot (default: colon)
+	ShowLangFlags      *bool    `json:"show_lang_flags,omitempty"`      // show language flags in toolbar (default: true)
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click
