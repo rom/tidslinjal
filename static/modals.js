@@ -2210,7 +2210,7 @@ function renderSidebar() {
     const activeLayers = state.layers.filter(l => isLayerActive(l.id));
     const isSynthActive = synthActive ? synthActive() : false;
     const lastTemplate = (state.exercise && state.exercise.last_template) || state.lastAppliedTemplate || null;
-    const langLabel = {en:'English 🇬🇧', sv:'Svenska 🇸🇪', fr:'Français 🇫🇷'}[lang] || lang;
+    const langLabel = {en:'English 🇬🇧', sv:'Svenska 🇸🇪', fr:'Français 🇫🇷', fi:'Suomi 🇫🇮', da:'Dansk 🇩🇰'}[lang] || lang;
     const vInfo = state._versionInfo || {};
     const gbStatus = state._gradualBackupStatus || null;
     el.innerHTML = `
@@ -6396,7 +6396,7 @@ function updateUILabels() {
 
 function updateLangFlags() {
   const lang = (state.preferences && state.preferences.language) || 'en';
-  ['EN', 'SV', 'FR'].forEach(code => {
+  ['EN', 'SV', 'FR', 'FI', 'DA'].forEach(code => {
     const btn = document.getElementById('flag'+code);
     if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
   });
@@ -11013,7 +11013,7 @@ function _filterReferences() {
   }
   const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
   const _langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский'};
-  const _copyModeLabels = {central:t('ref_copy_central'),local:t('ref_copy_local'),link:t('ref_copy_link')};
+  const _copyModeLabels = {central:t('ref_copy_central'),local:t('ref_copy_local'),link:t('ref_copy_link'),git:t('ref_copy_git')||'Push to Git'};
   listEl.innerHTML = refs.map(r => {
     const sizeStr = r.size ? fmtFileSize(r.size) : '';
     const dateStr = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString(getLocale()) : '';
@@ -11028,7 +11028,8 @@ function _filterReferences() {
         <div style="display:flex;gap:4px">
           ${r.ref_type === 'url' ? `<a href="${escHtml(r.url || '')}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:10px">🔗 Open</a>` :
             r.ref_type === 'local' ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-view-local="${r.id}">📄 View</button><span id="refLocal_${r.id}" style="display:none">${escHtml(r.content || '')}</span>` :
-            `<a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">${t('detail_download')||'Download'}</a>`}
+            `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-show="${r.id}">👁 ${t('ref_show')||'Show'}</button><a href="/api/references/${r.id}/download" target="_blank" class="btn btn-secondary btn-sm" style="font-size:10px">${t('detail_download')||'Download'}</a>`}
+          ${r.ref_type === 'url' && r.filename ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-show="${r.id}">👁 ${t('ref_show')||'Show'}</button>` : ''}
           ${r.checksum_md5 ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-checksums="${r.id}" title="${t('ref_checksums')}">#️⃣</button>` : ''}
           ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px" data-ref-edit="${r.id}">✏️</button>` : ''}
           ${canEdit ? `<button class="btn btn-secondary btn-sm" style="font-size:10px;color:var(--red)" data-ref-delete="${r.id}">${t('btn_delete')}</button>` : ''}
@@ -11049,9 +11050,14 @@ function _filterReferences() {
   // Bind reference action buttons (CSP-safe, no inline onclick)
   listEl.querySelectorAll('[data-ref-view-local]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const content = document.getElementById('refLocal_' + btn.dataset.refViewLocal)?.textContent || '';
-      alert(content);
+      const id = parseInt(btn.dataset.refViewLocal, 10);
+      const ref = (state.references || []).find(r => r.id === id);
+      const content = document.getElementById('refLocal_' + id)?.textContent || '';
+      _showReferenceInWindow(ref, content);
     });
+  });
+  listEl.querySelectorAll('[data-ref-show]').forEach(btn => {
+    btn.addEventListener('click', () => _showReferenceInWindow((state.references || []).find(r => r.id === parseInt(btn.dataset.refShow, 10))));
   });
   listEl.querySelectorAll('[data-ref-checksums]').forEach(btn => {
     btn.addEventListener('click', () => _showRefChecksums(parseInt(btn.dataset.refChecksums, 10)));
@@ -11064,6 +11070,34 @@ function _filterReferences() {
       if (confirm(t('ref_delete_confirm') || 'Delete this reference?')) _deleteReference(parseInt(btn.dataset.refDelete, 10));
     });
   });
+}
+
+function _showReferenceInWindow(ref, localContent) {
+  if (!ref) return;
+  const theme = state?.preferences?.theme || 'dark';
+  const title = 'Tidslinjal — ' + (ref.title || 'Reference');
+  if (ref.ref_type === 'local' || localContent) {
+    // Display inline content in a new window
+    const w = window.open('', '_blank', 'width=800,height=600,resizable=yes,scrollbars=yes');
+    if (!w) return;
+    const content = localContent || ref.content || '';
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title>
+<style>body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#212630;color:#c8d0e0}body{font-family:'Segoe UI',system-ui,sans-serif;padding:24px;white-space:pre-wrap;line-height:1.6}</style>
+</head><body class="theme-${escHtml(theme)}">${escHtml(content)}</body></html>`);
+    w.document.close();
+    return;
+  }
+  if (ref.ref_type === 'url' && ref.url) {
+    // For URL references that also have a server-cached file, show from server
+    if (ref.filename) {
+      window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
+    } else {
+      window.open(ref.url, '_blank');
+    }
+    return;
+  }
+  // File-type reference — open inline via download endpoint
+  window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
 }
 
 async function _deleteReference(id) {
@@ -11173,7 +11207,7 @@ function _openReferenceUploadModal() {
           <input type="text" id="refUpCustodian" class="form-input" placeholder="${t('ref_custodian_placeholder') || 'Document custodian'}">
           <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
           <select id="refUpCopyMode" class="form-input">
-            <option value="">—</option><option value="central">${t('ref_copy_central') || 'Central copy'}</option><option value="local">${t('ref_copy_local') || 'Local copy'}</option><option value="link">${t('ref_copy_link') || 'Show link'}</option>
+            <option value="">—</option><option value="central">${t('ref_copy_central') || 'Central copy'}</option><option value="local">${t('ref_copy_local') || 'Local copy'}</option><option value="link">${t('ref_copy_link') || 'Show link'}</option><option value="git">${t('ref_copy_git') || 'Push to Git'}</option>
           </select>
           <label style="margin-top:8px">Tags (comma-separated)</label>
           <input type="text" id="refUpTags" class="form-input" placeholder="tag1, tag2, ...">
@@ -11356,7 +11390,7 @@ function _openRefEditModal(id) {
   const ref = (state.references || []).find(r => r.id === id);
   if (!ref) return;
   const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'no',l:'Norsk'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'}];
-  const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'}];
+  const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'},{v:'git',l:t('ref_copy_git')||'Push to Git'}];
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal" style="max-width:460px">

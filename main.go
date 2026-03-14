@@ -10045,15 +10045,39 @@ func (app *App) handleDownloadReference(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// Handle URL-type references that have no stored file
+	if rd.Filename == "" {
+		if rd.RefType == "url" && rd.URL != "" {
+			http.Redirect(w, r, rd.URL, http.StatusFound)
+			return
+		}
+		if rd.RefType == "local" && rd.Content != "" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("Content-Disposition", "inline")
+			w.Write([]byte(rd.Content))
+			return
+		}
+		jsonError(w, "no file stored for this reference", http.StatusNotFound)
+		return
+	}
 	filePath := filepath.Join(app.store.ReferenceDir(), rd.Filename)
-	w.Header().Set("Content-Type", rd.ContentType)
+	ct := rd.ContentType
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", ct)
 	safeDisp := strings.Map(func(r rune) rune {
 		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
 			return -1
 		}
 		return r
 	}, rd.OriginalName)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
+	// Support inline display via ?inline=1 query parameter
+	if r.URL.Query().Get("inline") == "1" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, safeDisp))
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
+	}
 	http.ServeFile(w, r, filePath)
 }
 
