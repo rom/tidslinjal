@@ -574,13 +574,23 @@ function _renderMapTabs() {
     div.className = 'map-tab' + (tab.id === _activeTabId ? ' active' : '');
     div.dataset.mapId = tab.id;
     div.title = tab.label;
-    div.innerHTML = escH(tab.label) + (tab.id ? '<span class="tab-close" data-close-tab="' + tab.id + '"> ×</span>' : '');
+    div.innerHTML = escH(tab.label) +
+      '<span class="tab-detach" data-detach-tab="' + tab.id + '" title="' + (_t('map_detach_tab') || 'Detach to new window') + '"> ⧉</span>' +
+      (tab.id ? '<span class="tab-close" data-close-tab="' + tab.id + '"> ×</span>' : '');
     div.addEventListener('click', (e) => {
       if (e.target.dataset.closeTab !== undefined) return;
+      if (e.target.dataset.detachTab !== undefined) return;
       _activeTabId = tab.id;
       switchMap(tab.id);
       _renderMapTabs();
     });
+    const detachBtn = div.querySelector('[data-detach-tab]');
+    if (detachBtn) {
+      detachBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _detachMapTab(tab);
+      });
+    }
     const closeBtn = div.querySelector('[data-close-tab]');
     if (closeBtn) {
       closeBtn.addEventListener('click', (e) => {
@@ -611,6 +621,33 @@ document.getElementById('mapSelector').addEventListener('change', function() {
   _renderMapTabs();
 });
 
+/* ── Detach a map tab into its own window ── */
+function _detachMapTab(tab) {
+  const w = Math.min(window.screen.availWidth, 900);
+  const h = Math.min(window.screen.availHeight - 100, 650);
+  const mapUrl = '/static/map-popup.html' + (tab.id ? '?mapId=' + encodeURIComponent(tab.id) : '');
+  window.open(mapUrl, 'tidslinjal-map-' + (tab.id || 'osm'),
+    'width=' + w + ',height=' + h + ',resizable=yes,scrollbars=yes');
+}
+
+/* ── On load: check URL params for specific map to show ── */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const mapId = params.get('mapId');
+  if (mapId) {
+    // Wait for map resources to load, then switch to the specified map
+    const _waitAndSwitch = setInterval(() => {
+      if (typeof switchMap === 'function' && _map) {
+        clearInterval(_waitAndSwitch);
+        _activeTabId = mapId;
+        switchMap(mapId);
+        _renderMapTabs();
+      }
+    }, 200);
+    setTimeout(() => clearInterval(_waitAndSwitch), 10000);
+  }
+})();
+
 /* ── Legend toggle ── */
 let _legendVisible = true;
 document.getElementById('btnToggleLegend').addEventListener('click', function() {
@@ -619,6 +656,35 @@ document.getElementById('btnToggleLegend').addEventListener('click', function() 
   if (legend) legend.style.display = _legendVisible ? '' : 'none';
   this.classList.toggle('active', _legendVisible);
 });
+
+/* ── Legend drag-to-reposition ── */
+(function() {
+  const legend = document.getElementById('mapLegend');
+  if (!legend) return;
+  let _dragOffsetX = 0, _dragOffsetY = 0, _dragging = false;
+  legend.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    _dragging = true;
+    legend.classList.add('dragging');
+    const rect = legend.getBoundingClientRect();
+    _dragOffsetX = e.clientX - rect.left;
+    _dragOffsetY = e.clientY - rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_dragging) return;
+    legend.style.left = (e.clientX - _dragOffsetX) + 'px';
+    legend.style.top = (e.clientY - _dragOffsetY) + 'px';
+    legend.style.right = 'auto';
+    legend.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', function() {
+    if (_dragging) {
+      _dragging = false;
+      legend.classList.remove('dragging');
+    }
+  });
+})();
 
 /* ── Enhanced zoom for image maps ── */
 function _enhanceZoom() {

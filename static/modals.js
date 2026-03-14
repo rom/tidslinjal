@@ -1425,10 +1425,13 @@ async function openUserModal(user) {
         user.signal_handle ? `<strong>Signal:</strong> ${escHtml(user.signal_handle)}` : '',
         user.location ? `<strong>${t('user_location')||'Location'}:</strong> ${escHtml(user.location)}` : '',
       ].filter(Boolean);
+      const failedLoginStr = user.last_failed_login_at ? fmtDateTime(new Date(user.last_failed_login_at)) : '—';
+      const failedLoginIP = user.last_failed_login_ip || '—';
       uUserInfo.innerHTML = `
         <strong>${t('user_created_at')||'Created'}:</strong> ${escHtml(createdStr)}<br>
         <strong>${t('user_last_login')||'Last login'}:</strong> ${lastLoginStr}<br>
         <strong>${t('user_login_count')||'Logins'}:</strong> ${loginCountStr}<br>
+        <strong>${t('user_last_failed_login')||'Last failed login'}:</strong> ${failedLoginStr}${user.last_failed_login_ip ? ' (IP: ' + escHtml(failedLoginIP) + ')' : ''}<br>
         ${profileInfo.length ? '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' + profileInfo.join('<br>') : ''}
         ${blockedBadge ? '<br>' + blockedBadge : ''}
         ${ssoNote ? '<br>' + ssoNote : ''}
@@ -5315,11 +5318,29 @@ async function runReadyCheck() {
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${t('ready_check_total')||'Total activities'}: ${res.total}</p>
       </div>
       <div class="modal-footer">
+        ${!res.ready && notReady.length > 0 ? `<button class="btn btn-warning btn-sm" id="btnForceActivateAll" style="margin-right:auto;background:#E67E22;color:#fff;border:none">⚡ ${t('ready_check_force_activate')||'Force Activate All Planned'}</button>` : ''}
         <button class="btn btn-primary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
   _bindActions(modal);
+  // Force activate button
+  const forceBtn = modal.querySelector('#btnForceActivateAll');
+  if (forceBtn) {
+    forceBtn.addEventListener('click', async () => {
+      if (!confirm(t('ready_check_force_confirm') || 'Change all planned activities to active status?')) return;
+      let changed = 0;
+      for (const ev of notReady) {
+        try {
+          await patchEventStatus(ev.id, 'active', '');
+          changed++;
+        } catch (e) { /* skip */ }
+      }
+      showNotification('success', (t('ready_check_force_done') || 'All planned activities set to active') + ` (${changed})`);
+      modal.remove();
+      await refreshAll();
+    });
+  }
 }
 
 // ── Ready Check popup (wraps existing runReadyCheck) ────────────────────────
@@ -6130,6 +6151,15 @@ function connectSSE() {
           popup.remove(); // Already responded
         }
       }
+      // If the person ready check modal is open, live-update it
+      const prcModal = document.getElementById('personReadyCheckBody');
+      if (prcModal) {
+        const container = prcModal.querySelector('#prcActiveChecks');
+        if (container) {
+          // Re-load and re-render the active checks
+          _loadPersonReadyChecks(prcModal.closest('.modal-overlay'));
+        }
+      }
     } catch {}
   });
   // Decision assignment notification
@@ -6672,7 +6702,11 @@ async function confirmApplyTemplate(id) {
     closeModal('applyTemplateModal');
     closeModal('templatesModal');
     const tmpl = (state.templates || []).find(t2 => t2.id === id);
-    if (tmpl) state.lastAppliedTemplate = tmpl.name;
+    if (tmpl) {
+      state.lastAppliedTemplate = tmpl.name;
+      state.exercise = state.exercise || {};
+      state.exercise.last_template = tmpl.name;
+    }
     // If server set an exercise name from the template, update local state
     if (r.exercise_name) {
       state.exercise = state.exercise || {};
@@ -7793,6 +7827,8 @@ async function openDecisionLogModal() {
           <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
             <input type="text" id="dlTitle" placeholder="${t('decision_title_placeholder')||'Decision title (optional)'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <input type="text" id="dlReason" placeholder="${t('decision_reason_label')||'Reason for decision'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
             <textarea id="dlNewDecision" rows="3" placeholder="${t('decision_log_placeholder')||'Enter decision...'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical"></textarea>
             <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
@@ -7825,8 +7861,6 @@ async function openDecisionLogModal() {
               </label>
               <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
             </div>
-            <input type="text" id="dlReason" placeholder="${t('decision_reason_placeholder')||'Reason or background (optional)'}"
-              style="width:100%;margin-top:6px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs)">
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('decision_executor')||'Executor'}:</span>
               <select id="dlExecutorType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
@@ -7931,7 +7965,7 @@ function _renderDecisionLogEntries() {
   if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
   const canReview = hasRole2(state.user?.role, 'teamlead');
   return _decisionLogEntries.slice().reverse().map(e => {
-    const ts = new Date(e.timestamp).toLocaleString();
+    const ts = fmtDateTime(new Date(e.timestamp));
     const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
     const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
     const isAdmin = state.user?.role === 'admin';
@@ -7951,10 +7985,10 @@ function _renderDecisionLogEntries() {
       }
     } else if (e.status === 'approved') {
       statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DECIDED</span>`;
-      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     } else if (e.status === 'rejected') {
       statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REJECTED</span>`;
-      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + new Date(e.reviewed_at).toLocaleString() : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     }
     // Reason / background
     const reasonHtml = e.reason ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim);font-style:italic;border-left:3px solid var(--accent);padding-left:8px">${escHtml(e.reason)}</div>` : '';
@@ -7962,7 +7996,7 @@ function _renderDecisionLogEntries() {
     let coSignHtml = '';
     if (e.co_sign_required) {
       if (e.co_signed_by_name) {
-        coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">👁👁 Co-signed by ${escHtml(e.co_signed_by_name)}${e.co_signed_at ? ' — ' + new Date(e.co_signed_at).toLocaleString() : ''}${e.co_sign_comment ? ': ' + escHtml(e.co_sign_comment) : ''}</div>`;
+        coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">👁👁 Co-signed by ${escHtml(e.co_signed_by_name)}${e.co_signed_at ? ' — ' + fmtDateTime(new Date(e.co_signed_at)) : ''}${e.co_sign_comment ? ': ' + escHtml(e.co_sign_comment) : ''}</div>`;
       } else {
         coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:#E67E22">👁👁 Co-sign required (pending)</div>`;
         if (canReview && e.user_id !== state.user?.id) {
@@ -10591,7 +10625,7 @@ function _openReferenceUploadModal() {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    modal.querySelectorAll('[data-close-ref-modal]').forEach(b => b.addEventListener('click', () => modal.style.display = 'none'));
+    modal.querySelectorAll('[data-close-ref-modal]').forEach(b => b.addEventListener('click', () => modal.classList.remove('open')));
     document.getElementById('btnDoUploadRef').addEventListener('click', _handleReferenceUpload);
     // Ref type toggle
     modal.querySelectorAll('[data-ref-type]').forEach(btn => {
@@ -10622,7 +10656,7 @@ function _openReferenceUploadModal() {
   document.getElementById('refFileGroup').style.display = '';
   document.getElementById('refUrlGroup').style.display = 'none';
   document.getElementById('refLocalGroup').style.display = 'none';
-  modal.style.display = 'flex';
+  modal.classList.add('open');
 }
 
 async function _handleReferenceUpload() {
@@ -10645,7 +10679,7 @@ async function _handleReferenceUpload() {
     try {
       const res = await api('POST', '/api/references/link', body);
       if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
-      document.getElementById('referenceUploadModal').style.display = 'none';
+      document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
     } catch (e) { alert('Error: ' + e.message); }
   } else if (activeType === 'local') {
@@ -10662,7 +10696,7 @@ async function _handleReferenceUpload() {
     try {
       const res = await api('POST', '/api/references/link', body);
       if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
-      document.getElementById('referenceUploadModal').style.display = 'none';
+      document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
     } catch (e) { alert('Error: ' + e.message); }
   } else {
@@ -10679,7 +10713,7 @@ async function _handleReferenceUpload() {
     try {
       const res = await fetch('/api/references', { method: 'POST', body: fd });
       if (!res.ok) { const txt = await res.text(); alert('Upload failed: ' + txt); return; }
-      document.getElementById('referenceUploadModal').style.display = 'none';
+      document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
     } catch (e) { alert('Upload error: ' + e.message); }
   }

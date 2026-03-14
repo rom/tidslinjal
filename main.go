@@ -846,6 +846,15 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		app.audit(0, "system", "login_failed", "user", user.ID,
 			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
+		// Record failed login attempt on the user
+		go func(u User, ip string) {
+			if fullUser, ok := app.store.GetUserByID(u.ID); ok {
+				now := time.Now()
+				fullUser.LastFailedLoginAt = &now
+				fullUser.LastFailedLoginIP = ip
+				app.store.UpdateUser(*fullUser) //nolint
+			}
+		}(*user, loginClientIP)
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -5105,21 +5114,30 @@ func (app *App) routes() http.Handler {
 					jsonError(w, "invalid id", http.StatusBadRequest)
 					return
 				}
-				_, ok := app.store.GetUserByID(userID)
+				targetUser, ok := app.store.GetUserByID(userID)
 				if !ok {
 					jsonError(w, "user not found", http.StatusNotFound)
 					return
 				}
 				allEntries := app.store.GetAudit(0) // all entries, newest first
 				var loginEntries []AuditEntry
+				successCount := 0
 				for _, e := range allEntries {
 					if e.EntityType == "user" && e.EntityID == userID &&
 						(e.Action == "login" || e.Action == "login_failed" || e.Action == "login_blocked") {
 						loginEntries = append(loginEntries, e)
+						if e.Action == "login" {
+							successCount++
+						}
 						if len(loginEntries) >= 100 {
 							break
 						}
 					}
+				}
+				// Fix login count if it drifted from audit log reality
+				if targetUser.LoginCount != successCount && successCount > 0 {
+					targetUser.LoginCount = successCount
+					app.store.UpdateUser(*targetUser) //nolint
 				}
 				jsonOK(w, loginEntries)
 			})(w, r)

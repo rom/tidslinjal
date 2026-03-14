@@ -113,10 +113,12 @@ type User struct {
 	Telephone        string `json:"telephone,omitempty"`
 	Cellular         string `json:"cellular,omitempty"`
 	// Login tracking
-	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
-	LastLoginIP     string     `json:"last_login_ip,omitempty"`
-	LastLoginDomain string     `json:"last_login_domain,omitempty"`
-	LoginCount      int        `json:"login_count"`
+	LastLoginAt        *time.Time `json:"last_login_at,omitempty"`
+	LastLoginIP        string     `json:"last_login_ip,omitempty"`
+	LastLoginDomain    string     `json:"last_login_domain,omitempty"`
+	LoginCount         int        `json:"login_count"`
+	LastFailedLoginAt  *time.Time `json:"last_failed_login_at,omitempty"`
+	LastFailedLoginIP  string     `json:"last_failed_login_ip,omitempty"`
 	IsOIDC          bool       `json:"is_oidc,omitempty"` // true if this account was created via OIDC
 	// WebCal subscription token (unique per user, for calendar sync)
 	WebCalToken string `json:"webcal_token,omitempty"`
@@ -152,10 +154,12 @@ type UserPublic struct {
 	SignalHandle     string     `json:"signal_handle,omitempty"`
 	Telephone        string     `json:"telephone,omitempty"`
 	Cellular         string     `json:"cellular,omitempty"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	LoginCount  int        `json:"login_count"`
-	IsOIDC      bool       `json:"is_oidc,omitempty"`
-	Blocked          bool       `json:"blocked,omitempty"`
+	LastLoginAt       *time.Time `json:"last_login_at,omitempty"`
+	LoginCount        int        `json:"login_count"`
+	LastFailedLoginAt *time.Time `json:"last_failed_login_at,omitempty"`
+	LastFailedLoginIP string     `json:"last_failed_login_ip,omitempty"`
+	IsOIDC            bool       `json:"is_oidc,omitempty"`
+	Blocked           bool       `json:"blocked,omitempty"`
 	Location         string     `json:"location,omitempty"`
 	Latitude         float64    `json:"latitude,omitempty"`
 	Longitude        float64    `json:"longitude,omitempty"`
@@ -183,9 +187,11 @@ func (u *User) Public() UserPublic {
 		SignalHandle:     u.SignalHandle,
 		Telephone:        u.Telephone,
 		Cellular:         u.Cellular,
-		LastLoginAt: u.LastLoginAt,
-		LoginCount:  u.LoginCount,
-		IsOIDC:      u.IsOIDC,
+		LastLoginAt:       u.LastLoginAt,
+		LoginCount:        u.LoginCount,
+		LastFailedLoginAt: u.LastFailedLoginAt,
+		LastFailedLoginIP: u.LastFailedLoginIP,
+		IsOIDC:            u.IsOIDC,
 		Blocked:          u.Blocked,
 		Location:         u.Location,
 		Latitude:         u.Latitude,
