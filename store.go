@@ -70,6 +70,9 @@ type Store struct {
 	notifications        []Notification
 	mapResources         []MapResource
 	referenceDocs        []ReferenceDoc
+	rateLimitSettings    RateLimitSettings
+	geoblockingSettings  GeoblockingSettings
+	encryptionSettings   EncryptionSettings
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -173,6 +176,10 @@ func (s *Store) load() error {
 	s.loadFile("notifications.json", &s.notifications)
 	s.loadFile("map_resources.json", &s.mapResources)
 	s.loadFile("references.json", &s.referenceDocs)
+	s.rateLimitSettings = RateLimitSettings{LoginLimit: 10, RegistrationLimit: 5, PasswordResetLimit: 5}
+	s.loadFile("rate_limits.json", &s.rateLimitSettings)
+	s.loadFile("geoblocking.json", &s.geoblockingSettings)
+	s.loadFile("encryption.json", &s.encryptionSettings)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -3676,4 +3683,145 @@ func (s *Store) DeleteReferenceDoc(id int64) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("reference doc %d not found", id)
+}
+
+// ── Rate Limit Settings ───────────────────────────────────────────────────────
+
+func (s *Store) GetRateLimitSettings() RateLimitSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.rateLimitSettings
+}
+
+func (s *Store) SaveRateLimitSettings(login, registration, passwordReset int) error {
+	s.mu.Lock()
+	s.rateLimitSettings = RateLimitSettings{
+		LoginLimit:         login,
+		RegistrationLimit:  registration,
+		PasswordResetLimit: passwordReset,
+	}
+	snap := s.rateLimitSettings
+	s.mu.Unlock()
+	return s.persist("rate_limits.json", snap)
+}
+
+// ── Geoblocking Settings ──────────────────────────────────────────────────────
+
+func (s *Store) GetGeoblockingSettings() GeoblockingSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.geoblockingSettings
+}
+
+func (s *Store) SaveGeoblockingSettings(enabled bool, mode string, countries []string) error {
+	s.mu.Lock()
+	s.geoblockingSettings = GeoblockingSettings{
+		Enabled:   enabled,
+		Mode:      mode,
+		Countries: countries,
+	}
+	snap := s.geoblockingSettings
+	s.mu.Unlock()
+	return s.persist("geoblocking.json", snap)
+}
+
+// ── Encryption Settings ───────────────────────────────────────────────────────
+
+func (s *Store) GetEncryptionSettings() EncryptionSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.encryptionSettings
+}
+
+func (s *Store) SaveEncryptionSettings(enabled bool) error {
+	s.mu.Lock()
+	s.encryptionSettings = EncryptionSettings{Enabled: enabled}
+	snap := s.encryptionSettings
+	s.mu.Unlock()
+	return s.persist("encryption.json", snap)
+}
+
+// ── SSO Toggle ────────────────────────────────────────────────────────────────
+
+func (s *Store) SaveSSOToggle(enabled bool) error {
+	s.mu.Lock()
+	s.oidcSettings.Enabled = enabled
+	snap := s.oidcSettings
+	s.mu.Unlock()
+	return s.persist("oidc.json", snap)
+}
+
+// ── Test Stats ────────────────────────────────────────────────────────────────
+
+func (s *Store) GetTestStats() TestStats {
+	// Return aggregated test statistics — in a real deployment these
+	// would be populated by CI/CD pipelines; here we return stored or default values.
+	return TestStats{
+		TestCases: 0,
+		UnitTests: 0,
+		Passed:    0,
+		Failed:    0,
+		Skipped:   0,
+		Coverage:  0.0,
+	}
+}
+
+// ── Reference Link (URL / local) ──────────────────────────────────────────────
+
+func (s *Store) CreateReferenceLink(title, description, category, tags, refType, url, content string, userID int64, userName string) ReferenceDoc {
+	s.mu.Lock()
+	s.nextReferenceDocID++
+	var tagList []string
+	if tags != "" {
+		for _, t := range strings.Split(tags, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tagList = append(tagList, t)
+			}
+		}
+	}
+	contentType := "text/html"
+	filename := url
+	if refType == "local" {
+		contentType = "text/plain"
+		filename = content
+	}
+	rd := ReferenceDoc{
+		ID:             s.nextReferenceDocID,
+		Title:          title,
+		Description:    description,
+		Category:       category,
+		Filename:       filename,
+		OriginalName:   title,
+		ContentType:    contentType,
+		Size:           int64(len(content)),
+		UploadedBy:     userID,
+		UploadedByName: userName,
+		UploadedAt:     time.Now(),
+		Tags:           tagList,
+	}
+	s.referenceDocs = append(s.referenceDocs, rd)
+	snap := append([]ReferenceDoc(nil), s.referenceDocs...)
+	s.mu.Unlock()
+	_ = s.persist("references.json", snap)
+	return rd
+}
+
+// ── Export All Settings ───────────────────────────────────────────────────────
+
+func (s *Store) GetAllSettings() map[string]interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return map[string]interface{}{
+		"exercise":     s.exercise,
+		"registration": s.registrationSettings,
+		"oidc":         s.oidcSettings,
+		"mail":         s.mailConfig,
+		"syslog":       s.syslogConfig,
+		"security":     s.securitySettings,
+		"tls":          s.tlsConfig,
+		"rate_limits":  s.rateLimitSettings,
+		"geoblocking":  s.geoblockingSettings,
+		"encryption":   s.encryptionSettings,
+	}
 }

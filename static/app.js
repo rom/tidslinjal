@@ -165,6 +165,10 @@ async function init() {
         };
       }
     } catch { state._gradualBackupStatus = null; }
+    // Load test stats for admin legend panel
+    try {
+      state._testStats = await apiGet('/api/admin/test-stats');
+    } catch { state._testStats = null; }
   }
 
   // User info in header + role-gated controls
@@ -419,6 +423,17 @@ function toggleListView() {
   }
 }
 
+function _listWeekLabel(date) {
+  if (!state.preferences.show_week_numbers || !date) return '';
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+  const style = state.preferences.week_number_style;
+  const label = style === 'year_week' ? (date.getFullYear() % 10) + '-W' + String(weekNo).padStart(2,'0') : 'W' + weekNo;
+  return ` <span style="font-size:.8em;color:var(--accent);font-weight:600">${label}</span>`;
+}
+
 function listSortBy(key) {
   if (_listSortKey === key) {
     _listSortAsc = !_listSortAsc;
@@ -460,7 +475,8 @@ function renderListView() {
   events.sort((a, b) => {
     let va = a[_listSortKey] || '';
     let vb = b[_listSortKey] || '';
-    if (_listSortKey === 'start_time') { va = new Date(va); vb = new Date(vb); }
+    if (_listSortKey === 'start_time' || _listSortKey === 'end_time') { va = new Date(va || 0); vb = new Date(vb || 0); }
+    if (typeof va === 'string' && typeof vb === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
     if (va < vb) return _listSortAsc ? -1 : 1;
     if (va > vb) return _listSortAsc ?  1 : -1;
     return 0;
@@ -540,8 +556,8 @@ function renderListView() {
           </select>` :
           `<span style="color:${statusColors[ev.status]||'var(--text)'}">${t('status_'+(ev.status||'planned'))||ev.status}</span>`}
       </td>
-      <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}</td>
-      <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
+      <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}${_listWeekLabel(new Date(ev.start_time))}</td>
+      <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) + _listWeekLabel(new Date(ev.end_time)) : '—'}</td>
       <td style="padding:8px 10px">${responsibleCell}</td>
       <td style="padding:8px 10px;white-space:nowrap">
         <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">${t('lv_view')}</button>

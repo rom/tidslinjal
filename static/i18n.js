@@ -952,6 +952,111 @@ const TRANSLATIONS = {
     security_encryption:       'Backup Encryption',
     security_encryption_desc:  'Backups are encrypted with AES-256-GCM using PBKDF2-SHA256 key derivation (100,000 iterations).',
     checking:                  'Checking…',
+
+    // References tab
+    tab_references:            'References',
+    references_title:          'References',
+    ref_category_faq:          'FAQ',
+    ref_category_objectives:   'Objectives',
+    ref_add_title:             'Add Reference',
+    ref_type_file:             'Upload File',
+    ref_type_url:              'Link / URL',
+    ref_type_local:            'Local Resource',
+    ref_url_label:             'URL',
+    ref_url_placeholder:       'https://example.com/document',
+    ref_local_content:         'Content',
+    ref_local_placeholder:     'Enter content directly…',
+    ref_title_required:        'Title is required',
+
+    // Task-time matrix current time line
+    ttm_now:                   'Now',
+
+    // Calendar mode
+    cal_now:                   'Now',
+
+    // Geoblocking
+    security_geoblocking:      'Geoblocking',
+    security_geoblocking_desc: 'Restrict access by geographic location using IP-based geoblocking.',
+    security_geo_enabled:      'Enable geoblocking',
+    security_geo_mode:         'Mode',
+    security_geo_allowlist:    'Allowlist (only these countries)',
+    security_geo_blocklist:    'Blocklist (block these countries)',
+    security_geo_countries:    'Country codes (comma-separated, e.g. SE,NO,FI)',
+    security_geo_save:         'Save Geoblocking',
+    security_geo_saved:        'Geoblocking settings saved',
+
+    // Rate limiting settings
+    security_rate_edit:        'Edit Rate Limits',
+    security_rate_login_limit: 'Login rate limit',
+    security_rate_reg_limit:   'Registration rate limit',
+    security_rate_reset_limit: 'Password reset rate limit',
+    security_rate_save:        'Save Rate Limits',
+    security_rate_saved:       'Rate limiting settings saved',
+
+    // Backup encryption toggle
+    security_encryption_toggle:'Enable backup encryption',
+    security_encryption_saved: 'Backup encryption settings saved',
+
+    // Enrollment (moved to security)
+    settings_enrollment:       'User Enrollment',
+    settings_enrollment_desc:  'Controls how new users can register for access.',
+
+    // OIDC enable/disable
+    security_sso_enabled:      'Enable SSO',
+    security_oidc_details:     'Show Details',
+    security_oidc_hide_details:'Hide Details',
+    security_sso_saved:        'SSO settings saved',
+
+    // TLS enable/disable
+    security_tls_enabled:      'Enable TLS',
+    security_tls_details:      'Show Details',
+    security_tls_hide_details: 'Hide Details',
+    security_tls_saved:        'TLS settings saved',
+
+    // Cosign target
+    cosign_target_label:       'Request co-sign from',
+    cosign_target_anyone:      'Anyone eligible',
+
+    // Danger zone additions
+    danger_restart_backend:    'Restart Backend',
+    danger_restart_backend_desc:'Restart the Tidslinjal backend service. Active connections will be dropped.',
+    danger_restart_server:     'Restart Server',
+    danger_restart_server_desc:'Restart the server host. All services will be temporarily unavailable.',
+    danger_restart_confirm:    'Are you sure you want to restart? This will interrupt all active sessions.',
+    danger_server_confirm:     'Are you sure you want to restart the server? ALL services will be down temporarily.',
+
+    // Import/export additions
+    export_format:             'Format',
+    export_json:               'JSON',
+    export_csv:                'CSV',
+    export_ics:                'ICS',
+    export_kml:                'KML',
+    export_xml:                'XML',
+    export_logs:               'Export Logs',
+    export_decision_log:       'Decision Log',
+    export_log_book:           'Log Book',
+    export_audit_log:          'Audit Log',
+    export_event_log:          'Event Log',
+    export_settings:           'Export Settings',
+    export_app_settings:       'Application Settings',
+    import_kml:                'KML',
+    import_xml:                'XML',
+
+    // List sort
+    lv_sort_asc:               'Sort ascending',
+    lv_sort_desc:              'Sort descending',
+
+    // Test stats (admin legend)
+    legend_test_stats:         'Test Statistics',
+    legend_test_cases:         'Test cases',
+    legend_unit_tests:         'Unit tests',
+    legend_tests_run:          'Tests performed',
+
+    // Boot sequence
+    boot_mail_status:          'Mail',
+    boot_gradual_backup:       'Gradual backup',
+    boot_api_keys:             'API keys',
+    boot_rate_limits:          'Rate limits',
   },
 
   sv: {
@@ -1833,6 +1938,92 @@ const TRANSLATIONS = {
     security_encryption:       'Kryptering av säkerhetskopior',
     security_encryption_desc:  'Säkerhetskopior krypteras med AES-256-GCM med PBKDF2-SHA256 nyckelderivering (100 000 iterationer).',
     checking:                  'Kontrollerar…',
+
+    // References tab
+    tab_references:            'Referenser',
+    references_title:          'Referenser',
+    ref_category_faq:          'FAQ',
+    ref_category_objectives:   'Mål',
+    ref_add_title:             'Lägg till referens',
+    ref_type_file:             'Ladda upp fil',
+    ref_type_url:              'Länk / URL',
+    ref_type_local:            'Lokal resurs',
+    ref_url_label:             'URL',
+    ref_url_placeholder:       'https://example.com/dokument',
+    ref_local_content:         'Innehåll',
+    ref_local_placeholder:     'Skriv innehåll direkt…',
+    ref_title_required:        'Titel krävs',
+
+    ttm_now:                   'Nu',
+    cal_now:                   'Nu',
+
+    // Geoblocking
+    security_geoblocking:      'Geoblockering',
+    security_geoblocking_desc: 'Begränsa åtkomst baserat på geografisk plats med IP-baserad geoblockering.',
+    security_geo_enabled:      'Aktivera geoblockering',
+    security_geo_mode:         'Läge',
+    security_geo_allowlist:    'Tillåtlista (bara dessa länder)',
+    security_geo_blocklist:    'Blocklista (blockera dessa länder)',
+    security_geo_countries:    'Landskoder (kommaseparerade, t.ex. SE,NO,FI)',
+    security_geo_save:         'Spara geoblockering',
+    security_geo_saved:        'Geoblockeringsinställningar sparade',
+
+    security_rate_edit:        'Redigera hastighetsgränser',
+    security_rate_login_limit: 'Inloggningsgräns',
+    security_rate_reg_limit:   'Registreringsgräns',
+    security_rate_reset_limit: 'Lösenordsåterställningsgräns',
+    security_rate_save:        'Spara hastighetsgränser',
+    security_rate_saved:       'Hastighetsgränser sparade',
+
+    security_encryption_toggle:'Aktivera kryptering av säkerhetskopior',
+    security_encryption_saved: 'Krypteringsinställningar sparade',
+
+    settings_enrollment:       'Användarregistrering',
+    settings_enrollment_desc:  'Styr hur nya användare kan registrera sig.',
+
+    security_sso_enabled:      'Aktivera SSO',
+    security_oidc_details:     'Visa detaljer',
+    security_oidc_hide_details:'Dölj detaljer',
+    security_sso_saved:        'SSO-inställningar sparade',
+
+    security_tls_enabled:      'Aktivera TLS',
+    security_tls_details:      'Visa detaljer',
+    security_tls_hide_details: 'Dölj detaljer',
+    security_tls_saved:        'TLS-inställningar sparade',
+
+    cosign_target_label:       'Begär medsignering från',
+    cosign_target_anyone:      'Vem som helst behörig',
+
+    danger_restart_backend:    'Starta om backend',
+    danger_restart_backend_desc:'Starta om Tidslinjals backend-tjänst. Aktiva anslutningar avbryts.',
+    danger_restart_server:     'Starta om server',
+    danger_restart_server_desc:'Starta om servern. Alla tjänster blir tillfälligt otillgängliga.',
+    danger_restart_confirm:    'Är du säker på att du vill starta om? Detta avbryter alla aktiva sessioner.',
+    danger_server_confirm:     'Är du säker på att du vill starta om servern? ALLA tjänster kommer att vara nere tillfälligt.',
+
+    export_format:             'Format',
+    export_json:               'JSON',
+    export_csv:                'CSV',
+    export_ics:                'ICS',
+    export_kml:                'KML',
+    export_xml:                'XML',
+    export_logs:               'Exportera loggar',
+    export_decision_log:       'Beslutslogg',
+    export_log_book:           'Loggbok',
+    export_audit_log:          'Revisionslogg',
+    export_event_log:          'Händelselogg',
+    export_settings:           'Exportera inställningar',
+    export_app_settings:       'Applikationsinställningar',
+    import_kml:                'KML',
+    import_xml:                'XML',
+
+    lv_sort_asc:               'Sortera stigande',
+    lv_sort_desc:              'Sortera fallande',
+
+    legend_test_stats:         'Teststatistik',
+    legend_test_cases:         'Testfall',
+    legend_unit_tests:         'Enhetstester',
+    legend_tests_run:          'Tester utförda',
   },
 
   fr: {
@@ -2713,6 +2904,92 @@ const TRANSLATIONS = {
     security_encryption:       'Chiffrement des sauvegardes',
     security_encryption_desc:  'Les sauvegardes sont chiffrées avec AES-256-GCM et dérivation de clé PBKDF2-SHA256 (100 000 itérations).',
     checking:                  'Vérification…',
+
+    // References tab
+    tab_references:            'Références',
+    references_title:          'Références',
+    ref_category_faq:          'FAQ',
+    ref_category_objectives:   'Objectifs',
+    ref_add_title:             'Ajouter une référence',
+    ref_type_file:             'Télécharger un fichier',
+    ref_type_url:              'Lien / URL',
+    ref_type_local:            'Ressource locale',
+    ref_url_label:             'URL',
+    ref_url_placeholder:       'https://example.com/document',
+    ref_local_content:         'Contenu',
+    ref_local_placeholder:     'Saisir le contenu directement…',
+    ref_title_required:        'Le titre est requis',
+
+    ttm_now:                   'Maintenant',
+    cal_now:                   'Maintenant',
+
+    // Geoblocking
+    security_geoblocking:      'Géoblocage',
+    security_geoblocking_desc: 'Restreindre l\'accès par emplacement géographique via le géoblocage IP.',
+    security_geo_enabled:      'Activer le géoblocage',
+    security_geo_mode:         'Mode',
+    security_geo_allowlist:    'Liste blanche (uniquement ces pays)',
+    security_geo_blocklist:    'Liste noire (bloquer ces pays)',
+    security_geo_countries:    'Codes pays (séparés par des virgules, ex. FR,BE,CH)',
+    security_geo_save:         'Enregistrer le géoblocage',
+    security_geo_saved:        'Paramètres de géoblocage enregistrés',
+
+    security_rate_edit:        'Modifier les limites',
+    security_rate_login_limit: 'Limite de connexion',
+    security_rate_reg_limit:   'Limite d\'inscription',
+    security_rate_reset_limit: 'Limite de réinitialisation',
+    security_rate_save:        'Enregistrer les limites',
+    security_rate_saved:       'Limites de débit enregistrées',
+
+    security_encryption_toggle:'Activer le chiffrement des sauvegardes',
+    security_encryption_saved: 'Paramètres de chiffrement enregistrés',
+
+    settings_enrollment:       'Inscription des utilisateurs',
+    settings_enrollment_desc:  'Contrôle comment les nouveaux utilisateurs peuvent s\'inscrire.',
+
+    security_sso_enabled:      'Activer SSO',
+    security_oidc_details:     'Afficher les détails',
+    security_oidc_hide_details:'Masquer les détails',
+    security_sso_saved:        'Paramètres SSO enregistrés',
+
+    security_tls_enabled:      'Activer TLS',
+    security_tls_details:      'Afficher les détails',
+    security_tls_hide_details: 'Masquer les détails',
+    security_tls_saved:        'Paramètres TLS enregistrés',
+
+    cosign_target_label:       'Demander la co-signature de',
+    cosign_target_anyone:      'Toute personne éligible',
+
+    danger_restart_backend:    'Redémarrer le backend',
+    danger_restart_backend_desc:'Redémarrer le service backend de Tidslinjal. Les connexions actives seront interrompues.',
+    danger_restart_server:     'Redémarrer le serveur',
+    danger_restart_server_desc:'Redémarrer le serveur hôte. Tous les services seront temporairement indisponibles.',
+    danger_restart_confirm:    'Êtes-vous sûr de vouloir redémarrer ? Cela interrompra toutes les sessions actives.',
+    danger_server_confirm:     'Êtes-vous sûr de vouloir redémarrer le serveur ? TOUS les services seront indisponibles temporairement.',
+
+    export_format:             'Format',
+    export_json:               'JSON',
+    export_csv:                'CSV',
+    export_ics:                'ICS',
+    export_kml:                'KML',
+    export_xml:                'XML',
+    export_logs:               'Exporter les journaux',
+    export_decision_log:       'Journal des décisions',
+    export_log_book:           'Journal de bord',
+    export_audit_log:          'Journal d\'audit',
+    export_event_log:          'Journal des événements',
+    export_settings:           'Exporter les paramètres',
+    export_app_settings:       'Paramètres de l\'application',
+    import_kml:                'KML',
+    import_xml:                'XML',
+
+    lv_sort_asc:               'Tri croissant',
+    lv_sort_desc:              'Tri décroissant',
+
+    legend_test_stats:         'Statistiques de test',
+    legend_test_cases:         'Cas de test',
+    legend_unit_tests:         'Tests unitaires',
+    legend_tests_run:          'Tests effectués',
   }
 };
 
