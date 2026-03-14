@@ -1056,3 +1056,56 @@ type ReferenceDoc struct {
 	ChecksumSHA256 string    `json:"checksum_sha256,omitempty"`
 	ChecksumSHA512 string    `json:"checksum_sha512,omitempty"`
 }
+
+// PollQuestionType defines the type of a poll question
+type PollQuestionType string
+
+const (
+	PollQuestionScaleZeroThree PollQuestionType = "scale_0_3"
+	PollQuestionYesNo          PollQuestionType = "yes_no"
+	PollQuestionFreeText       PollQuestionType = "free_text"
+)
+
+// PollQuestion is a single question within a poll
+type PollQuestion struct {
+	ID       string           `json:"id"`
+	Text     string           `json:"text"`
+	Type     PollQuestionType `json:"type"`
+	Required bool             `json:"required"`
+}
+
+// PollResponse is a single user's answer to a single question
+type PollResponse struct {
+	UserID     int64     `json:"user_id"`
+	UserName   string    `json:"user_name"`
+	QuestionID string    `json:"question_id"`
+	Answer     string    `json:"answer"`
+	AnsweredAt time.Time `json:"answered_at"`
+}
+
+// Poll is a multipoll / personnel check that targets users, groups, or roles
+type Poll struct {
+	ID            int64          `json:"id"`
+	CreatedBy     int64          `json:"created_by"`
+	CreatedByName string         `json:"created_by_name"`
+	CreatedAt     time.Time      `json:"created_at"`
+	Title         string         `json:"title"`
+	Description   string         `json:"description,omitempty"`
+	TargetType    string         `json:"target_type"`    // user | group | role
+	TargetIDs     []string       `json:"target_ids"`     // user IDs, group IDs, or role names
+	Questions     []PollQuestion `json:"questions"`
+	Responses     []PollResponse `json:"responses"`
+	Status        string         `json:"status"`          // open | closed
+	ClosedAt      *time.Time     `json:"closed_at,omitempty"`
+}
+
+// DefaultPollQuestions returns the standard personnel-check questions
+func DefaultPollQuestions() []PollQuestion {
+	return []PollQuestion{
+		{ID: "stress_self", Text: "How would you rate your personal stress level?", Type: PollQuestionScaleZeroThree, Required: true},
+		{ID: "stress_team", Text: "How would you rate your team's stress level?", Type: PollQuestionScaleZeroThree, Required: true},
+		{ID: "in_control", Text: "Do you feel in control of your current tasks?", Type: PollQuestionYesNo, Required: true},
+		{ID: "need_assistance", Text: "Do you need assistance?", Type: PollQuestionYesNo, Required: true},
+		{ID: "free_text", Text: "Any additional comments or concerns?", Type: PollQuestionFreeText, Required: false},
+	}
+}

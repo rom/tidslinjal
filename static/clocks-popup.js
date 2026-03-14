@@ -53,6 +53,7 @@ let _lastLang = '';
 let _localIsUTC = null; // null = follow opener, true/false = local override
 let _hourFormat = '24'; // '24' | '12'
 let _timeSep = ':';     // ':' | '.'
+let _showSynthClock = false; // synthetic exercise clock toggle
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
@@ -351,7 +352,7 @@ let _lastClockCount = -1;
 let _lastMode = '';
 function rebuildClocks() {
   const {isUTC, extra} = getClockData();
-  const total = 1 + extra.length;
+  const total = 1 + extra.length + (_showSynthClock ? 1 : 0);
   const wrap = document.getElementById('clocksWrap');
   if (!wrap) return;
   _lastClockCount = total;
@@ -406,15 +407,72 @@ function rebuildClocks() {
       </div>`;
     }
   });
+  // Synthetic exercise clock
+  if (_showSynthClock) {
+    const synthLabel = _t('clock_synthetic') || 'Synthetic Time';
+    const synthTzLabel = _t('clock_synthetic_tz') || 'SYNTHETIC';
+    if (clockMode === 'vcr') {
+      html += `<div class="clock-card vcr-card synth-card" id="card-synth">
+        <button class="clock-remove" title="${removeTip}" data-rm-synth>&times;</button>
+        <div class="clock-label vcr-label">${buildSeg7Text(synthLabel)}</div>
+        <div class="clock-time vcr-time" id="vcr-synth-seg">${buildSeg7Time(0,0,0)}</div>
+        <div class="clock-date vcr-date" id="synth-date">${buildSeg7Text('--')}</div>
+        <div class="clock-tz vcr-tz" id="synth-tz">${buildSeg7Text(synthTzLabel)}</div>
+      </div>`;
+    } else if (clockMode === 'analog') {
+      html += `<div class="clock-card synth-card" id="card-synth">
+        <button class="clock-remove" title="${removeTip}" data-rm-synth>&times;</button>
+        <div class="clock-label">${escH(synthLabel)}</div>
+        <div class="clock-time" id="synth-time" style="color:#ff4444;font-size:inherit">--:--:--</div>
+        <div class="clock-date" id="synth-date"></div>
+        <div class="clock-tz" id="synth-tz" style="color:#ff4444">${escH(synthTzLabel)}</div>
+      </div>`;
+    } else {
+      html += `<div class="clock-card synth-card" id="card-synth">
+        <button class="clock-remove" title="${removeTip}" data-rm-synth>&times;</button>
+        <div class="clock-label" style="color:#ff4444">${escH(synthLabel)}</div>
+        <div class="clock-time" id="synth-time" style="color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,.4)">--:--:--</div>
+        <div class="clock-date" id="synth-date"></div>
+        <div class="clock-tz" id="synth-tz" style="color:#ff4444">${escH(synthTzLabel)}</div>
+      </div>`;
+    }
+  }
   wrap.innerHTML = html;
   wrap.querySelectorAll('[data-rm-clock]').forEach(btn => {
     btn.addEventListener('click', () => removeClock(parseInt(btn.dataset.rmClock, 10)));
+  });
+  wrap.querySelectorAll('[data-rm-synth]').forEach(btn => {
+    btn.addEventListener('click', () => { _showSynthClock = false; rebuildClocks(); });
   });
   const mainLbl = document.getElementById('main-label');
   if (mainLbl) mainLbl.addEventListener('click', toggleUTC);
 }
 
 function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ── Synthetic clock helpers ── */
+function _getSynthElapsed() {
+  try {
+    const ex = window.opener?.state?.exercise;
+    if (!ex || !ex.enabled || !ex.epoch) return null;
+    const now = _getEffectiveNow();
+    const epochMs = new Date(ex.epoch).getTime();
+    if (isNaN(epochMs)) return null;
+    const elapsedMs = now.getTime() - epochMs;
+    return { elapsedMs, now, epoch: new Date(epochMs), ex };
+  } catch(e) { return null; }
+}
+
+function _fmtSynthElapsed(elapsedMs) {
+  const neg = elapsedMs < 0;
+  const abs = Math.abs(elapsedMs);
+  const totalSec = Math.floor(abs / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const prefix = neg ? '-' : '';
+  return { h, m, s, text: prefix + 'H+' + h + _timeSep + pad(m) + _timeSep + pad(s) };
+}
 
 /* ── Main tick function ── */
 function tick() {
@@ -424,7 +482,7 @@ function tick() {
   const now = _getEffectiveNow();
   const locale = _getLocale();
 
-  if (1 + extra.length !== _lastClockCount || clockMode !== _lastMode) {
+  if (1 + extra.length + (_showSynthClock ? 1 : 0) !== _lastClockCount || clockMode !== _lastMode) {
     rebuildClocks();
   }
 
@@ -501,6 +559,39 @@ function tick() {
       const t=document.getElementById('ec-'+ec.id+'-time'); if(t)t.textContent='??:??:??';
     }
   });
+
+  // Update synthetic clock
+  if (_showSynthClock) {
+    const synthData = _getSynthElapsed();
+    if (synthData) {
+      const { elapsedMs } = synthData;
+      const fmt = _fmtSynthElapsed(elapsedMs);
+      if (clockMode === 'vcr') {
+        const segEl = document.getElementById('vcr-synth-seg');
+        if (segEl) segEl.innerHTML = buildSeg7Time(fmt.h, fmt.m, fmt.s);
+        const dateEl = document.getElementById('synth-date');
+        if (dateEl) dateEl.innerHTML = buildSeg7Text(fmt.text);
+      } else {
+        const tEl = document.getElementById('synth-time');
+        if (tEl) tEl.textContent = fmt.text;
+        const dateEl = document.getElementById('synth-date');
+        if (dateEl) dateEl.textContent = synthData.ex.label || '';
+      }
+    } else {
+      // No exercise active
+      if (clockMode === 'vcr') {
+        const segEl = document.getElementById('vcr-synth-seg');
+        if (segEl) segEl.innerHTML = buildSeg7Time(0, 0, 0);
+        const dateEl = document.getElementById('synth-date');
+        if (dateEl) dateEl.innerHTML = buildSeg7Text('NO EPOCH');
+      } else {
+        const tEl = document.getElementById('synth-time');
+        if (tEl) tEl.textContent = 'H+0' + _timeSep + '00' + _timeSep + '00';
+        const dateEl = document.getElementById('synth-date');
+        if (dateEl) dateEl.textContent = _t('clock_no_exercise') || 'No exercise active';
+      }
+    }
+  }
 }
 
 /* ── Countdown timer system ── */
@@ -1396,6 +1487,12 @@ function hideTimerPopover() {
   document.getElementById('timerOverlay').style.display = 'none';
 }
 document.getElementById('btnAddTimer').addEventListener('click', showTimerPopover);
+document.getElementById('btnAddSynth').addEventListener('click', function() {
+  _showSynthClock = !_showSynthClock;
+  this.classList.toggle('active', _showSynthClock);
+  rebuildClocks();
+  tick();
+});
 document.getElementById('tmrCancel').addEventListener('click', hideTimerPopover);
 document.getElementById('timerOverlay').addEventListener('click', hideTimerPopover);
 document.getElementById('tmrStart').addEventListener('click', function() {

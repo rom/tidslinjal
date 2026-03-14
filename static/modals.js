@@ -1993,6 +1993,92 @@ async function _loadEventLog() {
     </div>`).join('');
 }
 
+// ── Pollster Log ────────────────────────────────────────────────────────────
+async function _loadPollsterLog(container) {
+  const el = container.querySelector ? container.querySelector('#pollsterLogEntries') : document.getElementById('pollsterLogEntries');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/polls/log');
+    if (!res.ok) throw new Error('Failed');
+    const polls = await res.json();
+    if (!polls || polls.length === 0) {
+      el.innerHTML = `<em style="color:var(--text-dim)">${t('pollster_log_empty')||'No polls recorded yet.'}</em>`;
+      return;
+    }
+    el.innerHTML = polls.map(poll => {
+      const ts = new Date(poll.created_at).toLocaleString();
+      const statusColor = poll.status === 'open' ? 'var(--accent)' : 'var(--text-dim)';
+      const totalR = (poll.responses || []).length;
+      const totalT = (poll.target_ids || []).length || '?';
+      let detailHtml = '';
+      if ((poll.responses || []).length > 0) {
+        detailHtml = (poll.questions || []).map((q, qi) => {
+          const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+          if (q.type === 'scale' || q.type === 'scale_0_3') {
+            const counts = [0,0,0,0];
+            answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
+            return `<div>${escHtml(q.text)}: ${counts.map((c,i) => i+':'+c).join(' ')}</div>`;
+          } else if (q.type === 'yes_no') {
+            const yes = answers.filter(a => a === 'yes').length;
+            const no = answers.filter(a => a === 'no').length;
+            return `<div>${escHtml(q.text)}: Y:${yes} N:${no}</div>`;
+          } else {
+            return `<div>${escHtml(q.text)}: ${answers.length} answers</div>`;
+          }
+        }).join('');
+      }
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>📊 ${escHtml(poll.title)}</strong>
+          <span style="font-size:10px;color:${statusColor}">${poll.status}</span>
+        </div>
+        <div style="color:var(--text-dim)">${ts} — ${totalR}/${totalT} ${t('poll_responses')||'responses'}</div>
+        ${detailHtml ? `<div style="margin-top:2px;padding:4px;background:var(--bg3);border-radius:var(--radius)">${detailHtml}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<em style="color:var(--text-dim)">${t('pollster_log_empty')||'No polls recorded yet.'}</em>`;
+  }
+
+  // Search filter
+  const searchEl = container.querySelector ? container.querySelector('#pollsterSearch') : document.getElementById('pollsterSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      const q = searchEl.value.toLowerCase();
+      el.querySelectorAll(':scope > div').forEach(div => {
+        div.style.display = div.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  }
+
+  // Export CSV
+  const csvBtn = container.querySelector ? container.querySelector('#pollsterExportCSV') : document.getElementById('pollsterExportCSV');
+  if (csvBtn) {
+    csvBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/polls/log');
+        if (!res.ok) return;
+        const polls = await res.json();
+        let csv = 'Poll,Status,Created,Questions,Responses\n';
+        (polls || []).forEach(p => {
+          csv += `"${(p.title||'').replace(/"/g,'""')}","${p.status}","${p.created_at}","${(p.questions||[]).length}","${(p.responses||[]).length}"\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pollster_log.csv';
+        a.click();
+      } catch {}
+    });
+  }
+
+  // Print
+  const printBtn = container.querySelector ? container.querySelector('#pollsterPrint') : document.getElementById('pollsterPrint');
+  if (printBtn) {
+    printBtn.addEventListener('click', () => { window.print(); });
+  }
+}
+
 // ── Log Book ───────────────────────────────────────────────────────────────
 let _logBookEntries = [];
 async function _loadLogBook() {
@@ -2649,6 +2735,7 @@ function renderSidebar() {
       ${logSubBtn('logbook', t('tab_log_book')||'Log Book')}
       ${logSubBtn('audit', t('tab_audit_log')||'Audit Log')}
       ${logSubBtn('eventlog', t('tab_event_log')||'Event Log')}
+      ${logSubBtn('pollster', t('tab_pollster_log')||'Pollster Log')}
     </div>`;
     if (logSub === 'decision') {
       el.innerHTML = logTabBar + `<div class="sidebar-section">
@@ -2732,6 +2819,20 @@ function renderSidebar() {
       _bindLogSubTabs(el);
       _bindActions(el);
       _loadLogBook();
+    } else if (logSub === 'pollster') {
+      el.innerHTML = logTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">📊 ${t('pollster_log_title')||'Pollster Log'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('pollster_log_desc')||'View, search, and export poll results.'}</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+            <input type="text" id="pollsterSearch" placeholder="🔍 ${t('search')||'Search'}…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+            <button class="btn btn-secondary btn-sm" id="pollsterExportCSV" title="Export to CSV">⬇ CSV</button>
+            <button class="btn btn-secondary btn-sm" id="pollsterPrint" title="Print">🖨</button>
+          </div>
+          <div id="pollsterLogEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('lb_loading')||'Loading…'}</em></div>
+        </div>`;
+      _bindLogSubTabs(el);
+      _loadPollsterLog(el);
     }
   } else if (tab === 'phases' && state.user && hasRole2(state.user.role, 'teamlead')) {
     el.innerHTML = `
@@ -3306,9 +3407,10 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">🛠 ${t('tab_tools')||'Tools'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
+          ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -3607,6 +3709,58 @@ function renderSidebar() {
     const p  = state.preferences;
     const ex = state.exercise || {};
     el.innerHTML = `
+      ${state.user && hasRole2(state.user.role, 'oplead') ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_exercise')}</div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${getOperationNameLabel(ex)}</label>
+          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="${getOperationNameLabel(ex)}…"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getStartexLabel(ex)}</label>
+          <input type="datetime-local" id="exEpoch" value="${ex.epoch ? fmtDateInput(new Date(ex.epoch)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getEndexLabel(ex)}</label>
+          <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${getExIndexLabel(ex)}
+            <span data-action="showExIndexInfo" style="cursor:pointer;margin-left:4px;opacity:.6" title="${t('exercise_index_info_tip')||'What is this?'}">ℹ️</span>
+          </label>
+          <input type="number" id="exIndex" value="${ex.ex_index||0}" min="0"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('artificial_time')||'Artificial time'}</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" id="exArtificialTimeEnabled" ${ex.artificial_time_enabled?'checked':''}
+              data-action="setArtificialTime" data-event="change"
+              style="width:14px;height:14px;accent-color:var(--accent)">
+            <input type="datetime-local" id="exArtificialTime" value="${ex.artificial_time ? fmtDateInput(new Date(ex.artificial_time)) : ''}"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('artificial_time_desc')||'Set a custom "current time" for exercise simulation'}</div>
+        </div>
+        <div class="form-check" style="margin-bottom:6px">
+          <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
+          <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
+        </div>
+        <div class="form-check" style="margin-bottom:8px">
+          <input type="checkbox" id="exDayHoursOnly" ${ex.day_hours_only?'checked':''}>
+          <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
+        </div>
+        <div class="form-check" style="margin-bottom:8px">
+          <input type="checkbox" id="exIncludeWeekends" ${ex.include_weekends!==false?'checked':''}>
+          <label for="exIncludeWeekends" style="font-size:var(--fs-sm)" title="${t('settings_include_weekends_desc')||'Show weekends on the timeline and count them in synthetic time'}">${t('settings_include_weekends')||'Include weekends'}</label>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
+        ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
+      </div>` : ''}
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
         <div class="toggle-btn-group">
@@ -3709,6 +3863,22 @@ function renderSidebar() {
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_range')||'Default Timeline Range'}</div>
+        <div class="toggle-btn-group" style="flex-wrap:wrap">
+          ${['day','3days','week','2weeks','month'].map(v =>
+            `<button class="toggle-btn${(p.default_range||'week')===v?' active':''}" data-action="setPref" data-args='["default_range","${v}"]'>${t('range_'+v)||v}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_default_resolution')||'Default Time-slot Resolution'}</div>
+        <div class="toggle-btn-group">
+          ${[['ten','10 min'],['quarter','15 min'],['hour',t('res_hour')],['day',t('res_day')]].map(([v,l]) =>
+            `<button class="toggle-btn${(p.default_resolution||'hour')===v?' active':''}" data-action="setPref" data-args='["default_resolution","${v}"]'>${l}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_high_contrast')||'High Contrast'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_high_contrast_desc')}</p>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
@@ -3744,22 +3914,6 @@ function renderSidebar() {
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_auto_follow')||'Auto-follow "Now"'}
         </label>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_default_range')||'Default Timeline Range'}</div>
-        <div class="toggle-btn-group" style="flex-wrap:wrap">
-          ${['day','3days','week','2weeks','month'].map(v =>
-            `<button class="toggle-btn${(p.default_range||'week')===v?' active':''}" data-action="setPref" data-args='["default_range","${v}"]'>${t('range_'+v)||v}</button>`
-          ).join('')}
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_default_resolution')||'Default Time-slot Resolution'}</div>
-        <div class="toggle-btn-group">
-          ${[['ten','10 min'],['quarter','15 min'],['hour',t('res_hour')],['day',t('res_day')]].map(([v,l]) =>
-            `<button class="toggle-btn${(p.default_resolution||'hour')===v?' active':''}" data-action="setPref" data-args='["default_resolution","${v}"]'>${l}</button>`
-          ).join('')}
-        </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_tooltip_delay')||'Tooltip Hover Delay'}</div>
@@ -4062,58 +4216,6 @@ function renderSidebar() {
           <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" data-action="setOperationMode" data-arg="operation">Operation</button>
         </div>
       </div>
-      ${state.user && hasRole2(state.user.role, 'oplead') ? `
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_exercise')}</div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${getOperationNameLabel(ex)}</label>
-          <input type="text" id="exLabel" value="${escHtml(ex.label||'')}" placeholder="${getOperationNameLabel(ex)}…"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getStartexLabel(ex)}</label>
-          <input type="datetime-local" id="exEpoch" value="${ex.epoch ? fmtDateInput(new Date(ex.epoch)) : ''}"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:700">${getEndexLabel(ex)}</label>
-          <input type="datetime-local" id="exEndex" value="${ex.endex ? fmtDateInput(new Date(ex.endex)) : ''}"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
-            ${getExIndexLabel(ex)}
-            <span data-action="showExIndexInfo" style="cursor:pointer;margin-left:4px;opacity:.6" title="${t('exercise_index_info_tip')||'What is this?'}">ℹ️</span>
-          </label>
-          <input type="number" id="exIndex" value="${ex.ex_index||0}" min="0"
-            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-        </div>
-        <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('artificial_time')||'Artificial time'}</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="checkbox" id="exArtificialTimeEnabled" ${ex.artificial_time_enabled?'checked':''}
-              data-action="setArtificialTime" data-event="change"
-              style="width:14px;height:14px;accent-color:var(--accent)">
-            <input type="datetime-local" id="exArtificialTime" value="${ex.artificial_time ? fmtDateInput(new Date(ex.artificial_time)) : ''}"
-              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          </div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('artificial_time_desc')||'Set a custom "current time" for exercise simulation'}</div>
-        </div>
-        <div class="form-check" style="margin-bottom:6px">
-          <input type="checkbox" id="exEnabled" ${ex.enabled?'checked':''}>
-          <label for="exEnabled" style="font-size:var(--fs-sm)">${t('settings_exercise_enable')}</label>
-        </div>
-        <div class="form-check" style="margin-bottom:8px">
-          <input type="checkbox" id="exDayHoursOnly" ${ex.day_hours_only?'checked':''}>
-          <label for="exDayHoursOnly" style="font-size:var(--fs-sm)">${t('synth_day_hours_only')||'Day hours only'}</label>
-        </div>
-        <div class="form-check" style="margin-bottom:8px">
-          <input type="checkbox" id="exIncludeWeekends" ${ex.include_weekends!==false?'checked':''}>
-          <label for="exIncludeWeekends" style="font-size:var(--fs-sm)" title="${t('settings_include_weekends_desc')||'Show weekends on the timeline and count them in synthetic time'}">${t('settings_include_weekends')||'Include weekends'}</label>
-        </div>
-        <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
-        ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
-      </div>` : ''}
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">✅ ${t('ready_check_title')||'Ready Check'}</div>
@@ -5884,6 +5986,345 @@ function _showPRCPopup(check) {
   _playNotifBellSound();
 }
 
+/* ── Poll / Multipoll ── */
+async function openPollModal() {
+  const isCreator = hasRole2(state.user.role, 'teamlead');
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+
+  const standardQs = [
+    { key: 'stress',      label: t('poll_question_stress')||'Personal stress level (0-3)', type: 'scale' },
+    { key: 'team_stress', label: t('poll_question_team_stress')||'Team stress level (0-3)', type: 'scale' },
+    { key: 'in_control',  label: t('poll_question_in_control')||'Are you in control?', type: 'yes_no' },
+    { key: 'need_assist', label: t('poll_question_need_assist')||'Do you need assistance?', type: 'yes_no' },
+    { key: 'other',       label: t('poll_question_other')||'Additional comments', type: 'free_text' },
+  ];
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:750px">
+      <div class="modal-header">
+        <h3>📊 ${t('poll_title')||'Poll / Multipoll'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto" id="pollModalBody">
+        <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+          ${t('poll_desc')||'Poll specific users, groups, or roles with standard or custom questions. All replies are collected and reported.'}
+        </p>
+        ${isCreator ? `
+        <div style="border:1px solid var(--accent);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2))">
+          <h4 style="font-size:var(--fs-sm);margin-bottom:8px">${t('poll_create')||'Create New Poll'}</h4>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('poll_title')||'Poll title'}:</label>
+            <input type="text" id="pollTitleInput" placeholder="${t('poll_title')||'Poll title'}..." maxlength="100"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-bottom:4px;display:block">${t('poll_questions')||'Questions'}:</label>
+            <div style="margin-bottom:4px">
+              <button class="btn btn-sm btn-secondary" id="pollUseStandard">${t('poll_use_standard')||'Use standard questions'}</button>
+            </div>
+            <div id="pollQuestionList">
+            </div>
+            <button class="btn btn-sm btn-secondary" id="pollAddQuestion" style="margin-top:4px">+ ${t('poll_add_question')||'Add question'}</button>
+          </div>
+          <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('poll_target')||'Target'}:</label>
+            <div class="toggle-btn-group" style="font-size:10px">
+              <button class="toggle-btn active" id="pollModeUser" data-poll-mode="users">${t('poll_target_users')||'Users'}</button>
+              <button class="toggle-btn" id="pollModeGroup" data-poll-mode="groups">${t('poll_target_groups')||'Groups'}</button>
+              <button class="toggle-btn" id="pollModeRole" data-poll-mode="roles">${t('poll_target_roles')||'Roles'}</button>
+            </div>
+          </div>
+          <div id="pollTargetUsers">
+            <div id="pollUserList" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${(state.users||[]).filter(u => u.id !== state.user.id).map(u => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="poll-user-cb" value="${u.id}" style="margin-right:4px">
+                  ${u.availability === 'busy' ? '🟡' : u.availability === 'dnd' ? '🔴' : u.availability === 'away' ? '⚪' : '🟢'} ${escHtml(u.display_name||u.username)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <div id="pollTargetGroups" style="display:none">
+            <div id="pollGroupList" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${(state.groups||[]).map(g => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="poll-group-cb" value="${g.id}" style="margin-right:4px">
+                  👥 ${escHtml(g.name)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <div id="pollTargetRoles" style="display:none">
+            <div id="pollRoleList" style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${[...new Set((state.users||[]).map(u => u.role).filter(Boolean))].map(role => `
+                <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                  <input type="checkbox" class="poll-role-cb" value="${role}" style="margin-right:4px">
+                  🛡 ${getRoleDisplayName(role)}
+                </label>`).join('')}
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <button class="btn btn-primary btn-sm" id="btnCreatePoll">${t('poll_create')||'Create Poll'}</button>
+          </div>
+        </div>` : ''}
+        <div id="pollActiveList"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+
+  // Target mode switching
+  modal.querySelectorAll('[data-poll-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('[data-poll-mode]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const m = btn.dataset.pollMode;
+      const u = modal.querySelector('#pollTargetUsers');
+      const g = modal.querySelector('#pollTargetGroups');
+      const r = modal.querySelector('#pollTargetRoles');
+      if (u) u.style.display = m === 'users' ? '' : 'none';
+      if (g) g.style.display = m === 'groups' ? '' : 'none';
+      if (r) r.style.display = m === 'roles' ? '' : 'none';
+    });
+  });
+
+  // Standard questions button
+  const stdBtn = modal.querySelector('#pollUseStandard');
+  if (stdBtn) {
+    stdBtn.addEventListener('click', () => {
+      const list = modal.querySelector('#pollQuestionList');
+      if (!list) return;
+      list.innerHTML = '';
+      standardQs.forEach(q => _addPollQuestionRow(list, q.label, q.type));
+    });
+  }
+
+  // Add question button
+  const addBtn = modal.querySelector('#pollAddQuestion');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const list = modal.querySelector('#pollQuestionList');
+      if (list) _addPollQuestionRow(list, '', 'scale');
+    });
+  }
+
+  // Create poll button
+  const createBtn = modal.querySelector('#btnCreatePoll');
+  if (createBtn) {
+    createBtn.addEventListener('click', async () => {
+      const title = modal.querySelector('#pollTitleInput')?.value?.trim();
+      if (!title) { showError(t('poll_title_required')||'Poll title is required'); return; }
+      const questions = [];
+      modal.querySelectorAll('.poll-q-row').forEach(row => {
+        const text = row.querySelector('.poll-q-text')?.value?.trim();
+        const type = row.querySelector('.poll-q-type')?.value || 'scale';
+        if (text) questions.push({ text, type });
+      });
+      if (questions.length === 0) { showError(t('poll_questions_required')||'At least one question is required'); return; }
+
+      // Gather targets — backend expects target_type + target_ids
+      const activeMode = modal.querySelector('[data-poll-mode].active')?.dataset?.pollMode || 'users';
+      let targetType = 'user';
+      let targetIds = [];
+      if (activeMode === 'users') {
+        targetType = 'user';
+        modal.querySelectorAll('.poll-user-cb:checked').forEach(cb => targetIds.push(cb.value));
+      } else if (activeMode === 'groups') {
+        targetType = 'group';
+        modal.querySelectorAll('.poll-group-cb:checked').forEach(cb => targetIds.push(cb.value));
+      } else if (activeMode === 'roles') {
+        targetType = 'role';
+        modal.querySelectorAll('.poll-role-cb:checked').forEach(cb => targetIds.push(cb.value));
+      }
+      if (targetIds.length === 0) {
+        showError(t('poll_target_required')||'Select at least one target'); return;
+      }
+
+      // Map question types to backend format and add IDs
+      const mappedQs = questions.map((q, i) => ({
+        id: 'q_' + i,
+        text: q.text,
+        type: q.type === 'scale' ? 'scale_0_3' : q.type,
+        required: q.type !== 'free_text'
+      }));
+
+      try {
+        const res = await fetch('/api/polls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, questions: mappedQs, target_type: targetType, target_ids: targetIds })
+        });
+        if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+        showSuccess(t('poll_created')||'Poll created successfully');
+        _loadPolls(modal);
+      } catch (e) { showError(e.message); }
+    });
+  }
+
+  // Load existing polls
+  _loadPolls(modal);
+}
+
+function _addPollQuestionRow(container, text, type) {
+  const row = document.createElement('div');
+  row.className = 'poll-q-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  row.innerHTML = `
+    <input type="text" class="poll-q-text" value="${escHtml(text)}" placeholder="${t('poll_custom_question')||'Question text...'}"
+      style="flex:1;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+    <select class="poll-q-type" style="padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+      <option value="scale" ${type==='scale'?'selected':''}>${t('poll_type_scale')||'Scale 0-3'}</option>
+      <option value="yes_no" ${type==='yes_no'?'selected':''}>${t('poll_type_yes_no')||'Yes / No'}</option>
+      <option value="free_text" ${type==='free_text'?'selected':''}>${t('poll_type_free_text')||'Free text'}</option>
+    </select>
+    <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px" title="${t('poll_remove_question')||'Remove'}">✕</button>`;
+  row.querySelector('.btn-danger').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+async function _loadPolls(modal) {
+  const wrap = modal.querySelector('#pollActiveList');
+  if (!wrap) return;
+  try {
+    const res = await fetch('/api/polls');
+    if (!res.ok) { wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`; return; }
+    const polls = await res.json();
+    if (!polls || polls.length === 0) { wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`; return; }
+
+    wrap.innerHTML = polls.map(poll => {
+      const isOpen = poll.status === 'open';
+      const isCreator = poll.created_by === state.user.id;
+      const myResponse = (poll.responses || []).find(r => r.user_id === state.user.id);
+      const totalTargets = (poll.target_ids || []).length || '?';
+      const totalResponses = (poll.responses || []).length;
+      const statusColor = isOpen ? 'var(--accent)' : 'var(--text-dim)';
+      const statusText = isOpen ? (t('poll_status_open')||'Open') : (t('poll_status_closed')||'Closed');
+
+      let questionsHtml = '';
+      if (isOpen && !myResponse) {
+        // Show response form
+        questionsHtml = `<div class="poll-respond-form" data-poll-id="${poll.id}" style="margin-top:8px">
+          ${(poll.questions || []).map((q, qi) => {
+            if (q.type === 'scale' || q.type === 'scale_0_3') {
+              return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
+                <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
+                  ${[0,1,2,3].map(v => `<button class="toggle-btn poll-scale-btn" data-qi="${qi}" data-val="${v}">${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]}</button>`).join('')}
+                </div></div>`;
+            } else if (q.type === 'yes_no') {
+              return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
+                <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
+                  <button class="toggle-btn poll-yn-btn" data-qi="${qi}" data-val="yes">${t('yes')||'Yes'}</button>
+                  <button class="toggle-btn poll-yn-btn" data-qi="${qi}" data-val="no">${t('no')||'No'}</button>
+                </div></div>`;
+            } else {
+              return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
+                <input type="text" class="poll-free-input" data-qi="${qi}" placeholder="${t('poll_type_free_text')||'Your answer...'}"
+                  style="width:100%;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);margin-top:2px"></div>`;
+            }
+          }).join('')}
+          <button class="btn btn-primary btn-sm poll-submit-btn" data-poll-id="${poll.id}" style="margin-top:6px">${t('poll_respond')||'Submit Response'}</button>
+        </div>`;
+      } else if (myResponse) {
+        questionsHtml = `<div style="margin-top:6px;font-size:var(--fs-xs);color:var(--accent);font-weight:600">✅ ${t('poll_responded')||'You have responded'}</div>`;
+      }
+
+      // Summary for creator
+      let summaryHtml = '';
+      if (isCreator && (poll.responses || []).length > 0) {
+        summaryHtml = `<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
+          <strong>${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</strong>
+          ${(poll.questions || []).map((q, qi) => {
+            const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+            if (q.type === 'scale' || q.type === 'scale_0_3') {
+              const counts = [0,0,0,0];
+              answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
+              return `<div style="margin-top:4px">${escHtml(q.text)}: ${counts.map((c,i) => `<span style="margin-left:4px">${i}:${c}</span>`).join('')}</div>`;
+            } else if (q.type === 'yes_no') {
+              const yes = answers.filter(a => a === 'yes').length;
+              const no = answers.filter(a => a === 'no').length;
+              return `<div style="margin-top:4px">${escHtml(q.text)}: Yes:${yes} No:${no}</div>`;
+            } else {
+              return `<div style="margin-top:4px">${escHtml(q.text)}: ${answers.length} ${t('poll_responses')||'responses'}</div>`;
+            }
+          }).join('')}
+        </div>`;
+      }
+
+      return `<div class="sidebar-section" style="margin-bottom:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:var(--fs-sm)">📊 ${escHtml(poll.title)}</strong>
+          <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600">${statusText}</span>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</div>
+        ${questionsHtml}
+        ${summaryHtml}
+        ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger poll-close-btn" data-poll-id="${poll.id}" style="margin-top:6px">${t('poll_close')||'Close Poll'}</button>` : ''}
+      </div>`;
+    }).join('');
+
+    // Bind scale/yn toggle buttons
+    wrap.querySelectorAll('.poll-scale-btn, .poll-yn-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const grp = btn.parentElement;
+        grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Bind submit response
+    wrap.querySelectorAll('.poll-submit-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pollId = parseInt(btn.dataset.pollId);
+        const form = wrap.querySelector(`.poll-respond-form[data-poll-id="${pollId}"]`);
+        if (!form) return;
+        const poll = polls.find(p => p.id === pollId);
+        if (!poll) return;
+        const answers = (poll.questions || []).map((q, qi) => {
+          let answer = '';
+          if (q.type === 'scale_0_3' || q.type === 'scale') {
+            const active = form.querySelector(`.poll-scale-btn[data-qi="${qi}"].active`);
+            answer = active ? active.dataset.val : '';
+          } else if (q.type === 'yes_no') {
+            const active = form.querySelector(`.poll-yn-btn[data-qi="${qi}"].active`);
+            answer = active ? active.dataset.val : '';
+          } else {
+            const input = form.querySelector(`.poll-free-input[data-qi="${qi}"]`);
+            answer = input ? input.value.trim() : '';
+          }
+          return { question_id: q.id, answer };
+        }).filter(a => a.answer);
+        try {
+          const res = await fetch(`/api/polls/${pollId}/respond`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers })
+          });
+          if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+          showSuccess(t('poll_response_saved')||'Response saved');
+          _loadPolls(modal);
+        } catch (e) { showError(e.message); }
+      });
+    });
+
+    // Bind close poll
+    wrap.querySelectorAll('.poll-close-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pollId = parseInt(btn.dataset.pollId);
+        try {
+          const res = await fetch(`/api/polls/${pollId}/close`, { method: 'PUT' });
+          if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+          showSuccess(t('poll_closed_success')||'Poll closed');
+          _loadPolls(modal);
+        } catch (e) { showError(e.message); }
+      });
+    });
+  } catch (e) {
+    wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`;
+  }
+}
+
 // Symbol palettes for each resource type
 const _resourceSymbols = {
   room: ['🏠','🚪','🛋','📐','🪑','🖥','📽','🎙','📞','🏫','🏥','🏛','🏗','🔬','🧪'],
@@ -6378,6 +6819,7 @@ function updateUILabels() {
       responsible: t('report_type_responsible') || 'Responsible / Resource Report',
       planned_vs_actual: t('report_type_pva') || 'Planned vs. Actual',
       critical_path: t('report_type_cp') || 'Critical Path Analysis',
+      poll: t('report_poll') || 'Poll Report',
     };
     [...rType.options].forEach(opt => { opt.text = typeMap[opt.value] || opt.text; });
   }
@@ -7761,6 +8203,46 @@ async function generateReport() {
       }
     } catch(err) {
       html += '<p>Failed to load decision log data.</p>';
+    }
+
+  } else if (type === 'poll') {
+    // Poll report
+    try {
+      const res = await fetch('/api/polls/log');
+      const polls = res.ok ? await res.json() : [];
+      if (!polls || polls.length === 0) {
+        html += `<p>${t('poll_no_polls')||'No polls found.'}</p>`;
+      } else {
+        polls.forEach(poll => {
+          const ts = new Date(poll.created_at).toLocaleString();
+          const totalR = (poll.responses || []).length;
+          const totalT = (poll.target_ids || []).length || '?';
+          html += `<h2>📊 ${escHtml(poll.title)} <small style="font-size:11px;color:#888">(${poll.status} — ${ts})</small></h2>`;
+          html += `<p>Responses: ${totalR}/${totalT}</p>`;
+          if ((poll.questions || []).length && (poll.responses || []).length) {
+            html += '<table><thead><tr><th>Question</th><th>Type</th><th>Summary</th></tr></thead><tbody>';
+            (poll.questions || []).forEach((q, qi) => {
+              const answers = (poll.responses || []).map(r => (r.answers || [])[qi]).filter(Boolean);
+              let summary = '';
+              if (q.type === 'scale' || q.type === 'scale_0_3') {
+                const counts = [0,0,0,0];
+                answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
+                summary = counts.map((c,i) => `${i}: ${c}`).join(', ');
+              } else if (q.type === 'yes_no') {
+                const yes = answers.filter(a => a === 'yes').length;
+                const no = answers.filter(a => a === 'no').length;
+                summary = `Yes: ${yes}, No: ${no}`;
+              } else {
+                summary = answers.map(a => escHtml(a)).join('; ');
+              }
+              html += `<tr><td>${escHtml(q.text)}</td><td>${q.type}</td><td>${summary}</td></tr>`;
+            });
+            html += '</tbody></table>';
+          }
+        });
+      }
+    } catch(err) {
+      html += '<p>Failed to load poll data.</p>';
     }
 
   } else {
