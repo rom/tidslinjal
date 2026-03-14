@@ -3293,8 +3293,8 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 			limit = n
 		}
 	}
-	// Optional CSV export
-	exportCSV := q.Get("format") == "csv"
+	// Optional export format
+	exportFormat := q.Get("format") // csv, json, rtf, docx
 
 	// Filtering params
 	filterUser   := strings.ToLower(q.Get("user"))
@@ -3340,7 +3340,8 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 		entries = filtered
 	}
 
-	if exportCSV {
+	switch exportFormat {
+	case "csv":
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.csv\"")
 		fmt.Fprintf(w, "ID,Timestamp,User,Action,EntityType,EntityID,Summary\n")
@@ -3356,14 +3357,146 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 			)
 		}
 		return
+	case "json":
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.json\"")
+		json.NewEncoder(w).Encode(entries)
+		return
+	case "rtf":
+		w.Header().Set("Content-Type", "application/rtf")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.rtf\"")
+		fmt.Fprintf(w, "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Helvetica;}}\n")
+		fmt.Fprintf(w, "\\f0\\fs24\\b Audit Log\\b0\\par\\par\n")
+		fmt.Fprintf(w, "\\trowd\\trgaph100\\cellx800\\cellx3200\\cellx5200\\cellx7200\\cellx8800\\cellx9600\\cellx14000\\pard\\intbl\n")
+		fmt.Fprintf(w, "\\b ID\\cell Timestamp\\cell User\\cell Action\\cell Entity Type\\cell Entity ID\\cell Summary\\cell\\b0\\row\n")
+		for _, e := range entries {
+			fmt.Fprintf(w, "\\trowd\\trgaph100\\cellx800\\cellx3200\\cellx5200\\cellx7200\\cellx8800\\cellx9600\\cellx14000\\pard\\intbl\n")
+			fmt.Fprintf(w, "%d\\cell %s\\cell %s\\cell %s\\cell %s\\cell %d\\cell %s\\cell\\row\n",
+				e.ID,
+				e.Timestamp.Format("2006-01-02 15:04:05"),
+				rtfEscape(e.UserName),
+				rtfEscape(e.Action),
+				rtfEscape(e.EntityType),
+				e.EntityID,
+				rtfEscape(e.Summary),
+			)
+		}
+		fmt.Fprintf(w, "}\n")
+		return
+	case "docx":
+		app.exportAuditDocx(w, entries)
+		return
+	default:
+		jsonOK(w, entries)
 	}
-	jsonOK(w, entries)
 }
 
 func csvEscape(s string) string {
 	if strings.ContainsAny(s, ",\"\n\r") {
 		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 	}
+	return s
+}
+
+func rtfEscape(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString("\\\\")
+		case r == '{':
+			b.WriteString("\\{")
+		case r == '}':
+			b.WriteString("\\}")
+		case r == '\n':
+			b.WriteString("\\line ")
+		case r > 127:
+			b.WriteString(fmt.Sprintf("\\u%d?", r))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func (app *App) exportAuditDocx(w http.ResponseWriter, entries []AuditEntry) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.docx\"")
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	// [Content_Types].xml
+	ct, _ := zw.Create("[Content_Types].xml")
+	fmt.Fprintf(ct, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+		`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`+
+		`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`+
+		`<Default Extension="xml" ContentType="application/xml"/>`+
+		`<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`+
+		`</Types>`)
+
+	// _rels/.rels
+	rels, _ := zw.Create("_rels/.rels")
+	fmt.Fprintf(rels, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+		`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`+
+		`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>`+
+		`</Relationships>`)
+
+	// word/_rels/document.xml.rels
+	drels, _ := zw.Create("word/_rels/document.xml.rels")
+	fmt.Fprintf(drels, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+		`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`+
+		`</Relationships>`)
+
+	// word/document.xml
+	doc, _ := zw.Create("word/document.xml")
+	fmt.Fprintf(doc, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`+
+		`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">`+
+		`<w:body>`)
+	// Title
+	fmt.Fprintf(doc, `<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>Audit Log</w:t></w:r></w:p>`)
+	// Table
+	fmt.Fprintf(doc, `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>`+
+		`<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>`+
+		`</w:tblBorders></w:tblPr>`)
+	// Header row
+	headers := []string{"ID", "Timestamp", "User", "Action", "Entity Type", "Entity ID", "Summary"}
+	fmt.Fprintf(doc, `<w:tr>`)
+	for _, h := range headers {
+		fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEscape(h))
+	}
+	fmt.Fprintf(doc, `</w:tr>`)
+	// Data rows
+	for _, e := range entries {
+		fmt.Fprintf(doc, `<w:tr>`)
+		cells := []string{
+			fmt.Sprintf("%d", e.ID),
+			e.Timestamp.Format("2006-01-02 15:04:05"),
+			e.UserName,
+			e.Action,
+			e.EntityType,
+			fmt.Sprintf("%d", e.EntityID),
+			e.Summary,
+		}
+		for _, c := range cells {
+			fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEscape(c))
+		}
+		fmt.Fprintf(doc, `</w:tr>`)
+	}
+	fmt.Fprintf(doc, `</w:tbl>`)
+	fmt.Fprintf(doc, `</w:body></w:document>`)
+}
+
+func xmlEscape(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
 	return s
 }
 
@@ -3405,6 +3538,74 @@ var serverStartTime = time.Now()
 func handleVersion(w http.ResponseWriter, r *http.Request) {
 	uptime := time.Since(serverStartTime).Truncate(time.Second).String()
 	jsonOK(w, map[string]any{"version": AppVersion, "github": AppGitHub, "uptime": uptime, "started_at": serverStartTime.Format(time.RFC3339)})
+}
+
+func (app *App) handleDBStats(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetDBStats())
+}
+
+// ── Day Labels ────────────────────────────────────────────────────────────────
+
+func (app *App) handleGetDayLabels(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetDayLabels())
+}
+
+func (app *App) handleCreateDayLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	var dl DayLabel
+	if err := json.NewDecoder(r.Body).Decode(&dl); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if dl.Date == "" || dl.Label == "" {
+		jsonError(w, "date and label required", http.StatusBadRequest)
+		return
+	}
+	dl.CreatedBy = user.ID
+	created, err := app.store.AddDayLabel(dl)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.broker.BroadcastAll(SSEMessage{Event: "day_labels_change", Data: "{}"})
+	app.audit(user.ID, user.DisplayName, "created", "day_label", created.ID, fmt.Sprintf("Day label %q on %s", dl.Label, dl.Date))
+	jsonOK(w, created)
+}
+
+func (app *App) handleUpdateDayLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var dl DayLabel
+	if err := json.NewDecoder(r.Body).Decode(&dl); err != nil {
+		jsonError(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	dl.ID = id
+	dl.CreatedBy = user.ID
+	if err := app.store.UpdateDayLabel(dl); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.broker.BroadcastAll(SSEMessage{Event: "day_labels_change", Data: "{}"})
+	app.audit(user.ID, user.DisplayName, "updated", "day_label", id, fmt.Sprintf("Day label %q on %s", dl.Label, dl.Date))
+	jsonOK(w, dl)
+}
+
+func (app *App) handleDeleteDayLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteDayLabel(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.broker.BroadcastAll(SSEMessage{Event: "day_labels_change", Data: "{}"})
+	app.audit(user.ID, user.DisplayName, "deleted", "day_label", id, "")
+	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
 // ── Integration Status ─────────────────────────────────────────────────────────
@@ -4775,6 +4976,29 @@ func (app *App) routes() http.Handler {
 
 	// Version
 	mux.HandleFunc("/api/version", handleVersion)
+	mux.HandleFunc("/api/db-stats", app.requireAuth(app.handleDBStats))
+
+	// Day Labels
+	mux.HandleFunc("/api/day-labels", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetDayLabels)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleReadWrite, app.handleCreateDayLabel)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/day-labels/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			app.requireRole(RoleReadWrite, app.handleUpdateDayLabel)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleReadWrite, app.handleDeleteDayLabel)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	// Integration status (admin-only summary of SSO/TLS/Syslog/SMTP/Webhooks/API keys)
 	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 

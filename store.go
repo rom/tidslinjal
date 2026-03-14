@@ -73,6 +73,7 @@ type Store struct {
 	notifications        []Notification
 	mapResources         []MapResource
 	referenceDocs        []ReferenceDoc
+	dayLabels            []DayLabel
 	rateLimitSettings    RateLimitSettings
 	geoblockingSettings  GeoblockingSettings
 	encryptionSettings   EncryptionSettings
@@ -106,6 +107,7 @@ type Store struct {
 	nextNotificationID       int64
 	nextMapResourceID        int64
 	nextReferenceDocID       int64
+	nextDayLabelID           int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -185,6 +187,7 @@ func (s *Store) load() error {
 	s.loadFile("notifications.json", &s.notifications)
 	s.loadFile("map_resources.json", &s.mapResources)
 	s.loadFile("references.json", &s.referenceDocs)
+	s.loadFile("day_labels.json", &s.dayLabels)
 	s.rateLimitSettings = RateLimitSettings{LoginLimit: 10, RegistrationLimit: 5, PasswordResetLimit: 5}
 	s.loadFile("rate_limits.json", &s.rateLimitSettings)
 	s.loadFile("geoblocking.json", &s.geoblockingSettings)
@@ -364,6 +367,11 @@ func (s *Store) load() error {
 			s.nextReferenceDocID = x.ID
 		}
 	}
+	for _, x := range s.dayLabels {
+		if x.ID > s.nextDayLabelID {
+			s.nextDayLabelID = x.ID
+		}
+	}
 	// Build O(1) lookup indexes.
 	s.rebuildUserIdx()
 	s.rebuildSessionIdx()
@@ -429,6 +437,48 @@ func (s *Store) GetAudit(limit int) []AuditEntry {
 		result[i], result[j] = result[j], result[i]
 	}
 	return result
+}
+
+// GetDBStats returns database statistics for the legend panel.
+func (s *Store) GetDBStats() map[string]any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	// Calculate total data directory size
+	var totalSize int64
+	var createdAt time.Time
+	filepath.Walk(s.dataDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			totalSize += info.Size()
+			if createdAt.IsZero() || info.ModTime().Before(createdAt) {
+				createdAt = info.ModTime()
+			}
+		}
+		return nil
+	})
+	return map[string]any{
+		"created_at":      createdAt.Format(time.RFC3339),
+		"size_bytes":      totalSize,
+		"events":          len(s.events),
+		"users":           len(s.users),
+		"groups":          len(s.groups),
+		"layers":          len(s.layers),
+		"alarms":          len(s.alarms),
+		"phases":          len(s.phases),
+		"audit_entries":   len(s.audit),
+		"attachments":     len(s.attachments),
+		"comments":        len(s.comments),
+		"templates":       len(s.templates),
+		"polls":           len(s.polls),
+		"log_book":        len(s.logBook),
+		"decision_log":    len(s.decisionLog),
+		"map_locations":   len(s.mapLocations),
+		"rooms":           len(s.rooms),
+		"notifications":   len(s.notifications),
+		"reference_docs":  len(s.referenceDocs),
+	}
 }
 
 // ── Exercise settings ──────────────────────────────────────────────────────────
@@ -4031,5 +4081,64 @@ func (s *Store) GetAllSettings() map[string]interface{} {
 		"rate_limits":  s.rateLimitSettings,
 		"geoblocking":  s.geoblockingSettings,
 		"encryption":   s.encryptionSettings,
+		"day_labels":   s.dayLabels,
 	}
+}
+
+// ── Day Labels ────────────────────────────────────────────────────────────
+
+func (s *Store) GetDayLabels() []DayLabel {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]DayLabel, len(s.dayLabels))
+	copy(out, s.dayLabels)
+	return out
+}
+
+func (s *Store) AddDayLabel(dl DayLabel) (DayLabel, error) {
+	s.mu.Lock()
+	s.nextDayLabelID++
+	dl.ID = s.nextDayLabelID
+	s.dayLabels = append(s.dayLabels, dl)
+	snap := append([]DayLabel(nil), s.dayLabels...)
+	s.mu.Unlock()
+	return dl, s.persist("day_labels.json", snap)
+}
+
+func (s *Store) UpdateDayLabel(dl DayLabel) error {
+	s.mu.Lock()
+	found := false
+	for i := range s.dayLabels {
+		if s.dayLabels[i].ID == dl.ID {
+			s.dayLabels[i] = dl
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.mu.Unlock()
+		return fmt.Errorf("day label not found")
+	}
+	snap := append([]DayLabel(nil), s.dayLabels...)
+	s.mu.Unlock()
+	return s.persist("day_labels.json", snap)
+}
+
+func (s *Store) DeleteDayLabel(id int64) error {
+	s.mu.Lock()
+	idx := -1
+	for i := range s.dayLabels {
+		if s.dayLabels[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		s.mu.Unlock()
+		return fmt.Errorf("day label not found")
+	}
+	s.dayLabels = append(s.dayLabels[:idx], s.dayLabels[idx+1:]...)
+	snap := append([]DayLabel(nil), s.dayLabels...)
+	s.mu.Unlock()
+	return s.persist("day_labels.json", snap)
 }

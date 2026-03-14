@@ -14,6 +14,7 @@ window.state = {
   users:       [],
   eventTypes:  [],
   phases:      [],
+  dayLabels:   [],
   preferences: {
     theme:           'light',
     size:            'small',

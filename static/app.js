@@ -171,6 +171,11 @@ async function init() {
     } catch { state._testStats = null; }
   }
 
+  // Load database stats for legend panel
+  try {
+    state._dbStats = await apiGet('/api/db-stats');
+  } catch { state._dbStats = null; }
+
   // User info in header + role-gated controls
   applyRoleGatedUI();
 

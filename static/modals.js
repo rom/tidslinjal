@@ -1873,6 +1873,112 @@ async function deleteEtype(id) {
   } else { const err = await res.json(); showError(err.error); }
 }
 
+// ── Day Label Modal ────────────────────────────────────────────────────────
+function openDayLabelModal(date) {
+  const dateStr = typeof date === 'string' ? date : date.toISOString().slice(0,10);
+  const existing = (state.dayLabels||[]).filter(dl => dl.date === dateStr);
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h3>🏷️ ${t('day_labels')||'Day Labels'} — ${dateStr}</h3>
+        <button class="modal-close day-label-close">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+        <div id="dayLabelList">
+          ${existing.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('day_labels_none')||'No labels for this day.'}</p>` : ''}
+          ${existing.map(dl => `
+            <div class="day-label-row" data-id="${dl.id}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;padding:6px;border:1px solid var(--border);border-radius:var(--radius)">
+              <span style="background:${dl.background||'var(--accent)'};color:${dl.color||'#fff'};padding:2px 8px;border-radius:3px;font-size:${dl.font_size||'var(--fs-xs)'};font-weight:${dl.font_weight||'600'};flex:1">${escHtml(dl.label)}</span>
+              <button class="btn btn-danger btn-sm day-label-del" data-id="${dl.id}" style="flex-shrink:0">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
+          <div style="font-weight:600;font-size:var(--fs-sm);margin-bottom:6px">${t('day_label_add')||'Add Label'}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+            <div>
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_text')||'Label text'}:</label>
+              <input type="text" id="dlText" placeholder="${t('day_label_text')||'e.g. Training Day'}..." maxlength="60"
+                style="width:auto;padding:4px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+            </div>
+            <div>
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_bg')||'Background'}:</label>
+              <input type="color" id="dlBg" value="#4A90D9" style="width:auto;height:30px">
+            </div>
+            <div>
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_color')||'Text color'}:</label>
+              <input type="color" id="dlColor" value="#ffffff" style="width:auto;height:30px">
+            </div>
+            <div>
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_font_size')||'Font size'}:</label>
+              <select id="dlFontSize" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+                <option value="9px">9px</option>
+                <option value="10px">10px</option>
+                <option value="var(--fs-xs)" selected>Default (xs)</option>
+                <option value="var(--fs-sm)">Small</option>
+                <option value="var(--fs-base)">Base</option>
+                <option value="14px">14px</option>
+                <option value="16px">16px</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_font_weight')||'Font weight'}:</label>
+              <select id="dlFontWeight" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+                <option value="400">Normal</option>
+                <option value="600" selected>Semi-bold</option>
+                <option value="700">Bold</option>
+                <option value="800">Extra-bold</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="dlAddBtn">${t('btn_add')||'+ Add'}</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary day-label-close">${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  // Close handlers
+  modal.querySelectorAll('.day-label-close').forEach(b => b.addEventListener('click', () => modal.remove()));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  // Delete handlers
+  modal.querySelectorAll('.day-label-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.id, 10);
+      const res = await api('DELETE', `/api/day-labels/${id}`);
+      if (res.ok) {
+        await fetchDayLabels();
+        modal.remove();
+        renderTimeline();
+        openDayLabelModal(dateStr);
+      } else { showError('Failed to delete label'); }
+    });
+  });
+  // Add handler
+  modal.querySelector('#dlAddBtn').addEventListener('click', async () => {
+    const label = modal.querySelector('#dlText').value.trim();
+    if (!label) { showError(t('day_label_text_required')||'Label text is required'); return; }
+    const payload = {
+      date: dateStr,
+      label: label,
+      background: modal.querySelector('#dlBg').value,
+      color: modal.querySelector('#dlColor').value,
+      font_size: modal.querySelector('#dlFontSize').value,
+      font_weight: modal.querySelector('#dlFontWeight').value,
+    };
+    const res = await apiPost('/api/day-labels', payload);
+    if (res.ok) {
+      await fetchDayLabels();
+      modal.remove();
+      renderTimeline();
+      openDayLabelModal(dateStr);
+    } else { showError('Failed to add label'); }
+  });
+}
+
 // ── Phase Modal ────────────────────────────────────────────────────────────
 function openPhaseModal(ph) {
   const isEdit = !!ph;
@@ -2072,12 +2178,177 @@ async function _loadPollsterLog(container) {
     });
   }
 
+  // Export JSON
+  const jsonBtn = container.querySelector ? container.querySelector('#pollsterExportJSON') : document.getElementById('pollsterExportJSON');
+  if (jsonBtn) {
+    jsonBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/polls/log');
+        if (!res.ok) return;
+        const polls = await res.json();
+        const blob = new Blob([JSON.stringify(polls, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pollster_log.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch {}
+    });
+  }
+
+  // Export RTF
+  const rtfBtn = container.querySelector ? container.querySelector('#pollsterExportRTF') : document.getElementById('pollsterExportRTF');
+  if (rtfBtn) {
+    rtfBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/polls/log');
+        if (!res.ok) return;
+        const polls = await res.json();
+        const esc = s => String(s||'').replace(/\\/g,'\\\\').replace(/\{/g,'\\{').replace(/\}/g,'\\}');
+        let rtf = '{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Helvetica;}}\n';
+        rtf += '\\f0\\fs24\\b Pollster Log\\b0\\par\\par\n';
+        rtf += '\\trowd\\trgaph100\\cellx3000\\cellx5000\\cellx7500\\cellx9000\\cellx11000\\pard\\intbl\n';
+        rtf += '\\b Poll\\cell Status\\cell Created\\cell Questions\\cell Responses\\cell\\b0\\row\n';
+        (polls || []).forEach(p => {
+          rtf += '\\trowd\\trgaph100\\cellx3000\\cellx5000\\cellx7500\\cellx9000\\cellx11000\\pard\\intbl\n';
+          rtf += `${esc(p.title)}\\cell ${esc(p.status)}\\cell ${esc(p.created_at)}\\cell ${(p.questions||[]).length}\\cell ${(p.responses||[]).length}\\cell\\row\n`;
+        });
+        rtf += '}';
+        const blob = new Blob([rtf], { type: 'application/rtf' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pollster_log.rtf';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch {}
+    });
+  }
+
+  // Export DOCX
+  const docxBtn = container.querySelector ? container.querySelector('#pollsterExportDOCX') : document.getElementById('pollsterExportDOCX');
+  if (docxBtn) {
+    docxBtn.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/polls/log');
+        if (!res.ok) return;
+        const polls = await res.json();
+        const xe = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const headers = ['Poll','Status','Created','Questions','Responses'];
+        let rows = '';
+        (polls || []).forEach(p => {
+          const cells = [p.title, p.status, p.created_at, String((p.questions||[]).length), String((p.responses||[]).length)];
+          rows += '<w:tr>' + cells.map(c => `<w:tc><w:p><w:r><w:t>${xe(c)}</w:t></w:r></w:p></w:tc>`).join('') + '</w:tr>';
+        });
+        const docXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' +
+          '<w:p><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t>Pollster Log</w:t></w:r></w:p>' +
+          '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>' +
+          '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '<w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '<w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>' +
+          '</w:tblBorders></w:tblPr>' +
+          '<w:tr>' + headers.map(h => `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>${xe(h)}</w:t></w:r></w:p></w:tc>`).join('') + '</w:tr>' +
+          rows + '</w:tbl></w:body></w:document>';
+        const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+          '<Default Extension="xml" ContentType="application/xml"/>' +
+          '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+          '</Types>';
+        const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+          '</Relationships>';
+        const drels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+        // Build ZIP using minimal PKZIP structure
+        const enc = new TextEncoder();
+        const files = [
+          { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+          { name: '_rels/.rels', data: enc.encode(rels) },
+          { name: 'word/_rels/document.xml.rels', data: enc.encode(drels) },
+          { name: 'word/document.xml', data: enc.encode(docXml) },
+        ];
+        const parts = [];
+        const centralDir = [];
+        let offset = 0;
+        for (const f of files) {
+          const nameBytes = enc.encode(f.name);
+          // Local file header
+          const lh = new Uint8Array(30 + nameBytes.length);
+          const lv = new DataView(lh.buffer);
+          lv.setUint32(0, 0x04034b50, true); // signature
+          lv.setUint16(4, 20, true); // version
+          lv.setUint16(8, 0, true); // compression: store
+          lv.setUint16(12, 0, true); // mod time
+          lv.setUint16(14, 0, true); // mod date
+          const crc = _crc32(f.data);
+          lv.setUint32(16, crc, true);
+          lv.setUint32(20, f.data.length, true);
+          lv.setUint32(24, f.data.length, true);
+          lv.setUint16(26, nameBytes.length, true);
+          lh.set(nameBytes, 30);
+          parts.push(lh, f.data);
+          // Central directory entry
+          const cd = new Uint8Array(46 + nameBytes.length);
+          const cv = new DataView(cd.buffer);
+          cv.setUint32(0, 0x02014b50, true);
+          cv.setUint16(4, 20, true);
+          cv.setUint16(6, 20, true);
+          cv.setUint16(12, 0, true); // compression
+          cv.setUint32(16, crc, true);
+          cv.setUint32(20, f.data.length, true);
+          cv.setUint32(24, f.data.length, true);
+          cv.setUint16(28, nameBytes.length, true);
+          cv.setUint32(42, offset, true);
+          cd.set(nameBytes, 46);
+          centralDir.push(cd);
+          offset += lh.length + f.data.length;
+        }
+        const cdOffset = offset;
+        let cdSize = 0;
+        centralDir.forEach(c => cdSize += c.length);
+        const eocd = new Uint8Array(22);
+        const ev = new DataView(eocd.buffer);
+        ev.setUint32(0, 0x06054b50, true);
+        ev.setUint16(8, files.length, true);
+        ev.setUint16(10, files.length, true);
+        ev.setUint32(12, cdSize, true);
+        ev.setUint32(16, cdOffset, true);
+        const blob = new Blob([...parts, ...centralDir, eocd], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pollster_log.docx';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (e) { showError(e.message); }
+    });
+  }
+
   // Print
   const printBtn = container.querySelector ? container.querySelector('#pollsterPrint') : document.getElementById('pollsterPrint');
   if (printBtn) {
     printBtn.addEventListener('click', () => { window.print(); });
   }
 }
+
+// ── CRC32 for client-side ZIP generation ──────────────────────────────────
+const _crc32 = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    table[i] = c;
+  }
+  return data => {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) crc = table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  };
+})();
 
 // ── Log Book ───────────────────────────────────────────────────────────────
 let _logBookEntries = [];
@@ -2440,6 +2711,41 @@ function renderSidebar() {
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
       </div>
+      ${(() => {
+        // Database statistics panel
+        const db = state._dbStats || null;
+        if (db) {
+          const sizeStr = db.size_bytes < 1024 ? db.size_bytes + ' B'
+            : db.size_bytes < 1048576 ? (db.size_bytes/1024).toFixed(1) + ' KB'
+            : (db.size_bytes/1048576).toFixed(1) + ' MB';
+          const createdStr = db.created_at ? new Date(db.created_at).toLocaleString(getLocale()) : '—';
+          return `<div class="sidebar-section">
+            <div class="sidebar-section-title">💾 ${t('legend_database')||'Database'}</div>
+            <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
+              <span style="color:var(--text-dim)">${t('legend_db_created')||'Created'}:</span><span>${createdStr}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_size')||'Size'}:</span><span>${sizeStr}</span>
+              <span style="color:var(--text-dim)">${t('info_events')||'Events'}:</span><span>${db.events||0}</span>
+              <span style="color:var(--text-dim)">${t('info_users')||'Users'}:</span><span>${db.users||0}</span>
+              <span style="color:var(--text-dim)">${t('info_groups')||'Groups'}:</span><span>${db.groups||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_layers')||'Layers'}:</span><span>${db.layers||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_alarms')||'Alarms'}:</span><span>${db.alarms||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_phases')||'Phases'}:</span><span>${db.phases||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_audit')||'Audit entries'}:</span><span>${db.audit_entries||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_attachments')||'Attachments'}:</span><span>${db.attachments||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_comments')||'Comments'}:</span><span>${db.comments||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_templates')||'Templates'}:</span><span>${db.templates||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_polls')||'Polls'}:</span><span>${db.polls||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_log_book')||'Log book'}:</span><span>${db.log_book||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_decisions')||'Decisions'}:</span><span>${db.decision_log||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_locations')||'Map locations'}:</span><span>${db.map_locations||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_rooms')||'Rooms'}:</span><span>${db.rooms||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_notifications')||'Notifications'}:</span><span>${db.notifications||0}</span>
+              <span style="color:var(--text-dim)">${t('legend_db_references')||'Reference docs'}:</span><span>${db.reference_docs||0}</span>
+            </div>
+          </div>`;
+        }
+        return '';
+      })()}
       ${(() => {
         // Test statistics panel — admin only
         if (state.user && state.user.role === 'admin') {
@@ -2812,7 +3118,10 @@ function renderSidebar() {
             <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
             <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
             <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
-            <button class="btn btn-secondary btn-sm" data-action="exportAuditCSV" title="Export to CSV">⬇ CSV</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="csv" title="Export to CSV">⬇ CSV</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="json" title="Export to JSON">⬇ JSON</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="rtf" title="Export to RTF">⬇ RTF</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="docx" title="Export to DOCX">⬇ DOCX</button>
           </div>
           <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
         </div>`;
@@ -2870,6 +3179,9 @@ function renderSidebar() {
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
             <input type="text" id="pollsterSearch" placeholder="🔍 ${t('search')||'Search'}…" style="flex:1;min-width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
             <button class="btn btn-secondary btn-sm" id="pollsterExportCSV" title="Export to CSV">⬇ CSV</button>
+            <button class="btn btn-secondary btn-sm" id="pollsterExportJSON" title="Export to JSON">⬇ JSON</button>
+            <button class="btn btn-secondary btn-sm" id="pollsterExportRTF" title="Export to RTF">⬇ RTF</button>
+            <button class="btn btn-secondary btn-sm" id="pollsterExportDOCX" title="Export to DOCX">⬇ DOCX</button>
             <button class="btn btn-secondary btn-sm" id="pollsterPrint" title="Print">🖨</button>
           </div>
           <div id="pollsterLogEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('lb_loading')||'Loading…'}</em></div>
@@ -2887,15 +3199,17 @@ function renderSidebar() {
         <div class="phase-list">
           ${state.phases.length === 0
             ? `<div style="color:var(--text-dim);font-size:var(--fs-sm)">${t('phases_none')||'No phases defined.'}</div>`
-            : state.phases.sort((a,b)=>a.order-b.order).map(ph => `
-              <div class="phase-item" style="border-left:4px solid ${ph.color};padding:6px 8px;margin-bottom:6px;background:var(--bg2);border-radius:var(--radius)">
+            : state.phases.sort((a,b)=>a.order-b.order).map(ph => {
+              const canEdit = state.user && (hasRole2(state.user.role,'oplead') || ph.created_by === state.user.id);
+              return `<div class="phase-item" style="border-left:4px solid ${ph.color};padding:6px 8px;margin-bottom:6px;background:var(--bg2);border-radius:var(--radius);${canEdit?'cursor:pointer':'cursor:default'}" ${canEdit?`data-action="openPhaseModal" data-arg='${escAttr(JSON.stringify(ph))}' data-arg-el`:''}>
                 <div style="font-size:var(--fs-sm);font-weight:600;color:var(--text)">${escHtml(ph.name)}</div>
                 <div style="font-size:var(--fs-xs);color:var(--text-dim)">${fmtDateTime(new Date(ph.start_time))} – ${fmtDateTime(new Date(ph.end_time))}</div>
-                <div style="display:flex;gap:4px;margin-top:4px">
+                ${canEdit ? `<div style="display:flex;gap:4px;margin-top:4px" data-stop-prop-only>
                   <button class="btn btn-ghost btn-sm" data-action="openPhaseModal" data-arg='${escAttr(JSON.stringify(ph))}' data-arg-el>✏️</button>
                   <button class="btn btn-danger btn-sm" data-action="deletePhase" data-arg="${ph.id}">✕</button>
-                </div>
-              </div>`).join('')}
+                </div>` : ''}
+              </div>`;
+            }).join('')}
         </div>
       </div>
     `;
@@ -2923,7 +3237,10 @@ function renderSidebar() {
           <input type="date" id="auditDateFrom" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
           <span style="color:var(--text-dim);font-size:var(--fs-xs)">–</span>
           <input type="date" id="auditDateTo" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)" data-action="refreshAuditLog" data-event="change">
-          <button class="btn btn-secondary btn-sm" data-action="exportAuditCSV" title="Export to CSV">⬇ CSV</button>
+          <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="csv" title="Export to CSV">⬇ CSV</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="json" title="Export to JSON">⬇ JSON</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="rtf" title="Export to RTF">⬇ RTF</button>
+            <button class="btn btn-secondary btn-sm" data-action="exportAuditLog" data-arg="docx" title="Export to DOCX">⬇ DOCX</button>
         </div>
         <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
       </div>`;
@@ -6227,14 +6544,14 @@ function _addPollQuestionRow(container, text, type) {
   row.className = 'poll-q-row';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
   row.innerHTML = `
-    <input type="text" class="poll-q-text" value="${escHtml(text)}" placeholder="${t('poll_custom_question')||'Question text...'}"
-      style="flex:1;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
-    <select class="poll-q-type" style="padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+    <textarea class="poll-q-text" placeholder="${t('poll_custom_question')||'Question text...'}"
+      style="flex:1;width:auto;min-width:0;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical;min-height:32px;height:32px;line-height:1.4">${escHtml(text)}</textarea>
+    <select class="poll-q-type" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);flex-shrink:0">
       <option value="scale" ${type==='scale'?'selected':''}>${t('poll_type_scale')||'Scale 0-3'}</option>
       <option value="yes_no" ${type==='yes_no'?'selected':''}>${t('poll_type_yes_no')||'Yes / No'}</option>
       <option value="free_text" ${type==='free_text'?'selected':''}>${t('poll_type_free_text')||'Free text'}</option>
     </select>
-    <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px" title="${t('poll_remove_question')||'Remove'}">✕</button>`;
+    <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;flex-shrink:0" title="${t('poll_remove_question')||'Remove'}">✕</button>`;
   row.querySelector('.btn-danger').addEventListener('click', () => row.remove());
   container.appendChild(row);
 }
@@ -7048,6 +7365,11 @@ function connectSSE() {
       renderSidebar();
     } catch { /* ignore parse errors */ }
   });
+  // Day labels change
+  es.addEventListener('day_labels_change', async () => {
+    await fetchDayLabels();
+    renderTimeline();
+  });
   // Personal notification
   es.addEventListener('personal_notification', e => {
     try {
@@ -7146,13 +7468,15 @@ function showAlarmNotification(data, level) {
     <div class="notification-msg">${escHtml(data.message)}</div>
     <div class="alarm-since" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">⏱ 0s ago</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-      <button class="btn btn-ghost btn-sm notification-close-btn" data-action="dismissAlarmNotif" data-arg="${data.alarm_id}">${t('alarm_dismiss')||'Dismiss'}</button>
-      <button class="btn btn-secondary btn-sm" data-action="openAlarmEvent" data-arg="${data.event_id}">📋 Show event</button>
+      <button class="btn btn-ghost btn-sm notification-close-btn alarm-dismiss-btn">${t('alarm_dismiss')||'Dismiss'}</button>
+      <button class="btn btn-secondary btn-sm alarm-show-event-btn">📋 Show event</button>
       ${hasMeeting ? `<a href="${escHtml(meetingURL)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none">${t('alarm_enter_meeting')}</a>` : ''}
-      <button class="btn btn-primary btn-sm" data-action="ackAlarm" data-arg="${data.alarm_id}" data-arg-el>✓ ${t('alarm_ack')}</button>
+      <button class="btn btn-primary btn-sm alarm-ack-btn">✓ ${t('alarm_ack')}</button>
     </div>
   `;
-  _bindActions(el);
+  el.querySelector('.alarm-dismiss-btn').addEventListener('click', () => dismissAlarmNotif(data.alarm_id));
+  el.querySelector('.alarm-show-event-btn').addEventListener('click', () => openAlarmEvent(data.event_id));
+  el.querySelector('.alarm-ack-btn').addEventListener('click', () => ackAlarm(data.alarm_id, el));
   area.appendChild(el);
 
   // Update "X seconds/minutes ago" counter every second
@@ -7204,13 +7528,20 @@ async function openAlarmEvent(eventId) {
 }
 
 async function ackAlarm(alarmID, notifEl) {
-  const res = await apiPost(`/api/alarms/${alarmID}/ack`, {});
-  if (res.ok) {
-    dismissAlarmNotif(alarmID);
-    if (notifEl && notifEl.parentNode) notifEl.remove();
-    await fetchAlarms();
-    renderSidebar();
-    showNotification('success', t('alarm_acked'));
+  try {
+    const res = await apiPost(`/api/alarms/${alarmID}/ack`, {});
+    if (res.ok) {
+      dismissAlarmNotif(alarmID);
+      if (notifEl && notifEl.parentNode) notifEl.remove();
+      await fetchAlarms();
+      renderSidebar();
+      showNotification('success', t('alarm_acked')||'Alarm acknowledged');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to acknowledge alarm');
+    }
+  } catch (e) {
+    showError(e.message || 'Failed to acknowledge alarm');
   }
 }
 
@@ -11192,19 +11523,21 @@ async function refreshAuditLog() {
   </div>`;
 }
 
-function exportAuditCSV() {
+function exportAuditLog(format) {
+  format = format || 'csv';
   const search     = document.getElementById('auditSearch')?.value?.trim() || '';
   const action     = document.getElementById('auditFilterAction')?.value || '';
   const dateFrom   = document.getElementById('auditDateFrom')?.value || '';
   const dateTo     = document.getElementById('auditDateTo')?.value || '';
-  let url = '/api/audit?limit=5000&format=csv';
+  let url = `/api/audit?limit=5000&format=${encodeURIComponent(format)}`;
   if (search)   url += `&search=${encodeURIComponent(search)}`;
   if (action)   url += `&action=${encodeURIComponent(action)}`;
   if (dateFrom) url += `&date_from=${encodeURIComponent(dateFrom)}`;
   if (dateTo)   url += `&date_to=${encodeURIComponent(dateTo)}`;
+  const ext = format === 'docx' ? 'docx' : format;
   const a = document.createElement('a');
   a.href = url;
-  a.download = `audit-log-${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `audit-log-${new Date().toISOString().slice(0,10)}.${ext}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

@@ -220,7 +220,17 @@ function renderTimeline() {
       const label = style === 'year_week' ? (day.getFullYear() % 10) + '-W' + String(weekNo).padStart(2,'0') : 'W' + weekNo;
       weekHtml = `<div style="font-size:.55em;color:var(--accent);font-weight:700">${label}</div>`;
     }
+    const dayStr = day.toISOString().slice(0,10);
+    const dayLbls = (state.dayLabels||[]).filter(dl => dl.date === dayStr);
+    const dayLabelHtml = dayLbls.map(dl => {
+      const bg = dl.background || 'var(--accent)';
+      const col = dl.color || '#fff';
+      const fs = dl.font_size || 'var(--fs-xs)';
+      const fw = dl.font_weight || '600';
+      return `<div class="tl-day-label" style="background:${bg};color:${col};font-size:${fs};font-weight:${fw};padding:1px 4px;border-radius:3px;text-align:center;line-height:1.3;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(dl.label)}">${escHtml(dl.label)}</div>`;
+    }).join('');
     html += `<div class="tl-day-header${isToday?' today':''}${weekendCls}" data-date="${day.toISOString()}" data-center-day="${day.toISOString()}" title="Click to center this day" style="cursor:pointer">
+      ${dayLabelHtml}
       <div class="tl-day-name">${dayName}${doyHtml}</div>
       <div class="tl-day-date">${dayDate}${isToday?`<span class="today-marker">${t('today')||'Today'}</span>`:''}${weekHtml}</div>
     </div>`;
@@ -286,6 +296,16 @@ function renderTimeline() {
   // Attach day-header click listeners (CSP-safe)
   container.querySelectorAll('[data-center-day]').forEach(el => {
     el.addEventListener('click', () => centerDay(new Date(el.dataset.centerDay)));
+    // Double-click to manage day labels (for readwrite+ users)
+    if (state.user && hasRole2(state.user.role, 'readwrite')) {
+      el.addEventListener('dblclick', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dateStr = new Date(el.dataset.date).toISOString().slice(0,10);
+        openDayLabelModal(dateStr);
+      });
+      el.title = (el.title || '') + '\nDouble-click to manage day labels';
+    }
   });
   // Attach cell click listeners (CSP-safe)
   container.querySelectorAll('[data-cell-click]').forEach(el => {
@@ -339,15 +359,19 @@ function renderEventBlocks(days, slotH) {
           if (veMin <= vsMin) return;
           const topPx    = realHeaderH + (vsMin / slotMin) * realSlotH;
           const heightPx = Math.max(((veMin - vsMin) / slotMin) * realSlotH, 4);
+          const canEditPhase = state.user && (hasRole2(state.user.role,'oplead') || ph.created_by === state.user.id);
           const el = document.createElement('div');
           el.className = 'phase-overlay';
-          el.style.cssText = `top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:${ph.color};border-color:${ph.color};`;
+          el.style.cssText = `top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:${ph.color};border-color:${ph.color};${canEditPhase?'cursor:pointer;':''}`;
+          if (canEditPhase) el.addEventListener('click', e => { e.stopPropagation(); openPhaseModal(ph); });
+          el.title = ph.name + (canEditPhase ? ' (click to edit)' : '');
           container.appendChild(el);
           if (di === 0) {
             const lbl = document.createElement('div');
             lbl.className = 'phase-label';
-            lbl.style.cssText = `top:${topPx}px;left:${dayMeta[di].left}px;background:${ph.color};color:#fff;`;
+            lbl.style.cssText = `top:${topPx}px;left:${dayMeta[di].left}px;background:${ph.color};color:#fff;${canEditPhase?'cursor:pointer;':''}`;
             lbl.textContent = ph.name;
+            if (canEditPhase) lbl.addEventListener('click', e => { e.stopPropagation(); openPhaseModal(ph); });
             container.appendChild(lbl);
           }
         });
