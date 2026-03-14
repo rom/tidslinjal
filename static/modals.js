@@ -1239,6 +1239,8 @@ document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
   const webhook_url = webhookEl ? webhookEl.value.trim() : '';
   const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime, sound, webhook_url});
   if (res.ok) {
+    const created = await res.clone().json().catch(() => null);
+    if (created && created.id) pushUndo('create_alarm', { id: created.id });
     closeModal('alarmModal');
     await fetchAlarms(); renderSidebar();
     showNotification('success', t('notif_alarm_set'));
@@ -1246,8 +1248,12 @@ document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
 });
 
 async function deleteAlarm(id) {
+  const alarmToDelete = (state.alarms||[]).find(a => a.id === parseInt(id, 10));
   const res = await apiDel(`/api/alarms/${id}`);
-  if (res.ok) { await fetchAlarms(); renderSidebar(); showNotification('success', t('notif_alarm_removed')); }
+  if (res.ok) {
+    if (alarmToDelete) pushUndo('delete_alarm', { ...alarmToDelete });
+    await fetchAlarms(); renderSidebar(); showNotification('success', t('notif_alarm_removed'));
+  }
 }
 
 // ── Lock Modal ─────────────────────────────────────────────────────────────
@@ -1577,14 +1583,24 @@ document.getElementById('btnSaveGroup').addEventListener('click', async () => {
   if (!name) { showError('Name required', 'Validation'); return; }
   const payload = {name, description: document.getElementById('groupDesc').value};
   const res = id ? await apiPut(`/api/groups/${id}`, payload) : await apiPost('/api/groups', payload);
-  if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
+  if (res.ok) {
+    if (!id) {
+      const created = await res.clone().json().catch(() => null);
+      if (created && created.id) pushUndo('create_group', { id: created.id });
+    }
+    closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved'));
+  }
   else { const err = await res.json(); showError(err.error); }
 });
 
 async function deleteGroup(id) {
   if (!confirm(t('confirm_delete_group'))) return;
+  const groupToDelete = state.groups.find(g => g.id === parseInt(id, 10));
   const res = await apiDel(`/api/groups/${id}`);
-  if (res.ok) { closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved')); }
+  if (res.ok) {
+    if (groupToDelete) pushUndo('delete_group', { ...groupToDelete });
+    closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved'));
+  }
 }
 
 // ── Member Management Modal ────────────────────────────────────────────────
@@ -1733,8 +1749,15 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
     permission: document.getElementById('layerPermission').value,
     group_ids: groupIDs,
   };
+  const oldLayer = id ? state.layers.find(l => l.id === parseInt(id, 10)) : null;
   const res = id ? await apiPut(`/api/layers/${id}`, payload) : await apiPost('/api/layers', payload);
   if (res.ok) {
+    if (id && oldLayer) {
+      pushUndo('update_layer', { id: parseInt(id, 10), old: { ...oldLayer } });
+    } else if (!id) {
+      const created = await res.clone().json().catch(() => null);
+      if (created && created.id) pushUndo('create_layer', { id: created.id });
+    }
     closeModal('layerModal'); await fetchLayers(); renderSidebar(); renderTimeline();
     showNotification('success', t('notif_saved'));
     // When creating a new layer, offer to also create a group with the same name
@@ -1758,8 +1781,10 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
 
 async function deleteLayer(id) {
   if (!confirm(t('confirm_delete_layer'))) return;
+  const layerToDelete = state.layers.find(l => l.id === parseInt(id, 10));
   const res = await apiDel(`/api/layers/${id}`);
   if (res.ok) {
+    if (layerToDelete) pushUndo('delete_layer', { ...layerToDelete });
     closeModal('layerModal'); await fetchLayers();
     state.preferences.active_layers = (state.preferences.active_layers||[]).filter(x => x!==id);
     await savePreferences(); renderSidebar(); renderTimeline();
@@ -1805,8 +1830,15 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
     color:    document.getElementById('etypeColor').value,
     icon:     document.getElementById('etypeIcon').value.trim(),
   };
+  const oldEtype = id ? state.eventTypes.find(e => String(e.id) === String(id)) : null;
   const res = id ? await apiPut(`/api/event-types/${id}`, payload) : await apiPost('/api/event-types', payload);
   if (res.ok) {
+    if (id && oldEtype) {
+      pushUndo('update_event_type', { id: parseInt(id, 10), old: { ...oldEtype } });
+    } else if (!id) {
+      const created = await res.clone().json().catch(() => null);
+      if (created && created.id) pushUndo('create_event_type', { id: created.id });
+    }
     closeModal('etypeModal');
     state.eventTypes = await apiGet('/api/event-types');
     renderSidebar(); renderTimeline();
@@ -1816,8 +1848,10 @@ document.getElementById('btnSaveEtype').addEventListener('click', async () => {
 
 async function deleteEtype(id) {
   if (!confirm(t('confirm_delete_type'))) return;
+  const etypeToDelete = state.eventTypes.find(e => String(e.id) === String(id));
   const res = await apiDel(`/api/event-types/${id}`);
   if (res.ok) {
+    if (etypeToDelete) pushUndo('delete_event_type', { ...etypeToDelete });
     closeModal('etypeModal');
     state.eventTypes = await apiGet('/api/event-types');
     renderSidebar(); renderTimeline();
@@ -1863,8 +1897,15 @@ document.getElementById('btnSavePhase').addEventListener('click', async () => {
     end_time:   new Date(ev).toISOString(),
     layer_id:   phaseLayVal ? parseInt(phaseLayVal, 10) : null,
   };
+  const oldPhase = id ? (state.phases||[]).find(p => String(p.id) === String(id)) : null;
   const res = id ? await apiPut(`/api/phases/${id}`, payload) : await apiPost('/api/phases', payload);
   if (res.ok) {
+    if (id && oldPhase) {
+      pushUndo('update_phase', { id: parseInt(id, 10), old: { ...oldPhase } });
+    } else if (!id) {
+      const created = await res.clone().json().catch(() => null);
+      if (created && created.id) pushUndo('create_phase', { id: created.id });
+    }
     closeModal('phaseModal');
     await fetchPhases();
     renderSidebar();
@@ -1875,8 +1916,10 @@ document.getElementById('btnSavePhase').addEventListener('click', async () => {
 
 async function deletePhase(id) {
   if (!confirm(t('confirm_delete')||'Delete this phase?')) return;
+  const phaseToDelete = (state.phases||[]).find(p => String(p.id) === String(id));
   const res = await apiDel(`/api/phases/${id}`);
   if (res.ok) {
+    if (phaseToDelete) pushUndo('delete_phase', { ...phaseToDelete });
     closeModal('phaseModal');
     await fetchPhases();
     renderSidebar();
@@ -2012,6 +2055,11 @@ async function deleteLogBookEntry(id) {
 // Detach sidebar into separate window
 let _detachedSidebarWin = null;
 function detachSidebar() {
+  // If on resources tab, open standalone resources popup (CSP-safe)
+  if (state.sidebarTab === 'resources') {
+    openDetachedResources();
+    return;
+  }
   if (_detachedSidebarWin && !_detachedSidebarWin.closed) {
     _detachedSidebarWin.focus();
     return;
@@ -2363,6 +2411,7 @@ function renderSidebar() {
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
       ${subBtn('manage_types', t('manage_resource_types')||'Manage Types', '⚙')}
+      <button class="toggle-btn" data-action="openDetachedResources" title="${t('detach_window')||'Open in separate window'}" style="margin-left:auto">⧉</button>
     </div>`;
     // Load custom resource types if not cached
     if (!state._customResourceTypes) {
@@ -7794,6 +7843,20 @@ function openDetachedDecisionLog() {
   closeDecisionLogModal();
 }
 
+// ── Resources Window (detached) ──────────────────────────────────────────────
+let _resourcesPopout = null;
+
+function openDetachedResources() {
+  if (_resourcesPopout && !_resourcesPopout.closed) {
+    _resourcesPopout.focus();
+    return;
+  }
+  const w = Math.min(window.screen.availWidth, 600);
+  const h = Math.min(window.screen.availHeight - 100, 700);
+  _resourcesPopout = window.open('/static/resources-popup.html', 'tidslinjal-resources',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+}
+
 // ── Map Window (detached) ────────────────────────────────────────────────────
 let _mapPopout = null;
 
@@ -8244,6 +8307,66 @@ async function performUndo() {
       delete payload.created_at;
       await apiPost('/api/locks', payload);
       await fetchLocks();
+    } else if (entry.action === 'create_layer') {
+      await apiDel('/api/layers/' + entry.data.id);
+      await fetchLayers();
+    } else if (entry.action === 'delete_layer') {
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      await apiPost('/api/layers', payload);
+      await fetchLayers();
+    } else if (entry.action === 'update_layer') {
+      const payload = { ...entry.data.old };
+      delete payload.created_at;
+      await apiPut('/api/layers/' + entry.data.id, payload);
+      await fetchLayers();
+    } else if (entry.action === 'create_group') {
+      await apiDel('/api/groups/' + entry.data.id);
+      await fetchGroups();
+    } else if (entry.action === 'delete_group') {
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      await apiPost('/api/groups', payload);
+      await fetchGroups();
+    } else if (entry.action === 'create_event_type') {
+      await apiDel('/api/event-types/' + entry.data.id);
+      state.eventTypes = await apiGet('/api/event-types');
+    } else if (entry.action === 'delete_event_type') {
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      await apiPost('/api/event-types', payload);
+      state.eventTypes = await apiGet('/api/event-types');
+    } else if (entry.action === 'update_event_type') {
+      const payload = { ...entry.data.old };
+      delete payload.created_at;
+      await apiPut('/api/event-types/' + entry.data.id, payload);
+      state.eventTypes = await apiGet('/api/event-types');
+    } else if (entry.action === 'create_phase') {
+      await apiDel('/api/phases/' + entry.data.id);
+      await fetchPhases();
+    } else if (entry.action === 'delete_phase') {
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      await apiPost('/api/phases', payload);
+      await fetchPhases();
+    } else if (entry.action === 'update_phase') {
+      const payload = { ...entry.data.old };
+      delete payload.created_at;
+      await apiPut('/api/phases/' + entry.data.id, payload);
+      await fetchPhases();
+    } else if (entry.action === 'create_alarm') {
+      await apiDel('/api/alarms/' + entry.data.id);
+      await fetchAlarms();
+    } else if (entry.action === 'delete_alarm') {
+      const payload = { ...entry.data };
+      delete payload.id;
+      delete payload.created_at;
+      await apiPost('/api/alarms', payload);
+      await fetchAlarms();
     }
     await refreshAll();
     showNotification('success', `Undone: ${entry.action.replace(/_/g, ' ')}`);

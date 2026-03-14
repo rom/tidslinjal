@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Resources</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── Theme application ── */
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+
+/* ── Top bar ── */
+.top-bar { display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--bg2); border-bottom:1px solid var(--border); }
+.top-bar .title { font-size:13px; font-weight:700; color:var(--accent); letter-spacing:.05em; flex:1; }
+.top-bar button { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:4px 12px; cursor:pointer; font-size:12px; }
+.top-bar button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* ── Tabs ── */
+.res-tabs { display:flex; overflow-x:auto; border-bottom:1px solid var(--border); background:var(--bg2); flex-wrap:wrap; }
+.res-tab { padding:8px 14px; font-size:12px; border:none; background:none; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+.res-tab:hover { color:var(--text); background:var(--bg3); }
+.res-tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+
+/* ── Content ── */
+.res-content { padding:12px; overflow-y:auto; height:calc(100vh - 80px); }
+
+/* ── Resource tables ── */
+.res-table { width:100%; border-collapse:collapse; font-size:12px; }
+.res-table th { text-align:left; padding:6px 8px; color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); }
+.res-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
+.res-table tr:hover { background:var(--bg3); }
+
+/* ── User / Group cards ── */
+.res-card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:8px; }
+.res-card-name { font-weight:600; font-size:13px; }
+.res-card-detail { font-size:11px; color:var(--text-dim); margin-top:2px; }
+.res-card-status { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.status-online { background:#22c55e; }
+.status-offline { background:var(--text-dim); }
+
+/* ── Search ── */
+.res-search { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:6px 10px; font-size:12px; margin-bottom:10px; }
+.res-search:focus { outline:none; border-color:var(--accent); }
+
+/* ── Badge ── */
+.res-badge { display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; background:var(--bg3); color:var(--text-dim); }
+.res-badge-role { background:color-mix(in srgb, var(--accent) 15%, var(--bg3)); color:var(--accent); }
+
+/* ── Empty state ── */
+.res-empty { text-align:center; padding:32px 16px; color:var(--text-dim); font-size:13px; }
+</style>
+</head>
+<body class="theme-dark">
+<div class="top-bar">
+  <span class="title">Resources</span>
+  <button id="btnRefresh" title="Refresh data">Refresh</button>
+</div>
+<div class="res-tabs" id="resTabs"></div>
+<div class="res-content" id="resContent"></div>
+<script src="/static/resources-popup.js"></script>
+</body>
+</html>
