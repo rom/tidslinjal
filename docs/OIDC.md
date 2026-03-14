@@ -105,6 +105,52 @@ export OIDC_REDIRECT_URL="https://timeline.example.com/auth/oidc/callback"
 
 ---
 
+## Admin UI Configuration (Runtime)
+
+In addition to CLI flags and environment variables, OIDC can be configured at runtime through the **Admin Panel** in the web UI — no server restart required.
+
+### Accessing the OIDC Settings
+
+1. Log in as an **Admin** user
+2. Open the **Integrations** sidebar tab (or navigate to the Admin view)
+3. Click **OIDC / SSO**
+
+### Settings
+
+| Field | Description |
+|-------|-------------|
+| **Enabled** | Toggle OIDC on/off. When disabled, the "Sign in with SSO" button is hidden. |
+| **Issuer URL** | Base URL of the OIDC provider (must expose `/.well-known/openid-configuration`). |
+| **Client ID** | Client ID registered with the provider. |
+| **Client Secret** | Client secret. Displayed as `••••••••` after saving — leave blank to keep the existing secret. |
+| **Redirect URL** | Callback URL (must match the provider registration). Defaults to `http://localhost:8080/auth/oidc/callback`. |
+| **Exclusive Mode** | When enabled, disables local username/password login for all users except the built-in admin account. This forces all non-admin users to authenticate via SSO. Useful for organizations that require centralized identity management. |
+| **Default Role** | Role automatically assigned to new OIDC users on first login (default: `readwrite`). |
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/admin/oidc` | Retrieve current OIDC settings (admin only). The `client_secret` field is redacted in the response. |
+| `PUT` | `/api/admin/oidc` | Save OIDC settings (admin only). Send an empty `client_secret` to keep the existing secret. |
+| `POST` | `/api/admin/oidc/test` | Test OIDC connectivity — validates the issuer URL and attempts discovery. |
+
+### Exclusive Mode
+
+When **Exclusive Mode** is enabled:
+- The username/password login form is hidden for regular users
+- Only the "Sign in with SSO" button is shown on the login page
+- The built-in **admin** account can still log in with username/password (recovery access)
+- OIDC-created users are flagged with `IsOIDC` and cannot change their password through the application
+
+### Notes
+
+- Settings saved via the admin UI take effect immediately — no server restart needed.
+- CLI flags and environment variables serve as initial defaults. Once overridden via the admin UI, the UI settings take precedence.
+- The OIDC test endpoint (`POST /api/admin/oidc/test`) attempts to fetch the provider's OpenID configuration document and reports success or failure with diagnostic details.
+
+---
+
 ## User Auto-Provisioning
 
 When an OIDC user logs in for the first time, Tidslinjal automatically creates a local account with:
@@ -122,8 +168,9 @@ After auto-creation, an admin can update the user's role via the Users panel in 
 - OIDC tokens are exchanged server-side; the client never sees the access token.
 - The OIDC state parameter is validated to prevent CSRF attacks.
 - If OIDC is not configured, the SSO button does not appear on the login page.
-- Local username/password login continues to work alongside OIDC.
+- Local username/password login continues to work alongside OIDC (unless Exclusive Mode is enabled).
 - OIDC auto-created users have no password set — they can only log in via SSO unless an admin explicitly sets a password.
+- In Exclusive Mode, only the built-in admin account retains local login access for emergency recovery.
 
 ---
 
