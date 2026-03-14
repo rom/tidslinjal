@@ -41,14 +41,14 @@
     { "name": "Intelligence", "description": "Situational awareness, threat assessment, reporting" },
     { "name": "Logistics", "description": "Supply, transport, resource management" }
   ],
-  "events": [
+  "items": [
     {
       "title": "0600 — Shift Change & Handover",
       "description": "Outgoing shift briefs incoming. Open incidents, pending tasks, key contacts.",
       "event_type": "standup",
       "start_offset_min": 0,
       "duration_min": 30,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "0630 — Morning Intelligence Brief",
@@ -56,7 +56,7 @@
       "event_type": "reporting",
       "start_offset_min": 30,
       "duration_min": 30,
-      "responsible": "Intelligence"
+      "participant": "Intelligence"
     },
     {
       "title": "0700 — Daily Operations Brief (OPSBRF)",
@@ -64,7 +64,7 @@
       "event_type": "mote",
       "start_offset_min": 60,
       "duration_min": 60,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "0800 — Field Teams Deploy / Tasking Issued",
@@ -72,7 +72,7 @@
       "event_type": "instant",
       "start_offset_min": 120,
       "duration_min": 0,
-      "responsible": "Field Teams"
+      "participant": "Field Teams"
     },
     {
       "title": "0900 — Main Activity Window Begins",
@@ -80,7 +80,7 @@
       "event_type": "instant",
       "start_offset_min": 180,
       "duration_min": 0,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1000 — Mid-Morning SITREP",
@@ -88,7 +88,7 @@
       "event_type": "standup",
       "start_offset_min": 240,
       "duration_min": 15,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1200 — Noon SITREP & Logistics Check",
@@ -96,7 +96,7 @@
       "event_type": "reporting",
       "start_offset_min": 360,
       "duration_min": 30,
-      "responsible": "Logistics"
+      "participant": "Logistics"
     },
     {
       "title": "1400 — Decision Point / Tasking Review",
@@ -104,7 +104,7 @@
       "event_type": "decision",
       "start_offset_min": 480,
       "duration_min": 30,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1600 — Afternoon SITREP",
@@ -112,7 +112,7 @@
       "event_type": "reporting",
       "start_offset_min": 600,
       "duration_min": 30,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1700 — End of Main Activity Window",
@@ -120,7 +120,7 @@
       "event_type": "instant",
       "start_offset_min": 660,
       "duration_min": 0,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1800 — Daily Summary Report",
@@ -128,7 +128,7 @@
       "event_type": "reporting",
       "start_offset_min": 720,
       "duration_min": 45,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "1900 — Intelligence Wrap-Up",
@@ -136,7 +136,7 @@
       "event_type": "reporting",
       "start_offset_min": 780,
       "duration_min": 30,
-      "responsible": "Intelligence"
+      "participant": "Intelligence"
     },
     {
       "title": "2000 — Evening Shift Handover",
@@ -144,7 +144,7 @@
       "event_type": "standup",
       "start_offset_min": 840,
       "duration_min": 30,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     },
     {
       "title": "2200 — Night Watch Check-In",
@@ -152,7 +152,7 @@
       "event_type": "standup",
       "start_offset_min": 960,
       "duration_min": 15,
-      "responsible": "Operations Centre"
+      "participant": "Operations Centre"
     }
   ]
 }

@@ -40,14 +40,14 @@
     { "name": "Red Team", "description": "Opposing force / adversary" },
     { "name": "Control Cell", "description": "Exercise control and administration" }
   ],
-  "events": [
+  "items": [
     {
       "title": "INITEX — Exercise commences",
       "description": "Exercise formally begins. All participants acknowledge readiness.",
       "event_type": "instant",
       "start_offset_min": 0,
       "duration_min": 0,
-      "responsible": "Control Cell"
+      "participant": "Control Cell"
     },
     {
       "title": "Initial Situation Briefing",
@@ -55,7 +55,7 @@
       "event_type": "mote",
       "start_offset_min": 5,
       "duration_min": 25,
-      "responsible": "Control Cell"
+      "participant": "Control Cell"
     },
     {
       "title": "INJECT #1 — First exercise event",
@@ -63,7 +63,7 @@
       "event_type": "instant",
       "start_offset_min": 60,
       "duration_min": 0,
-      "responsible": "Red Team"
+      "participant": "Red Team"
     },
     {
       "title": "Blue Team Response",
@@ -71,7 +71,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 60,
       "duration_min": 90,
-      "responsible": "Blue Team"
+      "participant": "Blue Team"
     },
     {
       "title": "INJECT #2 — Escalation",
@@ -79,7 +79,7 @@
       "event_type": "instant",
       "start_offset_min": 180,
       "duration_min": 0,
-      "responsible": "Red Team"
+      "participant": "Red Team"
     },
     {
       "title": "Decision Point",
@@ -87,7 +87,7 @@
       "event_type": "decision",
       "start_offset_min": 240,
       "duration_min": 30,
-      "responsible": "Blue Team"
+      "participant": "Blue Team"
     },
     {
       "title": "INJECT #3 — Resolution Trigger",
@@ -95,7 +95,7 @@
       "event_type": "instant",
       "start_offset_min": 360,
       "duration_min": 0,
-      "responsible": "Red Team"
+      "participant": "Red Team"
     },
     {
       "title": "Situation Normalised",
@@ -103,7 +103,7 @@
       "event_type": "instant",
       "start_offset_min": 420,
       "duration_min": 0,
-      "responsible": "Blue Team"
+      "participant": "Blue Team"
     },
     {
       "title": "ENDEX — Exercise ends",
@@ -111,7 +111,7 @@
       "event_type": "instant",
       "start_offset_min": 510,
       "duration_min": 0,
-      "responsible": "Control Cell"
+      "participant": "Control Cell"
     },
     {
       "title": "After Action Review (AAR)",
@@ -119,7 +119,7 @@
       "event_type": "mote",
       "start_offset_min": 510,
       "duration_min": 30,
-      "responsible": "Control Cell"
+      "participant": "Control Cell"
     }
   ]
 }

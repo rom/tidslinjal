@@ -41,14 +41,14 @@
     { "name": "Analytics & Intel", "description": "Data analysis, situational awareness, metrics" },
     { "name": "Stakeholders", "description": "External stakeholders, clients, or command" }
   ],
-  "events": [
+  "items": [
     {
       "title": "Mon 0800 — Weekly Kick-Off Brief",
       "description": "Week begins. Review previous week summary, set objectives for the week, assign tasks.",
       "event_type": "mote",
       "start_offset_min": 60,
       "duration_min": 60,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Mon 0900 — Task Distribution",
@@ -56,7 +56,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 120,
       "duration_min": 30,
-      "responsible": "Teams A & B"
+      "participant": "Teams A & B"
     },
     {
       "title": "Mon 1000 — Intel/Analytics Brief",
@@ -64,7 +64,7 @@
       "event_type": "reporting",
       "start_offset_min": 180,
       "duration_min": 45,
-      "responsible": "Analytics & Intel"
+      "participant": "Analytics & Intel"
     },
     {
       "title": "Mon 1100 — Stakeholder Update Call",
@@ -72,7 +72,7 @@
       "event_type": "mote",
       "start_offset_min": 240,
       "duration_min": 30,
-      "responsible": "Stakeholders"
+      "participant": "Stakeholders"
     },
     {
       "title": "Tue 0900 — Daily Standup (Tuesday)",
@@ -80,7 +80,7 @@
       "event_type": "standup",
       "start_offset_min": 1560,
       "duration_min": 15,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Tue 1400 — Key Deliverable Due",
@@ -88,7 +88,7 @@
       "event_type": "deadline",
       "start_offset_min": 1860,
       "duration_min": 0,
-      "responsible": "Teams A & B"
+      "participant": "Teams A & B"
     },
     {
       "title": "Wed 0900 — Daily Standup (Wednesday)",
@@ -96,7 +96,7 @@
       "event_type": "standup",
       "start_offset_min": 3000,
       "duration_min": 15,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Wed 1400 — Decision Point",
@@ -104,7 +104,7 @@
       "event_type": "decision",
       "start_offset_min": 3300,
       "duration_min": 30,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Thu 0900 — Daily Standup (Thursday)",
@@ -112,7 +112,7 @@
       "event_type": "standup",
       "start_offset_min": 4440,
       "duration_min": 15,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Thu 1000 — Mid-Week Performance Review",
@@ -120,7 +120,7 @@
       "event_type": "mote",
       "start_offset_min": 4500,
       "duration_min": 60,
-      "responsible": "Analytics & Intel"
+      "participant": "Analytics & Intel"
     },
     {
       "title": "Thu 1400 — Risk & Issues Review",
@@ -128,7 +128,7 @@
       "event_type": "mote",
       "start_offset_min": 4700,
       "duration_min": 45,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Fri 0900 — Week Closing Brief",
@@ -136,7 +136,7 @@
       "event_type": "mote",
       "start_offset_min": 5880,
       "duration_min": 60,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Fri 1100 — Weekly Report Submitted",
@@ -144,7 +144,7 @@
       "event_type": "reporting",
       "start_offset_min": 6000,
       "duration_min": 0,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Fri 1300 — Lessons Learned Capture",
@@ -152,7 +152,7 @@
       "event_type": "standup",
       "start_offset_min": 6120,
       "duration_min": 30,
-      "responsible": "Teams A & B"
+      "participant": "Teams A & B"
     },
     {
       "title": "Fri 1400 — Next Week Planning",
@@ -160,7 +160,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 6180,
       "duration_min": 60,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     },
     {
       "title": "Fri 1600 — Week Closed",
@@ -168,7 +168,7 @@
       "event_type": "instant",
       "start_offset_min": 6300,
       "duration_min": 0,
-      "responsible": "Operations Lead"
+      "participant": "Operations Lead"
     }
   ]
 }

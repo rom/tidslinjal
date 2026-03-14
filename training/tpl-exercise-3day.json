@@ -35,14 +35,14 @@
     { "name": "Control Cell (EXCON)", "description": "Exercise control, administration, and inject management" },
     { "name": "Observer / Evaluator", "description": "Exercise observers and evaluators" }
   ],
-  "events": [
+  "items": [
     {
       "title": "Day 1 — Participant Check-In & Admin",
       "description": "Registration, equipment checks, communications setup.",
       "event_type": "mote",
       "start_offset_min": 0,
       "duration_min": 60,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 1 — Opening Brief & Scenario Overview",
@@ -50,7 +50,7 @@
       "event_type": "mote",
       "start_offset_min": 60,
       "duration_min": 60,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 1 — Team Planning Phase",
@@ -58,7 +58,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 120,
       "duration_min": 240,
-      "responsible": "Blue Team Alpha"
+      "participant": "Blue Team Alpha"
     },
     {
       "title": "INITEX — Exercise Commences",
@@ -66,7 +66,7 @@
       "event_type": "instant",
       "start_offset_min": 360,
       "duration_min": 0,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 1 — INJECT #1 (Initial Incident)",
@@ -74,7 +74,7 @@
       "event_type": "instant",
       "start_offset_min": 390,
       "duration_min": 0,
-      "responsible": "Red Cell"
+      "participant": "Red Cell"
     },
     {
       "title": "Day 1 — Initial Response",
@@ -82,7 +82,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 390,
       "duration_min": 120,
-      "responsible": "Blue Team Alpha"
+      "participant": "Blue Team Alpha"
     },
     {
       "title": "Day 1 — Evening Hot Wash",
@@ -90,7 +90,7 @@
       "event_type": "standup",
       "start_offset_min": 540,
       "duration_min": 30,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 2 — Morning Situation Update",
@@ -98,7 +98,7 @@
       "event_type": "reporting",
       "start_offset_min": 1440,
       "duration_min": 45,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 2 — INJECT #2 (Escalation)",
@@ -106,7 +106,7 @@
       "event_type": "instant",
       "start_offset_min": 1530,
       "duration_min": 0,
-      "responsible": "Red Cell"
+      "participant": "Red Cell"
     },
     {
       "title": "Day 2 — Critical Decision Point",
@@ -114,7 +114,7 @@
       "event_type": "decision",
       "start_offset_min": 1560,
       "duration_min": 30,
-      "responsible": "Blue Team Alpha"
+      "participant": "Blue Team Alpha"
     },
     {
       "title": "Day 2 — Multi-Team Coordination",
@@ -122,7 +122,7 @@
       "event_type": "mote",
       "start_offset_min": 1620,
       "duration_min": 60,
-      "responsible": "Blue Team Bravo"
+      "participant": "Blue Team Bravo"
     },
     {
       "title": "Day 2 — INJECT #3 (Complication)",
@@ -130,7 +130,7 @@
       "event_type": "instant",
       "start_offset_min": 1740,
       "duration_min": 0,
-      "responsible": "Red Cell"
+      "participant": "Red Cell"
     },
     {
       "title": "Day 2 — Observer Assessment Period",
@@ -138,7 +138,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 1800,
       "duration_min": 120,
-      "responsible": "Observer / Evaluator"
+      "participant": "Observer / Evaluator"
     },
     {
       "title": "Day 3 — Culminating Event",
@@ -146,7 +146,7 @@
       "event_type": "instant",
       "start_offset_min": 2880,
       "duration_min": 0,
-      "responsible": "Red Cell"
+      "participant": "Red Cell"
     },
     {
       "title": "Day 3 — Resolution & Recovery",
@@ -154,7 +154,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 2880,
       "duration_min": 180,
-      "responsible": "Blue Team Alpha"
+      "participant": "Blue Team Alpha"
     },
     {
       "title": "ENDEX — Exercise Ends",
@@ -162,7 +162,7 @@
       "event_type": "instant",
       "start_offset_min": 3180,
       "duration_min": 0,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 3 — After Action Review (AAR)",
@@ -170,7 +170,7 @@
       "event_type": "mote",
       "start_offset_min": 3180,
       "duration_min": 120,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     },
     {
       "title": "Day 3 — Closing Remarks & Admin Out",
@@ -178,7 +178,7 @@
       "event_type": "mote",
       "start_offset_min": 3360,
       "duration_min": 60,
-      "responsible": "Control Cell (EXCON)"
+      "participant": "Control Cell (EXCON)"
     }
   ]
 }

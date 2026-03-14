@@ -49,14 +49,14 @@
     { "name": "Legal & Compliance", "description": "Legal review, regulatory reporting, and compliance" },
     { "name": "Executive", "description": "Senior leadership escalation and strategic decisions" }
   ],
-  "events": [
+  "items": [
     {
       "title": "H+0: INCIDENT DETECTED",
       "description": "Initial detection. Document: who detected it, how, what system/data affected.",
       "event_type": "instant",
       "start_offset_min": 0,
       "duration_min": 0,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "H+0: Incident Classified & IC Assigned",
@@ -64,7 +64,7 @@
       "event_type": "instant",
       "start_offset_min": 15,
       "duration_min": 0,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "H+1: Incident Bridge / War Room Opened",
@@ -72,7 +72,7 @@
       "event_type": "mote",
       "start_offset_min": 30,
       "duration_min": 30,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "H+1: Executive Notified",
@@ -80,7 +80,7 @@
       "event_type": "instant",
       "start_offset_min": 60,
       "duration_min": 0,
-      "responsible": "Executive"
+      "participant": "Executive"
     },
     {
       "title": "H+2: Immediate Containment",
@@ -88,7 +88,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 120,
       "duration_min": 240,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "H+4: Evidence Preservation",
@@ -96,7 +96,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 240,
       "duration_min": 120,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "H+4: First External Communication",
@@ -104,7 +104,7 @@
       "event_type": "instant",
       "start_offset_min": 240,
       "duration_min": 0,
-      "responsible": "Communications & PR"
+      "participant": "Communications & PR"
     },
     {
       "title": "H+6: Regulatory Notification Assessment",
@@ -112,7 +112,7 @@
       "event_type": "decision",
       "start_offset_min": 360,
       "duration_min": 60,
-      "responsible": "Legal & Compliance"
+      "participant": "Legal & Compliance"
     },
     {
       "title": "Day 1 Closing SITREP",
@@ -120,7 +120,7 @@
       "event_type": "reporting",
       "start_offset_min": 1380,
       "duration_min": 30,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "Day 2: Root Cause Deep Dive",
@@ -128,7 +128,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 1440,
       "duration_min": 480,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "Day 2: SITREP to Executive",
@@ -136,7 +136,7 @@
       "event_type": "reporting",
       "start_offset_min": 2160,
       "duration_min": 30,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "Day 3: Eradication Phase Begins",
@@ -144,7 +144,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 2880,
       "duration_min": 1440,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "Day 4: Recovery Planning Approved",
@@ -152,7 +152,7 @@
       "event_type": "decision",
       "start_offset_min": 5040,
       "duration_min": 60,
-      "responsible": "Executive"
+      "participant": "Executive"
     },
     {
       "title": "Day 4: Regulatory Report Filed (if required)",
@@ -160,7 +160,7 @@
       "event_type": "deadline",
       "start_offset_min": 5760,
       "duration_min": 0,
-      "responsible": "Legal & Compliance"
+      "participant": "Legal & Compliance"
     },
     {
       "title": "Day 5: System Recovery & Validation",
@@ -168,7 +168,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 5760,
       "duration_min": 1440,
-      "responsible": "Technical Response"
+      "participant": "Technical Response"
     },
     {
       "title": "Day 6: Full Operations Restored",
@@ -176,7 +176,7 @@
       "event_type": "instant",
       "start_offset_min": 8520,
       "duration_min": 0,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "Day 7: Post-Incident Review (PIR)",
@@ -184,7 +184,7 @@
       "event_type": "mote",
       "start_offset_min": 8640,
       "duration_min": 180,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     },
     {
       "title": "Day 7: Lessons Learned Report Published",
@@ -192,7 +192,7 @@
       "event_type": "deadline",
       "start_offset_min": 9360,
       "duration_min": 0,
-      "responsible": "Incident Command"
+      "participant": "Incident Command"
     }
   ]
 }
