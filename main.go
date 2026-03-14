@@ -408,6 +408,16 @@ func (rl *ipRateLimiter) allow(ip string, limit int, window time.Duration) bool 
 	return true
 }
 
+// broadcastUserChange sends an SSE notification to all clients about a user change
+func (app *App) broadcastUserChange(senderID int64, action string, userID int64) {
+	payload := map[string]interface{}{
+		"action":  action,
+		"user_id": userID,
+	}
+	data, _ := json.Marshal(payload)
+	app.broker.BroadcastAll(SSEMessage{Event: "user_change", Data: string(data)})
+}
+
 // broadcastEventChange sends an SSE notification to all clients about an event change
 func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
 	payload := map[string]interface{}{
@@ -1532,6 +1542,7 @@ func (app *App) handleVetUser(w http.ResponseWriter, r *http.Request, user *User
 	}
 	app.audit(user.ID, user.DisplayName, "updated", "user", uid,
 		fmt.Sprintf("Admin %q vetted user #%d", user.Username, uid))
+	app.broadcastUserChange(user.ID, "vetted", uid)
 	// Send approval email if SMTP configured and user has email
 	go func() {
 		users := app.store.GetUsers()
@@ -1581,6 +1592,7 @@ func (app *App) handleBlockUser(w http.ResponseWriter, r *http.Request, admin *U
 	}
 	app.audit(admin.ID, admin.DisplayName, "blocked", "user", uid,
 		fmt.Sprintf("Admin %q blocked user %q (#%d)", admin.Username, target.Username, uid))
+	app.broadcastUserChange(admin.ID, "blocked", uid)
 	jsonOK(w, map[string]string{"status": "blocked"})
 }
 
@@ -1608,6 +1620,7 @@ func (app *App) handleUnblockUser(w http.ResponseWriter, r *http.Request, admin 
 	}
 	app.audit(admin.ID, admin.DisplayName, "unblocked", "user", uid,
 		fmt.Sprintf("Admin %q unblocked user %q (#%d)", admin.Username, target.Username, uid))
+	app.broadcastUserChange(admin.ID, "unblocked", uid)
 	jsonOK(w, map[string]string{"status": "unblocked"})
 }
 
@@ -3023,6 +3036,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	updated, _ := app.store.GetUserByID(id)
 	app.audit(user.ID, user.DisplayName, "updated", "user", id,
 		fmt.Sprintf("Updated user %q (role: %s)", updated.Username, updated.Role))
+	app.broadcastUserChange(user.ID, "updated", id)
 	jsonOK(w, updated.Public())
 }
 

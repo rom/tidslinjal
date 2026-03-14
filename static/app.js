@@ -65,6 +65,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+// ── Role-gated UI ────────────────────────────────────────────────────────────
+function applyRoleGatedUI() {
+  if (!state.user) return;
+  document.getElementById('userDisplayName').textContent = state.user.display_name || state.user.username;
+  const roleEl = document.getElementById('userRoleBadge');
+  roleEl.textContent = t('role_'+state.user.role) || state.user.role;
+  roleEl.className   = `role-badge role-${state.user.role}`;
+
+  const canWrite = hasRole2(state.user.role, 'readwrite');
+  document.getElementById('btnAddEvent').style.display = canWrite ? '' : 'none';
+  document.getElementById('btnAddLock').style.display = (state.user.role==='admin' || state.user.can_lock) ? '' : 'none';
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = state.user.role==='admin' ? '' : 'none');
+  document.querySelectorAll('.teamlead-only').forEach(el => el.style.display = hasRole2(state.user.role, 'teamlead') ? '' : 'none');
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────
 async function init() {
   // Check if server was started with --debug flag
@@ -150,30 +165,8 @@ async function init() {
     } catch { state._gradualBackupStatus = null; }
   }
 
-  // User info in header
-  document.getElementById('userDisplayName').textContent = state.user.display_name || state.user.username;
-  const roleEl = document.getElementById('userRoleBadge');
-  roleEl.textContent = t('role_'+state.user.role) || state.user.role;
-  roleEl.className   = `role-badge role-${state.user.role}`;
-
-  // Show/hide role-gated controls
-  const role = state.user.role;
-  const isAdminOrOplead = hasRole2(role, 'oplead');
-  const isTeamLead      = hasRole2(role, 'teamlead');
-  const canWrite        = hasRole2(role, 'readwrite');
-
-  if (canWrite) {
-    document.getElementById('btnAddEvent').style.display = '';
-  }
-  if (state.user.role==='admin' || state.user.can_lock) {
-    document.getElementById('btnAddLock').style.display = '';
-  }
-  if (state.user.role==='admin') {
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display='');
-  }
-  if (hasRole2(state.user.role, 'teamlead')) {
-    document.querySelectorAll('.teamlead-only').forEach(el => el.style.display='');
-  }
+  // User info in header + role-gated controls
+  applyRoleGatedUI();
 
   // Control events
   document.getElementById('rangeSelect').addEventListener('change', e => {

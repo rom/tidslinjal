@@ -5770,6 +5770,28 @@ function connectSSE() {
       if (window._handleEditingLockEvent) window._handleEditingLockEvent(data);
     } catch { /* ignore parse errors */ }
   });
+  // Listen for user changes (role updates, vetting, block/unblock)
+  es.addEventListener('user_change', async e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Refresh current user info if it was the affected user
+      if (state.user && data.user_id === state.user.id) {
+        try {
+          const me = await apiGet('/api/auth/me');
+          if (me) {
+            state.user = me;
+            if (typeof applyRoleGatedUI === 'function') applyRoleGatedUI();
+          }
+        } catch { /* ignore — may have been blocked */ }
+      }
+      // Refresh user list for everyone
+      try {
+        const users = await apiGet('/api/users');
+        if (users) state.users = users;
+      } catch { /* ignore */ }
+      renderSidebar();
+    } catch { /* ignore parse errors */ }
+  });
   // Decision assignment notification
   es.addEventListener('decision_assigned', e => {
     try {
