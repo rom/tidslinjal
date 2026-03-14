@@ -179,12 +179,28 @@ function renderUsers(el) {
     users.forEach(function(u) {
       var name = u.display_name || u.username;
       var roleLabel = u.role || 'unknown';
+      var initial = (name || '?')[0].toUpperCase();
+      var avatar = u.photo_data_url
+        ? '<img src="' + escHtml(u.photo_data_url) + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">'
+        : '<div class="res-card-avatar">' + escHtml(initial) + '</div>';
+      var lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—';
+      var failedLogin = u.last_failed_login_at
+        ? new Date(u.last_failed_login_at).toLocaleString() + (u.last_failed_login_ip ? ' (IP: ' + escHtml(u.last_failed_login_ip) + ')' : '')
+        : '';
       html += '<div class="res-card">' +
-        '<div class="res-card-name">' + escHtml(name) + '</div>' +
-        '<div class="res-card-detail">' +
-          '<span class="res-badge res-badge-role">' + escHtml(roleLabel) + '</span>' +
-          (u.username ? ' &middot; ' + escHtml(u.username) : '') +
-          (u.email ? ' &middot; ' + escHtml(u.email) : '') +
+        avatar +
+        '<div class="res-card-body">' +
+          '<div class="res-card-name">' + escHtml(name) + '</div>' +
+          '<div class="res-card-detail">' +
+            '<span class="res-badge res-badge-role">' + escHtml(roleLabel) + '</span>' +
+            (u.username ? ' &middot; ' + escHtml(u.username) : '') +
+            (u.email ? ' &middot; ' + escHtml(u.email) : '') +
+          '</div>' +
+          '<div class="res-card-meta">' +
+            '<span>Last login: ' + lastLogin + '</span>' +
+            '<span>Logins: ' + (u.login_count || 0) + '</span>' +
+            (failedLogin ? '<span style="color:var(--danger)">Failed: ' + failedLogin + '</span>' : '') +
+          '</div>' +
         '</div>' +
       '</div>';
     });

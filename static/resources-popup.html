@@ -37,9 +37,15 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .res-table tr:hover { background:var(--bg3); }
 
 /* ── User / Group cards ── */
-.res-card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:8px; }
-.res-card-name { font-weight:600; font-size:13px; }
+.res-card { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; margin-bottom:8px;
+  display:flex; align-items:center; gap:10px; transition:background .15s; }
+.res-card:hover { background:var(--bg3); }
+.res-card-avatar { width:36px; height:36px; border-radius:50%; background:var(--accent); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0; }
+.res-card-body { flex:1; min-width:0; }
+.res-card-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .res-card-detail { font-size:11px; color:var(--text-dim); margin-top:2px; }
+.res-card-meta { font-size:10px; color:var(--text-dim); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
 .res-card-status { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
 .status-online { background:#22c55e; }
 .status-offline { background:var(--text-dim); }

@@ -3,11 +3,13 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -106,6 +108,10 @@ type Store struct {
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
 	sessionByID map[string]Session
+
+	// Cached test stats
+	cachedTestStats   TestStats
+	cachedTestStatsAt time.Time
 
 	// writeMu serialises JSON file writes so they never race each other.
 	// It is acquired AFTER s.mu has been released, keeping s.mu hold-time minimal.
@@ -2445,22 +2451,66 @@ func (s *Store) ResetDatabase() error {
 	s.templates = nil
 	s.nextTemplateID = 0
 	s.exercise = ExerciseSettings{IncludeWeekends: true}
+	s.decisionLog = nil
+	s.nextDecisionLogID = 0
+	s.eventLog = nil
+	s.nextEventLogID = 0
+	s.logBook = nil
+	s.nextLogBookID = 0
+	s.personReadyChecks = nil
+	s.nextPersonReadyCheckID = 0
+	s.notifications = nil
+	s.nextNotificationID = 0
+	s.mapResources = nil
+	s.nextMapResourceID = 0
+	s.mapLocations = nil
+	s.nextMapLocationID = 0
+	s.referenceDocs = nil
+	s.nextReferenceDocID = 0
+	s.rooms = nil
+	s.nextRoomID = 0
+	s.customResourceTypes = nil
+	s.nextCustomResTypeID = 0
+	s.routingRules = nil
+	s.nextRoutingRuleID = 0
+	s.connectorConfigs = nil
+	s.filterPresets = nil
+	s.nextFilterPresetID = 0
+	s.eventVersions = nil
+	s.nextEventVersionID = 0
+	s.autoReportSchedules = nil
+	s.nextAutoReportScheduleID = 0
 
 	// Save all cleared files
 	files := map[string]interface{}{
-		"event_types.json":  s.eventTypes,
-		"preferences.json":  s.preferences,
-		"groups.json":       s.groups,
-		"memberships.json":  s.memberships,
-		"layers.json":       s.layers,
-		"events.json":       s.events,
-		"attachments.json":  s.attachments,
-		"alarms.json":       s.alarms,
-		"locks.json":        s.locks,
-		"comments.json":     s.comments,
-		"phases.json":       s.phases,
-		"templates.json":    s.templates,
-		"exercise.json":     s.exercise,
+		"event_types.json":            s.eventTypes,
+		"preferences.json":            s.preferences,
+		"groups.json":                 s.groups,
+		"memberships.json":            s.memberships,
+		"layers.json":                 s.layers,
+		"events.json":                 s.events,
+		"attachments.json":            s.attachments,
+		"alarms.json":                 s.alarms,
+		"locks.json":                  s.locks,
+		"comments.json":               s.comments,
+		"phases.json":                 s.phases,
+		"templates.json":              s.templates,
+		"exercise.json":               s.exercise,
+		"decision_log.json":           s.decisionLog,
+		"event_log.json":              s.eventLog,
+		"log_book.json":               s.logBook,
+		"person_ready_checks.json":    s.personReadyChecks,
+		"notifications.json":          s.notifications,
+		"map_resources.json":          s.mapResources,
+		"map_locations.json":          s.mapLocations,
+		"references.json":             s.referenceDocs,
+		"rooms.json":                  s.rooms,
+		"custom_resource_types.json":  s.customResourceTypes,
+		"routing_rules.json":          s.routingRules,
+		"connectors.json":             s.connectorConfigs,
+		"filter_presets.json":         s.filterPresets,
+		"event_versions.json":         s.eventVersions,
+		"auto_report_schedules.json":  s.autoReportSchedules,
 	}
 	for fname, data := range files {
 		if err := s.saveFile(fname, data); err != nil {
@@ -2473,6 +2523,13 @@ func (s *Store) ResetDatabase() error {
 	entries, _ := os.ReadDir(attDir)
 	for _, e := range entries {
 		os.Remove(filepath.Join(attDir, e.Name()))
+	}
+
+	// Clear reference document files
+	refDir := filepath.Join(s.dataDir, "references")
+	refEntries, _ := os.ReadDir(refDir)
+	for _, e := range refEntries {
+		os.Remove(filepath.Join(refDir, e.Name()))
 	}
 
 	return nil
@@ -3766,15 +3823,70 @@ func (s *Store) SaveSSOToggle(enabled bool) error {
 // ── Test Stats ────────────────────────────────────────────────────────────────
 
 func (s *Store) GetTestStats() TestStats {
-	// Return aggregated test statistics — in a real deployment these
-	// would be populated by CI/CD pipelines; here we return stored or default values.
+	s.mu.RLock()
+	cached := s.cachedTestStats
+	cacheTime := s.cachedTestStatsAt
+	s.mu.RUnlock()
+
+	// Return cached results if less than 5 minutes old
+	if !cacheTime.IsZero() && time.Since(cacheTime) < 5*time.Minute {
+		return cached
+	}
+
+	stats := runGoTests()
+
+	s.mu.Lock()
+	s.cachedTestStats = stats
+	s.cachedTestStatsAt = time.Now()
+	s.mu.Unlock()
+
+	return stats
+}
+
+func runGoTests() TestStats {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-v", "-cover", "./...")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.Run() // ignore error — tests may fail
+
+	output := stdout.String() + stderr.String()
+	var passed, failed, skipped, total int
+	var coverage float64
+
+	for _, line := range strings.Split(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "--- PASS:") {
+			passed++
+			total++
+		} else if strings.HasPrefix(trimmed, "--- FAIL:") {
+			failed++
+			total++
+		} else if strings.HasPrefix(trimmed, "--- SKIP:") {
+			skipped++
+			total++
+		}
+		// Parse coverage: "coverage: 42.3% of statements"
+		if idx := strings.Index(trimmed, "coverage:"); idx >= 0 {
+			rest := trimmed[idx+len("coverage:"):]
+			rest = strings.TrimSpace(rest)
+			if pctIdx := strings.Index(rest, "%"); pctIdx > 0 {
+				if v, err := strconv.ParseFloat(rest[:pctIdx], 64); err == nil {
+					coverage = v
+				}
+			}
+		}
+	}
+
 	return TestStats{
-		TestCases: 0,
-		UnitTests: 0,
-		Passed:    0,
-		Failed:    0,
-		Skipped:   0,
-		Coverage:  0.0,
+		TestCases: total,
+		UnitTests: total,
+		Passed:    passed,
+		Failed:    failed,
+		Skipped:   skipped,
+		Coverage:  coverage,
 	}
 }
 

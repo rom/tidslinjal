@@ -454,6 +454,12 @@ function renderListView() {
   const countEl = document.getElementById('listCount');
   if (!tbody) return;
 
+  // Always update sort indicators on all columns
+  document.querySelectorAll('[id^="listSort-"]').forEach(el => {
+    const col = el.id.replace('listSort-', '');
+    el.textContent = col === _listSortKey ? (_listSortAsc ? '▲' : '▼') : '';
+  });
+
   const search     = (document.getElementById('listSearch')?.value || '').toLowerCase();
   const statusFil  = document.getElementById('listStatusFilter')?.value || '';
   const typeFil    = document.getElementById('listTypeFilter')?.value || '';
