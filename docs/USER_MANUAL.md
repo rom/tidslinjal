@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 6.0.0**
+**Version 6.1.0**
 
 ---
 
@@ -32,6 +32,9 @@
 24. [Templates](#24-templates)
 25. [Keyboard & Mouse Shortcuts](#25-keyboard--mouse-shortcuts)
 26. [Troubleshooting](#26-troubleshooting)
+27. [References & Document Library](#27-references--document-library)
+28. [Accessibility](#28-accessibility)
+29. [Workspace Presets](#29-workspace-presets)
 
 ---
 
@@ -55,6 +58,11 @@ Key capabilities:
 - Integration framework with STIX/TAXII and syslog connectors
 - VCR seven-segment digital clock display with color customization
 - Artificial time system for exercise time offsets
+- DTG (Date-Time Group) military date format
+- High-contrast and color-blind accessibility modes
+- Finnish language support
+- Reference document management with checksums
+- Workspace presets
 - Offline sync mode and federation support
 
 ---
@@ -423,6 +431,7 @@ When an alarm fires, a notification bar appears at the top of the screen:
 
 - **Dismiss** — removes the notification without acknowledging.
 - **📋 Show event** — opens the full event detail view directly from the alarm.
+- **Enter Meeting** — if the event is a meeting with a URL (Teams/Zoom), this button appears in the alarm popup to join the meeting directly.
 - **✓ ACK** — acknowledges the alarm and stops escalation.
 
 Unacknowledged alarms escalate — they turn orange, then pulse red every 60 seconds.
@@ -554,10 +563,22 @@ Open the **Settings** sidebar tab to configure your preferences.
 |---|---|
 | **Theme** | Dark / Light / City Camo / Urban Camo |
 | **Display size** | Small / Normal / Large / Huge |
-| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
-| **Date/time format** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
+| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Date/time format** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
+| **Time format** | 24h / 12h |
+| **High-contrast mode** | On / Off (overlay that boosts grid lines, time markers, phase bands, locks, selections) |
+| **Color-blind palette** | Off / Protanopia / Deuteranopia / Tritanopia |
+| **Default landing view** | Grid / List / Log Book / Decisions / Map / Reports |
+| **Auto-follow now** | On / Off (keeps current time centered in view) |
+| **Default range** | Day / 3 Days / Week / 2 Weeks / Month |
+| **Default resolution** | 10 min / 15 min / Hour / Day |
+| **Week starts on** | Monday / Sunday |
+| **Tooltip delay** | Instant / 200 ms / 500 ms |
+| **Confirm drag-move** | On / Off (ask before drag-reschedule) |
+| **Default event type** | any configured type |
+| **Welcome banner** | first login overlay with description, URLs, version, server uptime |
 
-Language can also be changed instantly using the flag buttons (🇬🇧 🇸🇪 🇫🇷) in the toolbar.
+Language can also be changed instantly using the flag buttons (🇬🇧 🇸🇪 🇫🇷 🇫🇮) in the toolbar.
 
 ### Date/Time Format & Day Hours
 
@@ -852,6 +873,7 @@ Click **Map** in the toolbar or detach it to a separate window for use on a seco
 - **User markers** — user locations are plotted when available
 - **Address search** — type an address to geocode and zoom to the location
 - **GeoJSON/KML import** — load external geographic data files as overlays
+- **Symbol picker** — when using the draw-symbol tool, a floating panel with search and symbol grid appears for selecting an icon
 - **Fit All** — auto-zoom to show all visible markers
 - **Legend** — color-coded legend showing marker types
 
@@ -994,7 +1016,7 @@ Save and reuse sets of events, phases, locks, groups, and layers:
 
 ### Legend — System Info & GitHub Link
 
-The **Legend** sidebar tab includes a **System** info panel showing language, user count, group count, active layers, synthetic time state, last template, and version number. If the server is built with a GitHub link configured, a direct link to the repository appears at the bottom of the legend.
+The **Legend** sidebar tab includes a **System** info panel showing language, user count, group count, active layers, synthetic time state, last template, and version number. Server uptime and start time are also shown in the legend panel. If the server is built with a GitHub link configured, a direct link to the repository appears at the bottom of the legend.
 
 ---
 

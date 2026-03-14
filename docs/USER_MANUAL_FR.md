@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 6.0.0**
+**Version 6.1.0**
 
 ---
 
@@ -32,6 +32,9 @@
 24. [Modèles](#24-modèles)
 25. [Raccourcis clavier et souris](#25-raccourcis-clavier-et-souris)
 26. [Dépannage](#26-dépannage)
+27. [Références et bibliothèque de documents](#27-références-et-bibliothèque-de-documents)
+28. [Accessibilité](#28-accessibilité)
+29. [Préréglages d'espace de travail](#29-préréglages-despace-de-travail)
 
 ---
 
@@ -46,6 +49,11 @@ Fonctionnalités clés :
 - Support d'exercice avec STARTEX/ENDEX et temps synthétique « Jour N / T+H »
 - Notifications d'alarme en temps réel via Server-Sent Events
 - Export en ICS, JSON et CSV
+- Format DTG (Date-Time Group) militaire
+- Mode haut contraste et palettes pour daltoniens
+- Support de la langue finnoise (Suomi)
+- Gestion de documents de référence avec sommes de contrôle
+- Préréglages d'espace de travail
 
 ---
 
@@ -381,6 +389,7 @@ Lorsqu'une alarme se déclenche, une barre de notification apparaît en haut de 
 | **Ignorer** | Ferme la notification pour cette session ; l'alarme reste active |
 | **📋 Afficher événement** | Ouvre le panneau de détails de l'événement directement depuis la notification |
 | **ACK** | Acquitte définitivement l'alarme |
+| **Rejoindre la réunion** | Si l'événement est une réunion avec URL (Teams/Zoom), ouvre le lien de réunion |
 
 Les alarmes non acquittées s'intensifient — elles deviennent orange, puis clignotent en rouge toutes les 60 secondes.
 
@@ -498,10 +507,22 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 |---|---|
 | **Thème** | Sombre / Clair / City Camo / Urban Camo |
 | **Taille d'affichage** | Petit / Normal / Grand / Énorme |
-| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français |
-| **Format date/heure** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) |
+| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Format date/heure** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
+| **Format horaire** | 24h / 12h |
+| **Mode haut contraste** | Activé / Désactivé |
+| **Palette daltoniens** | Désactivé / Protanopie / Deutéranopie / Tritanopie |
+| **Vue d'accueil par défaut** | Grille / Liste / Journal / Décisions / Carte / Rapports |
+| **Suivi automatique maintenant** | Activé / Désactivé |
+| **Intervalle par défaut** | Jour / 3 Jours / Semaine / 2 Semaines / Mois |
+| **Résolution par défaut** | 10 min / 15 min / Heure / Jour |
+| **Début de semaine** | Lundi / Dimanche |
+| **Délai d'infobulle** | Instantané / 200 ms / 500 ms |
+| **Confirmer le déplacement** | Activé / Désactivé |
+| **Type d'événement par défaut** | tout type configuré |
+| **Bannière de bienvenue** | affichée à la première connexion |
 
-La langue peut aussi être changée instantanément avec les boutons de drapeaux (🇬🇧 🇸🇪 🇫🇷) dans la barre d'outils.
+La langue peut aussi être changée instantanément avec les boutons de drapeaux (🇬🇧 🇸🇪 🇫🇷 🇫🇮) dans la barre d'outils.
 
 ### Format date/heure et heures de journée
 
@@ -686,6 +707,7 @@ La projection cartographique offre une vue géographique interactive.
 - **Recherche d'adresse** — géocodage et zoom vers l'emplacement
 - **Import GeoJSON/KML** — charger des fichiers de données géographiques
 - **Ajuster tout** — zoom automatique pour montrer tous les marqueurs
+- **Sélecteur de symboles** — choisir et placer des symboles sur la carte
 
 ---
 

@@ -102,7 +102,7 @@ A structured decision-tracking system accessible from the sidebar:
 - Status workflow: Proposed → Approved / Rejected
 - File attachments on decisions
 - Detachable to a standalone browser window
-- Full i18n support (EN/SV/FR)
+- Full i18n support (EN/SV/FR/FI)
 
 ### Log Book
 
@@ -152,7 +152,7 @@ Save and reuse sets of events, phases, locks, groups, and layers:
 - Set alarm **inline** while creating/editing an event, or from the event Detail view
 - Ops Lead+ can notify all invited persons when setting an inline alarm
 - Delivered via **SSE** in real time; optional browser push notification
-- Notification popup shows **Dismiss**, **📋 Show Event**, and **ACK** buttons
+- Notification popup shows **Dismiss**, **📋 Show Event**, **ACK**, and **Enter Meeting** (for events with a meeting URL) buttons
 - Unacknowledged alarms escalate (orange → pulsing red every 60 s); a live seconds-since counter is shown in the notification
 - Alarm scheduler polls every **5 s** for precise trigger timing
 - **Alarm audit trail** — every ACK records who acknowledged it, when, and from which IP address
@@ -269,7 +269,60 @@ Ops Lead+ (and Team Lead, with the `can_lock` capability) can lock time slots to
 
 ### Internationalization
 
-Full UI translation in **English (EN)**, **Swedish (SV)**, and **French (FR)**. Language preference saved per user. All new features are translated in all three languages.
+Full UI translation in **English (EN)**, **Swedish (SV)**, **French (FR)**, and **Finnish (FI)**. Language preference saved per user. All new features are translated in all four languages.
+
+### Settings & Preferences
+
+User-configurable preferences (saved per user via the Settings sidebar tab):
+
+- **Time format** — 12-hour or 24-hour clock (default: 24h)
+- **DTG (Date-Time Group)** — military date format support (DDHHMMZmmmYY)
+- **High-contrast mode** — accessibility overlay applied on top of any theme
+- **Color-blind-safe palettes** — selectable modes for protanopia, deuteranopia, and tritanopia
+- **Default landing view** — choose which view opens on login: grid, list, log book, decisions, map, or reports
+- **Auto-follow "now"** — toggle to keep the current time centered on the timeline
+- **Default timeline range** — preferred display range on load
+- **Default time-slot resolution** — preferred slot granularity on load
+- **Start-of-week** — Monday or Sunday
+- **Tooltip hover delay** — configurable delay before event tooltips appear
+- **Confirm before drag-move** — require confirmation dialog when drag-moving events
+- **Default event type** — pre-selected event type for new events
+- **Workspace presets** — save and restore complete workspace state (view, filters, layers, zoom level, clocks, sidebar tab)
+
+### Welcome Banner
+
+First-time login displays a configurable **welcome banner** with:
+
+- Application description and version
+- Welcome URL and help URL links
+- Server uptime display
+
+### Server Uptime
+
+The **Legend** sidebar displays the current server uptime, showing how long the server has been running since last restart.
+
+### Map Symbol Picker
+
+The map draw-symbol mode includes a **symbol picker** for selecting from a library of map symbols when placing markers on the map projection.
+
+### Alarm Improvements
+
+- **"Enter Meeting" button** — alarm notifications for events with an associated meeting URL display an "Enter Meeting" button for one-click access to the meeting
+
+### Reference Documents
+
+A reference document management system for attaching and tracking operational documents:
+
+- **Language metadata** — specify the language of each reference document
+- **Automated file type detection** — automatic identification of file types (inspired by google/magika)
+- **Copy modes** — central copy, local copy, or show link
+- **Owner and custodian** — metadata fields for document accountability
+- **Time added** — timestamp showing when the reference was added
+- **Reference count** — track how many times a reference is linked
+- **Cryptographic checksums** — compute and verify MD5, SHA-1, SHA-256, and SHA-512 checksums for document integrity
+- **Bulk upload** — upload multiple reference documents at once
+- **Reference edit modal** — edit reference metadata after creation
+- **Checksum viewer modal** — view and verify all computed checksums for a reference
 
 ---
 
@@ -623,6 +676,8 @@ All endpoints (except `/api/version` and `/api/auth/login`) require an authentic
 | `GET/POST` | `/api/editing-locks` | Any | Active collaborative editing locks |
 | `GET` | `/api/backup` | Admin | Download data ZIP |
 | `POST` | `/api/restore` | Admin | Restore from ZIP |
+| `POST` | `/api/references/bulk` | RW+ | Bulk upload references |
+| `GET` | `/api/references/:id/checksums` | Any | Compute/retrieve file checksums |
 | `GET` | `/webcal/:token.ics` | Token | WebCal iCalendar feed |
 
 ---
@@ -641,7 +696,7 @@ tidslinjal/
 └── static/
     ├── index.html    # App shell with all modals
     ├── login.html    # Login page
-    ├── i18n.js       # EN / SV / FR translation strings
+    ├── i18n.js       # EN / SV / FR / FI translation strings
     ├── app.js        # Timeline engine, all UI logic
     ├── modals.js     # Modal dialogs (settings, templates, profile, map, PVA…)
     ├── timeline.js   # Timeline rendering and event drawing
@@ -728,6 +783,19 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v6.1.0 — References, Preferences & Accessibility
+
+- **Finnish (FI) language** — full UI translation added; Tidslinjal now supports EN, SV, FR, and FI
+- **Settings & preferences overhaul** — time format (12h/24h), DTG military date format, default landing view, auto-follow "now", default timeline range, default time-slot resolution, start-of-week, tooltip hover delay, confirm before drag-move, default event type, and workspace presets (save/restore view, filters, layers, zoom, clocks, sidebar tab)
+- **High-contrast mode** — accessibility overlay that works on top of any theme
+- **Color-blind-safe palettes** — selectable modes for protanopia, deuteranopia, and tritanopia
+- **Welcome banner** — configurable first-time login banner with description, welcome URL, help URL, version, and server uptime
+- **Server uptime display** — shown in the Legend sidebar
+- **Map symbol picker** — symbol library for draw-symbol mode on the map projection
+- **Alarm "Enter Meeting" button** — alarm notifications for events with meeting URLs include a one-click join button
+- **Reference document management** — language metadata, automated file type detection (inspired by google/magika), copy modes (central/local/link), owner and custodian fields, time added, reference count, cryptographic checksums (MD5, SHA-1, SHA-256, SHA-512), bulk upload, reference edit modal, and checksum viewer modal
+- **New API endpoints** — `POST /api/references/bulk` for bulk upload; `GET /api/references/:id/checksums` for file checksums
 
 ### v6.0.0 — Detachable Windows, Timers & Resources
 
