@@ -41,14 +41,14 @@
     { "name": "Communications", "description": "Stakeholder communications and reporting" },
     { "name": "Legal / Management", "description": "Management escalation and legal review" }
   ],
-  "events": [
+  "items": [
     {
       "title": "INCIDENT DETECTED",
       "description": "Initial detection or report. Document detection method, time, and source.",
       "event_type": "instant",
       "start_offset_min": 0,
       "duration_min": 0,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Initial Assessment",
@@ -56,7 +56,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 5,
       "duration_min": 30,
-      "responsible": "Incident Commander"
+      "participant": "Incident Commander"
     },
     {
       "title": "Incident Commander Notified",
@@ -64,7 +64,7 @@
       "event_type": "instant",
       "start_offset_min": 15,
       "duration_min": 0,
-      "responsible": "Incident Commander"
+      "participant": "Incident Commander"
     },
     {
       "title": "Response Team Activated",
@@ -72,7 +72,7 @@
       "event_type": "mote",
       "start_offset_min": 30,
       "duration_min": 30,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Management Notified",
@@ -80,7 +80,7 @@
       "event_type": "instant",
       "start_offset_min": 45,
       "duration_min": 0,
-      "responsible": "Legal / Management"
+      "participant": "Legal / Management"
     },
     {
       "title": "Containment Actions Begin",
@@ -88,7 +88,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 60,
       "duration_min": 120,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Evidence Collection",
@@ -96,7 +96,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 90,
       "duration_min": 90,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Situation Report #1",
@@ -104,7 +104,7 @@
       "event_type": "reporting",
       "start_offset_min": 120,
       "duration_min": 15,
-      "responsible": "Communications"
+      "participant": "Communications"
     },
     {
       "title": "Root Cause Analysis Begins",
@@ -112,7 +112,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 240,
       "duration_min": 180,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Situation Report #2",
@@ -120,7 +120,7 @@
       "event_type": "reporting",
       "start_offset_min": 360,
       "duration_min": 15,
-      "responsible": "Communications"
+      "participant": "Communications"
     },
     {
       "title": "Decision: Escalate or De-escalate",
@@ -128,7 +128,7 @@
       "event_type": "decision",
       "start_offset_min": 480,
       "duration_min": 30,
-      "responsible": "Incident Commander"
+      "participant": "Incident Commander"
     },
     {
       "title": "Recovery Actions Begin",
@@ -136,7 +136,7 @@
       "event_type": "assigned_task",
       "start_offset_min": 540,
       "duration_min": 240,
-      "responsible": "Response Team"
+      "participant": "Response Team"
     },
     {
       "title": "Final Situation Report",
@@ -144,7 +144,7 @@
       "event_type": "reporting",
       "start_offset_min": 780,
       "duration_min": 30,
-      "responsible": "Communications"
+      "participant": "Communications"
     },
     {
       "title": "INCIDENT CLOSED",
@@ -152,7 +152,7 @@
       "event_type": "instant",
       "start_offset_min": 840,
       "duration_min": 0,
-      "responsible": "Incident Commander"
+      "participant": "Incident Commander"
     }
   ]
 }
