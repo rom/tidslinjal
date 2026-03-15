@@ -1127,7 +1127,8 @@ func DefaultPollQuestions() []PollQuestion {
 		{ID: "stress_self", Text: "How would you rate your personal stress level?", Type: PollQuestionScaleZeroThree, Required: true},
 		{ID: "stress_team", Text: "How would you rate your team's stress level?", Type: PollQuestionScaleZeroThree, Required: true},
 		{ID: "in_control", Text: "Do you feel in control of your current tasks?", Type: PollQuestionYesNo, Required: true},
-		{ID: "need_assistance", Text: "Do you need assistance?", Type: PollQuestionYesNo, Required: true},
+		{ID: "need_assistance", Text: "Do you need assistance from Operations Lead or other central support?", Type: PollQuestionYesNo, Required: true},
+		{ID: "need_assist_teamlead", Text: "Do you need assistance from other team leads?", Type: PollQuestionYesNo, Required: true},
 		{ID: "free_text", Text: "Any additional comments or concerns?", Type: PollQuestionFreeText, Required: false},
 	}
 }

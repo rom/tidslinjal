@@ -6325,6 +6325,13 @@ func (app *App) routes() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/polls/{id}/remind", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleTeamLead, app.handlePollReminder)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// ── Resource Notes ──
 	mux.HandleFunc("/api/resource-notes", func(w http.ResponseWriter, r *http.Request) {
@@ -8789,6 +8796,57 @@ func (app *App) handleClosePoll(w http.ResponseWriter, r *http.Request, user *Us
 	// Broadcast SSE
 	closedData, _ := json.Marshal(poll)
 	app.broker.BroadcastAll(SSEMessage{Event: "poll_closed", Data: string(closedData)})
+}
+
+func (app *App) handlePollReminder(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	poll, ok := app.store.GetPollByID(id)
+	if !ok {
+		jsonError(w, "poll not found", http.StatusNotFound)
+		return
+	}
+	if poll.Status != "open" {
+		jsonError(w, "poll is not open", http.StatusBadRequest)
+		return
+	}
+	// Only creator or admin can send reminders
+	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "only the creator or an admin can send reminders", http.StatusForbidden)
+		return
+	}
+
+	// Find users who haven't responded
+	respondedUsers := make(map[int64]bool)
+	for _, resp := range poll.Responses {
+		respondedUsers[resp.UserID] = true
+	}
+	targetUserIDs := app.resolvePollTargets(*poll)
+	reminded := 0
+	creatorName := user.DisplayName
+	if creatorName == "" {
+		creatorName = user.Username
+	}
+	for _, uid := range targetUserIDs {
+		if !respondedUsers[uid] && uid != user.ID {
+			app.notifyUser(uid, "poll",
+				"Reminder: "+poll.Title,
+				fmt.Sprintf("Reminder from %s — please respond to the poll \"%s\"", creatorName, poll.Title),
+				fmt.Sprintf("%d", poll.ID))
+			reminded++
+		}
+	}
+
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "remind_poll", EntityType: "poll", EntityID: poll.ID,
+		Summary: fmt.Sprintf("Sent poll reminder for '%s' to %d non-responders", poll.Title, reminded),
+	})
+
+	jsonOK(w, map[string]interface{}{"status": "ok", "reminded": reminded})
 }
 
 func (app *App) handleGetPollLog(w http.ResponseWriter, r *http.Request, user *User) {
