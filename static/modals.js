@@ -4574,6 +4574,9 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' title="Suomi">${langAbbr('fi')}</button>
           <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' title="Dansk">${langAbbr('da')}</button>
           <button class="toggle-btn${p.language==='nb'?' active':''}" data-action="setPref" data-args='["language","nb"]' title="Norsk (Bokmål)">${langAbbr('nb')}</button>
+          <button class="toggle-btn${p.language==='et'?' active':''}" data-action="setPref" data-args='["language","et"]' title="Eesti">${langAbbr('et')}</button>
+          <button class="toggle-btn${p.language==='lv'?' active':''}" data-action="setPref" data-args='["language","lv"]' title="Latviešu">${langAbbr('lv')}</button>
+          <button class="toggle-btn${p.language==='lt'?' active':''}" data-action="setPref" data-args='["language","lt"]' title="Lietuvių">${langAbbr('lt')}</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
@@ -12810,16 +12813,20 @@ function _renderReferencesTab(el) {
       <datalist id="refSearchSuggestions"></datalist>
       <select id="refCategoryFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
         <option value="">${t('all_categories') || 'All categories'}</option>
-        <option value="handbook">Handbook</option>
-        <option value="sop">SOP</option>
-        <option value="policy">Policy</option>
-        <option value="map">Map</option>
-        <option value="reference">Reference</option>
+        <option value="handbook">${t('ref_category_handbook') || 'Handbook'}</option>
+        <option value="sop">${t('ref_category_sop') || 'SOP'}</option>
+        <option value="policy">${t('ref_category_policy') || 'Policy'}</option>
+        <option value="map">${t('ref_category_map') || 'Map'}</option>
+        <option value="reference">${t('ref_category_reference') || 'Reference'}</option>
         <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
         <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
         <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
-        <option value="other">Other</option>
+        <option value="other">${t('ref_category_other') || 'Other'}</option>
       </select>
+      <select id="refLanguageFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+        <option value="">${t('all_languages') || 'All languages'}</option>
+      </select>
+      <div id="refInfoArea" style="margin-bottom:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim)"></div>
       <div id="refGitActions" style="display:none;margin-bottom:8px;display:flex;gap:6px;align-items:center">
         <button class="btn btn-secondary btn-sm" id="btnRefGitSave" style="font-size:10px">💾 ${t('ref_git_save')||'Save to Git'}</button>
         <button class="btn btn-secondary btn-sm" id="btnRefGitLoad" style="font-size:10px">📥 ${t('ref_git_load')||'Load from Git'}</button>
@@ -12836,6 +12843,8 @@ function _renderReferencesTab(el) {
   if (searchEl) searchEl.addEventListener('input', () => _filterReferences());
   const catEl = document.getElementById('refCategoryFilter');
   if (catEl) catEl.addEventListener('change', () => _filterReferences());
+  const langEl = document.getElementById('refLanguageFilter');
+  if (langEl) langEl.addEventListener('change', () => _filterReferences());
 }
 
 async function _loadAndRenderReferences() {
@@ -12846,6 +12855,34 @@ async function _loadAndRenderReferences() {
   } catch (e) { state.references = []; }
   // Ensure default user manual reference exists
   _ensureDefaultUserManualRef();
+  // Populate language filter dropdown
+  const _langNamesForFilter = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
+  const langFilter = document.getElementById('refLanguageFilter');
+  if (langFilter) {
+    const usedLangs = new Set();
+    (state.references || []).forEach(r => { if (r.language) usedLangs.add(r.language); });
+    const currentVal = langFilter.value || '';
+    langFilter.innerHTML = `<option value="">${t('all_languages') || 'All languages'}</option>`;
+    [...usedLangs].sort().forEach(lang => {
+      langFilter.innerHTML += `<option value="${lang}"${lang === currentVal ? ' selected' : ''}>${_langNamesForFilter[lang] || lang}</option>`;
+    });
+  }
+  // Populate info area with category counts
+  const infoArea = document.getElementById('refInfoArea');
+  if (infoArea) {
+    const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+    const catCounts = {};
+    (state.references || []).forEach(r => {
+      const c = r.category || 'other';
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+    const total = (state.references || []).length;
+    const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','other'];
+    const badges = catKeys.filter(k => catCounts[k]).map(k =>
+      `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:${catColors[k]};color:#fff;margin-right:4px">${t('ref_category_'+k)||k} ${catCounts[k]}</span>`
+    ).join('');
+    infoArea.innerHTML = `<b>${t('ref_info_total') || 'Total'}: ${total}</b> &nbsp; ${badges}`;
+  }
   // Populate autocomplete suggestions from available reference titles and filenames
   const dl = document.getElementById('refSearchSuggestions');
   if (dl) {
@@ -12874,9 +12911,11 @@ function _filterReferences() {
   if (!listEl) return;
   const search = (document.getElementById('refSearch')?.value || '').toLowerCase();
   const cat = document.getElementById('refCategoryFilter')?.value || '';
+  const lang = document.getElementById('refLanguageFilter')?.value || '';
   const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
   const refs = (state.references || []).filter(r => {
     if (cat && r.category !== cat) return false;
+    if (lang && r.language !== lang) return false;
     if (search && !(r.title + ' ' + (r.description || '') + ' ' + (r.tags || []).join(' ')).toLowerCase().includes(search)) return false;
     return true;
   });
@@ -12885,7 +12924,7 @@ function _filterReferences() {
     return;
   }
   const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
-  const _langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский'};
+  const _langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
   const _copyModeLabels = {central:t('ref_copy_central'),local:t('ref_copy_local'),link:t('ref_copy_link'),git:t('ref_copy_git')||'Push to Git'};
   listEl.innerHTML = refs.map(r => {
     const sizeStr = r.size ? fmtFileSize(r.size) : '';
@@ -12918,6 +12957,7 @@ function _filterReferences() {
         ${r.reference_count ? `<span>${t('ref_times_referenced')}:</span><span>${r.reference_count}</span>` : ''}
       </div>
       ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(tg => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;background:var(--bg2);border:1px solid var(--border);margin-right:3px">${escHtml(tg)}</span>`).join('')}</div>` : ''}
+      ${r.checksum_md5 ? `<details style="margin-top:4px;font-size:10px;color:var(--text-dim)"><summary style="cursor:pointer;font-weight:600">${t('ref_checksums') || 'Checksums'}</summary><div style="font-family:monospace;font-size:9px;word-break:break-all;margin-top:2px;padding:4px;background:var(--bg2);border-radius:3px;line-height:1.6">MD5: ${escHtml(r.checksum_md5)}<br>SHA-1: ${escHtml(r.checksum_sha1 || '')}<br>SHA-256: ${escHtml(r.checksum_sha256 || '')}<br>SHA-512: ${escHtml(r.checksum_sha512 || '')}</div></details>` : ''}
     </div>`;
   }).join('');
   // Bind reference action buttons (CSP-safe, no inline onclick)
@@ -13074,19 +13114,19 @@ function _openReferenceUploadModal() {
           <input type="text" id="refUpDesc" class="form-input" placeholder="Description (optional)">
           <label style="margin-top:8px">Category</label>
           <select id="refUpCategory" class="form-input">
-            <option value="handbook">Handbook</option>
-            <option value="sop">SOP</option>
-            <option value="policy">Policy</option>
-            <option value="map">Map</option>
-            <option value="reference">Reference</option>
+            <option value="handbook">${t('ref_category_handbook') || 'Handbook'}</option>
+            <option value="sop">${t('ref_category_sop') || 'SOP'}</option>
+            <option value="policy">${t('ref_category_policy') || 'Policy'}</option>
+            <option value="map">${t('ref_category_map') || 'Map'}</option>
+            <option value="reference">${t('ref_category_reference') || 'Reference'}</option>
             <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
             <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
-            <option value="other">Other</option>
+            <option value="other">${t('ref_category_other') || 'Other'}</option>
           </select>
           <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
           <select id="refUpLang" class="form-input">
-            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="es">Español</option>
+            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="es">Español</option><option value="et">Eesti</option><option value="lv">Latviešu</option><option value="lt">Lietuvių</option>
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
           <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
@@ -13276,7 +13316,7 @@ function _showRefChecksums(id) {
 function _openRefEditModal(id) {
   const ref = (state.references || []).find(r => r.id === id);
   if (!ref) return;
-  const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'nb',l:'Norsk (Bokmål)'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'}];
+  const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'nb',l:'Norsk (Bokmål)'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'},{v:'et',l:'Eesti'},{v:'lv',l:'Latviešu'},{v:'lt',l:'Lietuvių'}];
   const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'},{v:'git',l:t('ref_copy_git')||'Push to Git'}];
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
@@ -13289,7 +13329,7 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditDesc" class="form-input" value="${escHtml(ref.description || '')}">
       <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
       <select id="refEditCategory" class="form-input">
-        ${[{v:'handbook',l:'Handbook'},{v:'sop',l:'SOP'},{v:'policy',l:'Policy'},{v:'map',l:'Map'},{v:'reference',l:'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'other',l:'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
+        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
       </select>
       <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
