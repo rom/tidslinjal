@@ -1532,39 +1532,6 @@ async function _populateItemRefSelector(type) {
   } catch (e) { console.warn('[populateRef]', e); }
 }
 
-// Populate symbol set picker
-(function() {
-  const sel = document.getElementById('symbolSetPicker');
-  if (!sel) return;
-  Object.keys(MAP_SYMBOL_SETS).forEach(key => {
-    const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = MAP_SYMBOL_SETS[key].label;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change', function() {
-    const grid = document.getElementById('symbolGrid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    const set = MAP_SYMBOL_SETS[this.value];
-    if (!set) return;
-    set.symbols.forEach(s => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.title = s.label;
-      btn.textContent = s.icon;
-      btn.style.cssText = 'width:28px;height:28px;font-size:16px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
-      btn.addEventListener('click', () => {
-        document.getElementById('itemIcon').value = s.icon;
-        if (!document.getElementById('itemLabel').value.trim()) {
-          document.getElementById('itemLabel').value = s.label;
-        }
-      });
-      grid.appendChild(btn);
-    });
-  });
-})();
-
 document.getElementById('btnPlaceItem').addEventListener('click', function() {
   if (!_currentOverlay || _currentOverlay.locked) return;
   const label = document.getElementById('itemLabel').value.trim();
@@ -1742,6 +1709,39 @@ const MAP_SYMBOL_SETS = {
     ]
   }
 };
+
+// Populate symbol set picker (must be after MAP_SYMBOL_SETS definition)
+(function() {
+  const sel = document.getElementById('symbolSetPicker');
+  if (!sel) return;
+  Object.keys(MAP_SYMBOL_SETS).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = MAP_SYMBOL_SETS[key].label;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function() {
+    const grid = document.getElementById('symbolGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    const set = MAP_SYMBOL_SETS[this.value];
+    if (!set) return;
+    set.symbols.forEach(s => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = s.label;
+      btn.textContent = s.icon;
+      btn.style.cssText = 'width:28px;height:28px;font-size:16px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
+      btn.addEventListener('click', () => {
+        document.getElementById('itemIcon').value = s.icon;
+        if (!document.getElementById('itemLabel').value.trim()) {
+          document.getElementById('itemLabel').value = s.label;
+        }
+      });
+      grid.appendChild(btn);
+    });
+  });
+})();
 
 /* ── Edit/Delete overlay items (called from popup links) ── */
 function _editOverlayItem(itemId) {
