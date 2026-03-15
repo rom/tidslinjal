@@ -390,6 +390,7 @@ type App struct {
 	connectors      *ConnectorRegistry
 	metrics         *Metrics
 	ldap            *LDAPConnector
+	enabledLangs    []string      // languages available to users (nil = all)
 	stopCh          chan struct{} // closed to stop background goroutines
 	stopOnce        sync.Once
 }
@@ -5009,6 +5010,12 @@ func (app *App) routes() http.Handler {
 		handleVersion(w, r)
 	})
 	mux.HandleFunc("/api/db-stats", app.requireAuth(app.handleDBStats))
+
+	// Languages (enabled language list)
+	mux.HandleFunc("/api/languages", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(app.enabledLangs)
+	})
 
 	// Day Labels
 	mux.HandleFunc("/api/day-labels", func(w http.ResponseWriter, r *http.Request) {
@@ -11327,6 +11334,14 @@ func main() {
 	flag.IntVar(&syslogPort,         "syslog-port",      0,               "Syslog server port (default 514 UDP/TCP, 6514 TLS)")
 	flag.StringVar(&syslogTransport, "syslog-transport", syslogTransport, "Syslog transport: udp | tcp | tls (default: udp)")
 	flag.StringVar(&syslogFormat,    "syslog-format",    syslogFormat,    "Syslog message format: classic | json (default: classic)")
+
+	// Language flags
+	var (
+		languagesFlag        string
+		disableLanguagesFlag string
+	)
+	flag.StringVar(&languagesFlag,        "languages",         os.Getenv("LANGUAGES"),         "Comma-separated list of enabled language codes (e.g. en,sv,da). Empty = all languages enabled.")
+	flag.StringVar(&disableLanguagesFlag, "disable-languages", os.Getenv("DISABLE_LANGUAGES"), "Comma-separated list of language codes to disable (e.g. et,lv,lt). Ignored if --languages is set.")
 	flag.Parse()
 
 	if debug {
@@ -11433,6 +11448,49 @@ func main() {
 			// Hook syslog into the standard logger
 			log.SetOutput(&syslogLogWriter{orig: os.Stderr})
 		}
+	}
+
+	// Resolve enabled languages
+	allLangs := []string{"en", "sv", "fr", "fi", "da", "nb", "et", "lv", "lt", "it", "es", "pt", "pl", "uk"}
+	if languagesFlag != "" {
+		// Explicit whitelist
+		var enabled []string
+		for _, code := range strings.Split(languagesFlag, ",") {
+			code = strings.TrimSpace(strings.ToLower(code))
+			if code != "" {
+				enabled = append(enabled, code)
+			}
+		}
+		// Always ensure "en" is included as it's the fallback language
+		hasEN := false
+		for _, c := range enabled {
+			if c == "en" {
+				hasEN = true
+				break
+			}
+		}
+		if !hasEN {
+			enabled = append([]string{"en"}, enabled...)
+		}
+		app.enabledLangs = enabled
+	} else if disableLanguagesFlag != "" {
+		// Blacklist: start from all and remove disabled
+		disabled := make(map[string]bool)
+		for _, code := range strings.Split(disableLanguagesFlag, ",") {
+			code = strings.TrimSpace(strings.ToLower(code))
+			if code != "" && code != "en" { // never disable English
+				disabled[code] = true
+			}
+		}
+		var enabled []string
+		for _, l := range allLangs {
+			if !disabled[l] {
+				enabled = append(enabled, l)
+			}
+		}
+		app.enabledLangs = enabled
+	} else {
+		app.enabledLangs = allLangs
 	}
 
 	go app.runAlarmScheduler()
@@ -11576,6 +11634,9 @@ func main() {
 	} else {
 		log.Printf("  Geoblocking: disabled")
 	}
+
+	// Languages
+	log.Printf("  Languages  : %s (%d of %d)", strings.Join(app.enabledLangs, ", "), len(app.enabledLangs), 14)
 
 	// Security policy
 	secCfg := app.store.GetSecuritySettings()
