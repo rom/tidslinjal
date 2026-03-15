@@ -1561,10 +1561,6 @@ func (app *App) handleDeleteInvitation(w http.ResponseWriter, r *http.Request, u
 // ── Vet User handler ────────────────────────────────────────────────────────────
 
 func (app *App) handleVetUser(w http.ResponseWriter, r *http.Request, user *User) {
-	if user.Role != RoleAdmin {
-		jsonError(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -2215,6 +2211,11 @@ func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 	newStatus := EventStatus(req.Status)
+	// Read-only / observer users cannot change event status at all
+	if !hasRole(user.Role, RoleReporter) {
+		jsonError(w, "insufficient permissions to change event status", http.StatusForbidden)
+		return
+	}
 	// Verify/reject require teamlead+
 	if (newStatus == StatusVerified || newStatus == StatusRejected) && !hasRole(user.Role, RoleTeamLead) {
 		jsonError(w, "team lead or above required to verify or reject events", http.StatusForbidden)
@@ -4993,11 +4994,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "static/login.html")
 	})
-	mux.HandleFunc("/admin-view", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
-		if user.Role != RoleAdmin {
-			http.Error(w, "Forbidden — admin access required", http.StatusForbidden)
-			return
-		}
+	mux.HandleFunc("/admin-view", app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
 		http.ServeFile(w, r, "static/admin.html")
 	}))
 
@@ -5104,9 +5101,9 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/event-types/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPut:
-			app.requireAuth(app.handleUpdateEventType)(w, r)
+			app.requireRole(RoleReadWrite, app.handleUpdateEventType)(w, r)
 		case http.MethodDelete:
-			app.requireAuth(app.handleDeleteEventType)(w, r)
+			app.requireRole(RoleReadWrite, app.handleDeleteEventType)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -5353,7 +5350,7 @@ func (app *App) routes() http.Handler {
 		}
 		// /api/users/:id/vet
 		if len(parts) == 4 && parts[3] == "vet" && r.Method == http.MethodPost {
-			app.requireAuth(app.handleVetUser)(w, r)
+			app.requireRole(RoleAdmin, app.handleVetUser)(w, r)
 			return
 		}
 		// /api/users/:id/block
@@ -5464,10 +5461,10 @@ func (app *App) routes() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
-	// Import (authenticated users; admin/oplead can import all)
+	// Import (readwrite+; admin/oplead can import all)
 	mux.HandleFunc("/api/import", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			app.requireAuth(app.handleImport)(w, r)
+			app.requireRole(RoleReadWrite, app.handleImport)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -5475,7 +5472,7 @@ func (app *App) routes() http.Handler {
 	// ICS import
 	mux.HandleFunc("/api/import/ics", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			app.requireAuth(app.handleImportICS)(w, r)
+			app.requireRole(RoleReadWrite, app.handleImportICS)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -5487,7 +5484,7 @@ func (app *App) routes() http.Handler {
 		case http.MethodGet:
 			app.requireAuth(app.handleGetTemplates)(w, r)
 		case http.MethodPost:
-			app.requireAuth(app.handleCreateTemplate)(w, r)
+			app.requireRole(RoleReadWrite, app.handleCreateTemplate)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -5497,7 +5494,7 @@ func (app *App) routes() http.Handler {
 		if len(parts) == 1 && r.Method == http.MethodDelete {
 			app.requireAuth(app.handleDeleteTemplate)(w, r)
 		} else if len(parts) == 2 && parts[1] == "apply" && r.Method == http.MethodPost {
-			app.requireAuth(app.handleApplyTemplate)(w, r)
+			app.requireRole(RoleReadWrite, app.handleApplyTemplate)(w, r)
 		} else {
 			http.Error(w, "not found", http.StatusNotFound)
 		}
@@ -5701,11 +5698,11 @@ func (app *App) routes() http.Handler {
 
 	// Decision Log — use Go 1.22+ method-based routing for clarity
 	mux.HandleFunc("GET /api/decision-log", app.requireAuth(app.handleListDecisionLog))
-	mux.HandleFunc("POST /api/decision-log", app.requireAuth(app.handleAddDecisionLogEntry))
+	mux.HandleFunc("POST /api/decision-log", app.requireRole(RoleTeamLead, app.handleAddDecisionLogEntry))
 	mux.HandleFunc("DELETE /api/decision-log/{id}", app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
-	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireAuth(app.handleDecisionLogAttachment))
+	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireRole(RoleTeamLead, app.handleDecisionLogAttachment))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		_, user := app.getSession(r)
 		if user == nil {
@@ -5745,7 +5742,9 @@ func (app *App) routes() http.Handler {
 		} else if r.Method == http.MethodPost && strings.Contains(path, "/attachment") {
 			app.requireAuth(app.handleLogBookAttachment)(w, r)
 		} else if r.Method == http.MethodGet && strings.Contains(path, "/attachment/") {
-			app.handleLogBookAttachmentDownload(w, r)
+			app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+				app.handleLogBookAttachmentDownload(w, r)
+			})(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
