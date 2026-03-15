@@ -215,7 +215,8 @@ function renderTimeline() {
     const isToday   = isSameDay(day, today);
     const isWeekend = isWeekendDay(day);
     const useSync   = synthActive();
-    const dayName   = useSync ? synthDayHeader(day) : localDayName(day);
+    const showDayName = state.preferences.show_day_name !== false;
+    const dayName   = showDayName ? (useSync ? synthDayHeader(day) : localDayName(day)) : '';
     const dayDate   = useSync
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);

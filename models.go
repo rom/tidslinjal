@@ -251,6 +251,7 @@ type UserPreferences struct {
 	ShowEventIcons  *bool        `json:"show_event_icons,omitempty"` // nil = true (default on)
 	ViewSpacing     float64      `json:"view_spacing,omitempty"`     // 1 | 1.5 | 2 — row spacing multiplier
 	ShowDayOfYear   bool         `json:"show_day_of_year,omitempty"` // show day-of-year number on calendar
+	ShowDayName     *bool        `json:"show_day_name,omitempty"`    // nil = true (default on) — show weekday name in column headers
 	ShowWeekNumbers bool         `json:"show_week_numbers,omitempty"` // show week numbers on calendar
 	WeekNumberStyle string       `json:"week_number_style,omitempty"` // "iso" (1-52) or "year_week" (Y-WW)
 	PushEventChanges *bool       `json:"push_event_changes,omitempty"` // browser notifications for event changes
