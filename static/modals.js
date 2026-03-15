@@ -7248,7 +7248,7 @@ async function _loadPolls(modal) {
           <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600">${statusText}</span>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">
-          ${t('poll_started')||'Started'}: ${fmtDateTime(new Date(poll.created_at))} — ${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}
+          ${t('poll_started')||'Started'}: ${fmtDateTime(new Date(poll.created_at))}${isCreator ? ` — ${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}` : ''}
         </div>
         ${questionsHtml}
         ${summaryHtml}
@@ -7875,7 +7875,7 @@ function updateUILabels() {
 
 function updateLangFlags() {
   const lang = (state.preferences && state.preferences.language) || 'en';
-  ['EN', 'SV', 'FR', 'FI', 'DA', 'NB', 'ET', 'LV', 'LT', 'IT', 'ES', 'PT'].forEach(code => {
+  ['EN', 'SV', 'FR', 'FI', 'DA', 'NB', 'ET', 'LV', 'LT', 'IT', 'ES', 'PT', 'PL', 'UK'].forEach(code => {
     const btn = document.getElementById('flag'+code);
     if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
   });
