@@ -2301,6 +2301,7 @@ async function _loadPollsterLog(container) {
         const at = new Date(r.answered_at);
         if (at < answeredMap[r.user_id].firstAt) answeredMap[r.user_id].firstAt = at;
       });
+      const partialTitle = t('poll_partial_answer')||'Partial';
       const answeredUsers = Object.entries(answeredMap).map(([uid, info]) => {
         const diffMs = info.firstAt - pollCreatedAt;
         const diffSec = Math.floor(diffMs / 1000);
@@ -2382,7 +2383,7 @@ async function _loadPollsterLog(container) {
           <strong>${t('poll_responses')||'Responses'}: ${totalR}/${totalT}</strong>
         </div>
         ${answeredUsers.length > 0 ? `<div style="font-size:var(--fs-xs);margin-top:4px"><span style="color:#27AE60;font-weight:600">✅ ${t('poll_answered')||'Answered'}:</span>
-          ${answeredUsers.map(au => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #27AE60${au.isPartial ? '80' : ''}">${escHtml(au.name)} <span style="color:var(--text-dim)">(+${au.diffStr})</span>${au.isPartial ? ' <span style="color:#F39C12" title="${t('poll_partial_answer')||'Partial'}">⚠</span>' : ''}</span>`).join(' ')}
+          ${answeredUsers.map(au => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #27AE60${au.isPartial ? '80' : ''}">${escHtml(au.name)} <span style="color:var(--text-dim)">(+${au.diffStr})</span>${au.isPartial ? ' <span style="color:#F39C12" title="' + partialTitle + '">⚠</span>' : ''}</span>`).join(' ')}
         </div>` : ''}
         ${nonRespondents.length > 0 ? `<div style="font-size:var(--fs-xs);margin-top:2px"><span style="color:#E74C3C;font-weight:600">❌ ${t('poll_not_answered')||'Not answered'}:</span>
           ${nonRespondents.map(nr => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #E74C3C">${escHtml(nr.name)}</span>`).join(' ')}
