@@ -44,6 +44,9 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <option value="objectives">Objectives</option>
     <option value="other">Other</option>
   </select>
+  <select id="refLangFilter">
+    <option value="">All languages</option>
+  </select>
   <button id="btnRefresh">🔄 Refresh</button>
 </div>
 <div id="gitBar" class="ref-git-bar" style="display:none">
@@ -52,6 +55,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <button id="btnGitLoad" class="btn">📥 Load from Git</button>
   <span id="gitStatus" style="color:var(--text-dim);margin-left:auto"></span>
 </div>
+<div id="refInfoBar" style="padding:6px 12px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:11px;color:var(--text-dim)"></div>
 <div class="ref-content" id="refContent"></div>
 <script>
 'use strict';
@@ -138,12 +142,43 @@ async function gitLoadRefs() {
   btn.textContent = '📥 Load from Git';
 }
 
+const _langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
+
+function updateInfoBar() {
+  const infoBar = document.getElementById('refInfoBar');
+  if (!infoBar) return;
+  const catCounts = {};
+  references.forEach(r => { const c = r.category || 'other'; catCounts[c] = (catCounts[c] || 0) + 1; });
+  const total = references.length;
+  const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','other'];
+  const badges = catKeys.filter(k => catCounts[k]).map(k =>
+    `<span class="ref-cat" style="background:${catColors[k]}">${escHtml(k)} ${catCounts[k]}</span>`
+  ).join('');
+  infoBar.innerHTML = `<b>Total: ${total}</b> &nbsp; ${badges}`;
+}
+
+function updateLangFilter() {
+  const langFilter = document.getElementById('refLangFilter');
+  if (!langFilter) return;
+  const usedLangs = new Set();
+  references.forEach(r => { if (r.language) usedLangs.add(r.language); });
+  const currentVal = langFilter.value || '';
+  langFilter.innerHTML = '<option value="">All languages</option>';
+  [...usedLangs].sort().forEach(lang => {
+    langFilter.innerHTML += `<option value="${lang}"${lang === currentVal ? ' selected' : ''}>${_langNames[lang] || lang}</option>`;
+  });
+}
+
 function render() {
+  updateInfoBar();
+  updateLangFilter();
   const el = document.getElementById('refContent');
   const search = (document.getElementById('refSearch')?.value || '').toLowerCase();
   const cat = document.getElementById('refCatFilter')?.value || '';
+  const lang = document.getElementById('refLangFilter')?.value || '';
   const filtered = references.filter(r => {
     if (cat && r.category !== cat) return false;
+    if (lang && r.language !== lang) return false;
     if (search && !(r.title + ' ' + (r.description || '') + ' ' + (r.tags || []).join(' ')).toLowerCase().includes(search)) return false;
     return true;
   });
@@ -158,6 +193,7 @@ function render() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span class="ref-cat" style="background:${catColors[r.category] || '#95A5A6'}">${escHtml(r.category || 'other')}</span>
+          ${r.language ? `<span class="ref-tag" title="Language">${escHtml(_langNames[r.language] || r.language)}</span>` : ''}
           <b>${escHtml(r.title)}</b>
         </div>
         <div style="display:flex;gap:4px">
@@ -170,6 +206,7 @@ function render() {
         ${escHtml(r.original_name || '')} ${sizeStr} · Owner: ${escHtml(r.owner || r.uploaded_by_name || '—')} · Added: ${dateStr}
       </div>
       ${(r.tags || []).length ? `<div style="margin-top:4px">${r.tags.map(tg => `<span class="ref-tag">${escHtml(tg)}</span>`).join('')}</div>` : ''}
+      ${r.checksum_md5 ? `<details style="margin-top:4px;font-size:10px;color:var(--text-dim)"><summary style="cursor:pointer;font-weight:600">Checksums</summary><div style="font-family:monospace;font-size:9px;word-break:break-all;margin-top:2px;padding:4px;background:var(--bg2);border-radius:3px;line-height:1.6">MD5: ${escHtml(r.checksum_md5)}<br>SHA-1: ${escHtml(r.checksum_sha1 || '')}<br>SHA-256: ${escHtml(r.checksum_sha256 || '')}<br>SHA-512: ${escHtml(r.checksum_sha512 || '')}</div></details>` : ''}
     </div>`;
   }).join('');
 }
@@ -178,6 +215,7 @@ function render() {
 document.getElementById('btnRefresh').addEventListener('click', loadReferences);
 document.getElementById('refSearch').addEventListener('input', render);
 document.getElementById('refCatFilter').addEventListener('change', render);
+document.getElementById('refLangFilter').addEventListener('change', render);
 document.getElementById('btnGitSave').addEventListener('click', gitSaveRefs);
 document.getElementById('btnGitLoad').addEventListener('click', gitLoadRefs);
 
