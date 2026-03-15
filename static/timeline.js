@@ -159,7 +159,16 @@ function updateSyntheticUI() {
       badge.textContent   = ex.label || '';
       badge.style.cursor = 'pointer';
       badge.title = t('exercise_click_info') || 'Click for details';
-      badge.onclick = function() { showExerciseInfoPopup(); };
+      badge.onclick = function() {
+        showExerciseInfoPopup();
+        // Navigate timeline to STARTEX date
+        if (ex.epoch) {
+          const epochDate = new Date(ex.epoch);
+          if (!isNaN(epochDate)) {
+            centerDay(epochDate);
+          }
+        }
+      };
     }
   } else {
     btn.style.display = 'none';

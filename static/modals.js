@@ -2434,15 +2434,17 @@ function openLogBookModal() {
     {v:'action',l:t('lb_action')||'Action taken'},
     {v:'briefing',l:t('lb_briefing')||'Briefing content'},
     {v:'situation',l:t('lb_situation')||'Situation change'},
+    {v:'logistics',l:t('lb_logistics')||'Logistics'},
     {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
     {v:'other',l:t('lb_other')||'Other'}
-  ];
+  ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
     <div class="modal" style="max-width:700px">
       <div class="modal-header">
         <h3>📖 ${t('tab_log_book')||'Log Book'}</h3>
+        <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-right:8px" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
         <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
       </div>
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
@@ -3146,12 +3148,15 @@ function renderSidebar() {
         {v:'action',l:t('lb_action')||'Action taken'},
         {v:'briefing',l:t('lb_briefing')||'Briefing content'},
         {v:'situation',l:t('lb_situation')||'Situation change'},
+        {v:'logistics',l:t('lb_logistics')||'Logistics'},
         {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
         {v:'other',l:t('lb_other')||'Other'}
-      ];
+      ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
       el.innerHTML = logTabBar + `
         <div class="sidebar-section">
-          <div class="sidebar-section-title">📖 ${t('tab_log_book')||'Log Book'}</div>
+          <div class="sidebar-section-title">📖 ${t('tab_log_book')||'Log Book'}
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-left:auto" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+          </div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
             <select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
               ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
@@ -4329,6 +4334,24 @@ function renderSidebar() {
         </div>
         <button class="btn btn-secondary btn-sm" data-action="saveWorkspacePreset">${t('preset_save')||'Save Current'}</button>
         ` : ''}
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_logbook_decisions')||'Log Book — Decisions'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_logbook_decisions_desc')||'When enabled, the "Decision" category is hidden from Log Book. Decisions will only appear in the dedicated Decisions Log.'}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.logbook_hide_decisions?'checked':''} data-action="setPref" data-event="change" data-pref-checked="logbook_hide_decisions"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_logbook_hide_decisions')||'Hide decisions from Log Book'}
+        </label>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_clock_flags')||'Clock Flags'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_clock_flags_desc')||'Show national flags on timezone clocks based on the city of each timezone.'}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.show_clock_flags?'checked':''} data-action="setPref" data-event="change" data-pref-checked="show_clock_flags"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_clock_flags')||'Add flags on clocks'}
+        </label>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_welcome_url')||'Welcome URL'}</div>
@@ -6373,12 +6396,12 @@ async function openPollModal() {
   ];
 
   modal.innerHTML = `
-    <div class="modal" style="max-width:750px">
+    <div class="modal" style="max-width:950px;width:90vw">
       <div class="modal-header">
         <h3>📊 ${t('poll_title')||'Poll / Multipoll'}</h3>
         <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
       </div>
-      <div class="modal-body" style="max-height:70vh;overflow-y:auto" id="pollModalBody">
+      <div class="modal-body" style="max-height:80vh;overflow-y:auto" id="pollModalBody">
         <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
           ${t('poll_desc')||'Poll specific users, groups, or roles with standard or custom questions. All replies are collected and reported.'}
         </p>
@@ -7308,6 +7331,7 @@ function playAlarmSound(sound) {
 // ── SSE, Alarm ACK: connectSSE, unackedAlarms, showAlarmNotification, dismissAlarmNotif, ackAlarm ──
 // ── SSE ────────────────────────────────────────────────────────────────────
 let _sseConnection = null;
+let _sseReconnectAttempts = 0;
 function connectSSE() {
   if (_sseConnection) {
     _sseConnection.close();
@@ -7321,10 +7345,13 @@ function connectSSE() {
     showAlarmNotification(data, 0);
   });
   // Listen for event changes from other users
+  let _sseRefreshTimer = null;
   es.addEventListener('event_change', e => {
     const data = JSON.parse(e.data);
     if (data.action === 'deleted' || data.action === 'created' || data.action === 'updated' || data.action === 'status_changed') {
-      refreshAll();
+      // Debounce SSE-triggered refreshes: batch rapid events into one refresh
+      if (_sseRefreshTimer) clearTimeout(_sseRefreshTimer);
+      _sseRefreshTimer = setTimeout(() => { _sseRefreshTimer = null; refreshAll(); }, 300);
       // Record to event log
       _eventLogEntries.push({ timestamp: new Date().toISOString(), source: 'sse', message: `${data.action}: ${data.title||'event #'+data.id}`, summary: data.user_name ? `by ${data.user_name}` : '' });
       // Browser push notification for event changes by others
@@ -7433,12 +7460,17 @@ function connectSSE() {
       }
     } catch {}
   });
+  es.onopen = () => { _sseReconnectAttempts = 0; };
   es.onerror = () => {
     if (_sseConnection === es) {
       _sseConnection = null;
       es.close();
     }
-    setTimeout(connectSSE, 5000);
+    // Exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, max 30s
+    const baseDelay = Math.min(1000 * Math.pow(2, _sseReconnectAttempts), 30000);
+    const jitter = Math.random() * 1000;
+    _sseReconnectAttempts++;
+    setTimeout(connectSSE, baseDelay + jitter);
   };
 }
 
@@ -9611,6 +9643,134 @@ function openDetachedTools() {
       _toolsPopout = null;
     }
   }, 1000);
+}
+
+// ── Detachable Log Book Window ────────────────────────────────────────────────
+let _logBookPopout = null;
+let _logBookPopoutMonitor = null;
+
+function openDetachedLogBook() {
+  if (_logBookPopout && !_logBookPopout.closed) {
+    _logBookPopout.focus();
+    return;
+  }
+
+  // Build logbook categories
+  const cats = [
+    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
+    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
+    {v:'incident',l:t('lb_incident')||'Special incident'},
+    {v:'directive',l:t('lb_directive')||'Directive'},
+    {v:'decision',l:t('lb_decision')||'Decision'},
+    {v:'action',l:t('lb_action')||'Action taken'},
+    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
+    {v:'situation',l:t('lb_situation')||'Situation change'},
+    {v:'logistics',l:t('lb_logistics')||'Logistics'},
+    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
+    {v:'other',l:t('lb_other')||'Other'}
+  ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
+
+  const theme = document.body.className || '';
+  const w = Math.min(window.screen.availWidth, 700);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _logBookPopout = window.open('', 'tidslinjal-logbook',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (!_logBookPopout) return;
+
+  _logBookPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal \u2014 Log Book</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>' +
+    'body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif}' +
+    'h3{margin:0 0 12px;font-size:16px;color:var(--accent)}' +
+    '</style></head><body class="' + escHtml(theme) + '">' +
+    '<h3>📖 ' + escHtml(t('tab_log_book')||'Log Book') + '</h3>' +
+    '<div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">' +
+    '<select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">' +
+    cats.map(c => '<option value="' + c.v + '">' + escHtml(c.l) + '</option>').join('') +
+    '</select>' +
+    '<input type="text" id="lbSubject" placeholder="' + escHtml(t('lb_subject')||'Subject') + '" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">' +
+    '<textarea id="lbBody" rows="3" placeholder="' + escHtml(t('lb_body')||'Details (optional)') + '" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">📎 <input type="file" id="lbAttachFile" style="max-width:200px;font-size:10px" multiple></label>' +
+    '<span style="flex:1"></span>' +
+    '<button class="btn btn-primary btn-sm" id="lbAddBtn">' + escHtml(t('btn_add')||'Add') + '</button>' +
+    '</div></div>' +
+    '<div id="logBookEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">' + escHtml(t('lb_loading')||'Loading…') + '</em></div>' +
+    '</body></html>');
+  _logBookPopout.document.close();
+
+  // Bind add button
+  const addBtn = _logBookPopout.document.getElementById('lbAddBtn');
+  if (addBtn) {
+    addBtn.addEventListener('click', async () => {
+      const doc = _logBookPopout.document;
+      const category = doc.getElementById('lbCategory')?.value || 'other';
+      const subject = doc.getElementById('lbSubject')?.value?.trim();
+      if (!subject) { alert(t('lb_subject_required')||'Subject is required'); return; }
+      const body = doc.getElementById('lbBody')?.value?.trim() || '';
+      const res = await apiPost('/api/log-book', {category, subject, body});
+      if (res.ok) {
+        const created = await res.json().catch(() => null);
+        const fileInput = doc.getElementById('lbAttachFile');
+        if (created && created.id && fileInput && fileInput.files.length > 0) {
+          for (const file of fileInput.files) {
+            const fd = new FormData();
+            fd.append('file', file);
+            await api('POST', '/api/log-book/' + created.id + '/attachment', fd);
+          }
+        }
+        doc.getElementById('lbSubject').value = '';
+        doc.getElementById('lbBody').value = '';
+        if (fileInput) fileInput.value = '';
+        _refreshLogBookPopout();
+        showNotification('success', t('lb_added')||'Log book entry added');
+      }
+    });
+  }
+
+  _refreshLogBookPopout();
+
+  // Close any modal that launched this
+  document.querySelectorAll('.modal-overlay.open').forEach(m => {
+    if (m.querySelector('[data-action="openDetachedLogBook"]')) m.remove();
+  });
+
+  if (_logBookPopoutMonitor) clearInterval(_logBookPopoutMonitor);
+  _logBookPopoutMonitor = setInterval(() => {
+    if (!_logBookPopout || _logBookPopout.closed) {
+      clearInterval(_logBookPopoutMonitor);
+      _logBookPopoutMonitor = null;
+      _logBookPopout = null;
+    }
+  }, 1000);
+}
+
+async function _refreshLogBookPopout() {
+  if (!_logBookPopout || _logBookPopout.closed) return;
+  try {
+    const entries = await apiGet('/api/log-book') || [];
+    const el = _logBookPopout.document.getElementById('logBookEntries');
+    if (!el) return;
+    const isAdmin = state.user && (state.user.role === 'admin' || hasRole2(state.user.role, 'oplead'));
+    if (entries.length === 0) {
+      el.innerHTML = '<em style="color:var(--text-dim)">' + escHtml(t('lb_empty')||'No log book entries yet.') + '</em>';
+      return;
+    }
+    el.innerHTML = entries.slice().reverse().map(e => {
+      const ts = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+      const attachments = (e.attachments||[]).map(a =>
+        '<a href="/api/log-book/' + e.id + '/attachment/' + encodeURIComponent(a.stored_name) + '" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">📎 ' + escHtml(a.filename) + '</a>'
+      ).join(' ');
+      return '<div style="border-bottom:1px solid var(--border);padding:6px 0">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-weight:600;color:var(--text)">[' + escHtml(e.category||'') + '] ' + escHtml(e.subject||'') + '</span>' +
+        '<span style="color:var(--text-dim);font-size:10px">' + escHtml(ts) + '</span></div>' +
+        (e.body ? '<div style="color:var(--text-dim);margin-top:2px;white-space:pre-line">' + escHtml(e.body) + '</div>' : '') +
+        (attachments ? '<div style="margin-top:2px">' + attachments + '</div>' : '') +
+        '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">' + escHtml(e.created_by_name||'') + '</div>' +
+        '</div>';
+    }).join('');
+  } catch(e) { /* ignore */ }
 }
 
 // ── Critical Line Analysis ──────────────────────────────────────────────────

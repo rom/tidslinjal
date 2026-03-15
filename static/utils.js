@@ -324,11 +324,68 @@ function updateClock() {
   }
 }
 
+// ── Timezone → country flag mapping ─────────────────────────────────────────
+const _tzCountryFlags = {
+  'Europe/London':'🇬🇧','Europe/Dublin':'🇮🇪','Europe/Paris':'🇫🇷','Europe/Berlin':'🇩🇪',
+  'Europe/Brussels':'🇧🇪','Europe/Amsterdam':'🇳🇱','Europe/Rome':'🇮🇹','Europe/Madrid':'🇪🇸',
+  'Europe/Lisbon':'🇵🇹','Europe/Zurich':'🇨🇭','Europe/Vienna':'🇦🇹','Europe/Stockholm':'🇸🇪',
+  'Europe/Oslo':'🇳🇴','Europe/Copenhagen':'🇩🇰','Europe/Helsinki':'🇫🇮','Europe/Warsaw':'🇵🇱',
+  'Europe/Prague':'🇨🇿','Europe/Budapest':'🇭🇺','Europe/Bucharest':'🇷🇴','Europe/Sofia':'🇧🇬',
+  'Europe/Athens':'🇬🇷','Europe/Istanbul':'🇹🇷','Europe/Moscow':'🇷🇺','Europe/Kiev':'🇺🇦',
+  'Europe/Kyiv':'🇺🇦','Europe/Tallinn':'🇪🇪','Europe/Riga':'🇱🇻','Europe/Vilnius':'🇱🇹',
+  'Europe/Belgrade':'🇷🇸','Europe/Zagreb':'🇭🇷','Europe/Ljubljana':'🇸🇮','Europe/Bratislava':'🇸🇰',
+  'Europe/Luxembourg':'🇱🇺','Europe/Malta':'🇲🇹','Europe/Andorra':'🇦🇩','Europe/Monaco':'🇲🇨',
+  'Europe/Sarajevo':'🇧🇦','Europe/Skopje':'🇲🇰','Europe/Podgorica':'🇲🇪','Europe/Tirane':'🇦🇱',
+  'Europe/Minsk':'🇧🇾','Europe/Chisinau':'🇲🇩','Europe/Reykjavik':'🇮🇸',
+  'America/New_York':'🇺🇸','America/Chicago':'🇺🇸','America/Denver':'🇺🇸','America/Los_Angeles':'🇺🇸',
+  'America/Anchorage':'🇺🇸','Pacific/Honolulu':'🇺🇸','America/Phoenix':'🇺🇸',
+  'America/Toronto':'🇨🇦','America/Vancouver':'🇨🇦','America/Montreal':'🇨🇦','America/Edmonton':'🇨🇦',
+  'America/Winnipeg':'🇨🇦','America/Halifax':'🇨🇦','America/St_Johns':'🇨🇦',
+  'America/Mexico_City':'🇲🇽','America/Cancun':'🇲🇽','America/Tijuana':'🇲🇽',
+  'America/Sao_Paulo':'🇧🇷','America/Argentina/Buenos_Aires':'🇦🇷','America/Santiago':'🇨🇱',
+  'America/Bogota':'🇨🇴','America/Lima':'🇵🇪','America/Caracas':'🇻🇪',
+  'Asia/Tokyo':'🇯🇵','Asia/Seoul':'🇰🇷','Asia/Shanghai':'🇨🇳','Asia/Hong_Kong':'🇭🇰',
+  'Asia/Taipei':'🇹🇼','Asia/Singapore':'🇸🇬','Asia/Bangkok':'🇹🇭','Asia/Jakarta':'🇮🇩',
+  'Asia/Manila':'🇵🇭','Asia/Kuala_Lumpur':'🇲🇾','Asia/Ho_Chi_Minh':'🇻🇳','Asia/Saigon':'🇻🇳',
+  'Asia/Kolkata':'🇮🇳','Asia/Calcutta':'🇮🇳','Asia/Karachi':'🇵🇰','Asia/Dhaka':'🇧🇩',
+  'Asia/Colombo':'🇱🇰','Asia/Kathmandu':'🇳🇵','Asia/Yangon':'🇲🇲',
+  'Asia/Dubai':'🇦🇪','Asia/Riyadh':'🇸🇦','Asia/Qatar':'🇶🇦','Asia/Bahrain':'🇧🇭',
+  'Asia/Kuwait':'🇰🇼','Asia/Muscat':'🇴🇲','Asia/Tehran':'🇮🇷','Asia/Baghdad':'🇮🇶',
+  'Asia/Jerusalem':'🇮🇱','Asia/Tel_Aviv':'🇮🇱','Asia/Beirut':'🇱🇧','Asia/Amman':'🇯🇴',
+  'Asia/Almaty':'🇰🇿','Asia/Tashkent':'🇺🇿','Asia/Tbilisi':'🇬🇪','Asia/Baku':'🇦🇿',
+  'Asia/Yerevan':'🇦🇲','Asia/Kabul':'🇦🇫','Asia/Ulaanbaatar':'🇲🇳',
+  'Africa/Cairo':'🇪🇬','Africa/Lagos':'🇳🇬','Africa/Johannesburg':'🇿🇦','Africa/Nairobi':'🇰🇪',
+  'Africa/Casablanca':'🇲🇦','Africa/Tunis':'🇹🇳','Africa/Algiers':'🇩🇿','Africa/Accra':'🇬🇭',
+  'Africa/Addis_Ababa':'🇪🇹','Africa/Dar_es_Salaam':'🇹🇿','Africa/Kampala':'🇺🇬',
+  'Australia/Sydney':'🇦🇺','Australia/Melbourne':'🇦🇺','Australia/Brisbane':'🇦🇺',
+  'Australia/Perth':'🇦🇺','Australia/Adelaide':'🇦🇺','Australia/Darwin':'🇦🇺',
+  'Pacific/Auckland':'🇳🇿','Pacific/Fiji':'🇫🇯','Pacific/Guam':'🇬🇺',
+  'Atlantic/Reykjavik':'🇮🇸','Atlantic/Canary':'🇪🇸','Indian/Maldives':'🇲🇻',
+  'Indian/Mauritius':'🇲🇺',
+};
+
+function _getClockFlag(tz) {
+  if (!tz) return '';
+  if (_tzCountryFlags[tz]) return _tzCountryFlags[tz];
+  // Try matching by region prefix (e.g. America/Indiana/Indianapolis → US)
+  const parts = tz.split('/');
+  if (parts[0] === 'America' && (tz.includes('Indiana') || tz.includes('Kentucky') || tz.includes('North_Dakota'))) return '🇺🇸';
+  if (parts[0] === 'Australia') return '🇦🇺';
+  return '';
+}
+
 // ── Extra timezone clocks ───────────────────────────────────────────────────
+let _lastClockFlagState = null;
 function updateExtraClocks(now) {
   const clocks = (state.preferences && state.preferences.extra_clocks) || [];
   const container = document.getElementById('extraClocksContainer');
   if (!container) return;
+  // If flag setting changed, rebuild all clock widgets
+  const curFlagState = !!(state.preferences && state.preferences.show_clock_flags);
+  if (_lastClockFlagState !== null && _lastClockFlagState !== curFlagState) {
+    container.querySelectorAll('.clock-extra').forEach(el => el.remove());
+  }
+  _lastClockFlagState = curFlagState;
   // Create/update one widget per configured extra clock
   clocks.forEach(ec => {
     const id = `extra-clock-${ec.id}`;
@@ -337,9 +394,11 @@ function updateExtraClocks(now) {
       el = document.createElement('div');
       el.id = id;
       el.className = 'clock-extra';
+      const showFlags = state.preferences && state.preferences.show_clock_flags;
+      const flag = showFlags ? _getClockFlag(ec.timezone) : '';
       el.innerHTML = `
         <div class="clock-extra-inner">
-          <div class="clock-extra-label">${escHtml(ec.label)}</div>
+          <div class="clock-extra-label">${flag ? '<span class="clock-flag">' + flag + '</span> ' : ''}${escHtml(ec.label)}</div>
           <div class="clock-extra-time" id="${id}-time">--:--:--</div>
           <div class="clock-extra-tz" id="${id}-tz"></div>
         </div>
