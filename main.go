@@ -5013,6 +5013,11 @@ func (app *App) routes() http.Handler {
 
 	// Languages (enabled language list)
 	mux.HandleFunc("/api/languages", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(app.enabledLangs)
 	})
@@ -5099,7 +5104,9 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/event-types", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			app.handleGetEventTypes(w, r)
+			app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+				app.handleGetEventTypes(w, r)
+			})(w, r)
 		case http.MethodPost:
 			app.requireRole(RoleReadWrite, app.handleCreateEventType)(w, r)
 		default:
@@ -6234,7 +6241,9 @@ func (app *App) routes() http.Handler {
 		} else if r.Method == http.MethodPost && strings.HasSuffix(path, "/image") {
 			app.requireRole(RoleTeamLead, app.handleRoomImageUpload)(w, r)
 		} else if r.Method == http.MethodGet && strings.Contains(path, "/image") {
-			app.handleRoomImageDownload(w, r)
+			app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+				app.handleRoomImageDownload(w, r)
+			})(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
