@@ -6596,6 +6596,14 @@ func (app *App) sendMail(cfg MailConfig, to, subject, bodyHTML string) error {
 		fromName = "Tidslinjal"
 	}
 
+	// Sanitise header values to prevent SMTP header injection
+	sanitiseHeader := func(s string) string {
+		return strings.NewReplacer("\r", "", "\n", "", "\x00", "").Replace(s)
+	}
+	to = sanitiseHeader(to)
+	subject = sanitiseHeader(subject)
+	fromName = sanitiseHeader(fromName)
+
 	logDebug("[mail] sending to=%s from=%s<%s> subject=%q host=%s:%d tls=%s auth=%v",
 		to, fromName, from, subject, cfg.SMTPHost, port, cfg.TLSMode, cfg.Username != "")
 
@@ -7216,6 +7224,15 @@ func (app *App) sendMailWithAttachment(cfg MailConfig, to, subject, bodyHTML str
 	if fromName == "" {
 		fromName = "Tidslinjal"
 	}
+
+	// Sanitise header values to prevent SMTP header injection
+	sanitiseHeader := func(s string) string {
+		return strings.NewReplacer("\r", "", "\n", "", "\x00", "").Replace(s)
+	}
+	to = sanitiseHeader(to)
+	subject = sanitiseHeader(subject)
+	fromName = sanitiseHeader(fromName)
+	attachName = sanitiseHeader(attachName)
 
 	boundary := fmt.Sprintf("---=_Part_%d", time.Now().UnixNano())
 	// Encode attachment as base64
