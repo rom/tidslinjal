@@ -6431,9 +6431,10 @@ function _showPRCPopup(check) {
       </div>
       <div class="modal-body">
         <p style="font-size:var(--fs-sm);margin-bottom:8px">
-          <b>${escHtml(check.created_by_name || '')}</b> has requested a readiness check.
+          <b>${escHtml(check.created_by_name || '')}</b> ${t('prc_popup_requested')||'has requested a readiness check.'}
         </p>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">Please confirm your readiness status.</p>
+        ${check.message ? `<div style="font-size:var(--fs-sm);padding:8px 10px;margin-bottom:10px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text);font-style:italic">${escHtml(check.message)}</div>` : ''}
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('prc_popup_confirm')||'Please confirm your readiness status.'}</p>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px">${participants}</div>
         <div style="display:flex;gap:8px;justify-content:center">
           <button class="btn btn-primary" id="prcPopupReady_${check.id}" style="background:#27AE60;border-color:#27AE60;padding:8px 24px;font-size:14px">✓ Ready</button>
@@ -6627,14 +6628,22 @@ async function openPollModal() {
 
       try {
         const payload = { title, questions: mappedQs, target_type: targetType, target_ids: targetIds.map(String) };
-        const res = await fetch('/api/polls', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const res = await apiPost('/api/polls', payload);
         if (!res.ok) {
-          const err = await res.json().catch(()=>({}));
-          const errMsg = err.error || (res.status === 403 ? (t('poll_no_permission')||'You do not have permission to create polls') : (t('poll_create_failed')||'Failed to create poll — status ' + res.status));
+          let errMsg = '';
+          try {
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const err = await res.json();
+              errMsg = err.error || '';
+            } else {
+              errMsg = await res.text();
+            }
+          } catch {}
+          if (!errMsg) {
+            errMsg = res.status === 403 ? (t('poll_no_permission')||'You do not have permission to create polls (requires team lead role)')
+              : (t('poll_create_failed')||'Failed to create poll') + ' — HTTP ' + res.status;
+          }
           throw new Error(errMsg);
         }
         showNotification('success',t('poll_created')||'Poll created successfully');
