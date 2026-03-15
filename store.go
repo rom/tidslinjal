@@ -79,6 +79,7 @@ type Store struct {
 	encryptionSettings   EncryptionSettings
 	resourceNotes        []ResourceNote
 	resourceStars        []ResourceStar
+	questionnaires       []PollQuestionnaire
 	startupText          string
 
 	nextEventTypeID  int64
@@ -113,6 +114,7 @@ type Store struct {
 	nextDayLabelID           int64
 	nextResourceNoteID       int64
 	nextResourceStarID       int64
+	nextQuestionnaireID      int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -201,6 +203,7 @@ func (s *Store) load() error {
 	s.loadFile("rate_limits.json", &s.rateLimitSettings)
 	s.loadFile("geoblocking.json", &s.geoblockingSettings)
 	s.loadFile("encryption.json", &s.encryptionSettings)
+	s.loadFile("questionnaires.json", &s.questionnaires)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -379,6 +382,11 @@ func (s *Store) load() error {
 	for _, x := range s.dayLabels {
 		if x.ID > s.nextDayLabelID {
 			s.nextDayLabelID = x.ID
+		}
+	}
+	for _, x := range s.questionnaires {
+		if x.ID > s.nextQuestionnaireID {
+			s.nextQuestionnaireID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2665,6 +2673,8 @@ func (s *Store) ResetDatabase() error {
 	s.nextAutoReportScheduleID = 0
 	s.dayLabels = nil
 	s.nextDayLabelID = 0
+	s.questionnaires = nil
+	s.nextQuestionnaireID = 0
 
 	// Save all cleared files
 	files := map[string]interface{}{
@@ -2698,6 +2708,7 @@ func (s *Store) ResetDatabase() error {
 		"event_versions.json":         s.eventVersions,
 		"auto_report_schedules.json":  s.autoReportSchedules,
 		"day_labels.json":             s.dayLabels,
+		"questionnaires.json":         s.questionnaires,
 	}
 	for fname, data := range files {
 		if err := s.saveFile(fname, data); err != nil {
@@ -3642,6 +3653,54 @@ func (s *Store) UpdatePoll(poll Poll) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("poll %d not found", poll.ID)
+}
+
+// ── Poll Questionnaires ─────────────────────────────────────────────────────
+
+func (s *Store) GetQuestionnaires() []PollQuestionnaire {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]PollQuestionnaire, len(s.questionnaires))
+	copy(out, s.questionnaires)
+	return out
+}
+
+func (s *Store) AddQuestionnaire(q PollQuestionnaire) (PollQuestionnaire, error) {
+	s.mu.Lock()
+	s.nextQuestionnaireID++
+	q.ID = s.nextQuestionnaireID
+	s.questionnaires = append(s.questionnaires, q)
+	snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+	s.mu.Unlock()
+	return q, s.persist("questionnaires.json", snap)
+}
+
+func (s *Store) UpdateQuestionnaire(q PollQuestionnaire) error {
+	s.mu.Lock()
+	for i, x := range s.questionnaires {
+		if x.ID == q.ID {
+			s.questionnaires[i] = q
+			snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+			s.mu.Unlock()
+			return s.persist("questionnaires.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("questionnaire %d not found", q.ID)
+}
+
+func (s *Store) DeleteQuestionnaire(id int64) error {
+	s.mu.Lock()
+	for i, x := range s.questionnaires {
+		if x.ID == id {
+			s.questionnaires = append(s.questionnaires[:i], s.questionnaires[i+1:]...)
+			snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+			s.mu.Unlock()
+			return s.persist("questionnaires.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("questionnaire %d not found", id)
 }
 
 // ── Event Log ───────────────────────────────────────────────────────────────

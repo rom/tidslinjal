@@ -6373,6 +6373,28 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
+	// ── Poll Questionnaires ──
+	mux.HandleFunc("/api/poll-questionnaires", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetQuestionnaires)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleStaffOfficer, app.handleCreateQuestionnaire)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/poll-questionnaires/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			app.requireRole(RoleStaffOfficer, app.handleUpdateQuestionnaire)(w, r)
+		case http.MethodDelete:
+			app.requireRole(RoleStaffOfficer, app.handleDeleteQuestionnaire)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Resource Notes ──
 	mux.HandleFunc("/api/resource-notes", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -9060,6 +9082,105 @@ func (app *App) handleGetPollLog(w http.ResponseWriter, r *http.Request, user *U
 		polls = []Poll{}
 	}
 	jsonOK(w, polls)
+}
+
+// ── Poll Questionnaire handlers ─────────────────────────────────────────────
+
+func (app *App) handleGetQuestionnaires(w http.ResponseWriter, r *http.Request, user *User) {
+	custom := app.store.GetQuestionnaires()
+	builtIn := BuiltInQuestionnaires()
+	all := append(builtIn, custom...)
+	jsonOK(w, all)
+}
+
+func (app *App) handleCreateQuestionnaire(w http.ResponseWriter, r *http.Request, user *User) {
+	var req PollQuestionnaire
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		jsonError(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Questions) == 0 {
+		jsonError(w, "at least one question is required", http.StatusBadRequest)
+		return
+	}
+	now := time.Now()
+	req.CreatedBy = user.ID
+	req.CreatedAt = now
+	req.UpdatedAt = now
+	req.BuiltIn = false
+	saved, err := app.store.AddQuestionnaire(req)
+	if err != nil {
+		jsonError(w, "failed to save questionnaire", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "create_questionnaire", EntityType: "questionnaire", EntityID: saved.ID,
+		Summary: fmt.Sprintf("Created poll questionnaire '%s'", saved.Name),
+	})
+	jsonOK(w, saved)
+}
+
+func (app *App) handleUpdateQuestionnaire(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if id < 0 {
+		jsonError(w, "cannot modify built-in questionnaires", http.StatusForbidden)
+		return
+	}
+	var req PollQuestionnaire
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		jsonError(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	req.ID = id
+	req.UpdatedAt = time.Now()
+	req.BuiltIn = false
+	if err := app.store.UpdateQuestionnaire(req); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "update_questionnaire", EntityType: "questionnaire", EntityID: id,
+		Summary: fmt.Sprintf("Updated poll questionnaire '%s'", req.Name),
+	})
+	jsonOK(w, req)
+}
+
+func (app *App) handleDeleteQuestionnaire(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if id < 0 {
+		jsonError(w, "cannot delete built-in questionnaires", http.StatusForbidden)
+		return
+	}
+	if err := app.store.DeleteQuestionnaire(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "delete_questionnaire", EntityType: "questionnaire", EntityID: id,
+		Summary: "Deleted poll questionnaire",
+	})
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 // resolvePollTargets returns the list of user IDs targeted by a poll

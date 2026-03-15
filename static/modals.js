@@ -4194,6 +4194,7 @@ function renderSidebar() {
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
@@ -6945,8 +6946,11 @@ async function openPollModal(opts) {
           </div>
           <div style="margin-bottom:8px">
             <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-bottom:4px;display:block">${t('poll_questions')||'Questions'}:</label>
-            <div style="margin-bottom:4px">
-              <button class="btn btn-sm btn-secondary" id="pollUseStandard">${t('poll_use_standard')||'Use standard questions'}</button>
+            <div style="margin-bottom:4px;display:flex;gap:6px;align-items:center">
+              <select id="pollQuestionnaireSelect" style="flex:1;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+                <option value="">${t('questionnaire_none')||'Custom questions'}</option>
+              </select>
+              <button class="btn btn-sm btn-secondary" id="pollUseQuestionnaire">${t('questionnaire_use')||'Use Questionnaire'}</button>
             </div>
             <div id="pollQuestionList">
             </div>
@@ -7057,14 +7061,35 @@ async function openPollModal(opts) {
     });
   }
 
-  // Standard questions button
-  const stdBtn = modal.querySelector('#pollUseStandard');
-  if (stdBtn) {
-    stdBtn.addEventListener('click', () => {
+  // Load questionnaires into dropdown
+  const qSelect = modal.querySelector('#pollQuestionnaireSelect');
+  if (qSelect) {
+    try {
+      const resp = await api('GET', '/api/poll-questionnaires');
+      const questionnaires = await resp.json();
+      questionnaires.forEach(q => {
+        const opt = document.createElement('option');
+        opt.value = q.id;
+        opt.textContent = q.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
+        opt.dataset.questions = JSON.stringify(q.questions || []);
+        qSelect.appendChild(opt);
+      });
+    } catch(e) { console.warn('Failed to load questionnaires', e); }
+  }
+  const useQBtn = modal.querySelector('#pollUseQuestionnaire');
+  if (useQBtn) {
+    useQBtn.addEventListener('click', () => {
       const list = modal.querySelector('#pollQuestionList');
       if (!list) return;
+      const sel = modal.querySelector('#pollQuestionnaireSelect');
+      if (!sel || !sel.value) return;
+      const opt = sel.selectedOptions[0];
+      const questions = JSON.parse(opt.dataset.questions || '[]');
       list.innerHTML = '';
-      standardQs.forEach(q => _addPollQuestionRow(list, q.label, q.type));
+      questions.forEach(q => {
+        const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
+        _addPollQuestionRow(list, q.text, typeMap[q.type] || q.type || 'scale');
+      });
     });
   }
 
@@ -7555,6 +7580,171 @@ function openRoomModal(argJson) {
     modal.remove();
     renderSidebar();
   });
+}
+
+// ── Poll Questionnaire Editor ────────────────────────────────────────────────
+
+async function openQuestionnaireEditor() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:900px;width:90vw">
+      <div class="modal-header">
+        <h3>📝 ${t('questionnaire_editor')||'Poll Questions Editor'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:80vh;overflow-y:auto">
+        <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+          ${t('questionnaire_editor_desc')||'Create and manage reusable questionnaires for polls.'}
+        </p>
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <select id="qEditorList" style="flex:1;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+            <option value="__new__">── ${t('questionnaire_new')||'New Questionnaire'} ──</option>
+          </select>
+          <button class="btn btn-sm btn-primary" id="qEditorNewBtn">+ ${t('questionnaire_new')||'New'}</button>
+        </div>
+        <div id="qEditorForm" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--bg2)">
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('questionnaire_name')||'Questionnaire Name'}:</label>
+            <input type="text" id="qEditorName" placeholder="${t('questionnaire_name')||'Questionnaire Name'}..." maxlength="200"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('questionnaire_desc')||'Description'}:</label>
+            <input type="text" id="qEditorDesc" placeholder="${t('questionnaire_desc')||'Description'}..." maxlength="500"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-bottom:4px;display:block">${t('questionnaire_questions')||'Questions'}:</label>
+            <div id="qEditorQuestions"></div>
+            <button class="btn btn-sm btn-secondary" id="qEditorAddQ" style="margin-top:4px">+ ${t('questionnaire_add_question')||'Add Question'}</button>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-sm btn-danger" id="qEditorDeleteBtn" style="display:none">${t('questionnaire_delete')||'Delete'}</button>
+            <button class="btn btn-sm btn-primary" id="qEditorSaveBtn">${t('questionnaire_save')||'Save Questionnaire'}</button>
+          </div>
+          <div id="qEditorBuiltinNote" style="display:none;margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('questionnaire_builtin')||'Built-in'} — read-only
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+
+  let questionnaires = [];
+  const listEl = modal.querySelector('#qEditorList');
+  const nameEl = modal.querySelector('#qEditorName');
+  const descEl = modal.querySelector('#qEditorDesc');
+  const questionsEl = modal.querySelector('#qEditorQuestions');
+  const deleteBtn = modal.querySelector('#qEditorDeleteBtn');
+  const saveBtn = modal.querySelector('#qEditorSaveBtn');
+  const builtinNote = modal.querySelector('#qEditorBuiltinNote');
+
+  async function loadList() {
+    try {
+      const resp = await api('GET', '/api/poll-questionnaires');
+      questionnaires = await resp.json();
+    } catch(e) { questionnaires = []; }
+    // Rebuild select
+    listEl.innerHTML = `<option value="__new__">── ${t('questionnaire_new')||'New Questionnaire'} ──</option>`;
+    questionnaires.forEach(q => {
+      const opt = document.createElement('option');
+      opt.value = q.id;
+      opt.textContent = q.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
+      listEl.appendChild(opt);
+    });
+  }
+
+  function loadForm(q) {
+    const isBuiltIn = q && q.built_in;
+    nameEl.value = q ? q.name : '';
+    descEl.value = q ? (q.description || '') : '';
+    questionsEl.innerHTML = '';
+    if (q && q.questions) {
+      const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
+      q.questions.forEach(qu => _addPollQuestionRow(questionsEl, qu.text, typeMap[qu.type] || qu.type || 'scale'));
+    }
+    nameEl.disabled = !!isBuiltIn;
+    descEl.disabled = !!isBuiltIn;
+    deleteBtn.style.display = (q && !isBuiltIn && q.id > 0) ? '' : 'none';
+    saveBtn.style.display = isBuiltIn ? 'none' : '';
+    builtinNote.style.display = isBuiltIn ? '' : 'none';
+    // Disable question editing for built-in
+    if (isBuiltIn) {
+      questionsEl.querySelectorAll('textarea, select').forEach(el => el.disabled = true);
+      questionsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = 'none');
+      modal.querySelector('#qEditorAddQ').style.display = 'none';
+    } else {
+      questionsEl.querySelectorAll('textarea, select').forEach(el => el.disabled = false);
+      questionsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
+      modal.querySelector('#qEditorAddQ').style.display = '';
+    }
+  }
+
+  listEl.addEventListener('change', () => {
+    if (listEl.value === '__new__') {
+      loadForm(null);
+    } else {
+      const q = questionnaires.find(x => String(x.id) === listEl.value);
+      if (q) loadForm(q);
+    }
+  });
+
+  modal.querySelector('#qEditorNewBtn').addEventListener('click', () => {
+    listEl.value = '__new__';
+    loadForm(null);
+  });
+
+  modal.querySelector('#qEditorAddQ').addEventListener('click', () => {
+    _addPollQuestionRow(questionsEl, '', 'scale');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const name = nameEl.value.trim();
+    if (!name) { showError(t('questionnaire_name')||'Name is required'); return; }
+    const questions = [];
+    questionsEl.querySelectorAll('.poll-q-row').forEach(row => {
+      const text = row.querySelector('.poll-q-text')?.value?.trim();
+      const rawType = row.querySelector('.poll-q-type')?.value || 'scale';
+      const typeMap = { scale: 'scale_0_3', yes_no: 'yes_no', free_text: 'free_text' };
+      if (text) questions.push({ text, type: typeMap[rawType] || rawType });
+    });
+    if (questions.length === 0) { showError(t('questionnaire_add_question')||'Add at least one question'); return; }
+    const selectedId = listEl.value;
+    const body = { name, description: descEl.value.trim(), questions };
+    try {
+      if (selectedId === '__new__') {
+        await api('POST', '/api/poll-questionnaires', body);
+        showNotification('success', `${name} created`);
+      } else {
+        await api('PUT', `/api/poll-questionnaires/${selectedId}`, body);
+        showNotification('success', `${name} updated`);
+      }
+      await loadList();
+      loadForm(null);
+      listEl.value = '__new__';
+    } catch(e) { showError('Failed to save: ' + (e.message||e)); }
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm(t('questionnaire_delete_confirm')||'Are you sure you want to delete this questionnaire?')) return;
+    const selectedId = listEl.value;
+    try {
+      await api('DELETE', `/api/poll-questionnaires/${selectedId}`);
+      showNotification('success', 'Questionnaire deleted');
+      await loadList();
+      loadForm(null);
+      listEl.value = '__new__';
+    } catch(e) { showError('Failed to delete: ' + (e.message||e)); }
+  });
+
+  await loadList();
+  loadForm(null);
 }
 
 function _closeParentModal() {
