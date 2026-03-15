@@ -17,7 +17,19 @@ async function api(method, path, body) {
   if (res.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
   return res;
 }
-async function apiGet(p)        { return (await api('GET', p)).json(); }
+async function apiGet(p) {
+  const res = await api('GET', p);
+  if (!res.ok) {
+    console.warn('[apiGet]', p, res.status, res.statusText);
+    return null;
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    console.warn('[apiGet]', p, 'unexpected content-type:', ct);
+    return null;
+  }
+  return res.json();
+}
 async function apiPost(p, b)    { return api('POST', p, b); }
 async function apiPut(p, b)     { return api('PUT', p, b); }
 async function apiDel(p)        { return api('DELETE', p); }

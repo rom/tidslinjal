@@ -4122,6 +4122,10 @@ function renderSidebar() {
     const p  = state.preferences;
     const ex = state.exercise || {};
     el.innerHTML = `
+      <div style="padding:10px 12px;margin:0 0 12px;background:var(--bg3);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px">${t('settings_global_header')||'Global Settings'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('settings_global_desc')||'Shared with all users — changes here affect everyone'}</div>
+      </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_exercise')}</div>
@@ -4177,6 +4181,30 @@ function renderSidebar() {
         <button class="btn btn-primary btn-sm" data-action="saveExercise">${t('btn_save')}</button>
         ${state.user.role==='admin' ? `<a href="/admin-view" class="btn btn-secondary btn-sm" style="margin-left:4px">${t('admin_view')||'Admin View'}</a>` : ''}
       </div>` : ''}
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_urls')||'Links & URLs'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_urls_desc')||'URLs shown on the welcome screen and help buttons. Visible to all users.'}</p>
+        <div class="sidebar-section-title" style="font-size:var(--fs-xs)">${t('settings_welcome_url')||'Welcome URL'}</div>
+        <input type="url" value="${escHtml(ex.welcome_url||p.welcome_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="welcome_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px;font-size:var(--fs-xs)">${t('settings_help_url')||'Help URL'}</div>
+        <input type="url" value="${escHtml(ex.help_url||p.help_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="help_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px;font-size:var(--fs-xs)">${t('settings_training_url')||'Training URL'}</div>
+        <input type="url" value="${escHtml(ex.training_url||p.training_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="training_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+        <div class="sidebar-section-title" style="margin-top:6px;font-size:var(--fs-xs)">${t('settings_demo_url')||'Demo URL'}</div>
+        <input type="url" value="${escHtml(ex.demo_url||p.demo_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="demo_url"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+      </div>
+      <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--text-dim);border-radius:0 var(--radius) var(--radius) 0">
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px">${t('settings_personal_header')||'Personal Preferences'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('settings_personal_desc')||'Only affects your view — other users have their own settings'}</div>
+      </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_theme')}</div>
         <div class="toggle-btn-group">
@@ -4398,24 +4426,6 @@ function renderSidebar() {
         </label>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">${t('settings_welcome_url')||'Welcome URL'}</div>
-        <input type="url" value="${escHtml(ex.welcome_url||p.welcome_url||'')}" placeholder="https://..."
-          data-action="setExerciseURL" data-event="change" data-url-key="welcome_url"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
-        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_help_url')||'Help URL'}</div>
-        <input type="url" value="${escHtml(ex.help_url||p.help_url||'')}" placeholder="https://..."
-          data-action="setExerciseURL" data-event="change" data-url-key="help_url"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
-        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_training_url')||'Training URL'}</div>
-        <input type="url" value="${escHtml(ex.training_url||p.training_url||'')}" placeholder="https://..."
-          data-action="setExerciseURL" data-event="change" data-url-key="training_url"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
-        <div class="sidebar-section-title" style="margin-top:6px">${t('settings_demo_url')||'Demo URL'}</div>
-        <input type="url" value="${escHtml(ex.demo_url||p.demo_url||'')}" placeholder="https://..."
-          data-action="setExerciseURL" data-event="change" data-url-key="demo_url"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-      </div>
-      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_default_view')||'Default View'}</div>
         <div class="toggle-btn-group" style="flex-wrap:wrap">
           ${['day','2days','3days','4days','5days','week','2weeks','3weeks'].map(v =>
@@ -4443,6 +4453,7 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="include_weekends"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_include_weekends')||'Include weekends'}
+          <span style="font-size:9px;padding:1px 5px;background:var(--accent);color:white;border-radius:8px;margin-left:2px;vertical-align:middle;font-weight:600">${t('settings_tag_global')||'GLOBAL'}</span>
           <span title="${t('settings_include_weekends_info')||'Show weekends on the timeline and count them in synthetic time calculations.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         ${synthActive() ? `
@@ -4457,6 +4468,7 @@ function renderSidebar() {
             data-action="setPref" data-event="change" data-pref-checked="synth_day_hours_only"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('synth_day_hours_only')||'Synthetic time: day hours only'}
+          <span style="font-size:9px;padding:1px 5px;background:var(--accent);color:white;border-radius:8px;margin-left:2px;vertical-align:middle;font-weight:600">${t('settings_tag_global')||'GLOBAL'}</span>
           <span title="${t('settings_synth_day_only_info')||'Only count daytime hours in synthetic elapsed time. Night hours are skipped.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>` : ''}
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
@@ -4599,6 +4611,10 @@ function renderSidebar() {
         <div id="offlineStatus" style="font-size:var(--fs-xs);padding:4px 8px;background:var(--bg3);border-radius:var(--radius)">
           ${window._offlineMode ? '<span style="color:#e05252">● Offline</span>' : '<span style="color:#27ae60">● Online</span>'}
         </div>
+      </div>
+      <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
+        <div style="font-size:var(--fs-sm);font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px">${t('settings_global_header')||'Global Settings'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('settings_global_desc')||'Shared with all users — changes here affect everyone'}</div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('artificial_time')||'Artificial Time'} <span title="${t('settings_artificial_time_info')||'Override the current time for exercise simulation purposes.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
