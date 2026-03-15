@@ -51,6 +51,7 @@ window.state = {
     demo_url:            '',
     time_separator:      'colon',
     show_lang_flags:     true,
+    country_code_format: 'alpha2',
   },
   resolution:    'hour',
   range:         'week',
