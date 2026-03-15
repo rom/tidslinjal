@@ -9519,9 +9519,9 @@ func (app *App) handleGradualBackupSnapshotNow(w http.ResponseWriter, r *http.Re
 
 // handleGradualBackupRestore handles POST /api/admin/gradual-backup/restore/{filename}
 func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Request, user *User) {
-	filename := strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/restore/")
-	if filename == "" {
-		jsonError(w, "filename required", http.StatusBadRequest)
+	filename := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/admin/gradual-backup/restore/"))
+	if filename == "" || filename == "." || filename == ".." {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
 	restored, err := app.store.RestoreGradualBackupSnapshot(filename)
