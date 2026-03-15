@@ -952,6 +952,7 @@ type PersonReadyCheck struct {
 	Participants  []PersonReadyCheckParticipant `json:"participants"`
 	CreatedAt     time.Time                     `json:"created_at"`
 	ScheduledAt   string                        `json:"scheduled_at,omitempty"`
+	Fired         bool                          `json:"fired,omitempty"` // true once a scheduled check has been dispatched
 }
 
 type EventLogEntry struct {

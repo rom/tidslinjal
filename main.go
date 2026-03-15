@@ -8479,22 +8479,21 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 	}
 	jsonOK(w, created)
 
-	// Broadcast SSE event for the new PRC so all clients can update
-	prcData, _ := json.Marshal(created)
-	app.broker.BroadcastAll(SSEMessage{Event: "prc_new_check", Data: string(prcData)})
-
-	// Notify each participant via personal notification
-	notifBody := fmt.Sprintf("You have been included in a ready check by %s", check.CreatedByName)
-	if check.Message != "" {
-		notifBody += ": " + check.Message
-	}
-	for _, p := range created.Participants {
-		if p.UserID != user.ID {
-			app.notifyUser(p.UserID, "prc",
-				"Ready Check",
-				notifBody,
-				fmt.Sprintf("%d", created.ID))
+	// Determine if this is a future-scheduled check
+	isScheduled := false
+	if req.ScheduledAt != "" {
+		if t, err := time.Parse(time.RFC3339, req.ScheduledAt); err == nil && t.After(time.Now()) {
+			isScheduled = true
 		}
+	}
+
+	if !isScheduled {
+		// Broadcast SSE event for the new PRC so all clients can update
+		prcData, _ := json.Marshal(created)
+		app.broker.BroadcastAll(SSEMessage{Event: "prc_new_check", Data: string(prcData)})
+
+		// Notify each participant via personal notification
+		app.sendPRCNotifications(created, user.ID)
 	}
 
 	// Create an audit log entry with participant details
@@ -8506,11 +8505,63 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 			participantNames = append(participantNames, fmt.Sprintf("user#%d", p.UserID))
 		}
 	}
+	auditSummary := fmt.Sprintf("Created person ready check targeting %d participants: %s", len(created.Participants), strings.Join(participantNames, ", "))
+	if isScheduled {
+		auditSummary += fmt.Sprintf(" (scheduled at %s)", req.ScheduledAt)
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "create_prc", EntityType: "person_ready_check", EntityID: created.ID,
-		Summary: fmt.Sprintf("Created person ready check targeting %d participants: %s", len(created.Participants), strings.Join(participantNames, ", ")),
+		Summary: auditSummary,
 	})
+}
+
+// sendPRCNotifications sends personal notifications to all participants of a PRC.
+func (app *App) sendPRCNotifications(check PersonReadyCheck, excludeUserID int64) {
+	notifBody := fmt.Sprintf("You have been included in a ready check by %s", check.CreatedByName)
+	if check.Message != "" {
+		notifBody += ": " + check.Message
+	}
+	for _, p := range check.Participants {
+		if p.UserID != excludeUserID {
+			app.notifyUser(p.UserID, "prc",
+				"Ready Check",
+				notifBody,
+				fmt.Sprintf("%d", check.ID))
+		}
+	}
+}
+
+// runPRCScheduler checks for scheduled person ready checks that are due and fires them.
+func (app *App) runPRCScheduler() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		checks := app.store.GetPersonReadyChecks()
+		for _, check := range checks {
+			if check.ScheduledAt == "" || check.Fired {
+				continue
+			}
+			scheduledTime, err := time.Parse(time.RFC3339, check.ScheduledAt)
+			if err != nil {
+				continue
+			}
+			if now.Before(scheduledTime) {
+				continue
+			}
+			// Mark as fired
+			check.Fired = true
+			if err := app.store.UpdatePersonReadyCheck(check); err != nil {
+				continue
+			}
+			// Broadcast SSE event
+			prcData, _ := json.Marshal(check)
+			app.broker.BroadcastAll(SSEMessage{Event: "prc_new_check", Data: string(prcData)})
+			// Send notifications to all participants
+			app.sendPRCNotifications(check, 0)
+		}
+	}
 }
 
 func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
@@ -8580,7 +8631,24 @@ func (app *App) handleGetPolls(w http.ResponseWriter, r *http.Request, user *Use
 	if polls == nil {
 		polls = []Poll{}
 	}
-	jsonOK(w, polls)
+	// For non-creators, strip other users' responses and target details
+	// so receivers only see the questionnaire and their own response status
+	filtered := make([]Poll, len(polls))
+	for i, p := range polls {
+		filtered[i] = p
+		if p.CreatedBy != user.ID {
+			// Only keep the current user's own responses
+			var myResponses []PollResponse
+			for _, r := range p.Responses {
+				if r.UserID == user.ID {
+					myResponses = append(myResponses, r)
+				}
+			}
+			filtered[i].Responses = myResponses
+			filtered[i].TargetIDs = nil
+		}
+	}
+	jsonOK(w, filtered)
 }
 
 func (app *App) handleGetDefaultPollQuestions(w http.ResponseWriter, r *http.Request, user *User) {
@@ -11505,6 +11573,7 @@ func main() {
 	go app.runAlarmScheduler()
 	go app.runSessionCleaner()
 	go app.runGradualBackupScheduler()
+	go app.runPRCScheduler()
 	app.startAutoReportScheduler()
 
 	addr := host + ":" + port

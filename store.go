@@ -603,6 +603,8 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 	s.phases = nil
 	s.roleConfigs = nil
 	s.exercise = ExerciseSettings{IncludeWeekends: true}
+	s.dayLabels = nil
+	s.nextDayLabelID = 0
 	s.nextGroupID = 0
 	s.nextLayerID = 0
 	s.nextEventID = 0
@@ -641,6 +643,7 @@ func (s *Store) ResetToEmpty(adminUser User, keepTemplates bool) error {
 		{"templates.json", s.templates},
 		{"exercise.json", ExerciseSettings{IncludeWeekends: true}},
 		{"roles.json", []RoleConfig{}},
+		{"day_labels.json", []DayLabel{}},
 	} {
 		if err := s.saveFile(file.name, file.val); err != nil {
 			return err
@@ -2660,6 +2663,8 @@ func (s *Store) ResetDatabase() error {
 	s.nextEventVersionID = 0
 	s.autoReportSchedules = nil
 	s.nextAutoReportScheduleID = 0
+	s.dayLabels = nil
+	s.nextDayLabelID = 0
 
 	// Save all cleared files
 	files := map[string]interface{}{
@@ -2692,6 +2697,7 @@ func (s *Store) ResetDatabase() error {
 		"filter_presets.json":         s.filterPresets,
 		"event_versions.json":         s.eventVersions,
 		"auto_report_schedules.json":  s.autoReportSchedules,
+		"day_labels.json":             s.dayLabels,
 	}
 	for fname, data := range files {
 		if err := s.saveFile(fname, data); err != nil {
