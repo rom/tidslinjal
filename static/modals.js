@@ -4573,6 +4573,7 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' title="Français">${langAbbr('fr')}</button>
           <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' title="Suomi">${langAbbr('fi')}</button>
           <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' title="Dansk">${langAbbr('da')}</button>
+          <button class="toggle-btn${p.language==='nb'?' active':''}" data-action="setPref" data-args='["language","nb"]' title="Norsk (Bokmål)">${langAbbr('nb')}</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
@@ -11419,6 +11420,7 @@ function _renderRoleEditorTable(roles) {
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇷 FR</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇮 FI</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇩🇰 DA</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇳🇴 NB</th>
           ${ALL_CAPABILITIES.map(cap =>
             `<th class="role-cap-header" data-cap="${cap}" style="padding:4px 3px;border-bottom:2px solid var(--border);font-size:10px;text-align:center;min-width:48px;cursor:pointer;user-select:none;vertical-align:bottom" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">
               <div>${_ROLE_CAP_LABELS[cap]||cap}</div>
@@ -11456,15 +11458,15 @@ function _renderRoleEditorTable(roles) {
 
 // Proper translated role name placeholders
 const _ROLE_PLACEHOLDERS = {
-  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur',                    fi: 'Tarkkailija',        da: 'Observatør' },
-  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture',                          fi: 'Luku',               da: 'Læs' },
-  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur',                      fi: 'Raportoija',         da: 'Rapportør' },
-  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe',                fi: 'Tiimin jäsen',       da: 'Teammedlem' },
-  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe',                  fi: 'Tiiminvetäjä',       da: 'Holdleder' },
-  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations',             fi: 'Operaatiojohtaja',   da: 'Operationsleder' },
-  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major',          fi: 'Esikuntaupseeri',    da: 'Stabsofficer' },
-  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet', fi: 'Esikuntaupseeri täysi', da: 'Stabsofficer fuld' },
-  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture',                fi: 'Luku/Kirjoitus',     da: 'Læs/Skriv' },
+  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur',                    fi: 'Tarkkailija',        da: 'Observatør',       nb: 'Observatør' },
+  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture',                          fi: 'Luku',               da: 'Læs',             nb: 'Les' },
+  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur',                      fi: 'Raportoija',         da: 'Rapportør',        nb: 'Rapportør' },
+  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe',                fi: 'Tiimin jäsen',       da: 'Teammedlem',       nb: 'Teammedlem' },
+  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe',                  fi: 'Tiiminvetäjä',       da: 'Holdleder',        nb: 'Lagleder' },
+  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations',             fi: 'Operaatiojohtaja',   da: 'Operationsleder',  nb: 'Operasjonsleder' },
+  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major',          fi: 'Esikuntaupseeri',    da: 'Stabsofficer',     nb: 'Stabsoffiser' },
+  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet', fi: 'Esikuntaupseeri täysi', da: 'Stabsofficer fuld', nb: 'Stabsoffiser full' },
+  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture',                fi: 'Luku/Kirjoitus',     da: 'Læs/Skriv',        nb: 'Les/Skriv' },
 };
 
 function _renderRoleRow(role, isBuiltin) {
@@ -11474,9 +11476,10 @@ function _renderRoleRow(role, isBuiltin) {
   const frVal = dn.fr || '';
   const fiVal = dn.fi || '';
   const daVal = dn.da || '';
+  const nbVal = dn.nb || '';
   const key = role.key;
   const s = _roleEditorInputStyle();
-  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key, fi: key, da: key };
+  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key, fi: key, da: key, nb: key };
   return `
     <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
       <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
@@ -11489,6 +11492,7 @@ function _renderRoleRow(role, isBuiltin) {
       <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(ph.fr)}" style="${s}"></td>
       <td style="padding:5px 6px"><input type="text" class="role-name-fi" data-key="${escHtml(key)}" value="${escHtml(fiVal)}" placeholder="${escHtml(ph.fi)}" style="${s}"></td>
       <td style="padding:5px 6px"><input type="text" class="role-name-da" data-key="${escHtml(key)}" value="${escHtml(daVal)}" placeholder="${escHtml(ph.da)}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-nb" data-key="${escHtml(key)}" value="${escHtml(nbVal)}" placeholder="${escHtml(ph.nb)}" style="${s}"></td>
       ${ALL_CAPABILITIES.map(cap => {
         const checked = role.capabilities && role.capabilities[cap];
         return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''} title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}"></td>`;
@@ -11539,17 +11543,20 @@ async function saveRoles() {
     const frEl = row.querySelector('.role-name-fr');
     const fiEl = row.querySelector('.role-name-fi');
     const daEl = row.querySelector('.role-name-da');
+    const nbEl = row.querySelector('.role-name-nb');
     const en = enEl ? enEl.value.trim() : '';
     const sv = svEl ? svEl.value.trim() : '';
     const fr = frEl ? frEl.value.trim() : '';
     const fi = fiEl ? fiEl.value.trim() : '';
     const da = daEl ? daEl.value.trim() : '';
+    const nb = nbEl ? nbEl.value.trim() : '';
     const display_names = {};
     if (en) display_names.en = en;
     if (sv) display_names.sv = sv;
     if (fr) display_names.fr = fr;
     if (fi) display_names.fi = fi;
     if (da) display_names.da = da;
+    if (nb) display_names.nb = nb;
     const caps = {};
     row.querySelectorAll('.role-cap-cb').forEach(cb => { caps[cb.dataset.cap] = cb.checked; });
     configs.push({ key, display_name: en || getRoleDisplayName(key), display_names, capabilities: caps });
@@ -13079,7 +13086,7 @@ function _openReferenceUploadModal() {
           </select>
           <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
           <select id="refUpLang" class="form-input">
-            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="no">Norsk</option><option value="da">Dansk</option><option value="es">Español</option>
+            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="es">Español</option>
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
           <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
@@ -13269,7 +13276,7 @@ function _showRefChecksums(id) {
 function _openRefEditModal(id) {
   const ref = (state.references || []).find(r => r.id === id);
   if (!ref) return;
-  const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'no',l:'Norsk'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'}];
+  const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'nb',l:'Norsk (Bokmål)'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'}];
   const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'},{v:'git',l:t('ref_copy_git')||'Push to Git'}];
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
