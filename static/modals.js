@@ -4449,6 +4449,17 @@ function renderSidebar() {
         <input type="url" value="${escHtml(ex.demo_url||p.demo_url||'')}" placeholder="https://..."
           data-action="setExerciseURL" data-event="change" data-url-key="demo_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        ${state.user && (state.user.role==='admin' || hasRole2(state.user.role, 'oplead')) ? `
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div class="sidebar-section-title" style="font-size:var(--fs-xs)">📢 ${t('startup_text')||'Startup Message'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('startup_text_desc')||'Text displayed to all users when they start the application'}</p>
+          <textarea id="startupTextInput" rows="3" placeholder="${t('startup_text_placeholder')||'Enter a message to display on startup...'}"
+            style="width:100%;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical"></textarea>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <button class="btn btn-primary btn-sm" data-action="saveStartupText">${t('startup_text_save')||'Save'}</button>
+            <button class="btn btn-secondary btn-sm" data-action="clearStartupText">${t('startup_text_clear')||'Clear'}</button>
+          </div>
+        </div>` : ''}
       </div>
       <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--text-dim);border-radius:0 var(--radius) var(--radius) 0">
         <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px">${t('settings_personal_header')||'Personal Preferences'}</div>
@@ -4606,6 +4617,7 @@ function renderSidebar() {
           <input type="checkbox" ${p.auto_follow_now?'checked':''} data-action="setPref" data-event="change" data-pref-checked="auto_follow_now"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_auto_follow')||'Auto-follow "Now"'}
+          <span title="${t('settings_auto_follow_info')||'When enabled, the timeline automatically scrolls to keep the current time visible as time progresses.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
       </div>
       <div class="sidebar-section">
@@ -4623,6 +4635,7 @@ function renderSidebar() {
           <input type="checkbox" ${p.confirm_drag_move?'checked':''} data-action="setPref" data-event="change" data-pref-checked="confirm_drag_move"
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_confirm_drag')||'Confirm Before Drag-Move'}
+          <span title="${t('settings_confirm_drag_info')||'Shows a confirmation dialog before moving an event via drag-and-drop, preventing accidental reschedules.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
       </div>
       <div class="sidebar-section">
@@ -4726,6 +4739,13 @@ function renderSidebar() {
             style="width:14px;height:14px;accent-color:var(--accent)">
           ${t('settings_show_day_of_year')||'Show day-of-year number (1–365)'}
           <span title="${t('settings_show_day_of_year_info')||'Display the ordinal day number (1–365) in the timeline header.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
+          <input type="checkbox" id="prefShowDayName" ${p.show_day_name!==false?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_day_name"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_day_name')||'Show name of day'}
+          <span title="${t('settings_show_day_name_info')||'Display the weekday name (e.g. Mon, Tue) in timeline column headers.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
           <input type="checkbox" id="prefShowWeekNumbers" ${p.show_week_numbers?'checked':''}
@@ -4946,17 +4966,6 @@ function renderSidebar() {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" data-action="saveReadyCheckSettings">${t('btn_save')||'Save'}</button>
           <button class="btn btn-secondary btn-sm" data-action="runReadyCheck">▶ ${t('ready_check_run')||'Run Now'}</button>
-        </div>
-      </div>` : ''}
-      ${state.user && (state.user.role==='admin' || hasRole2(state.user.role, 'oplead')) ? `
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">📢 ${t('startup_text')||'Startup Message'}</div>
-        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('startup_text_desc')||'Text displayed to all users when they start the application'}</p>
-        <textarea id="startupTextInput" rows="3" placeholder="${t('startup_text_placeholder')||'Enter a message to display on startup...'}"
-          style="width:100%;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical"></textarea>
-        <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="btn btn-primary btn-sm" data-action="saveStartupText">${t('startup_text_save')||'Save Startup Message'}</button>
-          <button class="btn btn-secondary btn-sm" data-action="clearStartupText">${t('startup_text_clear')||'Clear'}</button>
         </div>
       </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
