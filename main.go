@@ -4975,7 +4975,14 @@ func (app *App) routes() http.Handler {
 	}))
 
 	// Version
-	mux.HandleFunc("/api/version", handleVersion)
+	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		handleVersion(w, r)
+	})
 	mux.HandleFunc("/api/db-stats", app.requireAuth(app.handleDBStats))
 
 	// Day Labels
@@ -5672,7 +5679,14 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireAuth(app.handleDecisionLogAttachment))
-	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", app.handleDecisionLogAttachmentDownload)
+	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			jsonError(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		app.handleDecisionLogAttachmentDownload(w, r)
+	})
 
 	// Event Log
 	mux.HandleFunc("/api/event-log", func(w http.ResponseWriter, r *http.Request) {
@@ -5943,7 +5957,19 @@ func (app *App) routes() http.Handler {
 				// If download_server is set and URL is provided, fetch and cache the URL content
 				if req.DownloadServer && req.URL != "" && req.RefType == "url" {
 					go func() {
-						resp, err := http.Get(req.URL) //nolint:gosec
+						// SSRF protection: validate URL scheme and reject internal addresses
+						parsedURL, parseErr := url.Parse(req.URL)
+						if parseErr != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+							logVerbose("[reference] rejected non-http(s) URL: %s", req.URL)
+							return
+						}
+						host := parsedURL.Hostname()
+						if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "169.254.") {
+							logVerbose("[reference] rejected internal URL: %s", req.URL)
+							return
+						}
+						client := &http.Client{Timeout: 30 * time.Second}
+						resp, err := client.Get(req.URL) //nolint:gosec
 						if err != nil {
 							logVerbose("[reference] failed to download URL %s: %v", req.URL, err)
 							return
@@ -6392,7 +6418,14 @@ func (app *App) routes() http.Handler {
 	})
 
 	// ── Prometheus metrics (no auth — standard for metrics endpoints) ──
-	mux.HandleFunc("/metrics", app.handleMetrics)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		app.handleMetrics(w, r)
+	})
 
 	// ── References ──
 	mux.HandleFunc("/api/references", func(w http.ResponseWriter, r *http.Request) {
@@ -10634,6 +10667,12 @@ func (app *App) handleDownloadReference(w http.ResponseWriter, r *http.Request, 
 	// Handle URL-type references that have no stored file
 	if rd.Filename == "" {
 		if rd.RefType == "url" && rd.URL != "" {
+			// Validate URL scheme to prevent open redirect to javascript:/data: etc.
+			parsedURL, parseErr := url.Parse(rd.URL)
+			if parseErr != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+				jsonError(w, "invalid reference URL", http.StatusBadRequest)
+				return
+			}
 			http.Redirect(w, r, rd.URL, http.StatusFound)
 			return
 		}
