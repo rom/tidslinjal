@@ -4292,21 +4292,32 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 	logDebug("[template] Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339))
 	app.audit(user.ID, user.DisplayName, "applied", "template", id,
 		fmt.Sprintf("Applied template %q: created %d events (base=%s)", tmpl.Name, count, req.BaseTime.Format(time.RFC3339)))
-	// Set STARTEX (exercise epoch) to the base time specified by the user
-	// and record the template name for the legend display
+	// Compute template duration from the latest-ending item
+	maxOffsetMin := 0
+	for _, item := range tmpl.Items {
+		end := item.StartOffsetMin + item.DurationMin
+		if end > maxOffsetMin {
+			maxOffsetMin = end
+		}
+		if item.StartOffsetMin > maxOffsetMin {
+			maxOffsetMin = item.StartOffsetMin
+		}
+	}
+	endex := req.BaseTime.Add(time.Duration(maxOffsetMin) * time.Minute)
+
+	// Set STARTEX, ENDEX, exercise label, and enable synthetic time display
+	exerciseNameSet := tmpl.ExerciseName
+	if exerciseNameSet == "" {
+		exerciseNameSet = tmpl.Name
+	}
 	{
 		ex := app.store.GetExerciseSettings()
 		ex.Epoch = req.BaseTime.Format(time.RFC3339)
+		ex.Endex = endex.Format(time.RFC3339)
 		ex.LastTemplate = tmpl.Name
+		ex.Label = exerciseNameSet
+		ex.Enabled = true // enable synthetic time display
 		app.store.SaveExerciseSettings(ex) //nolint
-	}
-	// If the template carries an exercise name, update the exercise label
-	exerciseNameSet := ""
-	if tmpl.ExerciseName != "" {
-		ex := app.store.GetExerciseSettings()
-		ex.Label = tmpl.ExerciseName
-		app.store.SaveExerciseSettings(ex) //nolint
-		exerciseNameSet = tmpl.ExerciseName
 	}
 	// If the template carries day hour preferences, update the requesting user's preferences
 	dayStartHour, dayEndHour := 0, 0
@@ -4369,17 +4380,19 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		app.store.CreateAlarm(alarm) //nolint
 	}
 	jsonOK(w, map[string]interface{}{
-		"created":        count,
-		"exercise_name":  exerciseNameSet,
-		"day_start_hour": dayStartHour,
-		"day_end_hour":   dayEndHour,
-		"startex":        req.BaseTime.Format(time.RFC3339),
-		"operation_mode": operationModeSet,
-		"group_label":    groupLabelSet,
-		"user_label":     userLabelSet,
-		"theme":          tmpl.Theme,
-		"size":           tmpl.Size,
-		"language":       tmpl.Language,
+		"created":           count,
+		"exercise_name":     exerciseNameSet,
+		"day_start_hour":    dayStartHour,
+		"day_end_hour":      dayEndHour,
+		"startex":           req.BaseTime.Format(time.RFC3339),
+		"endex":             endex.Format(time.RFC3339),
+		"synthetic_enabled": true,
+		"operation_mode":    operationModeSet,
+		"group_label":       groupLabelSet,
+		"user_label":        userLabelSet,
+		"theme":             tmpl.Theme,
+		"size":              tmpl.Size,
+		"language":          tmpl.Language,
 	})
 }
 

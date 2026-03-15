@@ -8689,15 +8689,22 @@ async function confirmApplyTemplate(id) {
       state.exercise = state.exercise || {};
       state.exercise.last_template = tmpl.name;
     }
-    // If server set an exercise name from the template, update local state
+    // Update exercise settings from template application
     if (r.exercise_name) {
       state.exercise = state.exercise || {};
       state.exercise.label = r.exercise_name;
     }
-    // Update STARTEX epoch to the base time the user specified
     if (r.startex) {
       state.exercise = state.exercise || {};
       state.exercise.epoch = r.startex;
+    }
+    if (r.endex) {
+      state.exercise = state.exercise || {};
+      state.exercise.endex = r.endex;
+    }
+    if (r.synthetic_enabled) {
+      state.exercise = state.exercise || {};
+      state.exercise.enabled = true;
     }
     // If server applied day hour preferences from the template, update local state
     if (r.day_end_hour > 0) {
