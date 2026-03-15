@@ -4797,7 +4797,7 @@ func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User)
 	isPrivileged := hasRole(user.Role, RoleOpLead)
 	include := r.URL.Query().Get("include")
 	if include == "" {
-		include = "events,groups,layers,alarms,phases,event_types,comments"
+		include = "events,groups,layers,alarms,phases,event_types,comments,day_labels"
 		if isPrivileged {
 			include += ",users,decision_log,role_configs"
 		}
@@ -4832,7 +4832,7 @@ func (app *App) handleImport(w http.ResponseWriter, r *http.Request, user *User)
 	}
 	include := r.FormValue("include")
 	if include == "" {
-		include = "events,groups,layers,alarms"
+		include = "events,groups,layers,alarms,day_labels"
 	}
 	reassign := r.FormValue("reassign") == "true"
 	result := app.store.ImportData(data, user.ID, user.DisplayName, isPrivileged, reassign, parseCommaSet(include))
@@ -10068,6 +10068,7 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"apikeys.json", "filter_presets.json", "event_versions.json",
 		"decision_log.json", "event_log.json", "log_book.json",
 		"map_resources.json", "references.json", "rooms.json", "custom_resource_types.json",
+		"day_labels.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)
@@ -10147,6 +10148,7 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 		"map_resources.json": true, "references.json": true, "rooms.json": true,
 		"custom_resource_types.json": true, "decision_log.json": true,
 		"event_log.json": true, "log_book.json": true,
+		"day_labels.json": true,
 	}
 	// Note: users.json, sessions.json, apikeys.json, oidc.json, mail.json excluded for security
 	restored := 0

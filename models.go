@@ -531,7 +531,8 @@ type Template struct {
 	Locks         []TemplateLock  `json:"locks,omitempty"`  // optional time locks
 	Roles         []RoleConfig    `json:"roles,omitempty"`  // optional role configs
 	Groups        []TemplateGroup `json:"groups,omitempty"` // groups to create when applied
-	Layers        []TemplateLayer `json:"layers,omitempty"` // layers to create when applied
+	Layers        []TemplateLayer    `json:"layers,omitempty"` // layers to create when applied
+	DayLabels     []TemplateDayLabel `json:"day_labels,omitempty"` // day labels to create when applied
 	// Theme / UX settings applied when the template is loaded
 	Theme         string          `json:"theme,omitempty"`          // dark | light
 	Size          string          `json:"size,omitempty"`           // small | normal | large | huge
@@ -579,6 +580,16 @@ type TemplatePhase struct {
 	StartOffsetMin int    `json:"start_offset_min"`
 	EndOffsetMin   int    `json:"end_offset_min"`
 	Order          int    `json:"order"`
+}
+
+// TemplateDayLabel is a day label stored relative to T=0 for use in templates
+type TemplateDayLabel struct {
+	DayOffsetMin int    `json:"day_offset_min"` // offset in minutes from template base time (rounded to day)
+	Label        string `json:"label"`
+	Color        string `json:"color"`
+	Background   string `json:"background"`
+	FontSize     string `json:"font_size,omitempty"`
+	FontWeight   string `json:"font_weight,omitempty"`
 }
 
 // TemplateLock is a time lock stored relative to T=0 for use in templates

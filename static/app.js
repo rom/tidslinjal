@@ -390,19 +390,19 @@ async function init() {
     setTimeout(() => { window.open('/map', 'tidslinjal-map', 'width=1200,height=800,resizable=yes'); }, 200);
   }
 
-  // Welcome banner — show if never dismissed OR if user has "show on login" enabled (default=true)
-  const _showOnLogin = localStorage.getItem('tidslinjal_show_welcome');
-  if (_showOnLogin === null || _showOnLogin === '1') {
-    _showWelcomeBanner();
+  // Welcome banner — show if preference is on (default=true)
+  const showWelcomePref = state.preferences.show_welcome_message !== false;
+  if (showWelcomePref) {
+    // Fetch startup text to include in welcome window
+    let startupText = '';
+    try {
+      const startupData = await apiGet('/api/startup-text');
+      if (startupData && startupData.text && startupData.text.trim()) {
+        startupText = startupData.text.trim();
+      }
+    } catch { /* ignore if endpoint not available */ }
+    _showWelcomeBanner(startupText);
   }
-
-  // Startup text (MOTD) — show if admin has set a startup message
-  try {
-    const startupData = await apiGet('/api/startup-text');
-    if (startupData && startupData.text && startupData.text.trim()) {
-      _showStartupText(startupData.text);
-    }
-  } catch { /* ignore if endpoint not available */ }
 
   // Scroll to current time or day start
   setTimeout(() => {
@@ -423,7 +423,7 @@ async function init() {
 }
 
 // Welcome banner for first login
-function _showWelcomeBanner() {
+function _showWelcomeBanner(startupText) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.style.zIndex = '9999';
@@ -440,10 +440,18 @@ function _showWelcomeBanner() {
     trainingURL ? `<a href="${escHtml(trainingURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🎓 ${t('settings_training_url')||'Training'}</a>` : '',
     demoURL     ? `<a href="${escHtml(demoURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🎬 ${t('settings_demo_url')||'Demo'}</a>` : '',
   ].filter(Boolean);
+  // Build startup message section if text is provided
+  const startupSection = startupText
+    ? `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px;background:var(--bg2);text-align:left">
+        <div style="font-weight:600;font-size:var(--fs-sm);color:var(--accent);margin-bottom:6px">📢 ${t('startup_text')||'Startup Message'}</div>
+        <div style="font-size:var(--fs-sm);color:var(--text);line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto">${escHtml(startupText)}</div>
+      </div>`
+    : '';
   overlay.innerHTML = `
     <div class="modal" style="max-width:520px;padding:32px;text-align:center">
       <h2 style="font-size:var(--fs-xl);margin-bottom:8px;color:var(--text-bright)">${t('welcome_title')}</h2>
       <p style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6">${t('welcome_text')}</p>
+      ${startupSection}
       ${urlLinks.length ? `<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px">${urlLinks.join('')}</div>` : ''}
       <label style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:16px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
         <input type="checkbox" id="welcomeShowOnLogin" checked style="accent-color:var(--accent)">
@@ -455,28 +463,15 @@ function _showWelcomeBanner() {
   document.body.appendChild(overlay);
   const dismissWelcome = () => {
     const showOnLogin = overlay.querySelector('#welcomeShowOnLogin')?.checked;
-    localStorage.setItem('tidslinjal_show_welcome', showOnLogin ? '1' : '0');
+    // Save preference via API
+    if (!showOnLogin) {
+      state.preferences.show_welcome_message = false;
+      savePreferences();
+    }
     overlay.remove();
   };
   overlay.querySelector('#welcomeDismissBtn').addEventListener('click', dismissWelcome);
   overlay.addEventListener('click', e => { if (e.target === overlay) dismissWelcome(); });
-}
-
-// Startup text (MOTD) display
-function _showStartupText(text) {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay open';
-  overlay.style.zIndex = '9998';
-  overlay.innerHTML = `
-    <div class="modal" style="max-width:500px;padding:24px;text-align:center">
-      <h3 style="font-size:var(--fs-lg);margin-bottom:12px;color:var(--accent)">📢 ${t('startup_text')||'Startup Message'}</h3>
-      <div style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap;text-align:left;max-height:300px;overflow-y:auto">${escHtml(text)}</div>
-      <button class="btn btn-primary" id="startupTextDismiss">${t('startup_text_dismiss')||'Dismiss'}</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.querySelector('#startupTextDismiss').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 document.addEventListener('DOMContentLoaded', init);
