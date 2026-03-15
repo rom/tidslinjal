@@ -168,7 +168,7 @@ const TRANSLATIONS = {
     // Settings
     settings_show_day_of_year: 'Show day-of-year number (1–365)',
     settings_show_day_name: 'Show name of day',
-    settings_show_day_name_info: 'Display the weekday name (e.g. Mon, Tue) in timeline column headers.',
+    settings_show_day_name_info: 'Display the weekday name (e.g. Monday, Tuesday) in timeline column headers.',
     settings_show_week_numbers: 'Show week numbers',
     settings_week_style: 'Week number style',
 
@@ -1406,6 +1406,26 @@ const TRANSLATIONS = {
     // Manage notes capability
     cap_manage_notes: 'Notes',
     cap_manage_stars: 'Stars',
+
+    // Day labels
+    day_labels: 'Day Labels',
+    day_label_add: 'Add Label',
+    day_label_edit: 'Edit Label',
+    day_label_text: 'Label text',
+    day_label_color: 'Text color',
+    day_label_bg: 'Background',
+    day_label_font_size: 'Font size',
+    day_label_font_weight: 'Font weight',
+    day_labels_none: 'No labels for this day.',
+    day_label_text_required: 'Label text is required',
+    day_label_font_weight_normal: 'Normal',
+    day_label_font_weight_semibold: 'Semi-bold',
+    day_label_font_weight_bold: 'Bold',
+    day_label_font_weight_extrabold: 'Extra-bold',
+
+    // Show welcome message setting
+    settings_show_welcome_message: 'Show welcome message',
+    settings_show_welcome_message_info: 'Display the welcome window when logging in.',
   },
 
   sv: {
@@ -1960,7 +1980,7 @@ const TRANSLATIONS = {
 
     settings_show_day_of_year: 'Visa dagnummer för året (1–365)',
     settings_show_day_name: 'Visa veckodagens namn',
-    settings_show_day_name_info: 'Visa veckodagens namn (t.ex. Mån, Tis) i tidslinjens kolumnrubriker.',
+    settings_show_day_name_info: 'Visa veckodagens namn (t.ex. Måndag, Tisdag) i tidslinjens kolumnrubriker.',
     settings_show_week_numbers: 'Visa veckonummer',
     settings_week_style: 'Veckonummerstil',
 
@@ -2670,6 +2690,22 @@ const TRANSLATIONS = {
     role_editor_label_fi: '🇫🇮 FI',
     cap_manage_notes: 'Anteckningar',
     cap_manage_stars: 'Stjärnor',
+    day_labels: 'Dagsetiketter',
+    day_label_add: 'Lägg till etikett',
+    day_label_edit: 'Redigera etikett',
+    day_label_text: 'Etiketttext',
+    day_label_color: 'Textfärg',
+    day_label_bg: 'Bakgrund',
+    day_label_font_size: 'Textstorlek',
+    day_label_font_weight: 'Textvikt',
+    day_labels_none: 'Inga etiketter för denna dag.',
+    day_label_text_required: 'Etiketttext krävs',
+    day_label_font_weight_normal: 'Normal',
+    day_label_font_weight_semibold: 'Halvfet',
+    day_label_font_weight_bold: 'Fet',
+    day_label_font_weight_extrabold: 'Extrafet',
+    settings_show_welcome_message: 'Visa välkomstmeddelande',
+    settings_show_welcome_message_info: 'Visa välkomstfönstret vid inloggning.',
   },
 
   fr: {
@@ -3224,7 +3260,7 @@ const TRANSLATIONS = {
 
     settings_show_day_of_year: 'Afficher le numéro du jour de l\'année (1–365)',
     settings_show_day_name: 'Afficher le nom du jour',
-    settings_show_day_name_info: 'Afficher le nom du jour de la semaine (ex. Lun, Mar) dans les en-têtes de colonnes.',
+    settings_show_day_name_info: 'Afficher le nom du jour de la semaine (ex. Lundi, Mardi) dans les en-têtes de colonnes.',
     settings_show_week_numbers: 'Afficher les numéros de semaine',
     settings_week_style: 'Style de numéro de semaine',
 
@@ -3933,6 +3969,22 @@ const TRANSLATIONS = {
     role_editor_label_fi: '🇫🇮 FI',
     cap_manage_notes: 'Notes',
     cap_manage_stars: 'Étoiles',
+    day_labels: 'Étiquettes de jour',
+    day_label_add: 'Ajouter une étiquette',
+    day_label_edit: 'Modifier l\'étiquette',
+    day_label_text: 'Texte de l\'étiquette',
+    day_label_color: 'Couleur du texte',
+    day_label_bg: 'Arrière-plan',
+    day_label_font_size: 'Taille de police',
+    day_label_font_weight: 'Poids de police',
+    day_labels_none: 'Aucune étiquette pour ce jour.',
+    day_label_text_required: 'Le texte de l\'étiquette est requis',
+    day_label_font_weight_normal: 'Normal',
+    day_label_font_weight_semibold: 'Demi-gras',
+    day_label_font_weight_bold: 'Gras',
+    day_label_font_weight_extrabold: 'Extra-gras',
+    settings_show_welcome_message: 'Afficher le message de bienvenue',
+    settings_show_welcome_message_info: 'Afficher la fenêtre de bienvenue lors de la connexion.',
   },
 
   // ── Finnish ──────────────────────────────────────────────────────────────
@@ -3997,7 +4049,7 @@ const TRANSLATIONS = {
     settings_synth_day_only_info: 'Laske vain päivätunnit synteettisessä kuluneessa ajassa. Yötunnit ohitetaan.',
     settings_show_day_of_year_info: 'Näytä päivän järjestysnumero (1–365) aikajanan otsikossa.',
     settings_show_day_name: 'Näytä päivän nimi',
-    settings_show_day_name_info: 'Näytä viikonpäivän nimi (esim. Ma, Ti) aikajanan sarakeotsikossa.',
+    settings_show_day_name_info: 'Näytä viikonpäivän nimi (esim. Maanantai, Tiistai) aikajanan sarakeotsikossa.',
     settings_show_week_numbers_info: 'Näytä ISO-viikkonumerot (V1–V52) aikajanan otsikossa.',
     settings_exercise_enable_info: 'Ota käyttöön synteettinen aikanäyttö, joka näyttää kuluneen ajan (H+N) aikajanalla.',
     theme_dark: 'Tumma',
@@ -4336,6 +4388,22 @@ const TRANSLATIONS = {
     role_editor_label_fi: '🇫🇮 FI',
     cap_manage_notes: 'Muistiinpanot',
     cap_manage_stars: 'Tähdet',
+    day_labels: 'Päivätunnisteet',
+    day_label_add: 'Lisää tunniste',
+    day_label_edit: 'Muokkaa tunnistetta',
+    day_label_text: 'Tunnisteteksti',
+    day_label_color: 'Tekstin väri',
+    day_label_bg: 'Taustaväri',
+    day_label_font_size: 'Kirjasinkoko',
+    day_label_font_weight: 'Kirjasinpaino',
+    day_labels_none: 'Ei tunnisteita tälle päivälle.',
+    day_label_text_required: 'Tunnisteteksti vaaditaan',
+    day_label_font_weight_normal: 'Normaali',
+    day_label_font_weight_semibold: 'Puolilihava',
+    day_label_font_weight_bold: 'Lihavoitu',
+    day_label_font_weight_extrabold: 'Erittäin lihavoitu',
+    settings_show_welcome_message: 'Näytä tervetuloviesti',
+    settings_show_welcome_message_info: 'Näytä tervetuloikkuna kirjautuessa.',
   },
 
   // ── Danish ──────────────────────────────────────────────────────────────
@@ -4460,7 +4528,7 @@ const TRANSLATIONS = {
     decision_executor: 'Udfører', none: 'Ingen',
     settings_show_day_of_year: 'Vis dag-i-året (1–365)',
     settings_show_day_name: 'Vis navn på dag',
-    settings_show_day_name_info: 'Vis ugedagens navn (f.eks. Man, Tir) i tidslinjens kolonneoverskrifter.',
+    settings_show_day_name_info: 'Vis ugedagens navn (f.eks. Mandag, Tirsdag) i tidslinjens kolonneoverskrifter.',
     settings_show_week_numbers: 'Vis ugenumre',
     settings_week_style: 'Ugenummerstil',
     settings_theme: 'Tema', settings_size: 'Visningsstørrelse',
@@ -4629,6 +4697,22 @@ const TRANSLATIONS = {
     role_editor_label_fi: '🇫🇮 FI',
     cap_manage_notes: 'Noter',
     cap_manage_stars: 'Stjerner',
+    day_labels: 'Dagsmærkater',
+    day_label_add: 'Tilføj mærkat',
+    day_label_edit: 'Rediger mærkat',
+    day_label_text: 'Mærkattekst',
+    day_label_color: 'Tekstfarve',
+    day_label_bg: 'Baggrund',
+    day_label_font_size: 'Skriftstørrelse',
+    day_label_font_weight: 'Skriftvægt',
+    day_labels_none: 'Ingen mærkater for denne dag.',
+    day_label_text_required: 'Mærkattekst er påkrævet',
+    day_label_font_weight_normal: 'Normal',
+    day_label_font_weight_semibold: 'Halvfed',
+    day_label_font_weight_bold: 'Fed',
+    day_label_font_weight_extrabold: 'Ekstra fed',
+    settings_show_welcome_message: 'Vis velkomstbesked',
+    settings_show_welcome_message_info: 'Vis velkomstvinduet ved login.',
   }
 };
 
@@ -4643,9 +4727,9 @@ function getLocale() {
   return map[lang] || 'en-GB';
 }
 
-// Localised short day name
+// Localised weekday name (full, e.g. "Monday", "Tuesday")
 function localDayName(date) {
-  return date.toLocaleDateString(getLocale(), { weekday: 'short' });
+  return date.toLocaleDateString(getLocale(), { weekday: 'long' });
 }
 
 // Localised short month+day

@@ -1876,6 +1876,7 @@ type ExportData struct {
 	Rooms               []Room             `json:"rooms,omitempty"`
 	CustomResourceTypes []CustomResourceType `json:"custom_resource_types,omitempty"`
 	ClockSettings       []ExtraClock       `json:"clock_settings,omitempty"`
+	DayLabels           []DayLabel         `json:"day_labels,omitempty"`
 }
 
 func (s *Store) GetExportData() ExportData {
@@ -1911,6 +1912,8 @@ func (s *Store) GetExportData() ExportData {
 	copy(rooms, s.rooms)
 	customResTypes := make([]CustomResourceType, len(s.customResourceTypes))
 	copy(customResTypes, s.customResourceTypes)
+	dayLabels := make([]DayLabel, len(s.dayLabels))
+	copy(dayLabels, s.dayLabels)
 	return ExportData{
 		Version:             AppVersion,
 		ExportAt:            time.Now(),
@@ -1929,6 +1932,7 @@ func (s *Store) GetExportData() ExportData {
 		References:          referenceDocs,
 		Rooms:               rooms,
 		CustomResourceTypes: customResTypes,
+		DayLabels:           dayLabels,
 	}
 }
 
@@ -2020,6 +2024,10 @@ func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include m
 			out.ClockSettings = make([]ExtraClock, len(prefs.ExtraClocks))
 			copy(out.ClockSettings, prefs.ExtraClocks)
 		}
+	}
+	if include["day_labels"] {
+		out.DayLabels = make([]DayLabel, len(s.dayLabels))
+		copy(out.DayLabels, s.dayLabels)
 	}
 	return out
 }
@@ -2186,6 +2194,16 @@ func (s *Store) ImportData(data ExportData, currentUserID int64, currentUserName
 	if include["role_configs"] && isPrivileged {
 		if len(data.RoleConfigs) > 0 {
 			_ = s.SaveRoleConfigs(data.RoleConfigs)
+		}
+	}
+
+	if include["day_labels"] {
+		for _, dl := range data.DayLabels {
+			dl.ID = 0
+			dl.CreatedBy = ownerID(dl.CreatedBy)
+			if _, err := s.AddDayLabel(dl); err == nil {
+				res.Events++ // reuse counter
+			}
 		}
 	}
 
@@ -2504,6 +2522,21 @@ func (s *Store) ApplyTemplate(id int64, baseTime time.Time, layerID *int64, useT
 			LockedByName: createdByName,
 		}
 		s.CreateLock(lk) //nolint
+	}
+	// Create day labels from template
+	for _, tdl := range tmpl.DayLabels {
+		labelTime := baseTime.Add(time.Duration(tdl.DayOffsetMin) * time.Minute)
+		dateStr := labelTime.Format("2006-01-02")
+		dl := DayLabel{
+			Date:       dateStr,
+			Label:      tdl.Label,
+			Color:      tdl.Color,
+			Background: tdl.Background,
+			FontSize:   tdl.FontSize,
+			FontWeight: tdl.FontWeight,
+			CreatedBy:  createdBy,
+		}
+		s.AddDayLabel(dl) //nolint
 	}
 	// Create groups from template
 	groupIDMap := make(map[int]int64) // template group index -> real group ID
@@ -3269,7 +3302,7 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 		"comments.json", "phases.json", "templates.json", "roles.json",
 		"registration.json", "invitations.json", "filter_presets.json",
 		"event_versions.json", "auto_report_schedules.json",
-		"map_resources.json", "references.json",
+		"map_resources.json", "references.json", "day_labels.json",
 	}
 	for _, fn := range files {
 		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
