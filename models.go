@@ -751,6 +751,11 @@ type ExerciseSettings struct {
 	ReadyCheckTime        string `json:"ready_check_time,omitempty"`        // ISO8601: when to run the ready check
 	ReadyCheckOffsetMins  int    `json:"ready_check_offset_mins,omitempty"` // minutes before epoch to check (alternative to absolute time)
 	ReadyCheckUseOffset   bool   `json:"ready_check_use_offset"`            // if true, use offset from epoch instead of absolute time
+	// Global URLs displayed in the welcome banner (set by admin, visible to all)
+	WelcomeURL  string `json:"welcome_url,omitempty"`
+	HelpURL     string `json:"help_url,omitempty"`
+	TrainingURL string `json:"training_url,omitempty"`
+	DemoURL     string `json:"demo_url,omitempty"`
 }
 
 // MapLocation represents a named geographic position (HQ, base, POI, etc.)
@@ -929,8 +934,10 @@ type PersonReadyCheck struct {
 	CreatedBy     int64                         `json:"created_by"`
 	CreatedByName string                        `json:"created_by_name"`
 	EventID       *int64                        `json:"event_id,omitempty"`
+	Message       string                        `json:"message,omitempty"`
 	Participants  []PersonReadyCheckParticipant `json:"participants"`
 	CreatedAt     time.Time                     `json:"created_at"`
+	ScheduledAt   string                        `json:"scheduled_at,omitempty"`
 }
 
 type EventLogEntry struct {

@@ -1162,27 +1162,30 @@ function switchMap(mapResourceId) {
   const mapEl = document.getElementById('mapProjection');
   const tileCtrl = document.getElementById('selTileLayer');
 
+  // Clean up ALL previous map layers before switching to any new tab
+  const wasImageMap = _isImageMap;
+  if (_imageOverlayLayer) { _map.removeLayer(_imageOverlayLayer); _imageOverlayLayer = null; }
+  if (_geojsonOverlayLayer) { _map.removeLayer(_geojsonOverlayLayer); _geojsonOverlayLayer = null; }
+  // Restore CRS from image map if needed (before any new layer is added)
+  if (wasImageMap) {
+    _isImageMap = false;
+    _map.options.crs = L.CRS.EPSG3857;
+    _map.setMinZoom(0);
+    _map.setMaxZoom(19);
+    _map.setMaxBounds(null);
+    // Remove stale tile layer so it gets re-created with correct CRS
+    if (_tileLayer) { _map.removeLayer(_tileLayer); _tileLayer = null; }
+  }
+  // Always hide PDF container initially
+  pdfContainer.style.display = 'none';
+
   if (!mapResourceId) {
     // Switch back to OSM live
     _currentMapResource = null;
-    const wasImageMap = _isImageMap;
-    _isImageMap = false;
-    if (_imageOverlayLayer) { _map.removeLayer(_imageOverlayLayer); _imageOverlayLayer = null; }
-    if (_geojsonOverlayLayer) { _map.removeLayer(_geojsonOverlayLayer); _geojsonOverlayLayer = null; }
-    pdfContainer.style.display = 'none';
     mapEl.style.display = '';
     tileCtrl.disabled = false;
     if (overlayCtrl) overlayCtrl.style.display = 'none';
     document.getElementById('btnLockMap').style.display = 'none';
-    // Restore CRS to default Spherical Mercator if coming from an image map
-    if (wasImageMap) {
-      _map.options.crs = L.CRS.EPSG3857;
-      _map.setMinZoom(0);
-      _map.setMaxZoom(19);
-      _map.setMaxBounds(null);
-      // Remove stale tile layer so it gets re-created with correct CRS
-      if (_tileLayer) { _map.removeLayer(_tileLayer); _tileLayer = null; }
-    }
     // Restore tile layer
     if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
     // Force tile reload after CRS restoration
@@ -1217,7 +1220,6 @@ function switchMap(mapResourceId) {
   }
 
   // Image-based map (PNG, JPG, SVG)
-  pdfContainer.style.display = 'none';
   mapEl.style.display = '';
   _map.invalidateSize();
 

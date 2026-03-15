@@ -155,7 +155,8 @@ function updateSyntheticUI() {
     btn.style.display = '';
     btn.classList.toggle('active', state.syntheticOn);
     if (badge) {
-      badge.style.display = (state.syntheticOn && ex.label) ? '' : 'none';
+      // Show exercise badge whenever there is a label (regardless of syntheticOn toggle)
+      badge.style.display = ex.label ? '' : 'none';
       badge.textContent   = ex.label || '';
       badge.style.cursor = 'pointer';
       badge.title = t('exercise_click_info') || 'Click for details';
@@ -172,7 +173,18 @@ function updateSyntheticUI() {
     }
   } else {
     btn.style.display = 'none';
-    if (badge) badge.style.display = 'none';
+    // Still show badge if exercise has a name even when synthetic time is not enabled
+    if (badge) {
+      if (ex && ex.label) {
+        badge.style.display = '';
+        badge.textContent = ex.label || '';
+        badge.style.cursor = 'pointer';
+        badge.title = t('exercise_click_info') || 'Click for details';
+        badge.onclick = function() { showExerciseInfoPopup(); };
+      } else {
+        badge.style.display = 'none';
+      }
+    }
   }
 }
 

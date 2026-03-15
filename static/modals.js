@@ -3014,25 +3014,41 @@ function renderSidebar() {
           </div>
           ${customTypes.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('no_custom_types')||'No custom resource types defined yet.'}</p>` : ''}
           ${customTypes.map(ct => `
-            <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
-              <span style="font-size:20px">${ct.icon||'📦'}</span>
+            <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px" data-crt-id="${ct.id}">
+              <span style="font-size:20px" class="crt-icon">${ct.icon||'📦'}</span>
               <div style="flex:1;min-width:0">
-                <div style="font-size:var(--fs-sm);font-weight:600">${escHtml(ct.label)}</div>
+                <div style="font-size:var(--fs-sm);font-weight:600" class="crt-label">${escHtml(ct.label)}</div>
                 <div style="font-size:var(--fs-xs);color:var(--text-dim)">key: ${escHtml(ct.key)}</div>
               </div>
+              <button class="btn btn-ghost btn-sm" data-crt-edit="${ct.id}" data-crt-key="${escAttr(ct.key)}" data-crt-label="${escAttr(ct.label)}" data-crt-icon="${escAttr(ct.icon||'')}" style="padding:2px 8px;font-size:var(--fs-xs)" title="${t('btn_edit')||'Edit'}">✏️</button>
               <button class="btn btn-danger btn-sm" data-action="deleteCustomResourceType" data-arg="${ct.id}" style="padding:2px 8px;font-size:var(--fs-xs)">✕</button>
             </div>`).join('')}
         </div>`;
       _bindResSubTabs(el);
       _bindActions(el);
+      // Bind edit buttons for custom resource types
+      el.querySelectorAll('[data-crt-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const keyInput = el.querySelector('#crtKey');
+          const labelInput = el.querySelector('#crtLabel');
+          const iconInput = el.querySelector('#crtIcon');
+          const addBtn = el.querySelector('[data-action="saveCustomResourceType"]');
+          if (keyInput) { keyInput.value = btn.dataset.crtKey; keyInput.readOnly = true; }
+          if (labelInput) labelInput.value = btn.dataset.crtLabel;
+          if (iconInput) iconInput.value = btn.dataset.crtIcon;
+          if (addBtn) addBtn.textContent = t('btn_save') || 'Save';
+          keyInput?.scrollIntoView({behavior:'smooth', block:'nearest'});
+        });
+      });
     } else if (resSubTab === 'resource_list') {
       // Resource list: shows all users, groups, and rooms in a combined view
+      const canEdit = hasRole2(state.user.role, 'teamlead');
       Promise.all([apiGet('/api/users'), apiGet('/api/rooms').catch(()=>[])]).then(([users, rooms]) => {
         const allResources = [];
         (users||[]).forEach(u => allResources.push({type:'user', name: u.display_name||u.username, role: u.role, detail: '@'+u.username}));
         state.groups.forEach(g => allResources.push({type:'group', name: g.name, detail: g.description||''}));
         const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥'};
-        (rooms||[]).forEach(r => allResources.push({type: r.type||'room', name: r.name, detail: (r.location||'') + (r.capacity ? ' (cap:'+r.capacity+')' : ''), icon: typeIcons[r.type]||'🏠'}));
+        (rooms||[]).forEach(r => allResources.push({type: r.type||'room', name: r.name, detail: (r.location||'') + (r.capacity ? ' (cap:'+r.capacity+')' : ''), icon: typeIcons[r.type]||'🏠', _roomData: r}));
         el.innerHTML = subTabBar + `
           <div class="sidebar-section">
             <div class="sidebar-section-title">📋 ${t('resource_list')||'Resource List'}</div>
@@ -3041,15 +3057,43 @@ function renderSidebar() {
                 <th style="padding:4px 8px;text-align:left">${t('resource_type')||'Type'}</th>
                 <th style="padding:4px 8px;text-align:left">${t('resource_name')||'Name'}</th>
                 <th style="padding:4px 8px;text-align:left">${t('resource_detail')||'Detail'}</th>
+                ${canEdit ? `<th style="padding:4px 8px;text-align:center;width:70px">${t('actions')||'Actions'}</th>` : ''}
               </tr></thead><tbody>
               ${allResources.map(r => `<tr style="border-bottom:1px solid var(--border)">
                 <td style="padding:4px 8px">${r.icon||(r.type==='user'?'👤':'👥')} ${r.type}</td>
                 <td style="padding:4px 8px">${escHtml(r.name)}</td>
                 <td style="padding:4px 8px;color:var(--text-dim)">${escHtml(r.detail)}${r.role?' <span class="role-badge role-'+r.role+'">'+getRoleDisplayName(r.role)+'</span>':''}</td>
+                ${canEdit && r._roomData ? `<td style="padding:4px 8px;text-align:center;white-space:nowrap">
+                  <button class="btn btn-ghost btn-icon btn-sm" data-rl-edit='${escAttr(JSON.stringify(r._roomData))}' title="${t('btn_edit')||'Edit'}">✏️</button>
+                  <button class="btn btn-ghost btn-icon btn-sm" data-rl-delete="${r._roomData.id}" title="${t('btn_delete')||'Delete'}" style="color:var(--danger)">🗑</button>
+                </td>` : (canEdit ? '<td></td>' : '')}
               </tr>`).join('')}
               </tbody></table>
           </div>`;
         _bindResSubTabs(el);
+        // Bind edit/delete actions for resources
+        if (canEdit) {
+          el.querySelectorAll('[data-rl-edit]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const roomData = JSON.parse(btn.dataset.rlEdit);
+              openRoomModal(roomData);
+            });
+          });
+          el.querySelectorAll('[data-rl-delete]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              if (!confirm(t('confirm_delete_resource')||'Delete this resource?')) return;
+              try {
+                const res = await fetch('/api/rooms/' + btn.dataset.rlDelete, { method: 'DELETE' });
+                if (res.ok) {
+                  showNotification('success', t('resource_deleted')||'Resource deleted');
+                  renderSidebar();
+                } else {
+                  showError(t('resource_delete_failed')||'Failed to delete resource');
+                }
+              } catch (e) { showError(e.message); }
+            });
+          });
+        }
       });
     } else if (resSubTab === 'resource_plan') {
       // Resource plan: shows who is assigned to what events
@@ -4355,20 +4399,20 @@ function renderSidebar() {
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_welcome_url')||'Welcome URL'}</div>
-        <input type="url" value="${escHtml(p.welcome_url||'')}" placeholder="https://..."
-          data-action="setPrefInput" data-event="change" data-pref-key="welcome_url"
+        <input type="url" value="${escHtml(ex.welcome_url||p.welcome_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="welcome_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
         <div class="sidebar-section-title" style="margin-top:6px">${t('settings_help_url')||'Help URL'}</div>
-        <input type="url" value="${escHtml(p.help_url||'')}" placeholder="https://..."
-          data-action="setPrefInput" data-event="change" data-pref-key="help_url"
+        <input type="url" value="${escHtml(ex.help_url||p.help_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="help_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
         <div class="sidebar-section-title" style="margin-top:6px">${t('settings_training_url')||'Training URL'}</div>
-        <input type="url" value="${escHtml(p.training_url||'')}" placeholder="https://..."
-          data-action="setPrefInput" data-event="change" data-pref-key="training_url"
+        <input type="url" value="${escHtml(ex.training_url||p.training_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="training_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm);margin-bottom:6px">
         <div class="sidebar-section-title" style="margin-top:6px">${t('settings_demo_url')||'Demo URL'}</div>
-        <input type="url" value="${escHtml(p.demo_url||'')}" placeholder="https://..."
-          data-action="setPrefInput" data-event="change" data-pref-key="demo_url"
+        <input type="url" value="${escHtml(ex.demo_url||p.demo_url||'')}" placeholder="https://..."
+          data-action="setExerciseURL" data-event="change" data-url-key="demo_url"
           style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
       </div>
       <div class="sidebar-section">
@@ -6103,12 +6147,18 @@ async function openPersonReadyCheckPopup() {
                 </label>`).join('')}
             </div>
           </div>
+          <div style="margin-top:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('prc_message')||'Message (optional)'}:</label>
+            <textarea id="prcMessageText" rows="2" placeholder="${t('prc_message_placeholder')||'Add a message to send with the ready check...'}"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical;margin-top:2px"></textarea>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" id="btnCreatePRC">${t('prc_send_request')||'Send Ready Check Request'}</button>
             <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--text-dim)">
               <input type="checkbox" id="prcTimedCheck" style="accent-color:var(--accent);width:12px;height:12px">
               ${t('prc_timed_check')||'Timed Ready Check'}
             </label>
+            <span id="prcTimedTZInfo" style="display:none;font-size:var(--fs-xs);color:var(--text-dim)"></span>
             <input type="datetime-local" id="prcTimedDateTime" style="display:none;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           </div>
         </div>` : ''}
@@ -6168,9 +6218,20 @@ async function openPersonReadyCheckPopup() {
   // Timed check toggle
   const timedCheck = modal.querySelector('#prcTimedCheck');
   const timedDateTime = modal.querySelector('#prcTimedDateTime');
+  const timedTZInfo = modal.querySelector('#prcTimedTZInfo');
   if (timedCheck && timedDateTime) {
     timedCheck.addEventListener('change', () => {
       timedDateTime.style.display = timedCheck.checked ? '' : 'none';
+      if (timedTZInfo) {
+        if (timedCheck.checked) {
+          const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+          const tzAbbr = new Date().toLocaleTimeString('en-GB', {timeZoneName:'short'}).split(' ').pop() || '';
+          timedTZInfo.textContent = tzAbbr + (tzName ? ' (' + tzName + ')' : '');
+          timedTZInfo.style.display = '';
+        } else {
+          timedTZInfo.style.display = 'none';
+        }
+      }
       if (timedCheck.checked && !timedDateTime.value) {
         const d = new Date(); d.setMinutes(d.getMinutes() + 30);
         timedDateTime.value = fmtDateInput(d);
@@ -6206,7 +6267,9 @@ async function openPersonReadyCheckPopup() {
       const isTimed = modal.querySelector('#prcTimedCheck')?.checked || false;
       const timedAt = isTimed ? modal.querySelector('#prcTimedDateTime')?.value : null;
       if (isTimed && !timedAt) { showError(t('prc_timed_required')||'Please select a date and time for the timed check'); return; }
+      const messageText = modal.querySelector('#prcMessageText')?.value?.trim() || '';
       const body = { participant_ids: selected };
+      if (messageText) body.message = messageText;
       if (isTimed && timedAt) {
         body.scheduled_at = new Date(timedAt).toISOString();
       }
@@ -6268,10 +6331,11 @@ async function _loadPersonReadyChecks(modal) {
           </span>
           <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${checkTime.toLocaleString()}</span>
         </div>
+        ${check.message ? `<div style="font-size:var(--fs-sm);padding:6px 8px;margin-bottom:8px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text)">${escHtml(check.message)}</div>` : ''}
         <div style="font-size:var(--fs-xs);margin-bottom:8px;display:flex;gap:12px;color:var(--text-dim)">
           <span>🟢 ${readyCount}</span> <span>🔴 ${notReadyCount}</span> <span>🟡 ${pendingCount}</span>
           <span style="margin-left:auto">${t('prc_total')||'Total'}: ${participants.length}</span>
-          ${isScheduled ? `<span style="color:var(--accent)">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${new Date(check.scheduled_at).toLocaleString()}</span>` : ''}
+          ${isScheduled ? `<span style="color:var(--accent)">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${new Date(check.scheduled_at).toLocaleString(undefined, {timeZoneName:'short'})}</span>` : ''}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;${isLargeGroup ? 'max-height:200px;overflow-y:auto' : ''}">
           ${sortedParticipants.map(p => {
@@ -6546,12 +6610,17 @@ async function openPollModal() {
       }));
 
       try {
+        const payload = { title, questions: mappedQs, target_type: targetType, target_ids: targetIds.map(String) };
         const res = await fetch('/api/polls', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, questions: mappedQs, target_type: targetType, target_ids: targetIds })
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({}));
+          const errMsg = err.error || (res.status === 403 ? (t('poll_no_permission')||'You do not have permission to create polls') : (t('poll_create_failed')||'Failed to create poll — status ' + res.status));
+          throw new Error(errMsg);
+        }
         showNotification('success',t('poll_created')||'Poll created successfully');
         _loadPolls(modal);
       } catch (e) { showError(e.message); }
@@ -6928,6 +6997,28 @@ async function setPrefInput() {
   const key = el.dataset.prefKey;
   if (key) state.preferences[key] = el.value;
   await savePreferences();
+}
+
+// Save welcome/help/training/demo URLs to exercise settings (global, visible to all users)
+async function setExerciseURL() {
+  const el = event?.target;
+  if (!el) return;
+  const key = el.dataset.urlKey;
+  if (!key) return;
+  state.exercise = state.exercise || {};
+  state.exercise[key] = el.value;
+  try {
+    const res = await fetch('/api/exercise', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.exercise)
+    });
+    if (res.ok) state.exercise = await res.json();
+  } catch (e) {
+    // Fallback: save to user preferences
+    state.preferences[key] = el.value;
+    await savePreferences();
+  }
 }
 
 // Workspace preset actions
@@ -12205,7 +12296,21 @@ function _showReferenceInWindow(ref, localContent) {
     return;
   }
   // File-type reference — open inline via download endpoint
-  window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
+  const ct = (ref.content_type || ref.filename || '').toLowerCase();
+  const isPDF = ct.includes('pdf') || (ref.original_name || '').toLowerCase().endsWith('.pdf');
+  if (isPDF) {
+    // Open PDF in a detached window with an embedded iframe for reliable rendering
+    const pdfUrl = '/api/references/' + ref.id + '/download?inline=1';
+    const w = window.open('', 'tidslinjal-ref-' + ref.id, 'width=900,height=700,resizable=yes,scrollbars=yes');
+    if (w) {
+      w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(ref.title || 'PDF')}</title>
+<style>*{margin:0;padding:0}body,html{width:100%;height:100%;overflow:hidden}iframe{border:none;width:100%;height:100%}</style>
+</head><body><iframe src="${escHtml(pdfUrl)}"></iframe></body></html>`);
+      w.document.close();
+    }
+  } else {
+    window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
+  }
 }
 
 async function _deleteReference(id) {
