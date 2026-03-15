@@ -4215,6 +4215,32 @@ function renderSidebar() {
         </div>
       </div>
     `;
+  } else if (tab === 'checklists') {
+    el.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📋 ${t('checklists')||'Checklists'}</span>
+          <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedChecklists" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('checklists_desc')||'Create, manage, and track checklists for operational tasks.'}
+        </p>
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <button class="btn btn-sm btn-primary" data-action="openChecklistStart" style="flex:1">▶ ${t('checklist_start')||'Start Checklist'}</button>
+          ${hasRole2(state.user?.role||'','teamlead') ? `<button class="btn btn-sm btn-secondary" data-action="openChecklistEditor">✏ ${t('checklist_editor')||'Editor'}</button>` : ''}
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">✅ ${t('checklist_active')||'Active Checklists'}</div>
+        <div id="checklistActiveList" style="font-size:var(--fs-xs);color:var(--text-dim)">Loading...</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('checklist_completed')||'Completed'}</div>
+        <div id="checklistCompletedList" style="font-size:var(--fs-xs);color:var(--text-dim)">Loading...</div>
+      </div>
+    `;
+    _bindActions(el);
+    _loadChecklistInstances();
   } else if (tab === 'security' && state.user && state.user.role === 'admin') {
     el.innerHTML = `
       <div class="sidebar-section">
@@ -6938,7 +6964,7 @@ async function openPollModal(opts) {
             <h4 style="font-size:var(--fs-sm);margin:0">${t('poll_create')||'Create New Poll'}</h4>
             <span id="pollCreateToggle" style="font-size:12px;color:var(--text-dim)">${hideCreatePane ? '▶' : '▼'}</span>
           </div>
-          <div id="pollCreateBody" style="padding:0 12px 12px 12px;${hideCreatePane ? 'display:none' : ''}">`
+          <div id="pollCreateBody" style="padding:0 12px 12px 12px;${hideCreatePane ? 'display:none' : ''}">
           <div style="margin-bottom:8px">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('poll_title')||'Poll title'}:</label>
             <input type="text" id="pollTitleInput" placeholder="${t('poll_title')||'Poll title'}..." maxlength="100"
@@ -7580,6 +7606,401 @@ function openRoomModal(argJson) {
     modal.remove();
     renderSidebar();
   });
+}
+
+// ── Checklists ──────────────────────────────────────────────────────────────
+
+async function _loadChecklistInstances() {
+  const activeEl = document.getElementById('checklistActiveList');
+  const completedEl = document.getElementById('checklistCompletedList');
+  if (!activeEl || !completedEl) return;
+  try {
+    const res = await api('GET', '/api/checklist-instances');
+    const instances = await res.json();
+    const active = instances.filter(i => i.status === 'active');
+    const completed = instances.filter(i => i.status === 'completed');
+    if (active.length === 0) {
+      activeEl.innerHTML = `<p style="color:var(--text-dim);font-style:italic">${t('checklist_no_active')||'No active checklists.'}</p>`;
+    } else {
+      activeEl.innerHTML = active.map(ci => {
+        const total = ci.items.length;
+        const checked = ci.items.filter(it => it.checked).length;
+        const pct = total > 0 ? Math.round(checked/total*100) : 0;
+        return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:6px;background:var(--bg2);cursor:pointer" data-action="openChecklistInstance" data-arg="${ci.id}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <strong style="font-size:var(--fs-sm)">${escHtml(ci.name)}</strong>
+            <span style="font-size:10px;color:var(--text-dim)">${checked}/${total}</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:4px;height:6px;overflow:hidden">
+            <div style="background:var(--accent);height:100%;width:${pct}%;transition:width .3s"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    if (completed.length === 0) {
+      completedEl.innerHTML = `<p style="color:var(--text-dim);font-style:italic">—</p>`;
+    } else {
+      completedEl.innerHTML = completed.slice(0, 10).map(ci =>
+        `<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;cursor:pointer" data-action="openChecklistInstance" data-arg="${ci.id}">
+          <span style="font-size:var(--fs-xs)">${escHtml(ci.name)}</span>
+          <span style="font-size:10px;color:var(--text-dim)">${ci.completed_at ? new Date(ci.completed_at).toLocaleDateString() : ''}</span>
+        </div>`
+      ).join('');
+    }
+    _bindActions(activeEl);
+    _bindActions(completedEl);
+  } catch(e) {
+    activeEl.innerHTML = `<p style="color:var(--danger)">Failed to load checklists</p>`;
+    completedEl.innerHTML = '';
+  }
+}
+
+async function openChecklistStart() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:500px;width:90vw">
+      <div class="modal-header">
+        <h3>▶ ${t('checklist_start')||'Start Checklist'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+        <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+          ${t('checklist_start')||'Select a checklist template to start:'}
+        </p>
+        <div id="checklistTemplateList" style="font-size:var(--fs-sm)">Loading...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  try {
+    const res = await api('GET', '/api/checklist-templates');
+    const templates = await res.json();
+    const listEl = modal.querySelector('#checklistTemplateList');
+    if (templates.length === 0) {
+      listEl.innerHTML = '<p style="color:var(--text-dim)">No templates available.</p>';
+      return;
+    }
+    listEl.innerHTML = templates.map(tmpl =>
+      `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:6px;background:var(--bg2)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${escHtml(tmpl.name)}</strong>
+            ${tmpl.built_in ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">(${t('checklist_builtin')||'Built-in'})</span>` : ''}
+            <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${escHtml(tmpl.description||'')}</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${tmpl.items?.length||0} items</div>
+          </div>
+          <button class="btn btn-sm btn-primary _cl_start_btn" data-tmpl-id="${tmpl.id}" data-tmpl-name="${escHtml(tmpl.name)}">▶ ${t('checklist_start')||'Start'}</button>
+        </div>
+      </div>`
+    ).join('');
+    listEl.querySelectorAll('._cl_start_btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tid = parseInt(btn.dataset.tmplId);
+        try {
+          await api('POST', '/api/checklist-instances', { template_id: tid, name: btn.dataset.tmplName });
+          showNotification('success', 'Checklist started');
+          modal.remove();
+          _loadChecklistInstances();
+        } catch(e) { showError('Failed to start checklist'); }
+      });
+    });
+  } catch(e) {
+    modal.querySelector('#checklistTemplateList').innerHTML = '<p style="color:var(--danger)">Failed to load templates</p>';
+  }
+}
+
+async function openChecklistInstance(idOrStr) {
+  const id = typeof idOrStr === 'string' ? parseInt(idOrStr) : idOrStr;
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:650px;width:90vw">
+      <div class="modal-header">
+        <h3>📋 ${t('checklists')||'Checklist'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:75vh;overflow-y:auto" id="checklistInstanceBody">Loading...</div>
+      <div class="modal-footer" id="checklistInstanceFooter"></div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+
+  try {
+    const res = await api('GET', '/api/checklist-instances');
+    const instances = await res.json();
+    const ci = instances.find(x => x.id === id);
+    if (!ci) { modal.querySelector('#checklistInstanceBody').innerHTML = 'Not found'; return; }
+
+    function renderInstance() {
+      const total = ci.items.length;
+      const checked = ci.items.filter(it => it.checked).length;
+      const pct = total > 0 ? Math.round(checked/total*100) : 0;
+      const isComplete = ci.status === 'completed';
+
+      // Group items by category
+      const categories = {};
+      ci.items.forEach((it, idx) => {
+        const cat = it.category || '';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push({ ...it, _idx: idx });
+      });
+
+      let html = `
+        <div style="margin-bottom:12px">
+          <h4 style="margin:0 0 4px 0;font-size:var(--fs-sm)">${escHtml(ci.name)}</h4>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="flex:1;background:var(--bg3);border-radius:4px;height:8px;overflow:hidden">
+              <div style="background:${pct===100?'var(--success)':'var(--accent)'};height:100%;width:${pct}%;transition:width .3s"></div>
+            </div>
+            <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">${checked}/${total} (${pct}%)</span>
+          </div>
+        </div>`;
+
+      for (const [cat, items] of Object.entries(categories)) {
+        if (cat) html += `<div style="font-size:var(--fs-xs);color:var(--accent);font-weight:600;margin:8px 0 4px 0;text-transform:uppercase">${escHtml(cat)}</div>`;
+        items.forEach(it => {
+          html += `<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:var(--radius);cursor:${isComplete?'default':'pointer'};margin-bottom:2px;background:${it.checked?'color-mix(in srgb, var(--success) 8%, var(--bg2))':'var(--bg2)'}">
+            <input type="checkbox" class="_cl_check" data-idx="${it._idx}" ${it.checked?'checked':''} ${isComplete?'disabled':''}
+              style="margin-top:2px;width:16px;height:16px;accent-color:var(--success);flex-shrink:0">
+            <span style="font-size:var(--fs-sm);${it.checked?'text-decoration:line-through;opacity:.6':''}">${escHtml(it.text)}</span>
+          </label>`;
+        });
+      }
+      modal.querySelector('#checklistInstanceBody').innerHTML = html;
+
+      // Footer
+      const footerEl = modal.querySelector('#checklistInstanceFooter');
+      if (isComplete) {
+        footerEl.innerHTML = `
+          <button class="btn btn-sm btn-secondary" id="_cl_reopen">↩ ${t('checklist_reopen')||'Reopen'}</button>
+          <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>`;
+        footerEl.querySelector('#_cl_reopen').addEventListener('click', async () => {
+          ci.status = 'active';
+          ci.completed_at = null;
+          await api('PUT', `/api/checklist-instances/${ci.id}`, ci);
+          renderInstance();
+          _loadChecklistInstances();
+        });
+      } else {
+        footerEl.innerHTML = `
+          <button class="btn btn-sm btn-danger" id="_cl_delete">🗑 ${t('checklist_delete')||'Delete'}</button>
+          <button class="btn btn-sm btn-primary" id="_cl_complete" ${pct<100?'disabled':''}>✅ ${t('checklist_complete')||'Mark Complete'}</button>
+          <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>`;
+        footerEl.querySelector('#_cl_complete').addEventListener('click', async () => {
+          ci.status = 'completed';
+          await api('PUT', `/api/checklist-instances/${ci.id}`, ci);
+          showNotification('success', 'Checklist completed!');
+          renderInstance();
+          _loadChecklistInstances();
+        });
+        footerEl.querySelector('#_cl_delete').addEventListener('click', async () => {
+          if (!confirm(t('checklist_delete_confirm')||'Delete this checklist?')) return;
+          await api('DELETE', `/api/checklist-instances/${ci.id}`);
+          modal.remove();
+          _loadChecklistInstances();
+        });
+      }
+      _bindActions(footerEl);
+
+      // Bind checkbox toggles
+      modal.querySelectorAll('._cl_check').forEach(cb => {
+        cb.addEventListener('change', async () => {
+          const idx = parseInt(cb.dataset.idx);
+          ci.items[idx].checked = cb.checked;
+          if (cb.checked) {
+            ci.items[idx].checked_by = state.user?.id || 0;
+            const now = new Date().toISOString();
+            ci.items[idx].checked_at = now;
+          } else {
+            ci.items[idx].checked_by = 0;
+            ci.items[idx].checked_at = null;
+          }
+          await api('PUT', `/api/checklist-instances/${ci.id}`, ci);
+          renderInstance();
+          _loadChecklistInstances();
+        });
+      });
+    }
+    renderInstance();
+  } catch(e) {
+    modal.querySelector('#checklistInstanceBody').innerHTML = '<p style="color:var(--danger)">Failed to load checklist</p>';
+  }
+}
+
+function _addChecklistItemRow(container, text, category) {
+  const row = document.createElement('div');
+  row.className = 'cl-item-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  row.innerHTML = `
+    <input type="text" class="cl-item-text" placeholder="${t('checklist_item_text')||'Item text...'}" value="${escHtml(text)}"
+      style="flex:1;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+    <input type="text" class="cl-item-cat" placeholder="${t('checklist_item_category')||'Category'}" value="${escHtml(category||'')}"
+      style="width:100px;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+    <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;flex-shrink:0" title="${t('checklist_remove')||'Remove'}">✕</button>`;
+  row.querySelector('.btn-danger').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+async function openChecklistEditor() {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:900px;width:90vw">
+      <div class="modal-header">
+        <h3>✏ ${t('checklist_editor')||'Checklist Editor'}</h3>
+        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+      </div>
+      <div class="modal-body" style="max-height:80vh;overflow-y:auto">
+        <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+          ${t('checklists_desc')||'Create and manage reusable checklist templates.'}
+        </p>
+        <div style="display:flex;gap:12px;margin-bottom:12px">
+          <select id="clEditorList" style="flex:1;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+            <option value="__new__">── ${t('checklist_new')||'New Checklist'} ──</option>
+          </select>
+          <button class="btn btn-sm btn-primary" id="clEditorNewBtn">+ ${t('checklist_new')||'New'}</button>
+        </div>
+        <div id="clEditorForm" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--bg2)">
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('checklist_template_name')||'Checklist Name'}:</label>
+            <input type="text" id="clEditorName" placeholder="${t('checklist_template_name')||'Checklist Name'}..." maxlength="200"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('checklist_template_desc')||'Description'}:</label>
+            <input type="text" id="clEditorDesc" placeholder="${t('checklist_template_desc')||'Description'}..." maxlength="500"
+              style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          </div>
+          <div style="margin-bottom:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-bottom:4px;display:block">${t('checklist_items')||'Items'}:</label>
+            <div id="clEditorItems"></div>
+            <button class="btn btn-sm btn-secondary" id="clEditorAddItem" style="margin-top:4px">+ ${t('checklist_add_item')||'Add Item'}</button>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-sm btn-danger" id="clEditorDeleteBtn" style="display:none">${t('checklist_delete')||'Delete'}</button>
+            <button class="btn btn-sm btn-primary" id="clEditorSaveBtn">${t('checklist_save')||'Save Checklist'}</button>
+          </div>
+          <div id="clEditorBuiltinNote" style="display:none;margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('checklist_builtin')||'Built-in'} — read-only
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+
+  let templates = [];
+  const listEl = modal.querySelector('#clEditorList');
+  const nameEl = modal.querySelector('#clEditorName');
+  const descEl = modal.querySelector('#clEditorDesc');
+  const itemsEl = modal.querySelector('#clEditorItems');
+  const deleteBtn = modal.querySelector('#clEditorDeleteBtn');
+  const saveBtn = modal.querySelector('#clEditorSaveBtn');
+  const builtinNote = modal.querySelector('#clEditorBuiltinNote');
+
+  async function loadList() {
+    try {
+      const resp = await api('GET', '/api/checklist-templates');
+      templates = await resp.json();
+    } catch(e) { templates = []; }
+    listEl.innerHTML = `<option value="__new__">── ${t('checklist_new')||'New Checklist'} ──</option>`;
+    templates.forEach(tmpl => {
+      const opt = document.createElement('option');
+      opt.value = tmpl.id;
+      opt.textContent = tmpl.name + (tmpl.built_in ? ` (${t('checklist_builtin')||'Built-in'})` : '');
+      listEl.appendChild(opt);
+    });
+  }
+
+  function loadForm(tmpl) {
+    const isBuiltIn = tmpl && tmpl.built_in;
+    nameEl.value = tmpl ? tmpl.name : '';
+    descEl.value = tmpl ? (tmpl.description || '') : '';
+    itemsEl.innerHTML = '';
+    if (tmpl && tmpl.items) {
+      tmpl.items.forEach(it => _addChecklistItemRow(itemsEl, it.text, it.category));
+    }
+    nameEl.disabled = !!isBuiltIn;
+    descEl.disabled = !!isBuiltIn;
+    deleteBtn.style.display = (tmpl && !isBuiltIn && tmpl.id > 0) ? '' : 'none';
+    saveBtn.style.display = isBuiltIn ? 'none' : '';
+    builtinNote.style.display = isBuiltIn ? '' : 'none';
+    if (isBuiltIn) {
+      itemsEl.querySelectorAll('input').forEach(el => el.disabled = true);
+      itemsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = 'none');
+      modal.querySelector('#clEditorAddItem').style.display = 'none';
+    } else {
+      itemsEl.querySelectorAll('input').forEach(el => el.disabled = false);
+      itemsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
+      modal.querySelector('#clEditorAddItem').style.display = '';
+    }
+  }
+
+  listEl.addEventListener('change', () => {
+    if (listEl.value === '__new__') {
+      loadForm(null);
+    } else {
+      const tmpl = templates.find(x => String(x.id) === listEl.value);
+      if (tmpl) loadForm(tmpl);
+    }
+  });
+
+  modal.querySelector('#clEditorNewBtn').addEventListener('click', () => {
+    listEl.value = '__new__';
+    loadForm(null);
+  });
+
+  modal.querySelector('#clEditorAddItem').addEventListener('click', () => {
+    _addChecklistItemRow(itemsEl, '', '');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const name = nameEl.value.trim();
+    if (!name) { showError(t('checklist_template_name')||'Name is required'); return; }
+    const items = [];
+    itemsEl.querySelectorAll('.cl-item-row').forEach(row => {
+      const text = row.querySelector('.cl-item-text')?.value?.trim();
+      const cat = row.querySelector('.cl-item-cat')?.value?.trim() || '';
+      if (text) items.push({ text, category: cat });
+    });
+    if (items.length === 0) { showError(t('checklist_add_item')||'Add at least one item'); return; }
+    const selectedId = listEl.value;
+    const body = { name, description: descEl.value.trim(), items };
+    try {
+      if (selectedId === '__new__') {
+        await api('POST', '/api/checklist-templates', body);
+        showNotification('success', `${name} created`);
+      } else {
+        await api('PUT', `/api/checklist-templates/${selectedId}`, body);
+        showNotification('success', `${name} updated`);
+      }
+      await loadList();
+      loadForm(null);
+      listEl.value = '__new__';
+    } catch(e) { showError('Failed to save: ' + (e.message||e)); }
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm(t('checklist_delete_confirm')||'Are you sure you want to delete this checklist?')) return;
+    const selectedId = listEl.value;
+    try {
+      await api('DELETE', `/api/checklist-templates/${selectedId}`);
+      showNotification('success', 'Checklist deleted');
+      await loadList();
+      loadForm(null);
+      listEl.value = '__new__';
+    } catch(e) { showError('Failed to delete: ' + (e.message||e)); }
+  });
+
+  await loadList();
+  loadForm(null);
 }
 
 // ── Poll Questionnaire Editor ────────────────────────────────────────────────

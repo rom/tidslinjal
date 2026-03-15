@@ -1236,6 +1236,119 @@ func BuiltInQuestionnaires() []PollQuestionnaire {
 	}
 }
 
+// ── Checklists ──────────────────────────────────────────────────────────────
+
+// ChecklistTemplate is a reusable checklist definition (the "recipe").
+type ChecklistTemplate struct {
+	ID          int64              `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description,omitempty"`
+	Items       []ChecklistItemDef `json:"items"`
+	BuiltIn     bool               `json:"built_in"`
+	CreatedBy   int64              `json:"created_by,omitempty"`
+	CreatedAt   time.Time          `json:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
+// ChecklistItemDef is a single item in a checklist template.
+type ChecklistItemDef struct {
+	Text     string `json:"text"`
+	Category string `json:"category,omitempty"` // optional grouping
+}
+
+// ChecklistInstance is a running/completed checklist created from a template.
+type ChecklistInstance struct {
+	ID         int64                  `json:"id"`
+	TemplateID int64                  `json:"template_id"`
+	Name       string                 `json:"name"`
+	Items      []ChecklistInstanceItem `json:"items"`
+	Status     string                 `json:"status"` // active | completed
+	CreatedBy  int64                  `json:"created_by"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
+	CompletedAt *time.Time            `json:"completed_at,omitempty"`
+}
+
+// ChecklistInstanceItem tracks the check-state of a single item.
+type ChecklistInstanceItem struct {
+	Text      string     `json:"text"`
+	Category  string     `json:"category,omitempty"`
+	Checked   bool       `json:"checked"`
+	CheckedBy int64      `json:"checked_by,omitempty"`
+	CheckedAt *time.Time `json:"checked_at,omitempty"`
+	Note      string     `json:"note,omitempty"`
+}
+
+// BuiltInChecklists returns the pre-defined checklist templates.
+func BuiltInChecklists() []ChecklistTemplate {
+	now := time.Now()
+	return []ChecklistTemplate{
+		{
+			ID: -1, Name: "TeamLead Battle Rhythm Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Preparation checklist before answering the TeamLead Battle Rhythm Check poll.",
+			Items: []ChecklistItemDef{
+				{Text: "Review current task status and progress", Category: "Situational Awareness"},
+				{Text: "Check team member availability and well-being", Category: "Situational Awareness"},
+				{Text: "Review outstanding issues or blockers", Category: "Situational Awareness"},
+				{Text: "Assess personal stress level honestly", Category: "Self-Assessment"},
+				{Text: "Assess team morale and stress indicators", Category: "Self-Assessment"},
+				{Text: "Verify you have current information from all sub-teams", Category: "Information"},
+				{Text: "Check if any pending decisions need escalation", Category: "Information"},
+				{Text: "Review resource needs and shortfalls", Category: "Resources"},
+				{Text: "Identify any support needed from Ops Lead or other team leads", Category: "Resources"},
+				{Text: "Prepare summary of key concerns to report", Category: "Reporting"},
+			},
+		},
+		{
+			ID: -2, Name: "Shift Handover", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Standard checklist for shift handover procedures.",
+			Items: []ChecklistItemDef{
+				{Text: "Brief incoming shift on current operational situation", Category: "Briefing"},
+				{Text: "Hand over all active tasks with current status", Category: "Briefing"},
+				{Text: "Review open decisions and pending actions", Category: "Briefing"},
+				{Text: "Transfer access credentials and communication channels", Category: "Logistics"},
+				{Text: "Highlight any time-critical events in the next period", Category: "Logistics"},
+				{Text: "Review and update the timeline with latest information", Category: "Documentation"},
+				{Text: "Log handover in the log book", Category: "Documentation"},
+				{Text: "Confirm incoming shift has access to all needed systems", Category: "Verification"},
+				{Text: "Incoming shift acknowledges understanding of situation", Category: "Verification"},
+			},
+		},
+		{
+			ID: -3, Name: "Exercise Setup", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for setting up a new exercise or operation in Tidslinjal.",
+			Items: []ChecklistItemDef{
+				{Text: "Configure exercise name, dates, and time settings", Category: "Configuration"},
+				{Text: "Set up layers and event types", Category: "Configuration"},
+				{Text: "Create user accounts and assign roles", Category: "Users"},
+				{Text: "Create groups and assign memberships", Category: "Users"},
+				{Text: "Configure notification and mail settings", Category: "Communications"},
+				{Text: "Upload reference documents", Category: "Content"},
+				{Text: "Set up initial timeline events", Category: "Content"},
+				{Text: "Configure phases if applicable", Category: "Content"},
+				{Text: "Test poll and ready check functionality", Category: "Testing"},
+				{Text: "Verify all participants can log in", Category: "Testing"},
+				{Text: "Create backup before exercise start", Category: "Safety"},
+			},
+		},
+		{
+			ID: -4, Name: "After Action Review Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Preparation checklist for conducting an After Action Review.",
+			Items: []ChecklistItemDef{
+				{Text: "Export timeline data and reports", Category: "Data Collection"},
+				{Text: "Export poll results and decision log", Category: "Data Collection"},
+				{Text: "Download audit log for the exercise period", Category: "Data Collection"},
+				{Text: "Collect participant feedback forms", Category: "Data Collection"},
+				{Text: "Identify key events and decision points", Category: "Analysis"},
+				{Text: "Note timeline deviations from plan", Category: "Analysis"},
+				{Text: "Prepare lessons-learned template", Category: "Preparation"},
+				{Text: "Schedule AAR meeting with all key personnel", Category: "Preparation"},
+				{Text: "Distribute materials to participants before meeting", Category: "Preparation"},
+			},
+		},
+	}
+}
+
 // ResourceNote is a note (review, comment, achievement) attached to a resource (user, group, role, function)
 type ResourceNote struct {
 	ID           int64     `json:"id"`
