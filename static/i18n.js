@@ -268,6 +268,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
 
     // Layers
     layers_title: 'Layers',
@@ -1167,6 +1169,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     date_format_dtg: 'DTG (141830ZMAR26)',
     settings_time_format: 'Time Format',
     time_format_24h: '24-hour',
@@ -1579,6 +1583,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     layers_title: 'Lager',
     layers_add: '+ Nytt lager',
     layers_master: 'Masterlinjen',
@@ -2511,6 +2517,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     date_format_dtg: 'DTG (141830ZMAR26)',
     settings_time_format: 'Tidsformat',
     time_format_24h: '24-timmar',
@@ -2878,6 +2886,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     layers_title: 'Couches',
     layers_add: '+ Nouvelle couche',
     layers_master: 'Chronologie principale',
@@ -3809,6 +3819,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     date_format_dtg: 'DTG (141830ZMAR26)',
     settings_time_format: 'Format horaire',
     time_format_24h: '24 heures',
@@ -4124,6 +4136,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
 
     layers_title: 'Tasot',
     layers_add: '+ Uusi taso',
@@ -4618,7 +4632,7 @@ const TRANSLATIONS = {
     settings_exercise_enable_info: 'Aktivér syntetisk tidsvisning, der viser forløbet tid (H+N) på tidslinjen.',
     theme_dark: 'Mørk', theme_light: 'Lys',
     size_small: 'Lille', size_normal: 'Normal', size_large: 'Stor', size_huge: 'Kæmpe',
-    lang_en: 'English', lang_sv: 'Svenska', lang_fr: 'Français', lang_fi: 'Suomi', lang_da: 'Dansk', lang_nb: 'Norsk (Bokmål)', lang_it: 'Italiano', lang_es: 'Español', lang_pt: 'Português',
+    lang_en: 'English', lang_sv: 'Svenska', lang_fr: 'Français', lang_fi: 'Suomi', lang_da: 'Dansk', lang_nb: 'Norsk (Bokmål)', lang_it: 'Italiano', lang_es: 'Español', lang_pt: 'Português', lang_pl: 'Polski', lang_uk: 'Українська',
     layers_title: 'Lag', layers_add: '+ Nyt lag', layers_master: 'Hovedtidslinje',
     layers_my: 'Mine lag', layers_shared: 'Delte lag',
     groups_title: 'Grupper', groups_add: '+ Ny gruppe', groups_members: 'Medlemmer',
@@ -5060,6 +5074,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
 
     // Layers
     layers_title: 'Lag',
@@ -5958,6 +5974,8 @@ const TRANSLATIONS = {
     lang_it: 'Italiano',
     lang_es: 'Español',
     lang_pt: 'Português',
+    lang_pl: 'Polski',
+    lang_uk: 'Українська',
     date_format_dtg: 'DTG (141830ZMAR26)',
     settings_time_format: 'Tidsformat',
     time_format_24h: '24-timer',
@@ -6463,6 +6481,96 @@ const TRANSLATIONS = {
     settings_personal_desc: 'Afecta solo tu vista — otros usuarios tienen sus propias configuraciones',
   },
 
+  // ── Polish ─────────────────────────────────────────────────────────────
+  pl: {
+    app_name: 'Tidslinjal',
+    app_subtitle: 'Współpracowa oś czasu operacyjnego',
+    today: 'Dzisiaj', prev: '‹', next: '›',
+    show: 'Pokaż', resolution: 'Rozdzielczość',
+    zoom_now: 'Przejdź do teraz', add_event: '+ Dodaj zdarzenie',
+    lock_slot: '🔒 Zablokuj slot', logout: 'Wyloguj',
+    range_day: 'Dzień', range_2days: '2 dni', range_3days: '3 dni',
+    range_4days: '4 dni', range_5days: '5 dni', range_week: 'Tydzień',
+    range_2weeks: '2 tygodnie', range_3weeks: '3 tygodnie', range_month: 'Miesiąc',
+    range_2months: '2 miesiące', range_3months: '3 miesiące',
+    res_ten: '10 min', res_quarter: '15 min', res_hour: 'Godzina', res_day: 'Dzień',
+    day_mon: 'Pn', day_tue: 'Wt', day_wed: 'Śr', day_thu: 'Cz', day_fri: 'Pt', day_sat: 'So', day_sun: 'Nd',
+    tab_legend: 'Legenda', tab_tools: 'Narzędzia', tab_alarms: 'Alarmy',
+    tab_references: 'Odniesienia', references_title: 'Odniesienia',
+    ref_category_faq: 'FAQ', ref_category_objectives: 'Cele',
+    ref_category_handbook: 'Podręcznik', ref_category_sop: 'SOP',
+    ref_category_policy: 'Polityka', ref_category_map: 'Mapa',
+    ref_category_reference: 'Odniesienie', ref_category_checklist: 'Lista kontrolna',
+    ref_category_other: 'Inne',
+    all_categories: 'Wszystkie kategorie', all_languages: 'Wszystkie języki',
+    ref_info_total: 'Razem',
+    ref_add_title: 'Dodaj odniesienie', ref_type_file: 'Prześlij plik',
+    ref_type_url: 'Link / URL', ref_type_local: 'Zasób lokalny',
+    ref_language: 'Język', ref_owner: 'Właściciel', ref_custodian: 'Opiekun',
+    ref_copy_mode: 'Tryb kopiowania', ref_copy_central: 'Kopia centralna',
+    ref_copy_local: 'Kopia lokalna', ref_copy_link: 'Pokaż link',
+    ref_copy_git: 'Wypchnij do Git', ref_show: 'Pokaż',
+    ref_time_added: 'Dodano', ref_times_referenced: 'Razy odwoływano',
+    ref_checksums: 'Sumy kontrolne',
+    ref_no_checksums: 'Brak sum kontrolnych dla tego odniesienia.',
+    ref_edit_title: 'Edytuj odniesienie', ref_title: 'Tytuł',
+    ref_description: 'Opis', ref_tags: 'Tagi',
+    ref_owner_placeholder: 'Właściciel dokumentu', ref_custodian_placeholder: 'Opiekun dokumentu',
+    ref_git_save: 'Zapisz w Git', ref_git_load: 'Wczytaj z Git',
+    ref_delete_confirm: 'Usunąć to odniesienie?',
+    btn_save: 'Zapisz', btn_cancel: 'Anuluj', btn_close: 'Zamknij', btn_delete: 'Usuń',
+    search: 'Szukaj...', yes: 'Tak', no: 'Nie',
+    settings_global_header: 'Ustawienia globalne',
+    settings_global_desc: 'Współdzielone ze wszystkimi użytkownikami — zmiany tutaj wpływają na wszystkich',
+    settings_personal_header: 'Preferencje osobiste',
+    settings_personal_desc: 'Wpływa tylko na Twój widok — inni użytkownicy mają własne ustawienia',
+  },
+
+  // ── Ukrainian ──────────────────────────────────────────────────────────
+  uk: {
+    app_name: 'Tidslinjal',
+    app_subtitle: 'Спільна оперативна хронологія',
+    today: 'Сьогодні', prev: '‹', next: '›',
+    show: 'Показати', resolution: 'Роздільність',
+    zoom_now: 'Перейти до зараз', add_event: '+ Додати подію',
+    lock_slot: '🔒 Заблокувати слот', logout: 'Вийти',
+    range_day: 'День', range_2days: '2 дні', range_3days: '3 дні',
+    range_4days: '4 дні', range_5days: '5 днів', range_week: 'Тиждень',
+    range_2weeks: '2 тижні', range_3weeks: '3 тижні', range_month: 'Місяць',
+    range_2months: '2 місяці', range_3months: '3 місяці',
+    res_ten: '10 хв', res_quarter: '15 хв', res_hour: 'Година', res_day: 'День',
+    day_mon: 'Пн', day_tue: 'Вт', day_wed: 'Ср', day_thu: 'Чт', day_fri: 'Пт', day_sat: 'Сб', day_sun: 'Нд',
+    tab_legend: 'Легенда', tab_tools: 'Інструменти', tab_alarms: 'Сигнали',
+    tab_references: 'Довідки', references_title: 'Довідки',
+    ref_category_faq: 'FAQ', ref_category_objectives: 'Цілі',
+    ref_category_handbook: 'Посібник', ref_category_sop: 'SOP',
+    ref_category_policy: 'Політика', ref_category_map: 'Карта',
+    ref_category_reference: 'Довідка', ref_category_checklist: 'Контрольний список',
+    ref_category_other: 'Інше',
+    all_categories: 'Усі категорії', all_languages: 'Усі мови',
+    ref_info_total: 'Всього',
+    ref_add_title: 'Додати довідку', ref_type_file: 'Завантажити файл',
+    ref_type_url: 'Посилання / URL', ref_type_local: 'Локальний ресурс',
+    ref_language: 'Мова', ref_owner: 'Власник', ref_custodian: 'Відповідальний',
+    ref_copy_mode: 'Режим копіювання', ref_copy_central: 'Центральна копія',
+    ref_copy_local: 'Локальна копія', ref_copy_link: 'Показати посилання',
+    ref_copy_git: 'Відправити в Git', ref_show: 'Показати',
+    ref_time_added: 'Додано', ref_times_referenced: 'Разів згадано',
+    ref_checksums: 'Контрольні суми',
+    ref_no_checksums: 'Контрольні суми для цього посилання недоступні.',
+    ref_edit_title: 'Редагувати довідку', ref_title: 'Назва',
+    ref_description: 'Опис', ref_tags: 'Теги',
+    ref_owner_placeholder: 'Власник документа', ref_custodian_placeholder: 'Відповідальний за документ',
+    ref_git_save: 'Зберегти в Git', ref_git_load: 'Завантажити з Git',
+    ref_delete_confirm: 'Видалити це посилання?',
+    btn_save: 'Зберегти', btn_cancel: 'Скасувати', btn_close: 'Закрити', btn_delete: 'Видалити',
+    search: 'Пошук...', yes: 'Так', no: 'Ні',
+    settings_global_header: 'Глобальні налаштування',
+    settings_global_desc: 'Спільні для всіх користувачів — зміни тут впливають на всіх',
+    settings_personal_header: 'Особисті налаштування',
+    settings_personal_desc: 'Впливає лише на ваш вигляд — інші користувачі мають власні налаштування',
+  },
+
   // ── Portuguese ───────────────────────────────────────────────────────────
   pt: {
     app_name: 'Tidslinjal',
@@ -6509,6 +6617,17 @@ const TRANSLATIONS = {
   }
 };
 
+// Enabled languages (fetched from server; default to all until loaded)
+window.enabledLanguages = null; // null = all enabled (not yet loaded)
+fetch('/api/languages').then(r => r.json()).then(langs => {
+  if (Array.isArray(langs)) window.enabledLanguages = langs;
+}).catch(() => {});
+
+function isLangEnabled(code) {
+  if (!window.enabledLanguages) return true; // not loaded yet = show all
+  return window.enabledLanguages.includes(code);
+}
+
 function t(key) {
   const lang = (window.state && window.state.preferences && window.state.preferences.language) || 'en';
   return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
@@ -6516,7 +6635,7 @@ function t(key) {
 
 function getLocale() {
   const lang = (window.state && window.state.preferences && window.state.preferences.language) || 'en';
-  const map = { en: 'en-GB', sv: 'sv-SE', fr: 'fr-FR', fi: 'fi-FI', da: 'da-DK', nb: 'nb-NO', et: 'et-EE', lv: 'lv-LV', lt: 'lt-LT', it: 'it-IT', es: 'es-ES', pt: 'pt-PT' };
+  const map = { en: 'en-GB', sv: 'sv-SE', fr: 'fr-FR', fi: 'fi-FI', da: 'da-DK', nb: 'nb-NO', et: 'et-EE', lv: 'lv-LV', lt: 'lt-LT', it: 'it-IT', es: 'es-ES', pt: 'pt-PT', pl: 'pl-PL', uk: 'uk-UA' };
   return map[lang] || 'en-GB';
 }
 

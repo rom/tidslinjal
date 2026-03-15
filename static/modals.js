@@ -4568,18 +4568,15 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_language')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.language==='en'?' active':''}" data-action="setPref" data-args='["language","en"]' title="English">${langAbbr('en')}</button>
-          <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' title="Svenska">${langAbbr('sv')}</button>
-          <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' title="Français">${langAbbr('fr')}</button>
-          <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' title="Suomi">${langAbbr('fi')}</button>
-          <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' title="Dansk">${langAbbr('da')}</button>
-          <button class="toggle-btn${p.language==='nb'?' active':''}" data-action="setPref" data-args='["language","nb"]' title="Norsk (Bokmål)">${langAbbr('nb')}</button>
-          <button class="toggle-btn${p.language==='et'?' active':''}" data-action="setPref" data-args='["language","et"]' title="Eesti">${langAbbr('et')}</button>
-          <button class="toggle-btn${p.language==='lv'?' active':''}" data-action="setPref" data-args='["language","lv"]' title="Latviešu">${langAbbr('lv')}</button>
-          <button class="toggle-btn${p.language==='lt'?' active':''}" data-action="setPref" data-args='["language","lt"]' title="Lietuvių">${langAbbr('lt')}</button>
-          <button class="toggle-btn${p.language==='it'?' active':''}" data-action="setPref" data-args='["language","it"]' title="Italiano">${langAbbr('it')}</button>
-          <button class="toggle-btn${p.language==='es'?' active':''}" data-action="setPref" data-args='["language","es"]' title="Español">${langAbbr('es')}</button>
-          <button class="toggle-btn${p.language==='pt'?' active':''}" data-action="setPref" data-args='["language","pt"]' title="Português">${langAbbr('pt')}</button>
+          ${[
+            {code:'en',name:'English'},{code:'sv',name:'Svenska'},{code:'fr',name:'Français'},
+            {code:'fi',name:'Suomi'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
+            {code:'et',name:'Eesti'},{code:'lv',name:'Latviešu'},{code:'lt',name:'Lietuvių'},
+            {code:'it',name:'Italiano'},{code:'es',name:'Español'},{code:'pt',name:'Português'},
+            {code:'pl',name:'Polski'},{code:'uk',name:'Українська'}
+          ].filter(l => isLangEnabled(l.code)).map(l =>
+            `<button class="toggle-btn${p.language===l.code?' active':''}" data-action="setPref" data-args='["language","${l.code}"]' title="${l.name}">${langAbbr(l.code)}</button>`
+          ).join('')}
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
@@ -12859,7 +12856,7 @@ async function _loadAndRenderReferences() {
   // Ensure default user manual reference exists
   _ensureDefaultUserManualRef();
   // Populate language filter dropdown
-  const _langNamesForFilter = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
+  const _langNamesForFilter = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',uk:'Українська',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
   const langFilter = document.getElementById('refLanguageFilter');
   if (langFilter) {
     const usedLangs = new Set();

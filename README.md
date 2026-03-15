@@ -102,7 +102,7 @@ A structured decision-tracking system accessible from the sidebar:
 - Status workflow: Proposed → Approved / Rejected
 - File attachments on decisions
 - Detachable to a standalone browser window
-- Full i18n support (EN/SV/FR/FI)
+- Full i18n support (14 languages)
 
 ### Log Book
 
@@ -116,6 +116,43 @@ Manage operational resources from the sidebar Resources tab:
 - **Resource details** — name, description, location (lat/lng), image upload, symbol/icon selection
 - **Map integration** — resources displayed as overlay markers on the map projection
 - **Room types** — categorize rooms by function
+
+### Polls & Multipoll
+
+A survey system for operational awareness, accessible from the Tools sidebar tab:
+
+- **Multipoll** — send a poll with one or more questions to users, groups, or roles
+- **Question types** — scale (0–3), yes/no, and free text
+- **Standard questions** — pre-built stress assessment, situational control, and assistance request questions
+- **Custom questions** — define your own questions with any response type
+- **Real-time tracking** — see who has responded vs. not responded, with response timestamps
+- **Reminders** — send reminders to non-responders
+- **Pollster log** — all completed polls with questions, responses, and timestamps are stored for review
+- **Poll report** — summary of polls with aggregated responses, available as a report type
+- Requires Team Lead+ role to create polls
+
+### Ready Checks
+
+Two types of readiness verification:
+
+- **Activity Ready Check** — verify that all activities have been moved from "planned" status before an operation starts; supports force-activate of all planned activities; can be configured to run automatically at a specific time or N minutes before epoch
+- **Person Ready Check** — request all participants to confirm their readiness with traffic-light indicators (green = ready, red = not ready, yellow = pending); supports individual, group, and role-based selection; timed checks can be scheduled for a future date/time; includes optional custom messages
+
+### Day Labels
+
+Custom labels that can be placed on specific days in the timeline header:
+
+- Configurable text, text color, background color, font size, and font weight
+- Useful for marking special days (D-Day, H-Hour, milestone markers)
+
+### Resource Notes & Stars
+
+- **Notes** — add timestamped notes to resources (performance reviews, team spirit observations, achievements)
+- **Stars** — award recognition stars to resources with configurable visibility (global, team, role, or private)
+
+### Startup Message (MOTD)
+
+Administrators can configure a startup message displayed to all users when they log in, useful for announcements, exercise briefings, or status updates.
 
 ### Countdown & Timer System
 
@@ -269,7 +306,26 @@ Ops Lead+ (and Team Lead, with the `can_lock` capability) can lock time slots to
 
 ### Internationalization
 
-Full UI translation in **English (EN)**, **Swedish (SV)**, **French (FR)**, and **Finnish (FI)**. Language preference saved per user. All new features are translated in all four languages.
+Full UI translation in **14 languages**:
+
+| Code | Language | Locale |
+|------|----------|--------|
+| `en` | English | en-GB |
+| `sv` | Svenska (Swedish) | sv-SE |
+| `fr` | Français (French) | fr-FR |
+| `fi` | Suomi (Finnish) | fi-FI |
+| `da` | Dansk (Danish) | da-DK |
+| `nb` | Norsk Bokmål (Norwegian) | nb-NO |
+| `et` | Eesti (Estonian) | et-EE |
+| `lv` | Latviešu (Latvian) | lv-LV |
+| `lt` | Lietuvių (Lithuanian) | lt-LT |
+| `it` | Italiano (Italian) | it-IT |
+| `es` | Español (Spanish) | es-ES |
+| `pt` | Português (Portuguese) | pt-PT |
+| `pl` | Polski (Polish) | pl-PL |
+| `uk` | Українська (Ukrainian) | uk-UA |
+
+Language preference is saved per user. Administrators can restrict the available language set at startup using `--languages` or `--disable-languages` flags. English is always available as the fallback language.
 
 ### Settings & Preferences
 
@@ -373,6 +429,12 @@ Password: admin
 | `--oidc-redirect-url` | `OIDC_REDIRECT_URL` | — | OIDC redirect URL |
 | `--oidc-exclusive` | `OIDC_EXCLUSIVE` | `false` | Disable local login for all users except admin |
 | `--oidc-default-role` | `OIDC_DEFAULT_ROLE` | `readwrite` | Default role for auto-created OIDC users |
+| `--syslog-host` | `SYSLOG_HOST` | — | Syslog server host (enables syslog forwarding) |
+| `--syslog-port` | — | `514` / `6514` | Syslog server port (default 514 UDP/TCP, 6514 TLS) |
+| `--syslog-transport` | `SYSLOG_TRANSPORT` | `udp` | Syslog transport: `udp` / `tcp` / `tls` |
+| `--syslog-format` | `SYSLOG_FORMAT` | `classic` | Syslog message format: `classic` / `json` |
+| `--languages` | `LANGUAGES` | _(all)_ | Comma-separated whitelist of enabled language codes (e.g. `en,sv,da`) |
+| `--disable-languages` | `DISABLE_LANGUAGES` | _(none)_ | Comma-separated blacklist of language codes to disable (ignored if `--languages` is set) |
 
 ### TLS / HTTPS
 
@@ -619,6 +681,7 @@ All endpoints (except `/api/version` and `/api/auth/login`) require an authentic
 | `POST` | `/api/auth/update-email` | Any | Update own email |
 | `GET` | `/api/auth/oidc-config` | Public | OIDC provider info |
 | `GET` | `/api/version` | Public | App version |
+| `GET` | `/api/languages` | Public | Enabled language codes (JSON array) |
 | `GET/PUT` | `/api/preferences` | Any | User preferences |
 | `GET/PUT` | `/api/auth/profile` | Any | Social handles / profile fields |
 | `GET` | `/api/event-types` | Public | List event types |
@@ -696,7 +759,7 @@ tidslinjal/
 └── static/
     ├── index.html    # App shell with all modals
     ├── login.html    # Login page
-    ├── i18n.js       # EN / SV / FR / FI translation strings
+    ├── i18n.js       # 14-language translation strings (EN/SV/FR/FI/DA/NB/ET/LV/LT/IT/ES/PT/PL/UK)
     ├── app.js        # Timeline engine, all UI logic
     ├── modals.js     # Modal dialogs (settings, templates, profile, map, PVA…)
     ├── timeline.js   # Timeline rendering and event drawing
@@ -783,6 +846,25 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v7.0.0 — Language Expansion, Polls & Ready Checks
+
+- **Polish (PL) language** — full UI translation added
+- **Ukrainian (UK) language** — full UI translation added; Tidslinjal now supports 14 languages
+- **Language control flags** — new `--languages` (whitelist) and `--disable-languages` (blacklist) CLI flags to restrict available languages; corresponding `LANGUAGES` and `DISABLE_LANGUAGES` environment variables
+- **Language API endpoint** — `GET /api/languages` returns the list of enabled language codes
+- **Startup summary** — languages section added to server boot output showing enabled languages
+- **Polls / Multipoll** — send surveys with scale, yes/no, and free-text questions to users, groups, or roles; standard stress-assessment questions; real-time response tracking; reminders for non-responders; pollster log with full history
+- **Person Ready Check** — request participants to confirm readiness with traffic-light display (green/red/yellow); individual, group, and role-based selection; timed/scheduled checks; custom messages
+- **Activity Ready Check** — verify all activities moved from "planned" status; force-activate option; configurable auto-run at specific time or before epoch
+- **Day Labels** — custom labels on timeline day headers with configurable colors, font size, and weight
+- **Resource Notes & Stars** — timestamped notes and recognition stars on resources with visibility controls
+- **Startup Message (MOTD)** — admin-configurable message displayed to all users on login
+- **Sequence numbers** — `#` column in list view for sequential event numbering
+- **Time separator setting** — choose between colon (`:`) and dot (`.`) time separators
+- **Timed ready checks** — schedule ready checks for a specific future date/time
+- **Reference document improvements** — checklist category; Git save/load actions
+- **Danish (DA) and Norwegian (NB) full translations** — expanded from partial to comprehensive coverage including all new features
 
 ### v6.1.0 — References, Preferences & Accessibility
 
