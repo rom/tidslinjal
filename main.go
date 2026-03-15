@@ -8176,6 +8176,11 @@ func (app *App) handleDeleteRoom(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "deleted", EntityType: "room", EntityID: id,
+		Summary: fmt.Sprintf("Deleted room/resource ID %d", id),
+	})
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -8278,6 +8283,8 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 	var req struct {
 		ParticipantIDs []int64 `json:"participant_ids"`
 		EventID        *int64  `json:"event_id,omitempty"`
+		Message        string  `json:"message,omitempty"`
+		ScheduledAt    string  `json:"scheduled_at,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -8307,8 +8314,10 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 		CreatedBy:     user.ID,
 		CreatedByName: user.DisplayName,
 		EventID:       req.EventID,
+		Message:       req.Message,
 		Participants:  participants,
 		CreatedAt:     time.Now(),
+		ScheduledAt:   req.ScheduledAt,
 	}
 	if check.CreatedByName == "" {
 		check.CreatedByName = user.Username
@@ -8325,11 +8334,15 @@ func (app *App) handleCreatePersonReadyCheck(w http.ResponseWriter, r *http.Requ
 	app.broker.BroadcastAll(SSEMessage{Event: "prc_new_check", Data: string(prcData)})
 
 	// Notify each participant via personal notification
+	notifBody := fmt.Sprintf("You have been included in a ready check by %s", check.CreatedByName)
+	if check.Message != "" {
+		notifBody += ": " + check.Message
+	}
 	for _, p := range created.Participants {
 		if p.UserID != user.ID {
 			app.notifyUser(p.UserID, "prc",
 				"Ready Check",
-				fmt.Sprintf("You have been included in a ready check by %s", check.CreatedByName),
+				notifBody,
 				fmt.Sprintf("%d", created.ID))
 		}
 	}

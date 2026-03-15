@@ -303,8 +303,20 @@ function getClockData() {
     // Use local override if set, otherwise follow opener
     const isUTC = _localIsUTC !== null ? _localIsUTC : openerUTC;
     const extra = op?.state?.preferences?.extra_clocks || [];
-    return { isUTC, extra };
-  } catch(e) { return { isUTC: _localIsUTC || false, extra:[] }; }
+    const showFlags = !!(op?.state?.preferences?.show_clock_flags);
+    return { isUTC, extra, showFlags };
+  } catch(e) { return { isUTC: _localIsUTC || false, extra:[], showFlags: false }; }
+}
+
+/* ── Clock flag lookup: delegate to opener or return empty ── */
+function _getClockFlag(tz) {
+  try {
+    if (typeof window.opener?._getClockFlag === 'function') return window.opener._getClockFlag(tz);
+    // Fallback: try opener's _tzCountryFlags map
+    const flags = window.opener?._tzCountryFlags;
+    if (flags && flags[tz]) return flags[tz];
+  } catch(e) {}
+  return '';
 }
 
 /* ── Toggle local/Zulu time (local to this popup) ── */
@@ -350,8 +362,10 @@ function removeClock(id) {
 /* ── Build / rebuild all clock cards ── */
 let _lastClockCount = -1;
 let _lastMode = '';
+let _lastShowFlags = null;
 function rebuildClocks() {
-  const {isUTC, extra} = getClockData();
+  const {isUTC, extra, showFlags} = getClockData();
+  _lastShowFlags = showFlags;
   const total = 1 + extra.length + (_showSynthClock ? 1 : 0);
   const wrap = document.getElementById('clocksWrap');
   if (!wrap) return;
@@ -384,24 +398,27 @@ function rebuildClocks() {
     </div>`;
   }
   extra.forEach(ec => {
+    const flag = showFlags ? _getClockFlag(ec.timezone) : '';
+    const flagHtml = flag ? '<span class="clock-flag">' + flag + '</span> ' : '';
+    const labelText = ec.label || ec.timezone;
     if (clockMode === 'analog') {
       html += `<div class="clock-card" id="card-${ec.id}">
         <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
-        <div class="clock-label">${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-label">${flagHtml}${escH(labelText)}</div>
         <div class="analog-wrap">${buildAnalogSVG('svg-'+ec.id)}</div>
         <div class="clock-tz" id="ec-${ec.id}-tz"></div>
       </div>`;
     } else if (clockMode === 'vcr') {
       html += `<div class="clock-card vcr-card" id="card-${ec.id}">
         <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
-        <div class="clock-label vcr-label">${buildSeg7Text(ec.label||ec.timezone)}</div>
+        <div class="clock-label vcr-label">${flag ? '<span class="clock-flag">' + flag + '</span> ' : ''}${buildSeg7Text(labelText)}</div>
         <div class="clock-time vcr-time" id="vcr-ec-${ec.id}-seg">${buildSeg7Time(0,0,0)}</div>
         <div class="clock-tz vcr-tz" id="ec-${ec.id}-tz">${buildSeg7Text('--')}</div>
       </div>`;
     } else {
       html += `<div class="clock-card" id="card-${ec.id}">
         <button class="clock-remove" title="${removeTip}" data-rm-clock="${ec.id}">&times;</button>
-        <div class="clock-label">${escH(ec.label||ec.timezone)}</div>
+        <div class="clock-label">${flagHtml}${escH(labelText)}</div>
         <div class="clock-time" id="ec-${ec.id}-time">--:--:--</div>
         <div class="clock-tz" id="ec-${ec.id}-tz"></div>
       </div>`;
@@ -482,7 +499,8 @@ function tick() {
   const now = _getEffectiveNow();
   const locale = _getLocale();
 
-  if (1 + extra.length + (_showSynthClock ? 1 : 0) !== _lastClockCount || clockMode !== _lastMode) {
+  const curShowFlags = !!(window.opener?.state?.preferences?.show_clock_flags);
+  if (1 + extra.length + (_showSynthClock ? 1 : 0) !== _lastClockCount || clockMode !== _lastMode || curShowFlags !== _lastShowFlags) {
     rebuildClocks();
   }
 

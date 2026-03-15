@@ -283,6 +283,12 @@ async function init() {
   // Initial data load
   await refreshAll();
 
+  // Auto-enable synthetic time if exercise name is set
+  if (state.exercise && state.exercise.enabled && state.exercise.label && !state.syntheticOn) {
+    state.syntheticOn = true;
+    updateSyntheticUI();
+  }
+
   // Set up interactions
   setupZoomDrag();
   setupDragToReschedule();
@@ -408,10 +414,12 @@ function _showWelcomeBanner() {
   overlay.className = 'modal-overlay open';
   overlay.style.zIndex = '9999';
   const p = state.preferences || {};
-  const welcomeURL = p.welcome_url || '';
-  const helpURL = p.help_url || '';
-  const trainingURL = p.training_url || '';
-  const demoURL = p.demo_url || '';
+  const ex = state.exercise || {};
+  // Read URLs from exercise settings (global, set by admin) with per-user pref fallback
+  const welcomeURL = ex.welcome_url || p.welcome_url || '';
+  const helpURL = ex.help_url || p.help_url || '';
+  const trainingURL = ex.training_url || p.training_url || '';
+  const demoURL = ex.demo_url || p.demo_url || '';
   const urlLinks = [
     welcomeURL  ? `<a href="${escHtml(welcomeURL)}" target="_blank" rel="noopener" style="color:var(--accent)">🏠 ${t('settings_welcome_url')||'Welcome'}</a>` : '',
     helpURL     ? `<a href="${escHtml(helpURL)}" target="_blank" rel="noopener" style="color:var(--accent)">📖 ${t('settings_help_url')||'Help'}</a>` : '',
