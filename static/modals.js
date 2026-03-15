@@ -7875,7 +7875,7 @@ function updateUILabels() {
 
 function updateLangFlags() {
   const lang = (state.preferences && state.preferences.language) || 'en';
-  ['EN', 'SV', 'FR', 'FI', 'DA'].forEach(code => {
+  ['EN', 'SV', 'FR', 'FI', 'DA', 'NB', 'ET', 'LV', 'LT', 'IT', 'ES', 'PT'].forEach(code => {
     const btn = document.getElementById('flag'+code);
     if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
   });
@@ -13126,7 +13126,7 @@ function _openReferenceUploadModal() {
           </select>
           <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
           <select id="refUpLang" class="form-input">
-            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="es">Español</option><option value="et">Eesti</option><option value="lv">Latviešu</option><option value="lt">Lietuvių</option>
+            <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="it">Italiano</option><option value="es">Español</option><option value="pt">Português</option><option value="et">Eesti</option><option value="lv">Latviešu</option><option value="lt">Lietuvių</option>
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
           <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
