@@ -3343,10 +3343,20 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 		entries = filtered
 	}
 
+	// Build filename with timestamp and hostname: YYYYMMDD-hostname-audit-log.ext
+	auditDate := time.Now().Format("20060102")
+	auditHost := r.Host
+	if h := strings.Split(auditHost, ":"); len(h) > 0 {
+		auditHost = h[0]
+	}
+	if auditHost == "" {
+		auditHost, _ = os.Hostname()
+	}
+
 	switch exportFormat {
 	case "csv":
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.csv\"")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-%s-audit-log.csv\"", auditDate, auditHost))
 		fmt.Fprintf(w, "ID,Timestamp,User,Action,EntityType,EntityID,Summary\n")
 		for _, e := range entries {
 			fmt.Fprintf(w, "%d,%s,%s,%s,%s,%d,%s\n",
@@ -3362,12 +3372,12 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 		return
 	case "json":
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.json\"")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-%s-audit-log.json\"", auditDate, auditHost))
 		json.NewEncoder(w).Encode(entries)
 		return
 	case "rtf":
 		w.Header().Set("Content-Type", "application/rtf")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.rtf\"")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-%s-audit-log.rtf\"", auditDate, auditHost))
 		fmt.Fprintf(w, "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Helvetica;}}\n")
 		fmt.Fprintf(w, "\\f0\\fs24\\b Audit Log\\b0\\par\\par\n")
 		fmt.Fprintf(w, "\\trowd\\trgaph100\\cellx800\\cellx3200\\cellx5200\\cellx7200\\cellx8800\\cellx9600\\cellx14000\\pard\\intbl\n")
@@ -3387,7 +3397,7 @@ func (app *App) handleGetAudit(w http.ResponseWriter, r *http.Request, user *Use
 		fmt.Fprintf(w, "}\n")
 		return
 	case "docx":
-		app.exportAuditDocx(w, entries)
+		app.exportAuditDocx(w, entries, auditDate, auditHost)
 		return
 	default:
 		jsonOK(w, entries)
@@ -3422,9 +3432,9 @@ func rtfEscape(s string) string {
 	return b.String()
 }
 
-func (app *App) exportAuditDocx(w http.ResponseWriter, entries []AuditEntry) {
+func (app *App) exportAuditDocx(w http.ResponseWriter, entries []AuditEntry, auditDate, auditHost string) {
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"audit-log.docx\"")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-%s-audit-log.docx\"", auditDate, auditHost))
 	zw := zip.NewWriter(w)
 	defer zw.Close()
 
@@ -8577,6 +8587,81 @@ func (app *App) runPRCScheduler() {
 	}
 }
 
+// runPollScheduler checks for scheduled polls that are due and activates them.
+func (app *App) runPollScheduler() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		polls := app.store.GetPolls()
+		for _, poll := range polls {
+			if poll.ScheduledAt == "" || poll.Status != "scheduled" {
+				continue
+			}
+			scheduledTime, err := time.Parse(time.RFC3339, poll.ScheduledAt)
+			if err != nil {
+				continue
+			}
+			if now.Before(scheduledTime) {
+				continue
+			}
+			// Activate the poll
+			poll.Status = "open"
+			poll.Fired = true
+			if err := app.store.UpdatePoll(poll); err != nil {
+				continue
+			}
+			// Broadcast SSE
+			pollData, _ := json.Marshal(poll)
+			app.broker.BroadcastAll(SSEMessage{Event: "poll_new", Data: string(pollData)})
+			// Notify targeted users
+			targetUserIDs := app.resolvePollTargets(poll)
+			for _, uid := range targetUserIDs {
+				if uid != poll.CreatedBy {
+					app.notifyUser(uid, "poll",
+						"New Poll: "+poll.Title,
+						fmt.Sprintf("A scheduled poll by %s is now active", poll.CreatedByName),
+						fmt.Sprintf("%d", poll.ID))
+				}
+			}
+			log.Printf("[INFO] Scheduled poll '%s' (ID %d) activated", poll.Title, poll.ID)
+		}
+
+		// Auto-remind: check polls with reminder_mins set
+		for _, poll := range polls {
+			if poll.Status != "open" || poll.ReminderMins <= 0 {
+				continue
+			}
+			reminderTime := poll.CreatedAt.Add(time.Duration(poll.ReminderMins) * time.Minute)
+			if now.Before(reminderTime) {
+				continue
+			}
+			// Check if all targets have responded
+			targetUserIDs := app.resolvePollTargets(poll)
+			respondedSet := make(map[int64]bool)
+			for _, r := range poll.Responses {
+				respondedSet[r.UserID] = true
+			}
+			reminded := 0
+			for _, uid := range targetUserIDs {
+				if !respondedSet[uid] {
+					app.notifyUser(uid, "poll_reminder",
+						"Poll Reminder: "+poll.Title,
+						fmt.Sprintf("Please respond to the poll '%s'", poll.Title),
+						fmt.Sprintf("%d", poll.ID))
+					reminded++
+				}
+			}
+			if reminded > 0 {
+				// Clear reminder so it doesn't fire again
+				poll.ReminderMins = 0
+				app.store.UpdatePoll(poll)
+				log.Printf("[INFO] Auto-reminded %d non-responders for poll '%s' (ID %d)", reminded, poll.Title, poll.ID)
+			}
+		}
+	}
+}
+
 func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -8670,11 +8755,13 @@ func (app *App) handleGetDefaultPollQuestions(w http.ResponseWriter, r *http.Req
 
 func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Title       string         `json:"title"`
-		Description string         `json:"description"`
-		TargetType  string         `json:"target_type"`
-		TargetIDs   []string       `json:"target_ids"`
-		Questions   []PollQuestion `json:"questions"`
+		Title        string         `json:"title"`
+		Description  string         `json:"description"`
+		TargetType   string         `json:"target_type"`
+		TargetIDs    []string       `json:"target_ids"`
+		Questions    []PollQuestion `json:"questions"`
+		ScheduledAt  string         `json:"scheduled_at,omitempty"`
+		ReminderMins int            `json:"reminder_mins,omitempty"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -8700,6 +8787,14 @@ func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *U
 	if creatorName == "" {
 		creatorName = user.Username
 	}
+	// Determine if this is a scheduled (timed) poll
+	isScheduled := false
+	if req.ScheduledAt != "" {
+		if st, err := time.Parse(time.RFC3339, req.ScheduledAt); err == nil && st.After(time.Now()) {
+			isScheduled = true
+		}
+	}
+
 	poll := Poll{
 		CreatedBy:     user.ID,
 		CreatedByName: creatorName,
@@ -8711,6 +8806,11 @@ func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *U
 		Questions:     questions,
 		Responses:     []PollResponse{},
 		Status:        "open",
+		ScheduledAt:   req.ScheduledAt,
+		ReminderMins:  req.ReminderMins,
+	}
+	if isScheduled {
+		poll.Status = "scheduled"
 	}
 	created, err := app.store.AddPoll(poll)
 	if err != nil {
@@ -8719,26 +8819,32 @@ func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *U
 	}
 	jsonOK(w, created)
 
-	// Broadcast SSE
-	pollData, _ := json.Marshal(created)
-	app.broker.BroadcastAll(SSEMessage{Event: "poll_new", Data: string(pollData)})
+	if !isScheduled {
+		// Broadcast SSE
+		pollData, _ := json.Marshal(created)
+		app.broker.BroadcastAll(SSEMessage{Event: "poll_new", Data: string(pollData)})
 
-	// Notify targeted users
-	targetUserIDs := app.resolvePollTargets(created)
-	for _, uid := range targetUserIDs {
-		if uid != user.ID {
-			app.notifyUser(uid, "poll",
-				"New Poll: "+created.Title,
-				fmt.Sprintf("You have been included in a poll by %s", creatorName),
-				fmt.Sprintf("%d", created.ID))
+		// Notify targeted users
+		targetUserIDs := app.resolvePollTargets(created)
+		for _, uid := range targetUserIDs {
+			if uid != user.ID {
+				app.notifyUser(uid, "poll",
+					"New Poll: "+created.Title,
+					fmt.Sprintf("You have been included in a poll by %s", creatorName),
+					fmt.Sprintf("%d", created.ID))
+			}
 		}
 	}
 
 	// Audit log
+	auditSummary := fmt.Sprintf("Created poll '%s' targeting %s: %s", created.Title, created.TargetType, strings.Join(created.TargetIDs, ", "))
+	if isScheduled {
+		auditSummary += fmt.Sprintf(" (scheduled at %s)", req.ScheduledAt)
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "create_poll", EntityType: "poll", EntityID: created.ID,
-		Summary: fmt.Sprintf("Created poll '%s' targeting %s: %s", created.Title, created.TargetType, strings.Join(created.TargetIDs, ", ")),
+		Summary: auditSummary,
 	})
 }
 
@@ -8949,16 +9055,11 @@ func (app *App) handlePollReminder(w http.ResponseWriter, r *http.Request, user 
 
 func (app *App) handleGetPollLog(w http.ResponseWriter, r *http.Request, user *User) {
 	polls := app.store.GetPolls()
-	var closed []Poll
-	for _, p := range polls {
-		if p.Status == "closed" {
-			closed = append(closed, p)
-		}
+	// Return all polls (open, closed, scheduled) — not just closed ones
+	if polls == nil {
+		polls = []Poll{}
 	}
-	if closed == nil {
-		closed = []Poll{}
-	}
-	jsonOK(w, closed)
+	jsonOK(w, polls)
 }
 
 // resolvePollTargets returns the list of user IDs targeted by a poll
@@ -11587,6 +11688,7 @@ func main() {
 	go app.runSessionCleaner()
 	go app.runGradualBackupScheduler()
 	go app.runPRCScheduler()
+	go app.runPollScheduler()
 	app.startAutoReportScheduler()
 
 	addr := host + ":" + port

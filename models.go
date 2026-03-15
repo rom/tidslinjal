@@ -1133,6 +1133,9 @@ type Poll struct {
 	Responses     []PollResponse `json:"responses"`
 	Status        string         `json:"status"`          // open | closed
 	ClosedAt      *time.Time     `json:"closed_at,omitempty"`
+	ScheduledAt   string         `json:"scheduled_at,omitempty"` // ISO 8601 time for timed polls
+	ReminderMins  int            `json:"reminder_mins,omitempty"` // auto-remind non-responders after N minutes
+	Fired         bool           `json:"fired,omitempty"`         // true once a scheduled poll has been activated
 }
 
 // DefaultPollQuestions returns the standard personnel-check questions

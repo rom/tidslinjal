@@ -375,17 +375,31 @@ async function init() {
   if (landingView === 'list' && !_listViewActive) {
     setTimeout(() => toggleListView(), 50);
   } else if (landingView === 'log_book') {
-    state.sidebarTab = 'log_book';
+    // Log book is a sub-tab of the "logs" sidebar tab
+    state.sidebarTab = 'logs';
     document.querySelectorAll('.sidebar-tab').forEach(t2 => t2.classList.remove('active'));
-    const lbTab = document.querySelector('.sidebar-tab[data-tab="log_book"]');
-    if (lbTab) lbTab.classList.add('active');
+    const logsTab = document.querySelector('.sidebar-tab[data-tab="logs"]');
+    if (logsTab) logsTab.classList.add('active');
+    const el = document.getElementById('sidebarContent');
+    if (el) el.dataset.logSubTab = 'logbook';
     renderSidebar();
+    // Ensure sidebar is visible on mobile
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && window.innerWidth <= 1024) sidebar.classList.add('visible');
   } else if (landingView === 'decisions') {
-    state.sidebarTab = 'decision_log';
+    // Decision log is a sub-tab of the "logs" sidebar tab
+    state.sidebarTab = 'logs';
     document.querySelectorAll('.sidebar-tab').forEach(t2 => t2.classList.remove('active'));
-    const dlTab = document.querySelector('.sidebar-tab[data-tab="decision_log"]');
-    if (dlTab) dlTab.classList.add('active');
+    const logsTab = document.querySelector('.sidebar-tab[data-tab="logs"]');
+    if (logsTab) logsTab.classList.add('active');
+    const el = document.getElementById('sidebarContent');
+    if (el) el.dataset.logSubTab = 'decision';
     renderSidebar();
+    // Ensure sidebar is visible on mobile
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && window.innerWidth <= 1024) sidebar.classList.add('visible');
+  } else if (landingView === 'reports') {
+    setTimeout(() => { if (typeof openReportModal === 'function') openReportModal(); }, 200);
   } else if (landingView === 'map') {
     setTimeout(() => { window.open('/map', 'tidslinjal-map', 'width=1200,height=800,resizable=yes'); }, 200);
   }

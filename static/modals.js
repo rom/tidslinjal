@@ -2424,7 +2424,7 @@ async function _loadPollsterLog(container) {
               else if (v === 1) bg = 'background:#F39C1233';
               else if (v === 2) bg = 'background:#E67E2233';
               else if (v === 3) bg = 'background:#E74C3C33';
-              val = `${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v}`;
+              val = t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v;
             } else if (q.type === 'yes_no') {
               bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
               val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
@@ -3002,8 +3002,8 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('info_range')}</div>
         <div style="font-size:var(--fs-sm);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
-          <span style="color:var(--text-dim)">${t('info_from')}:</span><span>${localShortDate(state.startDate)}</span>
-          <span style="color:var(--text-dim)">${t('info_to')}:</span><span>${localShortDate(addDays(state.startDate, getRangeDays()-1))}</span>
+          <span style="color:var(--text-dim)">${t('info_from')}:</span><span>${fmtDateTime(state.startDate)}</span>
+          <span style="color:var(--text-dim)">${t('info_to')}:</span><span>${fmtDateTime(addDays(state.startDate, getRangeDays()-1))}</span>
           <span style="color:var(--text-dim)">${t('info_events')}:</span><span>${state.events.filter(e=>!isTypeHidden(e.event_type)).length}</span>
           <span style="color:var(--text-dim)">${t('info_locks')}:</span><span>${state.locks.length}</span>
         </div>
@@ -3036,8 +3036,8 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_uptime')||'Server Uptime'}:</span><span>${vInfo.uptime || '—'}</span>
-          <span style="color:var(--text-dim)">${t('info_tool_started')||'Tool Started'}:</span><span>${vInfo.started_at ? new Date(vInfo.started_at).toLocaleString(getLocale()) : '—'}</span>
-          <span style="color:var(--text-dim)">${t('info_server_booted')||'Server Booted'}:</span><span>${vInfo.server_booted_at ? new Date(vInfo.server_booted_at).toLocaleString(getLocale()) : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_tool_started')||'Tool Started'}:</span><span>${vInfo.started_at ? fmtDateTime(new Date(vInfo.started_at)) : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_server_booted')||'Server Booted'}:</span><span>${vInfo.server_booted_at ? fmtDateTime(new Date(vInfo.server_booted_at)) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${window._offlineModeForced ? '<span style="color:#f59e0b">● ' + (t('info_forced_offline')||'Forced Offline') + '</span>' : navigator.onLine ? '<span style="color:#22c55e">● ' + (t('info_online')||'Online') + '</span>' : '<span style="color:var(--red,#E74C3C)">● ' + (t('info_offline')||'Offline') + '</span>'}</span>
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
@@ -3049,7 +3049,7 @@ function renderSidebar() {
           const sizeStr = db.size_bytes < 1024 ? db.size_bytes + ' B'
             : db.size_bytes < 1048576 ? (db.size_bytes/1024).toFixed(1) + ' KB'
             : (db.size_bytes/1048576).toFixed(1) + ' MB';
-          const createdStr = db.created_at ? new Date(db.created_at).toLocaleString(getLocale()) : '—';
+          const createdStr = db.created_at ? fmtDateTime(new Date(db.created_at)) : '—';
           return `<div class="sidebar-section">
             <div class="sidebar-section-title">💾 ${t('legend_database')||'Database'}</div>
             <div style="font-size:var(--fs-xs);color:var(--text);display:grid;grid-template-columns:auto 1fr;gap:3px 8px">
@@ -3135,6 +3135,46 @@ function renderSidebar() {
     `;
   } else if (tab === 'alarms') {
     const active = state.alarms.filter(a => !a.fired);
+
+    // Collect scheduled (queued) polls and PRCs to show in alarms
+    let queuedHtml = '';
+    const _fetchQueued = async () => {
+      let items = [];
+      // Scheduled polls
+      try {
+        const pollRes = await api('GET', '/api/polls');
+        if (pollRes.ok) {
+          const polls = await pollRes.json();
+          (polls || []).forEach(p => {
+            if (p.status === 'scheduled' && p.scheduled_at) {
+              items.push({ type: 'poll', title: p.title, time: p.scheduled_at, id: p.id });
+            }
+          });
+        }
+      } catch {}
+      // Scheduled PRCs
+      try {
+        const prcs = await apiGet('/api/person-ready-check');
+        (prcs || []).forEach(c => {
+          if (c.scheduled_at && !c.fired && new Date(c.scheduled_at) > new Date()) {
+            items.push({ type: 'prc', title: (t('prc_ready_check')||'Ready Check') + ' #' + c.id, time: c.scheduled_at, id: c.id });
+          }
+        });
+      } catch {}
+      const queueEl = document.getElementById('alarmQueuedItems');
+      if (!queueEl) return;
+      if (items.length === 0) {
+        queueEl.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${t('alarms_no_queued')||'No queued items.'}</div>`;
+        return;
+      }
+      items.sort((a, b) => new Date(a.time) - new Date(b.time));
+      queueEl.innerHTML = items.map(it => `
+        <div class="alarm-item" style="border-left:3px solid ${it.type === 'poll' ? 'var(--accent)' : '#F39C12'}">
+          <div class="alarm-title">${it.type === 'poll' ? '📊' : '🙋'} ${escHtml(it.title)}</div>
+          <div class="alarm-meta">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${fmtDateTime(new Date(it.time))}</div>
+        </div>`).join('');
+    };
+
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('tab_alarms')}</div>
@@ -3148,7 +3188,12 @@ function renderSidebar() {
             </div>`).join('')}</div>`
         }
       </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">⏰ ${t('alarms_queued')||'Queued Timed Items'}</div>
+        <div id="alarmQueuedItems"><em style="color:var(--text-dim);font-size:var(--fs-xs)">${t('lb_loading')||'Loading…'}</em></div>
+      </div>
     `;
+    _fetchQueued();
   } else if (tab === 'layers') {
     const myLayers     = state.layers.filter(l => l.owner_id === state.user.id);
     const sharedLayers = state.layers.filter(l => l.owner_id !== state.user.id);
@@ -6860,8 +6905,10 @@ function _showPRCPopup(check) {
 }
 
 /* ── Poll / Multipoll ── */
-async function openPollModal() {
+async function openPollModal(opts) {
+  opts = opts || {};
   const isCreator = hasRole2(state.user.role, 'teamlead');
+  const hideCreatePane = opts.hideCreate || false;
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
 
@@ -6885,8 +6932,12 @@ async function openPollModal() {
           ${t('poll_desc')||'Poll specific users, groups, or roles with standard or custom questions. All replies are collected and reported.'}
         </p>
         ${isCreator ? `
-        <div style="border:1px solid var(--accent);border-radius:var(--radius);padding:12px;margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2))">
-          <h4 style="font-size:var(--fs-sm);margin-bottom:8px">${t('poll_create')||'Create New Poll'}</h4>
+        <div id="pollCreatePane" style="border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2));overflow:hidden">
+          <div id="pollCreateHeader" style="padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+            <h4 style="font-size:var(--fs-sm);margin:0">${t('poll_create')||'Create New Poll'}</h4>
+            <span id="pollCreateToggle" style="font-size:12px;color:var(--text-dim)">${hideCreatePane ? '▶' : '▼'}</span>
+          </div>
+          <div id="pollCreateBody" style="padding:0 12px 12px 12px;${hideCreatePane ? 'display:none' : ''}">`
           <div style="margin-bottom:8px">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('poll_title')||'Poll title'}:</label>
             <input type="text" id="pollTitleInput" placeholder="${t('poll_title')||'Poll title'}..." maxlength="100"
@@ -6936,8 +6987,19 @@ async function openPollModal() {
                 </label>`).join('')}
             </div>
           </div>
-          <div style="margin-top:10px">
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" id="btnCreatePoll">${t('poll_create')||'Create Poll'}</button>
+            <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--text-dim)">
+              <input type="checkbox" id="pollTimedCheck" style="accent-color:var(--accent);width:12px;height:12px">
+              ${t('poll_timed')||'Timed Poll'}
+            </label>
+            <input type="datetime-local" id="pollTimedDateTime" style="display:none;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+            <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--text-dim)">
+              <span>${t('poll_reminder_after')||'Remind after'}:</span>
+              <input type="number" id="pollReminderMins" min="0" value="0" placeholder="0" style="width:50px;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+              <span>${t('poll_minutes')||'min'}</span>
+            </label>
+          </div>
           </div>
         </div>` : ''}
         <div id="pollActiveList"></div>
@@ -6963,6 +7025,37 @@ async function openPollModal() {
       if (r) r.style.display = m === 'roles' ? '' : 'none';
     });
   });
+
+  // Collapsible create pane toggle
+  const pollCreateHeader = modal.querySelector('#pollCreateHeader');
+  if (pollCreateHeader) {
+    pollCreateHeader.addEventListener('click', () => {
+      const body = modal.querySelector('#pollCreateBody');
+      const toggle = modal.querySelector('#pollCreateToggle');
+      if (body) {
+        const hidden = body.style.display === 'none';
+        body.style.display = hidden ? '' : 'none';
+        if (toggle) toggle.textContent = hidden ? '▼' : '▶';
+      }
+    });
+  }
+
+  // Timed poll toggle
+  const pollTimedCheck = modal.querySelector('#pollTimedCheck');
+  const pollTimedDateTime = modal.querySelector('#pollTimedDateTime');
+  if (pollTimedCheck && pollTimedDateTime) {
+    pollTimedCheck.addEventListener('change', () => {
+      pollTimedDateTime.style.display = pollTimedCheck.checked ? '' : 'none';
+      const btn = modal.querySelector('#btnCreatePoll');
+      if (btn) btn.textContent = pollTimedCheck.checked
+        ? (t('poll_schedule')||'Schedule Poll')
+        : (t('poll_create')||'Create Poll');
+      if (pollTimedCheck.checked && !pollTimedDateTime.value) {
+        const d = new Date(); d.setMinutes(d.getMinutes() + 30);
+        pollTimedDateTime.value = fmtDateInput(d);
+      }
+    });
+  }
 
   // Standard questions button
   const stdBtn = modal.querySelector('#pollUseStandard');
@@ -7026,6 +7119,15 @@ async function openPollModal() {
 
       try {
         const payload = { title, questions: mappedQs, target_type: targetType, target_ids: targetIds.map(String) };
+        // Timed poll
+        const isPollTimed = modal.querySelector('#pollTimedCheck')?.checked || false;
+        const pollTimedVal = isPollTimed ? modal.querySelector('#pollTimedDateTime')?.value : null;
+        if (isPollTimed && pollTimedVal) {
+          payload.scheduled_at = new Date(pollTimedVal).toISOString();
+        }
+        // Reminder
+        const reminderMins = parseInt(modal.querySelector('#pollReminderMins')?.value || '0', 10);
+        if (reminderMins > 0) payload.reminder_mins = reminderMins;
         const res = await apiPost('/api/polls', payload);
         if (!res.ok) {
           let errMsg = '';
@@ -7102,7 +7204,7 @@ async function _loadPolls(modal) {
             if (q.type === 'scale' || q.type === 'scale_0_3') {
               return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
                 <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
-                  ${[0,1,2,3].map(v => `<button class="toggle-btn poll-scale-btn" data-qi="${qi}" data-val="${v}">${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]}</button>`).join('')}
+                  ${[0,1,2,3].map(v => `<button class="toggle-btn poll-scale-btn" data-qi="${qi}" data-val="${v}">${t('poll_scale_'+v)||['None','Low','Medium','High'][v]}</button>`).join('')}
                 </div></div>`;
             } else if (q.type === 'yes_no') {
               return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
@@ -7201,7 +7303,7 @@ async function _loadPolls(modal) {
                 else if (v === 1) bg = 'background:#F39C1233';
                 else if (v === 2) bg = 'background:#E67E2233';
                 else if (v === 3) bg = 'background:#E74C3C33';
-                val = `${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v}`;
+                val = t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v;
               } else if (q.type === 'yes_no') {
                 bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
                 val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
@@ -8039,7 +8141,7 @@ function connectSSE() {
       if (data.type === 'poll') {
         showNotification('info', `📊 ${data.title}: ${data.body}`, 8000);
         // Auto-open poll modal so the user can respond immediately
-        setTimeout(() => { if (typeof openPollModal === 'function') openPollModal(); }, 500);
+        setTimeout(() => { if (typeof openPollModal === 'function') openPollModal({hideCreate: true}); }, 500);
       } else {
         showNotification('info', `${data.title}: ${data.body}`);
       }
@@ -12440,7 +12542,9 @@ function exportAuditLog(format) {
   const ext = format === 'docx' ? 'docx' : format;
   const a = document.createElement('a');
   a.href = url;
-  a.download = `audit-log-${new Date().toISOString().slice(0,10)}.${ext}`;
+  const _auditTs = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const _auditHost = window.location.hostname || 'localhost';
+  a.download = `${_auditTs}-${_auditHost}-audit-log.${ext}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
