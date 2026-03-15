@@ -77,6 +77,9 @@ type Store struct {
 	rateLimitSettings    RateLimitSettings
 	geoblockingSettings  GeoblockingSettings
 	encryptionSettings   EncryptionSettings
+	resourceNotes        []ResourceNote
+	resourceStars        []ResourceStar
+	startupText          string
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -108,6 +111,8 @@ type Store struct {
 	nextMapResourceID        int64
 	nextReferenceDocID       int64
 	nextDayLabelID           int64
+	nextResourceNoteID       int64
+	nextResourceStarID       int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User

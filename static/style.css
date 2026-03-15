@@ -328,6 +328,28 @@ select.ctrl-select:focus { border-color: var(--accent); }
 #timeline-container {
   flex: 1; overflow: auto; position: relative; background: var(--bg);
 }
+
+/* Calendar navigation arrows */
+.cal-nav-arrow {
+  position: sticky; top: 50%; z-index: 35;
+  width: 28px; height: 56px; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg2) 85%, transparent);
+  border: 1px solid var(--border); cursor: pointer; user-select: none;
+  font-size: 22px; font-weight: 700; color: var(--accent);
+  transition: background 0.15s, color 0.15s;
+  position: fixed;
+}
+.cal-nav-arrow:hover {
+  background: var(--accent); color: #fff;
+}
+.cal-nav-left {
+  left: 0; border-radius: 0 6px 6px 0;
+  margin-top: -28px;
+}
+.cal-nav-right {
+  right: 0; border-radius: 6px 0 0 6px;
+  margin-top: -28px;
+}
 #list-view {
   flex: 1; overflow: auto; background: var(--bg);
 }

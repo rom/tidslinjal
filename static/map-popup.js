@@ -1749,15 +1749,44 @@ function _editOverlayItem(itemId) {
   const item = (_currentOverlay.items || []).find(i => i.id === itemId);
   if (!item) return;
   _map.closePopup();
-  const newLabel = prompt('Label:', item.label);
-  if (newLabel === null) return;
-  item.label = newLabel;
-  const newNotes = prompt('Notes:', item.notes || '');
-  if (newNotes !== null) item.notes = newNotes;
-  const newIcon = prompt('Icon:', item.icon || '');
-  if (newIcon !== null) item.icon = newIcon;
-  _saveOverlay();
-  _renderOverlayItems(_currentOverlay);
+
+  // Create inline edit form as popup on the map
+  const formHtml = `<div style="font-size:12px;min-width:200px">
+    <div style="margin-bottom:4px"><label style="font-weight:600">${typeof t==='function'?t('map_item_label')||'Label':'Label'}:</label><br>
+    <input type="text" id="_oiEditLabel" value="${escH(item.label||'')}" style="width:100%;font-size:11px;padding:3px 5px;border:1px solid #999;border-radius:3px"></div>
+    <div style="margin-bottom:4px"><label style="font-weight:600">Notes:</label><br>
+    <input type="text" id="_oiEditNotes" value="${escH(item.notes||'')}" style="width:100%;font-size:11px;padding:3px 5px;border:1px solid #999;border-radius:3px"></div>
+    <div style="margin-bottom:4px"><label style="font-weight:600">Icon:</label><br>
+    <input type="text" id="_oiEditIcon" value="${escH(item.icon||'')}" style="width:60px;font-size:11px;padding:3px 5px;border:1px solid #999;border-radius:3px"></div>
+    <div style="margin-bottom:6px"><label style="font-weight:600">${typeof t==='function'?t('map_item_color')||'Color':'Color'}:</label><br>
+    <input type="color" id="_oiEditColor" value="${item.color||'#3388ff'}" style="width:50px;height:24px;border:1px solid #999;border-radius:3px;cursor:pointer"></div>
+    <button id="_oiEditSave" style="padding:3px 10px;font-size:11px;background:#2980b9;color:#fff;border:none;border-radius:3px;cursor:pointer">${typeof t==='function'?t('map_item_save')||'Save':'Save'}</button>
+    <button id="_oiEditCancel" style="padding:3px 10px;font-size:11px;background:#ccc;border:none;border-radius:3px;cursor:pointer;margin-left:4px">Cancel</button>
+  </div>`;
+
+  const popup = L.popup({ closeButton: true, className: 'overlay-item-popup', maxWidth: 260 })
+    .setLatLng([item.lat || item.y, item.lng || item.x])
+    .setContent(formHtml)
+    .openOn(_map);
+
+  setTimeout(() => {
+    const saveBtn = document.getElementById('_oiEditSave');
+    const cancelBtn = document.getElementById('_oiEditCancel');
+    if (saveBtn) saveBtn.addEventListener('click', () => {
+      const lbl = document.getElementById('_oiEditLabel');
+      const notes = document.getElementById('_oiEditNotes');
+      const icon = document.getElementById('_oiEditIcon');
+      const color = document.getElementById('_oiEditColor');
+      if (lbl) item.label = lbl.value;
+      if (notes) item.notes = notes.value;
+      if (icon) item.icon = icon.value;
+      if (color) item.color = color.value;
+      _map.closePopup();
+      _saveOverlay();
+      _renderOverlayItems(_currentOverlay);
+    });
+    if (cancelBtn) cancelBtn.addEventListener('click', () => _map.closePopup());
+  }, 50);
 }
 
 function _deleteOverlayItem(itemId) {

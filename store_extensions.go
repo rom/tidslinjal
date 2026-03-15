@@ -340,3 +340,120 @@ func (s *Store) GetRoomFreeBusy(roomID int64, from, to time.Time) []Event {
 	}
 	return result
 }
+
+// ── Resource Notes ──────────────────────────────────────────────────────────
+
+func (s *Store) GetResourceNotes(resourceType, resourceID string) []ResourceNote {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []ResourceNote
+	for _, n := range s.resourceNotes {
+		if n.ResourceType == resourceType && n.ResourceID == resourceID {
+			result = append(result, n)
+		}
+	}
+	// Sort newest first
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.After(result[j].CreatedAt) })
+	return result
+}
+
+func (s *Store) GetAllResourceNotes() []ResourceNote {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]ResourceNote, len(s.resourceNotes))
+	copy(result, s.resourceNotes)
+	return result
+}
+
+func (s *Store) AddResourceNote(note ResourceNote) (ResourceNote, error) {
+	s.mu.Lock()
+	s.nextResourceNoteID++
+	note.ID = s.nextResourceNoteID
+	if note.CreatedAt.IsZero() {
+		note.CreatedAt = time.Now()
+	}
+	note.UpdatedAt = note.CreatedAt
+	s.resourceNotes = append(s.resourceNotes, note)
+	snap := append([]ResourceNote(nil), s.resourceNotes...)
+	s.mu.Unlock()
+	return note, s.persist("resource_notes.json", snap)
+}
+
+func (s *Store) DeleteResourceNote(id int64) error {
+	s.mu.Lock()
+	for i := range s.resourceNotes {
+		if s.resourceNotes[i].ID == id {
+			s.resourceNotes = append(s.resourceNotes[:i], s.resourceNotes[i+1:]...)
+			snap := append([]ResourceNote(nil), s.resourceNotes...)
+			s.mu.Unlock()
+			return s.persist("resource_notes.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("resource note %d not found", id)
+}
+
+// ── Resource Stars ──────────────────────────────────────────────────────────
+
+func (s *Store) GetResourceStars(resourceType, resourceID string) []ResourceStar {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []ResourceStar
+	for _, st := range s.resourceStars {
+		if st.ResourceType == resourceType && st.ResourceID == resourceID {
+			result = append(result, st)
+		}
+	}
+	return result
+}
+
+func (s *Store) GetAllResourceStars() []ResourceStar {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]ResourceStar, len(s.resourceStars))
+	copy(result, s.resourceStars)
+	return result
+}
+
+func (s *Store) AddResourceStar(star ResourceStar) (ResourceStar, error) {
+	s.mu.Lock()
+	s.nextResourceStarID++
+	star.ID = s.nextResourceStarID
+	if star.CreatedAt.IsZero() {
+		star.CreatedAt = time.Now()
+	}
+	star.UpdatedAt = star.CreatedAt
+	s.resourceStars = append(s.resourceStars, star)
+	snap := append([]ResourceStar(nil), s.resourceStars...)
+	s.mu.Unlock()
+	return star, s.persist("resource_stars.json", snap)
+}
+
+func (s *Store) DeleteResourceStar(id int64) error {
+	s.mu.Lock()
+	for i := range s.resourceStars {
+		if s.resourceStars[i].ID == id {
+			s.resourceStars = append(s.resourceStars[:i], s.resourceStars[i+1:]...)
+			snap := append([]ResourceStar(nil), s.resourceStars...)
+			s.mu.Unlock()
+			return s.persist("resource_stars.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("resource star %d not found", id)
+}
+
+// ── Startup Text ──────────────────────────────────────────────────────────
+
+func (s *Store) GetStartupText() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.startupText
+}
+
+func (s *Store) SetStartupText(text string) error {
+	s.mu.Lock()
+	s.startupText = text
+	s.mu.Unlock()
+	return s.persist("startup_text.json", map[string]string{"text": text})
+}
