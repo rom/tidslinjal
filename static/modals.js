@@ -1544,7 +1544,172 @@ async function openUserModal(user) {
       </label>`).join('');
   }
 
+  // ── Resource Notes & Stars panels ──
+  const notesPanel = document.getElementById('uResourceNotesPanel');
+  const starsPanel = document.getElementById('uResourceStarsPanel');
+  const canManageNotes = state.user && hasRole2(state.user.role, 'teamlead');
+  const canManageStars = state.user && hasRole2(state.user.role, 'teamlead');
+
+  if (isEdit && user.id) {
+    notesPanel.style.display = '';
+    starsPanel.style.display = '';
+    const resType = 'user';
+    const resId = String(user.id);
+
+    // Load notes
+    _loadResourceNotes(resType, resId, canManageNotes);
+    // Load stars
+    _loadResourceStars(resType, resId, canManageStars);
+
+    // Show add controls for authorized users
+    const notesAddEl = document.getElementById('uResourceNotesAdd');
+    const starsAddEl = document.getElementById('uResourceStarsAdd');
+    if (notesAddEl) notesAddEl.style.display = canManageNotes ? '' : 'none';
+    if (starsAddEl) starsAddEl.style.display = canManageStars ? '' : 'none';
+
+    // Bind add note button
+    const btnAddNote = document.getElementById('btnAddResourceNote');
+    if (btnAddNote) {
+      const newBtn = btnAddNote.cloneNode(true);
+      btnAddNote.parentNode.replaceChild(newBtn, btnAddNote);
+      newBtn.addEventListener('click', async () => {
+        const content = document.getElementById('uNoteContent').value.trim();
+        if (!content) return;
+        const noteType = document.getElementById('uNoteType').value;
+        try {
+          await apiPost('/api/resource-notes', {
+            resource_type: resType, resource_id: resId,
+            note_type: noteType, content: content
+          });
+          document.getElementById('uNoteContent').value = '';
+          _loadResourceNotes(resType, resId, canManageNotes);
+        } catch (e) { showError(e.message || 'Failed to add note'); }
+      });
+    }
+
+    // Bind star picker & add star button
+    _initStarPicker();
+    const btnAddStar = document.getElementById('btnAddResourceStar');
+    if (btnAddStar) {
+      const newBtn = btnAddStar.cloneNode(true);
+      btnAddStar.parentNode.replaceChild(newBtn, btnAddStar);
+      newBtn.addEventListener('click', async () => {
+        const stars = window._selectedStarCount || 0;
+        if (stars < 1) { showError('Select at least 1 star'); return; }
+        const visibility = document.getElementById('uStarVisibility').value;
+        try {
+          await apiPost('/api/resource-stars', {
+            resource_type: resType, resource_id: resId,
+            stars: stars, visibility: visibility
+          });
+          window._selectedStarCount = 0;
+          _initStarPicker();
+          _loadResourceStars(resType, resId, canManageStars);
+        } catch (e) { showError(e.message || 'Failed to add star'); }
+      });
+    }
+  } else {
+    notesPanel.style.display = 'none';
+    starsPanel.style.display = 'none';
+  }
+
   openModal('userModal');
+}
+
+async function _loadResourceNotes(resType, resId, canDelete) {
+  const list = document.getElementById('uResourceNotesList');
+  if (!list) return;
+  list.innerHTML = `<em style="color:var(--text-dim);font-size:var(--fs-xs)">${t('loading')||'Loading…'}</em>`;
+  try {
+    const notes = await apiGet(`/api/resource-notes?resource_type=${resType}&resource_id=${resId}`);
+    if (!notes || notes.length === 0) {
+      list.innerHTML = `<em style="color:var(--text-dim);font-size:var(--fs-xs)">${t('resource_note_empty')||'No notes yet.'}</em>`;
+      return;
+    }
+    list.innerHTML = notes.map(n => {
+      const typeLabel = t('resource_note_type_' + n.note_type) || n.note_type;
+      const dateStr = n.created_at ? fmtDateTime(new Date(n.created_at)) : '';
+      return `<div style="padding:4px 6px;border-bottom:1px solid var(--border);font-size:var(--fs-xs);display:flex;gap:6px;align-items:flex-start">
+        <div style="flex:1">
+          <span style="font-weight:600;color:var(--accent)">[${escHtml(typeLabel)}]</span>
+          ${escHtml(n.content)}
+          <div style="color:var(--text-dim);font-size:10px;margin-top:2px">— ${escHtml(n.created_by_name||'')} · ${dateStr}</div>
+        </div>
+        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="_deleteResourceNote(${n.id},'${resType}','${resId}')">&times;</button>` : ''}
+      </div>`;
+    }).join('');
+  } catch { list.innerHTML = `<em style="color:var(--red);font-size:var(--fs-xs)">Error loading notes.</em>`; }
+}
+
+window._deleteResourceNote = async function(noteId, resType, resId) {
+  if (!confirm(t('resource_note_delete_confirm')||'Delete this note?')) return;
+  try {
+    const res = await fetch(`/api/resource-notes/${noteId}`, { method: 'DELETE', headers: {'Authorization': 'Bearer ' + state.token} });
+    if (!res.ok) { const e = await res.json(); showError(e.error); return; }
+    _loadResourceNotes(resType, resId, true);
+  } catch (e) { showError(e.message); }
+};
+
+async function _loadResourceStars(resType, resId, canDelete) {
+  const list = document.getElementById('uResourceStarsList');
+  if (!list) return;
+  list.innerHTML = `<em style="color:var(--text-dim);font-size:var(--fs-xs)">${t('loading')||'Loading…'}</em>`;
+  try {
+    const stars = await apiGet(`/api/resource-stars?resource_type=${resType}&resource_id=${resId}`);
+    if (!stars || stars.length === 0) {
+      list.innerHTML = `<em style="color:var(--text-dim);font-size:var(--fs-xs)">${t('resource_note_empty')||'No stars yet.'}</em>`;
+      return;
+    }
+    list.innerHTML = stars.map(s => {
+      const starStr = '★'.repeat(s.stars) + '☆'.repeat(5 - s.stars);
+      const visLabel = t('star_visibility_' + s.visibility) || s.visibility;
+      const dateStr = s.created_at ? fmtDateTime(new Date(s.created_at)) : '';
+      return `<div style="padding:4px 6px;border-bottom:1px solid var(--border);font-size:var(--fs-xs);display:flex;gap:6px;align-items:center">
+        <span style="color:gold;font-size:14px;letter-spacing:1px">${starStr}</span>
+        <span style="color:var(--text-dim)">(${escHtml(visLabel)})</span>
+        <span style="color:var(--text-dim);font-size:10px;flex:1">— ${escHtml(s.created_by_name||'')} · ${dateStr}</span>
+        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="_deleteResourceStar(${s.id},'${resType}','${resId}')">&times;</button>` : ''}
+      </div>`;
+    }).join('');
+  } catch { list.innerHTML = `<em style="color:var(--red);font-size:var(--fs-xs)">Error loading stars.</em>`; }
+}
+
+window._deleteResourceStar = async function(starId, resType, resId) {
+  if (!confirm(t('resource_star_remove')||'Remove this star rating?')) return;
+  try {
+    const res = await fetch(`/api/resource-stars/${starId}`, { method: 'DELETE', headers: {'Authorization': 'Bearer ' + state.token} });
+    if (!res.ok) { const e = await res.json(); showError(e.error); return; }
+    _loadResourceStars(resType, resId, true);
+  } catch (e) { showError(e.message); }
+};
+
+function _initStarPicker() {
+  const picker = document.getElementById('uStarPicker');
+  if (!picker) return;
+  window._selectedStarCount = window._selectedStarCount || 0;
+  _renderStarPicker(picker, window._selectedStarCount);
+  picker.onmouseleave = () => _renderStarPicker(picker, window._selectedStarCount);
+}
+
+function _renderStarPicker(el, count) {
+  el.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const span = document.createElement('span');
+    span.textContent = i <= count ? '★' : '☆';
+    span.style.color = i <= count ? 'gold' : 'var(--text-dim)';
+    span.style.cursor = 'pointer';
+    span.addEventListener('mouseenter', () => {
+      [...el.children].forEach((c, idx) => {
+        c.textContent = idx < i ? '★' : '☆';
+        c.style.color = idx < i ? 'gold' : 'var(--text-dim)';
+      });
+    });
+    span.addEventListener('click', () => {
+      window._selectedStarCount = i;
+      _renderStarPicker(el, i);
+    });
+    el.appendChild(span);
+  }
 }
 
 document.getElementById('btnSaveUser').addEventListener('click', async () => {
@@ -1877,8 +2042,10 @@ async function deleteEtype(id) {
 function openDayLabelModal(date) {
   const dateStr = typeof date === 'string' ? date : date.toISOString().slice(0,10);
   const existing = (state.dayLabels||[]).filter(dl => dl.date === dateStr);
+  // Remove any existing day label modal to avoid duplicate IDs
+  document.querySelectorAll('.day-label-modal-overlay').forEach(m => m.remove());
   const modal = document.createElement('div');
-  modal.className = 'modal-overlay open';
+  modal.className = 'modal-overlay open day-label-modal-overlay';
   modal.innerHTML = `
     <div class="modal" style="max-width:500px">
       <div class="modal-header">
@@ -1886,7 +2053,7 @@ function openDayLabelModal(date) {
         <button class="modal-close day-label-close">&times;</button>
       </div>
       <div class="modal-body" style="max-height:60vh;overflow-y:auto">
-        <div id="dayLabelList">
+        <div class="dl-label-list">
           ${existing.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('day_labels_none')||'No labels for this day.'}</p>` : ''}
           ${existing.map(dl => `
             <div class="day-label-row" data-id="${dl.id}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;padding:6px;border:1px solid var(--border);border-radius:var(--radius)">
@@ -1900,20 +2067,20 @@ function openDayLabelModal(date) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
             <div>
               <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_text')||'Label text'}:</label>
-              <input type="text" id="dlText" placeholder="${t('day_label_text')||'e.g. Training Day'}..." maxlength="60"
+              <input type="text" class="dl-text-input" placeholder="${t('day_label_text')||'e.g. Training Day'}..." maxlength="60"
                 style="width:auto;padding:4px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
             </div>
             <div>
               <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_bg')||'Background'}:</label>
-              <input type="color" id="dlBg" value="#4A90D9" style="width:auto;height:30px">
+              <input type="color" class="dl-bg-input" value="#4A90D9" style="width:auto;height:30px">
             </div>
             <div>
               <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_color')||'Text color'}:</label>
-              <input type="color" id="dlColor" value="#ffffff" style="width:auto;height:30px">
+              <input type="color" class="dl-color-input" value="#ffffff" style="width:auto;height:30px">
             </div>
             <div>
               <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_font_size')||'Font size'}:</label>
-              <select id="dlFontSize" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+              <select class="dl-fontsize-input" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
                 <option value="9px">9px</option>
                 <option value="10px">10px</option>
                 <option value="var(--fs-xs)" selected>Default (xs)</option>
@@ -1925,7 +2092,7 @@ function openDayLabelModal(date) {
             </div>
             <div>
               <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('day_label_font_weight')||'Font weight'}:</label>
-              <select id="dlFontWeight" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+              <select class="dl-fontweight-input" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
                 <option value="400">Normal</option>
                 <option value="600" selected>Semi-bold</option>
                 <option value="700">Bold</option>
@@ -1933,7 +2100,7 @@ function openDayLabelModal(date) {
               </select>
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" id="dlAddBtn">${t('btn_add')||'+ Add'}</button>
+          <button class="btn btn-primary btn-sm dl-add-btn">${t('btn_add')||'+ Add'}</button>
         </div>
       </div>
       <div class="modal-footer">
@@ -1942,11 +2109,12 @@ function openDayLabelModal(date) {
     </div>`;
   document.body.appendChild(modal);
   // Close handlers
-  modal.querySelectorAll('.day-label-close').forEach(b => b.addEventListener('click', () => modal.remove()));
+  modal.querySelectorAll('.day-label-close').forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); modal.remove(); }));
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   // Delete handlers
   modal.querySelectorAll('.day-label-del').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const id = parseInt(btn.dataset.id, 10);
       const res = await api('DELETE', `/api/day-labels/${id}`);
       if (res.ok) {
@@ -1958,16 +2126,17 @@ function openDayLabelModal(date) {
     });
   });
   // Add handler
-  modal.querySelector('#dlAddBtn').addEventListener('click', async () => {
-    const label = modal.querySelector('#dlText').value.trim();
+  modal.querySelector('.dl-add-btn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const label = modal.querySelector('.dl-text-input').value.trim();
     if (!label) { showError(t('day_label_text_required')||'Label text is required'); return; }
     const payload = {
       date: dateStr,
       label: label,
-      background: modal.querySelector('#dlBg').value,
-      color: modal.querySelector('#dlColor').value,
-      font_size: modal.querySelector('#dlFontSize').value,
-      font_weight: modal.querySelector('#dlFontWeight').value,
+      background: modal.querySelector('.dl-bg-input').value,
+      color: modal.querySelector('.dl-color-input').value,
+      font_size: modal.querySelector('.dl-fontsize-input').value,
+      font_weight: modal.querySelector('.dl-fontweight-input').value,
     };
     const res = await apiPost('/api/day-labels', payload);
     if (res.ok) {
@@ -2708,7 +2877,8 @@ function renderSidebar() {
           <span style="color:var(--text-dim)">${t('info_last_template')||'Last template'}:</span><span>${lastTemplate ? escHtml(lastTemplate) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_version')||'Version'}:</span><span>${vInfo.version ? 'v'+vInfo.version : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_uptime')||'Server Uptime'}:</span><span>${vInfo.uptime || '—'}</span>
-          <span style="color:var(--text-dim)">${t('info_started_at')||'Started'}:</span><span>${vInfo.started_at ? new Date(vInfo.started_at).toLocaleString(getLocale()) : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_tool_started')||'Tool Started'}:</span><span>${vInfo.started_at ? new Date(vInfo.started_at).toLocaleString(getLocale()) : '—'}</span>
+          <span style="color:var(--text-dim)">${t('info_server_booted')||'Server Booted'}:</span><span>${vInfo.server_booted_at ? new Date(vInfo.server_booted_at).toLocaleString(getLocale()) : '—'}</span>
           <span style="color:var(--text-dim)">${t('info_connection')||'Connection'}:</span><span>${window._offlineModeForced ? '<span style="color:#f59e0b">● ' + (t('info_forced_offline')||'Forced Offline') + '</span>' : navigator.onLine ? '<span style="color:#22c55e">● ' + (t('info_online')||'Online') + '</span>' : '<span style="color:var(--red,#E74C3C)">● ' + (t('info_offline')||'Offline') + '</span>'}</span>
           ${gbStatus !== null ? `<span style="color:var(--text-dim)">Gradual backup:</span><span>${gbStatus.enabled ? `<span style="color:#22c55e">✓ Active</span> (every ${gbStatus.interval_minutes||15} min, ${gbStatus.snapshot_count||0} snapshots)` : '<span style="color:var(--text-dim)">— Disabled</span>'}</span>` : ''}
         </div>
@@ -4699,6 +4869,17 @@ function renderSidebar() {
           <button class="btn btn-secondary btn-sm" data-action="runReadyCheck">▶ ${t('ready_check_run')||'Run Now'}</button>
         </div>
       </div>` : ''}
+      ${state.user && (state.user.role==='admin' || hasRole2(state.user.role, 'oplead')) ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📢 ${t('startup_text')||'Startup Message'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('startup_text_desc')||'Text displayed to all users when they start the application'}</p>
+        <textarea id="startupTextInput" rows="3" placeholder="${t('startup_text_placeholder')||'Enter a message to display on startup...'}"
+          style="width:100%;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-primary btn-sm" data-action="saveStartupText">${t('startup_text_save')||'Save Startup Message'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="clearStartupText">${t('startup_text_clear')||'Clear'}</button>
+        </div>
+      </div>` : ''}
       ${state.user && state.user.role==='admin' ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title" style="color:var(--danger)">${t('settings_danger_zone')||'Danger Zone'}</div>
@@ -4721,6 +4902,11 @@ function renderSidebar() {
   }
   // Bind all data-action handlers on the sidebar (CSP-safe)
   _bindActions(el);
+
+  // Load startup text into settings textarea if settings tab is active
+  if (tab === 'settings') {
+    setTimeout(_loadStartupTextInput, 50);
+  }
 }
 
 // ── Webhook helpers, preference setters: setOOHPref, setRedLinePref, setSynthLabelPref, toggleFreeze, saveExercise, setDefaultView, setPref, setHourPref, toggleType, toggleLayer, toggleAllLayers ──
@@ -6681,6 +6867,9 @@ async function _loadPolls(modal) {
     const polls = await res.json();
     if (!polls || polls.length === 0) { wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`; return; }
 
+    // Sort polls: latest (most recently created) first
+    polls.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
     wrap.innerHTML = polls.map(poll => {
       const isOpen = poll.status === 'open';
       const isCreator = poll.created_by === state.user.id;
@@ -6735,7 +6924,7 @@ async function _loadPolls(modal) {
             } else if (q.type === 'yes_no') {
               const yes = answers.filter(a => a === 'yes').length;
               const no = answers.filter(a => a === 'no').length;
-              return `<div style="margin-top:4px">${escHtml(q.text)}: Yes:${yes} No:${no}</div>`;
+              return `<div style="margin-top:4px">${escHtml(q.text)}: ${t('yes')||'Yes'}:${yes} ${t('no')||'No'}:${no}</div>`;
             } else {
               return `<div style="margin-top:4px">${escHtml(q.text)}: ${answers.length} ${t('poll_responses')||'responses'}</div>`;
             }
@@ -7522,8 +7711,14 @@ function connectSSE() {
       if (Notification.permission === 'granted') {
         try { new Notification('Tidslinjal', { body: `${data.title}\n${data.body}`, icon: '/static/favicon.ico', tag: `notif-${data.id}` }); } catch {}
       }
-      // Toast
-      showNotification('info', `${data.title}: ${data.body}`);
+      // Toast — for polls, make it clickable to open the poll modal
+      if (data.type === 'poll') {
+        showNotification('info', `📊 ${data.title}: ${data.body}`, 8000);
+        // Auto-open poll modal so the user can respond immediately
+        setTimeout(() => { if (typeof openPollModal === 'function') openPollModal(); }, 500);
+      } else {
+        showNotification('info', `${data.title}: ${data.body}`);
+      }
       // Update badge
       _notifUnreadCount++;
       _updateNotifBadge();
@@ -9186,6 +9381,40 @@ async function resetDatabase() {
   }
 }
 
+// ── Startup Text ──────────────────────────────────────────────────────────
+async function saveStartupText() {
+  const input = document.getElementById('startupTextInput');
+  if (!input) return;
+  const text = input.value.trim();
+  const res = await api('PUT', '/api/startup-text', { text });
+  if (res.ok) {
+    showNotification('success', t('notif_saved')||'Saved');
+  } else {
+    showError('Failed to save startup text');
+  }
+}
+
+async function clearStartupText() {
+  const input = document.getElementById('startupTextInput');
+  if (input) input.value = '';
+  const res = await api('PUT', '/api/startup-text', { text: '' });
+  if (res.ok) {
+    showNotification('success', t('notif_saved')||'Saved');
+  } else {
+    showError('Failed to clear startup text');
+  }
+}
+
+// Load startup text into settings textarea when settings tab is shown
+async function _loadStartupTextInput() {
+  const input = document.getElementById('startupTextInput');
+  if (!input) return;
+  try {
+    const data = await apiGet('/api/startup-text');
+    if (data && data.text) input.value = data.text;
+  } catch { /* ignore */ }
+}
+
 // ── Operation mode label helpers ───────────────────────────────────────────
 function getStartexLabel(ex) {
   const mode = ex && ex.operation_mode;
@@ -10742,7 +10971,8 @@ const ALL_CAPABILITIES = [
   'manage_layers', 'manage_groups', 'manage_users', 'approve_users', 'manage_templates', 'lock_slots', 'view_audit', 'exercise',
   'report', 'auto_report',
   'decision_log', 'decision_log_readwrite', 'confidential_read', 'see_location', 'critical_line_analysis',
-  'manage_rooms', 'view_free_busy', 'manage_integrations', 'import_export', 'manage_alarms', 'comment'
+  'manage_rooms', 'view_free_busy', 'manage_integrations', 'import_export', 'manage_alarms', 'comment',
+  'manage_notes', 'manage_stars'
 ];
 
 async function openRoleEditor() {
@@ -10771,7 +11001,8 @@ const _ROLE_CAP_LABELS = {
   manage_users:'Mgr Users', approve_users:'Approve', manage_templates:'Tmpls', lock_slots:'Lock', view_audit:'Audit', exercise:'Exercise',
   report:'Report', auto_report:'Auto Rpt',
   decision_log:'Dec.Log', decision_log_readwrite:'Dec.Log RW', confidential_read:'Confid.', see_location:'See Loc.', critical_line_analysis:'Crit.Line',
-  manage_rooms:'Rooms', view_free_busy:'Free/Busy', manage_integrations:'Integr.', import_export:'Imp/Exp', manage_alarms:'Alarms', comment:'Comment'
+  manage_rooms:'Rooms', view_free_busy:'Free/Busy', manage_integrations:'Integr.', import_export:'Imp/Exp', manage_alarms:'Alarms', comment:'Comment',
+  manage_notes:'Notes', manage_stars:'Stars'
 };
 
 const _ROLE_CAP_DESCRIPTIONS = {
@@ -10802,7 +11033,9 @@ const _ROLE_CAP_DESCRIPTIONS = {
   manage_integrations: 'Configure connectors, webhooks, and external integrations',
   import_export:    'Import and export events (CSV, ICS, STIX)',
   manage_alarms:    'Create and manage alarms for events',
-  comment:          'Add comments and notes to events'
+  comment:          'Add comments and notes to events',
+  manage_notes:     'Add and manage notes on resources (users, groups)',
+  manage_stars:     'Add and manage star ratings on resources'
 };
 
 function _renderRoleEditorTable(roles) {
@@ -10818,6 +11051,8 @@ function _renderRoleEditorTable(roles) {
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇬🇧 EN</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇸🇪 SV</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇷 FR</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇮 FI</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇩🇰 DA</th>
           ${ALL_CAPABILITIES.map(cap =>
             `<th class="role-cap-header" data-cap="${cap}" style="padding:4px 3px;border-bottom:2px solid var(--border);font-size:10px;text-align:center;min-width:48px;cursor:pointer;user-select:none;vertical-align:bottom" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">
               <div>${_ROLE_CAP_LABELS[cap]||cap}</div>
@@ -10831,7 +11066,7 @@ function _renderRoleEditorTable(roles) {
         ${roles.map(role => _renderRoleRow(role, builtinKeys.includes(role.key))).join('')}
         <tr style="opacity:0.4">
           <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim);position:sticky;left:0;background:var(--bg2)">admin</td>
-          <td style="padding:8px 10px;font-size:var(--fs-sm)" colspan="3">${t('role_admin')||'Admin'} 🔒</td>
+          <td style="padding:8px 10px;font-size:var(--fs-sm)" colspan="5">${t('role_admin')||'Admin'} 🔒</td>
           ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
           <td></td>
         </tr>
@@ -10855,15 +11090,15 @@ function _renderRoleEditorTable(roles) {
 
 // Proper translated role name placeholders
 const _ROLE_PLACEHOLDERS = {
-  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur' },
-  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture' },
-  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur' },
-  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe' },
-  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe' },
-  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations' },
-  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major' },
-  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet' },
-  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture' },
+  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur',                    fi: 'Tarkkailija',        da: 'Observatør' },
+  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture',                          fi: 'Luku',               da: 'Læs' },
+  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur',                      fi: 'Raportoija',         da: 'Rapportør' },
+  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe',                fi: 'Tiimin jäsen',       da: 'Teammedlem' },
+  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe',                  fi: 'Tiiminvetäjä',       da: 'Holdleder' },
+  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations',             fi: 'Operaatiojohtaja',   da: 'Operationsleder' },
+  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major',          fi: 'Esikuntaupseeri',    da: 'Stabsofficer' },
+  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet', fi: 'Esikuntaupseeri täysi', da: 'Stabsofficer fuld' },
+  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture',                fi: 'Luku/Kirjoitus',     da: 'Læs/Skriv' },
 };
 
 function _renderRoleRow(role, isBuiltin) {
@@ -10871,9 +11106,11 @@ function _renderRoleRow(role, isBuiltin) {
   const enVal = dn.en || role.display_name || '';
   const svVal = dn.sv || '';
   const frVal = dn.fr || '';
+  const fiVal = dn.fi || '';
+  const daVal = dn.da || '';
   const key = role.key;
   const s = _roleEditorInputStyle();
-  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key };
+  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key, fi: key, da: key };
   return `
     <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
       <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
@@ -10884,6 +11121,8 @@ function _renderRoleRow(role, isBuiltin) {
       <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(ph.en)}" style="${s}"></td>
       <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(ph.sv)}" style="${s}"></td>
       <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(ph.fr)}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-fi" data-key="${escHtml(key)}" value="${escHtml(fiVal)}" placeholder="${escHtml(ph.fi)}" style="${s}"></td>
+      <td style="padding:5px 6px"><input type="text" class="role-name-da" data-key="${escHtml(key)}" value="${escHtml(daVal)}" placeholder="${escHtml(ph.da)}" style="${s}"></td>
       ${ALL_CAPABILITIES.map(cap => {
         const checked = role.capabilities && role.capabilities[cap];
         return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''} title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}"></td>`;
@@ -10932,13 +11171,19 @@ async function saveRoles() {
     const enEl = row.querySelector('.role-name-en');
     const svEl = row.querySelector('.role-name-sv');
     const frEl = row.querySelector('.role-name-fr');
+    const fiEl = row.querySelector('.role-name-fi');
+    const daEl = row.querySelector('.role-name-da');
     const en = enEl ? enEl.value.trim() : '';
     const sv = svEl ? svEl.value.trim() : '';
     const fr = frEl ? frEl.value.trim() : '';
+    const fi = fiEl ? fiEl.value.trim() : '';
+    const da = daEl ? daEl.value.trim() : '';
     const display_names = {};
     if (en) display_names.en = en;
     if (sv) display_names.sv = sv;
     if (fr) display_names.fr = fr;
+    if (fi) display_names.fi = fi;
+    if (da) display_names.da = da;
     const caps = {};
     row.querySelectorAll('.role-cap-cb').forEach(cb => { caps[cb.dataset.cap] = cb.checked; });
     configs.push({ key, display_name: en || getRoleDisplayName(key), display_names, capabilities: caps });

@@ -1131,3 +1131,31 @@ func DefaultPollQuestions() []PollQuestion {
 		{ID: "free_text", Text: "Any additional comments or concerns?", Type: PollQuestionFreeText, Required: false},
 	}
 }
+
+// ResourceNote is a note (review, comment, achievement) attached to a resource (user, group, role, function)
+type ResourceNote struct {
+	ID           int64     `json:"id"`
+	ResourceType string    `json:"resource_type"` // user | group | role | function
+	ResourceID   string    `json:"resource_id"`   // user ID, group ID, or role key
+	NoteType     string    `json:"note_type"`     // general | performance | achievement | team_spirit
+	Content      string    `json:"content"`
+	CreatedBy    int64     `json:"created_by"`
+	CreatedByName string   `json:"created_by_name"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// ResourceStar is a star rating for a resource with visibility controls
+type ResourceStar struct {
+	ID           int64     `json:"id"`
+	ResourceType string    `json:"resource_type"` // user | group | role | function
+	ResourceID   string    `json:"resource_id"`
+	Stars        int       `json:"stars"`         // 1-5
+	Visibility   string    `json:"visibility"`    // global | team | role | private
+	TeamID       *int64    `json:"team_id,omitempty"`    // if visibility=team, which team
+	RoleKey      string    `json:"role_key,omitempty"`   // if visibility=role, which role
+	CreatedBy    int64     `json:"created_by"`
+	CreatedByName string   `json:"created_by_name"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}

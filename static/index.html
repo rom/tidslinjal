@@ -170,6 +170,8 @@
     <div id="timeline-container">
       <div id="timeline"></div>
       <div id="current-time-line" style="display:none"></div>
+      <div id="calNavPrev" class="cal-nav-arrow cal-nav-left" title="Previous period">‹</div>
+      <div id="calNavNext" class="cal-nav-arrow cal-nav-right" title="Next period">›</div>
     </div>
 
     <!-- List View -->
@@ -941,6 +943,40 @@
         </div>
       </div>
       <div id="uUserInfo" style="display:none;margin-top:10px;padding:8px 10px;border-radius:var(--radius);background:var(--bg-subtle,var(--bg2));border:1px solid var(--border);font-size:var(--fs-xs);color:var(--text-dim);line-height:1.7"></div>
+      <!-- Resource Notes -->
+      <div id="uResourceNotesPanel" style="display:none;margin-top:10px">
+        <label style="font-weight:600;font-size:var(--fs-sm)">📝 <span data-i18n="resource_notes">Notes</span></label>
+        <div id="uResourceNotesList" style="margin:6px 0;max-height:180px;overflow-y:auto"></div>
+        <div id="uResourceNotesAdd" style="display:none;margin-top:4px">
+          <select id="uNoteType" style="font-size:var(--fs-xs);padding:3px 6px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:4px">
+            <option value="general">General</option>
+            <option value="performance">Performance</option>
+            <option value="achievement">Achievement</option>
+            <option value="team_spirit">Team Spirit</option>
+          </select>
+          <div style="display:flex;gap:4px">
+            <input type="text" id="uNoteContent" style="flex:1;font-size:var(--fs-xs);padding:4px 6px" data-i18n-placeholder="resource_note_placeholder" placeholder="Add a note...">
+            <button class="btn btn-primary btn-sm" id="btnAddResourceNote">+</button>
+          </div>
+        </div>
+      </div>
+      <!-- Resource Stars -->
+      <div id="uResourceStarsPanel" style="display:none;margin-top:10px">
+        <label style="font-weight:600;font-size:var(--fs-sm)">⭐ <span data-i18n="resource_stars">Stars</span></label>
+        <div id="uResourceStarsList" style="margin:6px 0;max-height:120px;overflow-y:auto"></div>
+        <div id="uResourceStarsAdd" style="display:none;margin-top:4px">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span id="uStarPicker" style="cursor:pointer;font-size:18px">☆☆☆☆☆</span>
+            <select id="uStarVisibility" style="font-size:var(--fs-xs);padding:3px 6px;border-radius:var(--radius);border:1px solid var(--border)">
+              <option value="global">Global</option>
+              <option value="team">Team</option>
+              <option value="role">Role</option>
+              <option value="private">Private</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="btnAddResourceStar">+</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm" id="btnDeleteUser" style="display:none">Delete User</button>

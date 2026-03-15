@@ -188,6 +188,11 @@ async function init() {
   });
   setupNavLongPress(document.getElementById('btnPrev'), -1);
   setupNavLongPress(document.getElementById('btnNext'),  1);
+  // Calendar navigation arrows on timeline edges
+  const calNavPrev = document.getElementById('calNavPrev');
+  const calNavNext = document.getElementById('calNavNext');
+  if (calNavPrev) calNavPrev.addEventListener('click', () => navigate(-1));
+  if (calNavNext) calNavNext.addEventListener('click', () => navigate(1));
   document.getElementById('btnToday').addEventListener('click', goToday);
   document.getElementById('btnDatePicker').addEventListener('click', e => {
     const inp = document.getElementById('datePickerInput');
@@ -390,6 +395,14 @@ async function init() {
     _showWelcomeBanner();
   }
 
+  // Startup text (MOTD) — show if admin has set a startup message
+  try {
+    const startupData = await apiGet('/api/startup-text');
+    if (startupData && startupData.text && startupData.text.trim()) {
+      _showStartupText(startupData.text);
+    }
+  } catch { /* ignore if endpoint not available */ }
+
   // Scroll to current time or day start
   setTimeout(() => {
     const now    = new Date();
@@ -446,6 +459,23 @@ function _showWelcomeBanner() {
   };
   overlay.querySelector('#welcomeDismissBtn').addEventListener('click', dismissWelcome);
   overlay.addEventListener('click', e => { if (e.target === overlay) dismissWelcome(); });
+}
+
+// Startup text (MOTD) display
+function _showStartupText(text) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '9998';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px;padding:24px;text-align:center">
+      <h3 style="font-size:var(--fs-lg);margin-bottom:12px;color:var(--accent)">📢 ${t('startup_text')||'Startup Message'}</h3>
+      <div style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6;white-space:pre-wrap;text-align:left;max-height:300px;overflow-y:auto">${escHtml(text)}</div>
+      <button class="btn btn-primary" id="startupTextDismiss">${t('startup_text_dismiss')||'Dismiss'}</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#startupTextDismiss').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 document.addEventListener('DOMContentLoaded', init);
