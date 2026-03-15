@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#flagFR', 'click', function () { setPref('language', 'fr'); });
   on('#flagFI', 'click', function () { setPref('language', 'fi'); });
   on('#flagDA', 'click', function () { setPref('language', 'da'); });
+  on('#flagNB', 'click', function () { setPref('language', 'nb'); });
 
   // ---------- Header: clock area ---------------------------------------------
   on('#clockDetachedIndicator', 'click', function () {
