@@ -4577,6 +4577,9 @@ function renderSidebar() {
           <button class="toggle-btn${p.language==='et'?' active':''}" data-action="setPref" data-args='["language","et"]' title="Eesti">${langAbbr('et')}</button>
           <button class="toggle-btn${p.language==='lv'?' active':''}" data-action="setPref" data-args='["language","lv"]' title="Latviešu">${langAbbr('lv')}</button>
           <button class="toggle-btn${p.language==='lt'?' active':''}" data-action="setPref" data-args='["language","lt"]' title="Lietuvių">${langAbbr('lt')}</button>
+          <button class="toggle-btn${p.language==='it'?' active':''}" data-action="setPref" data-args='["language","it"]' title="Italiano">${langAbbr('it')}</button>
+          <button class="toggle-btn${p.language==='es'?' active':''}" data-action="setPref" data-args='["language","es"]' title="Español">${langAbbr('es')}</button>
+          <button class="toggle-btn${p.language==='pt'?' active':''}" data-action="setPref" data-args='["language","pt"]' title="Português">${langAbbr('pt')}</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
