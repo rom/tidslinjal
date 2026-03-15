@@ -6636,13 +6636,12 @@ async function openPollModal() {
             if (ct.includes('application/json')) {
               const err = await res.json();
               errMsg = err.error || '';
-            } else {
-              errMsg = await res.text();
             }
           } catch {}
           if (!errMsg) {
             errMsg = res.status === 403 ? (t('poll_no_permission')||'You do not have permission to create polls (requires team lead role)')
-              : (t('poll_create_failed')||'Failed to create poll') + ' — HTTP ' + res.status;
+              : res.status === 404 ? (t('poll_not_available')||'Poll feature is not available on this server version')
+              : (t('poll_create_failed')||'Failed to create poll') + ' (HTTP ' + res.status + ')';
           }
           throw new Error(errMsg);
         }
@@ -12591,7 +12590,7 @@ async function _handleReferenceUpload() {
     if (copyMode) fd.append('copy_mode', copyMode);
     try {
       const res = await fetch('/api/references', { method: 'POST', body: fd });
-      if (!res.ok) { const txt = await res.text(); alert('Upload failed: ' + txt); return; }
+      if (!res.ok) { let txt = ''; try { const ct = res.headers.get('content-type')||''; if (ct.includes('application/json')) { const j = await res.json(); txt = j.error||''; } } catch {} showError(txt || ('Upload failed — HTTP ' + res.status)); return; }
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
     } catch (e) { alert('Upload error: ' + e.message); }
