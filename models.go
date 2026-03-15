@@ -1150,6 +1150,205 @@ func DefaultPollQuestions() []PollQuestion {
 	}
 }
 
+// PollQuestionnaire is a reusable set of questions that can be loaded into a poll
+type PollQuestionnaire struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Questions   []PollQuestion `json:"questions"`
+	BuiltIn     bool           `json:"built_in"`            // true for system-provided questionnaires
+	CreatedBy   int64          `json:"created_by,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+// BuiltInQuestionnaires returns the pre-defined questionnaire templates
+func BuiltInQuestionnaires() []PollQuestionnaire {
+	now := time.Now()
+	return []PollQuestionnaire{
+		{
+			ID: -1, Name: "TeamLead Battle Rhythm Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Standard team lead personnel check — stress levels, control, and support needs.",
+			Questions: []PollQuestion{
+				{ID: "stress_self", Text: "How would you rate your personal stress level?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "stress_team", Text: "How would you rate your team's stress level?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "in_control", Text: "Do you feel in control of your current tasks?", Type: PollQuestionYesNo, Required: true},
+				{ID: "need_assistance", Text: "Do you need assistance from Operations Lead or other central support?", Type: PollQuestionYesNo, Required: true},
+				{ID: "need_assist_teamlead", Text: "Do you need assistance from other team leads?", Type: PollQuestionYesNo, Required: true},
+				{ID: "free_text", Text: "Any additional comments or concerns?", Type: PollQuestionFreeText, Required: false},
+			},
+		},
+		{
+			ID: -2, Name: "Operational Picture Battle Rhythm Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Common Operational Picture (COP) check — assess how the operation is progressing and whether situational awareness is maintained.",
+			Questions: []PollQuestion{
+				{ID: "cop_progress", Text: "How would you rate the overall operational progress?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "cop_sa", Text: "How would you rate your current situational awareness?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "cop_timeline", Text: "Is the operation progressing according to the planned timeline?", Type: PollQuestionYesNo, Required: true},
+				{ID: "cop_objectives", Text: "Are the current operational objectives still achievable?", Type: PollQuestionYesNo, Required: true},
+				{ID: "cop_threats", Text: "How would you rate the current threat level compared to planning assumptions?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "cop_gaps", Text: "Are there any significant intelligence or information gaps affecting your area?", Type: PollQuestionYesNo, Required: true},
+				{ID: "cop_resources", Text: "Are your resources (personnel, equipment, supplies) sufficient for current tasks?", Type: PollQuestionYesNo, Required: true},
+				{ID: "cop_comments", Text: "Key observations or concerns about the operational picture?", Type: PollQuestionFreeText, Required: false},
+			},
+		},
+		{
+			ID: -3, Name: "Leadership Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Assess information management, leadership priorities, and cooperation towards primary objectives.",
+			Questions: []PollQuestion{
+				{ID: "lead_info_mgmt", Text: "Is there a working information management process in your area?", Type: PollQuestionYesNo, Required: true},
+				{ID: "lead_info_flow", Text: "How would you rate the quality and timeliness of information flow?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "lead_priorities", Text: "Is leadership prioritizing the right tasks and resources?", Type: PollQuestionYesNo, Required: true},
+				{ID: "lead_priority_clarity", Text: "How clear are the current priorities to your team?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "lead_cooperation", Text: "Is leadership cooperating effectively towards the primary objective?", Type: PollQuestionYesNo, Required: true},
+				{ID: "lead_coordination", Text: "How would you rate cross-functional coordination and cooperation?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "lead_decisions", Text: "Are decisions being made at the right level and in a timely manner?", Type: PollQuestionYesNo, Required: true},
+				{ID: "lead_comments", Text: "Observations or suggestions regarding leadership effectiveness?", Type: PollQuestionFreeText, Required: false},
+			},
+		},
+		{
+			ID: -4, Name: "International Partnership Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Evaluate the effectiveness of international partnership and multinational cooperation.",
+			Questions: []PollQuestion{
+				{ID: "intl_communication", Text: "How would you rate communication with international partners?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "intl_interop", Text: "Are interoperability procedures (technical, procedural, language) working effectively?", Type: PollQuestionYesNo, Required: true},
+				{ID: "intl_coordination", Text: "How would you rate the coordination of tasks across national boundaries?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "intl_trust", Text: "Is there a sufficient level of mutual trust and understanding between partners?", Type: PollQuestionYesNo, Required: true},
+				{ID: "intl_info_sharing", Text: "Is information sharing with international partners adequate and timely?", Type: PollQuestionYesNo, Required: true},
+				{ID: "intl_cultural", Text: "How well are cultural and procedural differences being managed?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "intl_comments", Text: "Observations or suggestions for improving international partnership?", Type: PollQuestionFreeText, Required: false},
+			},
+		},
+		{
+			ID: -5, Name: "Defence Capability Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Assess the effectiveness of defence measures and environmental security.",
+			Questions: []PollQuestion{
+				{ID: "def_perimeter", Text: "How would you rate the current perimeter and physical security posture?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "def_cyber", Text: "How would you rate the cyber defence and IT security posture?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "def_monitoring", Text: "Are monitoring and surveillance systems operating effectively?", Type: PollQuestionYesNo, Required: true},
+				{ID: "def_response", Text: "How would you rate the incident response readiness?", Type: PollQuestionScaleZeroThree, Required: true},
+				{ID: "def_vulnerabilities", Text: "Are there any known unmitigated vulnerabilities in your area?", Type: PollQuestionYesNo, Required: true},
+				{ID: "def_redundancy", Text: "Are backup systems and redundancy measures in place and tested?", Type: PollQuestionYesNo, Required: true},
+				{ID: "def_personnel", Text: "Is the defence manning level sufficient for current threat level?", Type: PollQuestionYesNo, Required: true},
+				{ID: "def_comments", Text: "Key observations or concerns regarding defence capabilities?", Type: PollQuestionFreeText, Required: false},
+			},
+		},
+	}
+}
+
+// ── Checklists ──────────────────────────────────────────────────────────────
+
+// ChecklistTemplate is a reusable checklist definition (the "recipe").
+type ChecklistTemplate struct {
+	ID          int64              `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description,omitempty"`
+	Items       []ChecklistItemDef `json:"items"`
+	BuiltIn     bool               `json:"built_in"`
+	CreatedBy   int64              `json:"created_by,omitempty"`
+	CreatedAt   time.Time          `json:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
+// ChecklistItemDef is a single item in a checklist template.
+type ChecklistItemDef struct {
+	Text     string `json:"text"`
+	Category string `json:"category,omitempty"` // optional grouping
+}
+
+// ChecklistInstance is a running/completed checklist created from a template.
+type ChecklistInstance struct {
+	ID         int64                  `json:"id"`
+	TemplateID int64                  `json:"template_id"`
+	Name       string                 `json:"name"`
+	Items      []ChecklistInstanceItem `json:"items"`
+	Status     string                 `json:"status"` // active | completed
+	CreatedBy  int64                  `json:"created_by"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
+	CompletedAt *time.Time            `json:"completed_at,omitempty"`
+}
+
+// ChecklistInstanceItem tracks the check-state of a single item.
+type ChecklistInstanceItem struct {
+	Text      string     `json:"text"`
+	Category  string     `json:"category,omitempty"`
+	Checked   bool       `json:"checked"`
+	CheckedBy int64      `json:"checked_by,omitempty"`
+	CheckedAt *time.Time `json:"checked_at,omitempty"`
+	Note      string     `json:"note,omitempty"`
+}
+
+// BuiltInChecklists returns the pre-defined checklist templates.
+func BuiltInChecklists() []ChecklistTemplate {
+	now := time.Now()
+	return []ChecklistTemplate{
+		{
+			ID: -1, Name: "TeamLead Battle Rhythm Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Preparation checklist before answering the TeamLead Battle Rhythm Check poll.",
+			Items: []ChecklistItemDef{
+				{Text: "Review current task status and progress", Category: "Situational Awareness"},
+				{Text: "Check team member availability and well-being", Category: "Situational Awareness"},
+				{Text: "Review outstanding issues or blockers", Category: "Situational Awareness"},
+				{Text: "Assess personal stress level honestly", Category: "Self-Assessment"},
+				{Text: "Assess team morale and stress indicators", Category: "Self-Assessment"},
+				{Text: "Verify you have current information from all sub-teams", Category: "Information"},
+				{Text: "Check if any pending decisions need escalation", Category: "Information"},
+				{Text: "Review resource needs and shortfalls", Category: "Resources"},
+				{Text: "Identify any support needed from Ops Lead or other team leads", Category: "Resources"},
+				{Text: "Prepare summary of key concerns to report", Category: "Reporting"},
+			},
+		},
+		{
+			ID: -2, Name: "Shift Handover", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Standard checklist for shift handover procedures.",
+			Items: []ChecklistItemDef{
+				{Text: "Brief incoming shift on current operational situation", Category: "Briefing"},
+				{Text: "Hand over all active tasks with current status", Category: "Briefing"},
+				{Text: "Review open decisions and pending actions", Category: "Briefing"},
+				{Text: "Transfer access credentials and communication channels", Category: "Logistics"},
+				{Text: "Highlight any time-critical events in the next period", Category: "Logistics"},
+				{Text: "Review and update the timeline with latest information", Category: "Documentation"},
+				{Text: "Log handover in the log book", Category: "Documentation"},
+				{Text: "Confirm incoming shift has access to all needed systems", Category: "Verification"},
+				{Text: "Incoming shift acknowledges understanding of situation", Category: "Verification"},
+			},
+		},
+		{
+			ID: -3, Name: "Exercise Setup", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for setting up a new exercise or operation in Tidslinjal.",
+			Items: []ChecklistItemDef{
+				{Text: "Configure exercise name, dates, and time settings", Category: "Configuration"},
+				{Text: "Set up layers and event types", Category: "Configuration"},
+				{Text: "Create user accounts and assign roles", Category: "Users"},
+				{Text: "Create groups and assign memberships", Category: "Users"},
+				{Text: "Configure notification and mail settings", Category: "Communications"},
+				{Text: "Upload reference documents", Category: "Content"},
+				{Text: "Set up initial timeline events", Category: "Content"},
+				{Text: "Configure phases if applicable", Category: "Content"},
+				{Text: "Test poll and ready check functionality", Category: "Testing"},
+				{Text: "Verify all participants can log in", Category: "Testing"},
+				{Text: "Create backup before exercise start", Category: "Safety"},
+			},
+		},
+		{
+			ID: -4, Name: "After Action Review Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Preparation checklist for conducting an After Action Review.",
+			Items: []ChecklistItemDef{
+				{Text: "Export timeline data and reports", Category: "Data Collection"},
+				{Text: "Export poll results and decision log", Category: "Data Collection"},
+				{Text: "Download audit log for the exercise period", Category: "Data Collection"},
+				{Text: "Collect participant feedback forms", Category: "Data Collection"},
+				{Text: "Identify key events and decision points", Category: "Analysis"},
+				{Text: "Note timeline deviations from plan", Category: "Analysis"},
+				{Text: "Prepare lessons-learned template", Category: "Preparation"},
+				{Text: "Schedule AAR meeting with all key personnel", Category: "Preparation"},
+				{Text: "Distribute materials to participants before meeting", Category: "Preparation"},
+			},
+		},
+	}
+}
+
 // ResourceNote is a note (review, comment, achievement) attached to a resource (user, group, role, function)
 type ResourceNote struct {
 	ID           int64     `json:"id"`

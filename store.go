@@ -79,6 +79,9 @@ type Store struct {
 	encryptionSettings   EncryptionSettings
 	resourceNotes        []ResourceNote
 	resourceStars        []ResourceStar
+	questionnaires       []PollQuestionnaire
+	checklistTemplates   []ChecklistTemplate
+	checklistInstances   []ChecklistInstance
 	startupText          string
 
 	nextEventTypeID  int64
@@ -113,6 +116,9 @@ type Store struct {
 	nextDayLabelID           int64
 	nextResourceNoteID       int64
 	nextResourceStarID       int64
+	nextQuestionnaireID      int64
+	nextChecklistTemplateID  int64
+	nextChecklistInstanceID  int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -201,6 +207,9 @@ func (s *Store) load() error {
 	s.loadFile("rate_limits.json", &s.rateLimitSettings)
 	s.loadFile("geoblocking.json", &s.geoblockingSettings)
 	s.loadFile("encryption.json", &s.encryptionSettings)
+	s.loadFile("questionnaires.json", &s.questionnaires)
+	s.loadFile("checklist_templates.json", &s.checklistTemplates)
+	s.loadFile("checklist_instances.json", &s.checklistInstances)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -379,6 +388,21 @@ func (s *Store) load() error {
 	for _, x := range s.dayLabels {
 		if x.ID > s.nextDayLabelID {
 			s.nextDayLabelID = x.ID
+		}
+	}
+	for _, x := range s.questionnaires {
+		if x.ID > s.nextQuestionnaireID {
+			s.nextQuestionnaireID = x.ID
+		}
+	}
+	for _, x := range s.checklistTemplates {
+		if x.ID > s.nextChecklistTemplateID {
+			s.nextChecklistTemplateID = x.ID
+		}
+	}
+	for _, x := range s.checklistInstances {
+		if x.ID > s.nextChecklistInstanceID {
+			s.nextChecklistInstanceID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2665,6 +2689,12 @@ func (s *Store) ResetDatabase() error {
 	s.nextAutoReportScheduleID = 0
 	s.dayLabels = nil
 	s.nextDayLabelID = 0
+	s.questionnaires = nil
+	s.nextQuestionnaireID = 0
+	s.checklistTemplates = nil
+	s.nextChecklistTemplateID = 0
+	s.checklistInstances = nil
+	s.nextChecklistInstanceID = 0
 
 	// Save all cleared files
 	files := map[string]interface{}{
@@ -2698,6 +2728,9 @@ func (s *Store) ResetDatabase() error {
 		"event_versions.json":         s.eventVersions,
 		"auto_report_schedules.json":  s.autoReportSchedules,
 		"day_labels.json":             s.dayLabels,
+		"questionnaires.json":         s.questionnaires,
+		"checklist_templates.json":    s.checklistTemplates,
+		"checklist_instances.json":    s.checklistInstances,
 	}
 	for fname, data := range files {
 		if err := s.saveFile(fname, data); err != nil {
@@ -3642,6 +3675,150 @@ func (s *Store) UpdatePoll(poll Poll) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("poll %d not found", poll.ID)
+}
+
+// ── Poll Questionnaires ─────────────────────────────────────────────────────
+
+func (s *Store) GetQuestionnaires() []PollQuestionnaire {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]PollQuestionnaire, len(s.questionnaires))
+	copy(out, s.questionnaires)
+	return out
+}
+
+func (s *Store) AddQuestionnaire(q PollQuestionnaire) (PollQuestionnaire, error) {
+	s.mu.Lock()
+	s.nextQuestionnaireID++
+	q.ID = s.nextQuestionnaireID
+	s.questionnaires = append(s.questionnaires, q)
+	snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+	s.mu.Unlock()
+	return q, s.persist("questionnaires.json", snap)
+}
+
+func (s *Store) UpdateQuestionnaire(q PollQuestionnaire) error {
+	s.mu.Lock()
+	for i, x := range s.questionnaires {
+		if x.ID == q.ID {
+			s.questionnaires[i] = q
+			snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+			s.mu.Unlock()
+			return s.persist("questionnaires.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("questionnaire %d not found", q.ID)
+}
+
+func (s *Store) DeleteQuestionnaire(id int64) error {
+	s.mu.Lock()
+	for i, x := range s.questionnaires {
+		if x.ID == id {
+			s.questionnaires = append(s.questionnaires[:i], s.questionnaires[i+1:]...)
+			snap := append([]PollQuestionnaire(nil), s.questionnaires...)
+			s.mu.Unlock()
+			return s.persist("questionnaires.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("questionnaire %d not found", id)
+}
+
+// ── Checklist Templates ─────────────────────────────────────────────────────
+
+func (s *Store) GetChecklistTemplates() []ChecklistTemplate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]ChecklistTemplate, len(s.checklistTemplates))
+	copy(out, s.checklistTemplates)
+	return out
+}
+
+func (s *Store) AddChecklistTemplate(t ChecklistTemplate) (ChecklistTemplate, error) {
+	s.mu.Lock()
+	s.nextChecklistTemplateID++
+	t.ID = s.nextChecklistTemplateID
+	s.checklistTemplates = append(s.checklistTemplates, t)
+	snap := append([]ChecklistTemplate(nil), s.checklistTemplates...)
+	s.mu.Unlock()
+	return t, s.persist("checklist_templates.json", snap)
+}
+
+func (s *Store) UpdateChecklistTemplate(t ChecklistTemplate) error {
+	s.mu.Lock()
+	for i, x := range s.checklistTemplates {
+		if x.ID == t.ID {
+			s.checklistTemplates[i] = t
+			snap := append([]ChecklistTemplate(nil), s.checklistTemplates...)
+			s.mu.Unlock()
+			return s.persist("checklist_templates.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("checklist template %d not found", t.ID)
+}
+
+func (s *Store) DeleteChecklistTemplate(id int64) error {
+	s.mu.Lock()
+	for i, x := range s.checklistTemplates {
+		if x.ID == id {
+			s.checklistTemplates = append(s.checklistTemplates[:i], s.checklistTemplates[i+1:]...)
+			snap := append([]ChecklistTemplate(nil), s.checklistTemplates...)
+			s.mu.Unlock()
+			return s.persist("checklist_templates.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("checklist template %d not found", id)
+}
+
+// ── Checklist Instances ─────────────────────────────────────────────────────
+
+func (s *Store) GetChecklistInstances() []ChecklistInstance {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]ChecklistInstance, len(s.checklistInstances))
+	copy(out, s.checklistInstances)
+	return out
+}
+
+func (s *Store) AddChecklistInstance(ci ChecklistInstance) (ChecklistInstance, error) {
+	s.mu.Lock()
+	s.nextChecklistInstanceID++
+	ci.ID = s.nextChecklistInstanceID
+	s.checklistInstances = append(s.checklistInstances, ci)
+	snap := append([]ChecklistInstance(nil), s.checklistInstances...)
+	s.mu.Unlock()
+	return ci, s.persist("checklist_instances.json", snap)
+}
+
+func (s *Store) UpdateChecklistInstance(ci ChecklistInstance) error {
+	s.mu.Lock()
+	for i, x := range s.checklistInstances {
+		if x.ID == ci.ID {
+			s.checklistInstances[i] = ci
+			snap := append([]ChecklistInstance(nil), s.checklistInstances...)
+			s.mu.Unlock()
+			return s.persist("checklist_instances.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("checklist instance %d not found", ci.ID)
+}
+
+func (s *Store) DeleteChecklistInstance(id int64) error {
+	s.mu.Lock()
+	for i, x := range s.checklistInstances {
+		if x.ID == id {
+			s.checklistInstances = append(s.checklistInstances[:i], s.checklistInstances[i+1:]...)
+			snap := append([]ChecklistInstance(nil), s.checklistInstances...)
+			s.mu.Unlock()
+			return s.persist("checklist_instances.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("checklist instance %d not found", id)
 }
 
 // ── Event Log ───────────────────────────────────────────────────────────────
