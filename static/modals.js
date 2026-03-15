@@ -2284,37 +2284,110 @@ async function _loadPollsterLog(container) {
       const ts = fmtDateTime(new Date(poll.created_at));
       const closedTs = poll.closed_at ? fmtDateTime(new Date(poll.closed_at)) : '';
       const statusColor = poll.status === 'open' ? 'var(--accent)' : 'var(--text-dim)';
-      const respondedUsers = new Set((poll.responses || []).map(r => r.user_id));
-      const totalR = respondedUsers.size;
+      const allResponses = poll.responses || [];
+      const respondedUserSet = new Set(allResponses.map(r => r.user_id));
+      const totalR = respondedUserSet.size;
       const totalT = (poll.target_ids || []).length || '?';
-      let detailHtml = '';
-      if ((poll.responses || []).length > 0) {
-        detailHtml = (poll.questions || []).map((q, qi) => {
-          const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
-          if (q.type === 'scale' || q.type === 'scale_0_3') {
-            const counts = [0,0,0,0];
-            answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
-            return `<div>${escHtml(q.text)}: ${counts.map((c,i) => i+':'+c).join(' ')}</div>`;
-          } else if (q.type === 'yes_no') {
-            const yes = answers.filter(a => a === 'yes').length;
-            const no = answers.filter(a => a === 'no').length;
-            return `<div>${escHtml(q.text)}: Y:${yes} N:${no}</div>`;
-          } else {
-            return `<div>${escHtml(q.text)}: ${answers.length} answers</div>`;
+      const pollCreatedAt = new Date(poll.created_at);
+      const totalQuestions = (poll.questions || []).length;
+
+      // Build respondent details
+      const answeredMap = {};
+      allResponses.forEach(r => {
+        if (!answeredMap[r.user_id]) {
+          answeredMap[r.user_id] = { name: r.user_name, firstAt: new Date(r.answered_at), count: 0 };
+        }
+        answeredMap[r.user_id].count++;
+        const at = new Date(r.answered_at);
+        if (at < answeredMap[r.user_id].firstAt) answeredMap[r.user_id].firstAt = at;
+      });
+      const answeredUsers = Object.entries(answeredMap).map(([uid, info]) => {
+        const diffMs = info.firstAt - pollCreatedAt;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffH = Math.floor(diffMin / 60);
+        let diffStr = '';
+        if (diffH > 0) diffStr = `${diffH}h ${diffMin % 60}m`;
+        else if (diffMin > 0) diffStr = `${diffMin}m ${diffSec % 60}s`;
+        else diffStr = `${diffSec}s`;
+        const isPartial = info.count < totalQuestions;
+        return { uid: parseInt(uid), name: info.name, diffStr, isPartial };
+      });
+
+      // Non-respondents
+      const respondedSet = new Set(Object.keys(answeredMap).map(Number));
+      let nonRespondents = [];
+      if (poll.target_type === 'user') {
+        (poll.target_ids || []).forEach(idStr => {
+          const uid = parseInt(idStr);
+          if (!respondedSet.has(uid)) {
+            const u = (state.users||[]).find(u => u.id === uid);
+            nonRespondents.push({ uid, name: u ? (u.display_name||u.username) : `User #${uid}` });
           }
+        });
+      }
+
+      // Standard question table
+      const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'yes_no');
+      let tableHtml = '';
+      if (standardQs.length > 0 && answeredUsers.length > 0) {
+        const headerCells = standardQs.map(q => `<th style="padding:3px 6px;border:1px solid var(--border);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(q.text)}">${escHtml(q.text.length > 30 ? q.text.slice(0,27)+'...' : q.text)}</th>`).join('');
+        const rows = answeredUsers.map(au => {
+          const cells = standardQs.map(q => {
+            const resp = allResponses.find(r => r.user_id === au.uid && r.question_id === q.id);
+            if (!resp) return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;color:var(--text-dim)">—</td>`;
+            let val = resp.answer;
+            let bg = '';
+            if (q.type === 'scale' || q.type === 'scale_0_3') {
+              const v = parseInt(val);
+              if (v === 0) bg = 'background:#27AE6033';
+              else if (v === 1) bg = 'background:#F39C1233';
+              else if (v === 2) bg = 'background:#E67E2233';
+              else if (v === 3) bg = 'background:#E74C3C33';
+              val = `${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v}`;
+            } else if (q.type === 'yes_no') {
+              bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
+              val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
+            }
+            return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;font-size:10px;${bg}">${val}</td>`;
+          }).join('');
+          return `<tr><td style="padding:3px 6px;border:1px solid var(--border);font-size:10px;white-space:nowrap">${escHtml(au.name)} <span style="color:var(--text-dim)">(+${au.diffStr})</span>${au.isPartial ? ' ⚠' : ''}</td>${cells}</tr>`;
+        }).join('');
+        tableHtml = `<div style="margin-top:6px;overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:10px">
+          <thead><tr><th style="padding:3px 6px;border:1px solid var(--border)"></th>${headerCells}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }
+
+      // Free text responses
+      const freeTextQs = (poll.questions || []).filter(q => q.type === 'free_text');
+      let freeTextHtml = '';
+      if (freeTextQs.length > 0) {
+        freeTextHtml = freeTextQs.map(q => {
+          const answers = allResponses.filter(r => r.question_id === q.id && r.answer).map(r => `<div style="padding:2px 0"><b>${escHtml(r.user_name)}</b>: ${escHtml(r.answer)}</div>`).join('');
+          return answers ? `<div style="margin-top:4px"><em>${escHtml(q.text)}</em>${answers}</div>` : '';
         }).join('');
       }
-      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>📊 ${escHtml(poll.title)}</strong>
           <span style="font-size:10px;color:${statusColor}">${poll.status}</span>
         </div>
         <div style="color:var(--text-dim);font-size:var(--fs-xs)">
-          📅 ${t('poll_performed')||'Performed'}: ${ts}
+          📅 ${t('poll_started')||'Started'}: ${ts}
           ${closedTs ? `<br>🔒 ${t('poll_closed')||'Closed'}: ${closedTs}` : ''}
         </div>
-        <div style="color:var(--text-dim)">${totalR}/${totalT} ${t('poll_responses')||'responses'}</div>
-        ${detailHtml ? `<div style="margin-top:2px;padding:4px;background:var(--bg3);border-radius:var(--radius)">${detailHtml}</div>` : ''}
+        <div style="font-size:var(--fs-xs);margin-top:4px">
+          <strong>${t('poll_responses')||'Responses'}: ${totalR}/${totalT}</strong>
+        </div>
+        ${answeredUsers.length > 0 ? `<div style="font-size:var(--fs-xs);margin-top:4px"><span style="color:#27AE60;font-weight:600">✅ ${t('poll_answered')||'Answered'}:</span>
+          ${answeredUsers.map(au => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #27AE60${au.isPartial ? '80' : ''}">${escHtml(au.name)} <span style="color:var(--text-dim)">(+${au.diffStr})</span>${au.isPartial ? ' <span style="color:#F39C12" title="${t('poll_partial_answer')||'Partial'}">⚠</span>' : ''}</span>`).join(' ')}
+        </div>` : ''}
+        ${nonRespondents.length > 0 ? `<div style="font-size:var(--fs-xs);margin-top:2px"><span style="color:#E74C3C;font-weight:600">❌ ${t('poll_not_answered')||'Not answered'}:</span>
+          ${nonRespondents.map(nr => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #E74C3C">${escHtml(nr.name)}</span>`).join(' ')}
+        </div>` : ''}
+        ${tableHtml || freeTextHtml ? `<div style="margin-top:4px;padding:6px;background:var(--bg3);border-radius:var(--radius)">${tableHtml}${freeTextHtml}</div>` : ''}
       </div>`;
     }).join('');
   } catch (e) {
@@ -6430,6 +6503,13 @@ async function openPersonReadyCheckPopup() {
   if (timedCheck && timedDateTime) {
     timedCheck.addEventListener('change', () => {
       timedDateTime.style.display = timedCheck.checked ? '' : 'none';
+      // Update button text to reflect timed vs immediate mode
+      const btn = modal.querySelector('#btnCreatePRC');
+      if (btn) {
+        btn.textContent = timedCheck.checked
+          ? (t('prc_schedule_request')||'Schedule Ready Check')
+          : (t('prc_send_request')||'Send Ready Check Request');
+      }
       if (timedTZInfo) {
         if (timedCheck.checked) {
           const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
@@ -6537,13 +6617,13 @@ async function _loadPersonReadyChecks(modal) {
           <span style="font-weight:600;font-size:var(--fs-sm)">
             ${isScheduled ? '⏰ ' : ''}${t('prc_ready_check')||'Ready Check'} #${check.id}
           </span>
-          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${checkTime.toLocaleString()}</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim)">${check.created_by_name || ''} — ${fmtDateTime(checkTime)}</span>
         </div>
         ${check.message ? `<div style="font-size:var(--fs-sm);padding:6px 8px;margin-bottom:8px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text)">${escHtml(check.message)}</div>` : ''}
         <div style="font-size:var(--fs-xs);margin-bottom:8px;display:flex;gap:12px;color:var(--text-dim)">
           <span>🟢 ${readyCount}</span> <span>🔴 ${notReadyCount}</span> <span>🟡 ${pendingCount}</span>
           <span style="margin-left:auto">${t('prc_total')||'Total'}: ${participants.length}</span>
-          ${isScheduled ? `<span style="color:var(--accent)">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${new Date(check.scheduled_at).toLocaleString(undefined, {timeZoneName:'short'})}</span>` : ''}
+          ${isScheduled ? `<span style="color:var(--accent)">⏰ ${t('prc_scheduled_for')||'Scheduled for'}: ${fmtDateTime(new Date(check.scheduled_at))}</span>` : ''}
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;${isLargeGroup ? 'max-height:200px;overflow-y:auto' : ''}">
           ${sortedParticipants.map(p => {
@@ -6562,7 +6642,7 @@ async function _loadPersonReadyChecks(modal) {
               if (diffH > 0) diffStr = `${diffH}h ${diffMin % 60}m`;
               else if (diffMin > 0) diffStr = `${diffMin}m ${diffSec % 60}s`;
               else diffStr = `${diffSec}s`;
-              responseInfo = `<span style="font-size:9px;color:var(--text-dim);margin-left:2px" title="${respTime.toLocaleString()}">(+${diffStr})</span>`;
+              responseInfo = `<span style="font-size:9px;color:var(--text-dim);margin-left:2px" title="${fmtDateTime(respTime)}">(+${diffStr})</span>`;
             }
             return `<div style="display:inline-flex;align-items:center;gap:3px;padding:3px 6px;background:var(--bg2);border-radius:var(--radius);border:1px solid ${color};font-size:var(--fs-xs)">
               <span>${icon}</span>
@@ -6664,7 +6744,8 @@ async function openPollModal() {
     { key: 'stress',      label: t('poll_question_stress')||'Personal stress level (0-3)', type: 'scale' },
     { key: 'team_stress', label: t('poll_question_team_stress')||'Team stress level (0-3)', type: 'scale' },
     { key: 'in_control',  label: t('poll_question_in_control')||'Are you in control?', type: 'yes_no' },
-    { key: 'need_assist', label: t('poll_question_need_assist')||'Do you need assistance?', type: 'yes_no' },
+    { key: 'need_assist', label: t('poll_question_need_assist')||'Do you need assistance from Operations Lead or other central support?', type: 'yes_no' },
+    { key: 'need_assist_teamlead', label: t('poll_question_need_assist_teamlead')||'Do you need assistance from other team leads?', type: 'yes_no' },
     { key: 'other',       label: t('poll_question_other')||'Additional comments', type: 'free_text' },
   ];
 
@@ -6916,25 +6997,123 @@ async function _loadPolls(modal) {
         questionsHtml = `<div style="margin-top:6px;font-size:var(--fs-xs);color:var(--accent);font-weight:600">✅ ${t('poll_responded')||'You have responded'}</div>`;
       }
 
-      // Summary for creator
+      // Summary for creator — enhanced with respondent tracking
       let summaryHtml = '';
-      if (isCreator && (poll.responses || []).length > 0) {
-        summaryHtml = `<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
-          <strong>${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</strong>
-          ${(poll.questions || []).map((q, qi) => {
-            const answers = (poll.responses || []).filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean);
-            if (q.type === 'scale' || q.type === 'scale_0_3') {
-              const counts = [0,0,0,0];
-              answers.forEach(a => { const v = parseInt(a); if (v >= 0 && v <= 3) counts[v]++; });
-              return `<div style="margin-top:4px">${escHtml(q.text)}: ${counts.map((c,i) => `<span style="margin-left:4px">${i}:${c}</span>`).join('')}</div>`;
-            } else if (q.type === 'yes_no') {
-              const yes = answers.filter(a => a === 'yes').length;
-              const no = answers.filter(a => a === 'no').length;
-              return `<div style="margin-top:4px">${escHtml(q.text)}: ${t('yes')||'Yes'}:${yes} ${t('no')||'No'}:${no}</div>`;
-            } else {
-              return `<div style="margin-top:4px">${escHtml(q.text)}: ${answers.length} ${t('poll_responses')||'responses'}</div>`;
+      if (isCreator) {
+        const allTargetIDs = (poll.target_ids || []);
+        const allResponses = poll.responses || [];
+        const pollCreatedAt = new Date(poll.created_at);
+        // Resolve who answered and who didn't
+        const answeredMap = {};  // user_id -> { name, answeredAt, questionCount }
+        allResponses.forEach(r => {
+          if (!answeredMap[r.user_id]) {
+            answeredMap[r.user_id] = { name: r.user_name, firstAt: new Date(r.answered_at), count: 0 };
+          }
+          answeredMap[r.user_id].count++;
+          const at = new Date(r.answered_at);
+          if (at < answeredMap[r.user_id].firstAt) answeredMap[r.user_id].firstAt = at;
+        });
+        const totalQuestions = (poll.questions || []).length;
+        // Build respondent details
+        const answeredUsers = Object.entries(answeredMap).map(([uid, info]) => {
+          const diffMs = info.firstAt - pollCreatedAt;
+          const diffSec = Math.floor(diffMs / 1000);
+          const diffMin = Math.floor(diffSec / 60);
+          const diffH = Math.floor(diffMin / 60);
+          let diffStr = '';
+          if (diffH > 0) diffStr = `${diffH}h ${diffMin % 60}m`;
+          else if (diffMin > 0) diffStr = `${diffMin}m ${diffSec % 60}s`;
+          else diffStr = `${diffSec}s`;
+          const isPartial = info.count < totalQuestions;
+          const u = (state.users||[]).find(u => u.id === parseInt(uid));
+          const avail = u ? u.availability : '';
+          const isRemote = u && u.location === 'remote';
+          let statusIcon = '🟢';
+          if (!u) statusIcon = '❓';
+          else if (avail === 'away') statusIcon = '⚪';
+          else if (avail === 'dnd') statusIcon = '🔴';
+          else if (avail === 'busy') statusIcon = '🟡';
+          else if (isRemote) statusIcon = '🌐';
+          return { uid: parseInt(uid), name: info.name, diffStr, isPartial, statusIcon, isRemote };
+        });
+        // Find non-respondents
+        const respondedSet = new Set(Object.keys(answeredMap).map(Number));
+        let nonRespondents = [];
+        // Try to resolve actual user names for targets
+        if (poll.target_type === 'user') {
+          allTargetIDs.forEach(idStr => {
+            const uid = parseInt(idStr);
+            if (!respondedSet.has(uid)) {
+              const u = (state.users||[]).find(u => u.id === uid);
+              const name = u ? (u.display_name||u.username) : `User #${uid}`;
+              const avail = u ? u.availability : '';
+              const isRemote = u && u.location === 'remote';
+              let statusIcon = '🟢';
+              if (!u) statusIcon = '❓';
+              else if (avail === 'away') statusIcon = '⚪';
+              else if (avail === 'dnd') statusIcon = '🔴';
+              else if (avail === 'busy') statusIcon = '🟡';
+              else if (isRemote) statusIcon = '🌐';
+              nonRespondents.push({ uid, name, statusIcon, isRemote });
             }
-          }).join('')}
+          });
+        }
+
+        // Standard question table for scale/yes_no
+        const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'yes_no');
+        let tableHtml = '';
+        if (standardQs.length > 0 && answeredUsers.length > 0) {
+          const headerCells = standardQs.map(q => `<th style="padding:3px 6px;border:1px solid var(--border);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(q.text)}">${escHtml(q.text.length > 30 ? q.text.slice(0,27)+'...' : q.text)}</th>`).join('');
+          const rows = answeredUsers.map(au => {
+            const cells = standardQs.map(q => {
+              const resp = allResponses.find(r => r.user_id === au.uid && r.question_id === q.id);
+              if (!resp) return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;color:var(--text-dim)">—</td>`;
+              let val = resp.answer;
+              let bg = '';
+              if (q.type === 'scale' || q.type === 'scale_0_3') {
+                const v = parseInt(val);
+                if (v === 0) bg = 'background:#27AE6033';
+                else if (v === 1) bg = 'background:#F39C1233';
+                else if (v === 2) bg = 'background:#E67E2233';
+                else if (v === 3) bg = 'background:#E74C3C33';
+                val = `${v} - ${t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v}`;
+              } else if (q.type === 'yes_no') {
+                bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
+                val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
+              }
+              return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;font-size:10px;${bg}">${val}</td>`;
+            }).join('');
+            return `<tr><td style="padding:3px 6px;border:1px solid var(--border);font-size:10px;white-space:nowrap">${au.statusIcon} ${escHtml(au.name)}${au.isRemote ? ' 🌐' : ''}</td>${cells}</tr>`;
+          }).join('');
+          tableHtml = `<div style="margin-top:6px;overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:10px">
+            <thead><tr><th style="padding:3px 6px;border:1px solid var(--border)"></th>${headerCells}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>`;
+        }
+
+        // Free text responses
+        const freeTextQs = (poll.questions || []).filter(q => q.type === 'free_text');
+        let freeTextHtml = '';
+        if (freeTextQs.length > 0) {
+          freeTextHtml = freeTextQs.map(q => {
+            const answers = allResponses.filter(r => r.question_id === q.id && r.answer).map(r => `<div style="padding:2px 0"><b>${escHtml(r.user_name)}</b>: ${escHtml(r.answer)}</div>`).join('');
+            return answers ? `<div style="margin-top:4px"><em>${escHtml(q.text)}</em>${answers}</div>` : '';
+          }).join('');
+        }
+
+        summaryHtml = `<div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong>${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</strong>
+            <span style="color:var(--text-dim)">${t('poll_started')||'Started'}: ${fmtDateTime(pollCreatedAt)}</span>
+          </div>
+          ${answeredUsers.length > 0 ? `<div style="margin-bottom:4px"><span style="color:#27AE60;font-weight:600">✅ ${t('poll_answered')||'Answered'}:</span>
+            ${answeredUsers.map(au => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #27AE60${au.isPartial ? '80' : ''}">${au.statusIcon} ${escHtml(au.name)}${au.isRemote ? ' 🌐' : ''} <span style="color:var(--text-dim)">(+${au.diffStr})</span>${au.isPartial ? ` <span style="color:#F39C12" title="${t('poll_partial_answer')||'Partial answer'}">⚠</span>` : ''}</span>`).join(' ')}
+          </div>` : ''}
+          ${nonRespondents.length > 0 ? `<div style="margin-bottom:4px"><span style="color:#E74C3C;font-weight:600">❌ ${t('poll_not_answered')||'Not answered'}:</span>
+            ${nonRespondents.map(nr => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #E74C3C">${nr.statusIcon} ${escHtml(nr.name)}${nr.isRemote ? ' 🌐' : ''}</span>`).join(' ')}
+          </div>` : ''}
+          ${tableHtml}
+          ${freeTextHtml}
         </div>`;
       }
 
@@ -6943,10 +7122,15 @@ async function _loadPolls(modal) {
           <strong style="font-size:var(--fs-sm)">📊 ${escHtml(poll.title)}</strong>
           <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600">${statusText}</span>
         </div>
-        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">
+          ${t('poll_started')||'Started'}: ${fmtDateTime(new Date(poll.created_at))} — ${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}
+        </div>
         ${questionsHtml}
         ${summaryHtml}
-        ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger poll-close-btn" data-poll-id="${poll.id}" style="margin-top:6px">${t('poll_close')||'Close Poll'}</button>` : ''}
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+          ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger poll-close-btn" data-poll-id="${poll.id}">${t('poll_close')||'Close Poll'}</button>` : ''}
+          ${isCreator && isOpen ? `<button class="btn btn-sm btn-secondary poll-remind-btn" data-poll-id="${poll.id}">${t('poll_send_reminder')||'Send Reminder'}</button>` : ''}
+        </div>
       </div>`;
     }).join('');
 
@@ -6999,6 +7183,19 @@ async function _loadPolls(modal) {
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
           showNotification('success',t('poll_closed_success')||'Poll closed');
           _loadPolls(modal);
+        } catch (e) { showError(e.message); }
+      });
+    });
+
+    // Bind send reminder
+    wrap.querySelectorAll('.poll-remind-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pollId = parseInt(btn.dataset.pollId);
+        try {
+          const res = await apiPost(`/api/polls/${pollId}/remind`, {});
+          if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+          const data = await res.json().catch(()=>({}));
+          showNotification('success', (t('poll_reminder_sent')||'Reminder sent') + (data.reminded != null ? ` (${data.reminded})` : ''));
         } catch (e) { showError(e.message); }
       });
     });
