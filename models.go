@@ -923,9 +923,10 @@ type LogBookAttachment struct {
 
 // PersonReadyCheckParticipant is a participant in a person ready check
 type PersonReadyCheckParticipant struct {
-	UserID   int64  `json:"user_id"`
-	UserName string `json:"user_name"`
-	Status   string `json:"status"` // pending | ready | not_ready
+	UserID      int64  `json:"user_id"`
+	UserName    string `json:"user_name"`
+	Status      string `json:"status"`                // pending | ready | not_ready
+	RespondedAt string `json:"responded_at,omitempty"` // ISO 8601 timestamp
 }
 
 // PersonReadyCheck tracks a per-participant readiness request

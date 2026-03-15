@@ -8396,6 +8396,7 @@ func (app *App) handleRespondPersonReadyCheck(w http.ResponseWriter, r *http.Req
 	for j := range found.Participants {
 		if found.Participants[j].UserID == user.ID {
 			found.Participants[j].Status = req.Status
+			found.Participants[j].RespondedAt = time.Now().UTC().Format(time.RFC3339)
 			updated = true
 			break
 		}
