@@ -2273,7 +2273,7 @@ async function _loadPollsterLog(container) {
   const el = container.querySelector ? container.querySelector('#pollsterLogEntries') : document.getElementById('pollsterLogEntries');
   if (!el) return;
   try {
-    const res = await fetch('/api/polls/log');
+    const res = await api('GET', '/api/polls/log');
     if (!res.ok) throw new Error('Failed');
     const polls = await res.json();
     if (!polls || polls.length === 0) {
@@ -2281,9 +2281,11 @@ async function _loadPollsterLog(container) {
       return;
     }
     el.innerHTML = polls.map(poll => {
-      const ts = new Date(poll.created_at).toLocaleString();
+      const ts = fmtDateTime(new Date(poll.created_at));
+      const closedTs = poll.closed_at ? fmtDateTime(new Date(poll.closed_at)) : '';
       const statusColor = poll.status === 'open' ? 'var(--accent)' : 'var(--text-dim)';
-      const totalR = (poll.responses || []).length;
+      const respondedUsers = new Set((poll.responses || []).map(r => r.user_id));
+      const totalR = respondedUsers.size;
       const totalT = (poll.target_ids || []).length || '?';
       let detailHtml = '';
       if ((poll.responses || []).length > 0) {
@@ -2307,7 +2309,11 @@ async function _loadPollsterLog(container) {
           <strong>📊 ${escHtml(poll.title)}</strong>
           <span style="font-size:10px;color:${statusColor}">${poll.status}</span>
         </div>
-        <div style="color:var(--text-dim)">${ts} — ${totalR}/${totalT} ${t('poll_responses')||'responses'}</div>
+        <div style="color:var(--text-dim);font-size:var(--fs-xs)">
+          📅 ${t('poll_performed')||'Performed'}: ${ts}
+          ${closedTs ? `<br>🔒 ${t('poll_closed')||'Closed'}: ${closedTs}` : ''}
+        </div>
+        <div style="color:var(--text-dim)">${totalR}/${totalT} ${t('poll_responses')||'responses'}</div>
         ${detailHtml ? `<div style="margin-top:2px;padding:4px;background:var(--bg3);border-radius:var(--radius)">${detailHtml}</div>` : ''}
       </div>`;
     }).join('');
@@ -2331,7 +2337,7 @@ async function _loadPollsterLog(container) {
   if (csvBtn) {
     csvBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/polls/log');
+        const res = await api('GET', '/api/polls/log');
         if (!res.ok) return;
         const polls = await res.json();
         let csv = 'Poll,Status,Created,Questions,Responses\n';
@@ -2352,7 +2358,7 @@ async function _loadPollsterLog(container) {
   if (jsonBtn) {
     jsonBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/polls/log');
+        const res = await api('GET', '/api/polls/log');
         if (!res.ok) return;
         const polls = await res.json();
         const blob = new Blob([JSON.stringify(polls, null, 2)], { type: 'application/json' });
@@ -2370,7 +2376,7 @@ async function _loadPollsterLog(container) {
   if (rtfBtn) {
     rtfBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/polls/log');
+        const res = await api('GET', '/api/polls/log');
         if (!res.ok) return;
         const polls = await res.json();
         const esc = s => String(s||'').replace(/\\/g,'\\\\').replace(/\{/g,'\\{').replace(/\}/g,'\\}');
@@ -2398,7 +2404,7 @@ async function _loadPollsterLog(container) {
   if (docxBtn) {
     docxBtn.addEventListener('click', async () => {
       try {
-        const res = await fetch('/api/polls/log');
+        const res = await api('GET', '/api/polls/log');
         if (!res.ok) return;
         const polls = await res.json();
         const xe = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -6862,7 +6868,7 @@ async function _loadPolls(modal) {
   const wrap = modal.querySelector('#pollActiveList');
   if (!wrap) return;
   try {
-    const res = await fetch('/api/polls');
+    const res = await api('GET', '/api/polls');
     if (!res.ok) { wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`; return; }
     const polls = await res.json();
     if (!polls || polls.length === 0) { wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('poll_no_polls')||'No polls found.'}</p>`; return; }
@@ -6976,11 +6982,7 @@ async function _loadPolls(modal) {
           return { question_id: q.id, answer };
         }).filter(a => a.answer);
         try {
-          const res = await fetch(`/api/polls/${pollId}/respond`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answers })
-          });
+          const res = await apiPut(`/api/polls/${pollId}/respond`, { answers });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
           showNotification('success',t('poll_response_saved')||'Response saved');
           _loadPolls(modal);
@@ -6993,7 +6995,7 @@ async function _loadPolls(modal) {
       btn.addEventListener('click', async () => {
         const pollId = parseInt(btn.dataset.pollId);
         try {
-          const res = await fetch(`/api/polls/${pollId}/close`, { method: 'PUT' });
+          const res = await apiPut(`/api/polls/${pollId}/close`);
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
           showNotification('success',t('poll_closed_success')||'Poll closed');
           _loadPolls(modal);
@@ -7755,6 +7757,34 @@ function connectSSE() {
           // Re-load and re-render the active checks
           _loadPersonReadyChecks(prcModal.closest('.modal-overlay'));
         }
+      }
+    } catch {}
+  });
+  // Poll response/update — live-refresh the poll modal if it's open
+  es.addEventListener('poll_update', e => {
+    try {
+      const pollModal = document.querySelector('.poll-respond-form, .poll-close-btn, #pollActiveList');
+      if (pollModal) {
+        const modal = pollModal.closest('.modal-overlay');
+        if (modal) _loadPolls(modal);
+      }
+    } catch {}
+  });
+  es.addEventListener('poll_closed', e => {
+    try {
+      const pollModal = document.querySelector('.poll-respond-form, .poll-close-btn, #pollActiveList');
+      if (pollModal) {
+        const modal = pollModal.closest('.modal-overlay');
+        if (modal) _loadPolls(modal);
+      }
+    } catch {}
+  });
+  es.addEventListener('poll_new', e => {
+    try {
+      const pollModal = document.querySelector('#pollActiveList');
+      if (pollModal) {
+        const modal = pollModal.closest('.modal-overlay');
+        if (modal) _loadPolls(modal);
       }
     } catch {}
   });
@@ -8939,7 +8969,7 @@ async function generateReport() {
   } else if (type === 'poll') {
     // Poll report
     try {
-      const res = await fetch('/api/polls/log');
+      const res = await api('GET', '/api/polls/log');
       const polls = res.ok ? await res.json() : [];
       if (!polls || polls.length === 0) {
         html += `<p>${t('poll_no_polls')||'No polls found.'}</p>`;
@@ -9568,7 +9598,6 @@ async function openDecisionLogModal() {
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
                 📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
               </label>
-              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
             </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('decision_executor')||'Executor'}:</span>
@@ -9580,6 +9609,9 @@ async function openDecisionLogModal() {
               </select>
               <select id="dlExecutorValue" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:120px">
               </select>
+            </div>
+            <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
@@ -11455,7 +11487,7 @@ function filterDepSearch() {
   el.innerHTML = candidates.map(ev => `
     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-radius:var(--radius);background:var(--bg3);margin-bottom:4px;cursor:pointer" data-action="addDependency" data-arg="${ev.id}">
       <span>${escHtml(ev.title)}</span>
-      <span style="font-size:var(--fs-xs);color:var(--text-dim)">${new Date(ev.start_time).toLocaleDateString()}</span>
+      <span style="font-size:var(--fs-xs);color:var(--text-dim)">${fmtDateTime(new Date(ev.start_time))}</span>
     </div>
   `).join('');
   _bindActions(el);
@@ -12120,11 +12152,43 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
     if (hours.length > 336) break; // max 2 weeks
   }
   if (hours.length === 0) { el.innerHTML = `<p style="color:var(--text-dim)">${t('ttm_no_range')||'No valid time range.'}</p>`; return; }
-  let html = `<table class="ttm-table" style="border-collapse:collapse;font-size:var(--fs-sm,11px);width:100%"><thead><tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left">${t('ttm_task')||'Task'}</th>`;
+  // Build phase lookup for the matrix time range
+  const phases = (state.phases || []).slice().sort((a,b) => (a.order||0) - (b.order||0));
+  const _phaseForHour = (hTime) => {
+    for (const ph of phases) {
+      const ps = new Date(ph.start_time).getTime();
+      const pe = new Date(ph.end_time).getTime();
+      if (hTime >= ps && hTime < pe) return ph;
+    }
+    return null;
+  };
+  let html = `<table class="ttm-table" style="border-collapse:collapse;font-size:var(--fs-sm,11px);width:100%"><thead>`;
+  // Phase row
+  if (phases.length > 0) {
+    html += `<tr><th style="padding:2px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left;font-size:9px;color:var(--text-dim)">${t('ttm_phase')||'Phase'}</th>`;
+    let i = 0;
+    while (i < hours.length) {
+      const ph = _phaseForHour(hours[i].getTime());
+      if (ph) {
+        let span = 1;
+        while (i + span < hours.length && _phaseForHour(hours[i + span].getTime())?.id === ph.id) span++;
+        html += `<th colspan="${span}" style="padding:2px 4px;text-align:center;font-size:9px;font-weight:600;color:#fff;background:${escHtml(ph.color || 'var(--accent)')};border-left:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(ph.name)}</th>`;
+        i += span;
+      } else {
+        html += `<th style="padding:2px;border-left:1px solid var(--border)"></th>`;
+        i++;
+      }
+    }
+    html += '</tr>';
+  }
+  // Time header row
+  html += `<tr><th style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:2;min-width:180px;text-align:left">${t('ttm_task')||'Task'}</th>`;
   hours.forEach(h => {
     const dayChanged = h.getHours() === 0;
     const lbl = dayChanged ? h.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' 00' : String(h.getHours()).padStart(2,'0');
-    html += `<th style="padding:3px 2px;min-width:28px;text-align:center;border-left:${dayChanged?'2':'1'}px solid var(--border);font-weight:${dayChanged?700:400};color:${dayChanged?'var(--accent)':'var(--text-dim)'}">${lbl}</th>`;
+    const ph = _phaseForHour(h.getTime());
+    const phBg = ph ? `background:color-mix(in srgb, ${ph.color} 15%, var(--bg2));` : '';
+    html += `<th style="padding:3px 2px;min-width:28px;text-align:center;border-left:${dayChanged?'2':'1'}px solid var(--border);font-weight:${dayChanged?700:400};color:${dayChanged?'var(--accent)':'var(--text-dim)'};${phBg}">${lbl}</th>`;
   });
   html += '</tr></thead><tbody>';
   const etMap = {};
@@ -12882,6 +12946,10 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditTitle" class="form-input" value="${escHtml(ref.title || '')}">
       <label style="margin-top:8px">${t('ref_description') || 'Description'}</label>
       <input type="text" id="refEditDesc" class="form-input" value="${escHtml(ref.description || '')}">
+      <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
+      <select id="refEditCategory" class="form-input">
+        ${[{v:'handbook',l:'Handbook'},{v:'sop',l:'SOP'},{v:'policy',l:'Policy'},{v:'map',l:'Map'},{v:'reference',l:'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'other',l:'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
+      </select>
       <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
@@ -12904,6 +12972,7 @@ function _openRefEditModal(id) {
     const body = {
       title: document.getElementById('refEditTitle').value.trim(),
       description: document.getElementById('refEditDesc').value.trim(),
+      category: document.getElementById('refEditCategory').value,
       language: document.getElementById('refEditLang').value,
       owner: document.getElementById('refEditOwner').value.trim(),
       custodian: document.getElementById('refEditCustodian').value.trim(),

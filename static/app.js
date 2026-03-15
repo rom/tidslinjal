@@ -131,53 +131,54 @@ async function init() {
 
   updateUILabels();
 
-  // Load version + GitHub link
-  try {
-    const vInfo = await apiGet('/api/version');
-    const vLink = document.getElementById('appVersionLink');
-    if (vLink && vInfo) {
-      vLink.textContent = 'v' + (vInfo.version || '?');
-      if (vInfo.github) {
-        vLink.href = vInfo.github;
-        vLink.title = t('github_link') || 'GitHub Repository';
-      }
-    }
-    const helpVer = document.getElementById('helpVersionLine');
-    if (helpVer && vInfo) {
-      helpVer.textContent = `Tidslinjal v${vInfo.version || '?'} — ${vInfo.github || ''}`;
-    }
-    state._versionInfo = vInfo;
-  } catch { /* ignore */ }
-
-  // Load integration status for admin legend panel
-  if (state.user && state.user.role === 'admin') {
-    try {
-      state._integrationStatus = await apiGet('/api/status');
-    } catch { state._integrationStatus = null; }
-    // Load gradual backup status for legend panel
-    try {
-      const gbData = await apiGet('/api/admin/gradual-backup');
-      if (gbData && gbData.settings) {
-        state._gradualBackupStatus = {
-          enabled: gbData.settings.enabled !== false,
-          interval_minutes: gbData.settings.interval_minutes || 15,
-          snapshot_count: (gbData.snapshots || []).length,
-        };
-      }
-    } catch { state._gradualBackupStatus = null; }
-    // Load test stats for admin legend panel
-    try {
-      state._testStats = await apiGet('/api/admin/test-stats');
-    } catch { state._testStats = null; }
-  }
-
-  // Load database stats for legend panel
-  try {
-    state._dbStats = await apiGet('/api/db-stats');
-  } catch { state._dbStats = null; }
-
   // User info in header + role-gated controls
   applyRoleGatedUI();
+
+  // Load non-critical data in background (don't block initial render)
+  (async () => {
+    // Load version + GitHub link
+    try {
+      const vInfo = await apiGet('/api/version');
+      const vLink = document.getElementById('appVersionLink');
+      if (vLink && vInfo) {
+        vLink.textContent = 'v' + (vInfo.version || '?');
+        if (vInfo.github) {
+          vLink.href = vInfo.github;
+          vLink.title = t('github_link') || 'GitHub Repository';
+        }
+      }
+      const helpVer = document.getElementById('helpVersionLine');
+      if (helpVer && vInfo) {
+        helpVer.textContent = `Tidslinjal v${vInfo.version || '?'} — ${vInfo.github || ''}`;
+      }
+      state._versionInfo = vInfo;
+    } catch { /* ignore */ }
+
+    // Load integration status for admin legend panel
+    if (state.user && state.user.role === 'admin') {
+      try {
+        const [statusData, gbData, testStats] = await Promise.all([
+          apiGet('/api/status').catch(() => null),
+          apiGet('/api/admin/gradual-backup').catch(() => null),
+          apiGet('/api/admin/test-stats').catch(() => null),
+        ]);
+        state._integrationStatus = statusData;
+        if (gbData && gbData.settings) {
+          state._gradualBackupStatus = {
+            enabled: gbData.settings.enabled !== false,
+            interval_minutes: gbData.settings.interval_minutes || 15,
+            snapshot_count: (gbData.snapshots || []).length,
+          };
+        } else { state._gradualBackupStatus = null; }
+        state._testStats = testStats;
+      } catch { /* ignore */ }
+    }
+
+    // Load database stats for legend panel
+    try {
+      state._dbStats = await apiGet('/api/db-stats');
+    } catch { state._dbStats = null; }
+  })();
 
   // Control events
   document.getElementById('rangeSelect').addEventListener('change', e => {

@@ -8861,11 +8861,37 @@ func (app *App) handleGetResourceNotes(w http.ResponseWriter, r *http.Request, u
 		if notes == nil {
 			notes = []ResourceNote{}
 		}
+		// Filter notes: only show notes created by the current user (private to each individual)
+		if !hasRole(user.Role, RoleAdmin) {
+			var filtered []ResourceNote
+			for _, n := range notes {
+				if n.CreatedBy == user.ID {
+					filtered = append(filtered, n)
+				}
+			}
+			if filtered == nil {
+				filtered = []ResourceNote{}
+			}
+			notes = filtered
+		}
 		jsonOK(w, notes)
 	} else {
 		notes := app.store.GetAllResourceNotes()
 		if notes == nil {
 			notes = []ResourceNote{}
+		}
+		// Filter: non-admin users only see their own notes
+		if !hasRole(user.Role, RoleAdmin) {
+			var filtered []ResourceNote
+			for _, n := range notes {
+				if n.CreatedBy == user.ID {
+					filtered = append(filtered, n)
+				}
+			}
+			if filtered == nil {
+				filtered = []ResourceNote{}
+			}
+			notes = filtered
 		}
 		jsonOK(w, notes)
 	}
