@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11450,9 +11451,18 @@ func main() {
 	}
 
 	// ── Startup summary ──────────────────────────────────────────────────────
+	hn, _ := os.Hostname()
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	log.Printf("  Tidslinjal v%s", AppVersion)
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Runtime / system info
+	log.Printf("  Hostname   : %s", hn)
+	log.Printf("  PID        : %d", os.Getpid())
+	log.Printf("  Go version : %s", runtime.Version())
+	log.Printf("  OS/Arch    : %s/%s", runtime.GOOS, runtime.GOARCH)
+	log.Printf("  CPUs       : %d", runtime.NumCPU())
+	log.Printf("  Started at : %s", time.Now().Format(time.RFC3339))
 
 	// Network / TLS
 	log.Printf("  URL        : %s://%s", scheme, listenAddr)
@@ -11508,6 +11518,12 @@ func main() {
 		log.Printf("    mode           : %s", func() string { if ex.OperationMode != "" { return ex.OperationMode }; return "exercise" }())
 		log.Printf("    label          : %q", ex.Label)
 		log.Printf("    epoch (STARTEX): %s", ex.Epoch)
+		if ex.GroupLabel != "" {
+			log.Printf("    group_label    : %s", ex.GroupLabel)
+		}
+		if ex.UserLabel != "" {
+			log.Printf("    user_label     : %s", ex.UserLabel)
+		}
 	}
 
 	// Syslog
@@ -11551,10 +11567,10 @@ func main() {
 	rlCfg := app.store.GetRateLimitSettings()
 	log.Printf("  Rate limits: login=%d reg=%d reset=%d", rlCfg.LoginLimit, rlCfg.RegistrationLimit, rlCfg.PasswordResetLimit)
 
-	// Geoblocking
+	// Geoblocking (ISO 3166-1)
 	geoCfg := app.store.GetGeoblockingSettings()
 	if geoCfg.Enabled {
-		log.Printf("  Geoblocking: ENABLED mode=%s countries=%v", geoCfg.Mode, geoCfg.Countries)
+		log.Printf("  Geoblocking: ENABLED mode=%s countries=%v (ISO 3166-1)", geoCfg.Mode, geoCfg.Countries)
 	} else {
 		log.Printf("  Geoblocking: disabled")
 	}
@@ -11567,17 +11583,36 @@ func main() {
 		log.Printf("  Password   : no policy enforced")
 	}
 
-	// Extra debug info: data counts
-	if debug {
+	// Data summary (always shown — gives a quick health overview)
+	{
 		users := app.store.GetUsers()
-		evs := app.store.GetEvents(time.Time{}, time.Now().Add(10*365*24*time.Hour), nil)
+		evTypes := app.store.GetEventTypes()
 		grps := app.store.GetGroups()
-		lyrs := app.store.GetLayersVisibleTo(0, nil)
-		log.Printf("  [DEBUG] Loaded data:")
-		log.Printf("    users    : %d", len(users))
-		log.Printf("    events   : %d", len(evs))
-		log.Printf("    groups   : %d", len(grps))
-		log.Printf("    layers   : %d", len(lyrs))
+		lyrs := app.store.GetAllLayers()
+		phases := app.store.GetPhases()
+		refs := app.store.GetReferenceDocs()
+		locs := app.store.GetMapLocations()
+		schedules := app.store.GetAutoReportSchedules()
+		log.Printf("  Data")
+		log.Printf("    users      : %d", len(users))
+		log.Printf("    groups     : %d", len(grps))
+		log.Printf("    layers     : %d", len(lyrs))
+		log.Printf("    event types: %d", len(evTypes))
+		log.Printf("    phases     : %d", len(phases))
+		log.Printf("    references : %d", len(refs))
+		log.Printf("    map locs   : %d", len(locs))
+		log.Printf("    auto rpts  : %d", len(schedules))
+	}
+
+	// Extra debug info
+	if debug {
+		evs := app.store.GetEvents(time.Time{}, time.Now().Add(10*365*24*time.Hour), nil)
+		decisions := app.store.GetDecisionLog()
+		sessions := app.store.GetAllSessions()
+		log.Printf("  [DEBUG] Extended data:")
+		log.Printf("    events     : %d", len(evs))
+		log.Printf("    decisions  : %d", len(decisions))
+		log.Printf("    sessions   : %d (active)", len(sessions))
 		log.Printf("  [DEBUG] All registered API routes will be logged per request")
 	}
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

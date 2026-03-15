@@ -277,6 +277,7 @@ type UserPreferences struct {
 	ShowLangFlags      *bool    `json:"show_lang_flags,omitempty"`      // show language flags in toolbar (default: true)
 	LogbookHideDecisions bool   `json:"logbook_hide_decisions,omitempty"` // hide 'decision' type from logbook (use decisions log only)
 	ShowClockFlags     *bool    `json:"show_clock_flags,omitempty"`     // show national flags on timezone clocks (default: false)
+	CountryCodeFormat  string   `json:"country_code_format,omitempty"` // alpha2 | alpha3 — ISO 3166-1 abbreviation format (default: alpha2)
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click

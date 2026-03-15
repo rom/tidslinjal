@@ -4185,9 +4185,10 @@ function renderSidebar() {
           </select>
         </div>
         <div class="form-group" style="margin-bottom:6px">
-          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_geo_countries')||'Country codes (comma-separated, e.g. SE,NO,FI)'}</label>
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('security_geo_countries')||'Country codes (ISO 3166-1, comma-separated, e.g. SE,NO,FI)'}</label>
           <input type="text" id="secGeoCountries" placeholder="SE,NO,FI,DK"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+          <div id="secGeoCountryNames" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px"></div>
         </div>
         <button class="btn btn-secondary btn-sm" data-action="saveSecGeoblock">${t('security_geo_save')||'Save Geoblocking'}</button>
       </div>
@@ -4354,6 +4355,7 @@ function renderSidebar() {
       setCb('secGeoEnabled', geo.enabled);
       setVal('secGeoMode', geo.mode || 'allowlist');
       setVal('secGeoCountries', (geo.countries || []).join(','));
+      _updateGeoCountryNames();
     }).catch(() => {});
     // Load backup encryption settings
     apiGet('/api/admin/encryption').then(enc => {
@@ -4487,11 +4489,11 @@ function renderSidebar() {
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_language')}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${p.language==='en'?' active':''}" data-action="setPref" data-args='["language","en"]' >EN</button>
-          <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' >SV</button>
-          <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' >FR</button>
-          <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' >FI</button>
-          <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' >DA</button>
+          <button class="toggle-btn${p.language==='en'?' active':''}" data-action="setPref" data-args='["language","en"]' title="English">${langAbbr('en')}</button>
+          <button class="toggle-btn${p.language==='sv'?' active':''}" data-action="setPref" data-args='["language","sv"]' title="Svenska">${langAbbr('sv')}</button>
+          <button class="toggle-btn${p.language==='fr'?' active':''}" data-action="setPref" data-args='["language","fr"]' title="Français">${langAbbr('fr')}</button>
+          <button class="toggle-btn${p.language==='fi'?' active':''}" data-action="setPref" data-args='["language","fi"]' title="Suomi">${langAbbr('fi')}</button>
+          <button class="toggle-btn${p.language==='da'?' active':''}" data-action="setPref" data-args='["language","da"]' title="Dansk">${langAbbr('da')}</button>
         </div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" ${p.show_lang_flags!==false?'checked':''}
@@ -4499,6 +4501,13 @@ function renderSidebar() {
             style="accent-color:var(--accent)">
           ${t('settings_show_lang_flags')||'Show language flags in toolbar'}
         </label>
+        <div style="margin-top:8px">
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_country_code_format')||'Country code format (ISO 3166-1)'}</div>
+          <div class="toggle-btn-group">
+            <button class="toggle-btn${(p.country_code_format||'alpha2')==='alpha2'?' active':''}" data-action="setPref" data-args='["country_code_format","alpha2"]' title="ISO 3166-1 alpha-2 (e.g. SE, GB, FR)">${t('settings_alpha2')||'2-letter'}</button>
+            <button class="toggle-btn${p.country_code_format==='alpha3'?' active':''}" data-action="setPref" data-args='["country_code_format","alpha3"]' title="ISO 3166-1 alpha-3 (e.g. SWE, GBR, FRA)">${t('settings_alpha3')||'3-letter'}</button>
+          </div>
+        </div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_date_format')||'Date / Time Format'}</div>
@@ -5893,6 +5902,9 @@ async function testSyslogConfig() {
 
 // ── Security Settings UI ──────────────────────────────────────────────────────
 async function _initSecuritySettingsUI() {
+  // Wire up geoblocking country names display on input change
+  const geoInput = document.getElementById('secGeoCountries');
+  if (geoInput) geoInput.addEventListener('input', _updateGeoCountryNames);
   try {
     const ss = await apiGet('/api/admin/security');
     if (!ss) return;
@@ -5973,6 +5985,19 @@ async function saveSecRateLimits() {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to save rate limits');
   }
+}
+
+function _updateGeoCountryNames() {
+  const el = document.getElementById('secGeoCountryNames');
+  const input = document.getElementById('secGeoCountries');
+  if (!el || !input) return;
+  const codes = (input.value || '').split(',').map(c => c.trim().toUpperCase()).filter(Boolean);
+  if (codes.length === 0) { el.textContent = ''; return; }
+  const names = codes.map(c => {
+    const name = countryName(c);
+    return name !== c ? `${countryAbbr(c)} (${name})` : c;
+  });
+  el.textContent = names.join(', ');
 }
 
 async function saveSecGeoblock() {
