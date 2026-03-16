@@ -49,11 +49,21 @@ Nyckelfunktioner:
 - Övningsstöd med STARTEX/ENDEX och syntetisk "Dag N / T+T" tid
 - Larmeddelanden i realtid via Server-Sent Events
 - Export till ICS, JSON och CSV
+- Nedräkningstimer och tidtagare med framstegsindikatorer och larm
+- Beslutslogg med statusarbetsflöde och bilagor
+- Loggbok för kronologiska operativa anteckningar
+- Resurshantering (rum, byggnader, IT-tjänster, datacenter)
+- Interaktiv kartprojektion med resursöverlägg och adresssökning
+- Avtagbara fönster för klockor, sidofält, beslutslogg och karta
+- Integreringsramverk med STIX/TAXII- och syslog-anslutningar
+- VCR sjusegment-klockdisplay med färganpassning
+- Artificiellt tidssystem för övningstidsförskjutningar
 - DTG (Date-Time Group) militärt datumformat
 - Högkontrastläge och färgblindsanpassade paletter
-- Finskt (Suomi) språkstöd
+- Stöd för 14 språk
 - Referensdokumenthantering med kontrollsummor
 - Arbetsytans förval
+- Offlinesynkronisering och federationsstöd
 
 ---
 
@@ -512,7 +522,7 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 |---|---|
 | **Tema** | Mörkt / Ljust / City Camo / Urban Camo |
 | **Storlek** | Liten / Normal / Stor / Enorm |
-| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
 | **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Tidsformat** | 24h / 12h |
 | **Högkontrastläge** | På / Av |
@@ -527,7 +537,7 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 | **Standard händelsetyp** | valfri konfigurerad typ |
 | **Välkomstbanner** | visas vid första inloggning |
 
-Språket kan också ändras direkt med flaggknapparna (🇬🇧 🇸🇪 🇫🇷 🇫🇮) i verktygsfältet.
+Språket kan också ändras direkt med flaggknapparna i verktygsfältet.
 
 ### Datum-/tidsformat och dagstimmar
 

@@ -49,11 +49,21 @@ Fonctionnalités clés :
 - Support d'exercice avec STARTEX/ENDEX et temps synthétique « Jour N / T+H »
 - Notifications d'alarme en temps réel via Server-Sent Events
 - Export en ICS, JSON et CSV
+- Comptes à rebours et chronomètres avec barres de progression et alarmes
+- Journal des décisions avec flux de statut et pièces jointes
+- Journal de bord pour les enregistrements opérationnels chronologiques
+- Gestion des ressources (salles, bâtiments, services informatiques, centres de données)
+- Projection cartographique interactive avec superpositions de ressources et recherche d'adresses
+- Fenêtres détachables pour horloges, panneau latéral, journal des décisions et carte
+- Cadre d'intégration avec connecteurs STIX/TAXII et syslog
+- Affichage d'horloge numérique VCR à sept segments avec personnalisation des couleurs
+- Système de temps artificiel pour les décalages de temps d'exercice
 - Format DTG (Date-Time Group) militaire
 - Mode haut contraste et palettes pour daltoniens
-- Support de la langue finnoise (Suomi)
+- Support de 14 langues
 - Gestion de documents de référence avec sommes de contrôle
 - Préréglages d'espace de travail
+- Mode de synchronisation hors ligne et support de fédération
 
 ---
 
@@ -507,7 +517,7 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 |---|---|
 | **Thème** | Sombre / Clair / City Camo / Urban Camo |
 | **Taille d'affichage** | Petit / Normal / Grand / Énorme |
-| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
 | **Format date/heure** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Format horaire** | 24h / 12h |
 | **Mode haut contraste** | Activé / Désactivé |
@@ -522,7 +532,7 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 | **Type d'événement par défaut** | tout type configuré |
 | **Bannière de bienvenue** | affichée à la première connexion |
 
-La langue peut aussi être changée instantanément avec les boutons de drapeaux (🇬🇧 🇸🇪 🇫🇷 🇫🇮) dans la barre d'outils.
+La langue peut aussi être changée instantanément avec les boutons de drapeaux dans la barre d'outils.
 
 ### Format date/heure et heures de journée
 
