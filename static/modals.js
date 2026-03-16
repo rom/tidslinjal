@@ -11259,6 +11259,7 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="optempo" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('optempo')||'OpTempo'}</button>
             <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
             <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('dependencies')||'Dependencies'}</button>
+            ${state.user && hasRole2(state.user.role, 'oplead') ? `<button class="btn btn-sm analysisTab" data-tab="leadership" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_leadership')||'Leadership'}</button>` : ''}
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
         </div>
@@ -11320,6 +11321,7 @@ async function _loadAnalysisTab(tab) {
       case 'optempo': await _renderOpTempoTab(container); break;
       case 'decisions': await _renderDecisionsTab(container); break;
       case 'dependencies': await _renderDependenciesTab(container); break;
+      case 'leadership': await _renderLeadershipTab(container); break;
       case 'export': _renderExportTab(container); break;
     }
   } catch(e) {
@@ -11528,6 +11530,207 @@ async function _renderDependenciesTab(container) {
   });
 }
 
+/* ── Leadership Dashboard Tab ─────────────────────────────────────────────── */
+async function _renderLeadershipTab(container) {
+  const data = await _analysisFetch('/api/stats/leadership-dashboard');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">No data available.</p>`; return; }
+
+  const T = data.tempo || {};
+  const R = data.readiness || {};
+  const P = data.progress || {};
+  const D = data.delay || {};
+  const B = data.bottlenecks || {};
+  const DL = data.decision_load || {};
+  const I = data.impact || {};
+  const C = data.confidence || {};
+  const E = data.escalation || {};
+  const S = data.summary || {};
+
+  // Color helpers
+  const confColor = v => v >= 75 ? '#27AE60' : v >= 50 ? '#E67E22' : '#E74C3C';
+  const trendIcon = t => t === 'accelerating' ? '▲' : t === 'decelerating' ? '▼' : '●';
+  const trendColor = t => t === 'accelerating' ? '#27AE60' : t === 'decelerating' ? '#E74C3C' : 'var(--text-dim)';
+  const prioColor = v => v === 'critical' ? '#E74C3C' : v === 'high' ? '#E67E22' : 'var(--text-dim)';
+
+  // Section helper
+  const section = (title, icon, html) => `
+    <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">${icon} ${escHtml(title)}</div>
+      ${html}
+    </div>`;
+
+  const cardRow = (...cards) => `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px">${cards.join('')}</div>`;
+  const card = (val, lbl, color) => _analysisCard(val, lbl, color);
+
+  // Build critical delays table
+  let critDelayHtml = '';
+  if (D.critical_delays && D.critical_delays.length) {
+    critDelayHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Top Delays</div>` +
+      D.critical_delays.map(d => `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="color:#E74C3C;font-weight:700;min-width:60px">+${Math.round(d.slip_minutes)}m</span>
+        <span>${escHtml(d.title || '#'+d.id)}</span>
+      </div>`).join('') + '</div>';
+  }
+
+  // Build blocked events list
+  let blockedHtml = '';
+  if (B.blocked_events && B.blocked_events.length) {
+    blockedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Blocked Events</div>` +
+      B.blocked_events.slice(0, 8).map(b => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="color:#E74C3C">⛔</span> ${escHtml(b.title)} <span style="color:var(--text-dim)">← ${escHtml(b.blocked_by_title)}</span>
+      </div>`).join('') + '</div>';
+  }
+
+  // Build overloaded users list
+  let overloadedHtml = '';
+  if (B.overloaded_users && B.overloaded_users.length) {
+    overloadedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Overloaded Personnel</div>` +
+      B.overloaded_users.map(u => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="color:#E67E22">⚠</span> ${escHtml(u.name)} <span style="color:var(--text-dim)">(${u.count} events)</span>
+      </div>`).join('') + '</div>';
+  }
+
+  // Impact by type chart data
+  const impactByType = I.events_by_type || {};
+  const impactByLayer = I.events_by_layer || {};
+
+  container.innerHTML = `
+    <!-- Confidence banner -->
+    <div style="display:flex;gap:12px;margin-bottom:16px;padding:16px;background:var(--bg3);border-radius:var(--radius);align-items:center;flex-wrap:wrap">
+      <div style="text-align:center;min-width:100px">
+        <div style="font-size:36px;font-weight:800;color:${confColor(C.overall_confidence||0)}">${Math.round(C.overall_confidence||0)}%</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_overall_confidence')||'Overall Confidence'}</div>
+      </div>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
+        ${card(Math.round(C.completion_confidence||0)+'%', t('ld_completion')||'Completion', confColor(C.completion_confidence||0))}
+        ${card(Math.round(C.readiness_score||0)+'%', t('ld_readiness')||'Readiness', confColor(C.readiness_score||0))}
+        ${card(Math.round((C.schedule_adherence||0)*100)+'%', t('ld_on_time')||'On-Time', confColor((C.schedule_adherence||0)*100))}
+      </div>
+      ${S.phase_name ? `<div style="padding:6px 14px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:var(--fs-xs);font-weight:700">${escHtml(S.phase_name)}</div>` : ''}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <!-- Left column -->
+      <div>
+        ${section(t('ld_tempo')||'Tempo', '⚡', `
+          ${cardRow(
+            card(T.events_last_hour||0, t('ld_last_1h')||'Last 1h'),
+            card(T.events_last_4h||0, t('ld_last_4h')||'Last 4h'),
+            card(T.events_last_24h||0, t('ld_last_24h')||'Last 24h'),
+            card(`<span style="color:${trendColor(T.tempo_trend)}">${trendIcon(T.tempo_trend)} ${T.tempo_trend||'—'}</span>`, t('ld_trend')||'Trend')
+          )}
+          <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
+        `)}
+
+        ${section(t('ld_progress')||'Progress', '📊', `
+          ${cardRow(
+            card(P.total_events||0, t('ld_total')||'Total'),
+            card(P.completed_count||0, t('ld_completed')||'Completed', '#27AE60'),
+            card(Math.round(P.completion_rate||0)+'%', t('ld_completion_rate')||'Rate', confColor(P.completion_rate||0))
+          )}
+          <canvas id="anlLdStatus" width="300" height="140"></canvas>
+        `)}
+
+        ${section(t('ld_delay')||'Delay', '⏱', `
+          ${cardRow(
+            card(Math.round(D.mean_slip_minutes||0)+'m', t('ld_mean_slip')||'Mean Slip', D.mean_slip_minutes > 15 ? '#E74C3C' : '#27AE60'),
+            card(Math.round(D.median_slip_minutes||0)+'m', t('ld_median_slip')||'Median', D.median_slip_minutes > 15 ? '#E74C3C' : '#27AE60'),
+            card(D.delayed_count||0, t('ld_delayed')||'Delayed', '#E67E22'),
+            card(Math.round((D.delayed_rate||0)*100)+'%', t('ld_delayed_rate')||'Delay Rate', D.delayed_rate > 0.2 ? '#E74C3C' : '#27AE60')
+          )}
+          ${critDelayHtml}
+        `)}
+
+        ${section(t('ld_impact')||'Impact', '💥', `
+          <canvas id="anlLdTypeChart" width="300" height="140"></canvas>
+          <canvas id="anlLdLayerChart" width="300" height="140" style="margin-top:8px"></canvas>
+        `)}
+      </div>
+
+      <!-- Right column -->
+      <div>
+        ${section(t('ld_readiness_title')||'Readiness', '✅', `
+          ${cardRow(
+            card(Math.round(R.latest_check_readiness||0)+'%', t('ld_latest_readiness')||'Latest Check', confColor(R.latest_check_readiness||0)),
+            card(R.total_checks||0, t('ld_total_checks')||'Total Checks'),
+            card(Math.round((R.avg_response_rate||0)*100)+'%', t('ld_avg_response')||'Avg Response', confColor((R.avg_response_rate||0)*100))
+          )}
+        `)}
+
+        ${section(t('ld_decision_load')||'Decision Load', '⚖', `
+          ${cardRow(
+            card(DL.total_decisions||0, t('ld_total')||'Total'),
+            card(DL.pending||0, t('ld_pending')||'Pending', DL.pending > 5 ? '#E74C3C' : '#E67E22'),
+            card(DL.approved||0, t('ld_approved')||'Approved', '#27AE60'),
+            card(DL.rejected||0, t('ld_rejected')||'Rejected', '#E74C3C')
+          )}
+          <div style="display:flex;gap:12px;font-size:var(--fs-xs);color:var(--text-dim)">
+            <span>${t('ld_last_1h')||'Last 1h'}: <b>${DL.decisions_last_hour||0}</b></span>
+            <span>${t('ld_last_4h')||'Last 4h'}: <b>${DL.decisions_last_4h||0}</b></span>
+            <span>${t('ld_avg_response_time')||'Avg response'}: <b>${Math.round(DL.avg_response_time_minutes||0)}m</b></span>
+            <span>${t('ld_velocity')||'Velocity'}: <b>${(DL.decision_velocity||0).toFixed(1)}/h</b></span>
+          </div>
+        `)}
+
+        ${section(t('ld_bottlenecks')||'Bottlenecks', '🚧', `
+          ${cardRow(
+            card(B.pending_decisions||0, t('ld_pending_decisions')||'Pending Dec.', B.pending_decisions > 3 ? '#E74C3C' : '#E67E22'),
+            card(B.unacknowledged_alarms||0, t('ld_unack_alarms')||'Unack. Alarms', B.unacknowledged_alarms > 0 ? '#E74C3C' : '#27AE60'),
+            card((B.stale_events||[]).length, t('ld_stale_events')||'Stale (>2h)', (B.stale_events||[]).length > 0 ? '#E67E22' : '#27AE60'),
+            card((B.blocked_events||[]).length, t('ld_blocked')||'Blocked', (B.blocked_events||[]).length > 0 ? '#E74C3C' : '#27AE60')
+          )}
+          ${overloadedHtml}
+          ${blockedHtml}
+        `)}
+
+        ${section(t('ld_escalation')||'Escalation', '🔺', `
+          ${cardRow(
+            card(E.escalated_decisions||0, t('ld_escalated')||'Escalated'),
+            card(E.quick_responses||0, t('ld_quick_resp')||'Quick Resp.'),
+            card(E.quick_reports||0, t('ld_quick_reports')||'Quick Reports'),
+            card((E.escalation_rate||0).toFixed(1)+'/h', t('ld_esc_rate')||'Rate')
+          )}
+        `)}
+
+        ${section(t('ld_summary')||'Summary', '📋', `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:var(--fs-xs)">
+            <div>${t('ld_active_users')||'Active users'}: <b>${S.active_users_count||0}</b></div>
+            <div>${t('ld_groups')||'Groups'}: <b>${S.total_groups||0}</b></div>
+            <div>${t('ld_layers')||'Layers'}: <b>${S.total_layers||0}</b></div>
+            <div>${t('ld_logbook_24h')||'Logbook (24h)'}: <b>${S.logbook_entries_24h||0}</b></div>
+            <div>${t('ld_locks')||'Locks'}: <b>${S.lock_count||0}</b></div>
+          </div>
+        `)}
+      </div>
+    </div>`;
+
+  // Render charts after DOM is ready
+  setTimeout(() => {
+    // Status distribution pie
+    const statusMap = P.events_by_status || {};
+    const statusLabels = Object.keys(statusMap);
+    const statusVals = Object.values(statusMap);
+    const statusColors = {planned:'#4A90D9', active:'#E67E22', completed:'#27AE60', verified:'#2ECC71', responded_to:'#3498DB', submitted:'#9B59B6', rejected:'#E74C3C', cancelled:'#95A5A6'};
+    if (statusLabels.length && typeof drawPieChart === 'function') {
+      drawPieChart('anlLdStatus', statusLabels, statusVals, statusLabels.map(s => statusColors[s] || '#666'));
+    }
+
+    // Type breakdown bar chart
+    const typeLabels = Object.keys(impactByType);
+    const typeVals = Object.values(impactByType);
+    if (typeLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlLdTypeChart', typeLabels, typeVals, {horizontal: true, maxBarWidth: 22});
+    }
+
+    // Layer breakdown bar chart
+    const layerLabels = Object.keys(impactByLayer);
+    const layerVals = Object.values(impactByLayer);
+    if (layerLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlLdLayerChart', layerLabels, layerVals, {horizontal: true, maxBarWidth: 22});
+    }
+  }, 50);
+}
+
 /* ── Export Tab ────────────────────────────────────────────────────────────── */
 function _renderExportTab(container) {
   const qs = _analysisDateParams();
@@ -11619,6 +11822,31 @@ async function openTeamLeadToolbox() {
                 <option value="critical">${t('priority_critical')||'Critical'}</option>
               </select>
               <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="sendQuickResponse">🚨 ${t('btn_send')||'Send'}</button>
+            </div>
+          </div>
+
+          <!-- Quick Report to OpLead / InfoHandler -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px;color:var(--accent)">📋 ${t('tl_quick_report')||'Quick Report'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_quick_report_desc')||'Send an instant report to Operations Lead and InfoHandler'}</p>
+            <input type="text" id="tlReportSubject" placeholder="${t('tl_report_subject')||'Report subject'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlReportBody" rows="3" placeholder="${t('tl_report_body')||'Report details...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="tlReportCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="situation">${t('tl_report_cat_situation')||'Situation'}</option>
+                <option value="incident">${t('tl_report_cat_incident')||'Incident'}</option>
+                <option value="resource">${t('tl_report_cat_resource')||'Resource'}</option>
+                <option value="progress">${t('tl_report_cat_progress')||'Progress'}</option>
+                <option value="other">${t('tl_report_cat_other')||'Other'}</option>
+              </select>
+              <select id="tlReportPriority" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="normal">${t('priority_normal')||'Normal'}</option>
+                <option value="high">${t('priority_high')||'High'}</option>
+                <option value="critical">${t('priority_critical')||'Critical'}</option>
+              </select>
+              <button class="btn btn-sm btn-primary" data-action="sendQuickReport">📋 ${t('btn_send_report')||'Send Report'}</button>
             </div>
           </div>
 
@@ -11779,6 +12007,24 @@ async function sendTeamPoll() {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to send poll');
+  }
+}
+
+async function sendQuickReport() {
+  const subject = document.getElementById('tlReportSubject')?.value?.trim();
+  if (!subject) { showError(t('tl_report_subject_required')||'Report subject is required'); return; }
+  const body = document.getElementById('tlReportBody')?.value?.trim();
+  if (!body) { showError(t('tl_report_body_required')||'Report body is required'); return; }
+  const category = document.getElementById('tlReportCategory')?.value || 'situation';
+  const priority = document.getElementById('tlReportPriority')?.value || 'normal';
+  const res = await apiPost('/api/teamlead/quick-report', {subject, body, category, priority});
+  if (res.ok) {
+    showNotification('success', t('tl_report_sent')||'Report sent to Operations Lead');
+    document.getElementById('tlReportSubject').value = '';
+    document.getElementById('tlReportBody').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to send report');
   }
 }
 

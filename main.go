@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"mime"
 	"net"
 	"net/http"
@@ -5767,6 +5768,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/stats/decisions/analytics", app.requireAuth(app.handleStatsDecisionAnalytics))
 	mux.HandleFunc("GET /api/stats/dependencies/graph", app.requireAuth(app.handleStatsDependencyGraph))
 	mux.HandleFunc("GET /api/stats/export", app.requireAuth(app.handleStatsExport))
+	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 
 	// Narrative / Storyline API
 	mux.HandleFunc("GET /api/narrative", app.requireAuth(app.handleNarrative))
@@ -5776,6 +5778,8 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("POST /api/teamlead/escalate-decision", app.requireRole(RoleTeamLead, app.handleTeamLeadEscalateDecision))
 	mux.HandleFunc("POST /api/teamlead/ready-check", app.requireRole(RoleTeamLead, app.handleTeamLeadReadyCheck))
 	mux.HandleFunc("POST /api/teamlead/team-poll", app.requireRole(RoleTeamLead, app.handleTeamLeadTeamPoll))
+	mux.HandleFunc("POST /api/teamlead/quick-report", app.requireRole(RoleTeamLead, app.handleTeamLeadQuickReport))
+	mux.HandleFunc("GET /api/teamlead/quick-reports", app.requireAuth(app.handleGetQuickReports))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		_, user := app.getSession(r)
 		if user == nil {
@@ -8846,6 +8850,112 @@ func (app *App) handleTeamLeadTeamPoll(w http.ResponseWriter, r *http.Request, u
 	jsonOK(w, map[string]string{"status": "sent"})
 }
 
+// ── Quick Report ──────────────────────────────────────────────────────────────
+
+func (app *App) handleTeamLeadQuickReport(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Subject    string `json:"subject"`
+		Body       string `json:"body"`
+		Priority   string `json:"priority"`   // normal, high, critical
+		Category   string `json:"category"`   // situation, incident, resource, progress, other
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Subject == "" || req.Body == "" {
+		jsonError(w, "subject and body are required", http.StatusBadRequest)
+		return
+	}
+	if req.Priority == "" {
+		req.Priority = "normal"
+	}
+	if req.Category == "" {
+		req.Category = "situation"
+	}
+
+	// Build the report payload
+	report := map[string]any{
+		"type":        "quick_report",
+		"subject":     req.Subject,
+		"body":        req.Body,
+		"priority":    req.Priority,
+		"category":    req.Category,
+		"from_user":   user.DisplayName,
+		"from_role":   string(user.Role),
+		"from_user_id": user.ID,
+		"timestamp":   time.Now().Format(time.RFC3339),
+	}
+	payload, _ := json.Marshal(report)
+
+	// Send to OpLead+ users and users with info_handler capability
+	users := app.store.GetUsers()
+	roleConfigs := app.store.GetRoleConfigs()
+	infoHandlerRoles := map[string]bool{}
+	for _, rc := range roleConfigs {
+		if rc.Capabilities["info_handler"] {
+			infoHandlerRoles[rc.Key] = true
+		}
+	}
+
+	for _, u := range users {
+		if u.ID == user.ID {
+			continue
+		}
+		// Send to OpLead+ or info_handler capability roles
+		isLeadership := hasRole(u.Role, RoleOpLead)
+		isInfoHandler := infoHandlerRoles[string(u.Role)]
+		if isLeadership || isInfoHandler {
+			app.broker.SendToUser(u.ID, SSEMessage{Event: "quick_report", Data: string(payload)})
+		}
+	}
+
+	// Also broadcast (so sender gets confirmation)
+	app.broker.SendToUser(user.ID, SSEMessage{Event: "quick_report_sent", Data: string(payload)})
+
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "quick_report", EntityType: "teamlead_toolbox",
+		Summary: fmt.Sprintf("Quick report: [%s] %s (priority: %s)", req.Category, req.Subject, req.Priority),
+	})
+
+	jsonOK(w, map[string]string{"status": "sent"})
+}
+
+func (app *App) handleGetQuickReports(w http.ResponseWriter, r *http.Request, user *User) {
+	// Only leadership and info_handler roles can view reports
+	isLeadership := hasRole(user.Role, RoleOpLead)
+	roleConfigs := app.store.GetRoleConfigs()
+	isInfoHandler := false
+	for _, rc := range roleConfigs {
+		if rc.Key == string(user.Role) && rc.Capabilities["info_handler"] {
+			isInfoHandler = true
+			break
+		}
+	}
+	// TeamLead+ can also see reports they sent
+	isTeamLead := hasRole(user.Role, RoleTeamLead)
+
+	if !isLeadership && !isInfoHandler && !isTeamLead {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Return quick reports from audit log
+	audits := app.store.GetAudit(200)
+	var reports []map[string]any
+	for _, a := range audits {
+		if a.Action == "quick_report" {
+			reports = append(reports, map[string]any{
+				"timestamp": a.Timestamp,
+				"user_name": a.UserName,
+				"summary":   a.Summary,
+			})
+		}
+	}
+	jsonOK(w, reports)
+}
+
 // ── Map Location handlers ─────────────────────────────────────────────────────
 
 func (app *App) handleListMapLocations(w http.ResponseWriter, r *http.Request, user *User) {
@@ -10395,6 +10505,537 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
 		json.NewEncoder(w).Encode(data)
 	}
+}
+
+// ── Stats: Leadership Dashboard ─────────────────────────────────────────────
+
+func (app *App) handleStatsLeadershipDashboard(w http.ResponseWriter, r *http.Request, user *User) {
+	now := time.Now()
+	events := app.allEvents()
+	decisions := app.store.GetDecisionLog()
+	phases := app.store.GetPhases()
+	layers := app.store.GetAllLayers()
+	groups := app.store.GetGroups()
+	users := app.store.GetUsers()
+	readyChecks := app.store.GetPersonReadyChecks()
+	logbook := app.store.GetLogBook()
+	locks := app.store.GetLocks()
+	alarms := app.store.GetActiveAlarms()
+	auditEntries := app.store.GetAudit(500)
+
+	// Build event map for dependency lookups
+	eventMap := make(map[int64]Event, len(events))
+	for _, ev := range events {
+		eventMap[ev.ID] = ev
+	}
+
+	// Build layer name map
+	layerNames := make(map[int64]string, len(layers))
+	for _, l := range layers {
+		layerNames[l.ID] = l.Name
+	}
+
+	// ── 1. Tempo ────────────────────────────────────────────────────────────
+	eventsLast1h, eventsLast4h, eventsLast24h := 0, 0, 0
+	eventsPrev4h := 0
+	concurrentActive := 0
+	cutoff1h := now.Add(-1 * time.Hour)
+	cutoff4h := now.Add(-4 * time.Hour)
+	cutoff8h := now.Add(-8 * time.Hour)
+	cutoff24h := now.Add(-24 * time.Hour)
+
+	for _, ev := range events {
+		if ev.StartTime.After(cutoff1h) {
+			eventsLast1h++
+		}
+		if ev.StartTime.After(cutoff4h) {
+			eventsLast4h++
+		}
+		if ev.StartTime.After(cutoff24h) {
+			eventsLast24h++
+		}
+		if ev.StartTime.After(cutoff8h) && !ev.StartTime.After(cutoff4h) {
+			eventsPrev4h++
+		}
+		if ev.Status == "active" {
+			concurrentActive++
+		}
+	}
+	tempoTrend := "steady"
+	if eventsLast4h > eventsPrev4h+2 {
+		tempoTrend = "accelerating"
+	} else if eventsLast4h < eventsPrev4h-2 {
+		tempoTrend = "decelerating"
+	}
+	tempo := map[string]any{
+		"events_last_hour": eventsLast1h,
+		"events_last_4h":   eventsLast4h,
+		"events_last_24h":  eventsLast24h,
+		"tempo_trend":      tempoTrend,
+		"concurrent_active": concurrentActive,
+	}
+
+	// ── 2. Readiness ────────────────────────────────────────────────────────
+	totalChecks := len(readyChecks)
+	avgResponseRate := 0.0
+	latestCheckReadiness := 0.0
+	if totalChecks > 0 {
+		sumRate := 0.0
+		for _, rc := range readyChecks {
+			total := len(rc.Participants)
+			if total == 0 {
+				continue
+			}
+			responded := 0
+			for _, p := range rc.Participants {
+				if p.Status != "pending" {
+					responded++
+				}
+			}
+			sumRate += float64(responded) / float64(total) * 100.0
+		}
+		avgResponseRate = sumRate / float64(totalChecks)
+
+		// Latest check (by CreatedAt)
+		latest := readyChecks[0]
+		for _, rc := range readyChecks[1:] {
+			if rc.CreatedAt.After(latest.CreatedAt) {
+				latest = rc
+			}
+		}
+		if len(latest.Participants) > 0 {
+			readyCount := 0
+			for _, p := range latest.Participants {
+				if p.Status == "ready" {
+					readyCount++
+				}
+			}
+			latestCheckReadiness = float64(readyCount) / float64(len(latest.Participants)) * 100.0
+		}
+	}
+	readiness := map[string]any{
+		"total_checks":           totalChecks,
+		"avg_response_rate":      math.Round(avgResponseRate*100) / 100,
+		"latest_check_readiness": math.Round(latestCheckReadiness*100) / 100,
+	}
+
+	// ── 3. Progress ─────────────────────────────────────────────────────────
+	totalEvents := len(events)
+	completedCount := 0
+	eventsByStatus := make(map[string]int)
+	for _, ev := range events {
+		eventsByStatus[string(ev.Status)]++
+		if ev.Status == "completed" || ev.Status == "verified" {
+			completedCount++
+		}
+	}
+	completionRate := 0.0
+	if totalEvents > 0 {
+		completionRate = float64(completedCount) / float64(totalEvents) * 100.0
+	}
+
+	// By phase
+	type phaseProgress struct {
+		Name           string  `json:"name"`
+		TotalEvents    int     `json:"total_events"`
+		CompletedCount int     `json:"completed_count"`
+		CompletionRate float64 `json:"completion_rate"`
+	}
+	var byPhase []phaseProgress
+	for _, ph := range phases {
+		phTotal, phCompleted := 0, 0
+		for _, ev := range events {
+			if !ev.StartTime.Before(ph.StartTime) && ev.StartTime.Before(ph.EndTime) {
+				phTotal++
+				if ev.Status == "completed" || ev.Status == "verified" {
+					phCompleted++
+				}
+			}
+		}
+		rate := 0.0
+		if phTotal > 0 {
+			rate = float64(phCompleted) / float64(phTotal) * 100.0
+		}
+		byPhase = append(byPhase, phaseProgress{
+			Name:           ph.Name,
+			TotalEvents:    phTotal,
+			CompletedCount: phCompleted,
+			CompletionRate: math.Round(rate*100) / 100,
+		})
+	}
+
+	progress := map[string]any{
+		"total_events":    totalEvents,
+		"completed_count": completedCount,
+		"completion_rate": math.Round(completionRate*100) / 100,
+		"by_phase":        byPhase,
+		"events_by_status": eventsByStatus,
+	}
+
+	// ── 4. Delay ────────────────────────────────────────────────────────────
+	var slips []float64
+	type criticalDelay struct {
+		ID          int64   `json:"id"`
+		Title       string  `json:"title"`
+		SlipMinutes float64 `json:"slip_minutes"`
+	}
+	var allDelays []criticalDelay
+	for _, ev := range events {
+		if ev.PlannedStart == nil {
+			continue
+		}
+		slip := ev.StartTime.Sub(*ev.PlannedStart).Minutes()
+		slips = append(slips, slip)
+		allDelays = append(allDelays, criticalDelay{ID: ev.ID, Title: ev.Title, SlipMinutes: math.Round(slip*100) / 100})
+	}
+
+	meanSlip, medianSlip, maxSlip := 0.0, 0.0, 0.0
+	delayedCount := 0
+	delayedRate := 0.0
+	if len(slips) > 0 {
+		total := 0.0
+		for _, s := range slips {
+			total += s
+			if s > maxSlip {
+				maxSlip = s
+			}
+			if s > 5 {
+				delayedCount++
+			}
+		}
+		meanSlip = total / float64(len(slips))
+		sort.Float64s(slips)
+		mid := len(slips) / 2
+		if len(slips)%2 == 0 {
+			medianSlip = (slips[mid-1] + slips[mid]) / 2
+		} else {
+			medianSlip = slips[mid]
+		}
+		delayedRate = float64(delayedCount) / float64(len(slips))
+	}
+
+	// Top 5 most delayed
+	sort.Slice(allDelays, func(i, j int) bool {
+		return allDelays[i].SlipMinutes > allDelays[j].SlipMinutes
+	})
+	criticalDelays := allDelays
+	if len(criticalDelays) > 5 {
+		criticalDelays = criticalDelays[:5]
+	}
+
+	delay := map[string]any{
+		"mean_slip_minutes":   math.Round(meanSlip*100) / 100,
+		"median_slip_minutes": math.Round(medianSlip*100) / 100,
+		"max_slip_minutes":    math.Round(maxSlip*100) / 100,
+		"delayed_count":       delayedCount,
+		"delayed_rate":        math.Round(delayedRate*10000) / 10000,
+		"critical_delays":     criticalDelays,
+	}
+
+	// ── 5. Bottlenecks ──────────────────────────────────────────────────────
+	// Overloaded users: users with >5 active/planned events
+	userEventCount := make(map[int64]int)
+	userNames := make(map[int64]string)
+	for _, u := range users {
+		userNames[u.ID] = u.DisplayName
+	}
+	for _, ev := range events {
+		if ev.Status == "active" || ev.Status == "planned" {
+			if ev.ResponsibleID != nil {
+				userEventCount[*ev.ResponsibleID]++
+			}
+		}
+	}
+	type overloadedUser struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	var overloadedUsers []overloadedUser
+	for uid, count := range userEventCount {
+		if count > 5 {
+			overloadedUsers = append(overloadedUsers, overloadedUser{Name: userNames[uid], Count: count})
+		}
+	}
+	sort.Slice(overloadedUsers, func(i, j int) bool {
+		return overloadedUsers[i].Count > overloadedUsers[j].Count
+	})
+
+	// Blocked events: events whose DependsOn includes a non-completed event
+	type blockedEvent struct {
+		ID             int64  `json:"id"`
+		Title          string `json:"title"`
+		BlockedByTitle string `json:"blocked_by_title"`
+	}
+	var blockedEvents []blockedEvent
+	for _, ev := range events {
+		for _, depID := range ev.DependsOn {
+			dep, ok := eventMap[depID]
+			if ok && dep.Status != "completed" && dep.Status != "verified" {
+				blockedEvents = append(blockedEvents, blockedEvent{
+					ID:             ev.ID,
+					Title:          ev.Title,
+					BlockedByTitle: dep.Title,
+				})
+				break
+			}
+		}
+	}
+
+	// Unacknowledged alarms
+	unacknowledgedAlarms := 0
+	for _, a := range alarms {
+		if a.AcknowledgedAt == nil {
+			unacknowledgedAlarms++
+		}
+	}
+
+	// Pending decisions
+	pendingDecisions := 0
+	for _, d := range decisions {
+		if d.Status == "requested" {
+			pendingDecisions++
+		}
+	}
+
+	// Stale events: active for more than 2 hours
+	type staleEvent struct {
+		ID      int64   `json:"id"`
+		Title   string  `json:"title"`
+		ActiveH float64 `json:"active_hours"`
+	}
+	var staleEvents []staleEvent
+	for _, ev := range events {
+		if ev.Status == "active" && now.Sub(ev.StartTime) > 2*time.Hour {
+			staleEvents = append(staleEvents, staleEvent{
+				ID:      ev.ID,
+				Title:   ev.Title,
+				ActiveH: math.Round(now.Sub(ev.StartTime).Hours()*100) / 100,
+			})
+		}
+	}
+
+	bottlenecks := map[string]any{
+		"overloaded_users":      overloadedUsers,
+		"blocked_events":        blockedEvents,
+		"unacknowledged_alarms": unacknowledgedAlarms,
+		"pending_decisions":     pendingDecisions,
+		"stale_events":          staleEvents,
+	}
+
+	// ── 6. Decision Load ────────────────────────────────────────────────────
+	totalDecisions := len(decisions)
+	pendingDec, approvedDec, rejectedDec := 0, 0, 0
+	decisionsLast1h, decisionsLast4h := 0, 0
+	var responseTimes []float64
+	decisionsLast24h := 0
+	for _, d := range decisions {
+		switch d.Status {
+		case "requested":
+			pendingDec++
+		case "approved":
+			approvedDec++
+		case "rejected":
+			rejectedDec++
+		}
+		if d.Timestamp.After(cutoff1h) {
+			decisionsLast1h++
+		}
+		if d.Timestamp.After(cutoff4h) {
+			decisionsLast4h++
+		}
+		if d.Timestamp.After(cutoff24h) {
+			decisionsLast24h++
+		}
+		if d.RequestedAt != nil && d.ReviewedAt != nil {
+			rt := d.ReviewedAt.Sub(*d.RequestedAt).Minutes()
+			if rt >= 0 {
+				responseTimes = append(responseTimes, rt)
+			}
+		}
+	}
+	avgResponseTime := 0.0
+	if len(responseTimes) > 0 {
+		sum := 0.0
+		for _, rt := range responseTimes {
+			sum += rt
+		}
+		avgResponseTime = sum / float64(len(responseTimes))
+	}
+	decisionVelocity := float64(decisionsLast24h) / 24.0
+
+	decisionLoad := map[string]any{
+		"total_decisions":          totalDecisions,
+		"pending":                  pendingDec,
+		"approved":                 approvedDec,
+		"rejected":                 rejectedDec,
+		"decisions_last_hour":      decisionsLast1h,
+		"decisions_last_4h":        decisionsLast4h,
+		"avg_response_time_minutes": math.Round(avgResponseTime*100) / 100,
+		"decision_velocity":        math.Round(decisionVelocity*100) / 100,
+	}
+
+	// ── 7. Impact ───────────────────────────────────────────────────────────
+	eventsByType := make(map[string]int)
+	eventsByLayer := make(map[string]int)
+	for _, ev := range events {
+		eventsByType[string(ev.EventType)]++
+		if ev.LayerID != nil {
+			name := layerNames[*ev.LayerID]
+			if name == "" {
+				name = fmt.Sprintf("layer_%d", *ev.LayerID)
+			}
+			eventsByLayer[name]++
+		} else {
+			eventsByLayer["master"]++
+		}
+	}
+
+	// Critical events: active events sorted by dependency fan-out
+	depFanOut := make(map[int64]int)
+	for _, ev := range events {
+		for _, depID := range ev.DependsOn {
+			depFanOut[depID]++
+		}
+	}
+	type criticalEvent struct {
+		ID     int64  `json:"id"`
+		Title  string `json:"title"`
+		FanOut int    `json:"dependency_fan_out"`
+	}
+	var criticalEvents []criticalEvent
+	for _, ev := range events {
+		if ev.Status == "active" && depFanOut[ev.ID] > 0 {
+			criticalEvents = append(criticalEvents, criticalEvent{
+				ID:     ev.ID,
+				Title:  ev.Title,
+				FanOut: depFanOut[ev.ID],
+			})
+		}
+	}
+	sort.Slice(criticalEvents, func(i, j int) bool {
+		return criticalEvents[i].FanOut > criticalEvents[j].FanOut
+	})
+
+	impact := map[string]any{
+		"events_by_type":  eventsByType,
+		"events_by_layer": eventsByLayer,
+		"critical_events": criticalEvents,
+	}
+
+	// ── 8. Confidence ───────────────────────────────────────────────────────
+	// On-time delivery: completed events that finished on or before PlannedEnd
+	onTimeCount := 0
+	completedWithPlan := 0
+	for _, ev := range events {
+		if ev.Status != "completed" && ev.Status != "verified" {
+			continue
+		}
+		if ev.PlannedEnd == nil {
+			continue
+		}
+		completedWithPlan++
+		endTime := ev.EndTime
+		if endTime != nil && !endTime.After(*ev.PlannedEnd) {
+			onTimeCount++
+		}
+	}
+	onTimeRate := 0.0
+	if completedWithPlan > 0 {
+		onTimeRate = float64(onTimeCount) / float64(completedWithPlan)
+	}
+
+	completionConf := completionRate * onTimeRate // weighted by on-time delivery
+	readinessScore := latestCheckReadiness
+	scheduleAdherence := (1.0 - delayedRate) * 100.0
+	overallConfidence := (completionConf + readinessScore + scheduleAdherence) / 3.0
+
+	confidence := map[string]any{
+		"completion_confidence": math.Round(completionConf*100) / 100,
+		"readiness_score":      math.Round(readinessScore*100) / 100,
+		"schedule_adherence":   math.Round(scheduleAdherence*100) / 100,
+		"overall_confidence":   math.Round(overallConfidence*100) / 100,
+	}
+
+	// ── 9. Escalation ───────────────────────────────────────────────────────
+	escalatedDecisions := 0
+	quickResponses := 0
+	quickReports := 0
+	for _, a := range auditEntries {
+		if !a.Timestamp.After(cutoff24h) {
+			continue
+		}
+		switch a.Action {
+		case "escalate_decision":
+			escalatedDecisions++
+		case "quick_response":
+			quickResponses++
+		case "quick_report":
+			quickReports++
+		}
+	}
+	escalationTotal := float64(escalatedDecisions + quickResponses + quickReports)
+	escalationRate := escalationTotal / 24.0
+
+	escalation := map[string]any{
+		"escalated_decisions": escalatedDecisions,
+		"quick_responses":     quickResponses,
+		"quick_reports":       quickReports,
+		"escalation_rate":     math.Round(escalationRate*100) / 100,
+	}
+
+	// ── 10. Summary ─────────────────────────────────────────────────────────
+	currentPhase := ""
+	for _, ph := range phases {
+		if !now.Before(ph.StartTime) && now.Before(ph.EndTime) {
+			currentPhase = ph.Name
+			break
+		}
+	}
+
+	// Count unique connected users from SSE broker
+	app.broker.mu.RLock()
+	activeUsersCount := len(app.broker.byUser)
+	app.broker.mu.RUnlock()
+
+	// Logbook entries in last 24h
+	logbookEntries24h := 0
+	for _, entry := range logbook {
+		if entry.Timestamp.After(cutoff24h) {
+			logbookEntries24h++
+		}
+	}
+
+	// Active locks (locks where now is within their time range)
+	activeLockCount := 0
+	for _, lock := range locks {
+		if !now.Before(lock.StartTime) && now.Before(lock.EndTime) {
+			activeLockCount++
+		}
+	}
+
+	summary := map[string]any{
+		"phase_name":          currentPhase,
+		"active_users_count":  activeUsersCount,
+		"total_groups":        len(groups),
+		"total_layers":        len(layers),
+		"logbook_entries_24h": logbookEntries24h,
+		"lock_count":          activeLockCount,
+	}
+
+	// ── Response ────────────────────────────────────────────────────────────
+	jsonOK(w, map[string]any{
+		"tempo":         tempo,
+		"readiness":     readiness,
+		"progress":      progress,
+		"delay":         delay,
+		"bottlenecks":   bottlenecks,
+		"decision_load": decisionLoad,
+		"impact":        impact,
+		"confidence":    confidence,
+		"escalation":    escalation,
+		"summary":       summary,
+		"generated_at":  now.Format(time.RFC3339),
+	})
 }
 
 // ── Digest handler ──────────────────────────────────────────────────────────
