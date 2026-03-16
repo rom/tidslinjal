@@ -883,6 +883,12 @@ const TRANSLATIONS = {
     // Narrative / Storyline
     narrative_title:         'Narrative / Storyline',
     narrative_empty:         'No events in this time range.',
+    narrative_detail_level:  'Detail level',
+    narrative_cat_all:       'All events',
+    narrative_cat_external:  'External events',
+    narrative_cat_operational: 'Operational events',
+    narrative_cat_security:  'Security events',
+    narrative_autoscroll:    'Autoscroll',
 
     // Event modal labels
     ev_add_title:            'Add Event',
@@ -2416,6 +2422,12 @@ const TRANSLATIONS = {
     teamlead_toolbox_title:  'Gruppledare-verktygslåda',
     narrative_title:         'Narrativ / Händelseförlopp',
     narrative_empty:         'Inga händelser i detta tidsintervall.',
+    narrative_detail_level:  'Detaljnivå',
+    narrative_cat_all:       'Alla händelser',
+    narrative_cat_external:  'Externa händelser',
+    narrative_cat_operational: 'Operativa händelser',
+    narrative_cat_security:  'Säkerhetshändelser',
+    narrative_autoscroll:    'Autorulla',
     tl_quick_response:       'Snabbsvar behövs!',
     tl_decisions:            'Gruppledarens beslut',
     tl_escalate_decision:    'Beslut behövs — Eskalera till OpLead',

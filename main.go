@@ -8532,6 +8532,7 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 			limit = v
 		}
 	}
+	category := r.URL.Query().Get("category") // all, external, operational, security
 	var fromTime, toTime time.Time
 	if fromStr != "" {
 		fromTime, _ = time.Parse(time.RFC3339, fromStr)
@@ -8554,6 +8555,7 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 		EntityType  string    `json:"entity_type,omitempty"`
 		UserName    string    `json:"user_name,omitempty"`
 		Severity    string    `json:"severity,omitempty"` // info, warning, critical
+		Category    string    `json:"category"` // external, operational, security
 	}
 
 	var entries []NarrativeEntry
@@ -8572,6 +8574,7 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 			EntityType: "event",
 			UserName:   e.ResponsibleName,
 			Severity:   severity,
+			Category:   "external",
 		})
 	}
 
@@ -8612,6 +8615,7 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 				EntityType: "decision",
 				UserName:   d.DisplayName,
 				Severity:   severity,
+				Category:   "operational",
 			})
 		}
 	}
@@ -8624,6 +8628,12 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 			if a.Action == "status_changed" || a.Action == "deleted" {
 				severity = "warning"
 			}
+			cat := "operational"
+			if a.Action == "login" || a.Action == "logout" || a.Action == "login_failed" {
+				cat = "security"
+			} else if a.Action == "co_signed" {
+				cat = "security"
+			}
 			entries = append(entries, NarrativeEntry{
 				Timestamp:  a.Timestamp,
 				Type:       entryType,
@@ -8632,6 +8642,7 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 				EntityType: a.EntityType,
 				UserName:   a.UserName,
 				Severity:   severity,
+				Category:   cat,
 			})
 		}
 	}
@@ -8640,6 +8651,17 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Timestamp.Before(entries[j].Timestamp)
 	})
+
+	// Filter by category
+	if category != "" && category != "all" {
+		filtered := make([]NarrativeEntry, 0, len(entries))
+		for _, e := range entries {
+			if e.Category == category {
+				filtered = append(filtered, e)
+			}
+		}
+		entries = filtered
+	}
 
 	// Apply limit
 	if len(entries) > limit {
