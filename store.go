@@ -214,6 +214,13 @@ func (s *Store) load() error {
 	s.loadFile("checklist_instances.json", &s.checklistInstances)
 	s.loadFile("tags.json", &s.tags)
 
+	// Load startup text (persisted as {"text":"..."})
+	var startupTextData map[string]string
+	s.loadFile("startup_text.json", &startupTextData)
+	if v, ok := startupTextData["text"]; ok {
+		s.startupText = v
+	}
+
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
 			s.nextEventTypeID = x.ID

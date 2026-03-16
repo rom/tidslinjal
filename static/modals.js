@@ -10,6 +10,27 @@ function safeJsonParse(str) {
   catch (e) { console.warn('[safeJsonParse] invalid JSON:', e.message); return null; }
 }
 
+/* ── Auto-stack modals: ensure each new modal-overlay opens on top ────────── */
+var _modalZCounter = 10100;
+(function _initModalStacking() {
+  var obs = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1 && node.classList && node.classList.contains('modal-overlay')) {
+          node.style.zIndex = String(++_modalZCounter);
+        }
+      });
+    });
+  });
+  if (document.body) {
+    obs.observe(document.body, { childList: true });
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      obs.observe(document.body, { childList: true });
+    });
+  }
+})();
+
 /**
  * CSP-safe event binding helper. After setting innerHTML, call this to bind
  * all elements with data-action="fnName" attributes to their handlers.
@@ -2898,6 +2919,7 @@ function detachSidebar() {
       wrap.querySelectorAll('[data-action]').forEach(function(el) {
         el.addEventListener('click', function(evt) {
           try {
+            window.focus();
             var fn = el.dataset.action;
             var arg = el.dataset.arg;
             if (typeof window[fn] === 'function') window[fn](arg === 'null' ? null : arg);
@@ -12316,6 +12338,7 @@ function openDetachedTools() {
     wrap.querySelectorAll('[data-action]').forEach(function(el) {
       el.onclick = function() {
         try {
+          window.focus();
           var fn = el.dataset.action;
           if (typeof window[fn] === 'function') window[fn]();
         } catch(e) {}
