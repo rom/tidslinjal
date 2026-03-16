@@ -83,6 +83,10 @@ function _bindActions(root) {
     el.removeAttribute('data-action');
     el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openPhaseModal(d); });
   });
+  root.querySelectorAll('[data-action="openRoomModal"][data-arg-el]').forEach(el => {
+    el.removeAttribute('data-action');
+    el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openRoomModal(d); });
+  });
   // Special: ackAlarm with closest notification element
   root.querySelectorAll('[data-action="ackAlarm"][data-arg-el]').forEach(el => {
     el.removeAttribute('data-action');
@@ -4210,6 +4214,7 @@ function renderSidebar() {
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
           ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
           ${toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()')}
+          ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -7822,6 +7827,13 @@ function openRoomModal(argJson) {
 
 // ── Checklists ──────────────────────────────────────────────────────────────
 
+function showChecklistsInSidebar() {
+  state.sidebarTab = 'checklists';
+  // Activate the tab visually (even though the tab button is removed, renderSidebar handles the content)
+  document.querySelectorAll('#sidebarTabs .sidebar-tab').forEach(btn => btn.classList.remove('active'));
+  renderSidebar();
+}
+
 async function _loadChecklistInstances() {
   const activeEl = document.getElementById('checklistActiveList');
   const completedEl = document.getElementById('checklistCompletedList');
@@ -11344,9 +11356,9 @@ function _analysisDateParams() {
 }
 
 function _analysisCard(value, label, color) {
-  return `<div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+  return `<div style="padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
     <div style="font-size:24px;font-weight:700;color:${color || 'var(--accent)'}">${escHtml(String(value))}</div>
-    <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(label)}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text)">${escHtml(label)}</div>
   </div>`;
 }
 
@@ -11562,7 +11574,7 @@ async function _renderDependenciesTab(container) {
     </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('dependency_graph')||'Event Dependency Graph'}</div>
-      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
+      <div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
       <canvas id="anlNetGraph" height="400"></canvas>
     </div>`;
 
@@ -11606,7 +11618,7 @@ async function _renderLeadershipTab(container) {
   // Build critical delays table
   let critDelayHtml = '';
   if (D.critical_delays && D.critical_delays.length) {
-    critDelayHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Top Delays</div>` +
+    critDelayHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Top Delays</div>` +
       D.critical_delays.map(d => `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E74C3C;font-weight:700;min-width:60px">+${Math.round(d.slip_minutes)}m</span>
         <span>${escHtml(d.title || '#'+d.id)}</span>
@@ -11616,7 +11628,7 @@ async function _renderLeadershipTab(container) {
   // Build blocked events list
   let blockedHtml = '';
   if (B.blocked_events && B.blocked_events.length) {
-    blockedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Blocked Events</div>` +
+    blockedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Blocked Events</div>` +
       B.blocked_events.slice(0, 8).map(b => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E74C3C">⛔</span> ${escHtml(b.title)} <span style="color:var(--text-dim)">← ${escHtml(b.blocked_by_title)}</span>
       </div>`).join('') + '</div>';
@@ -11625,7 +11637,7 @@ async function _renderLeadershipTab(container) {
   // Build overloaded users list
   let overloadedHtml = '';
   if (B.overloaded_users && B.overloaded_users.length) {
-    overloadedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Overloaded Personnel</div>` +
+    overloadedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Overloaded Personnel</div>` +
       B.overloaded_users.map(u => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E67E22">⚠</span> ${escHtml(u.name)} <span style="color:var(--text-dim)">(${u.count} events)</span>
       </div>`).join('') + '</div>';
@@ -11640,7 +11652,7 @@ async function _renderLeadershipTab(container) {
     <div style="display:flex;gap:12px;margin-bottom:16px;padding:16px;background:var(--bg3);border-radius:var(--radius);align-items:center;flex-wrap:wrap">
       <div style="text-align:center;min-width:100px">
         <div style="font-size:36px;font-weight:800;color:${confColor(C.overall_confidence||0)}">${Math.round(C.overall_confidence||0)}%</div>
-        <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_overall_confidence')||'Overall Confidence'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text)">${t('ld_overall_confidence')||'Overall Confidence'}</div>
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
         ${card(Math.round(C.completion_confidence||0)+'%', t('ld_completion')||'Completion', confColor(C.completion_confidence||0))}
@@ -11660,7 +11672,7 @@ async function _renderLeadershipTab(container) {
             card(T.events_last_24h||0, t('ld_last_24h')||'Last 24h'),
             card(`<span style="color:${trendColor(T.tempo_trend)}">${trendIcon(T.tempo_trend)} ${T.tempo_trend||'—'}</span>`, t('ld_trend')||'Trend')
           )}
-          <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
+          <div style="font-size:var(--fs-xs);color:var(--text)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
         `)}
 
         ${section(t('ld_progress')||'Progress', '📊', `
@@ -11705,7 +11717,7 @@ async function _renderLeadershipTab(container) {
             card(DL.approved||0, t('ld_approved')||'Approved', '#27AE60'),
             card(DL.rejected||0, t('ld_rejected')||'Rejected', '#E74C3C')
           )}
-          <div style="display:flex;gap:12px;font-size:var(--fs-xs);color:var(--text-dim)">
+          <div style="display:flex;gap:12px;font-size:var(--fs-xs);color:var(--text)">
             <span>${t('ld_last_1h')||'Last 1h'}: <b>${DL.decisions_last_hour||0}</b></span>
             <span>${t('ld_last_4h')||'Last 4h'}: <b>${DL.decisions_last_4h||0}</b></span>
             <span>${t('ld_avg_response_time')||'Avg response'}: <b>${Math.round(DL.avg_response_time_minutes||0)}m</b></span>
@@ -11734,7 +11746,7 @@ async function _renderLeadershipTab(container) {
         `)}
 
         ${section(t('ld_summary')||'Summary', '📋', `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:var(--fs-xs)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:var(--fs-xs);color:var(--text)">
             <div>${t('ld_active_users')||'Active users'}: <b>${S.active_users_count||0}</b></div>
             <div>${t('ld_groups')||'Groups'}: <b>${S.total_groups||0}</b></div>
             <div>${t('ld_layers')||'Layers'}: <b>${S.total_layers||0}</b></div>
@@ -11778,7 +11790,7 @@ function _renderExportTab(container) {
   container.innerHTML = `
     <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">${t('analysis_export_title')||'Export Analysis Data'}</div>
-      <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
+      <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:120px">CSV</button>
         <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:120px">JSON</button>
@@ -13277,10 +13289,14 @@ const DEFAULT_ROLE_CONFIGS = [
   { key: 'observer',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, view_free_busy: true } },
   { key: 'read',              display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, view_free_busy: true } },
   { key: 'reporter',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, decision_log: true, comment: true, manage_alarms: true, view_free_busy: true } },
+  { key: 'readwrite',         display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, decision_log: true, comment: true, manage_alarms: true, view_free_busy: true, import_export: true } },
   { key: 'teammember',        display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, delete_events: true, decision_log: true, comment: true, manage_alarms: true, view_free_busy: true, import_export: true } },
   { key: 'teamlead',          display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'deputy_teamlead',   display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, view_free_busy: true, import_export: true, manage_rooms: true } },
   { key: 'oplead',            display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'deputy_oplead',     display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
   { key: 'staffofficer',      display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, confidential_read: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
+  { key: 'staff_assistant',   display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true } },
   { key: 'staffofficer_full', display_name: '',  capabilities: { see_groups: true, see_users: true, view_events: true, create_events: true, edit_own: true, edit_all: true, delete_events: true, manage_layers: true, manage_groups: true, approve_users: true, manage_templates: true, exercise: true, view_audit: true, report: true, auto_report: true, decision_log: true, decision_log_readwrite: true, confidential_read: true, comment: true, manage_alarms: true, see_location: true, critical_line_analysis: true, view_free_busy: true, import_export: true, manage_rooms: true, manage_integrations: true } },
 ];
 
@@ -13374,6 +13390,12 @@ const _ROLE_CAP_DESCRIPTIONS = {
 function _renderRoleEditorTable(roles) {
   const tableEl = document.getElementById('roleEditorTable');
   if (!tableEl) return;
+  const _ROLE_LANGS = [
+    {code:'en',flag:'🇬🇧'},{code:'sv',flag:'🇸🇪'},{code:'fr',flag:'🇫🇷'},{code:'fi',flag:'🇫🇮'},
+    {code:'da',flag:'🇩🇰'},{code:'nb',flag:'🇳🇴'},{code:'et',flag:'🇪🇪'},{code:'lv',flag:'🇱🇻'},
+    {code:'lt',flag:'🇱🇹'},{code:'it',flag:'🇮🇹'},{code:'es',flag:'🇪🇸'},{code:'pt',flag:'🇵🇹'},
+    {code:'pl',flag:'🇵🇱'},{code:'uk',flag:'🇺🇦'}
+  ];
   const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key).concat(['admin']);
   tableEl.innerHTML = `
     <div style="overflow-x:auto">
@@ -13381,12 +13403,7 @@ function _renderRoleEditorTable(roles) {
       <thead>
         <tr style="background:var(--bg2)">
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px;white-space:nowrap;position:sticky;left:0;background:var(--bg2);z-index:1">Key</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇬🇧 EN</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇸🇪 SV</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇷 FR</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇫🇮 FI</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇩🇰 DA</th>
-          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:120px">🇳🇴 NB</th>
+          ${_ROLE_LANGS.map(l => `<th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px">${l.flag} ${l.code.toUpperCase()}</th>`).join('')}
           ${ALL_CAPABILITIES.map(cap =>
             `<th class="role-cap-header" data-cap="${cap}" style="padding:4px 3px;border-bottom:2px solid var(--border);font-size:10px;text-align:center;min-width:48px;cursor:pointer;user-select:none;vertical-align:bottom" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">
               <div>${_ROLE_CAP_LABELS[cap]||cap}</div>
@@ -13400,7 +13417,8 @@ function _renderRoleEditorTable(roles) {
         ${roles.map(role => _renderRoleRow(role, builtinKeys.includes(role.key))).join('')}
         <tr style="opacity:0.4">
           <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim);position:sticky;left:0;background:var(--bg2)">admin</td>
-          <td style="padding:8px 10px;font-size:var(--fs-sm)" colspan="5">${t('role_admin')||'Admin'} 🔒</td>
+          <td style="padding:8px 10px;font-size:var(--fs-sm)">${t('role_admin')||'Admin'} 🔒</td>
+          ${_ROLE_LANGS.slice(1).map(() => '<td></td>').join('')}
           ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
           <td></td>
         </tr>
@@ -13424,31 +13442,26 @@ function _renderRoleEditorTable(roles) {
 
 // Proper translated role name placeholders
 const _ROLE_PLACEHOLDERS = {
-  observer:          { en: 'Observer',          sv: 'Observatör',       fr: 'Observateur',                    fi: 'Tarkkailija',        da: 'Observatør',       nb: 'Observatør' },
-  read:              { en: 'Read',              sv: 'Läs',             fr: 'Lecture',                          fi: 'Luku',               da: 'Læs',             nb: 'Les' },
-  reporter:          { en: 'Reporter',          sv: 'Rapportör',       fr: 'Rapporteur',                      fi: 'Raportoija',         da: 'Rapportør',        nb: 'Rapportør' },
-  teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe',                fi: 'Tiimin jäsen',       da: 'Teammedlem',       nb: 'Teammedlem' },
-  teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe',                  fi: 'Tiiminvetäjä',       da: 'Holdleder',        nb: 'Lagleder' },
-  oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations',             fi: 'Operaatiojohtaja',   da: 'Operationsleder',  nb: 'Operasjonsleder' },
-  deputy_teamlead:   { en: 'Deputy Team Lead',  sv: 'Vice gruppledare', fr: 'Chef d\'équipe adjoint',          fi: 'Varatiiminvetäjä',   da: 'Stedfortræder holdleder', nb: 'Viselagleder' },
-  deputy_oplead:     { en: 'Deputy Ops Lead',   sv: 'Vice insatsledare',fr: 'Adj. chef des opérations',       fi: 'Varaoperaatiojohtaja', da: 'Stedfortræder operationsleder', nb: 'Viseoperasjonsleder' },
-  staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major',          fi: 'Esikuntaupseeri',    da: 'Stabsofficer',     nb: 'Stabsoffiser' },
-  staff_assistant:   { en: 'Staff Assistant',   sv: 'Stabsassistent',  fr: 'Assistant d\'état-major',         fi: 'Esikunta-avustaja',  da: 'Stabsassistent',   nb: 'Stabsassistent' },
-  staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet', fi: 'Esikuntaupseeri täysi', da: 'Stabsofficer fuld', nb: 'Stabsoffiser full' },
-  readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture',                fi: 'Luku/Kirjoitus',     da: 'Læs/Skriv',        nb: 'Les/Skriv' },
+  observer:          { en:'Observer', sv:'Observatör', fr:'Observateur', fi:'Tarkkailija', da:'Observatør', nb:'Observatør', et:'Vaatleja', lv:'Novērotājs', lt:'Stebėtojas', it:'Osservatore', es:'Observador', pt:'Observador', pl:'Obserwator', uk:'Спостерігач' },
+  read:              { en:'Read', sv:'Läs', fr:'Lecture', fi:'Luku', da:'Læs', nb:'Les', et:'Lugemine', lv:'Lasīt', lt:'Skaityti', it:'Lettura', es:'Lectura', pt:'Leitura', pl:'Odczyt', uk:'Читання' },
+  reporter:          { en:'Reporter', sv:'Rapportör', fr:'Rapporteur', fi:'Raportoija', da:'Rapportør', nb:'Rapportør', et:'Reporter', lv:'Ziņotājs', lt:'Pranešėjas', it:'Reporter', es:'Reportero', pt:'Repórter', pl:'Reporter', uk:'Репортер' },
+  readwrite:         { en:'Read/Write', sv:'Läs/Skriv', fr:'Lecture/Écriture', fi:'Luku/Kirjoitus', da:'Læs/Skriv', nb:'Les/Skriv', et:'Lugemine/Kirjutamine', lv:'Lasīt/Rakstīt', lt:'Skaityti/Rašyti', it:'Lettura/Scrittura', es:'Lectura/Escritura', pt:'Leitura/Escrita', pl:'Odczyt/Zapis', uk:'Читання/Запис' },
+  teammember:        { en:'Team Member', sv:'Teammedlem', fr:'Membre d\'équipe', fi:'Tiimin jäsen', da:'Teammedlem', nb:'Teammedlem', et:'Meeskonnaliige', lv:'Komandas loceklis', lt:'Komandos narys', it:'Membro del team', es:'Miembro del equipo', pt:'Membro da equipe', pl:'Członek zespołu', uk:'Член команди' },
+  teamlead:          { en:'Team Lead', sv:'Gruppledare', fr:'Chef d\'équipe', fi:'Tiiminvetäjä', da:'Holdleder', nb:'Lagleder', et:'Meeskonnajuht', lv:'Komandas vadītājs', lt:'Komandos vadovas', it:'Capo squadra', es:'Líder de equipo', pt:'Líder de equipe', pl:'Lider zespołu', uk:'Лідер команди' },
+  deputy_teamlead:   { en:'Deputy Team Lead', sv:'Vice gruppledare', fr:'Chef d\'équipe adjoint', fi:'Varatiiminvetäjä', da:'Stedfortræder holdleder', nb:'Viselagleder', et:'Asemeeskonnajuht', lv:'Komandas vad. vietnieks', lt:'Komandos vadovo pav.', it:'Vice capo squadra', es:'Sublíder de equipo', pt:'Vice-líder de equipe', pl:'Zastępca lidera', uk:'Заступник лідера' },
+  oplead:            { en:'Ops Lead', sv:'Insatsledare', fr:'Chef des opérations', fi:'Operaatiojohtaja', da:'Operationsleder', nb:'Operasjonsleder', et:'Operatsioonijuht', lv:'Operāciju vadītājs', lt:'Operacijų vadovas', it:'Capo operazioni', es:'Líder de operaciones', pt:'Líder de operações', pl:'Lider operacyjny', uk:'Керівник операцій' },
+  deputy_oplead:     { en:'Deputy Ops Lead', sv:'Vice insatsledare', fr:'Adj. chef des opérations', fi:'Varaoperaatiojohtaja', da:'Stedfortræder operationsleder', nb:'Viseoperasjonsleder', et:'Aseoperatsioonijuht', lv:'Operāc. vad. vietnieks', lt:'Operacijų vad. pav.', it:'Vice capo operazioni', es:'Sublíder de operaciones', pt:'Vice-líder de operações', pl:'Zastępca lidera oper.', uk:'Заступник кер. операцій' },
+  staffofficer:      { en:'Staff Officer', sv:'Stabsofficer', fr:'Officier d\'état-major', fi:'Esikuntaupseeri', da:'Stabsofficer', nb:'Stabsoffiser', et:'Staabiohvitser', lv:'Štāba virsnieks', lt:'Štabo karininkas', it:'Ufficiale di stato maggiore', es:'Oficial de estado mayor', pt:'Oficial de estado-maior', pl:'Oficer sztabowy', uk:'Штабний офіцер' },
+  staff_assistant:   { en:'Staff Assistant', sv:'Stabsassistent', fr:'Assistant d\'état-major', fi:'Esikunta-avustaja', da:'Stabsassistent', nb:'Stabsassistent', et:'Staabiassistent', lv:'Štāba palīgs', lt:'Štabo asistentas', it:'Assistente di stato maggiore', es:'Asistente de estado mayor', pt:'Assistente de estado-maior', pl:'Asystent sztabowy', uk:'Штабний помічник' },
+  staffofficer_full: { en:'Staff Officer Full', sv:'Stabsofficer Full', fr:'Officier d\'état-major complet', fi:'Esikuntaupseeri täysi', da:'Stabsofficer fuld', nb:'Stabsoffiser full', et:'Staabiohvitser täis', lv:'Štāba virsnieks pilns', lt:'Štabo karininkas pilnas', it:'Ufficiale di SM completo', es:'Oficial de EM completo', pt:'Oficial de EM completo', pl:'Oficer sztabowy pełny', uk:'Штабний офіцер повний' },
 };
 
 function _renderRoleRow(role, isBuiltin) {
   const dn = role.display_names || {};
-  const enVal = dn.en || role.display_name || '';
-  const svVal = dn.sv || '';
-  const frVal = dn.fr || '';
-  const fiVal = dn.fi || '';
-  const daVal = dn.da || '';
-  const nbVal = dn.nb || '';
   const key = role.key;
   const s = _roleEditorInputStyle();
-  const ph = _ROLE_PLACEHOLDERS[key] || { en: key, sv: key, fr: key, fi: key, da: key, nb: key };
+  const ph = _ROLE_PLACEHOLDERS[key] || {};
+  const _RL = ['en','sv','fr','fi','da','nb','et','lv','lt','it','es','pt','pl','uk'];
   return `
     <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
       <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
@@ -13456,12 +13469,11 @@ function _renderRoleRow(role, isBuiltin) {
           ? `<span style="font-family:monospace;color:var(--text-dim);font-size:var(--fs-sm)">${escHtml(key)}</span>`
           : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="e.g. analyst" style="${s};font-family:monospace">`}
       </td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(ph.en)}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(ph.sv)}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-fr" data-key="${escHtml(key)}" value="${escHtml(frVal)}" placeholder="${escHtml(ph.fr)}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-fi" data-key="${escHtml(key)}" value="${escHtml(fiVal)}" placeholder="${escHtml(ph.fi)}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-da" data-key="${escHtml(key)}" value="${escHtml(daVal)}" placeholder="${escHtml(ph.da)}" style="${s}"></td>
-      <td style="padding:5px 6px"><input type="text" class="role-name-nb" data-key="${escHtml(key)}" value="${escHtml(nbVal)}" placeholder="${escHtml(ph.nb)}" style="${s}"></td>
+      ${_RL.map(lang => {
+        const val = lang === 'en' ? (dn.en || role.display_name || '') : (dn[lang] || '');
+        const placeholder = ph[lang] || key;
+        return `<td style="padding:5px 6px"><input type="text" class="role-name-${lang}" data-key="${escHtml(key)}" value="${escHtml(val)}" placeholder="${escHtml(placeholder)}" style="${s}"></td>`;
+      }).join('')}
       ${ALL_CAPABILITIES.map(cap => {
         const checked = role.capabilities && role.capabilities[cap];
         return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''} title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}"></td>`;
@@ -13507,25 +13519,14 @@ async function saveRoles() {
       key = row.dataset.roleKey;
     }
     if (!key || key === 'admin') return;
-    const enEl = row.querySelector('.role-name-en');
-    const svEl = row.querySelector('.role-name-sv');
-    const frEl = row.querySelector('.role-name-fr');
-    const fiEl = row.querySelector('.role-name-fi');
-    const daEl = row.querySelector('.role-name-da');
-    const nbEl = row.querySelector('.role-name-nb');
-    const en = enEl ? enEl.value.trim() : '';
-    const sv = svEl ? svEl.value.trim() : '';
-    const fr = frEl ? frEl.value.trim() : '';
-    const fi = fiEl ? fiEl.value.trim() : '';
-    const da = daEl ? daEl.value.trim() : '';
-    const nb = nbEl ? nbEl.value.trim() : '';
+    const _RL = ['en','sv','fr','fi','da','nb','et','lv','lt','it','es','pt','pl','uk'];
     const display_names = {};
-    if (en) display_names.en = en;
-    if (sv) display_names.sv = sv;
-    if (fr) display_names.fr = fr;
-    if (fi) display_names.fi = fi;
-    if (da) display_names.da = da;
-    if (nb) display_names.nb = nb;
+    _RL.forEach(lang => {
+      const el = row.querySelector('.role-name-' + lang);
+      const val = el ? el.value.trim() : '';
+      if (val) display_names[lang] = val;
+    });
+    const en = display_names.en || '';
     const caps = {};
     row.querySelectorAll('.role-cap-cb').forEach(cb => { caps[cb.dataset.cap] = cb.checked; });
     configs.push({ key, display_name: en || getRoleDisplayName(key), display_names, capabilities: caps });
