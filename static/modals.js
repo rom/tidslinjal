@@ -11784,6 +11784,8 @@ async function sendTeamPoll() {
 
 // ── Narrative / Storyline Modal ──────────────────────────────────────────────
 let _narrativePopout = null;
+let _narrativeAutoScroll = true;
+let _narrativeAutoRefreshTimer = null;
 
 async function openNarrativeModal() {
   // Default to last 24 hours
@@ -11815,6 +11817,20 @@ async function openNarrativeModal() {
               ${t('to')||'To'}: <input type="datetime-local" id="narrativeTo" value="${now.toISOString().slice(0,16)}"
                 style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
             </label>
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('narrative_detail_level')||'Detail level'}:
+              <select id="narrativeCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+                <option value="all">${t('narrative_cat_all')||'All events'}</option>
+                <option value="external">${t('narrative_cat_external')||'External events'}</option>
+                <option value="operational">${t('narrative_cat_operational')||'Operational events'}</option>
+                <option value="security">${t('narrative_cat_security')||'Security events'}</option>
+              </select>
+            </label>
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="narrativeAutoScroll" ${_narrativeAutoScroll ? 'checked' : ''}
+                style="accent-color:var(--accent)" onchange="_narrativeAutoScroll=this.checked">
+              ${t('narrative_autoscroll')||'Autoscroll'}
+            </label>
             <button class="btn btn-sm btn-primary" data-action="refreshNarrative">${t('btn_refresh')||'Refresh'}</button>
           </div>
           <div id="narrativeEntries" style="font-family:var(--font-mono,monospace);font-size:var(--fs-xs)">
@@ -11828,6 +11844,16 @@ async function openNarrativeModal() {
   void modal.offsetHeight;
   modal.classList.add('open');
   _bindActions(modal);
+  // Category change triggers refresh
+  const catEl = document.getElementById('narrativeCategory');
+  if (catEl) catEl.addEventListener('change', () => refreshNarrative());
+  // Autoscroll to bottom on open
+  _narrativeScrollToBottom();
+  // Start auto-refresh (every 15s)
+  _narrativeAutoRefreshTimer = setInterval(() => {
+    if (document.getElementById('narrativeModal')) refreshNarrative();
+    else clearInterval(_narrativeAutoRefreshTimer);
+  }, 15000);
 }
 
 function _renderNarrativeEntries(entries) {
@@ -11859,6 +11885,7 @@ function _renderNarrativeEntries(entries) {
 }
 
 function closeNarrativeModal() {
+  if (_narrativeAutoRefreshTimer) { clearInterval(_narrativeAutoRefreshTimer); _narrativeAutoRefreshTimer = null; }
   const el = document.getElementById('narrativeModal');
   if (el) el.remove();
 }
@@ -11866,13 +11893,25 @@ function closeNarrativeModal() {
 async function refreshNarrative() {
   const fromEl = document.getElementById('narrativeFrom');
   const toEl = document.getElementById('narrativeTo');
+  const catEl = document.getElementById('narrativeCategory');
   let from = fromEl ? new Date(fromEl.value).toISOString() : new Date(Date.now()-24*60*60*1000).toISOString();
   let to = toEl ? new Date(toEl.value).toISOString() : new Date().toISOString();
+  const category = catEl ? catEl.value : 'all';
   try {
-    const entries = await apiGet(`/api/narrative?from=${from}&to=${to}&limit=200`) || [];
+    const entries = await apiGet(`/api/narrative?from=${from}&to=${to}&limit=200&category=${category}`) || [];
     const el = document.getElementById('narrativeEntries');
     if (el) el.innerHTML = _renderNarrativeEntries(entries);
+    _narrativeScrollToBottom();
   } catch(e) { showError('Failed to refresh: ' + e.message); }
+}
+
+function _narrativeScrollToBottom() {
+  if (!_narrativeAutoScroll) return;
+  const el = document.getElementById('narrativeEntries');
+  if (el) el.scrollTop = el.scrollHeight;
+  // Also scroll the modal body
+  const body = el && el.closest('.modal-body');
+  if (body) body.scrollTop = body.scrollHeight;
 }
 
 function detachNarrative() {
