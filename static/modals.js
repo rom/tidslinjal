@@ -6566,6 +6566,140 @@ function openReadyCheckPopup() {
   runReadyCheck();
 }
 
+// ── Tag Cloud / Tag Input Utilities ────────────────────────────────────────
+// Reusable tag cloud component for polls, ready checks, etc.
+
+const _tagCloudColors = [
+  '#e57373','#64b5f6','#81c784','#ffb74d','#ba68c8',
+  '#4dd0e1','#ff8a65','#aed581','#f06292','#7986cb',
+  '#a1887f','#90a4ae','#dce775','#4db6ac','#fff176'
+];
+
+function _tagColor(tag) {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = ((hash << 5) - hash) + tag.charCodeAt(i);
+  return _tagCloudColors[Math.abs(hash) % _tagCloudColors.length];
+}
+
+/**
+ * Render a tag input with tag cloud below.
+ * @param {HTMLElement} parentEl - container to append into
+ * @param {string} inputId - ID for the text input
+ * @param {string} placeholder - placeholder text
+ * @returns {{ inputEl: HTMLInputElement, getSelectedTags: () => string[] }}
+ */
+function _renderTagInput(parentEl, inputId, placeholder) {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'margin-bottom:8px';
+
+  const label = document.createElement('label');
+  label.style.cssText = 'font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;display:block;margin-bottom:4px';
+  label.textContent = t('tags_title') || 'Tags';
+  wrapper.appendChild(label);
+
+  const chipsRow = document.createElement('div');
+  chipsRow.id = inputId + '_chips';
+  chipsRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px';
+  wrapper.appendChild(chipsRow);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = inputId;
+  input.placeholder = placeholder || t('tags_placeholder') || 'Tags (comma-separated)';
+  input.style.cssText = 'width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)';
+  wrapper.appendChild(input);
+
+  const cloudContainer = document.createElement('div');
+  cloudContainer.id = inputId + '_cloud';
+  cloudContainer.style.cssText = 'margin-top:6px';
+  wrapper.appendChild(cloudContainer);
+
+  parentEl.appendChild(wrapper);
+
+  const selectedTags = new Set();
+
+  function renderChips() {
+    chipsRow.innerHTML = '';
+    selectedTags.forEach(tag => {
+      const chip = document.createElement('span');
+      chip.style.cssText = `display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:${_tagColor(tag)};cursor:default`;
+      chip.textContent = tag;
+      const x = document.createElement('span');
+      x.textContent = '\u00d7';
+      x.style.cssText = 'cursor:pointer;font-weight:bold;margin-left:2px';
+      x.addEventListener('click', () => { selectedTags.delete(tag); renderChips(); });
+      chip.appendChild(x);
+      chipsRow.appendChild(chip);
+    });
+  }
+
+  // Handle comma-separated input
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = input.value.replace(/,/g, '').trim();
+      if (val) { selectedTags.add(val); renderChips(); }
+      input.value = '';
+    }
+  });
+  input.addEventListener('blur', () => {
+    const val = input.value.replace(/,/g, '').trim();
+    if (val) { selectedTags.add(val); renderChips(); }
+    input.value = '';
+  });
+
+  // Fetch and render cloud
+  _renderTagCloud(cloudContainer, selectedTags, renderChips);
+
+  return {
+    inputEl: input,
+    getSelectedTags: () => [...selectedTags],
+    addTag: (tag) => { selectedTags.add(tag); renderChips(); }
+  };
+}
+
+/**
+ * Fetch tags from /api/tags/cloud and render as clickable colored chips.
+ * Clicking a tag adds it to the selectedTags set and re-renders chips.
+ */
+async function _renderTagCloud(container, selectedTags, renderChipsCallback) {
+  try {
+    const resp = await api('GET', '/api/tags/cloud');
+    if (!resp.ok) { container.innerHTML = ''; return; }
+    const tags = await resp.json();
+    if (!tags || tags.length === 0) {
+      container.innerHTML = `<span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('tags_no_tags') || 'No tags yet'}</span>`;
+      return;
+    }
+    const cloudLabel = document.createElement('div');
+    cloudLabel.style.cssText = 'font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:3px';
+    cloudLabel.textContent = t('tags_cloud') || 'Tag Cloud';
+    container.appendChild(cloudLabel);
+
+    const cloudRow = document.createElement('div');
+    cloudRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px';
+    (Array.isArray(tags) ? tags : []).forEach(tagObj => {
+      const tagName = typeof tagObj === 'string' ? tagObj : (tagObj.tag || tagObj.name || '');
+      if (!tagName) return;
+      const chip = document.createElement('span');
+      chip.style.cssText = `display:inline-block;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:${_tagColor(tagName)};cursor:pointer;opacity:0.8;transition:opacity 0.15s`;
+      chip.textContent = tagName + (tagObj.count ? ` (${tagObj.count})` : '');
+      chip.title = t('tags_add') || 'Add Tag';
+      chip.addEventListener('mouseenter', () => { chip.style.opacity = '1'; });
+      chip.addEventListener('mouseleave', () => { chip.style.opacity = '0.8'; });
+      chip.addEventListener('click', () => {
+        selectedTags.add(tagName);
+        renderChipsCallback();
+      });
+      cloudRow.appendChild(chip);
+    });
+    container.appendChild(cloudRow);
+  } catch (e) {
+    console.warn('Failed to load tag cloud', e);
+    container.innerHTML = '';
+  }
+}
+
 // ── Person Ready Check ─────────────────────────────────────────────────────
 // Tracks per-participant readiness with traffic-light status
 let _personReadyChecks = []; // { id, event_id?, created_by, participants: [{user_id, user_name, status}], created_at }
@@ -6641,6 +6775,7 @@ async function openPersonReadyCheckPopup() {
             <textarea id="prcMessageText" rows="2" placeholder="${t('prc_message_placeholder')||'Add a message to send with the ready check...'}"
               style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical;margin-top:2px"></textarea>
           </div>
+          <div id="prcTagsContainer" style="margin-top:8px"></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" id="btnCreatePRC">${t('prc_send_request')||'Send Ready Check Request'}</button>
             <label style="font-size:var(--fs-xs);cursor:pointer;display:flex;align-items:center;gap:4px;color:var(--text-dim)">
@@ -6659,6 +6794,13 @@ async function openPersonReadyCheckPopup() {
     </div>`;
   document.body.appendChild(modal);
   _bindActions(modal);
+
+  // Render tags input
+  let _prcTagInput = null;
+  const prcTagsContainer = modal.querySelector('#prcTagsContainer');
+  if (prcTagsContainer) {
+    _prcTagInput = _renderTagInput(prcTagsContainer, 'prcTags', t('tags_placeholder') || 'Tags (comma-separated)');
+  }
 
   // Load existing checks
   _loadPersonReadyChecks(modal);
@@ -6768,6 +6910,11 @@ async function openPersonReadyCheckPopup() {
       if (messageText) body.message = messageText;
       if (isTimed && timedAt) {
         body.scheduled_at = new Date(timedAt).toISOString();
+      }
+      // Include tags if any selected
+      if (_prcTagInput) {
+        const tags = _prcTagInput.getSelectedTags();
+        if (tags.length > 0) body.tags = tags;
       }
       const res = await apiPost('/api/person-ready-check', body);
       if (res.ok) {
@@ -6981,6 +7128,7 @@ async function openPollModal(opts) {
             <input type="text" id="pollTitleInput" placeholder="${t('poll_title')||'Poll title'}..." maxlength="100"
               style="width:100%;padding:5px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           </div>
+          <div id="pollTagsContainer" style="margin-bottom:0"></div>
           <div style="margin-bottom:8px">
             <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-bottom:4px;display:block">${t('poll_questions')||'Questions'}:</label>
             <div style="margin-bottom:4px;display:flex;gap:6px;align-items:center">
@@ -7051,6 +7199,13 @@ async function openPollModal(opts) {
     </div>`;
   document.body.appendChild(modal);
   _bindActions(modal);
+
+  // Render tags input for poll
+  let _pollTagInput = null;
+  const pollTagsContainer = modal.querySelector('#pollTagsContainer');
+  if (pollTagsContainer) {
+    _pollTagInput = _renderTagInput(pollTagsContainer, 'pollTags', t('tags_placeholder') || 'Tags (comma-separated)');
+  }
 
   // Target mode switching
   modal.querySelectorAll('[data-poll-mode]').forEach(btn => {
@@ -7181,6 +7336,11 @@ async function openPollModal(opts) {
 
       try {
         const payload = { title, questions: mappedQs, target_type: targetType, target_ids: targetIds.map(String) };
+        // Include tags if any selected
+        if (_pollTagInput) {
+          const tags = _pollTagInput.getSelectedTags();
+          if (tags.length > 0) payload.tags = tags;
+        }
         // Timed poll
         const isPollTimed = modal.querySelector('#pollTimedCheck')?.checked || false;
         const pollTimedVal = isPollTimed ? modal.querySelector('#pollTimedDateTime')?.value : null;
@@ -8036,6 +8196,9 @@ async function openQuestionnaireEditor() {
           </select>
           <button class="btn btn-sm btn-primary" id="qEditorNewBtn">+ ${t('questionnaire_new')||'New'}</button>
         </div>
+        <div id="qEditorBuiltinWarn" style="display:none;margin-bottom:8px;padding:8px 12px;background:#fffbe6;border:1px solid #ffe58f;border-radius:var(--radius);font-size:var(--fs-xs);color:#8b6914">
+          ⚠️ ${t('questionnaire_builtin_edit_warn')||'You are editing a built-in questionnaire. Changes will be saved as a new copy.'}
+        </div>
         <div id="qEditorForm" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--bg2)">
           <div style="margin-bottom:8px">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">${t('questionnaire_name')||'Questionnaire Name'}:</label>
@@ -8053,11 +8216,9 @@ async function openQuestionnaireEditor() {
             <button class="btn btn-sm btn-secondary" id="qEditorAddQ" style="margin-top:4px">+ ${t('questionnaire_add_question')||'Add Question'}</button>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-sm btn-secondary" id="qEditorDuplicateBtn" style="display:none">📋 ${t('questionnaire_duplicate')||'Duplicate'}</button>
             <button class="btn btn-sm btn-danger" id="qEditorDeleteBtn" style="display:none">${t('questionnaire_delete')||'Delete'}</button>
             <button class="btn btn-sm btn-primary" id="qEditorSaveBtn">${t('questionnaire_save')||'Save Questionnaire'}</button>
-          </div>
-          <div id="qEditorBuiltinNote" style="display:none;margin-top:8px;padding:8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs);color:var(--text-dim)">
-            ${t('questionnaire_builtin')||'Built-in'} — read-only
           </div>
         </div>
       </div>
@@ -8069,15 +8230,17 @@ async function openQuestionnaireEditor() {
   _bindActions(modal);
 
   let questionnaires = [];
+  let _builtinEditAcknowledged = false; // Only show confirmation once per session
   const listEl = modal.querySelector('#qEditorList');
   const nameEl = modal.querySelector('#qEditorName');
   const descEl = modal.querySelector('#qEditorDesc');
   const questionsEl = modal.querySelector('#qEditorQuestions');
   const deleteBtn = modal.querySelector('#qEditorDeleteBtn');
+  const duplicateBtn = modal.querySelector('#qEditorDuplicateBtn');
   const saveBtn = modal.querySelector('#qEditorSaveBtn');
-  const builtinNote = modal.querySelector('#qEditorBuiltinNote');
+  const builtinWarn = modal.querySelector('#qEditorBuiltinWarn');
 
-  async function loadList() {
+  async function loadList(selectId) {
     try {
       const resp = await api('GET', '/api/poll-questionnaires');
       questionnaires = await resp.json();
@@ -8090,10 +8253,19 @@ async function openQuestionnaireEditor() {
       opt.textContent = q.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
       listEl.appendChild(opt);
     });
+    if (selectId !== undefined) {
+      listEl.value = String(selectId);
+    }
+  }
+
+  function _getCurrentQ() {
+    if (listEl.value === '__new__') return null;
+    return questionnaires.find(x => String(x.id) === listEl.value) || null;
   }
 
   function loadForm(q) {
     const isBuiltIn = q && q.built_in;
+    _builtinEditAcknowledged = false; // Reset per questionnaire switch
     nameEl.value = q ? q.name : '';
     descEl.value = q ? (q.description || '') : '';
     questionsEl.innerHTML = '';
@@ -8101,22 +8273,38 @@ async function openQuestionnaireEditor() {
       const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
       q.questions.forEach(qu => _addPollQuestionRow(questionsEl, qu.text, typeMap[qu.type] || qu.type || 'scale'));
     }
-    nameEl.disabled = !!isBuiltIn;
-    descEl.disabled = !!isBuiltIn;
+    // All fields are always editable — built-in questionnaires can be edited (will save as copy)
+    nameEl.disabled = false;
+    descEl.disabled = false;
+    questionsEl.querySelectorAll('textarea, select').forEach(el => el.disabled = false);
+    questionsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
+    modal.querySelector('#qEditorAddQ').style.display = '';
+
+    // Show/hide buttons
     deleteBtn.style.display = (q && !isBuiltIn && q.id > 0) ? '' : 'none';
-    saveBtn.style.display = isBuiltIn ? 'none' : '';
-    builtinNote.style.display = isBuiltIn ? '' : 'none';
-    // Disable question editing for built-in
-    if (isBuiltIn) {
-      questionsEl.querySelectorAll('textarea, select').forEach(el => el.disabled = true);
-      questionsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = 'none');
-      modal.querySelector('#qEditorAddQ').style.display = 'none';
-    } else {
-      questionsEl.querySelectorAll('textarea, select').forEach(el => el.disabled = false);
-      questionsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
-      modal.querySelector('#qEditorAddQ').style.display = '';
-    }
+    duplicateBtn.style.display = (q && q.id > 0) ? '' : 'none'; // Visible for all existing questionnaires
+    saveBtn.style.display = '';
+    builtinWarn.style.display = isBuiltIn ? '' : 'none';
   }
+
+  // Confirmation guard for built-in edits — returns true if editing can proceed
+  function _confirmBuiltinEdit() {
+    const q = _getCurrentQ();
+    if (!q || !q.built_in) return true;
+    if (_builtinEditAcknowledged) return true;
+    const msg = t('questionnaire_builtin_edit_confirm') || 'This is a standard questionnaire. Your changes will be saved as a new custom copy. Continue?';
+    if (!confirm(msg)) return false;
+    _builtinEditAcknowledged = true;
+    showNotification('info', t('questionnaire_builtin_acknowledged') || 'Editing acknowledged — changes will create a new copy');
+    return true;
+  }
+
+  // Attach confirmation guard to editable fields
+  function _attachBuiltinGuard() {
+    nameEl.addEventListener('focus', (e) => { if (!_confirmBuiltinEdit()) { nameEl.blur(); } });
+    descEl.addEventListener('focus', (e) => { if (!_confirmBuiltinEdit()) { descEl.blur(); } });
+  }
+  _attachBuiltinGuard();
 
   listEl.addEventListener('change', () => {
     if (listEl.value === '__new__') {
@@ -8133,7 +8321,28 @@ async function openQuestionnaireEditor() {
   });
 
   modal.querySelector('#qEditorAddQ').addEventListener('click', () => {
+    if (!_confirmBuiltinEdit()) return;
     _addPollQuestionRow(questionsEl, '', 'scale');
+  });
+
+  // Duplicate button
+  duplicateBtn.addEventListener('click', async () => {
+    const selectedId = listEl.value;
+    if (selectedId === '__new__') return;
+    if (!confirm(t('questionnaire_duplicate_confirm') || 'Duplicate this questionnaire?')) return;
+    try {
+      const resp = await api('POST', `/api/poll-questionnaires/${selectedId}/duplicate`);
+      if (resp.ok) {
+        const newQ = await resp.json();
+        showNotification('success', t('questionnaire_duplicated') || 'Questionnaire duplicated');
+        await loadList(newQ.id);
+        const q = questionnaires.find(x => x.id === newQ.id);
+        if (q) loadForm(q);
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        showError(err.error || 'Failed to duplicate');
+      }
+    } catch(e) { showError('Failed to duplicate: ' + (e.message||e)); }
   });
 
   saveBtn.addEventListener('click', async () => {
@@ -8148,13 +8357,30 @@ async function openQuestionnaireEditor() {
     });
     if (questions.length === 0) { showError(t('questionnaire_add_question')||'Add at least one question'); return; }
     const selectedId = listEl.value;
+    const currentQ = _getCurrentQ();
+    const isBuiltIn = currentQ && currentQ.built_in;
     const body = { name, description: descEl.value.trim(), questions };
+    // When saving a built-in questionnaire, add acknowledge flag so backend creates a copy
+    if (isBuiltIn) body.acknowledge_builtin = true;
     try {
       if (selectedId === '__new__') {
         await api('POST', '/api/poll-questionnaires', body);
         showNotification('success', `${name} created`);
       } else {
-        await api('PUT', `/api/poll-questionnaires/${selectedId}`, body);
+        const resp = await api('PUT', `/api/poll-questionnaires/${selectedId}`, body);
+        if (isBuiltIn) {
+          // Backend creates a copy — try to select the new copy
+          try {
+            const newQ = await resp.json();
+            if (newQ && newQ.id) {
+              showNotification('success', `${name} saved as a new copy`);
+              await loadList(newQ.id);
+              const q = questionnaires.find(x => x.id === newQ.id);
+              if (q) loadForm(q);
+              return;
+            }
+          } catch {}
+        }
         showNotification('success', `${name} updated`);
       }
       await loadList();
@@ -11000,174 +11226,44 @@ function openDetachedDecisionLog() {
 
 // ── Analysis Modal ──────────────────────────────────────────────────────────
 let _analysisPopout = null;
+let _analysisCache = {};
+let _analysisActiveTab = 'overview';
 
 async function openAnalysisModal() {
-  // Fetch stats data
-  let overview = {}, evStatus = {}, evType = {}, heatmap = {}, workload = {}, decisionStats = {};
-  try {
-    const [oRes, sRes, tRes, hRes, wRes, dRes] = await Promise.all([
-      apiGet('/api/stats/overview'),
-      apiGet('/api/stats/events/status'),
-      apiGet('/api/stats/events/type'),
-      apiGet('/api/stats/events/heatmap'),
-      apiGet('/api/stats/users/workload'),
-      apiGet('/api/stats/decisions'),
-    ]);
-    overview = oRes || {};
-    evStatus = sRes || {};
-    evType = tRes || {};
-    heatmap = hRes || {};
-    workload = wRes || {};
-    decisionStats = dRes || {};
-  } catch(e) { console.warn('Stats fetch error', e); }
-
   const html = `
     <div class="modal-overlay" id="analysisModal">
-      <div class="modal" style="max-width:900px;width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+      <div class="modal" style="max-width:960px;width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
-          <h2>📈 ${t('analysis_title')||'Analysis'}</h2>
+          <h2>${t('analysis_title')||'Analysis'}</h2>
           <div style="display:flex;gap:6px;margin-left:auto;margin-right:8px">
-            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="detachAnalysis" title="${t('detach_window')||'Detach'}">⧉</button>
-            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="exportAnalysis" title="${t('btn_export')||'Export'}">⬇ ${t('btn_export')||'Export'}</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="detachAnalysis" title="${t('detach_window')||'Detach'}">&#x29C9;</button>
+            <select id="analysisExportFmt" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:2px 4px;font-size:11px">
+              <option value="csv">CSV</option><option value="json">JSON</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="exportAnalysis" title="${t('btn_export')||'Export'}">&#x2B07; ${t('btn_export')||'Export'}</button>
           </div>
-          <button class="modal-close" data-action="closeAnalysisModal">✕</button>
+          <button class="modal-close" data-action="closeAnalysisModal">&#x2715;</button>
         </div>
-        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
-          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
-              ${t('from')||'From'}: <input type="date" id="analysisFrom" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
-            </label>
-            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
-              ${t('to')||'To'}: <input type="date" id="analysisTo" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
-            </label>
-            <button class="btn btn-sm btn-primary" data-action="refreshAnalysis">${t('btn_refresh')||'Refresh'}</button>
+        <div style="padding:8px 12px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
+          <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+            ${t('from')||'From'}: <input type="date" id="analysisFrom" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+          </label>
+          <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+            ${t('to')||'To'}: <input type="date" id="analysisTo" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+          </label>
+          <button class="btn btn-sm btn-primary" data-action="refreshAnalysis" style="font-size:11px;padding:2px 8px">${t('btn_refresh')||'Refresh'}</button>
+          <div style="flex:1"></div>
+          <div id="analysisTabBar" style="display:flex;gap:0">
+            <button class="btn btn-sm analysisTab active" data-tab="overview" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('overview')||'Overview'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="activity" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('activity')||'Activity'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="optempo" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('optempo')||'OpTempo'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('dependencies')||'Dependencies'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
-
-          <!-- Overview Cards -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px" id="analysisOverview">
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:var(--accent)">${overview.total_events||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('total_events')||'Total Events'}</div>
-            </div>
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:var(--accent)">${overview.total_users||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('total_users')||'Total Users'}</div>
-            </div>
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:#E67E22">${overview.active_alarms||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('active_alarms')||'Active Alarms'}</div>
-            </div>
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:#27AE60">${overview.approved_decisions||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('approved_decisions')||'Approved'}</div>
-            </div>
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:#E67E22">${overview.pending_decisions||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('pending_decisions')||'Pending'}</div>
-            </div>
-            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
-              <div style="font-size:24px;font-weight:700;color:#E74C3C">${overview.denied_decisions||0}</div>
-              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('denied_decisions')||'Denied'}</div>
-            </div>
-          </div>
-
-          <!-- Status Distribution -->
-          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">${t('analysis_status_dist')||'Event Status Distribution'}</div>
-            <div id="analysisStatusChart" style="display:flex;gap:6px;flex-wrap:wrap">
-              ${Object.entries(evStatus).map(([k,v]) => {
-                const colors = {planned:'#3498DB',active:'#E67E22',completed:'#27AE60',cancelled:'#95A5A6',verified:'#2ECC71',rejected:'#E74C3C'};
-                return `<div style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs)">
-                  <span style="width:10px;height:10px;border-radius:50%;background:${colors[k]||'var(--accent)'}"></span>
-                  <span>${k}</span>
-                  <span style="font-weight:700">${v}</span>
-                </div>`;
-              }).join('')}
-            </div>
-            <div id="analysisStatusBar" style="display:flex;height:24px;border-radius:var(--radius);overflow:hidden;margin-top:8px">
-              ${(() => {
-                const total = Object.values(evStatus).reduce((a,b) => a+b, 0) || 1;
-                const colors = {planned:'#3498DB',active:'#E67E22',completed:'#27AE60',cancelled:'#95A5A6',verified:'#2ECC71',rejected:'#E74C3C'};
-                return Object.entries(evStatus).map(([k,v]) =>
-                  `<div style="width:${(v/total*100).toFixed(1)}%;background:${colors[k]||'var(--accent)'}" title="${k}: ${v} (${(v/total*100).toFixed(0)}%)"></div>`
-                ).join('');
-              })()}
-            </div>
-          </div>
-
-          <!-- Type Breakdown -->
-          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">${t('analysis_type_breakdown')||'Event Type Breakdown'}</div>
-            <div id="analysisTypeChart">
-              ${Object.entries(evType).sort((a,b) => b[1]-a[1]).map(([k,v]) => {
-                const max = Math.max(...Object.values(evType)) || 1;
-                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                  <span style="min-width:100px;font-size:var(--fs-xs);text-align:right">${k}</span>
-                  <div style="flex:1;height:18px;background:var(--bg2);border-radius:2px;overflow:hidden">
-                    <div style="width:${(v/max*100).toFixed(1)}%;height:100%;background:var(--accent);border-radius:2px"></div>
-                  </div>
-                  <span style="min-width:30px;font-size:var(--fs-xs);font-weight:700">${v}</span>
-                </div>`;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Activity Heatmap -->
-          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">${t('analysis_heatmap')||'Activity Heatmap (Day x Hour)'}</div>
-            <div style="overflow-x:auto">
-              <table style="border-collapse:collapse;font-size:10px;width:100%">
-                <tr>
-                  <th style="padding:2px 4px"></th>
-                  ${Array.from({length:24}, (_,i) => `<th style="padding:2px;text-align:center;color:var(--text-dim)">${String(i).padStart(2,'0')}</th>`).join('')}
-                </tr>
-                ${(heatmap.data||[]).map((row, di) => {
-                  const dayNames = heatmap.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-                  const maxVal = Math.max(1, ...((heatmap.data||[]).flat()));
-                  return `<tr>
-                    <td style="padding:2px 4px;font-weight:600;color:var(--text-dim)">${dayNames[di]||''}</td>
-                    ${(row||[]).map(v => {
-                      const intensity = v / maxVal;
-                      const bg = v === 0 ? 'var(--bg2)' : `rgba(52,152,219,${(0.15 + intensity * 0.85).toFixed(2)})`;
-                      return `<td style="padding:2px;text-align:center;background:${bg};color:${intensity > 0.5 ? '#fff' : 'var(--text)'};border-radius:2px" title="${v} events">${v||''}</td>`;
-                    }).join('')}
-                  </tr>`;
-                }).join('')}
-              </table>
-            </div>
-          </div>
-
-          <!-- User Workload -->
-          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">${t('analysis_workload')||'User Workload'}</div>
-            <div id="analysisWorkload">
-              ${Object.entries(workload).sort((a,b) => (b[1].total||0)-(a[1].total||0)).slice(0,15).map(([name,data]) => {
-                const total = data.total || 0;
-                const maxTotal = Math.max(...Object.values(workload).map(d => d.total||0)) || 1;
-                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                  <span style="min-width:120px;font-size:var(--fs-xs);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(name)}</span>
-                  <div style="flex:1;height:18px;background:var(--bg2);border-radius:2px;overflow:hidden">
-                    <div style="width:${(total/maxTotal*100).toFixed(1)}%;height:100%;background:var(--accent);border-radius:2px"></div>
-                  </div>
-                  <span style="min-width:30px;font-size:var(--fs-xs);font-weight:700">${total}</span>
-                </div>`;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Decision Statistics -->
-          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">${t('analysis_decisions')||'Decision Statistics'}</div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:var(--fs-sm)">
-              <div>${t('total')||'Total'}: <strong>${decisionStats.total||0}</strong></div>
-              ${Object.entries(decisionStats.by_status||{}).map(([k,v]) => {
-                const label = k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase()+k.slice(1);
-                return `<div>${label}: <strong>${v}</strong></div>`;
-              }).join('')}
-              <div>${t('avg_response_time')||'Avg response time'}: <strong>${decisionStats.average_response_ms ? (decisionStats.average_response_ms/60000).toFixed(1)+' min' : 'N/A'}</strong></div>
-            </div>
-          </div>
-
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px" id="analysisContent">
+          <div style="text-align:center;padding:40px;color:var(--text-dim)">${t('loading')||'Loading...'}</div>
         </div>
       </div>
     </div>`;
@@ -11176,16 +11272,309 @@ async function openAnalysisModal() {
   void modal.offsetHeight;
   modal.classList.add('open');
   _bindActions(modal);
+
+  // Tab switching
+  modal.querySelectorAll('.analysisTab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('.analysisTab').forEach(b => { b.classList.remove('active'); b.style.background = ''; b.style.color = ''; });
+      btn.classList.add('active');
+      btn.style.background = 'var(--accent)'; btn.style.color = '#fff';
+      _analysisActiveTab = btn.dataset.tab;
+      _loadAnalysisTab(btn.dataset.tab);
+    });
+  });
+  // style active tab
+  const activeBtn = modal.querySelector('.analysisTab.active');
+  if (activeBtn) { activeBtn.style.background = 'var(--accent)'; activeBtn.style.color = '#fff'; }
+
+  _analysisCache = {};
+  _analysisActiveTab = 'overview';
+  await _loadAnalysisTab('overview');
 }
 
+function _analysisDateParams() {
+  const from = document.getElementById('analysisFrom')?.value || '';
+  const to = document.getElementById('analysisTo')?.value || '';
+  let qs = '';
+  if (from) qs += (qs ? '&' : '?') + 'from=' + encodeURIComponent(from);
+  if (to) qs += (qs ? '&' : '?') + 'to=' + encodeURIComponent(to);
+  return qs;
+}
+
+function _analysisCard(value, label, color) {
+  return `<div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+    <div style="font-size:24px;font-weight:700;color:${color || 'var(--accent)'}">${escHtml(String(value))}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(label)}</div>
+  </div>`;
+}
+
+async function _loadAnalysisTab(tab) {
+  const container = document.getElementById('analysisContent');
+  if (!container) return;
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-dim)">${t('loading')||'Loading...'}</div>`;
+
+  try {
+    switch(tab) {
+      case 'overview': await _renderOverviewTab(container); break;
+      case 'activity': await _renderActivityTab(container); break;
+      case 'optempo': await _renderOpTempoTab(container); break;
+      case 'decisions': await _renderDecisionsTab(container); break;
+      case 'dependencies': await _renderDependenciesTab(container); break;
+      case 'export': _renderExportTab(container); break;
+    }
+  } catch(e) {
+    console.warn('Analysis tab error', tab, e);
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:#E74C3C">${t('error')||'Error'}: ${escHtml(e.message||String(e))}</div>`;
+  }
+}
+
+/* ── Overview Tab ──────────────────────────────────────────────────────────── */
+async function _renderOverviewTab(container) {
+  const qs = _analysisDateParams();
+  const [overview, evStatus, evType, workload] = await Promise.all([
+    _analysisFetch('/api/stats/overview' + qs),
+    _analysisFetch('/api/stats/events/status' + qs),
+    _analysisFetch('/api/stats/events/type' + qs),
+    _analysisFetch('/api/stats/users/workload' + qs),
+  ]);
+
+  const statusLabels = Object.keys(evStatus || {});
+  const statusData = Object.values(evStatus || {});
+  const statusColors = statusLabels.map(k => ({planned:'#3498DB',active:'#E67E22',completed:'#27AE60',cancelled:'#95A5A6',verified:'#2ECC71',rejected:'#E74C3C'}[k] || '#9B59B6'));
+
+  const typeEntries = Object.entries(evType || {}).sort((a,b) => b[1] - a[1]);
+  const typeLabels = typeEntries.map(e => e[0]);
+  const typeData = typeEntries.map(e => e[1]);
+
+  const wlEntries = Object.entries(workload || {}).sort((a,b) => (b[1].total||0) - (a[1].total||0)).slice(0, 15);
+  const wlLabels = wlEntries.map(e => e[0]);
+  const wlData = wlEntries.map(e => e[1].total || 0);
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(overview?.total_events||0, t('total_events')||'Total Events', 'var(--accent)')}
+      ${_analysisCard(overview?.total_users||0, t('total_users')||'Total Users', 'var(--accent)')}
+      ${_analysisCard(overview?.active_alarms||0, t('active_alarms')||'Active Alarms', '#E67E22')}
+      ${_analysisCard(overview?.pending_decisions||0, t('pending_decisions')||'Pending Decisions', '#E67E22')}
+      ${_analysisCard(overview?.approved_decisions||0, t('approved_decisions')||'Approved', '#27AE60')}
+      ${_analysisCard(overview?.denied_decisions||0, t('denied_decisions')||'Denied', '#E74C3C')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_status_dist')||'Event Status Distribution'}</div>
+        <canvas id="anlPieStatus" height="220"></canvas>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_type_breakdown')||'Event Type Breakdown'}</div>
+        <canvas id="anlBarType" height="${Math.max(180, typeLabels.length * 22 + 20)}"></canvas>
+      </div>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_workload')||'User Workload (Top 15)'}</div>
+      <canvas id="anlBarWorkload" height="${Math.max(180, wlLabels.length * 22 + 20)}"></canvas>
+    </div>`;
+
+  requestAnimationFrame(() => {
+    if (statusLabels.length) drawPieChart('anlPieStatus', statusLabels, statusData, statusColors);
+    if (typeLabels.length) drawBarChart('anlBarType', typeLabels, typeData, { horizontal: true });
+    if (wlLabels.length) drawBarChart('anlBarWorkload', wlLabels, wlData, { horizontal: true, colors: '#2980B9' });
+  });
+}
+
+/* ── Activity Tab ──────────────────────────────────────────────────────────── */
+async function _renderActivityTab(container) {
+  const qs = _analysisDateParams();
+  const [heatmap, timeline] = await Promise.all([
+    _analysisFetch('/api/stats/events/heatmap' + qs),
+    _analysisFetch('/api/stats/events/timeline' + qs).catch(() => null),
+  ]);
+
+  const hmData = heatmap?.data || [];
+  const hmDays = heatmap?.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const hmHours = Array.from({length:24}, (_, i) => String(i).padStart(2,'0'));
+
+  const tlLabels = timeline?.labels || timeline?.dates || [];
+  const tlData = timeline?.data || timeline?.counts || [];
+
+  container.innerHTML = `
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_heatmap')||'Activity Heatmap (Day x Hour)'}</div>
+      <canvas id="anlHeatmap" height="${Math.max(200, hmDays.length * 28 + 30)}"></canvas>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_events_timeline')||'Events Over Time'}</div>
+      <canvas id="anlAreaTimeline" height="250"></canvas>
+    </div>`;
+
+  setTimeout(() => {
+    if (hmData.length) {
+      drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorLow: '#1a1a2e', colorHigh: '#3498DB' });
+    }
+    if (tlLabels.length) {
+      drawAreaChart('anlAreaTimeline', tlLabels, tlData, { color: '#3498DB' });
+    }
+  }, 50);
+}
+
+/* ── Decisions Tab ─────────────────────────────────────────────────────────── */
+async function _renderDecisionsTab(container) {
+  const qs = _analysisDateParams();
+  const analytics = await _analysisFetch('/api/stats/decision-analytics' + qs).catch(() => ({})) || {};
+
+  const byStatus = analytics.by_status || {};
+  const outcomeLabels = Object.keys(byStatus).map(k => k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1));
+  const outcomeData = Object.values(byStatus);
+  const outcomeColors = Object.keys(byStatus).map(k => ({approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C'}[k] || '#9B59B6'));
+
+  const avgMs = analytics.average_response_ms || analytics.avg_response_ms || 0;
+  const avgResponse = avgMs ? (avgMs / 60000).toFixed(1) + ' min' : 'N/A';
+
+  const perReq = analytics.per_requester || analytics.by_requester || {};
+  const reqLabels = Object.keys(perReq);
+  const reqData = Object.values(perReq);
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_approval_rate')||'Approval Rate'}</div>
+        <canvas id="anlPieDecisions" height="250"></canvas>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);display:flex;flex-direction:column;justify-content:center;align-items:center">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('avg_response_time')||'Avg Response Time'}</div>
+        <div style="font-size:36px;font-weight:700;color:var(--accent)">${escHtml(avgResponse)}</div>
+      </div>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_per_requester')||'Decisions Per Requester'}</div>
+      <canvas id="anlBarRequester" height="${Math.max(250, reqLabels.length * 22 + 20)}"></canvas>
+    </div>`;
+
+  setTimeout(() => {
+    if (outcomeLabels.length) drawPieChart('anlPieDecisions', outcomeLabels, outcomeData, outcomeColors);
+    if (reqLabels.length) drawBarChart('anlBarRequester', reqLabels, reqData, { horizontal: true, maxBarWidth: 28 });
+  }, 50);
+}
+
+/* ── OpTempo Tab ───────────────────────────────────────────────────────────── */
+async function _renderOpTempoTab(container) {
+  const qs = _analysisDateParams();
+  const [opTempo, slipHist] = await Promise.all([
+    _analysisFetch('/api/stats/op-tempo' + qs).catch(() => null),
+    _analysisFetch('/api/stats/slip-histogram' + qs).catch(() => null),
+  ]);
+
+  const tempoLabels = opTempo?.labels || opTempo?.dates || [];
+  const tempoDatasets = [];
+  if (opTempo?.datasets && Array.isArray(opTempo.datasets)) {
+    opTempo.datasets.forEach(ds => tempoDatasets.push({data: ds.data||[], color: ds.color||'#3498DB', label: ds.label||''}));
+  } else if (opTempo?.data) {
+    tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: t('op_tempo')||'Op Tempo'});
+  }
+
+  const slipBuckets = slipHist?.labels || slipHist?.buckets || [];
+  const slipValues = slipHist?.data || slipHist?.values || [];
+
+  container.innerHTML = `
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_optempo')||'Operational Tempo'}</div>
+      <canvas id="anlLineOpTempo" height="250"></canvas>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_slip_histogram')||'Slip / Delay Histogram'}</div>
+      <canvas id="anlHistSlip" height="250"></canvas>
+    </div>`;
+
+  setTimeout(() => {
+    if (tempoLabels.length && tempoDatasets.length) {
+      drawLineChart('anlLineOpTempo', tempoLabels, tempoDatasets, { showArea: true, showPoints: true });
+    }
+    if (slipBuckets.length) {
+      drawHistogram('anlHistSlip', slipBuckets, slipValues, { color: '#E67E22', showValues: true });
+    }
+  }, 50);
+}
+
+/* ── Dependencies Tab ──────────────────────────────────────────────────────── */
+async function _renderDependenciesTab(container) {
+  const qs = _analysisDateParams();
+  const graph = await _analysisFetch('/api/stats/dependency-graph' + qs).catch(() => null);
+
+  const nodes = (graph?.nodes || []).map(n => ({
+    id: n.id, label: n.label || n.id, x: n.x, y: n.y,
+    color: n.critical ? '#E74C3C' : (n.color || '#3498DB'),
+    size: n.size || 10
+  }));
+  const edges = (graph?.edges || []).map(e => ({
+    from: e.from, to: e.to,
+    color: e.critical ? '#E74C3C' : (e.color || 'rgba(255,255,255,0.3)'),
+    critical: !!e.critical
+  }));
+  const stats = graph?.stats || {};
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(stats.total_nodes || nodes.length, t('total_nodes')||'Nodes', 'var(--accent)')}
+      ${_analysisCard(stats.total_edges || edges.length, t('total_edges')||'Edges', 'var(--accent)')}
+      ${_analysisCard(stats.longest_chain || 0, t('longest_chain')||'Longest Chain', '#E67E22')}
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('dependency_graph')||'Event Dependency Graph'}</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
+      <canvas id="anlNetGraph" height="400"></canvas>
+    </div>`;
+
+  requestAnimationFrame(() => {
+    drawNetworkGraph('anlNetGraph', nodes, edges, { directed: true, interactive: true, nodeRadius: 10 });
+  });
+}
+
+/* ── Export Tab ────────────────────────────────────────────────────────────── */
+function _renderExportTab(container) {
+  const qs = _analysisDateParams();
+  container.innerHTML = `
+    <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">${t('analysis_export_title')||'Export Analysis Data'}</div>
+      <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:120px">CSV</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:120px">JSON</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xlsx')" style="min-width:120px">XLSX</button>
+      </div>
+    </div>`;
+}
+
+function _downloadAnalysisExport(format) {
+  const from = document.getElementById('analysisFrom')?.value || '';
+  const to = document.getElementById('analysisTo')?.value || '';
+  let url = '/api/stats/export?format=' + encodeURIComponent(format);
+  if (from) url += '&from=' + encodeURIComponent(from);
+  if (to) url += '&to=' + encodeURIComponent(to);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
+  a.click();
+  showNotification('success', t('export_started')||'Export started');
+}
+
+/* ── Analysis Helpers ──────────────────────────────────────────────────────── */
+async function _analysisFetch(url) {
+  if (_analysisCache[url]) return _analysisCache[url];
+  const res = await apiGet(url);
+  _analysisCache[url] = res;
+  return res;
+}
+
+/* — kept for backward compat with old template references — */
 function closeAnalysisModal() {
   const el = document.getElementById('analysisModal');
   if (el) el.remove();
+  _analysisCache = {};
 }
 
 async function refreshAnalysis() {
-  closeAnalysisModal();
-  await openAnalysisModal();
+  _analysisCache = {};
+  const tab = _analysisActiveTab || 'overview';
+  await _loadAnalysisTab(tab);
 }
 
 function detachAnalysis() {
@@ -11201,33 +11590,8 @@ function detachAnalysis() {
 }
 
 async function exportAnalysis() {
-  // Export analysis data as CSV
-  try {
-    const [overview, evStatus, evType, workload, decisionStats] = await Promise.all([
-      apiGet('/api/stats/overview'),
-      apiGet('/api/stats/events/status'),
-      apiGet('/api/stats/events/type'),
-      apiGet('/api/stats/users/workload'),
-      apiGet('/api/stats/decisions'),
-    ]);
-    let csv = 'Category,Key,Value\\n';
-    csv += `Overview,Total Events,${overview?.total_events||0}\\n`;
-    csv += `Overview,Total Users,${overview?.total_users||0}\\n`;
-    csv += `Overview,Active Alarms,${overview?.active_alarms||0}\\n`;
-    csv += `Overview,Pending Decisions,${overview?.pending_decisions||0}\\n`;
-    csv += `Overview,Approved Decisions,${overview?.approved_decisions||0}\\n`;
-    csv += `Overview,Denied Decisions,${overview?.denied_decisions||0}\\n`;
-    for (const [k,v] of Object.entries(evStatus||{})) csv += `Event Status,${k},${v}\\n`;
-    for (const [k,v] of Object.entries(evType||{})) csv += `Event Type,${k},${v}\\n`;
-    for (const [name,data] of Object.entries(workload||{})) csv += `Workload,${name},${data.total||0}\\n`;
-    const blob = new Blob([csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('success', t('export_complete')||'Export complete');
-  } catch(e) { showError('Export failed: ' + e.message); }
+  const fmt = document.getElementById('analysisExportFmt')?.value || 'csv';
+  _downloadAnalysisExport(fmt);
 }
 
 // ── TeamLead Toolbox Modal ──────────────────────────────────────────────────

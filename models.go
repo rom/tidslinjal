@@ -956,6 +956,7 @@ type PersonReadyCheck struct {
 	CreatedAt     time.Time                     `json:"created_at"`
 	ScheduledAt   string                        `json:"scheduled_at,omitempty"`
 	Fired         bool                          `json:"fired,omitempty"` // true once a scheduled check has been dispatched
+	Tags          []string                     `json:"tags,omitempty"`
 }
 
 type EventLogEntry struct {
@@ -1120,6 +1121,7 @@ type PollResponse struct {
 	QuestionID string    `json:"question_id"`
 	Answer     string    `json:"answer"`
 	AnsweredAt time.Time `json:"answered_at"`
+	Tags       []string  `json:"tags,omitempty"`
 }
 
 // Poll is a multipoll / personnel check that targets users, groups, or roles
@@ -1139,6 +1141,7 @@ type Poll struct {
 	ScheduledAt   string         `json:"scheduled_at,omitempty"` // ISO 8601 time for timed polls
 	ReminderMins  int            `json:"reminder_mins,omitempty"` // auto-remind non-responders after N minutes
 	Fired         bool           `json:"fired,omitempty"`         // true once a scheduled poll has been activated
+	Tags          []string       `json:"tags,omitempty"`
 }
 
 // DefaultPollQuestions returns the standard personnel-check questions
@@ -1378,4 +1381,22 @@ type ResourceStar struct {
 	CreatedByName string   `json:"created_by_name"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Tag is a user-created label for organizing polls, ready checks, etc.
+type Tag struct {
+	ID         int64     `json:"id"`
+	Name       string    `json:"name"`
+	Color      string    `json:"color,omitempty"`
+	CreatedBy  int64     `json:"created_by"`
+	CreatedAt  time.Time `json:"created_at"`
+	UsageCount int       `json:"usage_count"`
+}
+
+// JiraStats holds aggregated issue statistics from Jira.
+type JiraStats struct {
+	TotalIssues  int            `json:"total_issues"`
+	ByStatus     map[string]int `json:"by_status"`
+	ByPriority   map[string]int `json:"by_priority"`
+	LastSyncTime time.Time      `json:"last_sync_time"`
 }

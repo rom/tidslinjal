@@ -5762,6 +5762,11 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/stats/events/heatmap", app.requireAuth(app.handleStatsEventsHeatmap))
 	mux.HandleFunc("GET /api/stats/users/workload", app.requireAuth(app.handleStatsUsersWorkload))
 	mux.HandleFunc("GET /api/stats/decisions", app.requireAuth(app.handleStatsDecisions))
+	mux.HandleFunc("GET /api/stats/events/slip", app.requireAuth(app.handleStatsSlipHistogram))
+	mux.HandleFunc("GET /api/stats/events/tempo", app.requireAuth(app.handleStatsOpTempo))
+	mux.HandleFunc("GET /api/stats/decisions/analytics", app.requireAuth(app.handleStatsDecisionAnalytics))
+	mux.HandleFunc("GET /api/stats/dependencies/graph", app.requireAuth(app.handleStatsDependencyGraph))
+	mux.HandleFunc("GET /api/stats/export", app.requireAuth(app.handleStatsExport))
 
 	// Narrative / Storyline API
 	mux.HandleFunc("GET /api/narrative", app.requireAuth(app.handleNarrative))
@@ -5848,6 +5853,22 @@ func (app *App) routes() http.Handler {
 		case http.MethodPut:
 			app.requireRole(RoleAdmin, app.handleSaveConnectorConfig)(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Digest & Jira Stats ──
+	mux.HandleFunc("/api/integrations/digest", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleOpLead, app.handleSendDigest)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/connectors/jira/stats", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireRole(RoleOpLead, app.handleJiraStats)(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
@@ -6421,6 +6442,39 @@ func (app *App) routes() http.Handler {
 		case http.MethodDelete:
 			app.requireRole(RoleStaffOfficer, app.handleDeleteQuestionnaire)(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/poll-questionnaires/{id}/duplicate", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireRole(RoleStaffOfficer, app.handleDuplicateQuestionnaire)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Tags ──
+	mux.HandleFunc("/api/tags", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetTags)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleCreateTag)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/tags/cloud", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetTagCloud)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/tags/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			app.requireRole(RoleTeamLead, app.handleDeleteTag)(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
@@ -9770,11 +9824,11 @@ func (app *App) handleUpdateQuestionnaire(w http.ResponseWriter, r *http.Request
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if id < 0 {
-		jsonError(w, "cannot modify built-in questionnaires", http.StatusForbidden)
-		return
+
+	var req struct {
+		PollQuestionnaire
+		AcknowledgeBuiltin bool `json:"acknowledge_builtin"`
 	}
-	var req PollQuestionnaire
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
@@ -9783,19 +9837,67 @@ func (app *App) handleUpdateQuestionnaire(w http.ResponseWriter, r *http.Request
 		jsonError(w, "name is required", http.StatusBadRequest)
 		return
 	}
-	req.ID = id
-	req.UpdatedAt = time.Now()
-	req.BuiltIn = false
-	if err := app.store.UpdateQuestionnaire(req); err != nil {
+
+	if id < 0 {
+		// Built-in questionnaire: require acknowledgement, then save as a new copy
+		if !req.AcknowledgeBuiltin {
+			jsonError(w, "You must acknowledge that you are editing a built-in questionnaire", http.StatusBadRequest)
+			return
+		}
+		// Find the built-in questionnaire to use as base
+		var base *PollQuestionnaire
+		for _, q := range BuiltInQuestionnaires() {
+			if q.ID == id {
+				base = &q
+				break
+			}
+		}
+		if base == nil {
+			jsonError(w, "built-in questionnaire not found", http.StatusNotFound)
+			return
+		}
+		// Apply changes from request onto the base, save as new user-created copy
+		now := time.Now()
+		newQ := PollQuestionnaire{
+			Name:        req.Name,
+			Description: req.Description,
+			Questions:   req.Questions,
+			BuiltIn:     false,
+			CreatedBy:   user.ID,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+		if len(newQ.Questions) == 0 {
+			newQ.Questions = base.Questions
+		}
+		saved, err := app.store.AddQuestionnaire(newQ)
+		if err != nil {
+			jsonError(w, "failed to save copy", http.StatusInternalServerError)
+			return
+		}
+		app.store.LogAudit(AuditEntry{
+			UserID: user.ID, UserName: user.DisplayName,
+			Action: "copy_builtin_questionnaire", EntityType: "questionnaire", EntityID: saved.ID,
+			Summary: fmt.Sprintf("Created copy of built-in questionnaire '%s' as '%s'", base.Name, saved.Name),
+		})
+		jsonOK(w, saved)
+		return
+	}
+
+	q := req.PollQuestionnaire
+	q.ID = id
+	q.UpdatedAt = time.Now()
+	q.BuiltIn = false
+	if err := app.store.UpdateQuestionnaire(q); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "update_questionnaire", EntityType: "questionnaire", EntityID: id,
-		Summary: fmt.Sprintf("Updated poll questionnaire '%s'", req.Name),
+		Summary: fmt.Sprintf("Updated poll questionnaire '%s'", q.Name),
 	})
-	jsonOK(w, req)
+	jsonOK(w, q)
 }
 
 func (app *App) handleDeleteQuestionnaire(w http.ResponseWriter, r *http.Request, user *User) {
@@ -9819,6 +9921,589 @@ func (app *App) handleDeleteQuestionnaire(w http.ResponseWriter, r *http.Request
 		Summary: "Deleted poll questionnaire",
 	})
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Duplicate Questionnaire handler ─────────────────────────────────────────
+
+func (app *App) handleDuplicateQuestionnaire(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	_ = decode(r, &req) // optional body
+
+	// Find questionnaire (check built-in first, then custom)
+	var source *PollQuestionnaire
+	for _, q := range BuiltInQuestionnaires() {
+		if q.ID == id {
+			source = &q
+			break
+		}
+	}
+	if source == nil {
+		for _, q := range app.store.GetQuestionnaires() {
+			if q.ID == id {
+				source = &q
+				break
+			}
+		}
+	}
+	if source == nil {
+		jsonError(w, "questionnaire not found", http.StatusNotFound)
+		return
+	}
+
+	name := req.Name
+	if name == "" {
+		name = source.Name + " (Copy)"
+	}
+
+	now := time.Now()
+	newQ := PollQuestionnaire{
+		Name:        name,
+		Description: source.Description,
+		Questions:   source.Questions,
+		BuiltIn:     false,
+		CreatedBy:   user.ID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	saved, err := app.store.AddQuestionnaire(newQ)
+	if err != nil {
+		jsonError(w, "failed to save copy", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "duplicate_questionnaire", EntityType: "questionnaire", EntityID: saved.ID,
+		Summary: fmt.Sprintf("Duplicated questionnaire '%s' as '%s'", source.Name, saved.Name),
+	})
+	jsonOK(w, saved)
+}
+
+// ── Tag handlers ────────────────────────────────────────────────────────────
+
+func (app *App) handleGetTags(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetTags())
+}
+
+func (app *App) handleCreateTag(w http.ResponseWriter, r *http.Request, user *User) {
+	var req Tag
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		jsonError(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	req.CreatedBy = user.ID
+	req.CreatedAt = time.Now()
+	saved, err := app.store.AddTag(req)
+	if err != nil {
+		jsonError(w, "failed to save tag", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, saved)
+}
+
+func (app *App) handleDeleteTag(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteTag(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleGetTagCloud(w http.ResponseWriter, r *http.Request, user *User) {
+	jsonOK(w, app.store.GetTagCloud())
+}
+
+// ── Stats: Slip Histogram ───────────────────────────────────────────────────
+
+func (app *App) handleStatsSlipHistogram(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	buckets := map[string]int{
+		"on_time":       0,
+		"early":         0,
+		"late_5min":     0,
+		"late_15min":    0,
+		"late_30min":    0,
+		"late_1h":       0,
+		"late_2h_plus":  0,
+	}
+	var slips []float64
+	for _, ev := range events {
+		if ev.PlannedStart == nil {
+			continue
+		}
+		slip := ev.StartTime.Sub(*ev.PlannedStart).Minutes()
+		slips = append(slips, slip)
+		switch {
+		case slip < -0.5:
+			buckets["early"]++
+		case slip <= 0.5:
+			buckets["on_time"]++
+		case slip <= 5:
+			buckets["late_5min"]++
+		case slip <= 15:
+			buckets["late_15min"]++
+		case slip <= 30:
+			buckets["late_30min"]++
+		case slip <= 60:
+			buckets["late_1h"]++
+		default:
+			buckets["late_2h_plus"]++
+		}
+	}
+
+	meanSlip := 0.0
+	medianSlip := 0.0
+	if len(slips) > 0 {
+		total := 0.0
+		for _, s := range slips {
+			total += s
+		}
+		meanSlip = total / float64(len(slips))
+		sort.Float64s(slips)
+		mid := len(slips) / 2
+		if len(slips)%2 == 0 {
+			medianSlip = (slips[mid-1] + slips[mid]) / 2
+		} else {
+			medianSlip = slips[mid]
+		}
+	}
+	jsonOK(w, map[string]any{
+		"buckets":              buckets,
+		"mean_slip_minutes":    meanSlip,
+		"median_slip_minutes":  medianSlip,
+	})
+}
+
+// ── Stats: Operational Tempo ────────────────────────────────────────────────
+
+func (app *App) handleStatsOpTempo(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	now := time.Now()
+	cutoff := now.Add(-24 * time.Hour)
+
+	eventsPerHour := make(map[string]int)
+	for h := 0; h < 24; h++ {
+		eventsPerHour[fmt.Sprintf("%02d", h)] = 0
+	}
+
+	var dayEvents []Event
+	for _, ev := range events {
+		if ev.StartTime.After(cutoff) {
+			hour := ev.StartTime.Format("15")
+			eventsPerHour[hour]++
+			dayEvents = append(dayEvents, ev)
+		}
+	}
+
+	// Concurrent peak: find maximum overlapping events
+	type point struct {
+		t     time.Time
+		delta int
+	}
+	var points []point
+	for _, ev := range events {
+		points = append(points, point{ev.StartTime, 1})
+		if ev.EndTime != nil {
+			points = append(points, point{*ev.EndTime, -1})
+		} else {
+			points = append(points, point{ev.StartTime.Add(time.Hour), -1})
+		}
+	}
+	sort.Slice(points, func(i, j int) bool { return points[i].t.Before(points[j].t) })
+	concurrentPeak := 0
+	running := 0
+	for _, p := range points {
+		running += p.delta
+		if running > concurrentPeak {
+			concurrentPeak = running
+		}
+	}
+
+	// Average events per day
+	avgPerDay := 0.0
+	if len(events) > 0 {
+		earliest := events[0].StartTime
+		for _, ev := range events {
+			if ev.StartTime.Before(earliest) {
+				earliest = ev.StartTime
+			}
+		}
+		days := now.Sub(earliest).Hours() / 24
+		if days < 1 {
+			days = 1
+		}
+		avgPerDay = float64(len(events)) / days
+	}
+
+	jsonOK(w, map[string]any{
+		"events_per_hour":  eventsPerHour,
+		"concurrent_peak":  concurrentPeak,
+		"avg_events_per_day": avgPerDay,
+	})
+}
+
+// ── Stats: Decision Analytics ───────────────────────────────────────────────
+
+func (app *App) handleStatsDecisionAnalytics(w http.ResponseWriter, r *http.Request, user *User) {
+	decisions := app.store.GetDecisionLog()
+
+	decisionsPerDay := make(map[string]int)
+	decisionsByType := map[string]int{"requested": 0, "approved": 0, "rejected": 0, "direct": 0}
+	var approvalTimes, denialTimes []float64
+	requesterCounts := make(map[string]int)
+	deciderCounts := make(map[string]int)
+
+	for _, d := range decisions {
+		day := d.Timestamp.Format("2006-01-02")
+		decisionsPerDay[day]++
+
+		switch d.Status {
+		case "requested":
+			decisionsByType["requested"]++
+		case "approved":
+			decisionsByType["approved"]++
+			if d.ReviewedAt != nil && d.RequestedAt != nil {
+				approvalTimes = append(approvalTimes, d.ReviewedAt.Sub(*d.RequestedAt).Minutes())
+			}
+		case "rejected":
+			decisionsByType["rejected"]++
+			if d.ReviewedAt != nil && d.RequestedAt != nil {
+				denialTimes = append(denialTimes, d.ReviewedAt.Sub(*d.RequestedAt).Minutes())
+			}
+		default:
+			decisionsByType["direct"]++
+		}
+
+		if d.UserName != "" {
+			requesterCounts[d.UserName]++
+		}
+		if d.ReviewedByName != "" {
+			deciderCounts[d.ReviewedByName]++
+		}
+	}
+
+	avgApproval := 0.0
+	if len(approvalTimes) > 0 {
+		total := 0.0
+		for _, t := range approvalTimes {
+			total += t
+		}
+		avgApproval = total / float64(len(approvalTimes))
+	}
+	avgDenial := 0.0
+	if len(denialTimes) > 0 {
+		total := 0.0
+		for _, t := range denialTimes {
+			total += t
+		}
+		avgDenial = total / float64(len(denialTimes))
+	}
+
+	type nameCount struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	topRequesters := topN(requesterCounts, 5)
+	topDeciders := topN(deciderCounts, 5)
+
+	jsonOK(w, map[string]any{
+		"decisions_per_day":        decisionsPerDay,
+		"decisions_by_type":        decisionsByType,
+		"avg_approval_time_minutes": avgApproval,
+		"avg_denial_time_minutes":   avgDenial,
+		"top_requesters":           topRequesters,
+		"top_deciders":             topDeciders,
+	})
+}
+
+// topN returns the top N entries from a name->count map, sorted by count descending.
+func topN(counts map[string]int, n int) []map[string]any {
+	type entry struct {
+		name  string
+		count int
+	}
+	var entries []entry
+	for name, count := range counts {
+		entries = append(entries, entry{name, count})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].count > entries[j].count })
+	if len(entries) > n {
+		entries = entries[:n]
+	}
+	var result []map[string]any
+	for _, e := range entries {
+		result = append(result, map[string]any{"name": e.name, "count": e.count})
+	}
+	return result
+}
+
+// ── Stats: Dependency Graph ─────────────────────────────────────────────────
+
+func (app *App) handleStatsDependencyGraph(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+
+	type node struct {
+		ID        int64     `json:"id"`
+		Title     string    `json:"title"`
+		Status    string    `json:"status"`
+		Type      string    `json:"type"`
+		StartTime time.Time `json:"start_time"`
+	}
+	type edge struct {
+		From int64 `json:"from"`
+		To   int64 `json:"to"`
+	}
+
+	var nodes []node
+	var edges []edge
+	eventMap := make(map[int64]Event)
+
+	for _, ev := range events {
+		eventMap[ev.ID] = ev
+		nodes = append(nodes, node{
+			ID:        ev.ID,
+			Title:     ev.Title,
+			Status:    string(ev.Status),
+			Type:      string(ev.EventType),
+			StartTime: ev.StartTime,
+		})
+		for _, depID := range ev.DependsOn {
+			edges = append(edges, edge{From: depID, To: ev.ID})
+		}
+	}
+
+	// Find critical path (longest chain via DFS)
+	// Build adjacency list
+	adj := make(map[int64][]int64)
+	for _, e := range edges {
+		adj[e.From] = append(adj[e.From], e.To)
+	}
+
+	// DFS for longest path from each node
+	memo := make(map[int64][]int64)
+	var longestFrom func(id int64) []int64
+	longestFrom = func(id int64) []int64 {
+		if cached, ok := memo[id]; ok {
+			return cached
+		}
+		best := []int64{id}
+		for _, next := range adj[id] {
+			candidate := longestFrom(next)
+			if len(candidate)+1 > len(best) {
+				path := make([]int64, 0, len(candidate)+1)
+				path = append(path, id)
+				path = append(path, candidate...)
+				best = path
+			}
+		}
+		memo[id] = best
+		return best
+	}
+
+	var criticalPath []int64
+	for id := range eventMap {
+		path := longestFrom(id)
+		if len(path) > len(criticalPath) {
+			criticalPath = path
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"nodes":         nodes,
+		"edges":         edges,
+		"critical_path": criticalPath,
+	})
+}
+
+// ── Stats: Export ────────────────────────────────────────────────────────────
+
+func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *User) {
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "json"
+	}
+
+	events := app.allEvents()
+	decisions := app.store.GetDecisionLog()
+	layers := app.store.GetAllLayers()
+
+	data := map[string]any{
+		"events":    events,
+		"decisions": decisions,
+		"layers":    layers,
+		"exported_at": time.Now().Format(time.RFC3339),
+	}
+
+	switch format {
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.csv")
+		fmt.Fprintf(w, "id,title,status,event_type,start_time,end_time\n")
+		for _, ev := range events {
+			endStr := ""
+			if ev.EndTime != nil {
+				endStr = ev.EndTime.Format(time.RFC3339)
+			}
+			fmt.Fprintf(w, "%d,%q,%s,%s,%s,%s\n", ev.ID, ev.Title, ev.Status, ev.EventType, ev.StartTime.Format(time.RFC3339), endStr)
+		}
+	case "json":
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
+		json.NewEncoder(w).Encode(data)
+	default:
+		// xlsx not implemented, fall back to JSON
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
+		json.NewEncoder(w).Encode(data)
+	}
+}
+
+// ── Digest handler ──────────────────────────────────────────────────────────
+
+func (app *App) handleSendDigest(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		WebhookURL  string `json:"webhook_url"`
+		WebhookType string `json:"webhook_type"` // "mattermost" | "slack"
+		Period      string `json:"period"`        // "last_hour" | "last_4h" | "last_12h" | "last_24h"
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.WebhookURL == "" {
+		jsonError(w, "webhook_url is required", http.StatusBadRequest)
+		return
+	}
+	if req.WebhookType == "" {
+		req.WebhookType = "mattermost"
+	}
+
+	var duration time.Duration
+	switch req.Period {
+	case "last_hour":
+		duration = time.Hour
+	case "last_4h":
+		duration = 4 * time.Hour
+	case "last_12h":
+		duration = 12 * time.Hour
+	case "last_24h", "":
+		duration = 24 * time.Hour
+	default:
+		jsonError(w, "invalid period", http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now()
+	cutoff := now.Add(-duration)
+
+	// Gather events in period
+	events := app.allEvents()
+	statusCounts := make(map[string]int)
+	eventCount := 0
+	for _, ev := range events {
+		if ev.StartTime.After(cutoff) || ev.UpdatedAt.After(cutoff) {
+			eventCount++
+			statusCounts[string(ev.Status)]++
+		}
+	}
+
+	// Gather decisions in period
+	decisions := app.store.GetDecisionLog()
+	pendingDecisions := 0
+	approvedDecisions := 0
+	deniedDecisions := 0
+	for _, d := range decisions {
+		if d.Timestamp.After(cutoff) {
+			switch d.Status {
+			case "requested":
+				pendingDecisions++
+			case "approved":
+				approvedDecisions++
+			case "rejected":
+				deniedDecisions++
+			}
+		}
+	}
+
+	// Active alarms
+	activeAlarms := app.store.GetActiveAlarms()
+
+	// Top activity by users
+	userActivity := make(map[string]int)
+	auditEntries := app.store.GetAudit(500)
+	for _, a := range auditEntries {
+		if a.Timestamp.After(cutoff) && a.UserName != "" {
+			userActivity[a.UserName]++
+		}
+	}
+	topUsers := topN(userActivity, 5)
+
+	// Build digest message
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("### Operations Digest (%s)\n\n", req.Period))
+	sb.WriteString(fmt.Sprintf("**Events:** %d total\n", eventCount))
+	for status, count := range statusCounts {
+		sb.WriteString(fmt.Sprintf("- %s: %d\n", status, count))
+	}
+	sb.WriteString(fmt.Sprintf("\n**Decisions:** pending=%d, approved=%d, denied=%d\n", pendingDecisions, approvedDecisions, deniedDecisions))
+	sb.WriteString(fmt.Sprintf("**Active Alarms:** %d\n", len(activeAlarms)))
+	if len(topUsers) > 0 {
+		sb.WriteString("\n**Top Activity:**\n")
+		for _, u := range topUsers {
+			sb.WriteString(fmt.Sprintf("- %s: %v actions\n", u["name"], u["count"]))
+		}
+	}
+
+	text := sb.String()
+	body, _ := json.Marshal(map[string]string{"text": text})
+	app.enqueueWebhook(req.WebhookType, req.WebhookURL, body)
+
+	jsonOK(w, map[string]string{"status": "sent"})
+}
+
+// ── Jira Stats handler ──────────────────────────────────────────────────────
+
+func (app *App) handleJiraStats(w http.ResponseWriter, r *http.Request, user *User) {
+	// Find the jira connector from the registry
+	app.connectors.mu.RLock()
+	c, ok := app.connectors.connectors["jira"]
+	app.connectors.mu.RUnlock()
+	if !ok {
+		jsonError(w, "jira connector not registered", http.StatusNotFound)
+		return
+	}
+	jc, ok := c.(*JiraConnector)
+	if !ok {
+		jsonError(w, "jira connector type error", http.StatusInternalServerError)
+		return
+	}
+	if !jc.Enabled() {
+		jsonError(w, "jira connector is not enabled", http.StatusBadRequest)
+		return
+	}
+	stats, err := jc.SyncStats()
+	if err != nil {
+		jsonError(w, fmt.Sprintf("jira stats failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, stats)
 }
 
 // ── Checklist handlers ──────────────────────────────────────────────────────
