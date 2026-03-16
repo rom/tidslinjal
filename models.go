@@ -13,15 +13,18 @@ const AppGitHub = "https://github.com/rom/tidslinjal"
 type Role string
 
 const (
-	RoleObserver      Role = "observer"      // read-only access (same level as read)
-	RoleRead          Role = "read"
-	RoleReporter      Role = "reporter"      // can comment + set responded/completed, needs approval
-	RoleReadWrite     Role = "teammember"
-	RoleTeamLead      Role = "teamlead"      // can create groups/layers, verify/reject events
-	RoleOpLead        Role = "oplead"        // operations lead: master timeline + teamlead rights
-	RoleStaffOfficer     Role = "staffofficer"      // staff officer assistant: same rights as oplead
-	RoleStaffOfficerFull Role = "staffofficer_full" // staff officer: same rights as oplead; requires J-designation
-	RoleAdmin            Role = "admin"             // full access
+	RoleObserver           Role = "observer"           // read-only access (same level as read)
+	RoleRead               Role = "read"
+	RoleReporter           Role = "reporter"           // can comment + set responded/completed, needs approval
+	RoleReadWrite          Role = "teammember"
+	RoleTeamLead           Role = "teamlead"           // can create groups/layers, verify/reject events
+	RoleDeputyTeamLead     Role = "deputy_teamlead"    // same permissions as teamlead
+	RoleOpLead             Role = "oplead"             // operations lead: master timeline + teamlead rights
+	RoleDeputyOpLead       Role = "deputy_oplead"      // same permissions as oplead
+	RoleStaffOfficer       Role = "staffofficer"       // staff officer assistant: same rights as oplead
+	RoleStaffAssistant     Role = "staff_assistant"    // same permissions as staff officer
+	RoleStaffOfficerFull   Role = "staffofficer_full"  // staff officer: same rights as oplead; requires J-designation
+	RoleAdmin              Role = "admin"              // full access
 )
 
 // EventStatus is the lifecycle state of an event

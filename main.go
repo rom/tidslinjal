@@ -29,6 +29,7 @@ import (
 	"os/exec"
 	"runtime"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -695,8 +696,11 @@ func hasRole(userRole, required Role) bool {
 		RoleReporter:         1,
 		RoleReadWrite:        2,
 		RoleTeamLead:         3,
+		RoleDeputyTeamLead:   3,
 		RoleOpLead:           4,
+		RoleDeputyOpLead:     4,
 		RoleStaffOfficer:     4,
+		RoleStaffAssistant:   4,
 		RoleStaffOfficerFull: 4,
 		RoleAdmin:            5,
 	}
@@ -5741,13 +5745,32 @@ func (app *App) routes() http.Handler {
 		}
 	})
 
-	// Decision Log — use Go 1.22+ method-based routing for clarity
+	// Decisions (formerly Decision Log) — use Go 1.22+ method-based routing for clarity
 	mux.HandleFunc("GET /api/decision-log", app.requireAuth(app.handleListDecisionLog))
-	mux.HandleFunc("POST /api/decision-log", app.requireRole(RoleTeamLead, app.handleAddDecisionLogEntry))
+	mux.HandleFunc("POST /api/decision-log", app.requireAuth(app.handleAddDecisionLogEntry))
+	mux.HandleFunc("POST /api/decision-log/request", app.requireAuth(app.handleRequestDecision))
 	mux.HandleFunc("DELETE /api/decision-log/{id}", app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireRole(RoleTeamLead, app.handleDecisionLogAttachment))
+
+	// Analysis / Statistics API
+	mux.HandleFunc("GET /api/stats/overview", app.requireAuth(app.handleStatsOverview))
+	mux.HandleFunc("GET /api/stats/events/timeline", app.requireAuth(app.handleStatsEventsTimeline))
+	mux.HandleFunc("GET /api/stats/events/status", app.requireAuth(app.handleStatsEventsStatus))
+	mux.HandleFunc("GET /api/stats/events/type", app.requireAuth(app.handleStatsEventsType))
+	mux.HandleFunc("GET /api/stats/events/heatmap", app.requireAuth(app.handleStatsEventsHeatmap))
+	mux.HandleFunc("GET /api/stats/users/workload", app.requireAuth(app.handleStatsUsersWorkload))
+	mux.HandleFunc("GET /api/stats/decisions", app.requireAuth(app.handleStatsDecisions))
+
+	// Narrative / Storyline API
+	mux.HandleFunc("GET /api/narrative", app.requireAuth(app.handleNarrative))
+
+	// TeamLead Toolbox API
+	mux.HandleFunc("POST /api/teamlead/quick-response", app.requireRole(RoleTeamLead, app.handleTeamLeadQuickResponse))
+	mux.HandleFunc("POST /api/teamlead/escalate-decision", app.requireRole(RoleTeamLead, app.handleTeamLeadEscalateDecision))
+	mux.HandleFunc("POST /api/teamlead/ready-check", app.requireRole(RoleTeamLead, app.handleTeamLeadReadyCheck))
+	mux.HandleFunc("POST /api/teamlead/team-poll", app.requireRole(RoleTeamLead, app.handleTeamLeadTeamPoll))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		_, user := app.getSession(r)
 		if user == nil {
@@ -7980,8 +8003,17 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// Accept "denied" as alias for "rejected"
+	if req.Status == "denied" {
+		req.Status = "rejected"
+	}
 	if req.Status != "approved" && req.Status != "rejected" {
-		jsonError(w, "status must be 'approved' or 'rejected'", http.StatusBadRequest)
+		jsonError(w, "status must be 'approved', 'denied', or 'rejected'", http.StatusBadRequest)
+		return
+	}
+	// Denial requires a reason/comment
+	if req.Status == "rejected" && strings.TrimSpace(req.Comment) == "" {
+		jsonError(w, "a reason is required when denying a decision", http.StatusBadRequest)
 		return
 	}
 	entries := app.store.GetDecisionLog()
@@ -8021,6 +8053,23 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		Action: req.Status, EntityType: "decision_log", EntityID: id,
 		Summary: reviewSummary,
 	})
+	// Notify the original requester about the decision outcome via SSE
+	if found.UserID > 0 {
+		outcomeLabel := "approved"
+		if req.Status == "rejected" {
+			outcomeLabel = "denied"
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"decision_id":     found.ID,
+			"sequence_number": found.SequenceNumber,
+			"title":           found.Title,
+			"outcome":         outcomeLabel,
+			"decided_by":      user.DisplayName,
+			"comment":         req.Comment,
+			"requester_id":    found.UserID,
+		})
+		app.broker.BroadcastAll(SSEMessage{Event: "decision_outcome", Data: string(payload)})
+	}
 	jsonOK(w, found)
 }
 
@@ -8181,6 +8230,544 @@ func (app *App) userHasCapability(user *User, cap string) bool {
 		}
 	}
 	return false
+}
+
+// ── Decision Request handler (any authenticated user) ─────────────────────────
+func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Title            string `json:"title"`
+		Decision         string `json:"decision"`
+		LogType          string `json:"log_type"`
+		GroupID          int64  `json:"group_id"`
+		Confidential     bool   `json:"confidential"`
+		Reason           string `json:"reason"`
+		RequestedOfType  string `json:"requested_of_type"`
+		RequestedOfValue string `json:"requested_of_value"`
+		RequestedOfLabel string `json:"requested_of_label"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Decision == "" {
+		jsonError(w, "decision request text is required", http.StatusBadRequest)
+		return
+	}
+	if req.LogType == "" {
+		req.LogType = "general"
+	}
+	now := time.Now()
+	entry := DecisionLogEntry{
+		Timestamp:        now,
+		UserID:           user.ID,
+		UserName:         user.Username,
+		DisplayName:      user.DisplayName,
+		Title:            req.Title,
+		Decision:         req.Decision,
+		LogType:          req.LogType,
+		GroupID:          req.GroupID,
+		Confidential:     req.Confidential,
+		Status:           "requested",
+		RequestedAt:      &now,
+		RequestedOfType:  req.RequestedOfType,
+		RequestedOfValue: req.RequestedOfValue,
+		RequestedOfLabel: req.RequestedOfLabel,
+		Reason:           req.Reason,
+	}
+	created, err := app.store.AddDecisionLogEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	seqPrefix := "decision"
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		seqPrefix = abbr
+	}
+	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
+	_ = app.store.UpdateDecisionLogEntry(created)
+	auditSummary := fmt.Sprintf("Decision %s requested: %s", created.SequenceNumber, req.Decision)
+	if req.Confidential {
+		auditSummary = fmt.Sprintf("Decision %s requested (confidential)", created.SequenceNumber)
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "requested", EntityType: "decision_log", EntityID: created.ID,
+		Summary: auditSummary,
+	})
+	// Broadcast decision request via SSE
+	titleInfo := created.SequenceNumber
+	if created.Title != "" {
+		titleInfo = created.Title + " (" + created.SequenceNumber + ")"
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"decision_id":     created.ID,
+		"sequence_number": created.SequenceNumber,
+		"title":           titleInfo,
+		"requested_by":    user.DisplayName,
+		"requested_of":    req.RequestedOfLabel,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "decision_requested", Data: string(payload)})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+// ── Analysis / Statistics handlers ────────────────────────────────────────────
+
+// allEvents returns all events using a very wide time range
+func (app *App) allEvents() []Event {
+	far := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	farEnd := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
+	return app.store.GetEvents(far, farEnd, nil)
+}
+
+func (app *App) handleStatsOverview(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	users := app.store.GetUsers()
+	layers := app.store.GetAllLayers()
+	decisions := app.store.GetDecisionLog()
+	statusCounts := map[string]int{}
+	typeCounts := map[string]int{}
+	for _, e := range events {
+		statusCounts[string(e.Status)]++
+		typeCounts[string(e.EventType)]++
+	}
+	pendingDecisions := 0
+	approvedDecisions := 0
+	deniedDecisions := 0
+	for _, d := range decisions {
+		switch d.Status {
+		case "requested":
+			pendingDecisions++
+		case "approved":
+			approvedDecisions++
+		case "rejected":
+			deniedDecisions++
+		}
+	}
+	jsonOK(w, map[string]any{
+		"total_events":       len(events),
+		"total_users":        len(users),
+		"total_layers":       len(layers),
+		"status_counts":      statusCounts,
+		"type_counts":        typeCounts,
+		"pending_decisions":  pendingDecisions,
+		"approved_decisions": approvedDecisions,
+		"denied_decisions":   deniedDecisions,
+		"total_decisions":    len(decisions),
+	})
+}
+
+func (app *App) handleStatsEventsTimeline(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	resolution := r.URL.Query().Get("resolution")
+	if resolution == "" {
+		resolution = "day"
+	}
+	buckets := map[string]int{}
+	for _, e := range events {
+		var key string
+		switch resolution {
+		case "hour":
+			key = e.StartTime.Format("2006-01-02T15")
+		case "week":
+			y, wk := e.StartTime.ISOWeek()
+			key = fmt.Sprintf("%d-W%02d", y, wk)
+		default:
+			key = e.StartTime.Format("2006-01-02")
+		}
+		buckets[key]++
+	}
+	jsonOK(w, buckets)
+}
+
+func (app *App) handleStatsEventsStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	counts := map[string]int{}
+	for _, e := range events {
+		counts[string(e.Status)]++
+	}
+	jsonOK(w, counts)
+}
+
+func (app *App) handleStatsEventsType(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	counts := map[string]int{}
+	for _, e := range events {
+		counts[string(e.EventType)]++
+	}
+	jsonOK(w, counts)
+}
+
+func (app *App) handleStatsEventsHeatmap(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	// 7 days × 24 hours matrix
+	heatmap := make([][]int, 7)
+	for i := range heatmap {
+		heatmap[i] = make([]int, 24)
+	}
+	for _, e := range events {
+		dow := int(e.StartTime.Weekday())
+		// Convert Sunday=0 to Monday=0 based
+		dow = (dow + 6) % 7
+		hour := e.StartTime.Hour()
+		heatmap[dow][hour]++
+	}
+	jsonOK(w, map[string]any{
+		"days":  []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"},
+		"hours": 24,
+		"data":  heatmap,
+	})
+}
+
+func (app *App) handleStatsUsersWorkload(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	workload := map[string]map[string]int{}
+	for _, e := range events {
+		name := e.ResponsibleName
+		if name == "" {
+			name = "(unassigned)"
+		}
+		if workload[name] == nil {
+			workload[name] = map[string]int{}
+		}
+		workload[name][string(e.Status)]++
+		workload[name]["total"]++
+	}
+	jsonOK(w, workload)
+}
+
+func (app *App) handleStatsDecisions(w http.ResponseWriter, r *http.Request, user *User) {
+	decisions := app.store.GetDecisionLog()
+	byStatus := map[string]int{}
+	byDay := map[string]int{}
+	avgResponseMs := int64(0)
+	responseCount := 0
+	for _, d := range decisions {
+		byStatus[d.Status]++
+		byDay[d.Timestamp.Format("2006-01-02")]++
+		if d.ReviewedAt != nil && d.RequestedAt != nil {
+			diff := d.ReviewedAt.Sub(*d.RequestedAt).Milliseconds()
+			avgResponseMs += diff
+			responseCount++
+		}
+	}
+	if responseCount > 0 {
+		avgResponseMs /= int64(responseCount)
+	}
+	jsonOK(w, map[string]any{
+		"by_status":              byStatus,
+		"by_day":                 byDay,
+		"average_response_ms":    avgResponseMs,
+		"total":                  len(decisions),
+	})
+}
+
+// ── Narrative / Storyline handler ─────────────────────────────────────────────
+
+func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *User) {
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 500 {
+			limit = v
+		}
+	}
+	var fromTime, toTime time.Time
+	if fromStr != "" {
+		fromTime, _ = time.Parse(time.RFC3339, fromStr)
+	}
+	if toStr != "" {
+		toTime, _ = time.Parse(time.RFC3339, toStr)
+	}
+	if fromTime.IsZero() {
+		fromTime = time.Now().Add(-24 * time.Hour)
+	}
+	if toTime.IsZero() {
+		toTime = time.Now()
+	}
+
+	type NarrativeEntry struct {
+		Timestamp   time.Time `json:"timestamp"`
+		Type        string    `json:"type"`
+		Summary     string    `json:"summary"`
+		EntityID    int64     `json:"entity_id,omitempty"`
+		EntityType  string    `json:"entity_type,omitempty"`
+		UserName    string    `json:"user_name,omitempty"`
+		Severity    string    `json:"severity,omitempty"` // info, warning, critical
+	}
+
+	var entries []NarrativeEntry
+
+	// Gather events that started/changed in range
+	for _, e := range app.store.GetEventsInRange(fromTime, toTime) {
+		severity := "info"
+		if e.Status == StatusActive {
+			severity = "warning"
+		}
+		entries = append(entries, NarrativeEntry{
+			Timestamp:  e.StartTime,
+			Type:       "event_started",
+			Summary:    fmt.Sprintf("%s: %s", string(e.EventType), e.Title),
+			EntityID:   e.ID,
+			EntityType: "event",
+			UserName:   e.ResponsibleName,
+			Severity:   severity,
+		})
+	}
+
+	// Gather decisions in range
+	for _, d := range app.store.GetDecisionLog() {
+		if d.Timestamp.After(fromTime) && d.Timestamp.Before(toTime) {
+			severity := "info"
+			summary := ""
+			switch d.Status {
+			case "requested":
+				summary = fmt.Sprintf("Decision requested: %s", d.Title)
+				if d.Title == "" {
+					summary = fmt.Sprintf("Decision requested by %s", d.DisplayName)
+				}
+				severity = "warning"
+			case "approved":
+				summary = fmt.Sprintf("Decision approved: %s", d.Title)
+				if d.Title == "" {
+					summary = fmt.Sprintf("Decision approved by %s", d.ReviewedByName)
+				}
+			case "rejected":
+				summary = fmt.Sprintf("Decision denied: %s", d.Title)
+				if d.Title == "" {
+					summary = fmt.Sprintf("Decision denied by %s", d.ReviewedByName)
+				}
+				severity = "warning"
+			default:
+				summary = fmt.Sprintf("Decision made: %s", d.Title)
+				if d.Title == "" {
+					summary = fmt.Sprintf("Decision by %s", d.DisplayName)
+				}
+			}
+			entries = append(entries, NarrativeEntry{
+				Timestamp:  d.Timestamp,
+				Type:       "decision_" + d.Status,
+				Summary:    summary,
+				EntityID:   d.ID,
+				EntityType: "decision",
+				UserName:   d.DisplayName,
+				Severity:   severity,
+			})
+		}
+	}
+
+	// Gather audit log entries in range
+	for _, a := range app.store.GetAudit(500) {
+		if a.Timestamp.After(fromTime) && a.Timestamp.Before(toTime) {
+			severity := "info"
+			entryType := "audit_" + a.Action
+			if a.Action == "status_changed" || a.Action == "deleted" {
+				severity = "warning"
+			}
+			entries = append(entries, NarrativeEntry{
+				Timestamp:  a.Timestamp,
+				Type:       entryType,
+				Summary:    a.Summary,
+				EntityID:   a.EntityID,
+				EntityType: a.EntityType,
+				UserName:   a.UserName,
+				Severity:   severity,
+			})
+		}
+	}
+
+	// Sort by timestamp
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Timestamp.Before(entries[j].Timestamp)
+	})
+
+	// Apply limit
+	if len(entries) > limit {
+		entries = entries[len(entries)-limit:]
+	}
+
+	jsonOK(w, entries)
+}
+
+// ── TeamLead Toolbox handlers ─────────────────────────────────────────────────
+
+func (app *App) handleTeamLeadQuickResponse(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Message  string `json:"message"`
+		Priority string `json:"priority"` // normal, high, critical
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Message == "" {
+		jsonError(w, "message is required", http.StatusBadRequest)
+		return
+	}
+	if req.Priority == "" {
+		req.Priority = "high"
+	}
+	// Send SSE notification to all OpLead+ users
+	payload, _ := json.Marshal(map[string]any{
+		"type":      "quick_response",
+		"message":   req.Message,
+		"priority":  req.Priority,
+		"from_user": user.DisplayName,
+		"from_role": string(user.Role),
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "teamlead_quick_response", Data: string(payload)})
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "quick_response", EntityType: "teamlead_toolbox",
+		Summary: fmt.Sprintf("Quick response to OpLead: %s (priority: %s)", req.Message, req.Priority),
+	})
+	jsonOK(w, map[string]string{"status": "sent"})
+}
+
+func (app *App) handleTeamLeadEscalateDecision(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Title    string `json:"title"`
+		Decision string `json:"decision"`
+		Reason   string `json:"reason"`
+		Urgency  string `json:"urgency"` // normal, urgent, critical
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Decision == "" {
+		jsonError(w, "decision text is required", http.StatusBadRequest)
+		return
+	}
+	if req.Urgency == "" {
+		req.Urgency = "urgent"
+	}
+	now := time.Now()
+	entry := DecisionLogEntry{
+		Timestamp:        now,
+		UserID:           user.ID,
+		UserName:         user.Username,
+		DisplayName:      user.DisplayName,
+		Title:            req.Title,
+		Decision:         req.Decision,
+		LogType:          "general",
+		Status:           "requested",
+		RequestedAt:      &now,
+		RequestedOfType:  "role",
+		RequestedOfValue: "oplead",
+		RequestedOfLabel: "Operations Lead",
+		Reason:           req.Reason,
+	}
+	created, err := app.store.AddDecisionLogEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	seqPrefix := "decision"
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		seqPrefix = abbr
+	}
+	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
+	_ = app.store.UpdateDecisionLogEntry(created)
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "escalated", EntityType: "decision_log", EntityID: created.ID,
+		Summary: fmt.Sprintf("Decision escalated to OpLead: %s (%s)", req.Title, req.Urgency),
+	})
+	payload, _ := json.Marshal(map[string]any{
+		"decision_id":     created.ID,
+		"sequence_number": created.SequenceNumber,
+		"title":           req.Title,
+		"urgency":         req.Urgency,
+		"from_user":       user.DisplayName,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "decision_escalated", Data: string(payload)})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(created)
+}
+
+func (app *App) handleTeamLeadReadyCheck(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		GroupID int64  `json:"group_id"`
+		Message string `json:"message"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.GroupID == 0 {
+		jsonError(w, "group_id is required", http.StatusBadRequest)
+		return
+	}
+	msg := req.Message
+	if msg == "" {
+		msg = "Ready check from " + user.DisplayName
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"type":      "team_ready_check",
+		"group_id":  req.GroupID,
+		"message":   msg,
+		"from_user": user.DisplayName,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "team_ready_check", Data: string(payload)})
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "ready_check", EntityType: "teamlead_toolbox",
+		Summary: fmt.Sprintf("Team ready check for group %d: %s", req.GroupID, msg),
+	})
+	jsonOK(w, map[string]string{"status": "sent"})
+}
+
+func (app *App) handleTeamLeadTeamPoll(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		GroupID  int64    `json:"group_id"`
+		Question string   `json:"question"`
+		Options  []string `json:"options"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.GroupID == 0 {
+		jsonError(w, "group_id is required", http.StatusBadRequest)
+		return
+	}
+	if req.Question == "" {
+		jsonError(w, "question is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Options) < 2 {
+		jsonError(w, "at least 2 options are required", http.StatusBadRequest)
+		return
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"type":      "team_poll",
+		"group_id":  req.GroupID,
+		"question":  req.Question,
+		"options":   req.Options,
+		"from_user": user.DisplayName,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "team_poll", Data: string(payload)})
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.Username,
+		Action: "team_poll", EntityType: "teamlead_toolbox",
+		Summary: fmt.Sprintf("Team poll for group %d: %s", req.GroupID, req.Question),
+	})
+	jsonOK(w, map[string]string{"status": "sent"})
 }
 
 // ── Map Location handlers ─────────────────────────────────────────────────────
