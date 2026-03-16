@@ -11419,64 +11419,40 @@ async function _renderActivityTab(container) {
 /* ── Decisions Tab ─────────────────────────────────────────────────────────── */
 async function _renderDecisionsTab(container) {
   const qs = _analysisDateParams();
-  const decisionStats = await _analysisFetch('/api/stats/decisions' + qs);
+  const analytics = await _analysisFetch('/api/stats/decision-analytics' + qs).catch(() => ({})) || {};
 
-  const byStatus = decisionStats?.by_status || {};
+  const byStatus = analytics.by_status || {};
   const outcomeLabels = Object.keys(byStatus).map(k => k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1));
   const outcomeData = Object.values(byStatus);
   const outcomeColors = Object.keys(byStatus).map(k => ({approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C'}[k] || '#9B59B6'));
 
-  const byDay = decisionStats?.by_day || {};
-  const dayLabels = Object.keys(byDay).sort();
-  const dayData = dayLabels.map(d => byDay[d]);
+  const avgMs = analytics.average_response_ms || analytics.avg_response_ms || 0;
+  const avgResponse = avgMs ? (avgMs / 60000).toFixed(1) + ' min' : 'N/A';
 
-  const avgApproval = decisionStats?.avg_approval_ms ? (decisionStats.avg_approval_ms / 60000).toFixed(1) + ' min' : 'N/A';
-  const avgDenial = decisionStats?.avg_denial_ms ? (decisionStats.avg_denial_ms / 60000).toFixed(1) + ' min' : 'N/A';
-  const avgResponse = decisionStats?.average_response_ms ? (decisionStats.average_response_ms / 60000).toFixed(1) + ' min' : 'N/A';
-
-  const topRequesters = decisionStats?.top_requesters || [];
-  const topDeciders = decisionStats?.top_deciders || [];
+  const perReq = analytics.per_requester || analytics.by_requester || {};
+  const reqLabels = Object.keys(perReq);
+  const reqData = Object.values(perReq);
 
   container.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
-      ${_analysisCard(decisionStats?.total||0, t('total')||'Total Decisions', 'var(--accent)')}
-      ${_analysisCard(avgApproval, t('avg_approval_time')||'Avg Approval Time', '#27AE60')}
-      ${_analysisCard(avgDenial, t('avg_denial_time')||'Avg Denial Time', '#E74C3C')}
-      ${_analysisCard(avgResponse, t('avg_response_time')||'Avg Response Time', '#3498DB')}
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('decision_outcomes')||'Decision Outcomes'}</div>
-        <canvas id="anlPieDecisions" height="220"></canvas>
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_approval_rate')||'Approval Rate'}</div>
+        <canvas id="anlPieDecisions" height="250"></canvas>
       </div>
-      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('decisions_per_day')||'Decisions Per Day'}</div>
-        <canvas id="anlBarDecDay" height="220"></canvas>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);display:flex;flex-direction:column;justify-content:center;align-items:center">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('avg_response_time')||'Avg Response Time'}</div>
+        <div style="font-size:36px;font-weight:700;color:var(--accent)">${escHtml(avgResponse)}</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('top_requesters')||'Top Requesters'}</div>
-        ${topRequesters.length ? topRequesters.map(r =>
-          `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:var(--fs-xs);border-bottom:1px solid var(--border)">
-            <span>${escHtml(r.name || r.user || '')}</span><strong>${r.count||0}</strong>
-          </div>`
-        ).join('') : `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${t('no_data')||'No data'}</div>`}
-      </div>
-      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('top_deciders')||'Top Deciders'}</div>
-        ${topDeciders.length ? topDeciders.map(r =>
-          `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:var(--fs-xs);border-bottom:1px solid var(--border)">
-            <span>${escHtml(r.name || r.user || '')}</span><strong>${r.count||0}</strong>
-          </div>`
-        ).join('') : `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${t('no_data')||'No data'}</div>`}
-      </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_per_requester')||'Decisions Per Requester'}</div>
+      <canvas id="anlBarRequester" height="${Math.max(250, reqLabels.length * 22 + 20)}"></canvas>
     </div>`;
 
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     if (outcomeLabels.length) drawPieChart('anlPieDecisions', outcomeLabels, outcomeData, outcomeColors);
-    if (dayLabels.length) drawBarChart('anlBarDecDay', dayLabels, dayData, { colors: '#3498DB' });
-  });
+    if (reqLabels.length) drawBarChart('anlBarRequester', reqLabels, reqData, { horizontal: true, maxBarWidth: 28 });
+  }, 50);
 }
 
 /* ── OpTempo Tab ───────────────────────────────────────────────────────────── */
@@ -11521,7 +11497,7 @@ async function _renderOpTempoTab(container) {
 /* ── Dependencies Tab ──────────────────────────────────────────────────────── */
 async function _renderDependenciesTab(container) {
   const qs = _analysisDateParams();
-  const graph = await _analysisFetch('/api/stats/dependencies/graph' + qs).catch(() => null);
+  const graph = await _analysisFetch('/api/stats/dependency-graph' + qs).catch(() => null);
 
   const nodes = (graph?.nodes || []).map(n => ({
     id: n.id, label: n.label || n.id, x: n.x, y: n.y,
@@ -11583,6 +11559,34 @@ async function _downloadExport(format) {
     URL.revokeObjectURL(a.href);
     showNotification('success', t('export_complete')||'Export complete');
   } catch(e) { showError('Export failed: ' + (e.message||e)); }
+}
+
+/* ── Export Tab ────────────────────────────────────────────────────────────── */
+function _renderExportTab(container) {
+  const qs = _analysisDateParams();
+  container.innerHTML = `
+    <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">${t('analysis_export_title')||'Export Analysis Data'}</div>
+      <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:120px">CSV</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:120px">JSON</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xlsx')" style="min-width:120px">XLSX</button>
+      </div>
+    </div>`;
+}
+
+function _downloadAnalysisExport(format) {
+  const from = document.getElementById('analysisFrom')?.value || '';
+  const to = document.getElementById('analysisTo')?.value || '';
+  let url = '/api/stats/export?format=' + encodeURIComponent(format);
+  if (from) url += '&from=' + encodeURIComponent(from);
+  if (to) url += '&to=' + encodeURIComponent(to);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
+  a.click();
+  showNotification('success', t('export_started')||'Export started');
 }
 
 /* ── Analysis Helpers ──────────────────────────────────────────────────────── */
