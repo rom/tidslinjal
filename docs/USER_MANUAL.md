@@ -60,7 +60,7 @@ Key capabilities:
 - Artificial time system for exercise time offsets
 - DTG (Date-Time Group) military date format
 - High-contrast and color-blind accessibility modes
-- Finnish language support
+- Full i18n support (14 languages)
 - Reference document management with checksums
 - Workspace presets
 - Offline sync mode and federation support
@@ -563,7 +563,7 @@ Open the **Settings** sidebar tab to configure your preferences.
 |---|---|
 | **Theme** | Dark / Light / City Camo / Urban Camo |
 | **Display size** | Small / Normal / Large / Huge |
-| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
 | **Date/time format** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Time format** | 24h / 12h |
 | **High-contrast mode** | On / Off (overlay that boosts grid lines, time markers, phase bands, locks, selections) |
@@ -578,7 +578,7 @@ Open the **Settings** sidebar tab to configure your preferences.
 | **Default event type** | any configured type |
 | **Welcome banner** | first login overlay with description, URLs, version, server uptime |
 
-Language can also be changed instantly using the flag buttons (🇬🇧 🇸🇪 🇫🇷 🇫🇮) in the toolbar.
+Language can also be changed instantly using the flag buttons in the toolbar.
 
 ### Date/Time Format & Day Hours
 

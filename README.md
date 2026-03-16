@@ -7,6 +7,7 @@
 ## Table of Contents
 
 - [Features Overview](#features-overview)
+- [Documentation](#documentation)
 - [Getting Started](#getting-started)
 - [Usage Guide](#usage-guide)
 - [Configuration](#configuration)
@@ -379,6 +380,48 @@ A reference document management system for attaching and tracking operational do
 - **Bulk upload** — upload multiple reference documents at once
 - **Reference edit modal** — edit reference metadata after creation
 - **Checksum viewer modal** — view and verify all computed checksums for a reference
+
+---
+
+## Documentation
+
+### User Manuals
+
+Comprehensive user manuals are available in all 14 supported languages:
+
+| Language | Manual |
+|----------|--------|
+| 🇬🇧 English | [USER_MANUAL.md](docs/USER_MANUAL.md) |
+| 🇸🇪 Svenska (Swedish) | [USER_MANUAL_SV.md](docs/USER_MANUAL_SV.md) |
+| 🇫🇷 Français (French) | [USER_MANUAL_FR.md](docs/USER_MANUAL_FR.md) |
+| 🇫🇮 Suomi (Finnish) | [USER_MANUAL_FI.md](docs/USER_MANUAL_FI.md) |
+| 🇩🇰 Dansk (Danish) | [USER_MANUAL_DA.md](docs/USER_MANUAL_DA.md) |
+| 🇳🇴 Norsk Bokmål (Norwegian) | [USER_MANUAL_NB.md](docs/USER_MANUAL_NB.md) |
+| 🇪🇪 Eesti (Estonian) | [USER_MANUAL_ET.md](docs/USER_MANUAL_ET.md) |
+| 🇱🇻 Latviešu (Latvian) | [USER_MANUAL_LV.md](docs/USER_MANUAL_LV.md) |
+| 🇱🇹 Lietuvių (Lithuanian) | [USER_MANUAL_LT.md](docs/USER_MANUAL_LT.md) |
+| 🇮🇹 Italiano (Italian) | [USER_MANUAL_IT.md](docs/USER_MANUAL_IT.md) |
+| 🇪🇸 Español (Spanish) | [USER_MANUAL_ES.md](docs/USER_MANUAL_ES.md) |
+| 🇵🇹 Português (Portuguese) | [USER_MANUAL_PT.md](docs/USER_MANUAL_PT.md) |
+| 🇵🇱 Polski (Polish) | [USER_MANUAL_PL.md](docs/USER_MANUAL_PL.md) |
+| 🇺🇦 Українська (Ukrainian) | [USER_MANUAL_UK.md](docs/USER_MANUAL_UK.md) |
+
+### Technical Documentation
+
+| Document | Description |
+|----------|-------------|
+| [OIDC.md](docs/OIDC.md) | Single Sign-On (OIDC) configuration guide |
+| [TLS.md](docs/TLS.md) | HTTPS/TLS setup guide |
+| [TESTS.md](docs/TESTS.md) | Testing guide |
+| [SIMULATION_TESTS.md](docs/SIMULATION_TESTS.md) | Simulation test procedures |
+| [PERFORMANCE_ANALYSIS.md](docs/PERFORMANCE_ANALYSIS.md) | Performance analysis and tuning |
+
+### Training Materials
+
+The `training/` directory contains structured training guides and example templates:
+
+- **7 training guides** — from getting started to quick reference
+- **31 example templates** — 20 military exercise scenarios + 11 incident response scenarios
 
 ---
 
