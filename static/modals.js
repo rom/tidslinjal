@@ -314,7 +314,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
       </label>`),
       ...groups.map(g => `<label class="group-chip${invGroupIDs.includes(g.id)?' selected':''}" style="cursor:pointer">
         <input type="checkbox" class="inv-group-cb" value="${g.id}" ${invGroupIDs.includes(g.id)?'checked':''} style="margin-right:4px">
-        👥 ${escHtml(g.name)}
+        <span class="group-icon-badge">👥</span> ${escHtml(g.name)}
       </label>`)
     ].join('');
     invList.querySelectorAll('input[type=checkbox]').forEach(cb => {
@@ -3320,7 +3320,7 @@ function renderSidebar() {
       el.innerHTML = subTabBar + `
         <div class="sidebar-section">
           <div class="sidebar-section-title">
-            👥 ${gl.plural}
+            <span class="group-icon-badge">👥</span> ${gl.plural}
             <button class="btn btn-primary btn-sm" data-action="openGroupModal" data-arg="null">+ ${t('btn_add')||'Add'} ${gl.singular}</button>
           </div>
           <div class="group-list">
@@ -3359,7 +3359,7 @@ function renderSidebar() {
         el.innerHTML = subTabBar + `
           <div class="sidebar-section">
             <div class="sidebar-section-title">${sectionIcon} ${sectionLabel}
-              <button class="btn btn-primary btn-sm" data-action="openRoomModal" data-arg='{"type":"${roomType}"}'  data-arg-el>${t('btn_add')||'Add'}</button>
+              <button type="button" class="btn btn-primary btn-sm" data-action="openRoomModal" data-arg='{"type":"${roomType}"}'>${t('btn_add')||'Add'}</button>
             </div>
             ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${sectionLabel.toLowerCase()} yet.</p>` : ''}
             ${filtered.map(r => `
@@ -3442,7 +3442,7 @@ function renderSidebar() {
                 ${canEdit ? `<th style="padding:4px 8px;text-align:center;width:70px">${t('actions')||'Actions'}</th>` : ''}
               </tr></thead><tbody>
               ${allResources.map(r => `<tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:4px 8px">${r.icon||(r.type==='user'?'👤':'👥')} ${r.type}</td>
+                <td style="padding:4px 8px">${r.icon||(r.type==='user'?'👤':'<span class="group-icon-badge">👥</span>')} ${({user:t('tab_users')||'User',group:t('tab_groups')||'Group',room:t('resource_rooms')||'Room',building:t('resource_buildings')||'Building',computer_service:t('resource_computer_services')||'IT Service',data_center:t('resource_data_centers')||'Data Center'})[r.type]||r.type}</td>
                 <td style="padding:4px 8px">${escHtml(r.name)}</td>
                 <td style="padding:4px 8px;color:var(--text-dim)">${escHtml(r.detail)}${r.role?' <span class="role-badge role-'+r.role+'">'+getRoleDisplayName(r.role)+'</span>':''}</td>
                 ${canEdit && r._roomData ? `<td style="padding:4px 8px;text-align:center;white-space:nowrap">
@@ -6289,8 +6289,28 @@ async function createAPIKey() {
   const res = await apiPost('/api/apikeys', {name, description: ''});
   if (res.ok) {
     const key = await res.json();
-    // Show the key once (will not be shown again)
-    alert(`New API key created!\n\nKey: ${key.key}\n\nCopy it now — it won't be shown again.`);
+    // Show the key in a modal with a copyable field
+    const keyModal = document.createElement('div');
+    keyModal.className = 'modal-overlay open';
+    keyModal.innerHTML = `
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header"><h3>${t('api_key_created')||'API Key Created'}</h3>
+          <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button></div>
+        <div class="modal-body">
+          <p style="font-size:var(--fs-sm);margin-bottom:8px">${t('api_key_copy_warning')||'Copy this key now — it will not be shown again.'}</p>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="apiKeyResult" value="${escHtml(key.key)}" readonly
+              style="flex:1;font-family:monospace;font-size:var(--fs-sm);padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);user-select:all"
+              onclick="this.select()">
+            <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('apiKeyResult').value).then(()=>showNotification('success','Copied!')).catch(()=>{document.getElementById('apiKeyResult').select();document.execCommand('copy');showNotification('success','Copied!')})">📋 ${t('btn_copy')||'Copy'}</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(keyModal);
+    _bindActions(keyModal);
     document.getElementById('newAPIKeyName').value = '';
     await _loadAPIKeys();
   } else {
@@ -6756,7 +6776,7 @@ async function openPersonReadyCheckPopup() {
               ${(state.groups||[]).map(g => `
                 <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                   <input type="checkbox" class="prc-group-cb" value="${g.id}" style="margin-right:4px">
-                  👥 ${escHtml(g.name)}
+                  <span class="group-icon-badge">👥</span> ${escHtml(g.name)}
                 </label>`).join('')}
             </div>
           </div>
@@ -7163,7 +7183,7 @@ async function openPollModal(opts) {
               ${(state.groups||[]).map(g => `
                 <label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                   <input type="checkbox" class="poll-group-cb" value="${g.id}" style="margin-right:4px">
-                  👥 ${escHtml(g.name)}
+                  <span class="group-icon-badge">👥</span> ${escHtml(g.name)}
                 </label>`).join('')}
             </div>
           </div>
@@ -7377,11 +7397,24 @@ async function openPollModal(opts) {
   _loadPolls(modal);
 }
 
+function _renumberPollQuestions(container) {
+  container.querySelectorAll('.poll-q-row').forEach((row, i) => {
+    const num = row.querySelector('.poll-q-num');
+    if (num) num.textContent = (i + 1) + '.';
+  });
+}
+
 function _addPollQuestionRow(container, text, type) {
   const row = document.createElement('div');
   row.className = 'poll-q-row';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  const idx = container.querySelectorAll('.poll-q-row').length + 1;
   row.innerHTML = `
+    <span class="poll-q-num" style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;min-width:20px;text-align:right;flex-shrink:0">${idx}.</span>
+    <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
+      <button class="btn btn-ghost poll-q-up" style="padding:0 3px;font-size:9px;line-height:1" title="${t('move_up')||'Move up'}">▲</button>
+      <button class="btn btn-ghost poll-q-down" style="padding:0 3px;font-size:9px;line-height:1" title="${t('move_down')||'Move down'}">▼</button>
+    </div>
     <textarea class="poll-q-text" placeholder="${t('poll_custom_question')||'Question text...'}"
       style="flex:1;width:auto;min-width:0;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical;min-height:32px;height:32px;line-height:1.4">${escHtml(text)}</textarea>
     <select class="poll-q-type" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);flex-shrink:0">
@@ -7390,7 +7423,15 @@ function _addPollQuestionRow(container, text, type) {
       <option value="free_text" ${type==='free_text'?'selected':''}>${t('poll_type_free_text')||'Free text'}</option>
     </select>
     <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;flex-shrink:0" title="${t('poll_remove_question')||'Remove'}">✕</button>`;
-  row.querySelector('.btn-danger').addEventListener('click', () => row.remove());
+  row.querySelector('.btn-danger').addEventListener('click', () => { row.remove(); _renumberPollQuestions(container); });
+  row.querySelector('.poll-q-up').addEventListener('click', () => {
+    const prev = row.previousElementSibling;
+    if (prev) { container.insertBefore(row, prev); _renumberPollQuestions(container); }
+  });
+  row.querySelector('.poll-q-down').addEventListener('click', () => {
+    const next = row.nextElementSibling;
+    if (next) { container.insertBefore(next, row); _renumberPollQuestions(container); }
+  });
   container.appendChild(row);
 }
 
@@ -11853,14 +11894,16 @@ async function openTeamLeadToolbox() {
           <!-- TeamLead Decisions -->
           <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
             <div style="font-weight:700;margin-bottom:8px">⚖ ${t('tl_decisions')||'TeamLead Decisions'}</div>
-            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_decisions_desc')||'Record decisions made by TeamLead or Deputy TeamLead'}</p>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_decisions_desc')||'Record decisions made by TeamLead or Deputy TeamLead on the full team'}</p>
             <input type="text" id="tlDecisionTitle" placeholder="${t('decision_title_placeholder')||'Decision title'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
             <textarea id="tlDecisionText" rows="2" placeholder="${t('tl_decision_placeholder')||'Enter your decision...'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
             <input type="text" id="tlDecisionReason" placeholder="${t('decision_reason_label')||'Reason for decision'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
-            <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
+            </div>
           </div>
 
           <!-- Escalate Decision -->
@@ -11910,7 +11953,9 @@ async function openTeamLeadToolbox() {
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
             <input type="text" id="tlPollOptions" placeholder="${t('tl_poll_options_placeholder')||'Options (comma-separated, e.g.: Yes, No, Maybe)'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
-            <button class="btn btn-sm btn-primary" data-action="sendTeamPoll">📊 ${t('btn_send_poll')||'Send Poll'}</button>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-sm btn-primary" data-action="sendTeamPoll">📊 ${t('btn_send_poll')||'Send Poll'}</button>
+            </div>
           </div>
 
         </div>
