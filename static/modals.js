@@ -11482,46 +11482,40 @@ async function _renderDecisionsTab(container) {
 /* ── OpTempo Tab ───────────────────────────────────────────────────────────── */
 async function _renderOpTempoTab(container) {
   const qs = _analysisDateParams();
-  const [tempo, workload] = await Promise.all([
-    _analysisFetch('/api/stats/events/tempo' + qs).catch(() => null),
-    _analysisFetch('/api/stats/users/workload' + qs),
+  const [opTempo, slipHist] = await Promise.all([
+    _analysisFetch('/api/stats/op-tempo' + qs).catch(() => null),
+    _analysisFetch('/api/stats/slip-histogram' + qs).catch(() => null),
   ]);
 
-  const tempoLabels = tempo?.labels || [];
-  const tempoData = tempo?.data || [];
-  const peak = tempo?.peak || 0;
+  const tempoLabels = opTempo?.labels || opTempo?.dates || [];
+  const tempoDatasets = [];
+  if (opTempo?.datasets && Array.isArray(opTempo.datasets)) {
+    opTempo.datasets.forEach(ds => tempoDatasets.push({data: ds.data||[], color: ds.color||'#3498DB', label: ds.label||''}));
+  } else if (opTempo?.data) {
+    tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: t('op_tempo')||'Op Tempo'});
+  }
 
-  const wlEntries = Object.entries(workload || {}).sort((a,b) => (b[1].total||0) - (a[1].total||0)).slice(0, 10);
+  const slipBuckets = slipHist?.labels || slipHist?.buckets || [];
+  const slipValues = slipHist?.data || slipHist?.values || [];
 
   container.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
-      ${_analysisCard(peak, t('concurrent_peak')||'Concurrent Peak', '#E67E22')}
-      ${_analysisCard(tempoData.length ? Math.round(tempoData.reduce((a,b)=>a+b,0)/tempoData.length) : 0, t('avg_per_hour')||'Avg Per Hour', 'var(--accent)')}
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_optempo')||'Operational Tempo'}</div>
+      <canvas id="anlLineOpTempo" height="250"></canvas>
     </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('events_per_hour')||'Events Per Hour (Last 24h)'}</div>
-      <canvas id="anlAreaTempo" height="220"></canvas>
-    </div>
-    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('activity_per_user')||'Activity Per User'}</div>
-      <div id="anlSparklines" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
-        ${wlEntries.map(([name, data], i) => `
-          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
-            <span style="font-size:var(--fs-xs);min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(name)}</span>
-            <canvas id="anlSpk${i}" height="24" style="flex:1"></canvas>
-            <span style="font-size:var(--fs-xs);font-weight:700;min-width:24px;text-align:right">${data.total||0}</span>
-          </div>
-        `).join('')}
-      </div>
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_slip_histogram')||'Slip / Delay Histogram'}</div>
+      <canvas id="anlHistSlip" height="250"></canvas>
     </div>`;
 
-  requestAnimationFrame(() => {
-    if (tempoLabels.length) drawAreaChart('anlAreaTempo', tempoLabels, tempoData, { color: '#3498DB' });
-    wlEntries.forEach(([name, data], i) => {
-      const sparkData = data.recent || data.hourly || (data.total ? [data.total] : [0]);
-      drawSparkline('anlSpk' + i, Array.isArray(sparkData) ? sparkData : [sparkData], { color: '#1ABC9C', fill: true });
-    });
-  });
+  setTimeout(() => {
+    if (tempoLabels.length && tempoDatasets.length) {
+      drawLineChart('anlLineOpTempo', tempoLabels, tempoDatasets, { showArea: true, showPoints: true });
+    }
+    if (slipBuckets.length) {
+      drawHistogram('anlHistSlip', slipBuckets, slipValues, { color: '#E67E22', showValues: true });
+    }
+  }, 50);
 }
 
 /* ── Dependencies Tab ──────────────────────────────────────────────────────── */
