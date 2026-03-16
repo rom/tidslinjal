@@ -5038,6 +5038,67 @@ func (app *App) routes() http.Handler {
 		http.ServeFile(w, r, "static/admin.html")
 	}))
 
+	// Documentation / User Manual
+	mux.HandleFunc("/docs/user-manual", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+		lang := r.URL.Query().Get("lang")
+		if lang == "" {
+			lang = "en"
+		}
+		file := "docs/USER_MANUAL.md"
+		if lang != "en" {
+			candidate := fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))
+			if _, err := os.Stat(candidate); err == nil {
+				file = candidate
+			}
+		}
+		content, err := os.ReadFile(file)
+		if err != nil {
+			http.Error(w, "Manual not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="%s"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Tidslinjal — User Manual</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<style>
+body{font-family:'Segoe UI',system-ui,sans-serif;max-width:900px;margin:0 auto;padding:20px 40px;background:#0f1923;color:#cfd8e3;line-height:1.6}
+a{color:#4A90D9}h1,h2,h3,h4{color:#f0f4f8;margin-top:1.5em}h1{border-bottom:2px solid #2a3f56;padding-bottom:8px}
+h2{border-bottom:1px solid #2a3f56;padding-bottom:6px}code{background:#1e2d40;padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:#1e2d40;padding:16px;border-radius:6px;overflow-x:auto}pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%%}th,td{border:1px solid #2a3f56;padding:8px 12px;text-align:left}
+th{background:#1e2d40}blockquote{border-left:4px solid #4A90D9;margin:1em 0;padding:8px 16px;background:#162030}
+hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
+.back-link{display:inline-block;margin-bottom:20px;color:#4A90D9;text-decoration:none;font-size:14px}
+.back-link:hover{text-decoration:underline}
+</style></head><body>
+<a href="/" class="back-link">← Back to Tidslinjal</a>
+<div id="content"></div>
+<script src="/static/docs-renderer.js"></script>
+</body></html>`, lang)
+		_ = content // will be served via API
+	}))
+	mux.HandleFunc("/api/docs/user-manual", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+		lang := r.URL.Query().Get("lang")
+		if lang == "" {
+			lang = "en"
+		}
+		file := "docs/USER_MANUAL.md"
+		if lang != "en" {
+			candidate := fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))
+			if _, err := os.Stat(candidate); err == nil {
+				file = candidate
+			}
+		}
+		content, err := os.ReadFile(file)
+		if err != nil {
+			jsonError(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write(content)
+	}))
+
 	// Version
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		_, user := app.getSession(r)
