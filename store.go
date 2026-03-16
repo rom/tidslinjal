@@ -82,6 +82,7 @@ type Store struct {
 	questionnaires       []PollQuestionnaire
 	checklistTemplates   []ChecklistTemplate
 	checklistInstances   []ChecklistInstance
+	tags                 []Tag
 	startupText          string
 
 	nextEventTypeID  int64
@@ -119,6 +120,7 @@ type Store struct {
 	nextQuestionnaireID      int64
 	nextChecklistTemplateID  int64
 	nextChecklistInstanceID  int64
+	nextTagID                int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -210,6 +212,7 @@ func (s *Store) load() error {
 	s.loadFile("questionnaires.json", &s.questionnaires)
 	s.loadFile("checklist_templates.json", &s.checklistTemplates)
 	s.loadFile("checklist_instances.json", &s.checklistInstances)
+	s.loadFile("tags.json", &s.tags)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {
@@ -403,6 +406,11 @@ func (s *Store) load() error {
 	for _, x := range s.checklistInstances {
 		if x.ID > s.nextChecklistInstanceID {
 			s.nextChecklistInstanceID = x.ID
+		}
+	}
+	for _, x := range s.tags {
+		if x.ID > s.nextTagID {
+			s.nextTagID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
@@ -2696,6 +2704,8 @@ func (s *Store) ResetDatabase() error {
 	s.nextChecklistTemplateID = 0
 	s.checklistInstances = nil
 	s.nextChecklistInstanceID = 0
+	s.tags = nil
+	s.nextTagID = 0
 
 	// Save all cleared files
 	files := map[string]interface{}{
@@ -2732,6 +2742,7 @@ func (s *Store) ResetDatabase() error {
 		"questionnaires.json":         s.questionnaires,
 		"checklist_templates.json":    s.checklistTemplates,
 		"checklist_instances.json":    s.checklistInstances,
+		"tags.json":                   s.tags,
 	}
 	for fname, data := range files {
 		if err := s.saveFile(fname, data); err != nil {
@@ -4421,4 +4432,66 @@ func (s *Store) DeleteDayLabel(id int64) error {
 	snap := append([]DayLabel(nil), s.dayLabels...)
 	s.mu.Unlock()
 	return s.persist("day_labels.json", snap)
+}
+
+// ── Tags ───────────────────────────────────────────────────────────────────────
+
+func (s *Store) GetTags() []Tag {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Tag, len(s.tags))
+	copy(out, s.tags)
+	return out
+}
+
+func (s *Store) AddTag(tag Tag) (Tag, error) {
+	s.mu.Lock()
+	s.nextTagID++
+	tag.ID = s.nextTagID
+	s.tags = append(s.tags, tag)
+	snap := append([]Tag(nil), s.tags...)
+	s.mu.Unlock()
+	return tag, s.persist("tags.json", snap)
+}
+
+func (s *Store) DeleteTag(id int64) error {
+	s.mu.Lock()
+	idx := -1
+	for i, t := range s.tags {
+		if t.ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		s.mu.Unlock()
+		return fmt.Errorf("tag not found")
+	}
+	s.tags = append(s.tags[:idx], s.tags[idx+1:]...)
+	snap := append([]Tag(nil), s.tags...)
+	s.mu.Unlock()
+	return s.persist("tags.json", snap)
+}
+
+// GetTagCloud returns all tags with usage counts computed from polls and ready checks.
+func (s *Store) GetTagCloud() []Tag {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	counts := make(map[string]int)
+	for _, p := range s.polls {
+		for _, t := range p.Tags {
+			counts[t]++
+		}
+	}
+	for _, rc := range s.personReadyChecks {
+		for _, t := range rc.Tags {
+			counts[t]++
+		}
+	}
+	out := make([]Tag, len(s.tags))
+	copy(out, s.tags)
+	for i := range out {
+		out[i].UsageCount = counts[out[i].Name]
+	}
+	return out
 }

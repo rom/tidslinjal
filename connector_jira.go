@@ -31,6 +31,7 @@ type JiraConfig struct {
 	JQL        string `json:"jql,omitempty"` // custom JQL filter (overrides project)
 	SyncTickets bool  `json:"sync_tickets"`
 	SyncSprints bool  `json:"sync_sprints"`
+	SyncStats   bool  `json:"sync_stats"`
 	// Bi-directional
 	PushEnabled   bool   `json:"push_enabled"`
 	PushIssueType string `json:"push_issue_type,omitempty"` // Jira issue type for pushed events (default: "Task")
@@ -188,6 +189,74 @@ func (c *JiraConnector) Poll(app *App) ([]IngestPayload, error) {
 	}
 
 	return payloads, nil
+}
+
+// SyncStats fetches aggregated issue counts from Jira grouped by status and priority.
+func (c *JiraConnector) SyncStats() (JiraStats, error) {
+	c.mu.RLock()
+	cfg := c.cfg
+	c.mu.RUnlock()
+
+	jql := cfg.JQL
+	if jql == "" {
+		jql = fmt.Sprintf("project = %s", cfg.Project)
+	}
+
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=100", cfg.BaseURL, jql)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return JiraStats{}, err
+	}
+	if cfg.Email != "" && cfg.APIToken != "" {
+		req.SetBasicAuth(cfg.Email, cfg.APIToken)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return JiraStats{}, fmt.Errorf("jira stats: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return JiraStats{}, fmt.Errorf("jira HTTP %d: %s", resp.StatusCode, body)
+	}
+
+	var result struct {
+		Total  int `json:"total"`
+		Issues []struct {
+			Fields struct {
+				Status struct {
+					Name string `json:"name"`
+				} `json:"status"`
+				Priority struct {
+					Name string `json:"name"`
+				} `json:"priority"`
+			} `json:"fields"`
+		} `json:"issues"`
+	}
+
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
+	if err != nil {
+		return JiraStats{}, err
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return JiraStats{}, fmt.Errorf("parse jira stats: %w", err)
+	}
+
+	stats := JiraStats{
+		TotalIssues:  result.Total,
+		ByStatus:     make(map[string]int),
+		ByPriority:   make(map[string]int),
+		LastSyncTime: time.Now(),
+	}
+	for _, iss := range result.Issues {
+		stats.ByStatus[iss.Fields.Status.Name]++
+		stats.ByPriority[iss.Fields.Priority.Name]++
+	}
+	return stats, nil
 }
 
 // mapJiraPriority converts Jira priority names to our priority levels.
