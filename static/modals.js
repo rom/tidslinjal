@@ -11530,39 +11530,6 @@ async function _renderDependenciesTab(container) {
 
 /* ── Export Tab ────────────────────────────────────────────────────────────── */
 function _renderExportTab(container) {
-  container.innerHTML = `
-    <div style="padding:20px">
-      <p style="color:var(--text-dim);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data for use in external tools.'}</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="_downloadExport('csv')" style="min-width:140px">⬇ ${t('analysis_export_csv')||'Export CSV'}</button>
-        <button class="btn btn-primary" onclick="_downloadExport('json')" style="min-width:140px">⬇ ${t('analysis_export_json')||'Export JSON'}</button>
-        <button class="btn btn-primary" onclick="_downloadExport('xlsx')" style="min-width:140px">⬇ ${t('analysis_export_xlsx')||'Export XLSX'}</button>
-      </div>
-      <div style="margin-top:16px">
-        <button class="btn btn-secondary" onclick="window.print()" style="min-width:140px">🖨 ${t('analysis_print')||'Print'}</button>
-      </div>
-    </div>`;
-}
-
-async function _downloadExport(format) {
-  try {
-    const qs = _analysisDateParams();
-    const sep = qs ? '&' : '?';
-    const url = '/api/stats/export' + qs + sep + 'format=' + format;
-    const resp = await api('GET', url);
-    if (!resp.ok) { showError('Export failed'); return; }
-    const blob = await resp.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'tidslinjal-export-' + new Date().toISOString().slice(0,10) + '.' + format;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showNotification('success', t('export_complete')||'Export complete');
-  } catch(e) { showError('Export failed: ' + (e.message||e)); }
-}
-
-/* ── Export Tab ────────────────────────────────────────────────────────────── */
-function _renderExportTab(container) {
   const qs = _analysisDateParams();
   container.innerHTML = `
     <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
@@ -11624,50 +11591,7 @@ function detachAnalysis() {
 
 async function exportAnalysis() {
   const fmt = document.getElementById('analysisExportFmt')?.value || 'csv';
-  try {
-    const qs = _analysisDateParams();
-    const [overview, evStatus, evType, workload, decisionStats] = await Promise.all([
-      _analysisFetch('/api/stats/overview' + qs),
-      _analysisFetch('/api/stats/events/status' + qs),
-      _analysisFetch('/api/stats/events/type' + qs),
-      _analysisFetch('/api/stats/users/workload' + qs),
-      _analysisFetch('/api/stats/decisions' + qs),
-    ]);
-
-    const data = { overview, evStatus, evType, workload, decisionStats };
-    let blob, ext;
-
-    if (fmt === 'json') {
-      blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      ext = 'json';
-    } else {
-      let csv = 'Category,Key,Value\n';
-      csv += `Overview,Total Events,${overview?.total_events||0}\n`;
-      csv += `Overview,Total Users,${overview?.total_users||0}\n`;
-      csv += `Overview,Active Alarms,${overview?.active_alarms||0}\n`;
-      csv += `Overview,Pending Decisions,${overview?.pending_decisions||0}\n`;
-      csv += `Overview,Approved Decisions,${overview?.approved_decisions||0}\n`;
-      csv += `Overview,Denied Decisions,${overview?.denied_decisions||0}\n`;
-      for (const [k,v] of Object.entries(evStatus||{})) csv += `Event Status,${k},${v}\n`;
-      for (const [k,v] of Object.entries(evType||{})) csv += `Event Type,${k},${v}\n`;
-      for (const [name,d] of Object.entries(workload||{})) csv += `Workload,${name},${d.total||0}\n`;
-      if (decisionStats) {
-        csv += `Decisions,Total,${decisionStats.total||0}\n`;
-        for (const [k,v] of Object.entries(decisionStats.by_status||{})) csv += `Decision Status,${k},${v}\n`;
-        csv += `Decisions,Avg Response (ms),${decisionStats.average_response_ms||0}\n`;
-      }
-      blob = new Blob([csv], { type: 'text/csv' });
-      ext = 'csv';
-    }
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + ext;
-    a.click();
-    URL.revokeObjectURL(url);
-    showNotification('success', t('export_complete')||'Export complete');
-  } catch(e) { showError('Export failed: ' + e.message); }
+  _downloadAnalysisExport(fmt);
 }
 
 // ── TeamLead Toolbox Modal ──────────────────────────────────────────────────
