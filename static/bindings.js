@@ -60,7 +60,11 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#datePickerInput', 'change', function () { goToDate(this.value); });
 
   // ---------- List view toolbar ----------------------------------------------
-  on('#listSearch',       'input',  function () { renderListView(); });
+  var _listSearchDebounce = null;
+  on('#listSearch',       'input',  function () {
+    if (_listSearchDebounce) clearTimeout(_listSearchDebounce);
+    _listSearchDebounce = setTimeout(renderListView, 300);
+  });
   on('#listStatusFilter', 'change', function () { renderListView(); });
   on('#listTypeFilter',   'change', function () { renderListView(); });
 

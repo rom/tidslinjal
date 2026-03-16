@@ -667,6 +667,13 @@ func (app *App) requireAuth(next func(http.ResponseWriter, *http.Request, *User)
 			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// CSRF protection: require X-Requested-With header on state-changing requests
+		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
+			if r.Header.Get("X-Requested-With") == "" {
+				jsonError(w, "missing required header", http.StatusForbidden)
+				return
+			}
+		}
 		next(w, r, user)
 	}
 }

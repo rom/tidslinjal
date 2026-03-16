@@ -4,6 +4,12 @@
    preferences UI, export/import, templates, alarms, SSE.
    ============================================================ */
 
+/** Safe JSON.parse wrapper — returns null on invalid input instead of throwing */
+function safeJsonParse(str) {
+  try { return JSON.parse(str); }
+  catch (e) { console.warn('[safeJsonParse] invalid JSON:', e.message); return null; }
+}
+
 /**
  * CSP-safe event binding helper. After setting innerHTML, call this to bind
  * all elements with data-action="fnName" attributes to their handlers.
@@ -49,11 +55,11 @@ function _bindActions(root) {
   });
   // Special: edit etype buttons (JSON in single-quoted data attr)
   root.querySelectorAll('[data-edit-etype]').forEach(el => {
-    el.addEventListener('click', e => { e.stopPropagation(); openEtypeModal(JSON.parse(el.dataset.editEtype)); });
+    el.addEventListener('click', e => { e.stopPropagation(); const d = safeJsonParse(el.dataset.editEtype); if (d) openEtypeModal(d); });
   });
   // Special: edit layer buttons
   root.querySelectorAll('[data-edit-layer]').forEach(el => {
-    el.addEventListener('click', e => { e.stopPropagation(); openLayerModal(JSON.parse(el.dataset.editLayer)); });
+    el.addEventListener('click', e => { e.stopPropagation(); const d = safeJsonParse(el.dataset.editLayer); if (d) openLayerModal(d); });
   });
   // Special: close OIDC test panel
   root.querySelectorAll('[data-close-oidc-test]').forEach(el => {
@@ -63,19 +69,19 @@ function _bindActions(root) {
   root.querySelectorAll('[data-action="openUserModal"][data-arg-el]').forEach(el => {
     // Remove the generic handler and re-bind with JSON parse
     el.removeAttribute('data-action');
-    el.addEventListener('click', () => openUserModal(JSON.parse(el.dataset.arg)));
+    el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openUserModal(d); });
   });
   root.querySelectorAll('[data-action="openGroupModal"][data-arg-el]').forEach(el => {
     el.removeAttribute('data-action');
-    el.addEventListener('click', () => openGroupModal(JSON.parse(el.dataset.arg)));
+    el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openGroupModal(d); });
   });
   root.querySelectorAll('[data-action="openMemberModal"][data-arg-el]').forEach(el => {
     el.removeAttribute('data-action');
-    el.addEventListener('click', () => openMemberModal(JSON.parse(el.dataset.arg)));
+    el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openMemberModal(d); });
   });
   root.querySelectorAll('[data-action="openPhaseModal"][data-arg-el]').forEach(el => {
     el.removeAttribute('data-action');
-    el.addEventListener('click', () => openPhaseModal(JSON.parse(el.dataset.arg)));
+    el.addEventListener('click', () => { const d = safeJsonParse(el.dataset.arg); if (d) openPhaseModal(d); });
   });
   // Special: ackAlarm with closest notification element
   root.querySelectorAll('[data-action="ackAlarm"][data-arg-el]').forEach(el => {
@@ -8575,7 +8581,12 @@ function updateUILabels() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const translated = t(key);
-    if (translated && translated !== key) el.textContent = translated;
+    if (translated && translated !== key) {
+      // Preserve child elements (e.g. sort indicator spans in list-view table headers)
+      const children = Array.from(el.children);
+      el.textContent = translated;
+      children.forEach(child => { el.appendChild(document.createTextNode(' ')); el.appendChild(child); });
+    }
   });
 
   // Search placeholder
@@ -12208,7 +12219,7 @@ function _renderRoleRow(role, isBuiltin) {
       <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
         ${isBuiltin
           ? `<span style="font-family:monospace;color:var(--text-dim);font-size:var(--fs-sm)">${escHtml(key)}</span>`
-          : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="custom_role" style="${s};font-family:monospace">`}
+          : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="e.g. analyst" style="${s};font-family:monospace">`}
       </td>
       <td style="padding:5px 6px"><input type="text" class="role-name-en" data-key="${escHtml(key)}" value="${escHtml(enVal)}" placeholder="${escHtml(ph.en)}" style="${s}"></td>
       <td style="padding:5px 6px"><input type="text" class="role-name-sv" data-key="${escHtml(key)}" value="${escHtml(svVal)}" placeholder="${escHtml(ph.sv)}" style="${s}"></td>

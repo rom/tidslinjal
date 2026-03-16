@@ -357,6 +357,9 @@ select.ctrl-select:focus { border-color: var(--accent); }
   border: 1px solid var(--border);
 }
 #list-view-table thead th { background: var(--bg2); font-weight: 600; }
+#list-view-table thead th[data-sort] span[id^="listSort-"] {
+  font-weight: 700; color: var(--accent); margin-left: 2px; font-size: 0.85em;
+}
 #list-view-table tbody tr:hover { background: var(--bg3); }
 
 /* ── Timeline grid ───────────────────────────────────────────────────────── */

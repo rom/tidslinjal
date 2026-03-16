@@ -6,7 +6,7 @@
 
 // ── HTTP helpers ────────────────────────────────────────────────────────────
 async function api(method, path, body) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest' } };
   if (body !== undefined && !(body instanceof FormData)) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
