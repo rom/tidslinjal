@@ -176,6 +176,15 @@ function applyPreferences() {
   // Show/hide language flags in toolbar
   const langFlagsEl = document.getElementById('langFlags');
   if (langFlagsEl) langFlagsEl.style.display = state.preferences.show_lang_flags === false ? 'none' : '';
+  // Load Google Material Icons if icon_set is 'material'
+  const iconSet = (state.exercise || {}).icon_set || 'emoji';
+  if (iconSet === 'material' && !document.getElementById('materialIconsCSS')) {
+    const link = document.createElement('link');
+    link.id = 'materialIconsCSS';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Round';
+    document.head.appendChild(link);
+  }
   // Broadcast theme to detached windows
   if (typeof _broadcastSync === 'function') {
     _broadcastSync({ type: 'theme', theme: state.preferences.theme || 'dark' });
@@ -350,7 +359,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   // Populate resource/room selector
   const resSel = document.getElementById('eventResourceSelect');
   if (resSel) {
-    const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥'};
+    const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥', exercise_area:'🏋', work_area:'💼', rest_room:'☕', training_ground:'🎯'};
     apiGet('/api/rooms').then(rooms => {
       const enabled = (rooms || []).filter(r => r.enabled !== false);
       resSel.innerHTML = '<option value="">— None —</option>' +
@@ -3292,6 +3301,10 @@ function renderSidebar() {
       ${subBtn('buildings', t('resource_buildings')||'Buildings', '🏢')}
       ${subBtn('computers', t('resource_computer_services')||'IT Services', '💻')}
       ${subBtn('datacenters', t('resource_data_centers')||'Data Centers', '🖥')}
+      ${subBtn('exercise_areas', t('resource_exercise_areas')||'Exercise Areas', '🏋')}
+      ${subBtn('work_areas', t('resource_work_areas')||'Work Areas', '💼')}
+      ${subBtn('rest_rooms', t('resource_rest_rooms')||'Rest Rooms', '☕')}
+      ${subBtn('training_grounds', t('resource_training_grounds')||'Training Ground', '🎯')}
       ${customTypes.map(ct => subBtn('custom_'+ct.key, ct.label, ct.icon||'📦')).join('')}
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
@@ -3364,10 +3377,10 @@ function renderSidebar() {
         </div>`;
       _bindResSubTabs(el);
       _bindActions(el);
-    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab.startsWith('custom_')) {
-      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center'};
-      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers'};
-      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥'};
+    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'exercise_areas' || resSubTab === 'work_areas' || resSubTab === 'rest_rooms' || resSubTab === 'training_grounds' || resSubTab.startsWith('custom_')) {
+      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', exercise_areas:'exercise_area', work_areas:'work_area', rest_rooms:'rest_room', training_grounds:'training_ground'};
+      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', exercise_areas:t('resource_exercise_areas')||'Exercise Areas', work_areas:t('resource_work_areas')||'Work Areas', rest_rooms:t('resource_rest_rooms')||'Rest Rooms', training_grounds:t('resource_training_grounds')||'Training Ground'};
+      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', exercise_areas:'🏋', work_areas:'💼', rest_rooms:'☕', training_grounds:'🎯'};
       let roomType, sectionLabel, sectionIcon;
       if (resSubTab.startsWith('custom_')) {
         const customKey = resSubTab.replace('custom_', '');
@@ -3455,7 +3468,7 @@ function renderSidebar() {
         const allResources = [];
         (users||[]).forEach(u => allResources.push({type:'user', name: u.display_name||u.username, role: u.role, detail: '@'+u.username}));
         state.groups.forEach(g => allResources.push({type:'group', name: g.name, detail: g.description||''}));
-        const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥'};
+        const typeIcons = {room:'🏠', building:'🏢', computer_service:'💻', data_center:'🖥', exercise_area:'🏋', work_area:'💼', rest_room:'☕', training_ground:'🎯'};
         (rooms||[]).forEach(r => allResources.push({type: r.type||'room', name: r.name, detail: (r.location||'') + (r.capacity ? ' (cap:'+r.capacity+')' : ''), icon: typeIcons[r.type]||'🏠', _roomData: r}));
         el.innerHTML = subTabBar + `
           <div class="sidebar-section">
@@ -4653,6 +4666,34 @@ function renderSidebar() {
           </div>
         </div>` : ''}
       </div>
+      ${state.user && hasRole2(state.user.role, 'oplead') ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🎨 ${t('settings_icon_set')||'Icon Set'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_icon_set_desc')||'Choose which icon set to use for symbols and icons across the application (maps, resources, user icons, etc.)'}</p>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(ex.icon_set||'emoji')==='emoji'?' active':''}" data-action="setIconSet" data-arg="emoji">😀 ${t('icon_set_emoji')||'Emoji'}</button>
+          <button class="toggle-btn${ex.icon_set==='material'?' active':''}" data-action="setIconSet" data-arg="material"><span class="material-icons" style="font-size:16px;vertical-align:middle">star</span> ${t('icon_set_material')||'Material Icons'}</button>
+        </div>
+        ${ex.icon_set==='material' ? `
+        <div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('material_icons_preview')||'Preview — Google Material Icons'}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:24px">
+            <span class="material-icons" title="Home">home</span>
+            <span class="material-icons" title="Person">person</span>
+            <span class="material-icons" title="Star">star</span>
+            <span class="material-icons" title="Warning">warning</span>
+            <span class="material-icons" title="Flag">flag</span>
+            <span class="material-icons" title="Place">place</span>
+            <span class="material-icons" title="Build">build</span>
+            <span class="material-icons" title="Security">security</span>
+            <span class="material-icons" title="Settings">settings</span>
+            <span class="material-icons-outlined" title="Military Tech">military_tech</span>
+            <span class="material-icons" title="Groups">groups</span>
+            <span class="material-icons" title="Assignment">assignment</span>
+          </div>
+          <p style="font-size:10px;color:var(--text-dim);margin-top:6px"><a href="https://fonts.google.com/icons" target="_blank" rel="noopener" style="color:var(--accent)">${t('browse_material_icons')||'Browse all Material Icons'}</a></p>
+        </div>` : ''}
+      </div>` : ''}
       <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--text-dim);border-radius:0 var(--radius) var(--radius) 0">
         <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px">${t('settings_personal_header')||'Personal Preferences'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('settings_personal_desc')||'Only affects your view — other users have their own settings'}</div>
@@ -5346,6 +5387,8 @@ async function saveExercise() {
     ready_check_time: ex.ready_check_time || '',
     ready_check_offset_mins: ex.ready_check_offset_mins || 0,
     ready_check_use_offset: ex.ready_check_use_offset || false,
+    // Preserve icon set
+    icon_set: ex.icon_set || 'emoji',
   };
   const res = await apiPut('/api/exercise', payload);
   if (res.ok) {
@@ -7728,13 +7771,17 @@ const _resourceSymbols = {
   computer_service: ['💻','🖥','🖨','🖱','⌨','💾','💿','📀','🔌','📡','📶','🌐','🔒','🔑','🛡','⚙','🔧','🧰','📊','📈','🗄','🗃','📁','📂','📧','📨','🔗','🧮','☁','🔄','📲','📱','🤖','🧠','🔬','📟','🎛','📺','🎮','🕹','🌍','🔐','🛜','📳','🏧'],
   data_center: ['🖥','🗄','💾','📡','🔌','⚡','❄','🌡','🔒','🛡','🏗','🏢','📊','🔄','☁','🌐','📶','🧊','🔧','⚙','🖧','📦','🗃','🔋','💡','🌀','🎚','🎛','📟','🧰'],
   vehicle: ['🚗','🚙','🚕','🚌','🚎','🚐','🚑','🚒','🚓','🚔','🚘','🚍','🚖','🛻','🚚','🚛','🚜','✈️','🛩','🚁','🚂','🚃','🚄','🚅','🚆','🚇','🚈','🚉','🚊','🛤','⛵','🛶','🚤','🛳','⛴','🛥','🏍','🛵','🚲','🛴','🛞','⛽','🚧'],
-  equipment: ['🔧','🔨','⚒','🛠','⛏','🔩','⚙','🧰','🪛','🪚','📦','📮','🔐','🔒','🔓','📟','📠','📺','📻','📡','🔋','🔌','💡','🕯','🧲','🧯','🪜','🧱','⛓','🪝','🎖','🏅','🔭','🔬','🧪','⚗','🩺','💉','🩹','⚖','🧭','📐','📏']
+  equipment: ['🔧','🔨','⚒','🛠','⛏','🔩','⚙','🧰','🪛','🪚','📦','📮','🔐','🔒','🔓','📟','📠','📺','📻','📡','🔋','🔌','💡','🕯','🧲','🧯','🪜','🧱','⛓','🪝','🎖','🏅','🔭','🔬','🧪','⚗','🩺','💉','🩹','⚖','🧭','📐','📏'],
+  exercise_area: ['🏋','🤸','🏃','🚴','🧗','🤺','🥊','🥋','⛹','🏊','🎯','🏹','🪂','🏕','🗺','🧭','⛰','🏔','🌲','🌳','🏟','🏜','🌾','🛤'],
+  work_area: ['💼','📋','📝','🖊','📎','🗂','📁','🖥','📊','📈','🗃','📐','✏','📌','📍','🖇','📏','🧮','🏢','🏗','🛠','⚙'],
+  rest_room: ['🛋','☕','🍵','🧘','😴','🛏','🪑','📺','🎵','📖','🎮','🕹','🍽','🧊','🚰','🚿','🏠','🛁','🌿','🕯'],
+  training_ground: ['🎯','🏋','🪖','🔫','🛡','⚔','🏃','🧗','🪂','🏕','⛺','🗺','🧭','🎖','🏹','🥊','🤺','🚁','📡','🔭','⛰','🌲','🏔','🏜']
 };
 
 function openRoomModal(argJson) {
   const data = typeof argJson === 'string' ? JSON.parse(argJson) : (argJson || {});
   const isEdit = !!data.id;
-  const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center'};
+  const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center', exercise_area:'Exercise Area', work_area:'Work Area', rest_room:'Rest Room', training_ground:'Training Ground'};
   // Look up custom resource type label if not a built-in type
   let label = typeLabel[data.type] || 'Resource';
   if (!typeLabel[data.type] && state._customResourceTypes) {
@@ -8581,6 +8628,24 @@ async function setExerciseURL() {
     state.preferences[key] = el.value;
     await savePreferences();
   }
+}
+
+// Set icon set (emoji or material)
+async function setIconSet(_, el) {
+  const iconSet = el?.dataset?.arg || 'emoji';
+  state.exercise = state.exercise || {};
+  state.exercise.icon_set = iconSet;
+  try {
+    const res = await fetch('/api/exercise', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.exercise)
+    });
+    if (res.ok) state.exercise = await res.json();
+  } catch (e) { console.warn('setIconSet error', e); }
+  applyPreferences();
+  renderSidebar();
+  showNotification('success', t('notif_saved'));
 }
 
 // Workspace preset actions
@@ -11335,6 +11400,10 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
             <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('dependencies')||'Dependencies'}</button>
             ${state.user && hasRole2(state.user.role, 'oplead') ? `<button class="btn btn-sm analysisTab" data-tab="leadership" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_leadership')||'Leadership'}</button>` : ''}
+            <button class="btn btn-sm analysisTab" data-tab="jstaff" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_jstaff')||'J-Staff'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="opsleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_opsleads')||'OpsLeads'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="teammembers" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teammembers')||'Team Members'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
         </div>
@@ -11397,6 +11466,10 @@ async function _loadAnalysisTab(tab) {
       case 'decisions': await _renderDecisionsTab(container); break;
       case 'dependencies': await _renderDependenciesTab(container); break;
       case 'leadership': await _renderLeadershipTab(container); break;
+      case 'jstaff': await _renderJStaffTab(container); break;
+      case 'teamleads': await _renderTeamLeadsTab(container); break;
+      case 'opsleads': await _renderOpsLeadsTab(container); break;
+      case 'teammembers': await _renderTeamMembersTab(container); break;
       case 'export': _renderExportTab(container); break;
     }
   } catch(e) {
@@ -11802,6 +11875,205 @@ async function _renderLeadershipTab(container) {
     const layerVals = Object.values(impactByLayer);
     if (layerLabels.length && typeof drawBarChart === 'function') {
       drawBarChart('anlLdLayerChart', layerLabels, layerVals, {horizontal: true, maxBarWidth: 22});
+    }
+  }, 50);
+}
+
+/* ── Personnel Performance Helper ─────────────────────────────────────────── */
+function _perfTable(users, title) {
+  if (!users || !users.length) return `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`;
+  const rows = users.map(u => `<tr>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border)">${escHtml(u.display_name||'')}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${u.total_events||0}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#27AE60">${u.completed||0}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#E67E22">${u.active||0}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${u.planned||0}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;color:${u.completion_rate >= 75 ? '#27AE60' : u.completion_rate >= 50 ? '#E67E22' : '#E74C3C'}">${(u.completion_rate||0).toFixed(1)}%</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:${Math.abs(u.avg_slip_minutes||0) > 15 ? '#E74C3C' : 'var(--text)'}">${(u.avg_slip_minutes||0).toFixed(1)}m</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${u.decisions_made||0}</td>
+    <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${u.audit_actions||0}</td>
+  </tr>`).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+    <thead><tr style="background:var(--bg2)">
+      <th style="padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)">${t('name')||'Name'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('total')||'Total'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('completed')||'Done'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('active')||'Active'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('planned')||'Planned'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('completion_rate')||'Rate'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('avg_slip')||'Avg Slip'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('decisions')||'Decisions'}</th>
+      <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">${t('actions')||'Actions'}</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+/* ── J-Staff Performance Tab ──────────────────────────────────────────────── */
+async function _renderJStaffTab(container) {
+  const data = await _analysisFetch('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
+
+  const byType = data.j_staff_by_type || [];
+  const individuals = data.j_staff_individual || [];
+
+  // J-staff type summary cards
+  const typeCards = byType.map(jt => _analysisCard(
+    `${jt.user_count} / ${jt.total_events}`,
+    `${jt.designation} (${(jt.completion_rate||0).toFixed(0)}%)`,
+    jt.completion_rate >= 75 ? '#27AE60' : jt.completion_rate >= 50 ? '#E67E22' : '#E74C3C'
+  )).join('');
+
+  // Chart data for type breakdown
+  const typeLabels = byType.map(jt => jt.designation);
+  const typeData = byType.map(jt => jt.total_events);
+
+  container.innerHTML = `
+    <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">⭐ ${t('jstaff_type_performance')||'J-Staff Performance by Designation'}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px">${typeCards}</div>
+      <canvas id="anlJStaffTypeChart" height="${Math.max(180, typeLabels.length * 28 + 20)}"></canvas>
+    </div>
+    <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('jstaff_individual_performance')||'Individual J-Staff Officer Performance'}</div>
+      ${_perfTable(individuals)}
+    </div>`;
+
+  setTimeout(() => {
+    if (typeLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlJStaffTypeChart', typeLabels, typeData, { horizontal: true, maxBarWidth: 28 });
+    }
+  }, 50);
+}
+
+/* ── TeamLeads Performance Tab ────────────────────────────────────────────── */
+async function _renderTeamLeadsTab(container) {
+  const data = await _analysisFetch('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
+
+  const leads = data.team_leads || [];
+  const deputies = data.deputy_team_leads || [];
+  const allLeads = leads.concat(deputies);
+
+  // Aggregate by role type
+  const tlTotal = leads.reduce((s,u) => s + (u.total_events||0), 0);
+  const tlCompleted = leads.reduce((s,u) => s + (u.completed||0), 0);
+  const dtlTotal = deputies.reduce((s,u) => s + (u.total_events||0), 0);
+  const dtlCompleted = deputies.reduce((s,u) => s + (u.completed||0), 0);
+  const tlRate = tlTotal > 0 ? (tlCompleted/tlTotal*100) : 0;
+  const dtlRate = dtlTotal > 0 ? (dtlCompleted/dtlTotal*100) : 0;
+
+  const chartLabels = allLeads.map(u => u.display_name);
+  const chartData = allLeads.map(u => u.total_events||0);
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">🧰 ${t('teamlead_type_perf')||'TeamLead Performance (by type)'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${_analysisCard(leads.length, t('teamleads')||'TeamLeads', 'var(--accent)')}
+          ${_analysisCard(deputies.length, t('deputy_teamleads')||'Deputy TeamLeads', 'var(--accent)')}
+          ${_analysisCard(tlRate.toFixed(0)+'%', t('tl_completion')||'TL Completion', tlRate >= 75 ? '#27AE60' : '#E67E22')}
+          ${_analysisCard(dtlRate.toFixed(0)+'%', t('dtl_completion')||'DTL Completion', dtlRate >= 75 ? '#27AE60' : '#E67E22')}
+        </div>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">📊 ${t('event_distribution')||'Event Distribution'}</div>
+        <canvas id="anlTLChart" height="${Math.max(180, chartLabels.length * 22 + 20)}"></canvas>
+      </div>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('individual_teamlead_perf')||'Individual TeamLead & Deputy TeamLead Performance'}</div>
+      ${_perfTable(allLeads)}
+    </div>`;
+
+  setTimeout(() => {
+    if (chartLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlTLChart', chartLabels, chartData, { horizontal: true, maxBarWidth: 22 });
+    }
+  }, 50);
+}
+
+/* ── OpsLeads Performance Tab ─────────────────────────────────────────────── */
+async function _renderOpsLeadsTab(container) {
+  const data = await _analysisFetch('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
+
+  const leads = data.ops_leads || [];
+  const deputies = data.deputy_ops_leads || [];
+  const allLeads = leads.concat(deputies);
+
+  const olTotal = leads.reduce((s,u) => s + (u.total_events||0), 0);
+  const olCompleted = leads.reduce((s,u) => s + (u.completed||0), 0);
+  const dolTotal = deputies.reduce((s,u) => s + (u.total_events||0), 0);
+  const dolCompleted = deputies.reduce((s,u) => s + (u.completed||0), 0);
+  const olRate = olTotal > 0 ? (olCompleted/olTotal*100) : 0;
+  const dolRate = dolTotal > 0 ? (dolCompleted/dolTotal*100) : 0;
+
+  const chartLabels = allLeads.map(u => u.display_name);
+  const chartData = allLeads.map(u => u.total_events||0);
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">⚙ ${t('opslead_type_perf')||'OperationsLead Performance (by type)'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${_analysisCard(leads.length, t('opsleads')||'OpsLeads', 'var(--accent)')}
+          ${_analysisCard(deputies.length, t('deputy_opsleads')||'Deputy OpsLeads', 'var(--accent)')}
+          ${_analysisCard(olRate.toFixed(0)+'%', t('ol_completion')||'OL Completion', olRate >= 75 ? '#27AE60' : '#E67E22')}
+          ${_analysisCard(dolRate.toFixed(0)+'%', t('dol_completion')||'DOL Completion', dolRate >= 75 ? '#27AE60' : '#E67E22')}
+        </div>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">📊 ${t('event_distribution')||'Event Distribution'}</div>
+        <canvas id="anlOLChart" height="${Math.max(180, chartLabels.length * 22 + 20)}"></canvas>
+      </div>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('individual_opslead_perf')||'Individual OperationsLead & Deputy OperationsLead Performance'}</div>
+      ${_perfTable(allLeads)}
+    </div>`;
+
+  setTimeout(() => {
+    if (chartLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlOLChart', chartLabels, chartData, { horizontal: true, maxBarWidth: 22 });
+    }
+  }, 50);
+}
+
+/* ── Team Members Performance Tab ─────────────────────────────────────────── */
+async function _renderTeamMembersTab(container) {
+  const data = await _analysisFetch('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
+
+  const members = data.team_members || [];
+
+  const chartLabels = members.slice(0, 20).map(u => u.display_name);
+  const chartData = members.slice(0, 20).map(u => u.total_events||0);
+
+  const totalEvents = members.reduce((s,u) => s + (u.total_events||0), 0);
+  const totalCompleted = members.reduce((s,u) => s + (u.completed||0), 0);
+  const overallRate = totalEvents > 0 ? (totalCompleted/totalEvents*100) : 0;
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(members.length, t('total_members')||'Team Members', 'var(--accent)')}
+      ${_analysisCard(totalEvents, t('total_events')||'Total Events', 'var(--accent)')}
+      ${_analysisCard(totalCompleted, t('completed')||'Completed', '#27AE60')}
+      ${_analysisCard(overallRate.toFixed(0)+'%', t('overall_completion')||'Overall Completion', overallRate >= 75 ? '#27AE60' : '#E67E22')}
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">📊 ${t('member_workload')||'Member Workload (Top 20)'}</div>
+      <canvas id="anlMemberChart" height="${Math.max(180, chartLabels.length * 22 + 20)}"></canvas>
+    </div>
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('individual_member_perf')||'Individual Team Member Performance'}</div>
+      ${_perfTable(members)}
+    </div>`;
+
+  setTimeout(() => {
+    if (chartLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlMemberChart', chartLabels, chartData, { horizontal: true, colors: '#2980B9', maxBarWidth: 22 });
     }
   }, 50);
 }

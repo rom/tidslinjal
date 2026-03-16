@@ -90,7 +90,11 @@ function renderTabs() {
     { key: 'room', label: 'Rooms' },
     { key: 'building', label: 'Buildings' },
     { key: 'computer_service', label: 'IT Services' },
-    { key: 'data_center', label: 'Data Centers' }
+    { key: 'data_center', label: 'Data Centers' },
+    { key: 'exercise_area', label: 'Exercise Areas' },
+    { key: 'work_area', label: 'Work Areas' },
+    { key: 'rest_room', label: 'Rest Rooms' },
+    { key: 'training_ground', label: 'Training Ground' }
   ];
   // Only show room type tabs that have at least one entry, or always show rooms
   roomTypes.forEach(function(rt) {

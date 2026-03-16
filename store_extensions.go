@@ -457,3 +457,18 @@ func (s *Store) SetStartupText(text string) error {
 	s.mu.Unlock()
 	return s.persist("startup_text.json", map[string]string{"text": text})
 }
+
+// GetGeoItems returns items placed on the geographical/OSM map.
+func (s *Store) GetGeoItems() []map[string]any {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.geoItems
+}
+
+// SetGeoItems saves items placed on the geographical/OSM map.
+func (s *Store) SetGeoItems(items []map[string]any) error {
+	s.mu.Lock()
+	s.geoItems = items
+	s.mu.Unlock()
+	return s.persist("geo_items.json", items)
+}
