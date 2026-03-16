@@ -4881,7 +4881,10 @@ func (app *App) handleImport(w http.ResponseWriter, r *http.Request, user *User)
 // ── User members (groups for a user) ─────────────────────────────────────────
 
 func (app *App) handleGetUserGroups(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	// Path is /api/users/{id}/groups — extract user ID from segment index 2.
+	// pathID would return the last segment ("groups"), which is wrong.
+	seg := pathSegment(r, 2)
+	id, err := strconv.ParseInt(seg, 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -5768,6 +5771,11 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/stats/decisions/analytics", app.requireAuth(app.handleStatsDecisionAnalytics))
 	mux.HandleFunc("GET /api/stats/dependencies/graph", app.requireAuth(app.handleStatsDependencyGraph))
 	mux.HandleFunc("GET /api/stats/export", app.requireAuth(app.handleStatsExport))
+	// Frontend-facing aliases for stats endpoints
+	mux.HandleFunc("GET /api/stats/dependency-graph", app.requireRole(RoleTeamLead, app.handleStatsDependencyGraph))
+	mux.HandleFunc("GET /api/stats/decision-analytics", app.requireRole(RoleTeamLead, app.handleStatsDecisionAnalytics))
+	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireRole(RoleTeamLead, app.handleStatsSlipHistogram))
+	mux.HandleFunc("GET /api/stats/op-tempo", app.requireRole(RoleTeamLead, app.handleStatsOpTempo))
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 
 	// Narrative / Storyline API

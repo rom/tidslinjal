@@ -1118,6 +1118,14 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 }
 .group-chip.selected { background: rgba(74,144,217,.25); border-color: var(--accent); color: var(--accent); }
 
+/* Group icon badge – gives the 👥 a tinted background so it's visually distinct from 👤 */
+.group-icon-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(142, 68, 173, .18);
+  border-radius: 4px; padding: 0 2px;
+  font-size: inherit; line-height: 1;
+}
+
 /* ── Inline alarm section in event modal ─────────────────────────────────── */
 .inline-alarm-group {
   border: 1px solid var(--border);
