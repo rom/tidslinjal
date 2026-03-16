@@ -209,9 +209,13 @@ async function init() {
   document.getElementById('btnFilter')?.addEventListener('click', e => openFilterPopover(e.currentTarget));
   document.getElementById('btnViewToggle')?.addEventListener('click', toggleListView);
   document.getElementById('btnUndo')?.addEventListener('click', performUndo);
+  let _searchDebounce = null;
   document.getElementById('searchInput').addEventListener('input', e => {
     state.search = e.target.value;
-    renderTimeline();
+    if (_searchDebounce) clearTimeout(_searchDebounce);
+    _searchDebounce = setTimeout(() => {
+      if (_listViewActive) renderListView(); else renderTimeline();
+    }, 300);
   });
 
   // Close layer popover, filter popover, and nav jump menu when clicking outside
@@ -309,10 +313,14 @@ async function init() {
     if (document.hidden) {
       // Release any mouse-button-held state by dispatching a synthetic mouseup
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      // Clear intervals to save resources while hidden
+      if (state._clockInterval)    { clearInterval(state._clockInterval);    state._clockInterval = null; }
+      if (state._timeLineInterval) { clearInterval(state._timeLineInterval); state._timeLineInterval = null; }
+      if (state._refreshInterval)  { clearInterval(state._refreshInterval);  state._refreshInterval = null; }
     } else {
-      // Tab became visible again — restart timers that may have been throttled
-      updateClock();
+      // Tab became visible again — restart timers safely
       if (state._clockInterval) clearInterval(state._clockInterval);
+      updateClock();
       state._clockInterval = setInterval(updateClock, 1000);
 
       if (state._timeLineInterval) clearInterval(state._timeLineInterval);

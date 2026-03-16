@@ -406,10 +406,18 @@ function renderEventBlocks(days, slotH) {
     const dayStartMin = (state.preferences.day_start_hour || 0) * 60;
     const dayEndMin   = (state.preferences.day_end_hour   || 24) * 60;
 
+    // Pre-build lookup maps for O(1) access in hot loops
+    const _layerMap = new Map((state.layers || []).map(l => [l.id, l]));
+    const _eventTypeMap = new Map((state.eventTypes || []).map(et => [et.key, et]));
+    const _eventIdMap = new Map((state.events || []).map(e => [e.id, e]));
+    const _hlSet = new Set(hl);
+
+    if (!days.length) return;
     const viewStart = days[0];
     const viewEnd   = addDays(days[days.length - 1], 1);
     const expandedEvents = [];
     state.events.forEach(ev => {
+      if (!ev.start_time || isNaN(new Date(ev.start_time).getTime())) return; // skip invalid dates
       if (!ev.is_recurring || !ev.recurrence_pattern) {
         expandedEvents.push(ev);
         return;
@@ -424,7 +432,7 @@ function renderEventBlocks(days, slotH) {
       const exclSet = new Set((ev.recurrence_excl || []).map(ts => new Date(ts).getTime()));
       let cur = new Date(evStart.getTime() + stepMs);
       let safety = 0;
-      while (cur < viewEnd && cur <= recEnd && safety++ < 500) {
+      while (cur < viewEnd && cur <= recEnd && safety++ < 500 && expandedEvents.length < 10000) {
         const occEnd = new Date(cur.getTime() + duration);
         if (cur >= viewStart) {
           if (exclSet.has(cur.getTime())) { cur = new Date(cur.getTime() + stepMs); continue; }
@@ -447,7 +455,7 @@ function renderEventBlocks(days, slotH) {
 
     const visibleEvents = expandedEvents.filter(ev => {
       if (isTypeHidden(ev.event_type)) return false;
-      if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
+      if (ev.layer_id != null && _hlSet.has(ev.layer_id)) return false;
       if (searchTerm && !(
         ev.title.toLowerCase().includes(searchTerm) ||
         (ev.description||'').toLowerCase().includes(searchTerm) ||
@@ -537,13 +545,14 @@ function renderEventBlocks(days, slotH) {
 
         let borderL = 'rgba(255,255,255,.3)';
         if (ev.layer_id) {
-          const layer = state.layers.find(l => l.id === ev.layer_id);
+          const layer = _layerMap.get(ev.layer_id);
           if (layer) borderL = layer.color || borderL;
         }
 
         const showIcons = state.preferences.show_event_icons !== false;
-        const statusDot  = ev.status && ev.status !== 'planned'
-          ? `<span class="ev-status-dot ev-status-${ev.status}" title="${ev.status}"></span>` : '';
+        const _safeStatus = (ev.status || '').replace(/[^a-z_-]/gi, '');
+        const statusDot  = _safeStatus && _safeStatus !== 'planned'
+          ? `<span class="ev-status-dot ev-status-${_safeStatus}" title="${escHtml(_safeStatus)}"></span>` : '';
         // recurring icon — LEFT of title
         const recurIcon  = showIcons && ev.is_recurring
           ? `<span class="ev-icon ev-left-icon" title="Recurring">↻</span>` : '';
@@ -562,7 +571,7 @@ function renderEventBlocks(days, slotH) {
           ? `<span class="ev-icon ev-left-icon" title="Instant">⚡</span>` : '';
 
         // Event-type icon: custom icon from type def, or built-in defaults
-        const evTypeDef = state.eventTypes ? state.eventTypes.find(x => x.key === ev.event_type) : null;
+        const evTypeDef = _eventTypeMap.get(ev.event_type) || null;
         const builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
           instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
         const typeIconChar = showIcons
@@ -576,7 +585,10 @@ function renderEventBlocks(days, slotH) {
         block.dataset.evId = ev.id;
         const _rawColor = ev.color || (evTypeDef ? evTypeDef.color : '#4A90D9');
         const evColor = typeof cbSafeColor === 'function' ? cbSafeColor(_rawColor) : _rawColor;
-        block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${evColor};border-left-color:${borderL};cursor:grab;`;
+        // Sanitize color values to prevent CSS injection
+        const _safeEvColor = /^(#[0-9A-Fa-f]{3,8}|rgba?\([0-9,.\s%]+\)|[a-zA-Z]{3,20})$/.test(evColor) ? evColor : '#4A90D9';
+        const _safeBorderL = /^(#[0-9A-Fa-f]{3,8}|rgba?\([0-9,.\s%]+\)|[a-zA-Z]{3,20})$/.test(borderL) ? borderL : 'rgba(255,255,255,.3)';
+        block.style.cssText = `top:${topPx}px;left:${blockL}px;width:${blockW}px;height:${heightPx}px;background:${_safeEvColor};border-left-color:${_safeBorderL};cursor:grab;`;
         if (ev.status === 'cancelled') block.style.opacity = '0.45';
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
@@ -599,7 +611,7 @@ function renderEventBlocks(days, slotH) {
           }
           if (ev._recurring_instance) {
             state._currentOccurrenceTime = new Date(ev.start_time);
-            const masterEv = state.events.find(x => x.id === parseInt(String(ev.id).split('_')[0], 10)) || ev;
+            const masterEv = _eventIdMap.get(parseInt(String(ev.id).split('_')[0], 10)) || ev;
             showEventDetail(masterEv);
           } else {
             state._currentOccurrenceTime = null;

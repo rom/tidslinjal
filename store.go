@@ -1355,7 +1355,8 @@ func (s *Store) GetEvents(from, to time.Time, layerIDs []int64) []Event {
 		layerSet[id] = true
 	}
 
-	var result []Event
+	// Pre-allocate with reasonable estimate to reduce GC pressure at scale
+	result := make([]Event, 0, min(len(s.events), 512))
 	for _, e := range s.events {
 		// Layer filter: only restrict when caller explicitly asks for specific layers
 		if filterLayers && e.LayerID != nil {
