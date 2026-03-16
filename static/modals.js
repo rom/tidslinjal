@@ -11344,9 +11344,9 @@ function _analysisDateParams() {
 }
 
 function _analysisCard(value, label, color) {
-  return `<div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+  return `<div style="padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
     <div style="font-size:24px;font-weight:700;color:${color || 'var(--accent)'}">${escHtml(String(value))}</div>
-    <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(label)}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text)">${escHtml(label)}</div>
   </div>`;
 }
 
@@ -11562,7 +11562,7 @@ async function _renderDependenciesTab(container) {
     </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('dependency_graph')||'Event Dependency Graph'}</div>
-      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
+      <div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
       <canvas id="anlNetGraph" height="400"></canvas>
     </div>`;
 
@@ -11606,7 +11606,7 @@ async function _renderLeadershipTab(container) {
   // Build critical delays table
   let critDelayHtml = '';
   if (D.critical_delays && D.critical_delays.length) {
-    critDelayHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Top Delays</div>` +
+    critDelayHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Top Delays</div>` +
       D.critical_delays.map(d => `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E74C3C;font-weight:700;min-width:60px">+${Math.round(d.slip_minutes)}m</span>
         <span>${escHtml(d.title || '#'+d.id)}</span>
@@ -11616,7 +11616,7 @@ async function _renderLeadershipTab(container) {
   // Build blocked events list
   let blockedHtml = '';
   if (B.blocked_events && B.blocked_events.length) {
-    blockedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Blocked Events</div>` +
+    blockedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Blocked Events</div>` +
       B.blocked_events.slice(0, 8).map(b => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E74C3C">⛔</span> ${escHtml(b.title)} <span style="color:var(--text-dim)">← ${escHtml(b.blocked_by_title)}</span>
       </div>`).join('') + '</div>';
@@ -11625,7 +11625,7 @@ async function _renderLeadershipTab(container) {
   // Build overloaded users list
   let overloadedHtml = '';
   if (B.overloaded_users && B.overloaded_users.length) {
-    overloadedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text-dim)">Overloaded Personnel</div>` +
+    overloadedHtml = `<div style="margin-top:8px;font-size:var(--fs-xs)"><div style="font-weight:600;margin-bottom:4px;color:var(--text)">Overloaded Personnel</div>` +
       B.overloaded_users.map(u => `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="color:#E67E22">⚠</span> ${escHtml(u.name)} <span style="color:var(--text-dim)">(${u.count} events)</span>
       </div>`).join('') + '</div>';
@@ -11640,7 +11640,7 @@ async function _renderLeadershipTab(container) {
     <div style="display:flex;gap:12px;margin-bottom:16px;padding:16px;background:var(--bg3);border-radius:var(--radius);align-items:center;flex-wrap:wrap">
       <div style="text-align:center;min-width:100px">
         <div style="font-size:36px;font-weight:800;color:${confColor(C.overall_confidence||0)}">${Math.round(C.overall_confidence||0)}%</div>
-        <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_overall_confidence')||'Overall Confidence'}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text)">${t('ld_overall_confidence')||'Overall Confidence'}</div>
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">
         ${card(Math.round(C.completion_confidence||0)+'%', t('ld_completion')||'Completion', confColor(C.completion_confidence||0))}
@@ -11660,7 +11660,7 @@ async function _renderLeadershipTab(container) {
             card(T.events_last_24h||0, t('ld_last_24h')||'Last 24h'),
             card(`<span style="color:${trendColor(T.tempo_trend)}">${trendIcon(T.tempo_trend)} ${T.tempo_trend||'—'}</span>`, t('ld_trend')||'Trend')
           )}
-          <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
+          <div style="font-size:var(--fs-xs);color:var(--text)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
         `)}
 
         ${section(t('ld_progress')||'Progress', '📊', `
@@ -11705,7 +11705,7 @@ async function _renderLeadershipTab(container) {
             card(DL.approved||0, t('ld_approved')||'Approved', '#27AE60'),
             card(DL.rejected||0, t('ld_rejected')||'Rejected', '#E74C3C')
           )}
-          <div style="display:flex;gap:12px;font-size:var(--fs-xs);color:var(--text-dim)">
+          <div style="display:flex;gap:12px;font-size:var(--fs-xs);color:var(--text)">
             <span>${t('ld_last_1h')||'Last 1h'}: <b>${DL.decisions_last_hour||0}</b></span>
             <span>${t('ld_last_4h')||'Last 4h'}: <b>${DL.decisions_last_4h||0}</b></span>
             <span>${t('ld_avg_response_time')||'Avg response'}: <b>${Math.round(DL.avg_response_time_minutes||0)}m</b></span>
@@ -11734,7 +11734,7 @@ async function _renderLeadershipTab(container) {
         `)}
 
         ${section(t('ld_summary')||'Summary', '📋', `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:var(--fs-xs)">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:var(--fs-xs);color:var(--text)">
             <div>${t('ld_active_users')||'Active users'}: <b>${S.active_users_count||0}</b></div>
             <div>${t('ld_groups')||'Groups'}: <b>${S.total_groups||0}</b></div>
             <div>${t('ld_layers')||'Layers'}: <b>${S.total_layers||0}</b></div>
@@ -11778,7 +11778,7 @@ function _renderExportTab(container) {
   container.innerHTML = `
     <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">${t('analysis_export_title')||'Export Analysis Data'}</div>
-      <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
+      <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:120px">CSV</button>
         <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:120px">JSON</button>

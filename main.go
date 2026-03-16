@@ -5772,10 +5772,10 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("GET /api/stats/dependencies/graph", app.requireAuth(app.handleStatsDependencyGraph))
 	mux.HandleFunc("GET /api/stats/export", app.requireAuth(app.handleStatsExport))
 	// Frontend-facing aliases for stats endpoints
-	mux.HandleFunc("GET /api/stats/dependency-graph", app.requireRole(RoleTeamLead, app.handleStatsDependencyGraph))
-	mux.HandleFunc("GET /api/stats/decision-analytics", app.requireRole(RoleTeamLead, app.handleStatsDecisionAnalytics))
-	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireRole(RoleTeamLead, app.handleStatsSlipHistogram))
-	mux.HandleFunc("GET /api/stats/op-tempo", app.requireRole(RoleTeamLead, app.handleStatsOpTempo))
+	mux.HandleFunc("GET /api/stats/dependency-graph", app.requireAuth(app.handleStatsDependencyGraph))
+	mux.HandleFunc("GET /api/stats/decision-analytics", app.requireAuth(app.handleStatsDecisionAnalytics))
+	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireAuth(app.handleStatsSlipHistogram))
+	mux.HandleFunc("GET /api/stats/op-tempo", app.requireAuth(app.handleStatsOpTempo))
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 
 	// Narrative / Storyline API
