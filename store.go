@@ -84,6 +84,7 @@ type Store struct {
 	checklistInstances   []ChecklistInstance
 	tags                 []Tag
 	startupText          string
+	geoItems             []map[string]any
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -220,6 +221,9 @@ func (s *Store) load() error {
 	if v, ok := startupTextData["text"]; ok {
 		s.startupText = v
 	}
+
+	// Load geo items (items placed on the geographical/OSM map)
+	s.loadFile("geo_items.json", &s.geoItems)
 
 	for _, x := range s.eventTypes {
 		if x.ID > s.nextEventTypeID {

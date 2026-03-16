@@ -5838,6 +5838,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireAuth(app.handleStatsSlipHistogram))
 	mux.HandleFunc("GET /api/stats/op-tempo", app.requireAuth(app.handleStatsOpTempo))
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
+	mux.HandleFunc("GET /api/stats/personnel-performance", app.requireAuth(app.handleStatsPersonnelPerformance))
 
 	// Narrative / Storyline API
 	mux.HandleFunc("GET /api/narrative", app.requireAuth(app.handleNarrative))
@@ -6684,6 +6685,18 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			app.requireRole(RoleAdmin, app.handleGetMeetingConfig)(w, r)
 		case http.MethodPut:
 			app.requireRole(RoleAdmin, app.handleSaveMeetingConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Geo Items (items placed directly on the geographical/OSM map) ──
+	mux.HandleFunc("/api/geo-items", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetGeoItems)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleSetGeoItems)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -11107,6 +11120,198 @@ func (app *App) handleStatsLeadershipDashboard(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// ── Personnel Performance Stats ─────────────────────────────────────────────
+
+func (app *App) handleStatsPersonnelPerformance(w http.ResponseWriter, r *http.Request, user *User) {
+	events := app.allEvents()
+	decisions := app.store.GetDecisionLog()
+	users := app.store.GetUsers()
+	auditEntries := app.store.GetAudit(1000)
+
+	// Build user maps
+	userMap := make(map[int64]User, len(users))
+	for _, u := range users {
+		userMap[u.ID] = u
+	}
+
+	// Per-user stats
+	type userPerf struct {
+		UserID       int64    `json:"user_id"`
+		DisplayName  string   `json:"display_name"`
+		Role         string   `json:"role"`
+		JDesignation []string `json:"j_designations,omitempty"`
+		TotalEvents  int      `json:"total_events"`
+		Completed    int      `json:"completed"`
+		Active       int      `json:"active"`
+		Planned      int      `json:"planned"`
+		Verified     int      `json:"verified"`
+		Rejected     int      `json:"rejected"`
+		CompletionRate float64 `json:"completion_rate"`
+		AvgSlipMinutes float64 `json:"avg_slip_minutes"`
+		DecisionsMade  int     `json:"decisions_made"`
+		DecisionsReq   int     `json:"decisions_requested"`
+		AuditActions   int     `json:"audit_actions"`
+	}
+
+	perfMap := make(map[int64]*userPerf)
+	ensurePerf := func(uid int64) *userPerf {
+		if p, ok := perfMap[uid]; ok {
+			return p
+		}
+		u := userMap[uid]
+		p := &userPerf{
+			UserID:       uid,
+			DisplayName:  u.DisplayName,
+			Role:         string(u.Role),
+			JDesignation: u.NATODesignations,
+		}
+		perfMap[uid] = p
+		return p
+	}
+
+	// Tally events per responsible user
+	for _, ev := range events {
+		if ev.ResponsibleID == nil {
+			continue
+		}
+		p := ensurePerf(*ev.ResponsibleID)
+		p.TotalEvents++
+		switch ev.Status {
+		case "completed":
+			p.Completed++
+		case "active":
+			p.Active++
+		case "planned":
+			p.Planned++
+		case "verified":
+			p.Verified++
+		case "rejected":
+			p.Rejected++
+		}
+		if ev.PlannedStart != nil {
+			slip := ev.StartTime.Sub(*ev.PlannedStart).Minutes()
+			p.AvgSlipMinutes += slip
+		}
+	}
+
+	// Finalize avg slip
+	for _, p := range perfMap {
+		if p.TotalEvents > 0 {
+			p.AvgSlipMinutes = math.Round(p.AvgSlipMinutes/float64(p.TotalEvents)*100) / 100
+			p.CompletionRate = math.Round(float64(p.Completed+p.Verified)/float64(p.TotalEvents)*10000) / 100
+		}
+	}
+
+	// Tally decisions
+	for _, d := range decisions {
+		if d.ReviewedBy > 0 {
+			ensurePerf(d.ReviewedBy).DecisionsMade++
+		}
+		if d.UserID > 0 {
+			ensurePerf(d.UserID).DecisionsReq++
+		}
+	}
+
+	// Tally audit actions
+	for _, a := range auditEntries {
+		if a.UserID > 0 {
+			ensurePerf(a.UserID).AuditActions++
+		}
+	}
+
+	// Build result arrays grouped by role type
+	type roleGroup struct {
+		Role  string      `json:"role"`
+		Users []*userPerf `json:"users"`
+	}
+
+	// J-staff by designation type (J1-J9 aggregated)
+	jStaffByType := make(map[string][]*userPerf)
+	var jStaffIndividual []*userPerf
+	var teamLeads []*userPerf
+	var deputyTeamLeads []*userPerf
+	var opsLeads []*userPerf
+	var deputyOpsLeads []*userPerf
+	var teamMembers []*userPerf
+
+	for _, p := range perfMap {
+		role := Role(p.Role)
+		switch {
+		case role == RoleStaffOfficer || role == RoleStaffOfficerFull || role == RoleStaffAssistant:
+			jStaffIndividual = append(jStaffIndividual, p)
+			for _, jd := range p.JDesignation {
+				jStaffByType[jd] = append(jStaffByType[jd], p)
+			}
+		case role == RoleTeamLead:
+			teamLeads = append(teamLeads, p)
+		case role == RoleDeputyTeamLead:
+			deputyTeamLeads = append(deputyTeamLeads, p)
+		case role == RoleOpLead:
+			opsLeads = append(opsLeads, p)
+		case role == RoleDeputyOpLead:
+			deputyOpsLeads = append(deputyOpsLeads, p)
+		case role == RoleReadWrite:
+			teamMembers = append(teamMembers, p)
+		}
+	}
+
+	// J-staff type aggregation
+	type jTypeAgg struct {
+		Designation    string  `json:"designation"`
+		UserCount      int     `json:"user_count"`
+		TotalEvents    int     `json:"total_events"`
+		Completed      int     `json:"completed"`
+		CompletionRate float64 `json:"completion_rate"`
+		AvgSlip        float64 `json:"avg_slip_minutes"`
+		DecisionsMade  int     `json:"decisions_made"`
+	}
+	var jTypeAggs []jTypeAgg
+	for jd, perfs := range jStaffByType {
+		agg := jTypeAgg{Designation: jd, UserCount: len(perfs)}
+		for _, p := range perfs {
+			agg.TotalEvents += p.TotalEvents
+			agg.Completed += p.Completed
+			agg.AvgSlip += p.AvgSlipMinutes
+			agg.DecisionsMade += p.DecisionsMade
+		}
+		if agg.UserCount > 0 {
+			agg.AvgSlip = math.Round(agg.AvgSlip/float64(agg.UserCount)*100) / 100
+		}
+		if agg.TotalEvents > 0 {
+			agg.CompletionRate = math.Round(float64(agg.Completed)/float64(agg.TotalEvents)*10000) / 100
+		}
+		jTypeAggs = append(jTypeAggs, agg)
+	}
+
+	// Sort slices by total events descending
+	sortPerf := func(s []*userPerf) {
+		sort.Slice(s, func(i, j int) bool {
+			return s[i].TotalEvents > s[j].TotalEvents
+		})
+	}
+	sortPerf(jStaffIndividual)
+	sortPerf(teamLeads)
+	sortPerf(deputyTeamLeads)
+	sortPerf(opsLeads)
+	sortPerf(deputyOpsLeads)
+	sortPerf(teamMembers)
+
+	sort.Slice(jTypeAggs, func(i, j int) bool {
+		return jTypeAggs[i].TotalEvents > jTypeAggs[j].TotalEvents
+	})
+
+	jsonOK(w, map[string]any{
+		"j_staff_by_type":       jTypeAggs,
+		"j_staff_individual":    jStaffIndividual,
+		"team_leads":            teamLeads,
+		"deputy_team_leads":     deputyTeamLeads,
+		"ops_leads":             opsLeads,
+		"deputy_ops_leads":      deputyOpsLeads,
+		"team_members":          teamMembers,
+		"generated_at":          time.Now().Format(time.RFC3339),
+	})
+}
+
 // ── Digest handler ──────────────────────────────────────────────────────────
 
 func (app *App) handleSendDigest(w http.ResponseWriter, r *http.Request, user *User) {
@@ -11780,6 +11985,26 @@ func (app *App) handleReadNotification(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 	jsonOK(w, map[string]bool{"ok": true})
+}
+
+// ── Geo Items (placed directly on the geographical/OSM map) ───────────────────
+
+func (app *App) handleGetGeoItems(w http.ResponseWriter, r *http.Request, user *User) {
+	items := app.store.GetGeoItems()
+	if items == nil {
+		items = []map[string]any{}
+	}
+	jsonOK(w, items)
+}
+
+func (app *App) handleSetGeoItems(w http.ResponseWriter, r *http.Request, user *User) {
+	var items []map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&items); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	app.store.SetGeoItems(items)
+	jsonOK(w, items)
 }
 
 // ── Map Resource handlers ──────────────────────────────────────────────────────

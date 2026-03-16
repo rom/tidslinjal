@@ -155,6 +155,10 @@ let _roomsLayer = null;
 let _buildingsLayer = null;
 let _computersLayer = null;
 let _dataCentersLayer = null;
+let _exerciseAreaLayer = null;
+let _workAreaLayer = null;
+let _restRoomLayer = null;
+let _trainingGroundLayer = null;
 let _showRooms = true;
 let _showBuildings = true;
 let _showComputers = true;
@@ -185,6 +189,10 @@ function initMapProjection() {
   _buildingsLayer = L.layerGroup().addTo(_map);
   _computersLayer = L.layerGroup().addTo(_map);
   _dataCentersLayer = L.layerGroup().addTo(_map);
+  _exerciseAreaLayer = L.layerGroup().addTo(_map);
+  _workAreaLayer = L.layerGroup().addTo(_map);
+  _restRoomLayer = L.layerGroup().addTo(_map);
+  _trainingGroundLayer = L.layerGroup().addTo(_map);
 
   loadMeetings();
   loadUsers();
@@ -279,9 +287,9 @@ async function loadUsers() {
 async function loadResourceLayers() {
   try {
     const rooms = await fetch('/api/rooms').then(r => r.ok ? r.json() : []);
-    const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer};
-    const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9'};
-    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧'};
+    const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer, exercise_area: _exerciseAreaLayer, work_area: _workAreaLayer, rest_room: _restRoomLayer, training_ground: _trainingGroundLayer};
+    const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9', exercise_area: '#e74c3c', work_area: '#3498db', rest_room: '#1abc9c', training_ground: '#d35400'};
+    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧', exercise_area: '🏋', work_area: '💼', rest_room: '☕', training_ground: '🎯'};
     Object.values(layerMap).forEach(l => l.clearLayers());
     (rooms || []).forEach(r => {
       if (!r.location) return;
@@ -309,6 +317,35 @@ async function loadResourceLayers() {
   } catch(e) {}
 }
 
+const MAJOR_CITIES = {
+  'stockholm':[59.3293,18.0686],'gothenburg':[57.7089,11.9746],'göteborg':[57.7089,11.9746],
+  'malmö':[55.6050,13.0038],'malmo':[55.6050,13.0038],'uppsala':[59.8586,17.6389],
+  'linköping':[58.4108,15.6214],'linkoping':[58.4108,15.6214],'örebro':[59.2753,15.2134],
+  'västerås':[59.6099,16.5448],'norrköping':[58.5942,16.1826],'helsingborg':[56.0465,12.6945],
+  'jönköping':[57.7826,14.1618],'umeå':[63.8258,20.2630],'lund':[55.7047,13.1910],
+  'luleå':[65.5848,22.1547],'karlstad':[59.3793,13.5036],'gävle':[60.6749,17.1413],
+  'sundsvall':[62.3908,17.3069],'kiruna':[67.8558,20.2253],'visby':[57.6348,18.2948],
+  'enköping':[59.6356,17.0773],'boden':[66.0000,21.6886],'skövde':[58.3883,13.8462],
+  'london':[51.5074,-0.1278],'paris':[48.8566,2.3522],'berlin':[52.5200,13.4050],
+  'rome':[41.9028,12.4964],'madrid':[40.4168,-3.7038],'amsterdam':[52.3676,4.9041],
+  'brussels':[50.8503,4.3517],'vienna':[48.2082,16.3738],'warsaw':[52.2297,21.0122],
+  'prague':[50.0755,14.4378],'copenhagen':[55.6761,12.5683],'oslo':[59.9139,10.7522],
+  'helsinki':[60.1699,24.9384],'tallinn':[59.4370,24.7536],'riga':[56.9496,24.1052],
+  'vilnius':[54.6872,25.2797],'lisbon':[38.7223,-9.1393],'athens':[37.9838,23.7275],
+  'zurich':[47.3769,8.5417],'geneva':[46.2044,6.1432],'munich':[48.1351,11.5820],
+  'hamburg':[53.5511,9.9937],'frankfurt':[50.1109,8.6821],'cologne':[50.9375,6.9603],
+  'lyon':[45.7640,4.8357],'marseille':[43.2965,5.3698],'barcelona':[41.3874,2.1686],
+  'milan':[45.4642,9.1900],'naples':[40.8518,14.2681],'dublin':[53.3498,-6.2603],
+  'edinburgh':[55.9533,-3.1883],'manchester':[53.4808,-2.2426],'new york':[40.7128,-74.0060],
+  'washington':[38.9072,-77.0369],'los angeles':[34.0522,-118.2437],'chicago':[41.8781,-87.6298],
+  'toronto':[43.6532,-79.3832],'tokyo':[35.6762,139.6503],'beijing':[39.9042,116.4074],
+  'singapore':[1.3521,103.8198],'sydney':[-33.8688,151.2093],'istanbul':[41.0082,28.9784],
+  'cairo':[30.0444,31.2357],'moscow':[55.7558,37.6173],'kyiv':[50.4501,30.5234],
+  'kiev':[50.4501,30.5234],'bucharest':[44.4268,26.1025],'budapest':[47.4979,19.0402],
+  'sofia':[42.6977,23.3219],'belgrade':[44.7866,20.4489],'zagreb':[45.8150,15.9819],
+  'bratislava':[48.1486,17.1077],'ljubljana':[46.0569,14.5058],
+};
+
 function geocodeSync(location) {
   // Try to parse "lat,lng" format
   const parts = location.split(',').map(s => parseFloat(s.trim()));
@@ -316,6 +353,14 @@ function geocodeSync(location) {
   // Try country lookup
   const lower = location.toLowerCase().trim();
   if (COUNTRY_CAPITALS[lower]) return COUNTRY_CAPITALS[lower];
+  // Try city lookup (e.g. "Stockholm, Sweden" → match "stockholm")
+  const cityParts = lower.split(',').map(s => s.trim());
+  for (const part of cityParts) {
+    if (MAJOR_CITIES[part]) return MAJOR_CITIES[part];
+    if (COUNTRY_CAPITALS[part]) return COUNTRY_CAPITALS[part];
+  }
+  // Try full string as city name
+  if (MAJOR_CITIES[lower]) return MAJOR_CITIES[lower];
   return null;
 }
 
@@ -1335,13 +1380,16 @@ function _renderOverlayItems(overlay) {
   }
   (overlay.items || []).forEach(item => {
     const typeIcons = { user: '👤', group: '👥', building: '🏢', service: '💻', custom: '📍' };
-    const icon = item.icon || typeIcons[item.type] || '📍';
+    const rawIcon = item.icon || typeIcons[item.type] || '📍';
+    const iconHtml = rawIcon.startsWith('mi:')
+      ? '<span class="material-icons" style="font-size:14px;vertical-align:middle">' + escH(rawIcon.slice(3)) + '</span>'
+      : escH(rawIcon);
     const marker = L.marker([item.y, item.x], {
       draggable: !overlay.locked,
       icon: L.divIcon({
         className: 'map-overlay-item',
         html: '<div style="background:' + (item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
-          icon + ' ' + escH(item.label) +
+          iconHtml + ' ' + escH(item.label) +
           (item.notes ? '<br><small style="opacity:.8">' + escH(item.notes) + '</small>' : '') +
           '</div>',
         iconSize: null,
@@ -1707,6 +1755,38 @@ const MAP_SYMBOL_SETS = {
       { icon: '🛥', label: 'Motor Boat' }, { icon: '⛴', label: 'Ferry' },
       { icon: '🛶', label: 'Canoe' }, { icon: '🚧', label: 'Roadblock' },
     ]
+  },
+  material_icons: {
+    label: 'Material Icons',
+    material: true,
+    symbols: [
+      { icon: 'home', label: 'Home' }, { icon: 'person', label: 'Person' },
+      { icon: 'group', label: 'Group' }, { icon: 'groups', label: 'Groups' },
+      { icon: 'star', label: 'Star' }, { icon: 'flag', label: 'Flag' },
+      { icon: 'place', label: 'Place' }, { icon: 'location_on', label: 'Location' },
+      { icon: 'my_location', label: 'My Location' }, { icon: 'navigation', label: 'Navigation' },
+      { icon: 'warning', label: 'Warning' }, { icon: 'error', label: 'Error' },
+      { icon: 'info', label: 'Info' }, { icon: 'check_circle', label: 'OK' },
+      { icon: 'cancel', label: 'Cancel' }, { icon: 'build', label: 'Build' },
+      { icon: 'settings', label: 'Settings' }, { icon: 'security', label: 'Security' },
+      { icon: 'shield', label: 'Shield' }, { icon: 'local_hospital', label: 'Hospital' },
+      { icon: 'local_fire_department', label: 'Fire' }, { icon: 'local_police', label: 'Police' },
+      { icon: 'military_tech', label: 'Military' }, { icon: 'radar', label: 'Radar' },
+      { icon: 'cell_tower', label: 'Tower' }, { icon: 'dns', label: 'Server' },
+      { icon: 'storage', label: 'Storage' }, { icon: 'cloud', label: 'Cloud' },
+      { icon: 'wifi', label: 'WiFi' }, { icon: 'router', label: 'Router' },
+      { icon: 'directions_car', label: 'Car' }, { icon: 'local_shipping', label: 'Truck' },
+      { icon: 'flight', label: 'Aircraft' }, { icon: 'directions_boat', label: 'Boat' },
+      { icon: 'train', label: 'Train' }, { icon: 'apartment', label: 'Building' },
+      { icon: 'business', label: 'Office' }, { icon: 'factory', label: 'Factory' },
+      { icon: 'warehouse', label: 'Warehouse' }, { icon: 'meeting_room', label: 'Room' },
+      { icon: 'assignment', label: 'Assignment' }, { icon: 'task', label: 'Task' },
+      { icon: 'description', label: 'Document' }, { icon: 'map', label: 'Map' },
+      { icon: 'terrain', label: 'Terrain' }, { icon: 'satellite_alt', label: 'Satellite' },
+      { icon: 'emergency', label: 'Emergency' }, { icon: 'campaign', label: 'Announce' },
+      { icon: 'visibility', label: 'Observe' }, { icon: 'explore', label: 'Explore' },
+      { icon: 'gps_fixed', label: 'GPS' }, { icon: 'bolt', label: 'Power' },
+    ]
   }
 };
 
@@ -1726,14 +1806,23 @@ const MAP_SYMBOL_SETS = {
     grid.innerHTML = '';
     const set = MAP_SYMBOL_SETS[this.value];
     if (!set) return;
+    const isMaterial = set.material;
     set.symbols.forEach(s => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.title = s.label;
-      btn.textContent = s.icon;
+      if (isMaterial) {
+        const span = document.createElement('span');
+        span.className = 'material-icons';
+        span.style.fontSize = '18px';
+        span.textContent = s.icon;
+        btn.appendChild(span);
+      } else {
+        btn.textContent = s.icon;
+      }
       btn.style.cssText = 'width:28px;height:28px;font-size:16px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0';
       btn.addEventListener('click', () => {
-        document.getElementById('itemIcon').value = s.icon;
+        document.getElementById('itemIcon').value = isMaterial ? 'mi:' + s.icon : s.icon;
         if (!document.getElementById('itemLabel').value.trim()) {
           document.getElementById('itemLabel').value = s.label;
         }
@@ -1742,6 +1831,116 @@ const MAP_SYMBOL_SETS = {
     });
   });
 })();
+
+/* ── Geographical Map Items (items placed directly on default OSM map) ── */
+let _geoItems = [];
+let _geoItemsLayer = null;
+
+async function _loadGeoItems() {
+  try {
+    const res = await fetch('/api/geo-items');
+    if (res.ok) _geoItems = await res.json() || [];
+  } catch (e) { console.warn('[loadGeoItems]', e); }
+  _renderGeoItems();
+}
+
+async function _saveGeoItems() {
+  try {
+    await fetch('/api/geo-items', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_geoItems)
+    });
+  } catch (e) { console.warn('[saveGeoItems]', e); }
+}
+
+function _renderGeoItems() {
+  if (_geoItemsLayer) _geoItemsLayer.clearLayers();
+  else _geoItemsLayer = L.layerGroup().addTo(_map);
+  (_geoItems || []).forEach(item => {
+    const rawIcon = item.icon || '📍';
+    const iconHtml = rawIcon.startsWith('mi:')
+      ? '<span class="material-icons" style="font-size:14px;vertical-align:middle">' + escH(rawIcon.slice(3)) + '</span>'
+      : escH(rawIcon);
+    const marker = L.marker([item.y, item.x], {
+      draggable: true,
+      icon: L.divIcon({
+        className: 'map-overlay-item',
+        html: '<div style="background:' + (item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
+          iconHtml + ' ' + escH(item.label) +
+          (item.notes ? '<br><small style="opacity:.8">' + escH(item.notes) + '</small>' : '') +
+          '</div>',
+        iconSize: null, iconAnchor: [0, 0]
+      })
+    });
+    marker.on('dragend', function(e) {
+      const pos = e.target.getLatLng();
+      item.x = pos.lng;
+      item.y = pos.lat;
+      _saveGeoItems();
+    });
+    marker.on('contextmenu', function(e) {
+      L.DomEvent.stopPropagation(e);
+      const popup = L.popup({ closeButton: true })
+        .setLatLng(e.latlng)
+        .setContent(
+          '<div style="font-size:11px"><b>' + escH(item.label) + '</b>' +
+          (item.notes ? '<br>' + escH(item.notes) : '') +
+          '<br><br><a href="#" onclick="event.preventDefault();_deleteGeoItem(\'' + item.id + '\')">Delete</a></div>')
+        .openOn(_map);
+    });
+    _geoItemsLayer.addLayer(marker);
+  });
+}
+
+function _deleteGeoItem(itemId) {
+  _geoItems = _geoItems.filter(i => i.id !== itemId);
+  _saveGeoItems();
+  _renderGeoItems();
+  _map.closePopup();
+}
+
+// "Add Item" button on geographical map
+document.getElementById('btnGeoAddItem').addEventListener('click', function() {
+  _populateItemRefSelector(document.getElementById('itemType').value);
+  document.getElementById('addItemDialog').classList.add('open');
+  // Tag the dialog as "geo" mode
+  document.getElementById('addItemDialog').dataset.geoMode = 'true';
+});
+
+// Override place item to handle geo mode
+const _origPlaceItemHandler = document.getElementById('btnPlaceItem').onclick;
+document.getElementById('btnPlaceItem').addEventListener('click', function(e) {
+  const dialog = document.getElementById('addItemDialog');
+  if (dialog.dataset.geoMode === 'true') {
+    e.stopImmediatePropagation();
+    const label = document.getElementById('itemLabel').value.trim();
+    if (!label) { alert('Label is required'); return; }
+    const center = _map.getCenter();
+    const newItem = {
+      id: 'geoitem_' + Date.now(),
+      type: document.getElementById('itemType').value,
+      ref_id: document.getElementById('itemRef').value,
+      label: label,
+      x: center.lng,
+      y: center.lat,
+      icon: document.getElementById('itemIcon').value.trim(),
+      color: document.getElementById('itemColor').value,
+      notes: document.getElementById('itemNotes').value.trim()
+    };
+    _geoItems.push(newItem);
+    _saveGeoItems();
+    _renderGeoItems();
+    dialog.classList.remove('open');
+    dialog.dataset.geoMode = '';
+    document.getElementById('itemLabel').value = '';
+    document.getElementById('itemIcon').value = '';
+    document.getElementById('itemNotes').value = '';
+  }
+}, true); // capture phase to run before original
+
+// Load geo items on init
+_loadGeoItems();
 
 /* ── Edit/Delete overlay items (called from popup links) ── */
 function _editOverlayItem(itemId) {
