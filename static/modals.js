@@ -1399,8 +1399,10 @@ async function openUserModal(user) {
   const builtinRoles = [
     {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
     {key:'reporter', label:'Reporter'}, {key:'teammember', label:'Team Member'},
-    {key:'teamlead', label:'Team Lead'}, {key:'oplead', label:'Operations Lead'},
-    {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
+    {key:'teamlead', label:'Team Lead'}, {key:'deputy_teamlead', label:'Deputy Team Lead'},
+    {key:'oplead', label:'Operations Lead'}, {key:'deputy_oplead', label:'Deputy Operations Lead'},
+    {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staff_assistant', label:'Staff Assistant'},
+    {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
   ];
   const allRoles = [...builtinRoles];
   (state.roleConfigs || []).forEach(rc => {
@@ -3506,7 +3508,7 @@ function renderSidebar() {
     const logSubBtn = (key, label) =>
       `<button class="toggle-btn${logSub===key?' active':''}" data-log-sub="${key}">${label}</button>`;
     const logTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
-      ${logSubBtn('decision', t('tab_decision_log')||'Decision Log')}
+      ${logSubBtn('decision', t('decisions_title')||'Decisions')}
       ${logSubBtn('logbook', t('tab_log_book')||'Log Book')}
       ${logSubBtn('audit', t('tab_audit_log')||'Audit Log')}
       ${logSubBtn('eventlog', t('tab_event_log')||'Event Log')}
@@ -3515,7 +3517,7 @@ function renderSidebar() {
     if (logSub === 'decision') {
       el.innerHTML = logTabBar + `<div class="sidebar-section">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="openDecisionLogModal">📋 ${t('decision_log_title')||'Decision Log'}</button>
+          <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="openDecisionLogModal">⚖ ${t('decisions_title')||'Decisions'}</button>
           <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="detachDecisionLog">⧉ ${t('detach_window')||'Detach Window'}</button>
         </div>
       </div>`;
@@ -4204,7 +4206,10 @@ function renderSidebar() {
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
-          ${toolBtn('📋', t('decision_log_title')||'Decision Log', 'openDecisionLogModal()')}
+          ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
+          ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
+          ${toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
@@ -10622,16 +10627,17 @@ async function openDecisionLogModal() {
   await _loadDecisionLog();
   const groups = state.groups || [];
   const canWrite = state.user?.role === 'admin' || hasRole2(state.user?.role, 'teamlead') || userHasCapability('decision_log_readwrite');
+  const canRequest = !!state.user; // Any authenticated user can request a decision
   const html = `
     <div class="modal-overlay" id="decisionLogModal">
       <div class="modal" style="max-width:700px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
-          <h2>📋 ${t('decision_log_title')||'Decision Log'}</h2>
+          <h2>⚖ ${t('decisions_title')||'Decisions'}</h2>
           <button class="btn btn-secondary btn-sm" style="margin-left:auto;margin-right:8px;font-size:11px;padding:2px 8px" data-action="openDetachedDecisionLog" title="${t('detach_window')||'Open in separate window'}">⧉ ${t('btn_detach')||'Detach'}</button>
           <button class="modal-close" data-action="closeDecisionLogModal">✕</button>
         </div>
         <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
-          ${canWrite ? `
+          ${(canWrite || canRequest) ? `
           <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
             <input type="text" id="dlTitle" placeholder="${t('decision_title_placeholder')||'Decision title (optional)'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
@@ -10680,7 +10686,7 @@ async function openDecisionLogModal() {
               </select>
             </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>
+              ${canWrite ? `<button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>` : ''}
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
@@ -10730,7 +10736,7 @@ async function openDecisionLogModal() {
       targetValueEl.style.display = '';
       let opts = '';
       if (tt === 'role') {
-        const roles = ['admin','oplead','staffofficer','teamlead','teammember','readwrite','reporter','read','observer'];
+        const roles = ['admin','oplead','deputy_oplead','staffofficer','staff_assistant','staffofficer_full','teamlead','deputy_teamlead','teammember','readwrite','reporter','read','observer'];
         opts = roles.map(r => `<option value="${r}">${r}</option>`).join('');
       } else if (tt === 'group') {
         opts = (state.groups || []).map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
@@ -10750,7 +10756,7 @@ async function openDecisionLogModal() {
       execValueEl.style.display = '';
       let opts = '';
       if (tt === 'role') {
-        const roles = ['admin','oplead','staffofficer','teamlead','teammember','readwrite','reporter','read','observer'];
+        const roles = ['admin','oplead','deputy_oplead','staffofficer','staff_assistant','staffofficer_full','teamlead','deputy_teamlead','teammember','readwrite','reporter','read','observer'];
         opts = roles.map(r => `<option value="${r}">${r}</option>`).join('');
       } else if (tt === 'group') {
         opts = (state.groups || []).map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('');
@@ -10790,15 +10796,15 @@ function _renderDecisionLogEntries() {
           <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
             style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
           <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
-          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="rejected" data-arg-el>✗ ${t('btn_reject')||'Reject'}</button>
+          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="denied" data-arg-el>✗ ${t('btn_deny')||'Deny'}</button>
         </div>`;
       }
     } else if (e.status === 'approved') {
       statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DECIDED</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     } else if (e.status === 'rejected') {
-      statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">REJECTED</span>`;
-      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+      statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DENIED</span>`;
+      if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ Denied by ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     }
     // Reason / background
     const reasonHtml = e.reason ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim);font-style:italic;border-left:3px solid var(--accent);padding-left:8px">${escHtml(e.reason)}</div>` : '';
@@ -10916,8 +10922,9 @@ async function requestDecision() {
   const targetValue = targetType ? (targetValueEl?.value || '') : '';
   const targetLabel = targetType ? (targetValueEl?.selectedOptions?.[0]?.textContent || targetValue) : '';
   const title = document.getElementById('dlTitle')?.value?.trim() || '';
-  const res = await apiPost('/api/decision-log', {
-    title, decision: text, log_type: logType, group_id: groupId, confidential, status: 'requested',
+  const reason = document.getElementById('dlReason')?.value?.trim() || '';
+  const res = await apiPost('/api/decision-log/request', {
+    title, decision: text, log_type: logType, group_id: groupId, confidential, reason,
     requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel
   });
   if (res.ok) {
@@ -10949,12 +10956,18 @@ async function reviewDecision(el) {
   const id = parseInt(el?.dataset?.arg, 10);
   const status = el?.dataset?.status || 'approved';
   const comment = document.getElementById('dlReviewComment_' + id)?.value?.trim() || '';
+  // Deny requires a reason
+  if (status === 'denied' && !comment) {
+    showError(t('deny_reason_required')||'A reason is required when denying a decision');
+    document.getElementById('dlReviewComment_' + id)?.focus();
+    return;
+  }
   const res = await api('PUT', `/api/decision-log/${id}/review`, {status, comment});
   if (res.ok) {
     await _loadDecisionLog();
-    const el = document.getElementById('dlEntries');
-    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
-    showNotification('success', status === 'approved' ? (t('decision_approved')||'Decision approved') : (t('decision_rejected')||'Decision rejected'));
+    const el2 = document.getElementById('dlEntries');
+    if (el2) { el2.innerHTML = _renderDecisionLogEntries(); _bindActions(el2); }
+    showNotification('success', status === 'approved' ? (t('decision_approved')||'Decision approved') : (t('decision_denied')||'Decision denied'));
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to review decision');
@@ -10983,6 +10996,531 @@ function openDetachedDecisionLog() {
   window.open('/static/decision-log-popup.html', 'tidslinjal-decisionlog-' + Date.now(),
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
   closeDecisionLogModal();
+}
+
+// ── Analysis Modal ──────────────────────────────────────────────────────────
+let _analysisPopout = null;
+
+async function openAnalysisModal() {
+  // Fetch stats data
+  let overview = {}, evStatus = {}, evType = {}, heatmap = {}, workload = {}, decisionStats = {};
+  try {
+    const [oRes, sRes, tRes, hRes, wRes, dRes] = await Promise.all([
+      apiGet('/api/stats/overview'),
+      apiGet('/api/stats/events/status'),
+      apiGet('/api/stats/events/type'),
+      apiGet('/api/stats/events/heatmap'),
+      apiGet('/api/stats/users/workload'),
+      apiGet('/api/stats/decisions'),
+    ]);
+    overview = oRes || {};
+    evStatus = sRes || {};
+    evType = tRes || {};
+    heatmap = hRes || {};
+    workload = wRes || {};
+    decisionStats = dRes || {};
+  } catch(e) { console.warn('Stats fetch error', e); }
+
+  const html = `
+    <div class="modal-overlay" id="analysisModal">
+      <div class="modal" style="max-width:900px;width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>📈 ${t('analysis_title')||'Analysis'}</h2>
+          <div style="display:flex;gap:6px;margin-left:auto;margin-right:8px">
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="detachAnalysis" title="${t('detach_window')||'Detach'}">⧉</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="exportAnalysis" title="${t('btn_export')||'Export'}">⬇ ${t('btn_export')||'Export'}</button>
+          </div>
+          <button class="modal-close" data-action="closeAnalysisModal">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('from')||'From'}: <input type="date" id="analysisFrom" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+            </label>
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('to')||'To'}: <input type="date" id="analysisTo" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+            </label>
+            <button class="btn btn-sm btn-primary" data-action="refreshAnalysis">${t('btn_refresh')||'Refresh'}</button>
+          </div>
+
+          <!-- Overview Cards -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:16px" id="analysisOverview">
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--accent)">${overview.total_events||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('total_events')||'Total Events'}</div>
+            </div>
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--accent)">${overview.total_users||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('total_users')||'Total Users'}</div>
+            </div>
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#E67E22">${overview.active_alarms||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('active_alarms')||'Active Alarms'}</div>
+            </div>
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#27AE60">${overview.approved_decisions||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('approved_decisions')||'Approved'}</div>
+            </div>
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#E67E22">${overview.pending_decisions||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('pending_decisions')||'Pending'}</div>
+            </div>
+            <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:#E74C3C">${overview.denied_decisions||0}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('denied_decisions')||'Denied'}</div>
+            </div>
+          </div>
+
+          <!-- Status Distribution -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">${t('analysis_status_dist')||'Event Status Distribution'}</div>
+            <div id="analysisStatusChart" style="display:flex;gap:6px;flex-wrap:wrap">
+              ${Object.entries(evStatus).map(([k,v]) => {
+                const colors = {planned:'#3498DB',active:'#E67E22',completed:'#27AE60',cancelled:'#95A5A6',verified:'#2ECC71',rejected:'#E74C3C'};
+                return `<div style="display:flex;align-items:center;gap:4px;padding:4px 8px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs)">
+                  <span style="width:10px;height:10px;border-radius:50%;background:${colors[k]||'var(--accent)'}"></span>
+                  <span>${k}</span>
+                  <span style="font-weight:700">${v}</span>
+                </div>`;
+              }).join('')}
+            </div>
+            <div id="analysisStatusBar" style="display:flex;height:24px;border-radius:var(--radius);overflow:hidden;margin-top:8px">
+              ${(() => {
+                const total = Object.values(evStatus).reduce((a,b) => a+b, 0) || 1;
+                const colors = {planned:'#3498DB',active:'#E67E22',completed:'#27AE60',cancelled:'#95A5A6',verified:'#2ECC71',rejected:'#E74C3C'};
+                return Object.entries(evStatus).map(([k,v]) =>
+                  `<div style="width:${(v/total*100).toFixed(1)}%;background:${colors[k]||'var(--accent)'}" title="${k}: ${v} (${(v/total*100).toFixed(0)}%)"></div>`
+                ).join('');
+              })()}
+            </div>
+          </div>
+
+          <!-- Type Breakdown -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">${t('analysis_type_breakdown')||'Event Type Breakdown'}</div>
+            <div id="analysisTypeChart">
+              ${Object.entries(evType).sort((a,b) => b[1]-a[1]).map(([k,v]) => {
+                const max = Math.max(...Object.values(evType)) || 1;
+                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="min-width:100px;font-size:var(--fs-xs);text-align:right">${k}</span>
+                  <div style="flex:1;height:18px;background:var(--bg2);border-radius:2px;overflow:hidden">
+                    <div style="width:${(v/max*100).toFixed(1)}%;height:100%;background:var(--accent);border-radius:2px"></div>
+                  </div>
+                  <span style="min-width:30px;font-size:var(--fs-xs);font-weight:700">${v}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Activity Heatmap -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">${t('analysis_heatmap')||'Activity Heatmap (Day x Hour)'}</div>
+            <div style="overflow-x:auto">
+              <table style="border-collapse:collapse;font-size:10px;width:100%">
+                <tr>
+                  <th style="padding:2px 4px"></th>
+                  ${Array.from({length:24}, (_,i) => `<th style="padding:2px;text-align:center;color:var(--text-dim)">${String(i).padStart(2,'0')}</th>`).join('')}
+                </tr>
+                ${(heatmap.data||[]).map((row, di) => {
+                  const dayNames = heatmap.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+                  const maxVal = Math.max(1, ...((heatmap.data||[]).flat()));
+                  return `<tr>
+                    <td style="padding:2px 4px;font-weight:600;color:var(--text-dim)">${dayNames[di]||''}</td>
+                    ${(row||[]).map(v => {
+                      const intensity = v / maxVal;
+                      const bg = v === 0 ? 'var(--bg2)' : `rgba(52,152,219,${(0.15 + intensity * 0.85).toFixed(2)})`;
+                      return `<td style="padding:2px;text-align:center;background:${bg};color:${intensity > 0.5 ? '#fff' : 'var(--text)'};border-radius:2px" title="${v} events">${v||''}</td>`;
+                    }).join('')}
+                  </tr>`;
+                }).join('')}
+              </table>
+            </div>
+          </div>
+
+          <!-- User Workload -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">${t('analysis_workload')||'User Workload'}</div>
+            <div id="analysisWorkload">
+              ${Object.entries(workload).sort((a,b) => (b[1].total||0)-(a[1].total||0)).slice(0,15).map(([name,data]) => {
+                const total = data.total || 0;
+                const maxTotal = Math.max(...Object.values(workload).map(d => d.total||0)) || 1;
+                return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="min-width:120px;font-size:var(--fs-xs);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(name)}</span>
+                  <div style="flex:1;height:18px;background:var(--bg2);border-radius:2px;overflow:hidden">
+                    <div style="width:${(total/maxTotal*100).toFixed(1)}%;height:100%;background:var(--accent);border-radius:2px"></div>
+                  </div>
+                  <span style="min-width:30px;font-size:var(--fs-xs);font-weight:700">${total}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Decision Statistics -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">${t('analysis_decisions')||'Decision Statistics'}</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:var(--fs-sm)">
+              <div>${t('total')||'Total'}: <strong>${decisionStats.total||0}</strong></div>
+              ${Object.entries(decisionStats.by_status||{}).map(([k,v]) => {
+                const label = k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase()+k.slice(1);
+                return `<div>${label}: <strong>${v}</strong></div>`;
+              }).join('')}
+              <div>${t('avg_response_time')||'Avg response time'}: <strong>${decisionStats.average_response_ms ? (decisionStats.average_response_ms/60000).toFixed(1)+' min' : 'N/A'}</strong></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('analysisModal');
+  void modal.offsetHeight;
+  modal.classList.add('open');
+  _bindActions(modal);
+}
+
+function closeAnalysisModal() {
+  const el = document.getElementById('analysisModal');
+  if (el) el.remove();
+}
+
+async function refreshAnalysis() {
+  closeAnalysisModal();
+  await openAnalysisModal();
+}
+
+function detachAnalysis() {
+  if (_analysisPopout && !_analysisPopout.closed) {
+    _analysisPopout.focus();
+    return;
+  }
+  const w = Math.min(window.screen.availWidth, 1000);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _analysisPopout = window.open('/static/analysis-popup.html', 'tidslinjal-analysis',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  closeAnalysisModal();
+}
+
+async function exportAnalysis() {
+  // Export analysis data as CSV
+  try {
+    const [overview, evStatus, evType, workload, decisionStats] = await Promise.all([
+      apiGet('/api/stats/overview'),
+      apiGet('/api/stats/events/status'),
+      apiGet('/api/stats/events/type'),
+      apiGet('/api/stats/users/workload'),
+      apiGet('/api/stats/decisions'),
+    ]);
+    let csv = 'Category,Key,Value\\n';
+    csv += `Overview,Total Events,${overview?.total_events||0}\\n`;
+    csv += `Overview,Total Users,${overview?.total_users||0}\\n`;
+    csv += `Overview,Active Alarms,${overview?.active_alarms||0}\\n`;
+    csv += `Overview,Pending Decisions,${overview?.pending_decisions||0}\\n`;
+    csv += `Overview,Approved Decisions,${overview?.approved_decisions||0}\\n`;
+    csv += `Overview,Denied Decisions,${overview?.denied_decisions||0}\\n`;
+    for (const [k,v] of Object.entries(evStatus||{})) csv += `Event Status,${k},${v}\\n`;
+    for (const [k,v] of Object.entries(evType||{})) csv += `Event Type,${k},${v}\\n`;
+    for (const [name,data] of Object.entries(workload||{})) csv += `Workload,${name},${data.total||0}\\n`;
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('success', t('export_complete')||'Export complete');
+  } catch(e) { showError('Export failed: ' + e.message); }
+}
+
+// ── TeamLead Toolbox Modal ──────────────────────────────────────────────────
+async function openTeamLeadToolbox() {
+  const groups = state.groups || [];
+  const myGroups = groups; // TeamLead can see all groups they manage
+  const html = `
+    <div class="modal-overlay" id="teamleadToolboxModal">
+      <div class="modal" style="max-width:650px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>🧰 ${t('teamlead_toolbox_title')||'TeamLead Toolbox'}</h2>
+          <button class="modal-close" data-action="closeTeamLeadToolbox">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+
+          <!-- Quick Response to OpLead -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px;color:#E74C3C">🚨 ${t('tl_quick_response')||'Quick Response needed!'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_quick_response_desc')||'Send an urgent message directly to Operations Lead'}</p>
+            <textarea id="tlQuickMsg" rows="2" placeholder="${t('tl_quick_response_placeholder')||'Describe the urgent situation...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="tlQuickPriority" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="high">${t('priority_high')||'High'}</option>
+                <option value="critical">${t('priority_critical')||'Critical'}</option>
+              </select>
+              <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="sendQuickResponse">🚨 ${t('btn_send')||'Send'}</button>
+            </div>
+          </div>
+
+          <!-- TeamLead Decisions -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">⚖ ${t('tl_decisions')||'TeamLead Decisions'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_decisions_desc')||'Record decisions made by TeamLead or Deputy TeamLead'}</p>
+            <input type="text" id="tlDecisionTitle" placeholder="${t('decision_title_placeholder')||'Decision title'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlDecisionText" rows="2" placeholder="${t('tl_decision_placeholder')||'Enter your decision...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <input type="text" id="tlDecisionReason" placeholder="${t('decision_reason_label')||'Reason for decision'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
+          </div>
+
+          <!-- Escalate Decision -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">⬆ ${t('tl_escalate_decision')||'Decision needed — Escalate to OpLead'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_escalate_desc')||'Escalate a decision that requires Operations Lead authority'}</p>
+            <input type="text" id="tlEscalateTitle" placeholder="${t('tl_escalate_title_placeholder')||'Decision title'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlEscalateText" rows="2" placeholder="${t('tl_escalate_placeholder')||'Describe what needs to be decided...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <input type="text" id="tlEscalateReason" placeholder="${t('tl_escalate_reason')||'Background / reason for escalation'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="tlEscalateUrgency" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="normal">${t('urgency_normal')||'Normal'}</option>
+                <option value="urgent">${t('urgency_urgent')||'Urgent'}</option>
+                <option value="critical">${t('urgency_critical')||'Critical'}</option>
+              </select>
+              <button class="btn btn-sm" style="background:#E67E22;color:#fff" data-action="escalateDecision">⬆ ${t('btn_escalate')||'Escalate'}</button>
+            </div>
+          </div>
+
+          <!-- Team Ready Check -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">✅ ${t('tl_team_ready_check')||'Team Ready Check'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_ready_check_desc')||'Send a ready check to your team members'}</p>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="tlReadyCheckGroup" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:150px">
+                ${myGroups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')}
+              </select>
+              <input type="text" id="tlReadyCheckMsg" placeholder="${t('tl_ready_check_msg')||'Optional message'}"
+                style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+              <button class="btn btn-sm btn-primary" data-action="sendTeamReadyCheck">✅ ${t('btn_send')||'Send'}</button>
+            </div>
+          </div>
+
+          <!-- Team Poll -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">📊 ${t('tl_team_poll')||'Team Poll'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_team_poll_desc')||'Send a quick poll to your team members'}</p>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+              <select id="tlPollGroup" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:150px">
+                ${myGroups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')}
+              </select>
+            </div>
+            <input type="text" id="tlPollQuestion" placeholder="${t('tl_poll_question')||'Question'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <input type="text" id="tlPollOptions" placeholder="${t('tl_poll_options_placeholder')||'Options (comma-separated, e.g.: Yes, No, Maybe)'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <button class="btn btn-sm btn-primary" data-action="sendTeamPoll">📊 ${t('btn_send_poll')||'Send Poll'}</button>
+          </div>
+
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('teamleadToolboxModal');
+  void modal.offsetHeight;
+  modal.classList.add('open');
+  _bindActions(modal);
+}
+
+function closeTeamLeadToolbox() {
+  const el = document.getElementById('teamleadToolboxModal');
+  if (el) el.remove();
+}
+
+async function sendQuickResponse() {
+  const msg = document.getElementById('tlQuickMsg')?.value?.trim();
+  if (!msg) { showError(t('message_required')||'Message is required'); return; }
+  const priority = document.getElementById('tlQuickPriority')?.value || 'high';
+  const res = await apiPost('/api/teamlead/quick-response', {message: msg, priority});
+  if (res.ok) {
+    showNotification('success', t('tl_quick_response_sent')||'Quick response sent to Operations Lead');
+    document.getElementById('tlQuickMsg').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to send');
+  }
+}
+
+async function addTeamLeadDecision() {
+  const title = document.getElementById('tlDecisionTitle')?.value?.trim() || '';
+  const text = document.getElementById('tlDecisionText')?.value?.trim();
+  if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
+  const reason = document.getElementById('tlDecisionReason')?.value?.trim() || '';
+  const res = await apiPost('/api/decision-log', {title, decision: text, reason, log_type: 'general'});
+  if (res.ok) {
+    showNotification('success', t('decision_added')||'Decision recorded');
+    document.getElementById('tlDecisionTitle').value = '';
+    document.getElementById('tlDecisionText').value = '';
+    document.getElementById('tlDecisionReason').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to add decision');
+  }
+}
+
+async function escalateDecision() {
+  const title = document.getElementById('tlEscalateTitle')?.value?.trim() || '';
+  const text = document.getElementById('tlEscalateText')?.value?.trim();
+  if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
+  const reason = document.getElementById('tlEscalateReason')?.value?.trim() || '';
+  const urgency = document.getElementById('tlEscalateUrgency')?.value || 'urgent';
+  const res = await apiPost('/api/teamlead/escalate-decision', {title, decision: text, reason, urgency});
+  if (res.ok) {
+    showNotification('success', t('tl_decision_escalated')||'Decision escalated to Operations Lead');
+    document.getElementById('tlEscalateTitle').value = '';
+    document.getElementById('tlEscalateText').value = '';
+    document.getElementById('tlEscalateReason').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to escalate');
+  }
+}
+
+async function sendTeamReadyCheck() {
+  const groupId = parseInt(document.getElementById('tlReadyCheckGroup')?.value || '0');
+  if (!groupId) { showError(t('group_required')||'Please select a group'); return; }
+  const msg = document.getElementById('tlReadyCheckMsg')?.value?.trim() || '';
+  const res = await apiPost('/api/teamlead/ready-check', {group_id: groupId, message: msg});
+  if (res.ok) {
+    showNotification('success', t('tl_ready_check_sent')||'Ready check sent');
+    document.getElementById('tlReadyCheckMsg').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to send ready check');
+  }
+}
+
+async function sendTeamPoll() {
+  const groupId = parseInt(document.getElementById('tlPollGroup')?.value || '0');
+  if (!groupId) { showError(t('group_required')||'Please select a group'); return; }
+  const question = document.getElementById('tlPollQuestion')?.value?.trim();
+  if (!question) { showError(t('question_required')||'Question is required'); return; }
+  const optionsStr = document.getElementById('tlPollOptions')?.value?.trim() || '';
+  const options = optionsStr.split(',').map(s => s.trim()).filter(Boolean);
+  if (options.length < 2) { showError(t('tl_poll_min_options')||'At least 2 options are required'); return; }
+  const res = await apiPost('/api/teamlead/team-poll', {group_id: groupId, question, options});
+  if (res.ok) {
+    showNotification('success', t('tl_poll_sent')||'Team poll sent');
+    document.getElementById('tlPollQuestion').value = '';
+    document.getElementById('tlPollOptions').value = '';
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to send poll');
+  }
+}
+
+// ── Narrative / Storyline Modal ──────────────────────────────────────────────
+let _narrativePopout = null;
+
+async function openNarrativeModal() {
+  // Default to last 24 hours
+  const now = new Date();
+  const from = new Date(now.getTime() - 24*60*60*1000);
+  let entries = [];
+  try {
+    entries = await apiGet(`/api/narrative?from=${from.toISOString()}&to=${now.toISOString()}&limit=200`) || [];
+  } catch(e) { console.warn('Narrative fetch error', e); }
+
+  const html = `
+    <div class="modal-overlay" id="narrativeModal">
+      <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
+        <div class="modal-header">
+          <h2>📰 ${t('narrative_title')||'Narrative / Storyline'}</h2>
+          <div style="display:flex;gap:6px;margin-left:auto;margin-right:8px">
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="detachNarrative">⧉</button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="refreshNarrative">${t('btn_refresh')||'Refresh'}</button>
+          </div>
+          <button class="modal-close" data-action="closeNarrativeModal">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('from')||'From'}: <input type="datetime-local" id="narrativeFrom" value="${from.toISOString().slice(0,16)}"
+                style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+            </label>
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('to')||'To'}: <input type="datetime-local" id="narrativeTo" value="${now.toISOString().slice(0,16)}"
+                style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+            </label>
+            <button class="btn btn-sm btn-primary" data-action="refreshNarrative">${t('btn_refresh')||'Refresh'}</button>
+          </div>
+          <div id="narrativeEntries" style="font-family:var(--font-mono,monospace);font-size:var(--fs-xs)">
+            ${_renderNarrativeEntries(entries)}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('narrativeModal');
+  void modal.offsetHeight;
+  modal.classList.add('open');
+  _bindActions(modal);
+}
+
+function _renderNarrativeEntries(entries) {
+  if (!entries || !entries.length) return `<p style="color:var(--text-dim)">${t('narrative_empty')||'No events in this time range.'}</p>`;
+  return entries.map(e => {
+    const ts = fmtDateTime(new Date(e.timestamp));
+    const timeStr = new Date(e.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    const severityColors = {info:'var(--text-dim)', warning:'#E67E22', critical:'#E74C3C'};
+    const severityColor = severityColors[e.severity] || 'var(--text-dim)';
+    const typeIcons = {
+      event_started: '📌', decision_requested: '❓', decision_approved: '✅',
+      decision_rejected: '❌', decision_: '⚖', audit_created: '➕',
+      audit_updated: '✏', audit_deleted: '🗑', audit_status_changed: '🔄',
+      audit_login: '🔑', audit_co_signed: '👁',
+    };
+    let icon = '•';
+    for (const [prefix, ic] of Object.entries(typeIcons)) {
+      if (e.type.startsWith(prefix)) { icon = ic; break; }
+    }
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start">
+      <span style="color:${severityColor};font-weight:700;min-width:42px">${timeStr}</span>
+      <span style="font-size:14px">${icon}</span>
+      <div style="flex:1">
+        <span style="color:var(--text)">${escHtml(e.summary)}</span>
+        ${e.user_name ? `<span style="color:var(--text-dim);margin-left:6px">— ${escHtml(e.user_name)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function closeNarrativeModal() {
+  const el = document.getElementById('narrativeModal');
+  if (el) el.remove();
+}
+
+async function refreshNarrative() {
+  const fromEl = document.getElementById('narrativeFrom');
+  const toEl = document.getElementById('narrativeTo');
+  let from = fromEl ? new Date(fromEl.value).toISOString() : new Date(Date.now()-24*60*60*1000).toISOString();
+  let to = toEl ? new Date(toEl.value).toISOString() : new Date().toISOString();
+  try {
+    const entries = await apiGet(`/api/narrative?from=${from}&to=${to}&limit=200`) || [];
+    const el = document.getElementById('narrativeEntries');
+    if (el) el.innerHTML = _renderNarrativeEntries(entries);
+  } catch(e) { showError('Failed to refresh: ' + e.message); }
+}
+
+function detachNarrative() {
+  if (_narrativePopout && !_narrativePopout.closed) {
+    _narrativePopout.focus();
+    return;
+  }
+  const w = Math.min(window.screen.availWidth, 800);
+  const h = Math.min(window.screen.availHeight - 100, 700);
+  _narrativePopout = window.open('/static/narrative-popup.html', 'tidslinjal-narrative',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  closeNarrativeModal();
 }
 
 // ── Resources Window (detached) ──────────────────────────────────────────────
@@ -12198,7 +12736,10 @@ const _ROLE_PLACEHOLDERS = {
   teammember:        { en: 'Team Member',       sv: 'Teammedlem',      fr: 'Membre d\'équipe',                fi: 'Tiimin jäsen',       da: 'Teammedlem',       nb: 'Teammedlem' },
   teamlead:          { en: 'Team Lead',         sv: 'Gruppledare',     fr: 'Chef d\'équipe',                  fi: 'Tiiminvetäjä',       da: 'Holdleder',        nb: 'Lagleder' },
   oplead:            { en: 'Ops Lead',          sv: 'Insatsledare',    fr: 'Chef des opérations',             fi: 'Operaatiojohtaja',   da: 'Operationsleder',  nb: 'Operasjonsleder' },
+  deputy_teamlead:   { en: 'Deputy Team Lead',  sv: 'Vice gruppledare', fr: 'Chef d\'équipe adjoint',          fi: 'Varatiiminvetäjä',   da: 'Stedfortræder holdleder', nb: 'Viselagleder' },
+  deputy_oplead:     { en: 'Deputy Ops Lead',   sv: 'Vice insatsledare',fr: 'Adj. chef des opérations',       fi: 'Varaoperaatiojohtaja', da: 'Stedfortræder operationsleder', nb: 'Viseoperasjonsleder' },
   staffofficer:      { en: 'Staff Officer',     sv: 'Stabsofficer',    fr: 'Officier d\'état-major',          fi: 'Esikuntaupseeri',    da: 'Stabsofficer',     nb: 'Stabsoffiser' },
+  staff_assistant:   { en: 'Staff Assistant',   sv: 'Stabsassistent',  fr: 'Assistant d\'état-major',         fi: 'Esikunta-avustaja',  da: 'Stabsassistent',   nb: 'Stabsassistent' },
   staffofficer_full: { en: 'Staff Officer Full',sv: 'Stabsofficer Full',fr: 'Officier d\'état-major complet', fi: 'Esikuntaupseeri täysi', da: 'Stabsofficer fuld', nb: 'Stabsoffiser full' },
   readwrite:         { en: 'Read/Write',        sv: 'Läs/Skriv',       fr: 'Lecture/Écriture',                fi: 'Luku/Kirjoitus',     da: 'Læs/Skriv',        nb: 'Les/Skriv' },
 };
