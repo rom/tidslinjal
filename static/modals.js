@@ -11255,9 +11255,9 @@ async function openAnalysisModal() {
           <div style="flex:1"></div>
           <div id="analysisTabBar" style="display:flex;gap:0">
             <button class="btn btn-sm analysisTab active" data-tab="overview" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('overview')||'Overview'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="events" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('events')||'Events'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="activity" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('activity')||'Activity'}</button>
             <button class="btn btn-sm analysisTab" data-tab="optempo" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('optempo')||'OpTempo'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
             <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('dependencies')||'Dependencies'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
@@ -11316,9 +11316,9 @@ async function _loadAnalysisTab(tab) {
   try {
     switch(tab) {
       case 'overview': await _renderOverviewTab(container); break;
-      case 'events': await _renderEventsTab(container); break;
-      case 'decisions': await _renderDecisionsTab(container); break;
+      case 'activity': await _renderActivityTab(container); break;
       case 'optempo': await _renderOpTempoTab(container); break;
+      case 'decisions': await _renderDecisionsTab(container); break;
       case 'dependencies': await _renderDependenciesTab(container); break;
       case 'export': _renderExportTab(container); break;
     }
@@ -11381,53 +11381,39 @@ async function _renderOverviewTab(container) {
   });
 }
 
-/* ── Events Tab ────────────────────────────────────────────────────────────── */
-async function _renderEventsTab(container) {
+/* ── Activity Tab ──────────────────────────────────────────────────────────── */
+async function _renderActivityTab(container) {
   const qs = _analysisDateParams();
-  const [evStatus, heatmap, slipData] = await Promise.all([
-    _analysisFetch('/api/stats/events/status' + qs),
+  const [heatmap, timeline] = await Promise.all([
     _analysisFetch('/api/stats/events/heatmap' + qs),
-    _analysisFetch('/api/stats/events/slip' + qs).catch(() => null),
+    _analysisFetch('/api/stats/events/timeline' + qs).catch(() => null),
   ]);
-
-  const statusLabels = Object.keys(evStatus || {});
-  const statusValues = Object.values(evStatus || {});
 
   const hmData = heatmap?.data || [];
   const hmDays = heatmap?.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const hmHours = Array.from({length:24}, (_, i) => String(i).padStart(2,'0'));
 
-  const slipBuckets = slipData?.buckets || [];
-  const slipValues = slipData?.values || [];
+  const tlLabels = timeline?.labels || timeline?.dates || [];
+  const tlData = timeline?.data || timeline?.counts || [];
 
   container.innerHTML = `
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('events_over_time')||'Events Over Time'}</div>
-      <canvas id="anlLineEvents" height="220"></canvas>
-    </div>
-    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_heatmap')||'Activity Heatmap (Day x Hour)'}</div>
-      <canvas id="anlHeatmap" height="${hmDays.length * 28 + 30}"></canvas>
+      <canvas id="anlHeatmap" height="${Math.max(200, hmDays.length * 28 + 30)}"></canvas>
     </div>
-    ${slipBuckets.length ? `
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('slip_distribution')||'PVA Slip Distribution'}</div>
-      <canvas id="anlHistSlip" height="200"></canvas>
-    </div>` : ''}`;
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_events_timeline')||'Events Over Time'}</div>
+      <canvas id="anlAreaTimeline" height="250"></canvas>
+    </div>`;
 
-  requestAnimationFrame(() => {
-    if (statusLabels.length) {
-      drawLineChart('anlLineEvents', statusLabels, [{
-        label: t('events')||'Events', data: statusValues, color: '#3498DB'
-      }], { showArea: true, showPoints: true });
-    }
+  setTimeout(() => {
     if (hmData.length) {
       drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorLow: '#1a1a2e', colorHigh: '#3498DB' });
     }
-    if (slipBuckets.length) {
-      drawHistogram('anlHistSlip', slipBuckets, slipValues, { color: '#E67E22', showValues: true });
+    if (tlLabels.length) {
+      drawAreaChart('anlAreaTimeline', tlLabels, tlData, { color: '#3498DB' });
     }
-  });
+  }, 50);
 }
 
 /* ── Decisions Tab ─────────────────────────────────────────────────────────── */
