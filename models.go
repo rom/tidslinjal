@@ -140,6 +140,10 @@ type User struct {
 	Latitude     float64 `json:"latitude,omitempty"`
 	Longitude    float64 `json:"longitude,omitempty"`
 	Availability string `json:"availability,omitempty"` // free | busy | dnd | away
+	// OIDC-synced profile fields
+	FullName string `json:"full_name,omitempty"` // full name from IDP (given_name + family_name or name)
+	Locale   string `json:"locale,omitempty"`    // user's preferred locale from IDP (e.g. "en", "sv")
+	Address  string `json:"address,omitempty"`   // user's address from IDP
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
@@ -180,6 +184,9 @@ type UserPublic struct {
 	Latitude         float64    `json:"latitude,omitempty"`
 	Longitude        float64    `json:"longitude,omitempty"`
 	Availability     string     `json:"availability,omitempty"`
+	FullName         string     `json:"full_name,omitempty"`
+	Locale           string     `json:"locale,omitempty"`
+	Address          string     `json:"address,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -217,6 +224,9 @@ func (u *User) Public() UserPublic {
 		Latitude:         u.Latitude,
 		Longitude:        u.Longitude,
 		Availability:     u.Availability,
+		FullName:         u.FullName,
+		Locale:           u.Locale,
+		Address:          u.Address,
 	}
 }
 
