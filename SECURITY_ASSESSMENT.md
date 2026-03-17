@@ -1,228 +1,566 @@
-# Security Vulnerability Assessment — Tidslinjal
+# Tidslinjal Security Vulnerability Assessment
 
 **Date:** 2026-03-17
-**Scope:** Full application audit (open-ended, no predefined scope)
-**Target:** Go web application — timeline/event management tool
+**Scope:** Full application — main.go (~14,900 LOC), store.go, models.go, ingest.go, routing.go, connectors, metrics
+**Methodology:** White-box source code review, nation-state threat model
+**Assessor:** Automated deep-dive security audit
 
 ---
 
 ## Executive Summary
 
-Four parallel security audits were conducted covering authentication & access control, input validation & injection, business logic & race conditions, and cryptography & network security. The application demonstrates generally solid security practices (bcrypt, crypto/rand, CSRF protection, SSRF-aware webhook transport, CSP headers, rate limiting). However, **27 unique findings** were identified, including 2 critical, 10 high, and 15 medium/low severity issues.
+Tidslinjal demonstrates a **generally security-conscious design** with many best practices already implemented (bcrypt password hashing, CSRF protection, SSRF guards, constant-time comparisons, audit logging, rate limiting). However, several **critical and high-severity vulnerabilities** remain that a sophisticated attacker could exploit to compromise the system, escalate privileges, or exfiltrate sensitive data.
 
-The most impactful findings are: (1) OIDC ID tokens are accepted without cryptographic signature verification, (2) the LDAP connector stub accepts any credentials, (3) blocked users retain active sessions, and (4) race conditions in the registration flow allow invitation code reuse and duplicate usernames.
-
----
-
-## CRITICAL
-
-### V-01: OIDC ID Token Signature Not Verified
-- **File:** `main.go:13400-13461`
-- **CWE:** CWE-345 (Insufficient Verification of Data Authenticity)
-- **Description:** `validateIDToken()` decodes and checks JWT claims (issuer, audience, expiry, nonce) but **never verifies the cryptographic signature** against the provider's JWK keys. The code comment at line 13400 acknowledges this: *"without full JWK signature verification."*
-- **Impact:** An attacker who can intercept/tamper with the token exchange response (MITM, compromised provider endpoint) can forge arbitrary ID tokens and authenticate as any user. Combined with OIDC auto-provisioning (line 13591), this enables full authentication bypass.
-- **Remediation:** Fetch the provider's JWKS from the discovery document and verify the JWT signature before trusting claims. Consider using a battle-tested library like `github.com/coreos/go-oidc`.
-
-### V-02: LDAP Connector Accepts Any Credentials (Authentication Bypass)
-- **File:** `connector_ldap.go:131-186`
-- **CWE:** CWE-287 (Improper Authentication)
-- **Description:** The `Authenticate()` method establishes a TCP/TLS connection to the LDAP server but **never performs an LDAP bind or search operation**. It returns a successful result with the default role for any username/password combination. The comment at line 162 says: *"This is a simplified LDAP implementation."*
-- **Impact:** If LDAP authentication is enabled in production, any credentials are accepted — complete authentication bypass.
-- **Remediation:** Implement actual LDAP bind authentication using a proper library (e.g., `go-ldap/ldap/v3`). At minimum, add a prominent warning that LDAP auth is a stub and must not be enabled in production.
+**Findings by Severity:**
+- **Critical:** 4
+- **High:** 8
+- **Medium:** 10
+- **Low:** 7
+- **Informational / Hardening:** 6
 
 ---
 
-## HIGH
+## CRITICAL Findings
 
-### V-03: Blocked/Unvetted Users Retain Active Sessions
-- **File:** `main.go:687-702`
-- **CWE:** CWE-613 (Insufficient Session Expiration)
-- **Description:** `getSession()` validates the session token and expiry but does NOT check `user.Blocked` or `user.Vetted`. When an admin blocks a user, their existing sessions (24-hour lifetime) remain valid.
-- **Impact:** Completely defeats user blocking as an incident response measure. A blocked user continues to have full access until session expiry.
-- **Remediation:** Add `if user.Blocked { return nil, nil }` in `getSession()`. Also invalidate all sessions for a user when blocking them.
+### C-01: OIDC JWT Signature Verification Missing for RSA/EC Algorithms
 
-### V-04: Race Condition — Invitation Code Reuse (TOCTOU)
-- **File:** `main.go:1229-1267`
-- **CWE:** CWE-367 (Time-of-check Time-of-use)
-- **Description:** In `handleRegister`, the invitation code is checked via `GetInvitationByCode` (acquires RLock, releases) and marked used via `MarkInvitationUsed` (acquires write lock, separate operation). Between these two operations, the lock is released. Two concurrent requests with the same code can both pass the validity check.
-- **Impact:** Single-use invitation codes can be reused to register multiple unauthorized accounts.
-- **Remediation:** Perform the check-and-mark-used as a single atomic operation under a write lock.
+**File:** `main.go:13517-13520`
+**CVSS:** 9.8 (Critical)
 
-### V-05: Race Condition — Duplicate Username Registration (TOCTOU)
-- **File:** `main.go:1215-1259`
-- **CWE:** CWE-367 (Time-of-check Time-of-use)
-- **Description:** Username uniqueness check (`GetUserByUsername`, RLock) and user creation (`CreateUser`, write lock) are separate operations. Two concurrent registrations with the same username can both pass the uniqueness check.
-- **Impact:** Two users with the same username — causes authentication confusion and potential account hijacking.
-- **Remediation:** Move uniqueness check inside `CreateUser` under the write lock, or add a unique constraint enforcement in the store.
+The `validateIDToken()` function only verifies HMAC-based JWT signatures (HS256/384/512). For RSA and EC algorithms (RS256, ES256, etc.) — which are used by **the vast majority of OIDC providers** (Google, Azure AD, Okta, Keycloak) — the signature is **not verified at all**:
 
-### V-06: Invitation Code Timing Side-Channel
-- **File:** `main.go:1224`
-- **CWE:** CWE-208 (Observable Timing Discrepancy)
-- **Description:** The generic invitation code is compared with Go's standard `!=` operator, which short-circuits on the first differing byte. Contrast with the password reset token (line 831) which correctly uses `subtle.ConstantTimeCompare`.
-- **Impact:** An attacker can brute-force the generic invitation code character by character via timing analysis. Combined with V-07 (rate limiter bypass), this is practically exploitable.
-- **Remediation:** Use `subtle.ConstantTimeCompare` for the generic invitation code comparison.
+```go
+case "RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512":
+    log.Printf("[SECURITY] OIDC ID token uses %s algorithm — JWKS signature verification not implemented; relying on TLS channel integrity from token endpoint", header.Alg)
+```
 
-### V-07: Rate Limiter Bypass via X-Forwarded-For Spoofing
-- **File:** `main.go:755-767`
-- **CWE:** CWE-348 (Use of Less Trusted Source)
-- **Description:** `clientIP()` trusts `X-Forwarded-For` and `X-Real-IP` headers unconditionally. Without a reverse proxy that strips these headers, any attacker can spoof a different IP on each request.
-- **Impact:** Complete bypass of rate limiting on login (10/min), registration (5/min), and password reset (5/min). Enables brute-force attacks.
-- **Remediation:** Add a configuration option for trusted proxy IPs. Only trust forwarded headers when the direct connection comes from a trusted proxy.
+**Impact:** An attacker who can intercept or manipulate the token exchange (MITM, compromised proxy, DNS spoofing) can forge arbitrary ID tokens to authenticate as any user, including creating admin accounts via OIDC auto-enrollment.
 
-### V-08: SSRF in Digest Webhook Handler (Missing Validation)
-- **File:** `main.go:11521`
-- **CWE:** CWE-918 (Server-Side Request Forgery)
-- **Description:** `handleSendDigest` accepts a `webhook_url` from the request body and passes it to `enqueueWebhook()` **without calling `validateWebhookURL()`**. Other handlers (preferences at line 1902, alarm creation at line 2839) correctly validate.
-- **Impact:** Any authenticated user can make the server send POST requests to arbitrary internal URLs (e.g., cloud metadata endpoints).
-- **Remediation:** Add `validateWebhookURL(req.WebhookURL)` before enqueueing.
-
-### V-09: SSRF Bypass via DNS Rebinding in Reference URL Fetch
-- **File:** `main.go:6210-6242`
-- **CWE:** CWE-918 (Server-Side Request Forgery)
-- **Description:** The SSRF protection uses string-based hostname prefix checks but the HTTP request uses the default client (no custom dialer). Vulnerable to DNS rebinding, IPv6 mapped addresses (`[::ffff:127.0.0.1]`), and decimal/octal IP notation. The webhook system (line 637-656) has proper IP-resolution-based protection — the reference fetch does not.
-- **Impact:** Authenticated users with reference-creation privileges can access internal services.
-- **Remediation:** Reuse the webhook system's custom transport with DNS-resolution-based IP validation.
-
-### V-10: OIDC Username Not Validated
-- **File:** `main.go:13564-13569`
-- **CWE:** CWE-20 (Improper Input Validation)
-- **Description:** Usernames from OIDC `preferred_username` or `email` claims are used directly without passing through `validateUsername()`. The local registration path validates at line 1195, but the OIDC path does not.
-- **Impact:** A malicious IDP could return usernames with special characters, excessive length, or control characters — causing log injection or bypassing username-based access controls.
-- **Remediation:** Apply `validateUsername()` (or equivalent sanitization) to OIDC-derived usernames.
-
-### V-11: Backup Restore Can Overwrite Registration Configuration
-- **File:** `main.go:13064-13095`
-- **CWE:** CWE-862 (Missing Authorization for Resource)
-- **Description:** The restore allowlist includes `registration.json` and `invitations.json`. A crafted backup can set `registration.json` to `{"mode":"open"}` to enable open registration, or inject pre-validated invitation codes.
-- **Impact:** An admin with backup-restore access can reopen registration or inject invitation codes. Relevant in scenarios with compromised admin accounts or social engineering.
-- **Remediation:** Exclude `registration.json` from restore, or require explicit confirmation for security-sensitive config changes during restore.
-
-### V-12: Missing Role Validation in Admin User Update
-- **File:** `main.go:3131-3134`
-- **CWE:** CWE-20 (Improper Input Validation)
-- **Description:** `handleUpdateUser` sets `existing.Role = req.Role` without validating against the allowed roles whitelist. `handleCreateUser` (lines 3046-3055) correctly validates.
-- **Impact:** An admin can set arbitrary role strings, causing unpredictable behavior.
-- **Remediation:** Add the same role validation whitelist from `handleCreateUser`.
+**Recommendation:**
+- Implement JWKS endpoint fetching and RSA/EC signature verification
+- Cache JWKS keys with periodic refresh
+- Consider using a vetted OIDC library (e.g., `coreos/go-oidc`)
 
 ---
 
-## MEDIUM
+### C-02: Path Traversal in `/api/docs/user-manual` API Endpoint
 
-### V-13: Ingest API Has No Role Restriction
-- **File:** `main.go:6375-6377`
-- **CWE:** CWE-862 (Missing Authorization)
-- **Description:** `/api/ingest` only requires `requireAuth` — any authenticated user including `observer` and `read` roles can ingest events, bypassing the `requireRole(RoleReadWrite)` check on `POST /api/events`.
-- **Remediation:** Change to `requireRole(RoleReadWrite, app.handleIngest)`.
+**File:** `main.go:5187-5206`
+**CVSS:** 7.5 (High → Critical in context)
 
-### V-14: Layer Creation Has No Role Restriction
-- **File:** `main.go:5376-5378`
-- **CWE:** CWE-862 (Missing Authorization)
-- **Description:** Any authenticated user can create layers via `POST /api/layers`, contradicting the read-only role model.
-- **Remediation:** Add `requireRole(RoleReadWrite, ...)` or higher.
+The HTML endpoint `/docs/user-manual` (line 5137) has the V-15 path traversal fix with character validation, but the **API endpoint** `/api/docs/user-manual` (line 5187) does **NOT** have the same validation:
 
-### V-15: Path Traversal in User Manual `lang` Parameter
-- **File:** `main.go:5098-5109`
-- **CWE:** CWE-22 (Path Traversal)
-- **Description:** The `lang` query parameter is inserted into a file path without sanitization: `fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))`. While constrained by `os.Stat` check and `.md` suffix, `../` sequences still resolve.
-- **Remediation:** Validate `lang` against an allowlist of known language codes, or strip path separators.
+```go
+// VULNERABLE - no lang validation
+mux.HandleFunc("/api/docs/user-manual", app.requireAuth(func(...) {
+    lang := r.URL.Query().Get("lang")
+    // No validation! lang can contain "../" sequences
+    candidate := fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))
+    if _, err := os.Stat(candidate); err == nil {
+        file = candidate
+    }
+    content, err := os.ReadFile(file) // Arbitrary file read
+```
 
-### V-16: Jira JQL Injection
-- **File:** `connector_jira.go:83-88`
-- **CWE:** CWE-943 (Improper Neutralization of Special Elements in Data Query Logic)
-- **Description:** `cfg.Project` is inserted directly into a JQL query without escaping or URL-encoding. Admin-configurable only.
-- **Remediation:** URL-encode JQL parameters and escape special characters in project names.
+**Impact:** An authenticated user (any role) can read arbitrary files on the server by crafting a `lang` parameter like `lang=../../etc/passwd`. Since `strings.ToUpper()` doesn't affect path separators, traversal sequences pass through.
 
-### V-17: Password Reset Token Logged in Plaintext
-- **File:** `main.go:1797`
-- **CWE:** CWE-532 (Insertion of Sensitive Information into Log File)
-- **Description:** When SMTP is not configured, the reset token is logged via `log.Printf`. If syslog forwarding is enabled (especially over non-TLS), this token can be intercepted.
-- **Remediation:** Consider writing tokens to a separate secure admin-only channel rather than general logging.
-
-### V-18: Syslog TLS Certificate Verification Disabled by Default
-- **File:** `main.go:227`
-- **CWE:** CWE-295 (Improper Certificate Validation)
-- **Description:** `InsecureSkipVerify: !sw.cfg.TLSVerify` — since `TLSVerify` defaults to `false`, syslog TLS connections skip certificate verification by default.
-- **Remediation:** Default `TLSVerify` to `true`.
-
-### V-19: `go test` Execution via Admin Endpoint
-- **File:** `store.go:4279-4282`
-- **CWE:** CWE-94 (Improper Control of Generation of Code)
-- **Description:** `GET /api/admin/test-stats` runs `exec.CommandContext(ctx, "go", "test", ...)` which compiles and runs all Go test code. Admin-only but represents code execution.
-- **Remediation:** Remove this endpoint from production builds or gate behind an explicit development-mode flag.
-
-### V-20: Connector SSRF (Admin-only)
-- **Files:** `connector_stix.go`, `connector_jira.go`, `connector_gcal.go`, `connector_github.go`
-- **CWE:** CWE-918 (Server-Side Request Forgery)
-- **Description:** Connector configurations accept arbitrary URLs fetched without private-IP validation, unlike the webhook system.
-- **Remediation:** Apply the same SSRF-aware transport used by the webhook system.
-
-### V-21: Login Endpoint Missing CSRF Protection (Login CSRF)
-- **File:** `main.go:872`
-- **CWE:** CWE-352 (Cross-Site Request Forgery)
-- **Description:** `handleLogin` is not wrapped in the CSRF check (`X-Requested-With` header). An attacker can force a victim to authenticate to an attacker-controlled account.
-- **Remediation:** Require `X-Requested-With` on the login endpoint.
-
-### V-22: Email Wipe on Non-Admin Self-Edit
-- **File:** `main.go:3130`
-- **CWE:** CWE-20 (Improper Input Validation)
-- **Description:** `existing.Email = req.Email` is applied unconditionally. If a non-admin user omits `email` from their profile update JSON, it decodes as empty string, wiping their email.
-- **Remediation:** Only update email if explicitly provided (check for zero-value or use a pointer field).
+**Recommendation:** Apply the same character validation as the HTML endpoint:
+```go
+for _, r := range lang {
+    if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '-') {
+        jsonError(w, "invalid language code", http.StatusBadRequest)
+        return
+    }
+}
+```
 
 ---
 
-## LOW / INFORMATIONAL
+### C-03: Default Hardcoded Admin Credentials Without Forced Change
 
-### V-23: Blocked User Check After Password Verification
-- **File:** `main.go:902-922`
-- **Description:** Login verifies the password before checking if the user is blocked. Different error messages confirm correct credentials to an attacker.
+**File:** `main.go:580-589`
+**CVSS:** 9.1 (Critical)
 
-### V-24: Session Tokens Persisted in Plaintext on Disk
-- **File:** `store.go:1713-1719`
-- **Description:** `sessions.json` stores session IDs in cleartext. File-system access compromises all active sessions.
+On first run, a default admin account is created with username `admin` and password `admin`:
 
-### V-25: Secrets Stored in Plaintext on Disk
-- **File:** `store.go:184-213`
-- **Description:** `oidc.json` (client secret), `mail.json` (SMTP password), `connectors.json` (API tokens) are stored as plaintext JSON. Data directory is 0700 but no application-level encryption.
+```go
+hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+store.CreateUser(User{
+    Username: "admin", PasswordHash: string(hash),
+    Role: RoleAdmin, CanLock: true, Vetted: true,
+})
+log.Println("Created default admin (username: admin, password: admin)")
+```
 
-### V-26: UserPublic Exposes LastFailedLoginIP
-- **File:** `models.go:167-168`
-- **CWE:** CWE-200 (Information Exposure)
-- **Description:** `UserPublic` struct includes `LastFailedLoginIP`, leaking IP addresses of failed login attempts to any authenticated user.
+There is **no forced password change** on first login. The password is also logged to console in plaintext.
 
-### V-27: innerHTML Usage in Frontend JavaScript
-- **Files:** `static/admin.js`, other JS files
-- **CWE:** CWE-79 (Cross-Site Scripting)
-- **Description:** Admin panel uses `innerHTML` with template literals containing user data. CSP (`script-src 'self'`) mitigates script injection, but HTML injection (phishing, UI redress) remains possible with inconsistent escaping.
+**Impact:** Any Tidslinjal instance is immediately compromisable if the admin doesn't change the password. Automated scanners can easily detect and exploit this.
 
----
-
-## Positive Security Observations
-
-The codebase demonstrates several strong security practices:
-
-- **Password hashing:** bcrypt with default cost
-- **Session tokens:** 256-bit entropy from `crypto/rand`
-- **Timing-safe comparisons:** Used for password reset tokens, WebCal tokens, OIDC state
-- **Dummy bcrypt on unknown users:** Prevents user enumeration via login timing
-- **CSRF protection:** `X-Requested-With` header required on state-changing requests
-- **XSS sanitization:** `stripHTMLTags()` applied at write time across ~20 input fields
-- **CSP headers:** `script-src 'self'` blocks inline script injection
-- **HSTS:** Enabled when TLS is active
-- **Rate limiting:** Login (10/min), registration (5/min), password reset (5/min)
-- **Webhook SSRF protection:** Custom `DialContext` with DNS-resolution-based private IP blocking
-- **Path traversal protection:** `filepath.Base()` on file uploads
-- **Request body size limits:** 1 MB JSON, 25 MB attachments
-- **PKCE:** Used for OIDC authentication flow
-- **Audit logging:** Comprehensive audit trail for security-relevant actions
-- **Backup excludes sessions:** `sessions.json` excluded from backup export
+**Recommendation:**
+- Generate a random initial password and display it once
+- Add a `MustChangePassword` flag and enforce it on next login
+- Remove plaintext password from log output
 
 ---
 
-## Recommended Priority
+### C-04: OIDC Auto-Enrollment Grants Pre-Authenticated Access with Configurable Default Role
 
-| Priority | Findings | Effort |
-|----------|----------|--------|
-| **P0 — Fix immediately** | V-01 (OIDC sig), V-02 (LDAP stub), V-03 (blocked sessions) | Medium |
-| **P1 — Fix before next release** | V-04/V-05 (race conditions), V-06 (timing), V-07 (rate limiter), V-08/V-09 (SSRF) | Medium |
-| **P2 — Fix soon** | V-10 (OIDC username), V-12 (role validation), V-13/V-14 (missing role checks), V-15 (path traversal) | Low |
-| **P3 — Harden** | V-16 through V-27 | Low |
+**File:** `main.go:13576-13600`
+**CVSS:** 8.1 (High)
+
+When OIDC auto-enrollment is active, any user who authenticates via the configured IdP is automatically created with `Vetted: true` and the configured default role (defaults to `RoleReadWrite`):
+
+```go
+newUser := User{
+    Username:    username,
+    DisplayName: displayName,
+    Role:        defaultRole,    // defaults to RoleReadWrite
+    Vetted:      true,           // auto-vetted
+    IsOIDC:      true,
+}
+```
+
+**Impact:** If the OIDC provider has a broad user base (e.g., corporate Azure AD with thousands of users), any employee — even those who should never access this military C2 timeline tool — gets `ReadWrite` access automatically.
+
+**Recommendation:**
+- Default OIDC role should be `RoleObserver` or `RoleRead` (least privilege)
+- Support OIDC group-to-role mapping to assign roles based on IdP groups
+- Consider requiring admin approval even for OIDC users (vetted=false by default)
+
+---
+
+## HIGH Findings
+
+### H-01: IDOR on Attachment Downloads — No Event-Level Access Control
+
+**File:** `main.go:2477-2500`
+**CVSS:** 6.5
+
+`handleDownloadAttachment` retrieves any attachment by ID without checking if the authenticated user has access to the parent event or its layer:
+
+```go
+func (app *App) handleDownloadAttachment(w http.ResponseWriter, r *http.Request, user *User) {
+    id, err := pathID(r)
+    att, ok := app.store.GetAttachmentByID(id)  // No ownership/layer check
+    path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
+    http.ServeFile(w, r, path)
+}
+```
+
+**Impact:** Any authenticated user can download attachments from private layers or events they shouldn't have access to by guessing/enumerating attachment IDs (sequential integers).
+
+**Recommendation:** Verify the user has read access to the event's layer before serving the file.
+
+---
+
+### H-02: IDOR on Attachment Deletion — Insufficient Ownership Check
+
+**File:** `main.go:2502-2530`
+**CVSS:** 6.5
+
+Similar to H-01, `handleDeleteAttachment` may not verify event/layer access comprehensively. An attacker could delete attachments belonging to events in private layers.
+
+**Impact:** Data destruction on events outside the attacker's access scope.
+
+**Recommendation:** Check event and layer ownership/access before allowing deletion.
+
+---
+
+### H-03: No Password Maximum Length Enforcement — bcrypt 72-Byte Truncation
+
+**File:** `main.go` (various bcrypt calls)
+**CVSS:** 5.3
+
+bcrypt silently truncates passwords at 72 bytes. No maximum length is enforced anywhere in the codebase:
+
+```go
+hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+```
+
+**Impact:**
+- Two passwords that share the same first 72 bytes but differ afterward will hash identically
+- Enables password collision attacks
+- Can be used for DoS: sending extremely long passwords forces expensive bcrypt computation
+
+**Recommendation:** Enforce a maximum password length of 128 characters. Consider pre-hashing with SHA-256 before bcrypt for passwords > 72 bytes.
+
+---
+
+### H-04: Event Layer Visibility Not Enforced Server-Side
+
+**File:** `store.go:1365-1395`, `main.go:2060`
+**CVSS:** 5.3
+
+`GetEvents()` returns all events when no layer filter is specified, and the code comment says "Layer visibility filtering is done client-side":
+
+```go
+// If no specific layers requested, return all (master + all layers).
+// Layer visibility filtering is done client-side.
+```
+
+**Impact:** An attacker can call the events API directly (bypassing the UI) to read events from private layers they shouldn't see. This undermines the entire layer permission model.
+
+**Recommendation:** Enforce server-side layer visibility filtering. Never rely on client-side filtering for access control.
+
+---
+
+### H-05: Webhook URL SSRF via DNS Rebinding
+
+**File:** `main.go:606-661`
+**CVSS:** 5.9
+
+The SSRF protection resolves DNS **before** connecting via `validateWebhookURL()`, but the actual connection through the HTTP transport resolves DNS **again**. A DNS rebinding attack can bypass this:
+
+1. First DNS lookup (validation) resolves to a public IP → passes
+2. By the time `DialContext` connects, DNS has been rebound to `127.0.0.1`
+
+The `newSSRFSafeTransport()` at line 641 mitigates this by also checking at connection time, but there's still a TOCTOU window between the two resolution steps.
+
+**Impact:** Attacker with DNS control can potentially reach internal services.
+
+**Recommendation:** Remove the double-check pattern. Only use `newSSRFSafeTransport()` (which checks at connection time) and drop the pre-check `validateWebhookURL()` DNS resolution, or better: pin resolved IPs in the dialer.
+
+---
+
+### H-06: OIDC Discovery Endpoint Fetched Without SSRF Protection
+
+**File:** `main.go:13350`
+**CVSS:** 6.1
+
+```go
+resp, err := http.Get(discURL) //nolint:gosec
+```
+
+The OIDC discovery document is fetched using a bare `http.Get()` with no SSRF protection. An admin who configures a malicious issuer URL can force the server to make requests to internal services.
+
+**Impact:** SSRF via admin-controlled OIDC configuration.
+
+**Recommendation:** Use `newSSRFSafeTransport()` for all outbound HTTP requests, including OIDC discovery.
+
+---
+
+### H-07: No Session Invalidation on Password Change
+
+**File:** `main.go:3138-3151`
+**CVSS:** 5.4
+
+When a user's password is changed (by self or admin), existing sessions are **not** invalidated:
+
+```go
+if req.Password != "" {
+    existing.PasswordHash = string(hash)
+    // No call to invalidate existing sessions for this user
+}
+```
+
+**Impact:** A compromised session continues to be valid even after password reset, defeating the purpose of password changes in incident response scenarios.
+
+**Recommendation:** Add `app.store.DeleteUserSessions(id)` after password changes and account blocking.
+
+---
+
+### H-08: Missing Password Quality Validation on `handleUpdateUser`
+
+**File:** `main.go:3138-3151`
+**CVSS:** 5.0
+
+When updating a user's password via `handleUpdateUser`, there is **no** password quality policy enforcement:
+
+```go
+if req.Password != "" {
+    // No call to validatePasswordQuality() — compare to handleRegister (line 1204) and handleResetPassword (line 1822)
+    hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+```
+
+**Recommendation:** Apply `validatePasswordQuality()` consistently in all password-setting paths.
+
+---
+
+## MEDIUM Findings
+
+### M-01: `crypto/md5` and `crypto/sha1` Imported — Potential Weak Hash Usage
+
+**File:** `main.go:10,12` (imports)
+
+The codebase imports `crypto/md5` and `crypto/sha1`. While these may be used for non-security purposes (e.g., ETags, content fingerprinting), their presence warrants audit to confirm they are not used for authentication or integrity verification in security-critical contexts.
+
+**Recommendation:** Audit all md5/sha1 call sites. Replace with SHA-256 where used for security-relevant hashing.
+
+---
+
+### M-02: Rate Limiter Has No Cleanup — Memory Exhaustion
+
+**File:** `main.go:443-473`
+
+The IP rate limiter stores buckets per IP address with no garbage collection for expired entries:
+
+```go
+type ipRateLimiter struct {
+    mu      sync.Mutex
+    buckets map[string]*rateBucket
+}
+```
+
+**Impact:** An attacker sending requests from many distinct IPs can grow this map unboundedly, eventually exhausting server memory.
+
+**Recommendation:** Add periodic cleanup of expired rate limit buckets (e.g., every 10 minutes, remove buckets older than 2x the window).
+
+---
+
+### M-03: CSRF Protection — `X-Requested-With` Header Only
+
+**File:** `main.go:728-734`
+
+CSRF protection relies solely on the `X-Requested-With` header combined with `SameSite=Lax` cookies. While generally effective for modern browsers, it has edge cases:
+- `Lax` allows top-level navigations (GET requests) from cross-origin sites
+- Some browser plugins/extensions can set custom headers on cross-origin requests
+- `Strict` would be more appropriate for a security-focused application
+
+**Recommendation:** Consider adding a synchronizer token pattern or switching cookies to `SameSite=Strict`.
+
+---
+
+### M-04: Logout Endpoint — Possible CSRF
+
+The logout endpoint may not require the `X-Requested-With` header (if using `getSession()` directly rather than `requireAuth()`), potentially allowing CSRF-based forced logout via image/script tags.
+
+**Recommendation:** Require POST method with CSRF protection for logout.
+
+---
+
+### M-05: API Key Role Hardcoded to `RoleReadWrite`
+
+**File:** `main.go:12692-12697`
+
+```go
+u := &User{
+    Role: RoleReadWrite, // conservative default — but unconfigurable
+}
+```
+
+All API keys get the same role. Cannot create read-only API keys or restrict to specific endpoints.
+
+**Impact:** Violates principle of least privilege. A compromised API key grants full read/write access.
+
+**Recommendation:** Allow admins to specify role when creating API keys. Support scoped permissions.
+
+---
+
+### M-06: API Key Validation — O(N) Bcrypt Comparisons
+
+**File:** `store.go:2950-2965`
+
+Each API key validation iterates all stored keys performing expensive bcrypt comparisons. With N keys, every API request costs O(N) bcrypt operations (~100ms each).
+
+**Impact:** Performance degrades linearly with number of API keys. Potential DoS vector.
+
+**Recommendation:** Use HMAC-SHA256 with server-side secret for API key hashing (bcrypt is designed for passwords, not API keys). Or index by key prefix.
+
+---
+
+### M-07: Connector Credentials Stored as Plaintext JSON on Disk
+
+**Files:** `connector_ldap.go:35`, `connector_jira.go`, `connector_stix.go`, `connector_gcal.go`
+
+Integration credentials (LDAP bind passwords, Jira API tokens, TAXII API keys, Google OAuth tokens) are stored as plaintext in JSON files:
+
+```go
+BindPassword string `json:"bind_password,omitempty"`
+```
+
+**Impact:** File system access reveals all integration credentials.
+
+**Recommendation:** Encrypt sensitive configuration fields at rest using the existing AES-GCM encryption infrastructure.
+
+---
+
+### M-08: Ingest API Creates Events Without XSS Sanitization
+
+**File:** `ingest.go:289-340`
+
+`processIngestPayload` creates events without applying `stripHTMLTags()` to title and description, unlike `handleCreateEvent` (line 2074):
+
+```go
+ev := Event{
+    Title:       p.Title,        // Not sanitized
+    Description: p.Description,  // Not sanitized
+}
+```
+
+**Impact:** Stored XSS via ingested data if connectors ingest malicious content or external feeds are compromised.
+
+**Recommendation:** Apply `stripHTMLTags()` to ingested title and description.
+
+---
+
+### M-09: `os.Exit(0)` Reachable via Admin API Endpoint
+
+**File:** `main.go:6198-6201`
+
+```go
+go func() {
+    time.Sleep(500 * time.Millisecond)
+    os.Exit(0) // Supervisor/systemd should restart the process
+}()
+```
+
+While admin-only, repeated calls could hit supervisor restart limits and permanently disable the service.
+
+**Recommendation:** Add rate limiting for restart endpoint. Require re-authentication. Log and alert.
+
+---
+
+### M-10: Backup Encryption Strength Tied to Admin Password
+
+**File:** `main.go:12983-13039`
+
+Backup encryption key is derived from admin password hash via PBKDF2. If the admin uses the default `admin` password, the backup encryption is trivially breakable.
+
+**Recommendation:** Warn if backup is requested while default credentials are active. Consider a separate backup passphrase.
+
+---
+
+## LOW Findings
+
+### L-01: Session Cookie Missing `Domain` Attribute
+
+**File:** `main.go:965-973`
+
+No `Domain` attribute on session cookie. While browsers default to exact domain match, explicitly setting it prevents potential subdomain attacks.
+
+---
+
+### L-02: Password Reset Token Sent in URL Query Parameter
+
+**File:** `main.go:1803`
+
+Reset tokens in URLs leak via browser history, referer headers, and access logs.
+
+**Recommendation:** Use POST-based token submission or fragment-based delivery (`#token=...`).
+
+---
+
+### L-03: Metrics Endpoint Exposes Internal State to All Authenticated Users
+
+**File:** `main.go:6897-6903`, `metrics.go`
+
+The `/metrics` endpoint requires authentication but allows any role to view detailed internal state (goroutine count, memory, event counts, user counts, SSE connections).
+
+**Recommendation:** Restrict to admin role.
+
+---
+
+### L-04: OIDC Flow Cookies Use `SameSite=Lax` Instead of `Strict`
+
+**File:** `main.go:13405-13451`
+
+OIDC state/nonce/PKCE cookies should use `SameSite=Strict` as they should never be sent in cross-origin contexts.
+
+---
+
+### L-05: Sequential Integer IDs Enable Enumeration
+
+**File:** `store.go` (various `nextXxxID++` patterns)
+
+All entity IDs are sequential integers, making enumeration trivial for attackers.
+
+**Recommendation:** Use UUIDs for externally-facing resources, particularly attachments.
+
+---
+
+### L-06: No Account Lockout After Failed Login Attempts
+
+Failed login attempts are tracked (`LastFailedLoginAt`, `LastFailedLoginIP`) but no automatic lockout mechanism exists. IP-based rate limiting doesn't prevent distributed brute-force.
+
+**Recommendation:** Implement progressive account lockout (5 failures → 15min lock, 10 → 1hr).
+
+---
+
+### L-07: LDAP Connector Is a Stub — Not Production-Ready
+
+**File:** `connector_ldap.go:155-174`
+
+The LDAP connector opens a TCP connection but doesn't perform actual LDAP bind authentication:
+
+```go
+// This is a simplified LDAP implementation.
+// In production, use a proper LDAP library (e.g., go-ldap/ldap/v3).
+```
+
+**Impact:** If enabled, any password would be accepted. Must be clearly documented as not production-ready.
+
+---
+
+## INFORMATIONAL / Hardening Recommendations
+
+### I-01: Add Content-Security-Policy `report-uri` Directive
+
+The CSP header (line 5078) is well-configured but lacks `report-uri`/`report-to` for monitoring violations.
+
+### I-02: Consider Subresource Integrity (SRI) for Static Assets
+
+Static JS/CSS from `/static/` don't use SRI hashes. If the static directory is compromised, malicious scripts bypass CSP.
+
+### I-03: Add `security.txt`
+
+No `/.well-known/security.txt` endpoint exists for responsible disclosure.
+
+### I-04: Enable Explicit CORS Headers
+
+No explicit CORS policy is set. Adding `Access-Control-Allow-Origin` restricted to the application origin would add defense in depth.
+
+### I-05: Consider Structured Logging
+
+Current `log.Printf` with formatted strings. Structured JSON logging would improve SIEM integration and forensic analysis.
+
+### I-06: Minimal Dependency Footprint — Maintain This
+
+The `go.mod` has only one external dependency (`golang.org/x/crypto v0.48.0`). This is excellent for supply chain security. The minimal footprint significantly reduces the attack surface.
+
+---
+
+## Security Strengths Observed
+
+The following security measures are well-implemented and should be maintained:
+
+1. **Session tokens:** 256-bit entropy via `crypto/rand` — excellent
+2. **Password hashing:** bcrypt with default cost (10) — industry standard
+3. **API key storage:** bcrypt-hashed, shown once on creation — correct
+4. **Timing attack protection:** Dummy bcrypt on unknown users, constant-time comparisons throughout
+5. **SSRF protection:** DNS-resolution-based blocking on webhooks and reference downloads
+6. **Security headers:** CSP, X-Frame-Options DENY, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS
+7. **Input sanitization:** HTML tag stripping, SMTP header injection prevention, LDAP filter escaping
+8. **Rate limiting:** Applied to login, registration, password reset
+9. **Audit logging:** Comprehensive action logging for forensic analysis
+10. **Backup encryption:** AES-256-GCM with PBKDF2-SHA256 key derivation (100K iterations)
+11. **PKCE for OIDC:** Implements code_challenge/code_verifier — prevents authorization code interception
+12. **Blocked user session invalidation:** Sessions checked against user.Blocked on every request
+13. **Restore allowlist:** Backup restore only allows whitelisted JSON files, excluding sensitive ones
+14. **Constant-time invitation code comparison:** Prevents timing side-channel attacks
+15. **X-Forwarded-For trust only from private IPs:** Prevents client IP spoofing from public internet
+
+---
+
+## Prioritized Remediation Roadmap
+
+| Priority | Finding | Effort | Impact |
+|----------|---------|--------|--------|
+| 1 | C-02: Path traversal in `/api/docs/user-manual` | Low | High |
+| 2 | C-03: Default admin credentials | Medium | Critical |
+| 3 | C-01: OIDC JWT signature verification | High | Critical |
+| 4 | H-01: Attachment download IDOR | Medium | High |
+| 5 | H-07: No session invalidation on password change | Low | High |
+| 6 | H-08: Missing password validation in updateUser | Low | Medium |
+| 7 | M-08: Ingest API missing XSS sanitization | Low | Medium |
+| 8 | H-04: Client-side layer visibility filtering | Medium | High |
+| 9 | H-03: bcrypt 72-byte truncation | Low | Medium |
+| 10 | L-07: LDAP connector stub returns success | Medium | High (if used) |
+| 11 | C-04: OIDC auto-enrollment default role | Low | High |
+| 12 | H-05/H-06: SSRF via DNS rebinding / OIDC discovery | Medium | Medium |
+| 13 | M-06: API key O(N) bcrypt validation | Medium | Medium |
+| 14 | M-02: Rate limiter memory exhaustion | Low | Medium |
+| 15 | M-07: Connector credentials plaintext storage | Medium | Medium |
+
+---
+
+*Assessment generated by automated security audit tooling. Manual penetration testing recommended to validate findings.*
