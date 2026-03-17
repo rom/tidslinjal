@@ -11,16 +11,31 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
 // newTestApp creates a fresh App backed by a temp data directory.
+// After creation, it resets the admin password to "admin" so tests
+// can login with known credentials.
 func newTestApp(t *testing.T) (*App, *httptest.Server) {
 	t.Helper()
 	app, err := NewApp(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewApp: %v", err)
+	}
+	// Reset admin password to a known value for tests
+	users := app.store.GetUsers()
+	for _, u := range users {
+		if u.Username == "admin" {
+			hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+			u.PasswordHash = string(hash)
+			u.MustChangePassword = false
+			app.store.UpdateUser(u)
+			break
+		}
 	}
 	srv := httptest.NewServer(app.routes())
 	t.Cleanup(func() {

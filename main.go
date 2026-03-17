@@ -452,7 +452,26 @@ type rateBucket struct {
 }
 
 func newIPRateLimiter() *ipRateLimiter {
-	return &ipRateLimiter{buckets: make(map[string]*rateBucket)}
+	rl := &ipRateLimiter{buckets: make(map[string]*rateBucket)}
+	// M-02 fix: periodically clean up expired rate limit buckets to prevent memory exhaustion
+	go func() {
+		for range time.NewTicker(10 * time.Minute).C {
+			rl.cleanup()
+		}
+	}()
+	return rl
+}
+
+// cleanup removes expired rate limit buckets to prevent unbounded memory growth.
+func (rl *ipRateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	for ip, b := range rl.buckets {
+		if now.After(b.resetAt) {
+			delete(rl.buckets, ip)
+		}
+	}
 }
 
 // allow returns true if the request from ip is within limit per window.
@@ -577,16 +596,23 @@ func NewApp(dataDir string) (*App, error) {
 	go app.runConnectorPoller()
 
 	if len(store.GetUsers()) == 0 {
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		// C-03 fix: generate a random initial admin password instead of hardcoded "admin"
+		adminPassBytes := make([]byte, 16)
+		if _, err := rand.Read(adminPassBytes); err != nil {
+			log.Fatalf("failed to generate admin password: %v", err)
+		}
+		adminPass := hex.EncodeToString(adminPassBytes)
+		hash, _ := bcrypt.GenerateFromPassword([]byte(adminPass), bcrypt.DefaultCost)
 		store.CreateUser(User{ //nolint
-			Username:     "admin",
-			PasswordHash: string(hash),
-			DisplayName:  "Administrator",
-			Role:         RoleAdmin,
-			CanLock:      true,
-			Vetted:       true,
+			Username:           "admin",
+			PasswordHash:       string(hash),
+			DisplayName:        "Administrator",
+			Role:               RoleAdmin,
+			CanLock:            true,
+			Vetted:             true,
+			MustChangePassword: true,
 		})
-		log.Println("Created default admin (username: admin, password: admin)")
+		log.Printf("Created default admin (username: admin, password: %s) — change this password immediately!", adminPass)
 	}
 	return app, nil
 }
@@ -922,6 +948,12 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// L-06 fix: check progressive account lockout
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
+		jsonError(w, "account temporarily locked — try again later", http.StatusTooManyRequests)
+		return
+	}
 	// Check blocked/unvetted status BEFORE password verification to avoid
 	// leaking valid credentials via different error responses (V-23 fix)
 	if user.Blocked {
@@ -940,12 +972,25 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		app.audit(0, "system", "login_failed", "user", user.ID,
 			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
-		// Record failed login attempt on the user
+		// Record failed login attempt and apply progressive lockout (L-06 fix)
 		go func(u User, ip string) {
 			if fullUser, ok := app.store.GetUserByID(u.ID); ok {
 				now := time.Now()
 				fullUser.LastFailedLoginAt = &now
 				fullUser.LastFailedLoginIP = ip
+				fullUser.FailedLoginCount++
+				// Progressive lockout: 5 failures → 15min, 10 → 1hr, 20+ → 4hr
+				switch {
+				case fullUser.FailedLoginCount >= 20:
+					lockUntil := now.Add(4 * time.Hour)
+					fullUser.LockedUntil = &lockUntil
+				case fullUser.FailedLoginCount >= 10:
+					lockUntil := now.Add(1 * time.Hour)
+					fullUser.LockedUntil = &lockUntil
+				case fullUser.FailedLoginCount >= 5:
+					lockUntil := now.Add(15 * time.Minute)
+					fullUser.LockedUntil = &lockUntil
+				}
 				app.store.UpdateUser(*fullUser) //nolint
 			}
 		}(*user, loginClientIP)
@@ -993,6 +1038,9 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			fullUser.LastLoginIP = u.LastLoginIP
 			fullUser.LastLoginDomain = u.LastLoginDomain
 			fullUser.LoginCount++
+			// L-06 fix: reset failed login counter on successful login
+			fullUser.FailedLoginCount = 0
+			fullUser.LockedUntil = nil
 			app.store.UpdateUser(*fullUser) //nolint
 		}
 	}(*user, loginClientIP)
@@ -1150,6 +1198,10 @@ func validateUsername(username string) error {
 
 // validatePasswordQuality checks a candidate password against the active policy.
 func validatePasswordQuality(password string, policy SecuritySettings) error {
+	// H-03 fix: enforce max length to prevent bcrypt 72-byte truncation issues
+	if len(password) > 128 {
+		return fmt.Errorf("password_quality: Password must not exceed 128 characters")
+	}
 	minLen := policy.MinLength
 	if minLen == 0 {
 		minLen = 8
@@ -1232,8 +1284,8 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-	} else if len(req.Password) < 6 {
-		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
+	} else if len(req.Password) < 6 || len(req.Password) > 128 {
+		jsonError(w, "password must be 6–128 characters", http.StatusBadRequest)
 		return
 	}
 
@@ -1850,8 +1902,8 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-	} else if len(req.NewPassword) < 6 {
-		jsonError(w, "password must be at least 6 characters", http.StatusBadRequest)
+	} else if len(req.NewPassword) < 6 || len(req.NewPassword) > 128 {
+		jsonError(w, "password must be 6–128 characters", http.StatusBadRequest)
 		return
 	}
 
@@ -2071,8 +2123,34 @@ func (app *App) handleGetEvents(w http.ResponseWriter, r *http.Request, user *Us
 		to = time.Now().AddDate(0, 1, 0)
 	}
 
-	// Return all events; layer visibility is filtered client-side
-	events := app.store.GetEvents(from, to, nil)
+	// H-04 fix: enforce server-side layer visibility filtering
+	allEvents := app.store.GetEvents(from, to, nil)
+	// Build set of layer IDs this user can read
+	var visibleLayerIDs map[int64]bool
+	if !hasRole(user.Role, RoleAdmin) {
+		visibleLayerIDs = make(map[int64]bool)
+		userGroups := app.userGroups(user.ID)
+		for _, l := range app.store.GetLayersVisibleTo(user.ID, userGroups) {
+			visibleLayerIDs[l.ID] = true
+		}
+	}
+	events := make([]Event, 0, len(allEvents))
+	for _, e := range allEvents {
+		// Master timeline events (no layer) are visible to all authenticated users
+		if e.LayerID == nil {
+			events = append(events, e)
+			continue
+		}
+		// Admins see all layers
+		if hasRole(user.Role, RoleAdmin) {
+			events = append(events, e)
+			continue
+		}
+		// Non-admins: only include events from visible layers
+		if visibleLayerIDs[*e.LayerID] {
+			events = append(events, e)
+		}
+	}
 	if events == nil {
 		events = []Event{}
 	}
@@ -2485,6 +2563,13 @@ func (app *App) handleDownloadAttachment(w http.ResponseWriter, r *http.Request,
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// H-01 fix: verify user can access the event's layer before serving attachment
+	if ev, ok := app.store.GetEventByID(att.EventID); ok && ev.LayerID != nil {
+		if !app.canReadLayer(*ev.LayerID, user) {
+			jsonError(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
 	w.Header().Set("Content-Type", att.MimeType)
 	// Sanitise filename for use in Content-Disposition to prevent header injection.
@@ -2510,6 +2595,13 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// H-02 fix: verify user can access the event's layer before allowing delete
+	if ev, ok := app.store.GetEventByID(att.EventID); ok && ev.LayerID != nil {
+		if !app.canReadLayer(*ev.LayerID, user) {
+			jsonError(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	if att.UploadedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
@@ -2524,6 +2616,33 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 }
 
 // ── Layer helpers ──────────────────────────────────────────────────────────────
+
+// canReadLayer checks whether the user has read access to a layer (H-01/H-02/H-04 fix).
+func (app *App) canReadLayer(layerID int64, user *User) bool {
+	layer, ok := app.store.GetLayerByID(layerID)
+	if !ok {
+		return false
+	}
+	if layer.OwnerID == user.ID || hasRole(user.Role, RoleAdmin) {
+		return true
+	}
+	if layer.Visibility == "public" {
+		return true
+	}
+	if layer.Visibility == "groups" {
+		userGroups := app.userGroups(user.ID)
+		groupSet := make(map[int64]bool)
+		for _, gid := range userGroups {
+			groupSet[gid] = true
+		}
+		for _, gid := range layer.GroupIDs {
+			if groupSet[gid] {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 func (app *App) canWriteLayer(layerID int64, user *User) bool {
 	layer, ok := app.store.GetLayerByID(layerID)
@@ -3136,6 +3255,21 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	if req.Password != "" {
+		// H-03 fix: enforce max length before bcrypt
+		if len(req.Password) > 128 {
+			jsonError(w, "password must not exceed 128 characters", http.StatusBadRequest)
+			return
+		}
+		// H-08 fix: apply password quality policy if enabled
+		if policy := app.store.GetSecuritySettings(); policy.PasswordPolicyEnabled {
+			if err := validatePasswordQuality(req.Password, policy); err != nil {
+				jsonError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		} else if len(req.Password) < 6 {
+			jsonError(w, "password must be 6–128 characters", http.StatusBadRequest)
+			return
+		}
 		// Non-admin users must verify their current password before changing it
 		if !hasRole(user.Role, RoleAdmin) {
 			if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(req.CurrentPassword)); err != nil {
@@ -3149,6 +3283,10 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			return
 		}
 		existing.PasswordHash = string(hash)
+		// Clear MustChangePassword flag on successful password change
+		existing.MustChangePassword = false
+		// H-07 fix: invalidate all existing sessions for this user after password change
+		app.store.DeleteSessionsForUser(id)
 	}
 	if req.DisplayName != "" {
 		existing.DisplayName = req.DisplayName
@@ -5189,6 +5327,17 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		if lang == "" {
 			lang = "en"
 		}
+		// C-02 fix: validate lang parameter to prevent path traversal (same as HTML endpoint)
+		for _, c := range lang {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-') {
+				jsonError(w, "invalid language code", http.StatusBadRequest)
+				return
+			}
+		}
+		if len(lang) > 10 {
+			jsonError(w, "invalid language code", http.StatusBadRequest)
+			return
+		}
 		file := "docs/USER_MANUAL.md"
 		if lang != "en" {
 			candidate := fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))
@@ -6893,14 +7042,11 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 
-	// ── Prometheus metrics (no auth — standard for metrics endpoints) ──
+	// ── Prometheus metrics (L-03 fix: restricted to admin role) ──
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		_, user := app.getSession(r)
-		if user == nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		app.handleMetrics(w, r)
+		app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
+			app.handleMetrics(w, r)
+		})(w, r)
 	})
 
 	// ── References ──
@@ -8016,6 +8162,7 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Role        Role   `json:"role"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -8023,6 +8170,18 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 	}
 	if req.Name == "" {
 		jsonError(w, "name required", http.StatusBadRequest)
+		return
+	}
+	// M-05 fix: validate and default API key role
+	if req.Role == "" {
+		req.Role = RoleRead
+	}
+	validAPIKeyRoles := map[Role]bool{
+		RoleObserver: true, RoleRead: true, RoleReporter: true,
+		RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
+	}
+	if !validAPIKeyRoles[req.Role] {
+		jsonError(w, "invalid role for API key (admin/staff roles not allowed)", http.StatusBadRequest)
 		return
 	}
 
@@ -8042,6 +8201,7 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 	k := APIKey{
 		Name:        req.Name,
 		Description: req.Description,
+		Role:        req.Role,
 		KeyHash:     string(hash),
 		CreatedBy:   user.ID,
 	}
@@ -12690,11 +12850,16 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 							return
 						}
 					}
-					u := &User{
+					// M-05 fix: use the API key's configured role instead of hardcoded RoleReadWrite
+				keyRole := k.Role
+				if keyRole == "" {
+					keyRole = RoleRead // safe default for legacy keys without role
+				}
+				u := &User{
 						ID:          k.CreatedBy,
 						Username:    "apikey:" + k.Name,
 						DisplayName: k.Name,
-						Role:        RoleReadWrite,
+						Role:        keyRole,
 					}
 					next(w, r, u)
 					return
@@ -13714,7 +13879,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		defaultRole := app.oidcDefaultRole
 		if defaultRole == "" {
-			defaultRole = RoleReadWrite
+			// C-04 fix: default to least-privilege role for auto-enrolled OIDC users
+			defaultRole = RoleRead
 		}
 		newUser := User{
 			Username:    username,
