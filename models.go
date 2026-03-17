@@ -1288,6 +1288,9 @@ type ChecklistInstanceItem struct {
 	CheckedBy int64      `json:"checked_by,omitempty"`
 	CheckedAt *time.Time `json:"checked_at,omitempty"`
 	Note      string     `json:"note,omitempty"`
+	Skipped   bool       `json:"skipped,omitempty"`
+	SkippedBy int64      `json:"skipped_by,omitempty"`
+	SkippedAt *time.Time `json:"skipped_at,omitempty"`
 }
 
 // BuiltInChecklists returns the pre-defined checklist templates.

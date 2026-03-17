@@ -8072,7 +8072,9 @@ async function openChecklistInstance(idOrStr) {
     function renderInstance() {
       const total = ci.items.length;
       const checked = ci.items.filter(it => it.checked).length;
-      const pct = total > 0 ? Math.round(checked/total*100) : 0;
+      const skipped = ci.items.filter(it => it.skipped).length;
+      const done = checked + skipped;
+      const pct = total > 0 ? Math.round(done/total*100) : 0;
       const isComplete = ci.status === 'completed';
 
       // Group items by category
@@ -8090,18 +8092,23 @@ async function openChecklistInstance(idOrStr) {
             <div style="flex:1;background:var(--bg3);border-radius:4px;height:8px;overflow:hidden">
               <div style="background:${pct===100?'var(--success)':'var(--accent)'};height:100%;width:${pct}%;transition:width .3s"></div>
             </div>
-            <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">${checked}/${total} (${pct}%)</span>
+            <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">${done}/${total} (${pct}%)${skipped?' · '+skipped+' '+(t('checklist_skipped_label')||'skipped'):''}</span>
           </div>
         </div>`;
 
       for (const [cat, items] of Object.entries(categories)) {
         if (cat) html += `<div style="font-size:var(--fs-xs);color:var(--accent);font-weight:600;margin:8px 0 4px 0;text-transform:uppercase">${escHtml(cat)}</div>`;
         items.forEach(it => {
-          html += `<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:var(--radius);cursor:${isComplete?'default':'pointer'};margin-bottom:2px;background:${it.checked?'color-mix(in srgb, var(--success) 8%, var(--bg2))':'var(--bg2)'}">
-            <input type="checkbox" class="_cl_check" data-idx="${it._idx}" ${it.checked?'checked':''} ${isComplete?'disabled':''}
-              style="margin-top:2px;width:16px;height:16px;accent-color:var(--success);flex-shrink:0">
-            <span style="font-size:var(--fs-sm);${it.checked?'text-decoration:line-through;opacity:.6':''}">${escHtml(it.text)}</span>
-          </label>`;
+          const itemBg = it.skipped ? 'color-mix(in srgb, var(--warning) 8%, var(--bg2))' : it.checked ? 'color-mix(in srgb, var(--success) 8%, var(--bg2))' : 'var(--bg2)';
+          const itemStyle = it.skipped ? 'text-decoration:line-through;opacity:.5;font-style:italic' : it.checked ? 'text-decoration:line-through;opacity:.6' : '';
+          html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:var(--radius);margin-bottom:2px;background:${itemBg}">
+            <label style="display:flex;align-items:flex-start;gap:8px;flex:1;cursor:${isComplete||it.skipped?'default':'pointer'};margin:0">
+              <input type="checkbox" class="_cl_check" data-idx="${it._idx}" ${it.checked?'checked':''} ${isComplete||it.skipped?'disabled':''}
+                style="margin-top:2px;width:16px;height:16px;accent-color:var(--success);flex-shrink:0">
+              <span style="font-size:var(--fs-sm);${itemStyle}">${escHtml(it.text)}${it.skipped?' <em style="font-size:var(--fs-xs);color:var(--warning)">('+( t('checklist_skipped_label')||'skipped')+')</em>':''}</span>
+            </label>
+            ${!isComplete && !it.checked ? `<button class="_cl_skip btn btn-sm" data-idx="${it._idx}" style="padding:1px 6px;font-size:var(--fs-xs);opacity:.7;flex-shrink:0" title="${t('checklist_skip')||'Skip'}">${it.skipped?(t('checklist_unskip')||'Unskip'):(t('checklist_skip')||'Skip')}</button>` : ''}
+          </div>`;
         });
       }
       modal.querySelector('#checklistInstanceBody').innerHTML = html;
@@ -8122,7 +8129,7 @@ async function openChecklistInstance(idOrStr) {
       } else {
         footerEl.innerHTML = `
           <button class="btn btn-sm btn-danger" id="_cl_delete">🗑 ${t('checklist_delete')||'Delete'}</button>
-          <button class="btn btn-sm btn-primary" id="_cl_complete" ${pct<100?'disabled':''}>✅ ${t('checklist_complete')||'Mark Complete'}</button>
+          <button class="btn btn-sm btn-primary" id="_cl_complete" ${done<total?'disabled':''}>✅ ${t('checklist_complete')||'Mark Complete'}</button>
           <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>`;
         footerEl.querySelector('#_cl_complete').addEventListener('click', async () => {
           ci.status = 'completed';
@@ -8152,6 +8159,26 @@ async function openChecklistInstance(idOrStr) {
           } else {
             ci.items[idx].checked_by = 0;
             ci.items[idx].checked_at = null;
+          }
+          await api('PUT', `/api/checklist-instances/${ci.id}`, ci);
+          renderInstance();
+          _loadChecklistInstances();
+        });
+      });
+
+      // Bind skip toggles
+      modal.querySelectorAll('._cl_skip').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const idx = parseInt(btn.dataset.idx);
+          const wasSkipped = ci.items[idx].skipped;
+          ci.items[idx].skipped = !wasSkipped;
+          if (!wasSkipped) {
+            ci.items[idx].skipped_by = state.user?.id || 0;
+            ci.items[idx].skipped_at = new Date().toISOString();
+          } else {
+            ci.items[idx].skipped_by = 0;
+            ci.items[idx].skipped_at = null;
           }
           await api('PUT', `/api/checklist-instances/${ci.id}`, ci);
           renderInstance();
