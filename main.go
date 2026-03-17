@@ -6824,6 +6824,13 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/references/index", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleReferenceIndex)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/api/references/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
@@ -14161,6 +14168,111 @@ func (app *App) handleReferenceChecksums(w http.ResponseWriter, r *http.Request,
 		"sha1":   rd.ChecksumSHA1,
 		"sha256": rd.ChecksumSHA256,
 		"sha512": rd.ChecksumSHA512,
+	})
+}
+
+// handleReferenceIndex returns a structured index of all reference documents,
+// grouped by category with summary statistics.
+func (app *App) handleReferenceIndex(w http.ResponseWriter, r *http.Request, user *User) {
+	refs := app.store.GetReferenceDocs()
+
+	type IndexEntry struct {
+		ID           int64    `json:"id"`
+		Title        string   `json:"title"`
+		Category     string   `json:"category"`
+		RefType      string   `json:"ref_type,omitempty"`
+		DetectedType string   `json:"detected_type,omitempty"`
+		Language     string   `json:"language,omitempty"`
+		Owner        string   `json:"owner,omitempty"`
+		Authors      string   `json:"authors,omitempty"`
+		Tags         []string `json:"tags,omitempty"`
+		Size         int64    `json:"size,omitempty"`
+		UploadedAt   string   `json:"uploaded_at,omitempty"`
+		DownloadURL  string   `json:"download_url,omitempty"`
+	}
+
+	type CategoryGroup struct {
+		Category string       `json:"category"`
+		Count    int          `json:"count"`
+		Entries  []IndexEntry `json:"entries"`
+	}
+
+	// Group by category
+	catMap := make(map[string][]IndexEntry)
+	catOrder := []string{"handbook", "sop", "policy", "map", "reference", "checklist", "faq", "objectives", "other"}
+	for _, rd := range refs {
+		cat := rd.Category
+		if cat == "" {
+			cat = "other"
+		}
+		entry := IndexEntry{
+			ID:           rd.ID,
+			Title:        rd.Title,
+			Category:     cat,
+			RefType:      rd.RefType,
+			DetectedType: rd.DetectedType,
+			Language:     rd.Language,
+			Owner:        rd.Owner,
+			Authors:      rd.Authors,
+			Tags:         rd.Tags,
+			Size:         rd.Size,
+		}
+		if !rd.UploadedAt.IsZero() {
+			entry.UploadedAt = rd.UploadedAt.Format("2006-01-02T15:04:05Z")
+		}
+		if rd.RefType == "url" && rd.URL != "" {
+			entry.DownloadURL = rd.URL
+		} else if rd.RefType != "local" && rd.Filename != "" {
+			entry.DownloadURL = fmt.Sprintf("/api/references/%d/download", rd.ID)
+		}
+		catMap[cat] = append(catMap[cat], entry)
+	}
+
+	groups := make([]CategoryGroup, 0, len(catMap))
+	// Add in canonical order first
+	for _, c := range catOrder {
+		if entries, ok := catMap[c]; ok {
+			groups = append(groups, CategoryGroup{Category: c, Count: len(entries), Entries: entries})
+			delete(catMap, c)
+		}
+	}
+	// Any remaining categories
+	for c, entries := range catMap {
+		groups = append(groups, CategoryGroup{Category: c, Count: len(entries), Entries: entries})
+	}
+
+	// Collect unique languages and tags
+	langSet := make(map[string]bool)
+	tagSet := make(map[string]int)
+	for _, rd := range refs {
+		if rd.Language != "" {
+			langSet[rd.Language] = true
+		}
+		for _, tg := range rd.Tags {
+			tagSet[tg]++
+		}
+	}
+	languages := make([]string, 0, len(langSet))
+	for l := range langSet {
+		languages = append(languages, l)
+	}
+	sort.Strings(languages)
+
+	type TagCount struct {
+		Tag   string `json:"tag"`
+		Count int    `json:"count"`
+	}
+	tagCounts := make([]TagCount, 0, len(tagSet))
+	for tg, cnt := range tagSet {
+		tagCounts = append(tagCounts, TagCount{Tag: tg, Count: cnt})
+	}
+	sort.Slice(tagCounts, func(i, j int) bool { return tagCounts[i].Count > tagCounts[j].Count })
+
+	jsonOK(w, map[string]any{
+		"total_count": len(refs),
+		"categories":  groups,
+		"languages":   languages,
+		"tags":        tagCounts,
 	})
 }
 

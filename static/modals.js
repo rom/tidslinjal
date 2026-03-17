@@ -15466,6 +15466,99 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── References Tab ──────────────────────────────────────────────────────────
 
+async function _openReferenceIndex() {
+  const theme = state?.preferences?.theme || 'dark';
+  const catLabels = {
+    handbook: t('ref_category_handbook') || 'Handbook',
+    sop: t('ref_category_sop') || 'SOP',
+    policy: t('ref_category_policy') || 'Policy',
+    map: t('ref_category_map') || 'Map',
+    reference: t('ref_category_reference') || 'Reference',
+    checklist: t('ref_category_checklist') || 'Checklist',
+    faq: t('ref_category_faq') || 'FAQ',
+    objectives: t('ref_category_objectives') || 'Objectives',
+    other: t('ref_category_other') || 'Other'
+  };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+  const langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',uk:'Українська',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
+
+  let data;
+  try {
+    const res = await fetch('/api/references/index');
+    if (!res.ok) throw new Error('failed');
+    data = await res.json();
+  } catch (e) {
+    console.warn('[refIndex]', e);
+    return;
+  }
+
+  const w = window.open('', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
+  if (!w) return;
+
+  let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Document Index</title>
+<style>
+body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#212630;color:#c8d0e0}
+body{font-family:'Segoe UI',system-ui,sans-serif;padding:24px;line-height:1.6;font-size:13px}
+h1{font-size:18px;margin-bottom:16px;letter-spacing:.05em}
+h2{font-size:14px;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(128,128,128,.3);padding-bottom:4px}
+.summary{margin-bottom:20px;padding:12px;border-radius:6px;background:rgba(128,128,128,.1);border:1px solid rgba(128,128,128,.2)}
+.summary b{font-size:15px}
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;color:#fff;margin-right:6px;margin-bottom:4px}
+.tag-list{margin-top:8px}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;border:1px solid rgba(128,128,128,.3);margin:2px 3px 2px 0}
+table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:12px}
+th{text-align:left;padding:6px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid rgba(128,128,128,.3)}
+td{padding:5px 8px;border-bottom:1px solid rgba(128,128,128,.15)}
+tr:hover td{background:rgba(128,128,128,.08)}
+a{color:#4a9eff;text-decoration:none}
+a:hover{text-decoration:underline}
+.lang-tag{font-size:10px;padding:1px 4px;border-radius:2px;border:1px solid rgba(128,128,128,.3);margin-left:4px}
+.type-tag{font-size:10px;padding:1px 4px;border-radius:2px;background:#4a9eff;color:#fff;margin-left:4px}
+</style></head><body class="theme-${escHtml(theme)}">
+<h1>Document Index</h1>
+<div class="summary">
+  <b>${t('ref_info_total') || 'Total'}: ${data.total_count}</b><br>`;
+
+  // Category badges
+  (data.categories || []).forEach(g => {
+    html += `<span class="badge" style="background:${catColors[g.category] || '#95A5A6'}">${escHtml(catLabels[g.category] || g.category)} (${g.count})</span>`;
+  });
+
+  // Languages
+  if (data.languages && data.languages.length) {
+    html += `<br><span style="font-size:11px;opacity:.7">${t('ref_languages') || 'Languages'}: ${data.languages.map(l => langNames[l] || l).join(', ')}</span>`;
+  }
+
+  // Top tags
+  if (data.tags && data.tags.length) {
+    html += `<div class="tag-list">`;
+    data.tags.slice(0, 20).forEach(tg => {
+      html += `<span class="tag">${escHtml(tg.tag)} (${tg.count})</span>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+
+  // Category sections with tables
+  (data.categories || []).forEach(g => {
+    html += `<h2><span class="badge" style="background:${catColors[g.category] || '#95A5A6'}">${g.count}</span>${escHtml(catLabels[g.category] || g.category)}</h2>`;
+    html += `<table><thead><tr><th>#</th><th>${t('ref_title') || 'Title'}</th><th>${t('ref_type') || 'Type'}</th><th>${t('ref_language') || 'Language'}</th><th>${t('ref_owner') || 'Owner'}</th><th>${t('ref_tags') || 'Tags'}</th><th></th></tr></thead><tbody>`;
+    g.entries.forEach((e, i) => {
+      const langLabel = e.language ? `<span class="lang-tag">${escHtml(langNames[e.language] || e.language)}</span>` : '';
+      const typeLabel = e.detected_type ? `<span class="type-tag">${escHtml(e.detected_type.toUpperCase())}</span>` : (e.ref_type || '');
+      const tags = (e.tags || []).map(tg => `<span class="tag">${escHtml(tg)}</span>`).join('');
+      const link = e.download_url ? `<a href="${escHtml(e.download_url)}" target="_blank">${e.ref_type === 'url' ? 'Open' : 'Download'}</a>` : '';
+      html += `<tr><td>${i + 1}</td><td><b>${escHtml(e.title)}</b></td><td>${typeLabel}</td><td>${langLabel}</td><td>${escHtml(e.owner || e.authors || '')}</td><td>${tags}</td><td>${link}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  });
+
+  html += `</body></html>`;
+  w.document.write(html);
+  w.document.close();
+}
+
 function _renderReferencesTab(el) {
   const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
   el.innerHTML = `
@@ -15474,6 +15567,7 @@ function _renderReferencesTab(el) {
         <span>${t('references_title') || 'References'}</span>
         <span style="display:flex;gap:4px;align-items:center">
           ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
+          <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" id="btnRefIndex" title="${t('ref_index')||'Document Index'}">Index</button>
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" id="btnDetachReferences" title="${t('btn_detach')||'Detach to window'}">⧉</button>
         </span>
       </div>
@@ -15507,6 +15601,8 @@ function _renderReferencesTab(el) {
   _checkRefGitIntegration();
   const addBtn = document.getElementById('btnAddReference');
   if (addBtn) addBtn.addEventListener('click', () => _openReferenceUploadModal());
+  const indexBtn = document.getElementById('btnRefIndex');
+  if (indexBtn) indexBtn.addEventListener('click', () => _openReferenceIndex());
   const detachRefBtn = document.getElementById('btnDetachReferences');
   if (detachRefBtn) detachRefBtn.addEventListener('click', () => openDetachedReferences());
   const searchEl = document.getElementById('refSearch');

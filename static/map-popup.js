@@ -480,23 +480,47 @@ function parseKMLCoords(text) {
 }
 
 /* ── Legend ── */
+const _legendLayers = [
+  { key: 'meetings',     color: '#D35400', labelKey: 'map_meetings_layer',    fallback: 'Meetings',    getLayer: () => _meetingsLayer,     getShow: () => _showMeetings,     setShow: v => { _showMeetings = v; } },
+  { key: 'users',        color: '#4a9eff', labelKey: 'map_users_layer',       fallback: 'Users',       getLayer: () => _usersLayer,        getShow: () => _showUsers,        setShow: v => { _showUsers = v; } },
+  { key: 'rooms',        color: '#27ae60', labelKey: 'map_rooms',             fallback: 'Rooms',       getLayer: () => _roomsLayer,        getShow: () => _showRooms,        setShow: v => { _showRooms = v; } },
+  { key: 'buildings',    color: '#8e44ad', labelKey: 'map_buildings',          fallback: 'Buildings',   getLayer: () => _buildingsLayer,    getShow: () => _showBuildings,    setShow: v => { _showBuildings = v; } },
+  { key: 'computers',    color: '#e67e22', labelKey: 'map_computer_services',  fallback: 'IT Services', getLayer: () => _computersLayer,    getShow: () => _showComputers,    setShow: v => { _showComputers = v; } },
+  { key: 'dataCenters',  color: '#2980b9', labelKey: 'map_data_centers',       fallback: 'Data Centers',getLayer: () => _dataCentersLayer,  getShow: () => _showDataCenters,  setShow: v => { _showDataCenters = v; } },
+];
+
 function updateLegend() {
   const el = document.getElementById('legendContent');
   if (!el) return;
   el.innerHTML = '';
-  const items = [
-    { color: '#D35400', label: _t('map_meetings_layer') || 'Meetings' },
-    { color: '#4a9eff', label: _t('map_users_layer') || 'Users' },
-    { color: '#27ae60', label: _t('map_rooms') || 'Rooms' },
-    { color: '#8e44ad', label: _t('map_buildings') || 'Buildings' },
-    { color: '#e67e22', label: _t('map_computer_services') || 'IT Services' },
-    { color: '#2980b9', label: _t('map_data_centers') || 'Data Centers' },
-  ];
-  _importedLayers.forEach(il => {
-    items.push({ color: '#e67e22', label: il.name });
+
+  _legendLayers.forEach(it => {
+    const checked = it.getShow();
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<input type="checkbox" class="legend-cb" data-legend-key="${it.key}" ${checked ? 'checked' : ''}><span class="legend-dot" style="background:${it.color}"></span>${escH(_t(it.labelKey) || it.fallback)}`;
+    div.querySelector('input').addEventListener('change', function() {
+      it.setShow(this.checked);
+      const layer = it.getLayer();
+      if (this.checked) _map.addLayer(layer);
+      else _map.removeLayer(layer);
+      // Sync toolbar button active state
+      const btnMap = { meetings:'btnMeetings', users:'btnUsers', rooms:'btnRooms', buildings:'btnBuildings', computers:'btnComputers', dataCenters:'btnDataCenters' };
+      const btn = document.getElementById(btnMap[it.key]);
+      if (btn) btn.classList.toggle('active', this.checked);
+    });
+    el.appendChild(div);
   });
-  items.forEach(it => {
-    el.innerHTML += `<div class="legend-item"><span class="legend-dot" style="background:${it.color}"></span>${escH(it.label)}</div>`;
+
+  _importedLayers.forEach((il, idx) => {
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<input type="checkbox" class="legend-cb" data-imported-idx="${idx}" checked><span class="legend-dot" style="background:#e67e22"></span>${escH(il.name)}`;
+    div.querySelector('input').addEventListener('change', function() {
+      if (this.checked) _map.addLayer(il.layer);
+      else _map.removeLayer(il.layer);
+    });
+    el.appendChild(div);
   });
 }
 
