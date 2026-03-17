@@ -469,10 +469,38 @@ function _showWelcomeBanner(startupText) {
         <div style="font-size:var(--fs-sm);color:var(--text);line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto">${escHtml(startupText)}</div>
       </div>`
     : '';
+  // Build login info section
+  const u = state.user || {};
+  const greetName = u.display_name || u.username || '';
+  const prevAt = u.prev_login_at ? fmtDateTime(new Date(u.prev_login_at)) : '';
+  const prevFrom = u.prev_login_domain || u.prev_login_ip || '';
+  const loginCount = u.login_count || 0;
+  const failedAt = u.last_failed_login_at ? fmtDateTime(new Date(u.last_failed_login_at)) : '';
+  const failedFrom = u.last_failed_login_ip || '';
+
+  let loginInfoLines = [];
+  if (prevAt) {
+    const fromStr = prevFrom ? ` ${t('from')||'from'} <em>${escHtml(prevFrom)}</em>` : '';
+    loginInfoLines.push(`<span>${t('welcome_last_login')||'Last login'}: ${prevAt}${fromStr}</span>`);
+  } else {
+    loginInfoLines.push(`<span>${t('welcome_first_login')||'This is your first login — welcome!'}</span>`);
+  }
+  if (loginCount > 1) {
+    loginInfoLines.push(`<span>${t('welcome_login_count')||'Total logins'}: ${loginCount}</span>`);
+  }
+  if (failedAt) {
+    const failedFromStr = failedFrom ? ` ${t('from')||'from'} <em>${escHtml(failedFrom)}</em>` : '';
+    loginInfoLines.push(`<span style="color:var(--warning,#e67e22)">⚠ ${t('welcome_failed_login')||'Failed login attempt'}: ${failedAt}${failedFromStr}</span>`);
+  }
+  const loginInfoSection = `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px;background:var(--bg2);text-align:left;font-size:var(--fs-sm);line-height:1.8">
+    ${loginInfoLines.join('<br>')}
+  </div>`;
+
   overlay.innerHTML = `
     <div class="modal" style="max-width:520px;padding:32px;text-align:center">
-      <h2 style="font-size:var(--fs-xl);margin-bottom:8px;color:var(--text-bright)">${t('welcome_title')}</h2>
+      <h2 style="font-size:var(--fs-xl);margin-bottom:8px;color:var(--text-bright)">${t('welcome_greeting')?.replace('{name}', escHtml(greetName)) || ('Welcome, ' + escHtml(greetName) + '!')}</h2>
       <p style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6">${t('welcome_text')}</p>
+      ${loginInfoSection}
       ${startupSection}
       ${urlLinks.length ? `<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px">${urlLinks.join('')}</div>` : ''}
       <label style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:16px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">

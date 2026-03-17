@@ -924,6 +924,10 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			u.LastLoginDomain = strings.TrimSuffix(names[0], ".")
 		}
 		if fullUser, ok := app.store.GetUserByID(u.ID); ok {
+			// Preserve previous login info before overwriting
+			fullUser.PrevLoginAt = fullUser.LastLoginAt
+			fullUser.PrevLoginIP = fullUser.LastLoginIP
+			fullUser.PrevLoginDomain = fullUser.LastLoginDomain
 			fullUser.LastLoginAt = u.LastLoginAt
 			fullUser.LastLoginIP = u.LastLoginIP
 			fullUser.LastLoginDomain = u.LastLoginDomain
@@ -13596,6 +13600,10 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			u.LastLoginDomain = strings.TrimSuffix(names[0], ".")
 		}
 		if fullUser, ok := app.store.GetUserByID(u.ID); ok {
+			// Preserve previous login info before overwriting
+			fullUser.PrevLoginAt = fullUser.LastLoginAt
+			fullUser.PrevLoginIP = fullUser.LastLoginIP
+			fullUser.PrevLoginDomain = fullUser.LastLoginDomain
 			fullUser.LastLoginAt = u.LastLoginAt
 			fullUser.LastLoginIP = u.LastLoginIP
 			fullUser.LastLoginDomain = u.LastLoginDomain
