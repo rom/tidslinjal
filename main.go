@@ -13647,7 +13647,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		"response_type":         {"code"},
 		"client_id":             {app.oidc.ClientID},
 		"redirect_uri":          {app.oidc.RedirectURL},
-		"scope":                 {"openid profile email"},
+		"scope":                 {"openid profile email address"},
 		"state":                 {state},
 		"nonce":                 {nonce},
 		"code_challenge":        {codeChallenge},
@@ -14052,6 +14052,12 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Email       string `json:"email"`
 		Name        string `json:"name"`
 		PreferredUN string `json:"preferred_username"`
+		GivenName   string `json:"given_name"`
+		FamilyName  string `json:"family_name"`
+		Locale      string `json:"locale"`
+		Groups      []string `json:"groups"`
+		// Address can be a structured object or a string; capture as raw JSON
+		AddressRaw json.RawMessage `json:"address"`
 	}
 	if err := json.NewDecoder(uiResp.Body).Decode(&userInfo); err != nil {
 		http.Redirect(w, r, "/login?error=userinfo_parse_failed", http.StatusFound)
@@ -14088,6 +14094,54 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		displayName = username
 	}
 
+	// Build full name from IDP claims (prefer given_name + family_name, fallback to name)
+	fullName := userInfo.Name
+	if userInfo.GivenName != "" || userInfo.FamilyName != "" {
+		fullName = strings.TrimSpace(userInfo.GivenName + " " + userInfo.FamilyName)
+	}
+
+	// Parse address from IDP (can be a JSON object with "formatted" key, or a plain string)
+	var oidcAddress string
+	if len(userInfo.AddressRaw) > 0 {
+		// Try structured address object first (OpenID Connect standard)
+		var addrObj struct {
+			Formatted     string `json:"formatted"`
+			StreetAddress string `json:"street_address"`
+			Locality      string `json:"locality"`
+			Region        string `json:"region"`
+			PostalCode    string `json:"postal_code"`
+			Country       string `json:"country"`
+		}
+		if err := json.Unmarshal(userInfo.AddressRaw, &addrObj); err == nil && addrObj.Formatted != "" {
+			oidcAddress = addrObj.Formatted
+		} else if err == nil {
+			// Build from components
+			parts := []string{}
+			if addrObj.StreetAddress != "" {
+				parts = append(parts, addrObj.StreetAddress)
+			}
+			if addrObj.Locality != "" {
+				parts = append(parts, addrObj.Locality)
+			}
+			if addrObj.Region != "" {
+				parts = append(parts, addrObj.Region)
+			}
+			if addrObj.PostalCode != "" {
+				parts = append(parts, addrObj.PostalCode)
+			}
+			if addrObj.Country != "" {
+				parts = append(parts, addrObj.Country)
+			}
+			oidcAddress = strings.Join(parts, ", ")
+		} else {
+			// Maybe it's a plain string
+			var plainAddr string
+			if err := json.Unmarshal(userInfo.AddressRaw, &plainAddr); err == nil {
+				oidcAddress = plainAddr
+			}
+		}
+	}
+
 	// Find or auto-create the local user
 	user, found := app.store.GetUserByUsername(username)
 	if !found {
@@ -14102,6 +14156,9 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			Role:        defaultRole,
 			Vetted:      true, // SSO users are pre-authenticated by the IDP
 			IsOIDC:      true,
+			FullName:    fullName,
+			Locale:      userInfo.Locale,
+			Address:     oidcAddress,
 		}
 		// No password — OIDC-only login
 		created, err := app.store.CreateUser(newUser)
@@ -14115,12 +14172,31 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		app.audit(0, "system", "created", "user", created.ID,
 			fmt.Sprintf("SSO auto enrollment: user %q auto-created via OIDC (role=%s)", username, defaultRole))
 	} else {
-		// Sync display name from IDP on every login
+		// Sync profile fields from IDP on every login
+		changed := false
 		if displayName != "" && displayName != user.DisplayName {
 			logVerbose("OIDC: updating display name for %q: %q → %q", username, user.DisplayName, displayName)
 			user.DisplayName = displayName
+			changed = true
+		}
+		if fullName != "" && fullName != user.FullName {
+			logVerbose("OIDC: updating full name for %q: %q → %q", username, user.FullName, fullName)
+			user.FullName = fullName
+			changed = true
+		}
+		if userInfo.Locale != "" && userInfo.Locale != user.Locale {
+			logVerbose("OIDC: updating locale for %q: %q → %q", username, user.Locale, userInfo.Locale)
+			user.Locale = userInfo.Locale
+			changed = true
+		}
+		if oidcAddress != "" && oidcAddress != user.Address {
+			logVerbose("OIDC: updating address for %q: %q → %q", username, user.Address, oidcAddress)
+			user.Address = oidcAddress
+			changed = true
+		}
+		if changed {
 			if err := app.store.UpdateUser(*user); err != nil {
-				logVerbose("OIDC: failed to update display name for %q: %v", username, err)
+				logVerbose("OIDC: failed to update profile for %q: %v", username, err)
 			}
 		}
 		// Ensure existing OIDC users are vetted
@@ -14129,6 +14205,11 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			app.store.UpdateUser(*user) //nolint
 			logVerbose("OIDC: auto-vetted existing user %q", username)
 		}
+	}
+
+	// Sync group memberships from IDP groups claim
+	if len(userInfo.Groups) > 0 {
+		app.syncOIDCGroups(user, userInfo.Groups)
 	}
 
 	// Deny login for blocked accounts (even via OIDC)
@@ -14185,6 +14266,68 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	logVerbose("OIDC login success: user=%s role=%s", username, user.Role)
 	logDebug("OIDC: session created id=%s expires=%s", sessID, sess.ExpiresAt.Format(time.RFC3339))
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+// syncOIDCGroups synchronises the user's local group memberships with the groups
+// claim received from the identity provider. For each IDP group the matching
+// local group is found (case-insensitive) or auto-created, and the user is added.
+// Memberships for groups not present in the IDP claim are removed so that Keycloak
+// remains the authoritative source of group membership.
+func (app *App) syncOIDCGroups(user *User, idpGroups []string) {
+	// Keycloak often sends groups as "/groupname" – strip leading slash
+	cleaned := make([]string, 0, len(idpGroups))
+	for _, g := range idpGroups {
+		g = strings.TrimPrefix(g, "/")
+		g = strings.TrimSpace(g)
+		if g != "" {
+			cleaned = append(cleaned, g)
+		}
+	}
+
+	// Build a set of target group IDs from the IDP claim
+	targetGroupIDs := make(map[int64]bool)
+	for _, groupName := range cleaned {
+		grp, found := app.store.GetGroupByName(groupName)
+		if !found {
+			// Auto-create the group
+			newGroup := Group{
+				Name:        groupName,
+				Description: "Auto-created from IDP group",
+				CreatedBy:   0, // system
+			}
+			created, err := app.store.CreateGroup(newGroup)
+			if err != nil {
+				logVerbose("OIDC: failed to auto-create group %q: %v", groupName, err)
+				continue
+			}
+			grp = &created
+			log.Printf("OIDC: auto-created group %q (id=%d) from IDP claim", groupName, grp.ID)
+			app.audit(0, "system", "created", "group", grp.ID,
+				fmt.Sprintf("Group %q auto-created from IDP groups claim", groupName))
+		}
+		targetGroupIDs[grp.ID] = true
+		// Ensure user is a member
+		if err := app.store.AddGroupMember(GroupMembership{
+			GroupID: grp.ID,
+			UserID:  user.ID,
+			Role:    "member",
+		}); err != nil {
+			logVerbose("OIDC: failed to add user %q to group %q: %v", user.Username, groupName, err)
+		}
+	}
+
+	// Remove memberships for groups not in the IDP claim (IDP is authoritative)
+	currentMemberships := app.store.GetUserGroups(user.ID)
+	for _, m := range currentMemberships {
+		if !targetGroupIDs[m.GroupID] {
+			if err := app.store.RemoveGroupMember(m.GroupID, user.ID); err != nil {
+				logVerbose("OIDC: failed to remove user %q from group %d: %v", user.Username, m.GroupID, err)
+			} else {
+				logVerbose("OIDC: removed user %q from group %d (not in IDP claim)", user.Username, m.GroupID)
+			}
+		}
+	}
+	logVerbose("OIDC: synced %d group(s) for user %q", len(cleaned), user.Username)
 }
 
 // ── Additional Map Resource handlers ───────────────────────────────────────────

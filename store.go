@@ -1192,6 +1192,18 @@ func (s *Store) GetGroupByID(id int64) (*Group, bool) {
 	return nil, false
 }
 
+func (s *Store) GetGroupByName(name string) (*Group, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.groups {
+		if strings.EqualFold(s.groups[i].Name, name) {
+			g := s.groups[i]
+			return &g, true
+		}
+	}
+	return nil, false
+}
+
 func (s *Store) CreateGroup(g Group) (Group, error) {
 	s.mu.Lock()
 	s.nextGroupID++
