@@ -48,6 +48,10 @@ func apiDo(t *testing.T, srv *httptest.Server, method, path string, body any, co
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// CSRF protection: state-changing requests require X-Requested-With header
+	if method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
+		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	}
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -187,7 +191,8 @@ func TestAPI_Me_Unauthenticated(t *testing.T) {
 
 func TestAPI_Version(t *testing.T) {
 	_, srv := newTestApp(t)
-	resp := apiDo(t, srv, http.MethodGet, "/api/version", nil, nil)
+	cookies := login(t, srv, "admin", "admin")
+	resp := apiDo(t, srv, http.MethodGet, "/api/version", nil, cookies)
 	var result map[string]any
 	decodeJSON(t, resp, &result)
 	if !isSuccess(resp.StatusCode) {
@@ -322,7 +327,8 @@ func TestAPI_DeleteUser(t *testing.T) {
 
 func TestAPI_GetEventTypes(t *testing.T) {
 	_, srv := newTestApp(t)
-	resp := apiDo(t, srv, http.MethodGet, "/api/event-types", nil, nil)
+	cookies := login(t, srv, "admin", "admin")
+	resp := apiDo(t, srv, http.MethodGet, "/api/event-types", nil, cookies)
 	var types []map[string]any
 	decodeJSON(t, resp, &types)
 	if !isSuccess(resp.StatusCode) {

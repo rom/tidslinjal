@@ -27,7 +27,6 @@ import (
 	"net/smtp"
 	"net/url"
 	"os"
-	"os/exec"
 	"runtime"
 	"path/filepath"
 	"sort"
@@ -49,6 +48,42 @@ var (
 var _xmlReplacer = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;")
 
 func xmlEsc(s string) string { return _xmlReplacer.Replace(s) }
+
+// stripHTMLTags removes HTML/script tags from user input to prevent stored XSS.
+// It strips anything that looks like an HTML tag (<...>) including script tags.
+func stripHTMLTags(s string) string {
+	// Remove <script>...</script> blocks (case insensitive)
+	for {
+		lower := strings.ToLower(s)
+		start := strings.Index(lower, "<script")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(lower[start:], "</script>")
+		if end == -1 {
+			s = s[:start]
+			break
+		}
+		s = s[:start] + s[start+end+len("</script>"):]
+	}
+	// Remove remaining HTML tags
+	var result strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' && inTag {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			result.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(result.String())
+}
 
 func init() {
 	// Ensure correct MIME types on all platforms (some Linux distros
@@ -2035,6 +2070,11 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "title required", http.StatusBadRequest)
 		return
 	}
+	// Sanitize user-supplied text fields to prevent stored XSS
+	e.Title = stripHTMLTags(e.Title)
+	e.Description = stripHTMLTags(e.Description)
+	e.PhysicalLocation = stripHTMLTags(e.PhysicalLocation)
+	e.LocationAddress = stripHTMLTags(e.LocationAddress)
 	if e.EventType == "" {
 		e.EventType = "event"
 	}
@@ -2148,6 +2188,11 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// Sanitize user-supplied text fields to prevent stored XSS
+	e.Title = stripHTMLTags(e.Title)
+	e.Description = stripHTMLTags(e.Description)
+	e.PhysicalLocation = stripHTMLTags(e.PhysicalLocation)
+	e.LocationAddress = stripHTMLTags(e.LocationAddress)
 	e.ID = id
 	e.CreatedBy = existing.CreatedBy
 	e.CreatedByName = existing.CreatedByName
@@ -3150,7 +3195,7 @@ func (app *App) handleGetEventLog(w http.ResponseWriter, r *http.Request, user *
 
 func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *User) {
 	var entry EventLogEntry
-	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&entry); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -3186,7 +3231,7 @@ func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, us
 		Subject  string `json:"subject"`
 		Body     string `json:"body"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -3201,9 +3246,9 @@ func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, us
 		UserID:      user.ID,
 		UserName:    user.Username,
 		DisplayName: user.DisplayName,
-		Category:    req.Category,
-		Subject:     req.Subject,
-		Body:        req.Body,
+		Category:    stripHTMLTags(req.Category),
+		Subject:     stripHTMLTags(req.Subject),
+		Body:        stripHTMLTags(req.Body),
 	}
 	created, err := app.store.AddLogBookEntry(entry)
 	if err != nil {
@@ -3612,7 +3657,7 @@ func (app *App) handleGetDayLabels(w http.ResponseWriter, r *http.Request, user 
 
 func (app *App) handleCreateDayLabel(w http.ResponseWriter, r *http.Request, user *User) {
 	var dl DayLabel
-	if err := json.NewDecoder(r.Body).Decode(&dl); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&dl); err != nil {
 		jsonError(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -3620,6 +3665,8 @@ func (app *App) handleCreateDayLabel(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "date and label required", http.StatusBadRequest)
 		return
 	}
+	// Sanitize label to prevent stored XSS
+	dl.Label = stripHTMLTags(dl.Label)
 	dl.CreatedBy = user.ID
 	created, err := app.store.AddDayLabel(dl)
 	if err != nil {
@@ -3638,7 +3685,7 @@ func (app *App) handleUpdateDayLabel(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 	var dl DayLabel
-	if err := json.NewDecoder(r.Body).Decode(&dl); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&dl); err != nil {
 		jsonError(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -4011,7 +4058,7 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 		EventID:         eventID,
 		AuthorID:        user.ID,
 		AuthorName:      user.DisplayName,
-		Content:         req.Content,
+		Content:         stripHTMLTags(req.Content),
 		PendingApproval: pendingApproval,
 		StatusChange:    req.StatusChange,
 	})
@@ -4224,7 +4271,7 @@ func (app *App) handleGetTemplates(w http.ResponseWriter, r *http.Request, user 
 
 func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, user *User) {
 	var tmpl Template
-	if err := json.NewDecoder(r.Body).Decode(&tmpl); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&tmpl); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -4287,7 +4334,7 @@ func (app *App) handleApplyTemplate(w http.ResponseWriter, r *http.Request, user
 		LayerID           *int64    `json:"layer_id"`
 		UseTemplateLayers *bool     `json:"use_template_layers"` // nil/true = use per-item layers from template; false = force all to LayerID
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -4438,7 +4485,7 @@ func (app *App) handleGetRoles(w http.ResponseWriter, r *http.Request, user *Use
 // handleUpdateRoles saves updated role configurations (admin only)
 func (app *App) handleUpdateRoles(w http.ResponseWriter, r *http.Request, user *User) {
 	var configs []RoleConfig
-	if err := json.NewDecoder(r.Body).Decode(&configs); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&configs); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -5995,7 +6042,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 					RegistrationLimit  int `json:"registration_limit"`
 					PasswordResetLimit int `json:"password_reset_limit"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 					http.Error(w, "invalid request", http.StatusBadRequest)
 					return
 				}
@@ -6023,7 +6070,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 					Mode      string   `json:"mode"`
 					Countries []string `json:"countries"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 					http.Error(w, "invalid request", http.StatusBadRequest)
 					return
 				}
@@ -6049,7 +6096,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				var req struct {
 					Enabled bool `json:"enabled"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 					http.Error(w, "invalid request", http.StatusBadRequest)
 					return
 				}
@@ -6069,7 +6116,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				var req struct {
 					Enabled bool `json:"enabled"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 					http.Error(w, "invalid request", http.StatusBadRequest)
 					return
 				}
@@ -6098,17 +6145,13 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 
-	// Server restart (admin only)
+	// Server restart (disabled — OS-level reboot from a web API is a security risk;
+	// use systemd/supervisor to manage the process lifecycle instead)
 	mux.HandleFunc("/api/admin/restart-server", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
-				app.audit(user.ID, user.Username, "restart_server", "system", 0, "Admin initiated server restart")
-				jsonOK(w, map[string]string{"ok": "true"})
-				go func() {
-					time.Sleep(500 * time.Millisecond)
-					// Attempt to reboot — requires appropriate permissions
-					exec.Command("reboot").Run() //nolint
-				}()
+				app.audit(user.ID, user.Username, "restart_server_denied", "system", 0, "Server restart via API is disabled for security")
+				jsonError(w, "server restart via API is disabled for security — use systemd/supervisor to restart", http.StatusForbidden)
 			})(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -6147,7 +6190,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 					Custodian      string `json:"custodian"`
 					CopyMode       string `json:"copy_mode"`
 				}
-				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 					jsonError(w, "invalid request", http.StatusBadRequest)
 					return
 				}
@@ -6173,7 +6216,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 							return
 						}
 						host := parsedURL.Hostname()
-						if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "169.254.") {
+						if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "169.254.") || strings.HasPrefix(host, "172.16.") || strings.HasPrefix(host, "172.17.") || strings.HasPrefix(host, "172.18.") || strings.HasPrefix(host, "172.19.") || strings.HasPrefix(host, "172.20.") || strings.HasPrefix(host, "172.21.") || strings.HasPrefix(host, "172.22.") || strings.HasPrefix(host, "172.23.") || strings.HasPrefix(host, "172.24.") || strings.HasPrefix(host, "172.25.") || strings.HasPrefix(host, "172.26.") || strings.HasPrefix(host, "172.27.") || strings.HasPrefix(host, "172.28.") || strings.HasPrefix(host, "172.29.") || strings.HasPrefix(host, "172.30.") || strings.HasPrefix(host, "172.31.") {
 							logVerbose("[reference] rejected internal URL: %s", req.URL)
 							return
 						}
@@ -6505,7 +6548,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	})
 	mux.HandleFunc("/api/polls/{id}/close", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
-			app.requireAuth(app.handleClosePoll)(w, r)
+			app.requireRole(RoleTeamLead, app.handleClosePoll)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -6884,7 +6927,7 @@ func (app *App) handleGetMailConfig(w http.ResponseWriter, r *http.Request, user
 
 func (app *App) handleSaveMailConfig(w http.ResponseWriter, r *http.Request, user *User) {
 	var cfg MailConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -6937,7 +6980,7 @@ func (app *App) handleSendMail(w http.ResponseWriter, r *http.Request, user *Use
 		BodyHTML string `json:"body_html"`
 		BodyText string `json:"body_text"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -6948,7 +6991,9 @@ func (app *App) handleSendMail(w http.ResponseWriter, r *http.Request, user *Use
 	}
 	body := req.BodyHTML
 	if body == "" {
-		body = "<pre>" + req.BodyText + "</pre>"
+		// HTML-escape plain text to prevent XSS via email body injection
+		escaped := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&#39;").Replace(req.BodyText)
+		body = "<pre>" + escaped + "</pre>"
 	}
 	if err := app.sendMail(cfg, req.To, req.Subject, body); err != nil {
 		app.store.LogAudit(AuditEntry{
@@ -7073,7 +7118,7 @@ func (app *App) handleGetSyslogConfig(w http.ResponseWriter, r *http.Request, us
 
 func (app *App) handleSaveSyslogConfig(w http.ResponseWriter, r *http.Request, user *User) {
 	var cfg SyslogConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -7119,7 +7164,7 @@ func (app *App) handleGetSecuritySettings(w http.ResponseWriter, r *http.Request
 
 func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Request, user *User) {
 	var ss SecuritySettings
-	if err := json.NewDecoder(r.Body).Decode(&ss); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&ss); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -7142,7 +7187,7 @@ func (app *App) handleGetTLSConfig(w http.ResponseWriter, r *http.Request, user 
 
 func (app *App) handleSaveTLSConfig(w http.ResponseWriter, r *http.Request, user *User) {
 	var cfg TLSConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -7918,7 +7963,7 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 		Name        string `json:"name"`
 		Description string `json:"description"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -8054,9 +8099,9 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		UserID:            user.ID,
 		UserName:          user.Username,
 		DisplayName:       user.DisplayName,
-		Title:             req.Title,
+		Title:             stripHTMLTags(req.Title),
 		Status:            req.Status,
-		Decision:          req.Decision,
+		Decision:          stripHTMLTags(req.Decision),
 		LogType:           req.LogType,
 		GroupID:            req.GroupID,
 		Confidential:      req.Confidential,
@@ -12072,7 +12117,7 @@ func (app *App) handleGetGeoItems(w http.ResponseWriter, r *http.Request, user *
 
 func (app *App) handleSetGeoItems(w http.ResponseWriter, r *http.Request, user *User) {
 	var items []map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&items); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&items); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -12244,7 +12289,7 @@ func (app *App) handleSaveMapOverlays(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var overlays []MapOverlay
-	if err := json.NewDecoder(r.Body).Decode(&overlays); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&overlays); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -12396,7 +12441,7 @@ func (app *App) handleUpdateMapDrawings(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	var drawings []MapDrawing
-	if err := json.NewDecoder(r.Body).Decode(&drawings); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&drawings); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
@@ -12609,7 +12654,7 @@ func (app *App) handleListFilterPresets(w http.ResponseWriter, r *http.Request, 
 
 func (app *App) handleCreateFilterPreset(w http.ResponseWriter, r *http.Request, user *User) {
 	var p FilterPreset
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&p); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
@@ -12767,7 +12812,7 @@ func (app *App) handleGradualBackupSettings(w http.ResponseWriter, r *http.Reque
 		})
 	case http.MethodPut:
 		var cfg GradualBackupSettings
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 			jsonError(w, "invalid body", http.StatusBadRequest)
 			return
 		}
@@ -13132,16 +13177,17 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "user not found", http.StatusNotFound)
 		return
 	}
-	fullUser.MattermostHandle = req.MattermostHandle
-	fullUser.DiscordHandle = req.DiscordHandle
-	fullUser.SignalHandle = req.SignalHandle
-	fullUser.Telephone = req.Telephone
-	fullUser.Cellular = req.Cellular
-	fullUser.Title = req.Title
-	fullUser.Rank = req.Rank
-	fullUser.JobRole = req.JobRole
-	fullUser.Expertise = req.Expertise
-	fullUser.Location = req.Location
+	// Sanitize text fields to prevent stored XSS — strip HTML tags
+	fullUser.MattermostHandle = stripHTMLTags(req.MattermostHandle)
+	fullUser.DiscordHandle = stripHTMLTags(req.DiscordHandle)
+	fullUser.SignalHandle = stripHTMLTags(req.SignalHandle)
+	fullUser.Telephone = stripHTMLTags(req.Telephone)
+	fullUser.Cellular = stripHTMLTags(req.Cellular)
+	fullUser.Title = stripHTMLTags(req.Title)
+	fullUser.Rank = stripHTMLTags(req.Rank)
+	fullUser.JobRole = stripHTMLTags(req.JobRole)
+	fullUser.Expertise = stripHTMLTags(req.Expertise)
+	fullUser.Location = stripHTMLTags(req.Location)
 	fullUser.Latitude = req.Latitude
 	fullUser.Longitude = req.Longitude
 	if req.Availability == "free" || req.Availability == "busy" || req.Availability == "dnd" || req.Availability == "away" || req.Availability == "" {
