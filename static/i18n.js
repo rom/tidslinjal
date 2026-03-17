@@ -910,6 +910,9 @@ const TRANSLATIONS = {
     narrative_cat_operational: 'Operational events',
     narrative_cat_security:  'Security events',
     narrative_autoscroll:    'Autoscroll',
+    narrative_sort_order:    'Order',
+    narrative_sort_newest:   'Newest first',
+    narrative_sort_oldest:   'Oldest first',
 
     // Event modal labels
     ev_add_title:            'Add Event',
@@ -2553,6 +2556,9 @@ const TRANSLATIONS = {
     narrative_cat_operational: 'Operativa händelser',
     narrative_cat_security:  'Säkerhetshändelser',
     narrative_autoscroll:    'Autorulla',
+    narrative_sort_order:    'Ordning',
+    narrative_sort_newest:   'Nyast först',
+    narrative_sort_oldest:   'Äldst först',
     tl_quick_response:       'Snabbsvar behövs!',
     tl_decisions:            'Gruppledarens beslut',
     tl_escalate_decision:    'Beslut behövs — Eskalera till OpLead',

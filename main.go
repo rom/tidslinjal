@@ -4847,7 +4847,7 @@ func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User)
 		fmt.Sprintf("Exported JSON data (include=%s)", include))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-export-%s.json"`,
-		time.Now().Format("2006-01-02")))
+		time.Now().Format("2006-01-02T150405")))
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.Encode(data) //nolint
@@ -6137,16 +6137,28 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 					Content        string `json:"content"`
 					DownloadLocal  bool   `json:"download_local"`
 					DownloadServer bool   `json:"download_server"`
+					Language       string `json:"language"`
+					Owner          string `json:"owner"`
+					Authors        string `json:"authors"`
+					Custodian      string `json:"custodian"`
+					CopyMode       string `json:"copy_mode"`
 				}
 				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-					http.Error(w, "invalid request", http.StatusBadRequest)
+					jsonError(w, "invalid request", http.StatusBadRequest)
 					return
 				}
 				if req.Title == "" {
-					http.Error(w, `{"error":"title is required"}`, http.StatusBadRequest)
+					jsonError(w, "title is required", http.StatusBadRequest)
 					return
 				}
 				ref := app.store.CreateReferenceLink(req.Title, req.Description, req.Category, req.Tags, req.RefType, req.URL, req.Content, user.ID, user.DisplayName)
+				// Set additional metadata fields on the created reference
+				ref.Language = req.Language
+				ref.Owner = req.Owner
+				ref.Authors = req.Authors
+				ref.Custodian = req.Custodian
+				ref.CopyMode = req.CopyMode
+				app.store.UpdateReferenceDoc(ref)
 				// If download_server is set and URL is provided, fetch and cache the URL content
 				if req.DownloadServer && req.URL != "" && req.RefType == "url" {
 					go func() {
@@ -7737,7 +7749,7 @@ func (app *App) handleExportXLSX(w http.ResponseWriter, r *http.Request, user *U
 
 	app.audit(user.ID, user.DisplayName, "exported", "data", 0, "Exported XLSX")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-%s.xlsx"`, time.Now().Format("2006-01-02")))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="tidslinjal-export-%s.xlsx"`, time.Now().Format("2006-01-02T150405")))
 	w.Write(buf.Bytes()) //nolint
 }
 

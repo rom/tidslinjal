@@ -1679,9 +1679,10 @@ async function _loadResourceNotes(resType, resId, canDelete) {
           ${escHtml(n.content)}
           <div style="color:var(--text-dim);font-size:10px;margin-top:2px">— ${escHtml(n.created_by_name||'')} · ${dateStr}</div>
         </div>
-        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="_deleteResourceNote(${n.id},'${resType}','${resId}')">&times;</button>` : ''}
+        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" data-action="_deleteResourceNote" data-args='[${n.id},"${resType}","${resId}"]'>&times;</button>` : ''}
       </div>`;
     }).join('');
+    _bindActions(list);
   } catch { list.innerHTML = `<em style="color:var(--red);font-size:var(--fs-xs)">Error loading notes.</em>`; }
 }
 
@@ -1712,9 +1713,10 @@ async function _loadResourceStars(resType, resId, canDelete) {
         <span style="color:gold;font-size:14px;letter-spacing:1px">${starStr}</span>
         <span style="color:var(--text-dim)">(${escHtml(visLabel)})</span>
         <span style="color:var(--text-dim);font-size:10px;flex:1">— ${escHtml(s.created_by_name||'')} · ${dateStr}</span>
-        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" onclick="_deleteResourceStar(${s.id},'${resType}','${resId}')">&times;</button>` : ''}
+        ${canDelete ? `<button class="btn btn-danger btn-sm" style="padding:1px 5px;font-size:10px" data-action="_deleteResourceStar" data-args='[${s.id},"${resType}","${resId}"]'>&times;</button>` : ''}
       </div>`;
     }).join('');
+    _bindActions(list);
   } catch { list.innerHTML = `<em style="color:var(--red);font-size:var(--fs-xs)">Error loading stars.</em>`; }
 }
 
@@ -2278,9 +2280,11 @@ function openPhaseModal(ph) {
   document.getElementById('phaseId').value    = ph ? ph.id : '';
   document.getElementById('phaseName').value  = ph ? ph.name : '';
   document.getElementById('phaseColor').value = ph ? (ph.color||'#4A90D9') : '#4A90D9';
-  document.getElementById('phaseOrder').value = ph ? ph.order : 0;
-  document.getElementById('phaseStart').value = ph ? fmtDateInput(new Date(ph.start_time)) : fmtDateInput(state.startDate);
-  document.getElementById('phaseEnd').value   = ph ? fmtDateInput(new Date(ph.end_time))   : fmtDateInput(addDays(state.startDate, 1));
+  document.getElementById('phaseOrder').value = ph ? (ph.order ?? 0) : 0;
+  const phStart = ph && ph.start_time ? new Date(ph.start_time) : null;
+  const phEnd   = ph && ph.end_time   ? new Date(ph.end_time)   : null;
+  document.getElementById('phaseStart').value = fmtDateInput(phStart && !isNaN(phStart) ? phStart : state.startDate);
+  document.getElementById('phaseEnd').value   = fmtDateInput(phEnd && !isNaN(phEnd)     ? phEnd   : addDays(state.startDate, 1));
   // Layer selector for phase
   const phaseLaySel = document.getElementById('phaseLayer');
   if (phaseLaySel) {
@@ -6412,8 +6416,8 @@ async function createAPIKey() {
           <div style="display:flex;gap:6px;align-items:center">
             <input type="text" id="apiKeyResult" value="${escHtml(key.key)}" readonly
               style="flex:1;font-family:monospace;font-size:var(--fs-sm);padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);user-select:all"
-              onclick="this.select()">
-            <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('apiKeyResult').value).then(()=>showNotification('success','Copied!')).catch(()=>{document.getElementById('apiKeyResult').select();document.execCommand('copy');showNotification('success','Copied!')})">📋 ${t('btn_copy')||'Copy'}</button>
+              data-action="selectSelf" data-arg-el data-event="click">
+            <button class="btn btn-primary btn-sm" data-action="copyApiKey">📋 ${t('btn_copy')||'Copy'}</button>
           </div>
         </div>
         <div class="modal-footer">
@@ -8600,6 +8604,17 @@ function _closeParentModal() {
   if (m) m.remove();
 }
 
+/** CSP-safe: select all text in the input that triggered the event */
+function selectSelf(el) { if (el && el.select) el.select(); }
+
+/** CSP-safe: copy API key to clipboard */
+function copyApiKey() {
+  const val = document.getElementById('apiKeyResult')?.value || '';
+  navigator.clipboard.writeText(val)
+    .then(() => showNotification('success', 'Copied!'))
+    .catch(() => { document.getElementById('apiKeyResult')?.select(); document.execCommand('copy'); showNotification('success', 'Copied!'); });
+}
+
 // ── Meeting Config ───────────────────────────────────────────────────────────
 async function saveMeetingConfig(provider) {
   const val = id => document.getElementById(id)?.value?.trim() || '';
@@ -9938,7 +9953,7 @@ async function exportTemplatesToFile() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'templates.json';
+  a.download = `tidslinjal-template-${new Date().toISOString().slice(0,19).replace(/:/g,'')}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -12170,23 +12185,24 @@ function _renderExportTab(container) {
       <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">📄 ${t('analysis_export_data')||'Export Data'}</div>
       <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:90px">📋 CSV</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:90px">📋 JSON</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xml')" style="min-width:90px">📋 XML</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('txt')" style="min-width:90px">📋 TXT</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xlsx')" style="min-width:90px">📋 XLSX</button>
+        <button class="btn btn-primary" data-action="_downloadAnalysisExport" data-arg="csv" style="min-width:90px">📋 CSV</button>
+        <button class="btn btn-primary" data-action="_downloadAnalysisExport" data-arg="json" style="min-width:90px">📋 JSON</button>
+        <button class="btn btn-primary" data-action="_downloadAnalysisExport" data-arg="xml" style="min-width:90px">📋 XML</button>
+        <button class="btn btn-primary" data-action="_downloadAnalysisExport" data-arg="txt" style="min-width:90px">📋 TXT</button>
+        <button class="btn btn-primary" data-action="_downloadAnalysisExport" data-arg="xlsx" style="min-width:90px">📋 XLSX</button>
       </div>
     </div>
     <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">🖼 ${t('analysis_export_visual')||'Export Visuals'}</div>
       <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_visual_desc')||'Capture the current analysis view as an image or document.'}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="_exportAnalysisVisual('png')" style="min-width:90px">🖼 PNG</button>
-        <button class="btn btn-primary" onclick="_exportAnalysisVisual('jpeg')" style="min-width:90px">🖼 JPEG</button>
-        <button class="btn btn-primary" onclick="_exportAnalysisVisual('svg')" style="min-width:90px">🖼 SVG</button>
-        <button class="btn btn-primary" onclick="_exportAnalysisVisual('pdf')" style="min-width:90px">📑 PDF</button>
+        <button class="btn btn-primary" data-action="_exportAnalysisVisual" data-arg="png" style="min-width:90px">🖼 PNG</button>
+        <button class="btn btn-primary" data-action="_exportAnalysisVisual" data-arg="jpeg" style="min-width:90px">🖼 JPEG</button>
+        <button class="btn btn-primary" data-action="_exportAnalysisVisual" data-arg="svg" style="min-width:90px">🖼 SVG</button>
+        <button class="btn btn-primary" data-action="_exportAnalysisVisual" data-arg="pdf" style="min-width:90px">📑 PDF</button>
       </div>
     </div>`;
+  _bindActions(container);
 }
 
 function _downloadAnalysisExport(format) {
@@ -12197,7 +12213,7 @@ function _downloadAnalysisExport(format) {
   if (to) url += '&to=' + encodeURIComponent(to);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
+  a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,19).replace(/:/g,'') + '.' + format;
   a.click();
   showNotification('success', t('export_started')||'Export started');
 }
@@ -12653,6 +12669,7 @@ async function sendQuickReport() {
 let _narrativePopout = null;
 let _narrativeAutoScroll = true;
 let _narrativeAutoRefreshTimer = null;
+let _narrativeSortNewestFirst = true;
 
 async function openNarrativeModal() {
   // Default to last 24 hours
@@ -12695,8 +12712,15 @@ async function openNarrativeModal() {
             </label>
             <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px;cursor:pointer">
               <input type="checkbox" id="narrativeAutoScroll" ${_narrativeAutoScroll ? 'checked' : ''}
-                style="accent-color:var(--accent)" onchange="_narrativeAutoScroll=this.checked">
+                style="accent-color:var(--accent)" data-action="_setNarrativeAutoScroll" data-arg-checked data-event="change">
               ${t('narrative_autoscroll')||'Autoscroll'}
+            </label>
+            <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+              ${t('narrative_sort_order')||'Order'}:
+              <select id="narrativeSortOrder" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
+                <option value="newest" ${_narrativeSortNewestFirst ? 'selected' : ''}>${t('narrative_sort_newest')||'Newest first'}</option>
+                <option value="oldest" ${!_narrativeSortNewestFirst ? 'selected' : ''}>${t('narrative_sort_oldest')||'Oldest first'}</option>
+              </select>
             </label>
             <button class="btn btn-sm btn-primary" data-action="refreshNarrative">${t('btn_refresh')||'Refresh'}</button>
           </div>
@@ -12714,6 +12738,9 @@ async function openNarrativeModal() {
   // Category change triggers refresh
   const catEl = document.getElementById('narrativeCategory');
   if (catEl) catEl.addEventListener('change', () => refreshNarrative());
+  // Sort order change triggers refresh
+  const sortEl = document.getElementById('narrativeSortOrder');
+  if (sortEl) sortEl.addEventListener('change', () => { _narrativeSortNewestFirst = sortEl.value === 'newest'; refreshNarrative(); });
   // Autoscroll to bottom on open
   _narrativeScrollToBottom();
   // Start auto-refresh (every 15s)
@@ -12725,7 +12752,13 @@ async function openNarrativeModal() {
 
 function _renderNarrativeEntries(entries) {
   if (!entries || !entries.length) return `<p style="color:var(--text-dim)">${t('narrative_empty')||'No events in this time range.'}</p>`;
-  return entries.map(e => {
+  // Sort entries based on user preference (newest first or oldest first)
+  const sorted = [...entries].sort((a, b) => {
+    const ta = new Date(a.timestamp).getTime();
+    const tb = new Date(b.timestamp).getTime();
+    return _narrativeSortNewestFirst ? (tb - ta) : (ta - tb);
+  });
+  return sorted.map(e => {
     const ts = fmtDateTime(new Date(e.timestamp));
     const timeStr = new Date(e.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
     const severityColors = {info:'var(--text-dim)', warning:'#E67E22', critical:'#E74C3C'};
@@ -12750,6 +12783,8 @@ function _renderNarrativeEntries(entries) {
     </div>`;
   }).join('');
 }
+
+function _setNarrativeAutoScroll(val) { _narrativeAutoScroll = val; }
 
 function closeNarrativeModal() {
   if (_narrativeAutoRefreshTimer) { clearInterval(_narrativeAutoRefreshTimer); _narrativeAutoRefreshTimer = null; }
@@ -15185,11 +15220,13 @@ body{padding:20px;overflow:auto}
 </style></head><body class="${theme}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px" class="no-print">
   <h2>${t('btn_task_time_matrix')||'Task-Time Matrix'}</h2>
-  <button onclick="window.print()" class="btn btn-primary btn-sm">🖨 ${t('btn_print')||'Print'}</button>
+  <button class="btn btn-primary btn-sm" id="ttmPrintBtn">🖨 ${t('btn_print')||'Print'}</button>
 </div>
 ${content}
 </body></html>`);
   w.document.close();
+  const printBtn = w.document.getElementById('ttmPrintBtn');
+  if (printBtn) printBtn.addEventListener('click', () => w.print());
 }
 
 function _printTaskTimeMatrix() {
@@ -15268,7 +15305,7 @@ function _renderNotifPanel() {
       const icon = typeIcons[n.type] || '🔔';
       const unreadClass = n.read ? '' : ' unread';
       const ackBtn = n.acknowledged ? '' :
-        `<div class="notif-item-actions"><button class="notif-ack-btn" onclick="_ackNotification(${n.id}); event.stopPropagation();">Acknowledge</button></div>`;
+        `<div class="notif-item-actions"><button class="notif-ack-btn" data-action="_ackNotification" data-arg="${n.id}" data-stop-prop>Acknowledge</button></div>`;
       html += `<div class="notif-item${unreadClass}" data-notif-id="${n.id}">
         <div class="notif-item-title">${icon} ${escHtml(n.title)}</div>
         <div class="notif-item-body">${escHtml(n.body)}</div>
@@ -15278,6 +15315,7 @@ function _renderNotifPanel() {
     }
   }
   panel.innerHTML = html;
+  _bindActions(panel);
 }
 
 function _toggleNotifPanel() {
@@ -15646,6 +15684,8 @@ function _openReferenceUploadModal() {
           <input type="text" id="refUpTitle" class="form-input" placeholder="Document title">
           <label style="margin-top:8px">Description</label>
           <input type="text" id="refUpDesc" class="form-input" placeholder="Description (optional)">
+          <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
+          <input type="text" id="refUpAuthors" class="form-input" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
           <label style="margin-top:8px">Category</label>
           <select id="refUpCategory" class="form-input">
             <option value="handbook">${t('ref_category_handbook') || 'Handbook'}</option>
@@ -15664,8 +15704,6 @@ function _openReferenceUploadModal() {
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
           <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
-          <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
-          <input type="text" id="refUpAuthors" class="form-input" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
           <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
           <input type="text" id="refUpCustodian" class="form-input" placeholder="${t('ref_custodian_placeholder') || 'Document custodian'}">
           <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
@@ -15759,6 +15797,11 @@ async function _handleReferenceUpload() {
       ref_type: 'url',
       download_local: downloadLocal,
       download_server: downloadServer,
+      language: document.getElementById('refUpLang')?.value || '',
+      owner: document.getElementById('refUpOwner')?.value?.trim() || '',
+      authors: document.getElementById('refUpAuthors')?.value?.trim() || '',
+      custodian: document.getElementById('refUpCustodian')?.value?.trim() || '',
+      copy_mode: document.getElementById('refUpCopyMode')?.value || '',
     };
     try {
       const res = await api('POST', '/api/references/link', body);
@@ -15786,7 +15829,12 @@ async function _handleReferenceUpload() {
       description: document.getElementById('refUpDesc').value.trim(),
       category: document.getElementById('refUpCategory').value,
       tags: document.getElementById('refUpTags').value.trim(),
-      ref_type: 'local'
+      ref_type: 'local',
+      language: document.getElementById('refUpLang')?.value || '',
+      owner: document.getElementById('refUpOwner')?.value?.trim() || '',
+      authors: document.getElementById('refUpAuthors')?.value?.trim() || '',
+      custodian: document.getElementById('refUpCustodian')?.value?.trim() || '',
+      copy_mode: document.getElementById('refUpCopyMode')?.value || '',
     };
     try {
       const res = await api('POST', '/api/references/link', body);
@@ -15865,6 +15913,8 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditTitle" class="form-input" value="${escHtml(ref.title || '')}">
       <label style="margin-top:8px">${t('ref_description') || 'Description'}</label>
       <input type="text" id="refEditDesc" class="form-input" value="${escHtml(ref.description || '')}">
+      <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
+      <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
       <select id="refEditCategory" class="form-input">
         ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
@@ -15873,8 +15923,6 @@ function _openRefEditModal(id) {
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
       <input type="text" id="refEditOwner" class="form-input" value="${escHtml(ref.owner || '')}">
-      <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
-      <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
       <input type="text" id="refEditCustodian" class="form-input" value="${escHtml(ref.custodian || '')}">
       <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
@@ -15899,7 +15947,7 @@ function _openRefEditModal(id) {
       authors: document.getElementById('refEditAuthors')?.value?.trim() || '',
       custodian: document.getElementById('refEditCustodian').value.trim(),
       copy_mode: document.getElementById('refEditCopyMode').value,
-      tags: document.getElementById('refEditTags').value.trim(),
+      tags: document.getElementById('refEditTags').value.trim().split(',').map(t => t.trim()).filter(Boolean),
     };
     try {
       const res = await api('PUT', '/api/references/' + id, body);
