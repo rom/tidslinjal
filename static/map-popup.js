@@ -1083,7 +1083,7 @@ function updateLegendForMap(mr) {
     items.push({ color: '#888', label: 'No items on this map' });
   }
   items.forEach(it => {
-    el.innerHTML += '<div class="legend-item"><span class="legend-dot" style="background:' + it.color + '"></span>' + escH(it.label) + '</div>';
+    el.innerHTML += '<div class="legend-item"><span class="legend-dot" style="background:' + escH(it.color) + '"></span>' + escH(it.label) + '</div>';
   });
 }
 
@@ -1391,7 +1391,7 @@ function _renderOverlayItems(overlay) {
       draggable: !overlay.locked,
       icon: L.divIcon({
         className: 'map-overlay-item',
-        html: '<div style="background:' + (item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
+        html: '<div style="background:' + escH(item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
           iconHtml + ' ' + escH(item.label) +
           (item.notes ? '<br><small style="opacity:.8">' + escH(item.notes) + '</small>' : '') +
           '</div>',
@@ -1869,7 +1869,7 @@ function _renderGeoItems() {
       draggable: true,
       icon: L.divIcon({
         className: 'map-overlay-item',
-        html: '<div style="background:' + (item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
+        html: '<div style="background:' + escH(item.color || '#4A90D9') + ';padding:3px 8px;border-radius:4px;color:#fff;white-space:nowrap;font-size:11px;display:inline-flex;align-items:center;gap:4px;box-shadow:0 1px 4px rgba(0,0,0,.3)">' +
           iconHtml + ' ' + escH(item.label) +
           (item.notes ? '<br><small style="opacity:.8">' + escH(item.notes) + '</small>' : '') +
           '</div>',

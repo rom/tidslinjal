@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -36,7 +37,7 @@ func (app *App) handleConnectorConfig(w http.ResponseWriter, r *http.Request, us
 
 	case http.MethodPut:
 		var cfg ConnectorConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 			jsonError(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
@@ -66,7 +67,7 @@ func (app *App) handleLDAPConfig(w http.ResponseWriter, r *http.Request, user *U
 
 	case http.MethodPut:
 		var cfg LDAPConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
 			jsonError(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
@@ -102,7 +103,7 @@ func (app *App) handleLDAPTest(w http.ResponseWriter, r *http.Request, user *Use
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}

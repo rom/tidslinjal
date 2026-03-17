@@ -205,6 +205,7 @@ func TestAPI_ImportICS_Success(t *testing.T) {
 	body, ct := buildICSMultipart(t, icsData)
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -242,6 +243,7 @@ func TestAPI_ImportICS_AllDay(t *testing.T) {
 	body, ct := buildICSMultipart(t, icsData)
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -283,6 +285,7 @@ func TestAPI_ImportICS_RecurringEvent(t *testing.T) {
 	body, ct := buildICSMultipart(t, icsData)
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -332,6 +335,7 @@ func TestAPI_ImportICS_EmptyCalendar(t *testing.T) {
 	body, ct := buildICSMultipart(t, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n")
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -360,6 +364,7 @@ func TestAPI_ImportICS_MultipleEvents(t *testing.T) {
 	body, ct := buildICSMultipart(t, icsData)
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -393,6 +398,7 @@ func TestAPI_ImportICS_WithLocation(t *testing.T) {
 	body, ct := buildICSMultipart(t, icsData)
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/import/ics", body)
 	req.Header.Set("Content-Type", ct)
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}

@@ -191,6 +191,7 @@ func TestIngestAPI(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/ingest?source=test", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
@@ -217,7 +218,12 @@ func TestIngestAPI(t *testing.T) {
 
 func TestMetricsEndpoint(t *testing.T) {
 	_, srv := newTestApp(t)
-	resp, err := http.Get(srv.URL + "/metrics")
+	cookies := login(t, srv, "admin", "admin")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/metrics", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET /metrics: %v", err)
 	}

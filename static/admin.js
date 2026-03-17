@@ -6,6 +6,12 @@ function escHtml(s) {
 }
 
 async function api(path, opts) {
+  if (!opts) opts = {};
+  if (!opts.headers) opts.headers = {};
+  // Add CSRF protection header for state-changing requests
+  if (opts.method && opts.method !== 'GET' && opts.method !== 'HEAD') {
+    opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   const r = await fetch(path, opts);
   if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
   if (r.status === 403) { throw new Error('forbidden'); }

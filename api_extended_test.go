@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -1041,9 +1042,13 @@ func TestAPI_CreateEvent_SpecialCharacters(t *testing.T) {
 	if !isSuccess(resp.StatusCode) {
 		t.Fatalf("create event with special chars: expected 2xx, got %d", resp.StatusCode)
 	}
-	// Title should be stored as-is (output encoding is frontend responsibility)
-	if created["title"] != `O'Brien's <script>alert('xss')</script> Event — Ü` {
-		t.Errorf("title not stored correctly: %v", created["title"])
+	// Title should have HTML/script tags stripped (server-side XSS prevention)
+	title, _ := created["title"].(string)
+	if strings.Contains(title, "<script>") {
+		t.Errorf("title should have script tags stripped, got: %v", title)
+	}
+	if !strings.Contains(title, "O'Brien's") || !strings.Contains(title, "Event — Ü") {
+		t.Errorf("title should preserve non-HTML content, got: %v", title)
 	}
 }
 
