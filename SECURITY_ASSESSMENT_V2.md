@@ -11,7 +11,7 @@
 
 This second assessment was conducted after an initial round of security fixes. The application has significantly improved — OIDC JWKS verification is now implemented, CSRF protection covers login, rate limiters have cleanup, and many IDOR issues were addressed. However, **critical gaps remain in layer-based access control across multiple data paths**, and several new findings emerge from deeper analysis of session management, SSE broadcasting, export endpoints, and concurrency handling.
 
-**Finding breakdown**: 5 High, 12 Medium, 8 Low, 6 Informational = **31 findings total**
+**Finding breakdown**: 8 High, 17 Medium, 8 Low, 6 Informational = **39 findings total**
 
 ---
 
@@ -99,6 +99,41 @@ Similarly, `handleResetPassword` (line 1905-1958, the forgot-password token flow
 **Attack scenario**: Attacker steals a session cookie. Victim changes password. Attacker retains access for up to 24 hours.
 
 **Remediation**: Add `app.store.DeleteSessionsForUser(user.ID)` to both `handleChangePassword` and `handleResetPassword`, matching the pattern in `handleUpdateUser`.
+
+---
+
+### H-06: Data Race in GetDBStats — Write Under RLock
+
+**Location**: `store.go:554-555`
+**Severity**: **HIGH**
+
+`GetDBStats()` acquires an `RLock` (shared read lock) at line 530 but then writes to `s.cachedDBStats` and `s.cachedDBStatsAt` at lines 554-555. Multiple goroutines can hold `RLock` concurrently, so two simultaneous calls write to the same fields without mutual exclusion — a textbook Go data race causing undefined behavior.
+
+**Remediation**: Use a full `s.mu.Lock()` when updating the cache, or use a separate `sync.Mutex` for the cache fields.
+
+---
+
+### H-07: Zip Bomb in Backup Restore — No Decompressed Size Limit
+
+**Location**: `store.go:3536` and `main.go:13346`
+**Severity**: **HIGH**
+
+When restoring backups, individual ZIP entries are read with `io.ReadAll(rc)` with no size limit on decompressed data. A zip bomb (small compressed, huge decompressed) will exhaust memory and crash the server.
+
+**Remediation**: Use `io.LimitReader(rc, maxDecompressedSize)` (e.g., 100MB per file) when extracting ZIP entries.
+
+---
+
+### H-08: TOCTOU Race Conditions in Read-Modify-Write Handlers
+
+**Location**: Multiple handlers including `main.go:1148-1179` (`handleChangePassword`), `main.go:3227-3339` (`handleUpdateUser`)
+**Severity**: **HIGH**
+
+Handlers read a user/event with `GetUserByID`, modify fields in the handler, then call `UpdateUser`. If another goroutine modifies the same record between read and write, the update overwrites all fields with the stale copy, silently reverting the other change.
+
+**Attack scenario**: Admin changes user A's role to "observer". Simultaneously, user A changes their password. The password change reads the old record (with elevated role), sets new hash, writes back — reverting the role change. User A retains elevated privileges.
+
+**Remediation**: Implement optimistic concurrency (version field check) or use a compare-and-swap pattern in the store.
 
 ---
 
@@ -239,6 +274,61 @@ There is no limit on concurrent SSE connections per user or per IP. Each SSE con
 The connector config GET endpoint returns raw `Config` JSON which may contain API keys, tokens, and passwords for GitHub, Jira, Google Calendar, and STIX connectors. While admin-only, secrets should be masked in API responses.
 
 **Remediation**: Strip or mask secret fields (api_key, token, password) in connector config GET responses, similar to how OIDC client_secret is masked.
+
+---
+
+### M-13: No fsync Before Rename in saveFile — Data Loss on Power Failure
+
+**Location**: `store.go:588-604`
+**Severity**: **MEDIUM**
+
+The write pattern is write-to-temp-then-rename (good for atomicity), but there is no `f.Sync()` before `f.Close()`. On Linux, the data may still be in the page cache when `os.Rename()` is called. Power loss after rename but before kernel flush results in a zero-byte or truncated file. Combined with `loadFile` silently ignoring decode errors (line 579-586), this means a crash can silently lose an entire data collection.
+
+**Remediation**: Add `f.Sync()` before `f.Close()` in `saveFile`.
+
+---
+
+### M-14: Unbounded Data Growth in Collections (Memory/Disk Exhaustion)
+
+**Location**: `store.go` — events, comments, sessions, notifications, logBook, decisionLog, polls
+**Severity**: **MEDIUM**
+
+While audit is capped at 10,000 entries and eventVersions at 5,000, most collections have no growth limit. An attacker with `RoleReadWrite` can create unlimited events and comments, growing in-memory slices until OOM. Each create also serializes the entire collection to disk, causing write amplification.
+
+**Remediation**: Add configurable caps to major collections. Alert when thresholds are approached.
+
+---
+
+### M-15: UserPublic Struct Leaks Sensitive Operational Data
+
+**Location**: `models.go:146-183`
+**Severity**: **MEDIUM**
+
+`UserPublic` exposes `LastFailedLoginIP`, `LastFailedLoginAt`, `PrevLoginIP`, `PrevLoginDomain`, `Location`, `Latitude`, `Longitude`, and `Blocked`/`MustChangePassword` flags to any authenticated user. This aids reconnaissance.
+
+**Remediation**: Only expose these fields to the user themselves or admins. Use a separate `UserSelf` struct for the current user's full profile.
+
+---
+
+### M-16: Backup Restore io.Copy Bypasses ParseMultipartForm Size Limit
+
+**Location**: `main.go:13297-13301`
+**Severity**: **MEDIUM**
+
+`ParseMultipartForm(64<<20)` limits in-memory portion to 64MB but spills the rest to disk. The subsequent `io.Copy(buf, file)` reads the entire file (potentially multi-GB from the temp file) into memory with no limit.
+
+**Remediation**: Use `io.LimitReader(file, maxBackupSize)` in the `io.Copy` call.
+
+---
+
+### M-17: Restored Files Written with 0644 (World-Readable)
+
+**Location**: `store.go:3541` and `store.go:3401`
+**Severity**: **MEDIUM**
+
+Gradual backup restore writes restored data files with 0644 permissions instead of 0600. Until the next normal persist cycle, sensitive files (users, sessions, API keys) are world-readable on the filesystem.
+
+**Remediation**: Use 0600 for all data file writes, matching `saveFile`.
 
 ---
 
@@ -441,6 +531,9 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | H-03 | HIGH | AuthZ | Comments and attachments listed without layer access check |
 | H-04 | HIGH | AuthZ | handleUpdateEvent missing layer write check |
 | H-05 | HIGH | AuthN | Sessions not invalidated after self-service password change/reset |
+| H-06 | HIGH | Concurrency | Data race in GetDBStats — write under RLock |
+| H-07 | HIGH | DoS | Zip bomb in backup restore — no decompressed size limit |
+| H-08 | HIGH | Concurrency | TOCTOU race conditions in read-modify-write handlers |
 | M-01 | MEDIUM | Crypto | OIDC JWT algorithm confusion (HMAC alongside JWKS) |
 | M-02 | MEDIUM | SSRF | OIDC discovery/token/userinfo use unprotected HTTP client |
 | M-03 | MEDIUM | AuthN | OIDC PKCE and nonce not required |
@@ -453,6 +546,11 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | M-10 | MEDIUM | AuthN | No concurrent session limit |
 | M-11 | MEDIUM | DoS | No SSE connection limit per user/IP |
 | M-12 | MEDIUM | Data | Connector config API returns secrets in plaintext |
+| M-13 | MEDIUM | Data | No fsync before rename in saveFile — data loss on power failure |
+| M-14 | MEDIUM | DoS | Unbounded data growth in events, comments, logs |
+| M-15 | MEDIUM | Data | UserPublic leaks IPs, locations, security state |
+| M-16 | MEDIUM | DoS | Backup restore io.Copy bypasses multipart size limit |
+| M-17 | MEDIUM | Data | Restored files written with 0644 instead of 0600 |
 | L-01 | LOW | AuthZ | handleUploadAttachment missing layer write check |
 | L-02 | LOW | AuthZ | handleCreateComment missing layer write check |
 | L-03 | LOW | AuthZ | Auto-report email includes all events |
