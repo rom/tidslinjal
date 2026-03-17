@@ -111,7 +111,7 @@ async function gitSaveRefs() {
   const btn = document.getElementById('btnGitSave');
   btn.textContent = '⏳ Saving...';
   try {
-    const res = await fetch('/api/references/git/save', { method: 'POST' });
+    const res = await fetch('/api/references/git/save', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'} });
     if (res.ok) {
       document.getElementById('gitStatus').textContent = '✓ Saved at ' + new Date().toLocaleTimeString();
     } else {
@@ -128,7 +128,7 @@ async function gitLoadRefs() {
   const btn = document.getElementById('btnGitLoad');
   btn.textContent = '⏳ Loading...';
   try {
-    const res = await fetch('/api/references/git/load', { method: 'POST' });
+    const res = await fetch('/api/references/git/load', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'} });
     if (res.ok) {
       document.getElementById('gitStatus').textContent = '✓ Loaded at ' + new Date().toLocaleTimeString();
       await loadReferences();

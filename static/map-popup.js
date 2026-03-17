@@ -1,5 +1,17 @@
 'use strict';
 
+// Helper: ensure X-Requested-With header on all state-changing requests (CSRF protection)
+function _mapFetch(url, opts) {
+  if (!opts) opts = {};
+  if (!opts.headers) opts.headers = {};
+  if (typeof opts.headers.set === 'function') {
+    if (!opts.headers.has('X-Requested-With')) opts.headers.set('X-Requested-With', 'XMLHttpRequest');
+  } else {
+    if (!opts.headers['X-Requested-With']) opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
+  return fetch(url, opts);
+}
+
 /* ── Country name → capital city coordinates ── */
 const COUNTRY_CAPITALS = {
   'afghanistan':[34.5553,69.2075],'albania':[41.3275,19.8187],'algeria':[36.7538,3.0588],
@@ -998,7 +1010,7 @@ async function _saveDrawings() {
     }
   });
   try {
-    await fetch('/api/map-resources/' + _currentMapResource.id + '/drawings', {
+    await _mapFetch('/api/map-resources/' + _currentMapResource.id + '/drawings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(drawings)
@@ -1044,7 +1056,7 @@ document.getElementById('btnLockMap').addEventListener('click', async function()
   if (!_currentMapResource) return;
   try {
     const action = _mapLocked ? 'unlock' : 'lock';
-    const res = await fetch('/api/map-resources/' + _currentMapResource.id + '/' + action, { method: 'POST' });
+    const res = await _mapFetch('/api/map-resources/' + _currentMapResource.id + '/' + action, { method: 'POST' });
     if (res.ok) {
       _mapLocked = !_mapLocked;
       this.textContent = _mapLocked ? '🔓 Unlock' : '🔒 Lock';
@@ -1449,7 +1461,7 @@ async function _saveOverlay() {
     const overlays = _currentMapResource.overlays || [];
     const idx = overlays.findIndex(o => o.id === _currentOverlay.id);
     if (idx >= 0) overlays[idx] = _currentOverlay;
-    await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
+    await _mapFetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(overlays)
@@ -1474,7 +1486,7 @@ document.getElementById('btnDoUploadMap').addEventListener('click', async functi
   fd.append('description', document.getElementById('uploadMapDesc').value.trim());
   fd.append('map_type', document.getElementById('uploadMapType').value);
   try {
-    const res = await fetch('/api/map-resources', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}, body: fd });
+    const res = await _mapFetch('/api/map-resources', { method: 'POST', body: fd });
     if (!res.ok) { const t = await res.text(); alert('Upload failed: ' + t); return; }
     document.getElementById('uploadMapDialog').classList.remove('open');
     document.getElementById('uploadMapName').value = '';
@@ -1509,7 +1521,7 @@ document.getElementById('btnDoNewOverlay').addEventListener('click', async funct
 async function _saveOverlays() {
   if (!_currentMapResource) return;
   try {
-    await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
+    await _mapFetch('/api/map-resources/' + _currentMapResource.id + '/overlays', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(_currentMapResource.overlays || [])
@@ -1522,7 +1534,7 @@ document.getElementById('btnLockOverlay').addEventListener('click', async functi
   if (!_currentMapResource || !_currentOverlay) return;
   var action = _currentOverlay.locked ? 'unlock' : 'lock';
   try {
-    const res = await fetch('/api/map-resources/' + _currentMapResource.id + '/overlays/' + _currentOverlay.id + '/' + action, {
+    const res = await _mapFetch('/api/map-resources/' + _currentMapResource.id + '/overlays/' + _currentOverlay.id + '/' + action, {
       method: 'POST'
     });
     if (res.ok) {
@@ -1846,7 +1858,7 @@ async function _loadGeoItems() {
 
 async function _saveGeoItems() {
   try {
-    await fetch('/api/geo-items', {
+    await _mapFetch('/api/geo-items', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(_geoItems)
@@ -2097,7 +2109,7 @@ function _moveItemToMap(itemId) {
   }
   // Save both maps
   _saveOverlays();
-  fetch('/api/map-resources/' + targetMap.id + '/overlays', {
+  _mapFetch('/api/map-resources/' + targetMap.id + '/overlays', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(targetMap.overlays)

@@ -1269,15 +1269,19 @@ type ChecklistItemDef struct {
 
 // ChecklistInstance is a running/completed checklist created from a template.
 type ChecklistInstance struct {
-	ID         int64                  `json:"id"`
-	TemplateID int64                  `json:"template_id"`
-	Name       string                 `json:"name"`
-	Items      []ChecklistInstanceItem `json:"items"`
-	Status     string                 `json:"status"` // active | completed
-	CreatedBy  int64                  `json:"created_by"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-	CompletedAt *time.Time            `json:"completed_at,omitempty"`
+	ID              int64                  `json:"id"`
+	TemplateID      int64                  `json:"template_id"`
+	Name            string                 `json:"name"`
+	Items           []ChecklistInstanceItem `json:"items"`
+	Status          string                 `json:"status"` // active | completed
+	CreatedBy       int64                  `json:"created_by"`
+	CreatedByName   string                 `json:"created_by_name,omitempty"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
+	CompletedAt     *time.Time             `json:"completed_at,omitempty"`
+	CompletedBy     int64                  `json:"completed_by,omitempty"`
+	CompletedByName string                 `json:"completed_by_name,omitempty"`
+	GroupID         int64                  `json:"group_id,omitempty"`
 }
 
 // ChecklistInstanceItem tracks the check-state of a single item.
@@ -1358,6 +1362,53 @@ func BuiltInChecklists() []ChecklistTemplate {
 				{Text: "Prepare lessons-learned template", Category: "Preparation"},
 				{Text: "Schedule AAR meeting with all key personnel", Category: "Preparation"},
 				{Text: "Distribute materials to participants before meeting", Category: "Preparation"},
+			},
+		},
+		{
+			ID: -5, Name: "Team Status Assessment", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for assessing overall team status and readiness.",
+			Items: []ChecklistItemDef{
+				{Text: "Verify all team members have checked in", Category: "Personnel"},
+				{Text: "Confirm team member roles and responsibilities are clear", Category: "Personnel"},
+				{Text: "Check team fatigue levels and schedule rest rotations", Category: "Personnel"},
+				{Text: "Review team communication channels are working", Category: "Communications"},
+				{Text: "Verify all team members have access to shared resources", Category: "Communications"},
+				{Text: "Confirm team understands current priorities", Category: "Situational Awareness"},
+				{Text: "Review team workload distribution and balance", Category: "Situational Awareness"},
+				{Text: "Identify any skill gaps for current tasks", Category: "Capability"},
+				{Text: "Check equipment and tools availability for team", Category: "Capability"},
+				{Text: "Confirm backup personnel are identified", Category: "Capability"},
+			},
+		},
+		{
+			ID: -6, Name: "Team Briefing Checklist", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for conducting effective team briefings.",
+			Items: []ChecklistItemDef{
+				{Text: "Gather all team members or confirm remote attendance", Category: "Preparation"},
+				{Text: "Prepare situation overview with latest updates", Category: "Preparation"},
+				{Text: "Share current operational picture with the team", Category: "Briefing"},
+				{Text: "Review assigned tasks and their current status", Category: "Briefing"},
+				{Text: "Communicate priorities and any changes", Category: "Briefing"},
+				{Text: "Address questions and concerns from team members", Category: "Interaction"},
+				{Text: "Collect status updates from each team member", Category: "Interaction"},
+				{Text: "Assign new tasks and confirm understanding", Category: "Tasking"},
+				{Text: "Set next check-in time and communication plan", Category: "Tasking"},
+				{Text: "Document key decisions and action items", Category: "Documentation"},
+			},
+		},
+		{
+			ID: -7, Name: "Team Coordination Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for inter-team and intra-team coordination.",
+			Items: []ChecklistItemDef{
+				{Text: "Review dependencies with other teams", Category: "Inter-team"},
+				{Text: "Confirm shared information is up to date", Category: "Inter-team"},
+				{Text: "Check for conflicting activities between teams", Category: "Inter-team"},
+				{Text: "Verify team internal task assignments are clear", Category: "Intra-team"},
+				{Text: "Confirm all sub-tasks have owners", Category: "Intra-team"},
+				{Text: "Check progress against team milestones", Category: "Progress"},
+				{Text: "Identify and address bottlenecks", Category: "Progress"},
+				{Text: "Update team status board/timeline", Category: "Reporting"},
+				{Text: "Report team status to team lead", Category: "Reporting"},
 			},
 		},
 	}

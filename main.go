@@ -11641,13 +11641,14 @@ func (app *App) handleCreateChecklistInstance(w http.ResponseWriter, r *http.Req
 		items[i] = ChecklistInstanceItem{Text: it.Text, Category: it.Category}
 	}
 	ci := ChecklistInstance{
-		TemplateID: req.TemplateID,
-		Name:       name,
-		Items:      items,
-		Status:     "active",
-		CreatedBy:  user.ID,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		TemplateID:    req.TemplateID,
+		Name:          name,
+		Items:         items,
+		Status:        "active",
+		CreatedBy:     user.ID,
+		CreatedByName: user.DisplayName,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	saved, err := app.store.AddChecklistInstance(ci)
 	if err != nil {
@@ -11679,10 +11680,19 @@ func (app *App) handleUpdateChecklistInstance(w http.ResponseWriter, r *http.Req
 	if req.Status == "completed" && req.CompletedAt == nil {
 		now := time.Now()
 		req.CompletedAt = &now
+		req.CompletedBy = user.ID
+		req.CompletedByName = user.DisplayName
 	}
 	if err := app.store.UpdateChecklistInstance(req); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
+	}
+	if req.Status == "completed" {
+		app.store.LogAudit(AuditEntry{
+			UserID: user.ID, UserName: user.DisplayName,
+			Action: "complete_checklist", EntityType: "checklist_instance", EntityID: req.ID,
+			Summary: fmt.Sprintf("Completed checklist '%s'", req.Name),
+		})
 	}
 	jsonOK(w, req)
 }
