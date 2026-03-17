@@ -1003,7 +1003,7 @@ type MapResource struct {
 	ID            int64        `json:"id"`
 	Name          string       `json:"name"`
 	Description   string       `json:"description,omitempty"`
-	MapType       string       `json:"map_type"`      // geographical | network | electrical | floor_plan | org_chart | custom
+	MapType       string       `json:"map_type"`      // geographical | political | logical | network | electrical | floor_plan | org_chart | custom
 	Filename      string       `json:"filename"`       // stored filename on disk
 	OriginalName  string       `json:"original_name"`  // original upload filename
 	ContentType   string       `json:"content_type"`   // MIME type

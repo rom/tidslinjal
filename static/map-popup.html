@@ -42,8 +42,10 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   max-height:200px; overflow-y:auto; min-width:150px; cursor:grab; user-select:none; }
 .map-legend.dragging { cursor:grabbing; opacity:0.9; box-shadow:0 4px 16px rgba(0,0,0,0.3); }
 .map-legend h4 { font-size:11px; color:var(--accent); margin-bottom:4px; letter-spacing:.08em; text-transform:uppercase; }
-.legend-item { display:flex; align-items:center; gap:6px; padding:2px 0; }
+.legend-item { display:flex; align-items:center; gap:6px; padding:2px 0; cursor:pointer; }
+.legend-item:hover { opacity:0.85; }
 .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.legend-cb { width:13px; height:13px; margin:0; cursor:pointer; accent-color:var(--accent); flex-shrink:0; }
 /* ── Overlay layers panel ── */
 .map-layers { position:absolute; top:60px; right:12px; z-index:1001; background:var(--bg2);
   border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:11px;
@@ -191,6 +193,8 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <label>Type</label>
   <select id="uploadMapType">
     <option value="geographical">Geographical</option>
+    <option value="political">Political</option>
+    <option value="logical">Logical</option>
     <option value="floor_plan">Floor Plan</option>
     <option value="network">Network</option>
     <option value="electrical">Electrical</option>
