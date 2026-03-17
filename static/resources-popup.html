@@ -60,6 +60,17 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 
 /* ── Empty state ── */
 .res-empty { text-align:center; padding:32px 16px; color:var(--text-dim); font-size:13px; }
+
+/* ── Clickable cards ── */
+.res-card-clickable { cursor:pointer; }
+
+/* ── User SSO detail panel ── */
+.res-user-detail { margin-top:6px; padding:8px 10px; background:var(--bg3); border-radius:6px; font-size:12px; display:none; }
+.res-user-detail.open { display:block; }
+.res-user-detail-row { display:flex; gap:6px; margin-bottom:4px; }
+.res-user-detail-row .label { color:var(--text-dim); min-width:80px; font-size:11px; }
+.res-user-detail-row .value { color:var(--text); }
+.res-user-detail-groups { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
 </style>
 </head>
 <body class="theme-dark">
