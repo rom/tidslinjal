@@ -62,7 +62,7 @@ function applyI18n() {
   // Tab labels
   document.querySelectorAll('#anlTabBar .btn').forEach(function(btn) {
     var tab = btn.dataset.tab;
-    var map = {overview:'overview', activity:'activity', optempo:'optempo', decisions:'decisions', dependencies:'dependencies'};
+    var map = {overview:'analysis_tab_overview', activity:'analysis_tab_activity', optempo:'analysis_tab_optempo', decisions:'analysis_tab_decisions', dependencies:'analysis_tab_dependencies', export:'analysis_tab_export'};
     if (map[tab]) btn.textContent = t(map[tab]) || btn.textContent;
   });
 }
@@ -221,7 +221,8 @@ async function renderDependencies(container) {
   var graph = await cachedGet('/api/stats/dependency-graph' + qs);
 
   var nodes = (graph?.nodes || []).map(function(n) {
-    return { id: n.id, label: n.label || n.id, x: n.x, y: n.y, color: n.critical ? '#E74C3C' : (n.color || '#3498DB'), size: n.size || 10 };
+    return { id: n.id, label: n.label || n.title || n.id, x: n.x, y: n.y, color: n.critical ? '#E74C3C' : (n.color || '#3498DB'), size: n.size || 10,
+      _event: { status: n.status, event_type: n.type, start_time: n.start_time, description: n.description, assigned_to: n.assigned_to, layer_name: n.layer_name } };
   });
   var edges = (graph?.edges || []).map(function(e) {
     return { from: e.from, to: e.to, color: e.critical ? '#E74C3C' : (e.color || 'rgba(255,255,255,0.3)'), critical: !!e.critical };
@@ -235,13 +236,90 @@ async function renderDependencies(container) {
       card(stats.longest_chain || 0, t('longest_chain')||'Longest Chain', '#E67E22') +
     '</div>' +
     '<div class="anl-section"><div class="anl-section-title">' + (t('dependency_graph')||'Event Dependency Graph') + '</div>' +
-      '<div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">' + (t('drag_nodes')||'Drag nodes to reposition. Red = critical path.') + '</div>' +
+      '<div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">' + (t('drag_nodes_click')||'Drag nodes to reposition. Click a node to see event details. Red = critical path.') + '</div>' +
       '<canvas id="anlNetGraph" height="400"></canvas>' +
     '</div>';
 
   requestAnimationFrame(function() {
     drawNetworkGraph('anlNetGraph', nodes, edges, { directed: true, interactive: true, nodeRadius: 10 });
   });
+}
+
+/* ── Export Tab ─────────────────────────────────────────────────────────── */
+
+function renderExport(container) {
+  container.innerHTML =
+    '<div style="padding:16px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">' +
+      '<div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">📄 ' + (t('analysis_export_data')||'Export Data') + '</div>' +
+      '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">' + (t('analysis_export_desc')||'Download analysis data in your preferred format.') + '</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn" onclick="popupDownloadExport(\'csv\')">📋 CSV</button>' +
+        '<button class="btn" onclick="popupDownloadExport(\'json\')">📋 JSON</button>' +
+        '<button class="btn" onclick="popupDownloadExport(\'xml\')">📋 XML</button>' +
+        '<button class="btn" onclick="popupDownloadExport(\'txt\')">📋 TXT</button>' +
+        '<button class="btn" onclick="popupDownloadExport(\'xlsx\')">📋 XLSX</button>' +
+      '</div>' +
+    '</div>' +
+    '<div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">' +
+      '<div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">🖼 ' + (t('analysis_export_visual')||'Export Visuals') + '</div>' +
+      '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">' + (t('analysis_export_visual_desc')||'Capture the current analysis view as an image. Switch to a chart tab first.') + '</p>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn" onclick="popupExportVisual(\'png\')">🖼 PNG</button>' +
+        '<button class="btn" onclick="popupExportVisual(\'jpeg\')">🖼 JPEG</button>' +
+        '<button class="btn" onclick="popupExportVisual(\'svg\')">🖼 SVG</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function popupDownloadExport(format) {
+  var qs = dateParams();
+  var url = '/api/stats/export?format=' + encodeURIComponent(format);
+  var from = document.getElementById('anlFrom').value;
+  var to = document.getElementById('anlTo').value;
+  if (from) url += '&from=' + encodeURIComponent(from);
+  if (to) url += '&to=' + encodeURIComponent(to);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
+  a.click();
+}
+
+function popupExportVisual(format) {
+  var contentEl = document.getElementById('anlContent');
+  var canvases = contentEl ? contentEl.querySelectorAll('canvas') : [];
+  if (!canvases.length) { alert(t('no_charts')||'No charts to export. Switch to a tab with charts first.'); return; }
+  var dateStr = new Date().toISOString().slice(0,10);
+  var fname = 'tidslinjal-analysis-' + dateStr;
+  var dpr = window.devicePixelRatio || 1;
+  var gap = 20, totalH = gap, maxW = 0;
+  canvases.forEach(function(c) { totalH += c.height/dpr + gap; maxW = Math.max(maxW, c.width/dpr); });
+
+  if (format === 'png' || format === 'jpeg') {
+    var merged = document.createElement('canvas');
+    merged.width = maxW * dpr; merged.height = totalH * dpr;
+    var mctx = merged.getContext('2d'); mctx.scale(dpr, dpr);
+    mctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#0f1923';
+    mctx.fillRect(0, 0, maxW, totalH);
+    var yOff = gap;
+    canvases.forEach(function(c) { var cw=c.width/dpr, ch=c.height/dpr; mctx.drawImage(c, 0,0,c.width,c.height, 0,yOff,cw,ch); yOff+=ch+gap; });
+    var mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    merged.toBlob(function(blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = fname + '.' + format; a.click();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+    }, mimeType, 0.95);
+  } else if (format === 'svg') {
+    var parts = [];
+    parts.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + maxW + '" height="' + totalH + '">');
+    parts.push('<rect width="100%" height="100%" fill="' + (getComputedStyle(document.body).getPropertyValue('--bg')||'#0f1923') + '"/>');
+    var yOff2 = gap;
+    canvases.forEach(function(c) { var cw=c.width/dpr, ch=c.height/dpr; parts.push('<image x="0" y="'+yOff2+'" width="'+cw+'" height="'+ch+'" href="'+c.toDataURL('image/png')+'"/>'); yOff2+=ch+gap; });
+    parts.push('</svg>');
+    var blob2 = new Blob([parts.join('\n')], {type:'image/svg+xml'});
+    var url2 = URL.createObjectURL(blob2);
+    var a2 = document.createElement('a'); a2.href = url2; a2.download = fname + '.svg'; a2.click();
+    setTimeout(function() { URL.revokeObjectURL(url2); }, 5000);
+  }
 }
 
 /* ── Tab loading ────────────────────────────────────────────────────────── */
@@ -264,6 +342,7 @@ async function loadTab(tab) {
       case 'optempo':      await renderOpTempo(container); break;
       case 'decisions':    await renderDecisions(container); break;
       case 'dependencies': await renderDependencies(container); break;
+      case 'export':       renderExport(container); break;
     }
   } catch(e) {
     console.warn('Analysis tab error', e);
@@ -327,4 +406,26 @@ try {
 // Init
 initThemeAndI18n();
 applyI18n();
+
+// Set default from/to dates and name from exercise settings
+(function() {
+  var op = getOpener();
+  if (op && op.state && op.state.exercise) {
+    var ex = op.state.exercise;
+    var fromEl = document.getElementById('anlFrom');
+    var toEl = document.getElementById('anlTo');
+    if (ex.epoch && fromEl && !fromEl.value) {
+      try { fromEl.value = new Date(ex.epoch).toISOString().slice(0, 10); } catch(e) {}
+    }
+    if (ex.endex && toEl && !toEl.value) {
+      try { toEl.value = new Date(ex.endex).toISOString().slice(0, 10); } catch(e) {}
+    }
+    // Update title with exercise name
+    if (ex.label) {
+      var title = document.getElementById('anlHeaderTitle');
+      if (title) title.textContent = '\u{1F4C8} ' + ex.label + ' \u2014 ' + (t('analysis_title') || 'Analysis');
+    }
+  }
+})();
+
 loadTab('overview');

@@ -30,6 +30,7 @@
   --slot-h-quarter: 18px;
   --slot-h-hour:    40px;
   --slot-h-day:     80px;
+  --tactical-font: 'Tactical Task Graphics to Cyber', sans-serif;
   /* Font */
   --fs-base:    13px;
   --fs-sm:      11px;
@@ -161,6 +162,12 @@ body.size-huge {
   --slot-h-day:     192px;
   --day-col-min:    250px;
   --time-col-w:     80px;
+}
+
+/* ── Tactical Task Graphics font ─────────────────────────────────────────── */
+body.tactical-font-enabled .event-block .event-icon,
+body.tactical-font-enabled .tactical-symbol {
+  font-family: var(--tactical-font);
 }
 
 /* ── High-contrast mode (layered on top of any theme) ────────────────────── */

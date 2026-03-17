@@ -185,6 +185,8 @@ function applyPreferences() {
     link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Round';
     document.head.appendChild(link);
   }
+  // Apply tactical font
+  if (typeof _applyTacticalFont === 'function') _applyTacticalFont();
   // Broadcast theme to detached windows
   if (typeof _broadcastSync === 'function') {
     _broadcastSync({ type: 'theme', theme: state.preferences.theme || 'dark' });
@@ -4694,6 +4696,23 @@ function renderSidebar() {
           <p style="font-size:10px;color:var(--text-dim);margin-top:6px"><a href="https://fonts.google.com/icons" target="_blank" rel="noopener" style="color:var(--accent)">${t('browse_material_icons')||'Browse all Material Icons'}</a></p>
         </div>` : ''}
       </div>` : ''}
+      ${state.user && hasRole2(state.user.role, 'oplead') ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🎖 ${t('settings_tactical_font')||'Tactical Task Graphics Font'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_tactical_font_desc')||'Use the NDU Tactical Task Graphics font for military symbols and icons. The font is not distributed with Tidslinjal due to licensing — download it from the official source, then install it locally.'}</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <a href="http://ndupress.ndu.edu/Portals/68/Images/jfq/jfq-85/cyberspace-graphics/Tactical-Task-Graphics-to-Cyber.zip" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="text-align:center;text-decoration:none">⬇ ${t('settings_tactical_font_download')||'Download Font (NDU Press)'}</a>
+          <p style="font-size:10px;color:var(--text-dim);line-height:1.5">${t('settings_tactical_font_install')||'After downloading, extract the ZIP and install the .ttf/.otf font files on your operating system. Then enable the font below.'}</p>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+            <input type="checkbox" id="prefTacticalFont" ${p.tactical_font_enabled?'checked':''} data-action="setTacticalFontPref" data-event="change" data-arg-checked
+              style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('settings_tactical_font_enable')||'Enable Tactical Task Graphics font'}
+          </label>
+          <input type="text" id="prefTacticalFontFamily" value="${escHtml(p.tactical_font_family || 'Tactical Task Graphics to Cyber')}" data-action="setTacticalFontFamily" data-event="change" data-arg-value
+            style="font-size:var(--fs-xs);padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)" placeholder="Font family name">
+          <p style="font-size:10px;color:var(--text-dim)">${t('settings_tactical_font_family_desc')||'CSS font-family name (must match the installed font name).'}</p>
+        </div>
+      </div>` : ''}
       <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--text-dim);border-radius:0 var(--radius) var(--radius) 0">
         <div style="font-size:var(--fs-sm);font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.5px">${t('settings_personal_header')||'Personal Preferences'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${t('settings_personal_desc')||'Only affects your view — other users have their own settings'}</div>
@@ -5345,6 +5364,28 @@ async function setSynthLabelPref(val) {
   state.preferences.synth_label = val;
   await savePreferences();
   updateCurrentTimeLine(getDays(), getSlotHeight());
+}
+
+async function setTacticalFontPref(val) {
+  state.preferences.tactical_font_enabled = val;
+  await savePreferences();
+  _applyTacticalFont();
+}
+
+async function setTacticalFontFamily(val) {
+  state.preferences.tactical_font_family = val;
+  await savePreferences();
+  _applyTacticalFont();
+}
+
+function _applyTacticalFont() {
+  const p = state.preferences;
+  if (p.tactical_font_enabled && p.tactical_font_family) {
+    document.documentElement.style.setProperty('--tactical-font', p.tactical_font_family);
+    document.body.classList.add('tactical-font-enabled');
+  } else {
+    document.body.classList.remove('tactical-font-enabled');
+  }
 }
 
 function toggleFreeze() {
@@ -11372,7 +11413,7 @@ let _analysisActiveTab = 'overview';
 async function openAnalysisModal() {
   const html = `
     <div class="modal-overlay" id="analysisModal">
-      <div class="modal" style="max-width:960px;width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column">
+      <div class="modal" style="max-width:1280px;width:96vw;max-height:94vh;overflow:hidden;display:flex;flex-direction:column">
         <div class="modal-header">
           <h2>${t('analysis_title')||'Analysis'}</h2>
           <div style="display:flex;gap:6px;margin-left:auto;margin-right:8px">
@@ -11386,6 +11427,9 @@ async function openAnalysisModal() {
         </div>
         <div style="padding:8px 12px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border)">
           <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+            ${t('analysis_name')||'Name'}: <input type="text" id="analysisName" value="${escHtml((state.exercise && state.exercise.label) || '')}" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs);width:140px" placeholder="${t('analysis_name_placeholder')||'Analysis name'}">
+          </label>
+          <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
             ${t('from')||'From'}: <input type="date" id="analysisFrom" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
           </label>
           <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
@@ -11394,11 +11438,11 @@ async function openAnalysisModal() {
           <button class="btn btn-sm btn-primary" data-action="refreshAnalysis" style="font-size:11px;padding:2px 8px">${t('btn_refresh')||'Refresh'}</button>
           <div style="flex:1"></div>
           <div id="analysisTabBar" style="display:flex;gap:0">
-            <button class="btn btn-sm analysisTab active" data-tab="overview" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('overview')||'Overview'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="activity" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('activity')||'Activity'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="optempo" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('optempo')||'OpTempo'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('decisions')||'Decisions'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('dependencies')||'Dependencies'}</button>
+            <button class="btn btn-sm analysisTab active" data-tab="overview" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_overview')||'Overview'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="activity" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_activity')||'Activity'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="optempo" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_optempo')||'OpTempo'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="decisions" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_decisions')||'Decisions'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="dependencies" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_dependencies')||'Dependencies'}</button>
             ${state.user && hasRole2(state.user.role, 'oplead') ? `<button class="btn btn-sm analysisTab" data-tab="leadership" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_leadership')||'Leadership'}</button>` : ''}
             <button class="btn btn-sm analysisTab" data-tab="jstaff" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_jstaff')||'J-Staff'}</button>
             <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
@@ -11431,6 +11475,18 @@ async function openAnalysisModal() {
   // style active tab
   const activeBtn = modal.querySelector('.analysisTab.active');
   if (activeBtn) { activeBtn.style.background = 'var(--accent)'; activeBtn.style.color = '#fff'; }
+
+  // Set default from/to dates from exercise settings (epoch/endex)
+  const fromEl = document.getElementById('analysisFrom');
+  const toEl = document.getElementById('analysisTo');
+  if (state.exercise) {
+    if (state.exercise.epoch && fromEl && !fromEl.value) {
+      try { fromEl.value = new Date(state.exercise.epoch).toISOString().slice(0, 10); } catch(e) {}
+    }
+    if (state.exercise.endex && toEl && !toEl.value) {
+      try { toEl.value = new Date(state.exercise.endex).toISOString().slice(0, 10); } catch(e) {}
+    }
+  }
 
   _analysisCache = {};
   _analysisActiveTab = 'overview';
@@ -11650,9 +11706,10 @@ async function _renderDependenciesTab(container) {
   const graph = await _analysisFetch('/api/stats/dependency-graph' + qs).catch(() => null);
 
   const nodes = (graph?.nodes || []).map(n => ({
-    id: n.id, label: n.label || n.id, x: n.x, y: n.y,
+    id: n.id, label: n.label || n.title || n.id, x: n.x, y: n.y,
     color: n.critical ? '#E74C3C' : (n.color || '#3498DB'),
-    size: n.size || 10
+    size: n.size || 10,
+    _event: { status: n.status, event_type: n.type, start_time: n.start_time, description: n.description, assigned_to: n.assigned_to, layer_name: n.layer_name }
   }));
   const edges = (graph?.edges || []).map(e => ({
     from: e.from, to: e.to,
@@ -11669,7 +11726,7 @@ async function _renderDependenciesTab(container) {
     </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('dependency_graph')||'Event Dependency Graph'}</div>
-      <div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">${t('drag_nodes')||'Drag nodes to reposition. Red = critical path.'}</div>
+      <div style="font-size:var(--fs-xs);color:var(--text);margin-bottom:6px">${t('drag_nodes_click')||'Drag nodes to reposition. Click a node to see event details. Red = critical path.'}</div>
       <canvas id="anlNetGraph" height="400"></canvas>
     </div>`;
 
@@ -12082,13 +12139,25 @@ async function _renderTeamMembersTab(container) {
 function _renderExportTab(container) {
   const qs = _analysisDateParams();
   container.innerHTML = `
-    <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">${t('analysis_export_title')||'Export Analysis Data'}</div>
+    <div style="padding:16px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">📄 ${t('analysis_export_data')||'Export Data'}</div>
       <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_desc')||'Download analysis data in your preferred format.'}</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:120px">CSV</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:120px">JSON</button>
-        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xlsx')" style="min-width:120px">XLSX</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('csv')" style="min-width:90px">📋 CSV</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('json')" style="min-width:90px">📋 JSON</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xml')" style="min-width:90px">📋 XML</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('txt')" style="min-width:90px">📋 TXT</button>
+        <button class="btn btn-primary" onclick="_downloadAnalysisExport('xlsx')" style="min-width:90px">📋 XLSX</button>
+      </div>
+    </div>
+    <div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">🖼 ${t('analysis_export_visual')||'Export Visuals'}</div>
+      <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">${t('analysis_export_visual_desc')||'Capture the current analysis view as an image or document.'}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="_exportAnalysisVisual('png')" style="min-width:90px">🖼 PNG</button>
+        <button class="btn btn-primary" onclick="_exportAnalysisVisual('jpeg')" style="min-width:90px">🖼 JPEG</button>
+        <button class="btn btn-primary" onclick="_exportAnalysisVisual('svg')" style="min-width:90px">🖼 SVG</button>
+        <button class="btn btn-primary" onclick="_exportAnalysisVisual('pdf')" style="min-width:90px">📑 PDF</button>
       </div>
     </div>`;
 }
@@ -12103,6 +12172,180 @@ function _downloadAnalysisExport(format) {
   a.href = url;
   a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
   a.click();
+  showNotification('success', t('export_started')||'Export started');
+}
+
+function _exportAnalysisVisual(format) {
+  const contentEl = document.getElementById('analysisContent') || document.querySelector('.anl-content');
+  if (!contentEl) { showNotification('error', 'No analysis content found'); return; }
+  const canvases = contentEl.querySelectorAll('canvas');
+  if (!canvases.length) { showNotification('warning', t('no_charts')||'No charts to export. Switch to a tab with charts first.'); return; }
+
+  const dateStr = new Date().toISOString().slice(0,10);
+  const fname = 'tidslinjal-analysis-' + dateStr;
+
+  if (format === 'png' || format === 'jpeg') {
+    // Merge all canvases into one image
+    const merged = document.createElement('canvas');
+    const gap = 20;
+    let totalH = gap;
+    let maxW = 0;
+    canvases.forEach(c => { totalH += c.height / (window.devicePixelRatio||1) + gap; maxW = Math.max(maxW, c.width / (window.devicePixelRatio||1)); });
+    const dpr = window.devicePixelRatio || 1;
+    merged.width = maxW * dpr;
+    merged.height = totalH * dpr;
+    const mctx = merged.getContext('2d');
+    mctx.scale(dpr, dpr);
+    mctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#0f1923';
+    mctx.fillRect(0, 0, maxW, totalH);
+    let yOff = gap;
+    canvases.forEach(c => {
+      const cw = c.width / dpr, ch = c.height / dpr;
+      mctx.drawImage(c, 0, 0, c.width, c.height, 0, yOff, cw, ch);
+      yOff += ch + gap;
+    });
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    merged.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname + '.' + format; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }, mimeType, 0.95);
+    showNotification('success', t('export_started')||'Export started');
+  } else if (format === 'svg') {
+    // Convert canvases to an SVG with embedded images
+    let svgParts = [];
+    const gap = 20;
+    let totalH = gap, maxW = 0;
+    const dpr = window.devicePixelRatio || 1;
+    canvases.forEach(c => { const cw = c.width/dpr, ch = c.height/dpr; totalH += ch + gap; maxW = Math.max(maxW, cw); });
+    svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${maxW}" height="${totalH}">`);
+    svgParts.push(`<rect width="100%" height="100%" fill="${getComputedStyle(document.body).getPropertyValue('--bg')||'#0f1923'}"/>`);
+    let yOff = gap;
+    canvases.forEach(c => {
+      const cw = c.width/dpr, ch = c.height/dpr;
+      const dataUrl = c.toDataURL('image/png');
+      svgParts.push(`<image x="0" y="${yOff}" width="${cw}" height="${ch}" href="${dataUrl}"/>`);
+      yOff += ch + gap;
+    });
+    svgParts.push('</svg>');
+    const blob = new Blob([svgParts.join('\n')], {type:'image/svg+xml'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = fname + '.svg'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showNotification('success', t('export_started')||'Export started');
+  } else if (format === 'pdf') {
+    // Simple PDF with embedded images
+    _exportAnalysisPDF(canvases, fname);
+  }
+}
+
+function _exportAnalysisPDF(canvases, fname) {
+  const dpr = window.devicePixelRatio || 1;
+  const pageW = 595.28, pageH = 841.89; // A4 in points
+  const margin = 40;
+  const contentW = pageW - margin * 2;
+
+  // Collect canvas images
+  const images = [];
+  canvases.forEach(c => {
+    const cw = c.width / dpr, ch = c.height / dpr;
+    const scale = Math.min(contentW / cw, 1);
+    const imgW = cw * scale, imgH = ch * scale;
+    const dataUrl = c.toDataURL('image/jpeg', 0.92);
+    // Extract base64 data
+    const b64 = dataUrl.split(',')[1];
+    images.push({ b64, w: imgW, h: imgH, rawW: c.width, rawH: c.height });
+  });
+
+  // Build minimal PDF
+  const objects = [];
+  let objId = 0;
+  function addObj(content) { objId++; objects.push({ id: objId, content }); return objId; }
+
+  const catalogId = addObj(''); // placeholder
+  const pagesId = addObj('');   // placeholder
+  const pageIds = [];
+  const gap = 20;
+
+  // Create pages with images
+  let currentY = margin;
+  let currentPageStreams = [];
+  let currentPageImages = [];
+  let pageCount = 0;
+
+  function finalizePage() {
+    if (currentPageImages.length === 0) return;
+    pageCount++;
+    const imgObjIds = [];
+    currentPageImages.forEach((img, i) => {
+      const imgObjId = addObj(`<< /Type /XObject /Subtype /Image /Width ${img.rawW} /Height ${img.rawH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${atob(img.b64).length} >>`);
+      imgObjIds.push({ objId: imgObjId, img, idx: i });
+    });
+    // Build content stream
+    let stream = '';
+    let yPos = pageH - margin;
+    currentPageImages.forEach((img, i) => {
+      yPos -= img.h;
+      stream += `q ${img.w} 0 0 ${img.h} ${margin} ${yPos} cm /Img${i} Do Q\n`;
+      yPos -= gap;
+    });
+    const streamBytes = new TextEncoder().encode(stream);
+    const contentId = addObj(`<< /Length ${streamBytes.length} >>`);
+    // Resources
+    let resImgs = '';
+    imgObjIds.forEach((io, i) => { resImgs += `/Img${i} ${io.objId} 0 R `; });
+    const pageId = addObj(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Contents ${contentId} 0 R /Resources << /XObject << ${resImgs} >> >> >>`);
+    pageIds.push(pageId);
+    // Store stream and image data for writing
+    objects[contentId - 1]._stream = stream;
+    imgObjIds.forEach(io => { objects[io.objId - 1]._imgB64 = io.img.b64; });
+    currentPageImages = [];
+    currentY = margin;
+  }
+
+  images.forEach(img => {
+    if (currentY + img.h + gap > pageH - margin && currentPageImages.length > 0) {
+      finalizePage();
+    }
+    currentPageImages.push(img);
+    currentY += img.h + gap;
+  });
+  finalizePage();
+
+  // Update catalog and pages
+  objects[catalogId - 1].content = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+  objects[pagesId - 1].content = `<< /Type /Pages /Kids [${pageIds.map(id => id + ' 0 R').join(' ')}] /Count ${pageIds.length} >>`;
+
+  // Serialize PDF
+  const parts = ['%PDF-1.4\n'];
+  const offsets = [];
+  objects.forEach(obj => {
+    offsets.push(parts.join('').length);
+    parts.push(`${obj.id} 0 obj\n${obj.content}\n`);
+    if (obj._stream) {
+      parts.push(`stream\n${obj._stream}endstream\n`);
+    }
+    if (obj._imgB64) {
+      const bin = atob(obj._imgB64);
+      parts.push('stream\n');
+      // We'll handle binary separately
+      obj._binOffset = parts.join('').length;
+      parts.push(bin);
+      parts.push('\nendstream\n');
+    }
+    parts.push('endobj\n');
+  });
+  const xrefOffset = parts.join('').length;
+  parts.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
+  offsets.forEach(off => { parts.push(String(off).padStart(10, '0') + ' 00000 n \n'); });
+  parts.push(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+
+  const blob = new Blob(parts, { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = fname + '.pdf'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
   showNotification('success', t('export_started')||'Export started');
 }
 
@@ -12132,8 +12375,8 @@ function detachAnalysis() {
     _analysisPopout.focus();
     return;
   }
-  const w = Math.min(window.screen.availWidth, 1000);
-  const h = Math.min(window.screen.availHeight - 100, 800);
+  const w = Math.min(window.screen.availWidth, 1400);
+  const h = Math.min(window.screen.availHeight - 60, 1000);
   _analysisPopout = window.open('/static/analysis-popup.html', 'tidslinjal-analysis',
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
   closeAnalysisModal();
@@ -15394,6 +15637,8 @@ function _openReferenceUploadModal() {
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
           <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
+          <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
+          <input type="text" id="refUpAuthors" class="form-input" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
           <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
           <input type="text" id="refUpCustodian" class="form-input" placeholder="${t('ref_custodian_placeholder') || 'Document custodian'}">
           <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
@@ -15538,6 +15783,8 @@ async function _handleReferenceUpload() {
     const currentUserName = state.user?.display_name || state.user?.username || '';
     const owner = document.getElementById('refUpOwner')?.value?.trim() || currentUserName;
     if (owner) fd.append('owner', owner);
+    const authors = document.getElementById('refUpAuthors')?.value?.trim() || '';
+    if (authors) fd.append('authors', authors);
     const custodian = document.getElementById('refUpCustodian')?.value?.trim() || currentUserName;
     if (custodian) fd.append('custodian', custodian);
     const copyMode = document.getElementById('refUpCopyMode')?.value || '';
@@ -15599,6 +15846,8 @@ function _openRefEditModal(id) {
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
       <input type="text" id="refEditOwner" class="form-input" value="${escHtml(ref.owner || '')}">
+      <label style="margin-top:8px">${t('ref_authors') || 'Authors'}</label>
+      <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
       <input type="text" id="refEditCustodian" class="form-input" value="${escHtml(ref.custodian || '')}">
       <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
@@ -15620,6 +15869,7 @@ function _openRefEditModal(id) {
       category: document.getElementById('refEditCategory').value,
       language: document.getElementById('refEditLang').value,
       owner: document.getElementById('refEditOwner').value.trim(),
+      authors: document.getElementById('refEditAuthors')?.value?.trim() || '',
       custodian: document.getElementById('refEditCustodian').value.trim(),
       copy_mode: document.getElementById('refEditCopyMode').value,
       tags: document.getElementById('refEditTags').value.trim(),

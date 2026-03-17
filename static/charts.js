@@ -554,9 +554,80 @@ function drawNetworkGraph(canvasId, nodes, edges, options) {
       dragging.y = e.clientY - r.top;
       render();
     });
-    canvas.addEventListener('mouseup', () => { dragging = null; canvas.style.cursor = 'default'; });
+    canvas.addEventListener('mouseup', e => {
+      if (dragging) { dragging = null; canvas.style.cursor = 'default'; return; }
+    });
     canvas.addEventListener('mouseleave', () => { dragging = null; canvas.style.cursor = 'default'; });
+
+    // Click to show node info
+    let _downPos = null;
+    canvas.addEventListener('mousedown', e2 => { _downPos = { x: e2.clientX, y: e2.clientY }; }, true);
+    canvas.addEventListener('click', e2 => {
+      // Only trigger if not a drag (moved < 5px)
+      if (_downPos) {
+        const dx = e2.clientX - _downPos.x, dy = e2.clientY - _downPos.y;
+        if (dx*dx + dy*dy > 25) return;
+      }
+      const r2 = rect();
+      const mx = e2.clientX - r2.left, my = e2.clientY - r2.top;
+      for (const n of nodes) {
+        const ddx = n.x - mx, ddy = n.y - my;
+        if (ddx*ddx + ddy*ddy < (n.size||nodeR) * (n.size||nodeR) * 1.5) {
+          _showNodeInfoPopup(canvas, n, mx, my);
+          break;
+        }
+      }
+    });
   }
+}
+
+function _showNodeInfoPopup(canvas, node, mx, my) {
+  // Remove any existing popup
+  const existing = document.getElementById('_nodeInfoPopup');
+  if (existing) existing.remove();
+
+  const popup = document.createElement('div');
+  popup.id = '_nodeInfoPopup';
+  popup.style.cssText = 'position:absolute;z-index:9999;background:var(--bg2,#162030);border:1px solid var(--border,#2a3f56);border-radius:6px;padding:10px 14px;max-width:320px;font-size:11px;color:var(--text,#cfd8e3);box-shadow:0 4px 16px rgba(0,0,0,0.4);pointer-events:auto;';
+
+  const title = node.label || node.id;
+  const info = node._event || node._data || {};
+  let html = '<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--text-bright,#f0f4f8)">' + _escForPopup(String(title)) + '</div>';
+  html += '<div style="font-size:10px;color:var(--text-dim,#7a8fa6);margin-bottom:4px">ID: ' + _escForPopup(String(node.id)) + '</div>';
+
+  if (info.status) html += '<div><b>Status:</b> ' + _escForPopup(info.status) + '</div>';
+  if (info.event_type || info.type) html += '<div><b>Type:</b> ' + _escForPopup(info.event_type || info.type) + '</div>';
+  if (info.start_time || info.start) html += '<div><b>Start:</b> ' + _escForPopup(String(info.start_time || info.start).slice(0,16).replace('T',' ')) + '</div>';
+  if (info.end_time || info.end) html += '<div><b>End:</b> ' + _escForPopup(String(info.end_time || info.end).slice(0,16).replace('T',' ')) + '</div>';
+  if (info.description) html += '<div style="margin-top:4px;color:var(--text-dim)">' + _escForPopup(info.description).slice(0,200) + '</div>';
+  if (info.assigned_to) html += '<div><b>Assigned:</b> ' + _escForPopup(info.assigned_to) + '</div>';
+  if (info.layer_name) html += '<div><b>Layer:</b> ' + _escForPopup(info.layer_name) + '</div>';
+
+  html += '<div style="margin-top:8px;text-align:right"><button onclick="this.parentElement.parentElement.remove()" style="background:var(--bg3,#1e2d40);border:1px solid var(--border,#2a3f56);border-radius:4px;color:var(--text,#cfd8e3);padding:2px 10px;font-size:10px;cursor:pointer">✕ Close</button></div>';
+  popup.innerHTML = html;
+
+  // Position relative to canvas parent
+  const parent = canvas.parentElement;
+  if (parent) {
+    parent.style.position = 'relative';
+    popup.style.left = Math.min(mx, parent.clientWidth - 330) + 'px';
+    popup.style.top = Math.max(0, my - 60) + 'px';
+    parent.appendChild(popup);
+  } else {
+    document.body.appendChild(popup);
+  }
+
+  // Close on outside click
+  setTimeout(() => {
+    const handler = (ev) => {
+      if (!popup.contains(ev.target)) { popup.remove(); document.removeEventListener('mousedown', handler); }
+    };
+    document.addEventListener('mousedown', handler);
+  }, 100);
+}
+
+function _escForPopup(s) {
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
 }
 
 /* ── drawAreaChart ─────────────────────────────────────────────────────────── */

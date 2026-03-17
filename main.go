@@ -46,6 +46,10 @@ var (
 	debug   bool
 )
 
+var _xmlReplacer = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;")
+
+func xmlEsc(s string) string { return _xmlReplacer.Replace(s) }
+
 func init() {
 	// Ensure correct MIME types on all platforms (some Linux distros
 	// map .js → text/plain in /etc/mime.types, causing browsers to
@@ -10581,8 +10585,44 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
 		json.NewEncoder(w).Encode(data)
+	case "xml":
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.xml")
+		fmt.Fprintf(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<export exported_at=\"%s\">\n<events>\n", time.Now().Format(time.RFC3339))
+		for _, ev := range events {
+			endStr := ""
+			if ev.EndTime != nil {
+				endStr = ev.EndTime.Format(time.RFC3339)
+			}
+			fmt.Fprintf(w, "  <event id=\"%d\" title=\"%s\" status=\"%s\" type=\"%s\" start=\"%s\" end=\"%s\"/>\n",
+				ev.ID, xmlEsc(ev.Title), ev.Status, ev.EventType, ev.StartTime.Format(time.RFC3339), endStr)
+		}
+		fmt.Fprintf(w, "</events>\n<decisions>\n")
+		for _, d := range decisions {
+			fmt.Fprintf(w, "  <decision id=\"%d\" title=\"%s\" status=\"%s\" user=\"%s\"/>\n",
+				d.ID, xmlEsc(d.Title), d.Status, xmlEsc(d.DisplayName))
+		}
+		fmt.Fprintf(w, "</decisions>\n</export>\n")
+	case "txt":
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.txt")
+		fmt.Fprintf(w, "TIDSLINJAL ANALYSIS EXPORT\nExported: %s\n\n", time.Now().Format(time.RFC3339))
+		fmt.Fprintf(w, "=== EVENTS (%d) ===\n", len(events))
+		for _, ev := range events {
+			endStr := ""
+			if ev.EndTime != nil {
+				endStr = ev.EndTime.Format(time.RFC3339)
+			}
+			fmt.Fprintf(w, "[%d] %s | Status: %s | Type: %s | Start: %s | End: %s\n",
+				ev.ID, ev.Title, ev.Status, ev.EventType, ev.StartTime.Format(time.RFC3339), endStr)
+		}
+		fmt.Fprintf(w, "\n=== DECISIONS (%d) ===\n", len(decisions))
+		for _, d := range decisions {
+			fmt.Fprintf(w, "[%d] %s | Status: %s | User: %s\n",
+				d.ID, d.Title, d.Status, d.DisplayName)
+		}
 	default:
-		// xlsx not implemented, fall back to JSON
+		// xlsx not implemented server-side, fall back to JSON
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
 		json.NewEncoder(w).Encode(data)
@@ -13813,6 +13853,7 @@ func (app *App) handleUploadReference(w http.ResponseWriter, r *http.Request, us
 		DetectedType:   detectedType,
 		CopyMode:       r.FormValue("copy_mode"),
 		Owner:          r.FormValue("owner"),
+		Authors:        r.FormValue("authors"),
 		Custodian:      r.FormValue("custodian"),
 		ChecksumMD5:    csumMD5,
 		ChecksumSHA1:   csumSHA1,
@@ -13907,6 +13948,7 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 		Language    *string  `json:"language"`
 		CopyMode   *string  `json:"copy_mode"`
 		Owner      *string  `json:"owner"`
+		Authors    *string  `json:"authors"`
 		Custodian  *string  `json:"custodian"`
 	}
 	if err := decode(r, &req); err != nil {
@@ -13933,6 +13975,9 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 	}
 	if req.Owner != nil {
 		rd.Owner = *req.Owner
+	}
+	if req.Authors != nil {
+		rd.Authors = *req.Authors
 	}
 	if req.Custodian != nil {
 		rd.Custodian = *req.Custodian

@@ -198,7 +198,7 @@ function renderTimeline() {
   const slots      = getSlotsPerDay();
   const slotH      = getSlotHeight();
   const baseTimeColW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--time-col-w')) || 52;
-  const synthLabelActive = synthActive() && state.preferences.synth_label;
+  const synthLabelActive = synthActive();
   const synthExtra = synthLabelActive ? 44 : 0;
   const timeColW   = baseTimeColW + synthExtra;
   const today      = new Date();
