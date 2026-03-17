@@ -37,7 +37,7 @@ type GCalConfig struct {
 
 func NewGCalConnector() *GCalConnector {
 	return &GCalConnector{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{Timeout: 30 * time.Second, Transport: newSSRFSafeTransport()}, // V-20 fix
 	}
 }
 

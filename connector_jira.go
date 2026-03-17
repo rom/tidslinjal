@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	neturl "net/url"
 	"sync"
 	"time"
 )
@@ -39,7 +40,7 @@ type JiraConfig struct {
 
 func NewJiraConnector() *JiraConnector {
 	return &JiraConnector{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{Timeout: 30 * time.Second, Transport: newSSRFSafeTransport()}, // V-20 fix
 	}
 }
 
@@ -85,7 +86,8 @@ func (c *JiraConnector) Poll(app *App) ([]IngestPayload, error) {
 		jql = fmt.Sprintf("project = %s ORDER BY updated DESC", cfg.Project)
 	}
 
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=30", cfg.BaseURL, jql)
+	// V-16 fix: URL-encode JQL to prevent injection
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=30", cfg.BaseURL, neturl.QueryEscape(jql))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

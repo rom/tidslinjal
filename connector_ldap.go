@@ -158,31 +158,16 @@ func (c *LDAPConnector) Authenticate(username, password string) (*LDAPAuthResult
 		conn = tlsConn
 	}
 
-	// This is a simplified LDAP implementation.
-	// In production, use a proper LDAP library (e.g., go-ldap/ldap/v3).
-	// For now, we validate the connection and return a result based on config.
+	// SECURITY (V-02 fix): This is a stub implementation that does NOT perform
+	// actual LDAP bind authentication. Reject all authentication attempts until
+	// a proper LDAP library (e.g., go-ldap/ldap/v3) is integrated.
+	_ = conn // connection established but cannot perform LDAP bind without a proper library
 
-	// Build the user DN from the filter
+	// Build the user DN from the filter (for logging only)
 	userFilter := strings.Replace(cfg.UserFilter, "%s", escapeLDAPFilter(username), 1)
 
-	result := &LDAPAuthResult{
-		Username: username,
-		Role:     Role(cfg.DefaultRole),
-	}
-
-	// Map groups to roles and J-designations
-	for groupDN, role := range cfg.RoleMapping {
-		// In production, check actual LDAP group membership
-		_ = groupDN
-		_ = role
-	}
-	for groupDN, jd := range cfg.JDesignationMapping {
-		_ = groupDN
-		result.JDesignations = append(result.JDesignations, jd)
-	}
-
-	log.Printf("[LDAP] authenticated user %s (filter: %s)", username, userFilter)
-	return result, nil
+	log.Printf("[LDAP] REJECTED authentication for user %s — LDAP bind not implemented (filter: %s)", username, userFilter)
+	return nil, fmt.Errorf("LDAP authentication is not fully implemented — please use a proper LDAP library (go-ldap/ldap/v3) or configure OIDC instead")
 }
 
 // GetConfig returns the current LDAP configuration (with password masked).
