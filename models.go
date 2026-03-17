@@ -281,6 +281,8 @@ type UserPreferences struct {
 	LogbookHideDecisions bool   `json:"logbook_hide_decisions,omitempty"` // hide 'decision' type from logbook (use decisions log only)
 	ShowClockFlags     *bool    `json:"show_clock_flags,omitempty"`     // show national flags on timezone clocks (default: false)
 	CountryCodeFormat  string   `json:"country_code_format,omitempty"` // alpha2 | alpha3 — ISO 3166-1 abbreviation format (default: alpha2)
+	TacticalFontEnabled bool   `json:"tactical_font_enabled,omitempty"` // enable tactical task graphics font
+	TacticalFontFamily  string `json:"tactical_font_family,omitempty"`  // CSS font-family name for tactical font
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click
@@ -1091,6 +1093,7 @@ type ReferenceDoc struct {
 	DetectedType   string    `json:"detected_type,omitempty"` // auto-detected file type (e.g. "pdf", "docx")
 	CopyMode       string    `json:"copy_mode,omitempty"`     // central | local | link
 	Owner          string    `json:"owner,omitempty"`          // document owner
+	Authors        string    `json:"authors,omitempty"`        // document authors (comma-separated)
 	Custodian      string    `json:"custodian,omitempty"`      // document custodian
 	ReferenceCount int       `json:"reference_count,omitempty"` // number of times referenced
 	ChecksumMD5    string    `json:"checksum_md5,omitempty"`

@@ -42,6 +42,9 @@ input[type="date"] { background:var(--bg); border:1px solid var(--border); borde
   <span class="page-header" id="anlHeaderTitle">📈 Tidslinjal — Analysis</span>
   <span style="flex:1"></span>
   <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
+    <span id="lblName">Name</span>: <input type="text" id="anlName" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs);width:140px">
+  </label>
+  <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
     <span id="lblFrom">From</span>: <input type="date" id="anlFrom">
   </label>
   <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
@@ -54,6 +57,7 @@ input[type="date"] { background:var(--bg); border:1px solid var(--border); borde
     <button class="btn" data-tab="optempo">OpTempo</button>
     <button class="btn" data-tab="decisions">Decisions</button>
     <button class="btn" data-tab="dependencies">Dependencies</button>
+    <button class="btn" data-tab="export">Export</button>
   </div>
 </div>
 <div class="anl-content" id="anlContent">

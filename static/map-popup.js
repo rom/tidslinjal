@@ -1474,7 +1474,7 @@ document.getElementById('btnDoUploadMap').addEventListener('click', async functi
   fd.append('description', document.getElementById('uploadMapDesc').value.trim());
   fd.append('map_type', document.getElementById('uploadMapType').value);
   try {
-    const res = await fetch('/api/map-resources', { method: 'POST', body: fd });
+    const res = await fetch('/api/map-resources', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}, body: fd });
     if (!res.ok) { const t = await res.text(); alert('Upload failed: ' + t); return; }
     document.getElementById('uploadMapDialog').classList.remove('open');
     document.getElementById('uploadMapName').value = '';
