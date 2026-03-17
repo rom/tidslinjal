@@ -259,9 +259,9 @@ function render(entries) {
     '</div>';
   }).join('');
 
-  // Autoscroll
+  // Autoscroll — stay at top
   if (document.getElementById('nrAutoscroll').checked) {
-    el.scrollTop = el.scrollHeight;
+    el.scrollTop = 0;
   }
 }
 

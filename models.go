@@ -1087,7 +1087,7 @@ type ReferenceDoc struct {
 	ID             int64     `json:"id"`
 	Title          string    `json:"title"`
 	Description    string    `json:"description,omitempty"`
-	Category       string    `json:"category"` // handbook | sop | policy | map | reference | checklist | faq | objectives | other
+	Category       string    `json:"category"` // handbook | sop | policy | map | reference | checklist | faq | objectives | exercise_documents | other
 	Filename       string    `json:"filename"`
 	OriginalName   string    `json:"original_name"`
 	ContentType    string    `json:"content_type"`
