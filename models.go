@@ -122,6 +122,8 @@ type User struct {
 	LoginCount         int        `json:"login_count"`
 	LastFailedLoginAt  *time.Time `json:"last_failed_login_at,omitempty"`
 	LastFailedLoginIP  string     `json:"last_failed_login_ip,omitempty"`
+	FailedLoginCount   int        `json:"failed_login_count,omitempty"`   // L-06: progressive lockout counter
+	LockedUntil        *time.Time `json:"locked_until,omitempty"`         // L-06: account temporarily locked
 	// Previous login tracking (preserved when a new login occurs)
 	PrevLoginAt     *time.Time `json:"prev_login_at,omitempty"`
 	PrevLoginIP     string     `json:"prev_login_ip,omitempty"`
@@ -131,6 +133,8 @@ type User struct {
 	WebCalToken string `json:"webcal_token,omitempty"`
 	// Blocked: admin can block a user from logging in (even via OIDC)
 	Blocked bool `json:"blocked,omitempty"`
+	// MustChangePassword: forces user to change password on next login (C-03 fix)
+	MustChangePassword bool `json:"must_change_password,omitempty"`
 	// Location: user's physical location (free text, e.g. "Stockholm, Sweden")
 	Location     string `json:"location,omitempty"`
 	Latitude     float64 `json:"latitude,omitempty"`
@@ -171,6 +175,7 @@ type UserPublic struct {
 	PrevLoginDomain string     `json:"prev_login_domain,omitempty"`
 	IsOIDC            bool       `json:"is_oidc,omitempty"`
 	Blocked           bool       `json:"blocked,omitempty"`
+	MustChangePassword bool      `json:"must_change_password,omitempty"`
 	Location         string     `json:"location,omitempty"`
 	Latitude         float64    `json:"latitude,omitempty"`
 	Longitude        float64    `json:"longitude,omitempty"`
@@ -207,6 +212,7 @@ func (u *User) Public() UserPublic {
 		PrevLoginDomain:   u.PrevLoginDomain,
 		IsOIDC:            u.IsOIDC,
 		Blocked:          u.Blocked,
+		MustChangePassword: u.MustChangePassword,
 		Location:         u.Location,
 		Latitude:         u.Latitude,
 		Longitude:        u.Longitude,
@@ -654,6 +660,7 @@ type APIKey struct {
 	Key         string    `json:"key,omitempty"` // only shown on creation
 	KeyHash     string    `json:"key_hash,omitempty"`
 	Description string    `json:"description,omitempty"`
+	Role        Role      `json:"role,omitempty"` // M-05 fix: configurable role (default: read)
 	CreatedBy   int64     `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`

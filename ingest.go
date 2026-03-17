@@ -295,9 +295,10 @@ func (app *App) processIngestPayload(p IngestPayload) *Event {
 		startTime = *p.StartTime
 	}
 
+	// M-08 fix: sanitize ingested text fields to prevent stored XSS
 	ev := Event{
-		Title:       p.Title,
-		Description: p.Description,
+		Title:       stripHTMLTags(p.Title),
+		Description: stripHTMLTags(p.Description),
 		EventType:   p.EventType,
 		Status:      StatusPlanned,
 		StartTime:   startTime,
