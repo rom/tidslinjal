@@ -122,6 +122,10 @@ type User struct {
 	LoginCount         int        `json:"login_count"`
 	LastFailedLoginAt  *time.Time `json:"last_failed_login_at,omitempty"`
 	LastFailedLoginIP  string     `json:"last_failed_login_ip,omitempty"`
+	// Previous login tracking (preserved when a new login occurs)
+	PrevLoginAt     *time.Time `json:"prev_login_at,omitempty"`
+	PrevLoginIP     string     `json:"prev_login_ip,omitempty"`
+	PrevLoginDomain string     `json:"prev_login_domain,omitempty"`
 	IsOIDC          bool       `json:"is_oidc,omitempty"` // true if this account was created via OIDC
 	// WebCal subscription token (unique per user, for calendar sync)
 	WebCalToken string `json:"webcal_token,omitempty"`
@@ -161,6 +165,10 @@ type UserPublic struct {
 	LoginCount        int        `json:"login_count"`
 	LastFailedLoginAt *time.Time `json:"last_failed_login_at,omitempty"`
 	LastFailedLoginIP string     `json:"last_failed_login_ip,omitempty"`
+	// Previous login tracking
+	PrevLoginAt     *time.Time `json:"prev_login_at,omitempty"`
+	PrevLoginIP     string     `json:"prev_login_ip,omitempty"`
+	PrevLoginDomain string     `json:"prev_login_domain,omitempty"`
 	IsOIDC            bool       `json:"is_oidc,omitempty"`
 	Blocked           bool       `json:"blocked,omitempty"`
 	Location         string     `json:"location,omitempty"`
@@ -194,6 +202,9 @@ func (u *User) Public() UserPublic {
 		LoginCount:        u.LoginCount,
 		LastFailedLoginAt: u.LastFailedLoginAt,
 		LastFailedLoginIP: u.LastFailedLoginIP,
+		PrevLoginAt:       u.PrevLoginAt,
+		PrevLoginIP:       u.PrevLoginIP,
+		PrevLoginDomain:   u.PrevLoginDomain,
 		IsOIDC:            u.IsOIDC,
 		Blocked:          u.Blocked,
 		Location:         u.Location,
