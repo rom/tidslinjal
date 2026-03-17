@@ -3510,7 +3510,7 @@ function renderSidebar() {
             btn.addEventListener('click', async () => {
               if (!confirm(t('confirm_delete_resource')||'Delete this resource?')) return;
               try {
-                const res = await fetch('/api/rooms/' + btn.dataset.rlDelete, { method: 'DELETE' });
+                const res = await api('DELETE', '/api/rooms/' + btn.dataset.rlDelete, null);
                 if (res.ok) {
                   showNotification('success', t('resource_deleted')||'Resource deleted');
                   renderSidebar();

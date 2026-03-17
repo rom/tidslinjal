@@ -45,6 +45,24 @@ function apiGet(url) {
     .catch(function() { return []; });
 }
 
+function apiDelete(url) {
+  return fetch(url, { method: 'DELETE', credentials: 'include' });
+}
+
+// Check current user role for edit/delete permissions
+var _currentUserRole = '';
+(function() {
+  fetch('/api/auth/me', { credentials: 'include' })
+    .then(function(r) { return r.ok ? r.json() : {}; })
+    .then(function(u) { _currentUserRole = u.role || ''; })
+    .catch(function() {});
+})();
+
+function canEditResources() {
+  var editRoles = ['admin','oplead','deputy_oplead','teamlead','deputy_teamlead','staffofficer','staffofficer_full','staff_assistant'];
+  return editRoles.indexOf(_currentUserRole) >= 0;
+}
+
 function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -242,12 +260,14 @@ function renderRoomsByType(el, roomType) {
   var filtered = (_rooms || []).filter(function(r) { return r.type === roomType; });
   filtered = filterItems(filtered, ['name', 'location', 'description']);
   var html = renderSearchBox();
+  var editable = canEditResources();
 
   if (filtered.length === 0) {
     html += '<div class="res-empty">No resources of this type</div>';
   } else {
     html += '<table class="res-table"><thead><tr>' +
       '<th>Name</th><th>Location</th><th>Capacity</th><th>Status</th>' +
+      (editable ? '<th style="width:40px"></th>' : '') +
       '</tr></thead><tbody>';
     filtered.forEach(function(r) {
       html += '<tr>' +
@@ -255,6 +275,7 @@ function renderRoomsByType(el, roomType) {
         '<td>' + escHtml(r.location || '-') + '</td>' +
         '<td>' + (r.capacity || '-') + '</td>' +
         '<td>' + (r.enabled ? '<span style="color:#22c55e">Active</span>' : '<span style="color:var(--text-dim)">Disabled</span>') + '</td>' +
+        (editable ? '<td style="text-align:center"><button class="res-delete-btn" data-delete-room="' + r.id + '" title="Delete resource" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--danger);padding:2px 6px">🗑</button></td>' : '') +
         '</tr>';
     });
     html += '</tbody></table>';
@@ -262,6 +283,24 @@ function renderRoomsByType(el, roomType) {
 
   el.innerHTML = html;
   bindSearch();
+  bindDeleteButtons();
+}
+
+function bindDeleteButtons() {
+  var btns = document.querySelectorAll('[data-delete-room]');
+  btns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id = btn.dataset.deleteRoom;
+      if (!confirm('Delete this resource?')) return;
+      apiDelete('/api/rooms/' + id).then(function(res) {
+        if (res.ok) {
+          loadAll();
+        } else {
+          alert('Failed to delete resource');
+        }
+      }).catch(function() { alert('Failed to delete resource'); });
+    });
+  });
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────

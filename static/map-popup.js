@@ -618,72 +618,22 @@ try {
   };
 } catch(e) {}
 
-/* ── Multi-map tabs ── */
-let _openMaps = [{ id: '', label: '🗺 OSM' }]; // tabs currently open
-let _activeTabId = '';
-
-function _renderMapTabs() {
-  const container = document.getElementById('mapTabs');
-  if (!container) return;
-  container.innerHTML = '';
-  _openMaps.forEach(tab => {
-    const div = document.createElement('div');
-    div.className = 'map-tab' + (tab.id === _activeTabId ? ' active' : '');
-    div.dataset.mapId = tab.id;
-    div.title = tab.label;
-    div.innerHTML = escH(tab.label) +
-      '<span class="tab-detach" data-detach-tab="' + tab.id + '" title="' + (_t('map_detach_tab') || 'Detach to new window') + '"> ⧉</span>' +
-      (tab.id ? '<span class="tab-close" data-close-tab="' + tab.id + '"> ×</span>' : '');
-    div.addEventListener('click', (e) => {
-      if (e.target.dataset.closeTab !== undefined) return;
-      if (e.target.dataset.detachTab !== undefined) return;
-      _activeTabId = tab.id;
-      switchMap(tab.id);
-      _renderMapTabs();
-    });
-    const detachBtn = div.querySelector('[data-detach-tab]');
-    if (detachBtn) {
-      detachBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        _detachMapTab(tab);
-      });
-    }
-    const closeBtn = div.querySelector('[data-close-tab]');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        _openMaps = _openMaps.filter(t => t.id !== tab.id);
-        if (_activeTabId === tab.id) {
-          _activeTabId = _openMaps.length > 0 ? _openMaps[0].id : '';
-          switchMap(_activeTabId);
-        }
-        _renderMapTabs();
-      });
-    }
-    container.appendChild(div);
-  });
-}
-
-// Override map selector to open new tabs instead of replacing
+/* ── Map selector: open each map in its own dedicated window ── */
 document.getElementById('mapSelector').removeEventListener('change', function(){});
 document.getElementById('mapSelector').addEventListener('change', function() {
   const mapId = this.value;
-  // Add tab if not already open
-  if (!_openMaps.find(t => t.id === String(mapId))) {
-    const mr = (_mapResources || []).find(m => String(m.id) === String(mapId));
-    _openMaps.push({ id: String(mapId), label: mr ? mr.name : 'Map' });
-  }
-  _activeTabId = String(mapId);
-  switchMap(mapId);
-  _renderMapTabs();
+  if (!mapId) return; // OSM already shown in current window
+  // Open a full separate window for this map
+  _openMapWindow(mapId);
+  // Reset selector back to OSM (this window stays on OSM)
+  this.value = '';
 });
 
-/* ── Detach a map tab into its own window ── */
-function _detachMapTab(tab) {
-  const w = Math.min(window.screen.availWidth, 900);
-  const h = Math.min(window.screen.availHeight - 100, 650);
-  const mapUrl = '/static/map-popup.html' + (tab.id ? '?mapId=' + encodeURIComponent(tab.id) : '');
-  window.open(mapUrl, 'tidslinjal-map-' + (tab.id || 'osm'),
+function _openMapWindow(mapId) {
+  const w = Math.min(window.screen.availWidth, 1200);
+  const h = Math.min(window.screen.availHeight - 60, 900);
+  const mapUrl = '/static/map-popup.html?mapId=' + encodeURIComponent(mapId);
+  window.open(mapUrl, 'tidslinjal-map-' + mapId,
     'width=' + w + ',height=' + h + ',resizable=yes,scrollbars=yes');
 }
 
@@ -696,9 +646,13 @@ function _detachMapTab(tab) {
     const _waitAndSwitch = setInterval(() => {
       if (typeof switchMap === 'function' && _map) {
         clearInterval(_waitAndSwitch);
-        _activeTabId = mapId;
         switchMap(mapId);
-        _renderMapTabs();
+        // Update selector to reflect current map
+        const sel = document.getElementById('mapSelector');
+        if (sel) sel.value = String(mapId);
+        // Update window title with map name
+        const mr = (_mapResources || []).find(m => String(m.id) === String(mapId));
+        if (mr) document.title = 'Tidslinjal — ' + mr.name;
       }
     }, 200);
     setTimeout(() => clearInterval(_waitAndSwitch), 10000);
@@ -1206,7 +1160,20 @@ async function loadMapResources() {
 }
 
 document.getElementById('mapSelector').addEventListener('change', function() {
-  switchMap(this.value);
+  // When in a dedicated map window (opened with ?mapId), selecting a different map opens a new window
+  const params = new URLSearchParams(window.location.search);
+  const currentMapId = params.get('mapId');
+  const selectedId = this.value;
+  if (currentMapId && selectedId && selectedId !== currentMapId) {
+    _openMapWindow(selectedId);
+    this.value = String(currentMapId); // keep selector on current map
+    return;
+  }
+  // For OSM base window, the override handler above already handles opening new windows
+  // For direct switchMap (e.g. on page load), allow it
+  if (!selectedId || selectedId === currentMapId) {
+    switchMap(selectedId);
+  }
 });
 
 function switchMap(mapResourceId) {
