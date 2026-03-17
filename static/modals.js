@@ -4256,13 +4256,13 @@ function renderSidebar() {
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedTools" title="${t('btn_detach')||'Detach to window'}">⧉</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
-          ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
+          ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
-          ${(isTeamLead || isAdminOrOplead) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
           ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
           ${toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()')}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
@@ -7405,10 +7405,11 @@ async function openPollModal(opts) {
       const resp = await api('GET', '/api/poll-questionnaires');
       const questionnaires = await resp.json();
       questionnaires.forEach(q => {
+        const tq = _translateSQ(q);
         const opt = document.createElement('option');
         opt.value = q.id;
-        opt.textContent = q.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
-        opt.dataset.questions = JSON.stringify(q.questions || []);
+        opt.textContent = tq.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
+        opt.dataset.questions = JSON.stringify(tq.questions || []);
         qSelect.appendChild(opt);
       });
     } catch(e) { console.warn('Failed to load questionnaires', e); }
@@ -7527,6 +7528,22 @@ function _renumberPollQuestions(container) {
     const num = row.querySelector('.poll-q-num');
     if (num) num.textContent = (i + 1) + '.';
   });
+}
+
+// Translate built-in questionnaire fields via i18n keys
+function _translateSQ(q) {
+  if (!q || !q.built_in || q.id >= 0) return q;
+  const idx = Math.abs(q.id);
+  const tq = Object.assign({}, q);
+  tq.name = t('sq' + idx + '_name') || q.name;
+  tq.description = t('sq' + idx + '_desc') || q.description;
+  if (q.questions) {
+    tq.questions = q.questions.map(qu => {
+      const tText = t('sq' + idx + '_q_' + qu.id);
+      return tText ? Object.assign({}, qu, { text: tText }) : qu;
+    });
+  }
+  return tq;
 }
 
 function _addPollQuestionRow(container, text, type) {
@@ -8523,9 +8540,10 @@ async function openQuestionnaireEditor() {
     // Rebuild select
     listEl.innerHTML = `<option value="__new__">── ${t('questionnaire_new')||'New Questionnaire'} ──</option>`;
     questionnaires.forEach(q => {
+      const tq = _translateSQ(q);
       const opt = document.createElement('option');
       opt.value = q.id;
-      opt.textContent = q.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
+      opt.textContent = tq.name + (q.built_in ? ` (${t('questionnaire_builtin')||'Built-in'})` : '');
       listEl.appendChild(opt);
     });
     if (selectId !== undefined) {
@@ -8541,12 +8559,13 @@ async function openQuestionnaireEditor() {
   function loadForm(q) {
     const isBuiltIn = q && q.built_in;
     _builtinEditAcknowledged = false; // Reset per questionnaire switch
-    nameEl.value = q ? q.name : '';
-    descEl.value = q ? (q.description || '') : '';
+    const tq = _translateSQ(q);
+    nameEl.value = tq ? tq.name : '';
+    descEl.value = tq ? (tq.description || '') : '';
     questionsEl.innerHTML = '';
-    if (q && q.questions) {
+    if (tq && tq.questions) {
       const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
-      q.questions.forEach(qu => _addPollQuestionRow(questionsEl, qu.text, typeMap[qu.type] || qu.type || 'scale'));
+      tq.questions.forEach(qu => _addPollQuestionRow(questionsEl, qu.text, typeMap[qu.type] || qu.type || 'scale'));
     }
     // All fields are always editable — built-in questionnaires can be edited (will save as copy)
     nameEl.disabled = false;
@@ -12835,7 +12854,7 @@ async function openNarrativeModal() {
   const sortEl = document.getElementById('narrativeSortOrder');
   if (sortEl) sortEl.addEventListener('change', () => { _narrativeSortNewestFirst = sortEl.value === 'newest'; refreshNarrative(); });
   // Autoscroll to bottom on open
-  _narrativeScrollToBottom();
+  _narrativeScrollToTop();
   // Start auto-refresh (every 15s)
   _narrativeAutoRefreshTimer = setInterval(() => {
     if (document.getElementById('narrativeModal')) refreshNarrative();
@@ -12896,17 +12915,17 @@ async function refreshNarrative() {
     const entries = await apiGet(`/api/narrative?from=${from}&to=${to}&limit=200&category=${category}`) || [];
     const el = document.getElementById('narrativeEntries');
     if (el) el.innerHTML = _renderNarrativeEntries(entries);
-    _narrativeScrollToBottom();
+    _narrativeScrollToTop();
   } catch(e) { showError('Failed to refresh: ' + e.message); }
 }
 
-function _narrativeScrollToBottom() {
+function _narrativeScrollToTop() {
   if (!_narrativeAutoScroll) return;
   const el = document.getElementById('narrativeEntries');
-  if (el) el.scrollTop = el.scrollHeight;
+  if (el) el.scrollTop = 0;
   // Also scroll the modal body
   const body = el && el.closest('.modal-body');
-  if (body) body.scrollTop = body.scrollHeight;
+  if (body) body.scrollTop = 0;
 }
 
 function detachNarrative() {
@@ -15477,9 +15496,10 @@ async function _openReferenceIndex() {
     checklist: t('ref_category_checklist') || 'Checklist',
     faq: t('ref_category_faq') || 'FAQ',
     objectives: t('ref_category_objectives') || 'Objectives',
+    exercise_documents: t('ref_category_exercise_documents') || 'Exercise Documents',
     other: t('ref_category_other') || 'Other'
   };
-  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', exercise_documents:'#8E44AD', other:'#95A5A6' };
   const langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',uk:'Українська',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
 
   let data;
@@ -15583,6 +15603,7 @@ function _renderReferencesTab(el) {
         <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
         <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
         <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
+        <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
         <option value="other">${t('ref_category_other') || 'Other'}</option>
       </select>
       <select id="refLanguageFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
@@ -15890,6 +15911,7 @@ function _openReferenceUploadModal() {
             <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
             <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
+            <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
             <option value="other">${t('ref_category_other') || 'Other'}</option>
           </select>
           <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
@@ -15897,9 +15919,9 @@ function _openReferenceUploadModal() {
             <option value="">—</option><option value="en">English</option><option value="sv">Svenska</option><option value="fr">Français</option><option value="fi">Suomi</option><option value="de">Deutsch</option><option value="nb">Norsk (Bokmål)</option><option value="da">Dansk</option><option value="it">Italiano</option><option value="es">Español</option><option value="pt">Português</option><option value="et">Eesti</option><option value="lv">Latviešu</option><option value="lt">Lietuvių</option>
           </select>
           <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
-          <input type="text" id="refUpOwner" class="form-input" placeholder="${t('ref_owner_placeholder') || 'Document owner'}">
+          <select id="refUpOwner" class="form-input"><option value="">—</option></select>
           <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
-          <input type="text" id="refUpCustodian" class="form-input" placeholder="${t('ref_custodian_placeholder') || 'Document custodian'}">
+          <select id="refUpCustodian" class="form-input"><option value="">—</option></select>
           <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
           <select id="refUpCopyMode" class="form-input">
             <option value="">—</option><option value="central">${t('ref_copy_central') || 'Central copy'}</option><option value="local">${t('ref_copy_local') || 'Local copy'}</option><option value="link">${t('ref_copy_link') || 'Show link'}</option><option value="git">${t('ref_copy_git') || 'Push to Git'}</option>
@@ -15968,7 +15990,31 @@ function _openReferenceUploadModal() {
   document.getElementById('refFileGroup').style.display = '';
   document.getElementById('refUrlGroup').style.display = 'none';
   document.getElementById('refLocalGroup').style.display = 'none';
+  // Populate owner/custodian user selects
+  _populateRefUserSelects(['refUpOwner', 'refUpCustodian']);
   modal.classList.add('open');
+}
+
+async function _populateRefUserSelects(selectIds, selectedValues) {
+  let users = state.users || [];
+  if (!users.length) {
+    try { const res = await fetch('/api/users'); if (res.ok) users = await res.json(); } catch {}
+  }
+  const sv = selectedValues || {};
+  for (const id of selectIds) {
+    const sel = document.getElementById(id);
+    if (!sel) continue;
+    const curVal = sv[id] || '';
+    sel.innerHTML = '<option value="">\u2014</option>';
+    users.forEach(u => {
+      const name = u.display_name || u.username;
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === curVal) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
 }
 
 async function _handleReferenceUpload() {
@@ -16059,7 +16105,7 @@ async function _handleReferenceUpload() {
     const copyMode = document.getElementById('refUpCopyMode')?.value || '';
     if (copyMode) fd.append('copy_mode', copyMode);
     try {
-      const res = await fetch('/api/references', { method: 'POST', body: fd });
+      const res = await fetch('/api/references', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       if (!res.ok) { let txt = ''; try { const ct = res.headers.get('content-type')||''; if (ct.includes('application/json')) { const j = await res.json(); txt = j.error||''; } } catch {} showError(txt || ('Upload failed — HTTP ' + res.status)); return; }
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
@@ -16111,14 +16157,14 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
       <select id="refEditCategory" class="form-input">
-        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
+        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'exercise_documents',l:t('ref_category_exercise_documents')||'Exercise Documents'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
       </select>
       <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_owner') || 'Owner'}</label>
-      <input type="text" id="refEditOwner" class="form-input" value="${escHtml(ref.owner || '')}">
+      <select id="refEditOwner" class="form-input"><option value="">—</option></select>
       <label style="margin-top:8px">${t('ref_custodian') || 'Custodian'}</label>
-      <input type="text" id="refEditCustodian" class="form-input" value="${escHtml(ref.custodian || '')}">
+      <select id="refEditCustodian" class="form-input"><option value="">—</option></select>
       <label style="margin-top:8px">${t('ref_copy_mode') || 'Copy Mode'}</label>
       <select id="refEditCopyMode" class="form-input">${_copyOpts.map(o => `<option value="${o.v}"${o.v === (ref.copy_mode || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_tags') || 'Tags'} (comma-separated)</label>
@@ -16130,6 +16176,8 @@ function _openRefEditModal(id) {
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  // Populate owner/custodian user selects with current values
+  _populateRefUserSelects(['refEditOwner', 'refEditCustodian'], { refEditOwner: ref.owner || '', refEditCustodian: ref.custodian || '' });
   overlay.querySelectorAll('[data-close-overlay]').forEach(b => b.addEventListener('click', () => overlay.remove()));
   document.getElementById('btnSaveRefEdit').addEventListener('click', async () => {
     const body = {
