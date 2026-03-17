@@ -11,7 +11,7 @@
 
 This second assessment was conducted after an initial round of security fixes. The application has significantly improved — OIDC JWKS verification is now implemented, CSRF protection covers login, rate limiters have cleanup, and many IDOR issues were addressed. However, **critical gaps remain in layer-based access control across multiple data paths**, and several new findings emerge from deeper analysis of session management, SSE broadcasting, export endpoints, and concurrency handling.
 
-**Finding breakdown**: 10 High, 19 Medium, 8 Low, 6 Informational = **43 findings total**
+**Finding breakdown**: 10 High, 19 Medium, 13 Low, 6 Informational = **48 findings total**
 
 ---
 
@@ -44,7 +44,9 @@ This effectively nullifies the entire layer visibility system for any user with 
 - `main.go:7476` — Report download: `app.store.GetEvents(from, to, nil)` — **no layer filter**
 - `main.go:7602` — Auto-report email: `app.store.GetEvents(...)` — **no layer filter**
 - `main.go:10871` — Stats export: `app.allEvents()` — **no layer filter, only requireAuth**
+- `main.go:8964` — Narrative: `app.store.GetEventsInRange(...)` — **no layer filter**
 - `main.go:13393` — WebCal: delegates to ICS export — **no layer filter, token-authenticated**
+- `main.go:8783+` — 13+ statistics endpoints: `app.allEvents()` — **no layer filter**
 
 **Severity**: **HIGH**
 **CVSS**: 7.5
@@ -479,6 +481,61 @@ Event version history is accessible for any event ID without layer visibility ch
 
 ---
 
+### L-09: `handlePatchEventStatus` Missing Layer Access Check
+
+**Location**: `main.go:2393-2462`
+**Severity**: **LOW**
+
+Status changes check role-based permission but never verify the user can access the event's layer. A reporter can change the status of events on private layers.
+
+**Remediation**: Add `canWriteLayer` check.
+
+---
+
+### L-10: Editing Lock Can Be Acquired on Private Layer Events
+
+**Location**: `main.go:12971-12981`
+**Severity**: **LOW**
+
+Editing lock handlers do not check layer visibility. A user can acquire a lock on a private-layer event, blocking legitimate editors (DoS on editing).
+
+**Remediation**: Add `canReadLayer` check before allowing lock acquisition.
+
+---
+
+### L-11: Activity Feed Leaks Event Titles from Private Layers
+
+**Location**: `main.go:4772`
+**Severity**: **LOW**
+
+The activity feed returns audit log entries containing event titles from all layers. Summaries like "Created event 'Secret Op X'" leak private layer data.
+
+**Remediation**: Filter audit entries by the requesting user's visible layers, or redact event titles for entries referencing inaccessible layers.
+
+---
+
+### L-12: Geo Items and Map Overlays Writable by Any Authenticated User
+
+**Location**: `main.go:6992-6993` (geo items), `main.go:7020-7054` (overlays/drawings)
+**Severity**: **LOW**
+
+`PUT /api/geo-items` and map overlay/drawing endpoints only require `requireAuth`, allowing observer/read-only users to modify map content. These should require `RoleReadWrite` or `RoleTeamLead`.
+
+**Remediation**: Wrap these endpoints with `requireRole(RoleReadWrite, ...)` or `requireRole(RoleTeamLead, ...)`.
+
+---
+
+### L-13: 13+ Statistics Endpoints Bypass Layer Visibility
+
+**Location**: `main.go:8783, 8820, 8843, 8852, 8861, 8882, 10564, 10625, 10788, 10871, 10946, 11476, 11709`
+**Severity**: **LOW**
+
+All stats handlers use `app.allEvents()` with zero layer filtering. While stats are aggregate (counts, percentages), they still leak information about private layer events — an observer can learn how many events exist on layers they can't see, their types, and timing patterns.
+
+**Remediation**: Apply layer filtering to `allEvents()` calls in stats handlers, or create a `app.visibleEvents(user)` helper.
+
+---
+
 ## Informational Findings
 
 ### I-01: MD5 and SHA-1 Used for Attachment Checksums
@@ -620,6 +677,11 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | L-06 | LOW | AuthZ | handleDeleteAttachment checks read not write |
 | L-07 | LOW | Config | OIDC routes not registered dynamically |
 | L-08 | LOW | AuthZ | handleGetEventHistory missing layer access check |
+| L-09 | LOW | AuthZ | handlePatchEventStatus missing layer access check |
+| L-10 | LOW | AuthZ | Editing lock can be acquired on private layer events |
+| L-11 | LOW | Data | Activity feed leaks event titles from private layers |
+| L-12 | LOW | AuthZ | Geo items and map overlays writable by any authenticated user |
+| L-13 | LOW | AuthZ | 13+ statistics endpoints bypass layer visibility |
 | I-01 | INFO | Crypto | MD5/SHA-1 used for attachment checksums |
 | I-02 | INFO | Config | SkipVerify in LDAP config |
 | I-03 | INFO | AuthN | Open registration auto-vets users |
