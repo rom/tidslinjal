@@ -73,16 +73,6 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 .add-item-dialog .dialog-buttons { display:flex; gap:8px; margin-top:12px; justify-content:flex-end; }
 /* ── Map overlay item markers ── */
 .map-overlay-item { background:transparent; border:none; }
-/* ── Multi-map tabs ── */
-.map-tabs { display:flex; gap:2px; align-items:center; flex-shrink:0; }
-.map-tab { background:var(--bg3); border:1px solid var(--border); border-radius:5px 5px 0 0;
-  padding:3px 10px; font-size:10px; cursor:pointer; color:var(--text); max-width:140px;
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; position:relative; }
-.map-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-.map-tab .tab-close { margin-left:4px; font-size:9px; opacity:0.6; cursor:pointer; }
-.map-tab .tab-close:hover { opacity:1; }
-.map-tab .tab-detach { margin-left:4px; font-size:9px; opacity:0.5; cursor:pointer; }
-.map-tab .tab-detach:hover { opacity:1; color:var(--accent); }
 /* ── Drawing toolbar ── */
 .draw-toolbar { display:flex; gap:4px; align-items:center; padding:0 4px; }
 .draw-toolbar .draw-btn { background:var(--bg3); border:1px solid var(--border); border-radius:4px;
@@ -166,10 +156,6 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <input type="text" id="addressSearch" placeholder="Search address..." style="min-width:180px;flex:1;max-width:300px" title="Type an address to search and zoom">
   <button class="btn-map" id="btnSearch" title="Search address">&#128269;</button>
 </div>
-<!-- Multi-map tabs -->
-<div class="map-tabs" id="mapTabs" style="background:var(--bg2);padding:0 12px;border-bottom:1px solid var(--border)">
-  <div class="map-tab active" data-map-id="" title="OpenStreetMap (Live)">🗺 OSM</div>
-</div>
 <div id="mapProjection"></div>
 <div id="pdfContainer">
   <div class="pdf-controls">
@@ -208,6 +194,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <option value="floor_plan">Floor Plan</option>
     <option value="network">Network</option>
     <option value="electrical">Electrical</option>
+    <option value="org_chart">Organisational Chart</option>
     <option value="custom">Custom</option>
   </select>
   <label>File (image, PDF, or GeoJSON)</label>
