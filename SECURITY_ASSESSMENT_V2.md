@@ -11,7 +11,7 @@
 
 This second assessment was conducted after an initial round of security fixes. The application has significantly improved — OIDC JWKS verification is now implemented, CSRF protection covers login, rate limiters have cleanup, and many IDOR issues were addressed. However, **critical gaps remain in layer-based access control across multiple data paths**, and several new findings emerge from deeper analysis of session management, SSE broadcasting, export endpoints, and concurrency handling.
 
-**Finding breakdown**: 10 High, 19 Medium, 13 Low, 6 Informational = **48 findings total**
+**Finding breakdown**: 10 High, 19 Medium, 16 Low, 8 Informational = **53 findings total**
 
 ---
 
@@ -536,6 +536,39 @@ All stats handlers use `app.allEvents()` with zero layer filtering. While stats 
 
 ---
 
+### L-14: Popup Endpoints Missing CSRF Protection
+
+**Location**: `decision-log-popup.html`, `resources-popup.js` (frontend)
+**Severity**: **LOW**
+
+The popup windows for decision log and resources make fetch calls without the `X-Requested-With: XMLHttpRequest` header that `requireAuth` middleware checks for CSRF protection. This means these popup-initiated requests would be rejected by the server — indicating the feature is currently broken, or the CSRF check is being bypassed in another way.
+
+**Remediation**: Ensure all frontend fetch calls include `X-Requested-With: XMLHttpRequest` header. Audit popup JavaScript for consistency.
+
+---
+
+### L-15: No Graceful Shutdown — `os.Exit(0)` in Admin Restart Handler
+
+**Location**: `main.go` — admin restart/shutdown handler
+**Severity**: **LOW**
+
+The admin restart handler calls `os.Exit(0)` directly, which does not allow in-flight HTTP requests to complete, does not flush pending file writes, and does not close SSE connections cleanly. On a busy server, this can cause data loss for requests being processed at the time of restart.
+
+**Remediation**: Use `http.Server.Shutdown(ctx)` with a deadline (e.g., 30 seconds) to allow in-flight requests to complete before exiting. Also handle SIGTERM/SIGINT for clean process shutdown.
+
+---
+
+### L-16: Static Directory Listings Exposed via `http.FileServer`
+
+**Location**: `main.go` — static file serving routes
+**Severity**: **LOW**
+
+`http.FileServer` serves directory listings by default when no `index.html` exists in a directory. This exposes the directory structure of static assets, which leaks internal naming conventions and file organization to attackers.
+
+**Remediation**: Wrap the file server handler with one that returns 404 for directory requests, or ensure all static directories contain an `index.html`.
+
+---
+
 ## Informational Findings
 
 ### I-01: MD5 and SHA-1 Used for Attachment Checksums
@@ -589,6 +622,28 @@ While `decode()` limits JSON bodies to 1MB, multipart form uploads vary: 10MB fo
 **Severity**: **INFO**
 
 Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. If the admin password is changed, old encrypted backups become undecryptable (no key rotation mechanism). Additionally, if the admin password is weak, the backup encryption is proportionally weak.
+
+---
+
+### I-07: CSP Conflicts with Inline Scripts in Popup HTML Files
+
+**Location**: Popup HTML files (`decision-log-popup.html`, etc.)
+**Severity**: **INFO**
+
+Several popup HTML files contain inline `<script>` tags, but the CSP policy sets `script-src 'self'` (no `'unsafe-inline'`). This means inline scripts in popups are blocked by CSP. Either the popups are non-functional, or they are served without CSP headers (which would be a separate concern).
+
+**Remediation**: Move all inline scripts to external `.js` files to comply with CSP, or verify that popup routes inherit the main application's security headers.
+
+---
+
+### I-08: `requireAPIKeyOrAuth` Middleware Defined but Never Wired
+
+**Location**: `main.go` — middleware definition and routes
+**Severity**: **INFO**
+
+A `requireAPIKeyOrAuth` middleware function is defined but not used in any route registration. This suggests either dead code from a planned feature, or a regression where API key authentication was intended for certain endpoints but never connected.
+
+**Remediation**: Either wire the middleware to appropriate endpoints (e.g., automation/integration endpoints) or remove the dead code to reduce attack surface confusion.
 
 ---
 
@@ -682,12 +737,17 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | L-11 | LOW | Data | Activity feed leaks event titles from private layers |
 | L-12 | LOW | AuthZ | Geo items and map overlays writable by any authenticated user |
 | L-13 | LOW | AuthZ | 13+ statistics endpoints bypass layer visibility |
+| L-14 | LOW | CSRF | Popup endpoints missing X-Requested-With CSRF header |
+| L-15 | LOW | Availability | No graceful shutdown — os.Exit(0) in admin restart handler |
+| L-16 | LOW | InfoLeak | Static directory listings exposed via http.FileServer |
 | I-01 | INFO | Crypto | MD5/SHA-1 used for attachment checksums |
 | I-02 | INFO | Config | SkipVerify in LDAP config |
 | I-03 | INFO | AuthN | Open registration auto-vets users |
 | I-04 | INFO | Headers | unsafe-inline in style-src CSP |
 | I-05 | INFO | DoS | Multipart form size limits vary |
 | I-06 | INFO | Crypto | Backup encryption tied to admin password |
+| I-07 | INFO | Headers | CSP conflicts with inline scripts in popup HTML files |
+| I-08 | INFO | Config | requireAPIKeyOrAuth middleware defined but never wired |
 
 ---
 
