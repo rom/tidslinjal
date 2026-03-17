@@ -209,7 +209,8 @@ function renderUsers(el) {
       var failedLogin = u.last_failed_login_at
         ? new Date(u.last_failed_login_at).toLocaleString() + (u.last_failed_login_ip ? ' (IP: ' + escHtml(u.last_failed_login_ip) + ')' : '')
         : '';
-      html += '<div class="res-card">' +
+      var hasSsoInfo = u.full_name || u.locale || u.email || u.address;
+      html += '<div class="res-card res-card-clickable" style="flex-wrap:wrap" data-user-id="' + u.id + '">' +
         avatar +
         '<div class="res-card-body">' +
           '<div class="res-card-name">' + escHtml(name) + '</div>' +
@@ -217,6 +218,7 @@ function renderUsers(el) {
             '<span class="res-badge res-badge-role">' + escHtml(roleLabel) + '</span>' +
             (u.username ? ' &middot; ' + escHtml(u.username) : '') +
             (u.email ? ' &middot; ' + escHtml(u.email) : '') +
+            (u.is_oidc ? ' &middot; <span class="res-badge" style="font-size:9px">SSO</span>' : '') +
           '</div>' +
           '<div class="res-card-meta">' +
             '<span>Last login: ' + lastLogin + '</span>' +
@@ -224,12 +226,57 @@ function renderUsers(el) {
             (failedLogin ? '<span style="color:var(--danger)">Failed: ' + failedLogin + '</span>' : '') +
           '</div>' +
         '</div>' +
+        '<div class="res-user-detail" id="user-detail-' + u.id + '">' +
+          (u.full_name ? '<div class="res-user-detail-row"><span class="label">Full name</span><span class="value">' + escHtml(u.full_name) + '</span></div>' : '') +
+          (u.locale ? '<div class="res-user-detail-row"><span class="label">Locale</span><span class="value">' + escHtml(u.locale) + '</span></div>' : '') +
+          (u.email ? '<div class="res-user-detail-row"><span class="label">Email</span><span class="value">' + escHtml(u.email) + '</span></div>' : '') +
+          (u.address ? '<div class="res-user-detail-row"><span class="label">Address</span><span class="value">' + escHtml(u.address) + '</span></div>' : '') +
+          '<div class="res-user-detail-row"><span class="label">Groups</span><span class="value" id="user-groups-' + u.id + '">Loading...</span></div>' +
+        '</div>' +
       '</div>';
     });
   }
 
   el.innerHTML = html;
   bindSearch();
+  bindUserCards();
+}
+
+function bindUserCards() {
+  var cards = document.querySelectorAll('[data-user-id]');
+  cards.forEach(function(card) {
+    card.addEventListener('click', function(e) {
+      // Don't toggle if clicking the search box
+      if (e.target.tagName === 'INPUT') return;
+      var uid = card.dataset.userId;
+      var detail = document.getElementById('user-detail-' + uid);
+      if (!detail) return;
+      var isOpen = detail.classList.contains('open');
+      // Close all other detail panels
+      document.querySelectorAll('.res-user-detail.open').forEach(function(d) { d.classList.remove('open'); });
+      if (!isOpen) {
+        detail.classList.add('open');
+        // Load user groups
+        var groupsEl = document.getElementById('user-groups-' + uid);
+        if (groupsEl && groupsEl.textContent === 'Loading...') {
+          apiGet('/api/users/' + uid + '/groups').then(function(memberships) {
+            if (!memberships || memberships.length === 0) {
+              groupsEl.textContent = 'None';
+              return;
+            }
+            var names = [];
+            (memberships || []).forEach(function(m) {
+              var grp = _groups.find(function(g) { return g.id === m.group_id; });
+              names.push(grp ? grp.name : 'Group #' + m.group_id);
+            });
+            groupsEl.innerHTML = '<span class="res-user-detail-groups">' +
+              names.map(function(n) { return '<span class="res-badge">' + escHtml(n) + '</span>'; }).join('') +
+              '</span>';
+          });
+        }
+      }
+    });
+  });
 }
 
 function renderGroups(el) {
@@ -241,12 +288,16 @@ function renderGroups(el) {
   } else {
     groups.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
     groups.forEach(function(g) {
-      var memberCount = (g.member_ids || g.members || []).length;
+      var memberCount = typeof g.member_count === 'number' ? g.member_count : (g.member_ids || g.members || []).length;
+      var createdAt = g.created_at ? new Date(g.created_at).toLocaleDateString() : '';
       html += '<div class="res-card">' +
-        '<div class="res-card-name">' + escHtml(g.name) + '</div>' +
-        '<div class="res-card-detail">' +
-          memberCount + ' member' + (memberCount !== 1 ? 's' : '') +
-          (g.description ? ' &middot; ' + escHtml(g.description) : '') +
+        '<div class="res-card-body">' +
+          '<div class="res-card-name">' + escHtml(g.name) + '</div>' +
+          '<div class="res-card-detail">' +
+            '<span class="res-badge">' + memberCount + ' member' + (memberCount !== 1 ? 's' : '') + '</span>' +
+            (createdAt ? ' &middot; Created: ' + createdAt : '') +
+            (g.description ? ' &middot; ' + escHtml(g.description) : '') +
+          '</div>' +
         '</div>' +
       '</div>';
     });

@@ -2819,7 +2819,19 @@ func (app *App) handleGetGroups(w http.ResponseWriter, r *http.Request, user *Us
 	if groups == nil {
 		groups = []Group{}
 	}
-	jsonOK(w, groups)
+	// Enrich with member counts
+	type groupWithCount struct {
+		Group
+		MemberCount int `json:"member_count"`
+	}
+	enriched := make([]groupWithCount, len(groups))
+	for i, g := range groups {
+		enriched[i] = groupWithCount{
+			Group:       g,
+			MemberCount: len(app.store.GetGroupMembers(g.ID)),
+		}
+	}
+	jsonOK(w, enriched)
 }
 
 func (app *App) handleCreateGroup(w http.ResponseWriter, r *http.Request, user *User) {
