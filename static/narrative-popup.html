@@ -64,6 +64,13 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <input type="checkbox" id="nrAutoscroll" checked>
     <span id="lblAutoscroll">Autoscroll</span>
   </label>
+  <label>
+    <span id="lblSortOrder">Order</span>:
+    <select id="nrSortOrder">
+      <option value="newest" id="optNewest" selected>Newest first</option>
+      <option value="oldest" id="optOldest">Oldest first</option>
+    </select>
+  </label>
   <button class="btn" id="btnFilterRefresh">🔄 <span id="lblRefresh2">Refresh</span></button>
 </div>
 <div class="nr-content" id="narrativeEntries"></div>
@@ -189,6 +196,9 @@ function applyI18n() {
   el('lblTo', 'to', 'To');
   el('lblDetail', 'detail_level', 'Detail level');
   el('lblAutoscroll', 'autoscroll', 'Autoscroll');
+  el('lblSortOrder', 'narrative_sort_order', 'Order');
+  el('optNewest', 'narrative_sort_newest', 'Newest first');
+  el('optOldest', 'narrative_sort_oldest', 'Oldest first');
 }
 
 // Set default date range (last 24h)
@@ -225,7 +235,14 @@ function render(entries) {
     el.innerHTML = '<div class="nr-empty">' + escHtml(_t.narrative_empty || 'No events in this time range.') + '</div>';
     return;
   }
-  el.innerHTML = entries.map(e => {
+  const sortEl = document.getElementById('nrSortOrder');
+  const newestFirst = sortEl ? sortEl.value === 'newest' : true;
+  const sorted = entries.slice().sort(function(a, b) {
+    var ta = new Date(a.timestamp).getTime();
+    var tb = new Date(b.timestamp).getTime();
+    return newestFirst ? (tb - ta) : (ta - tb);
+  });
+  el.innerHTML = sorted.map(e => {
     const timeStr = new Date(e.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
     const severityColor = severityColors[e.severity] || 'var(--text-dim)';
     let icon = '•';
@@ -251,6 +268,7 @@ function render(entries) {
 // Bind refresh buttons
 document.getElementById('btnToolbarRefresh').onclick = loadEntries;
 document.getElementById('btnFilterRefresh').onclick = loadEntries;
+document.getElementById('nrSortOrder').onchange = loadEntries;
 
 // Listen for theme changes from parent
 window.addEventListener('message', function(e) {

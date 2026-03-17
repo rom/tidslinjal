@@ -253,22 +253,28 @@ function renderExport(container) {
       '<div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">📄 ' + (t('analysis_export_data')||'Export Data') + '</div>' +
       '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">' + (t('analysis_export_desc')||'Download analysis data in your preferred format.') + '</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn" onclick="popupDownloadExport(\'csv\')">📋 CSV</button>' +
-        '<button class="btn" onclick="popupDownloadExport(\'json\')">📋 JSON</button>' +
-        '<button class="btn" onclick="popupDownloadExport(\'xml\')">📋 XML</button>' +
-        '<button class="btn" onclick="popupDownloadExport(\'txt\')">📋 TXT</button>' +
-        '<button class="btn" onclick="popupDownloadExport(\'xlsx\')">📋 XLSX</button>' +
+        '<button class="btn" data-export-fmt="csv">📋 CSV</button>' +
+        '<button class="btn" data-export-fmt="json">📋 JSON</button>' +
+        '<button class="btn" data-export-fmt="xml">📋 XML</button>' +
+        '<button class="btn" data-export-fmt="txt">📋 TXT</button>' +
+        '<button class="btn" data-export-fmt="xlsx">📋 XLSX</button>' +
       '</div>' +
     '</div>' +
     '<div style="padding:16px;background:var(--bg3);border-radius:var(--radius)">' +
       '<div style="font-weight:700;margin-bottom:12px;font-size:var(--fs-sm)">🖼 ' + (t('analysis_export_visual')||'Export Visuals') + '</div>' +
       '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:16px">' + (t('analysis_export_visual_desc')||'Capture the current analysis view as an image. Switch to a chart tab first.') + '</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn" onclick="popupExportVisual(\'png\')">🖼 PNG</button>' +
-        '<button class="btn" onclick="popupExportVisual(\'jpeg\')">🖼 JPEG</button>' +
-        '<button class="btn" onclick="popupExportVisual(\'svg\')">🖼 SVG</button>' +
+        '<button class="btn" data-visual-fmt="png">🖼 PNG</button>' +
+        '<button class="btn" data-visual-fmt="jpeg">🖼 JPEG</button>' +
+        '<button class="btn" data-visual-fmt="svg">🖼 SVG</button>' +
       '</div>' +
     '</div>';
+  container.querySelectorAll('[data-export-fmt]').forEach(function(btn) {
+    btn.addEventListener('click', function() { popupDownloadExport(btn.dataset.exportFmt); });
+  });
+  container.querySelectorAll('[data-visual-fmt]').forEach(function(btn) {
+    btn.addEventListener('click', function() { popupExportVisual(btn.dataset.visualFmt); });
+  });
 }
 
 function popupDownloadExport(format) {
@@ -279,7 +285,7 @@ function popupDownloadExport(format) {
   if (from) url += '&from=' + encodeURIComponent(from);
   if (to) url += '&to=' + encodeURIComponent(to);
   var a = document.createElement('a');
-  a.href = url; a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,10) + '.' + format;
+  a.href = url; a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,19).replace(/:/g,'') + '.' + format;
   a.click();
 }
 
