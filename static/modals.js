@@ -3555,6 +3555,7 @@ function renderSidebar() {
     const logTabBar = `<div class="toggle-btn-group" style="margin-bottom:10px">
       ${logSubBtn('decision', t('decisions_title')||'Decisions')}
       ${logSubBtn('logbook', t('tab_log_book')||'Log Book')}
+      ${logSubBtn('checklists', t('checklist_logs')||'Checklist Log')}
       ${logSubBtn('audit', t('tab_audit_log')||'Audit Log')}
       ${logSubBtn('eventlog', t('tab_event_log')||'Event Log')}
       ${logSubBtn('pollster', t('tab_pollster_log')||'Pollster Log')}
@@ -3647,6 +3648,15 @@ function renderSidebar() {
       _bindLogSubTabs(el);
       _bindActions(el);
       _loadLogBook();
+    } else if (logSub === 'checklists') {
+      el.innerHTML = logTabBar + `
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">📋 ${t('checklist_logs')||'Checklist Log'}</div>
+          <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('checklist_logs_desc')||'All completed checklists with details and timestamps.'}</p>
+          <div id="checklistLogEntries" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">${t('lb_loading')||'Loading…'}</em></div>
+        </div>`;
+      _bindLogSubTabs(el);
+      _loadChecklistLog();
     } else if (logSub === 'pollster') {
       el.innerHTML = logTabBar + `
         <div class="sidebar-section">
@@ -7979,9 +7989,12 @@ async function _loadChecklistInstances() {
       completedEl.innerHTML = `<p style="color:var(--text-dim);font-style:italic">—</p>`;
     } else {
       completedEl.innerHTML = completed.slice(0, 10).map(ci =>
-        `<div style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;cursor:pointer" data-action="openChecklistInstance" data-arg="${ci.id}">
-          <span style="font-size:var(--fs-xs)">${escHtml(ci.name)}</span>
-          <span style="font-size:10px;color:var(--text-dim)">${ci.completed_at ? new Date(ci.completed_at).toLocaleDateString() : ''}</span>
+        `<div style="padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" data-action="openChecklistInstance" data-arg="${ci.id}">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:var(--fs-xs)">${escHtml(ci.name)}</span>
+            <span style="font-size:10px;color:var(--text-dim)">${ci.completed_at ? new Date(ci.completed_at).toLocaleDateString() : ''}</span>
+          </div>
+          ${ci.completed_by_name ? `<div style="font-size:10px;color:var(--text-dim)">${t('checklist_completed_by')||'Completed by'}: ${escHtml(ci.completed_by_name)}</div>` : ''}
         </div>`
       ).join('');
     }
@@ -7990,6 +8003,43 @@ async function _loadChecklistInstances() {
   } catch(e) {
     activeEl.innerHTML = `<p style="color:var(--danger)">Failed to load checklists</p>`;
     completedEl.innerHTML = '';
+  }
+}
+
+async function _loadChecklistLog() {
+  const container = document.getElementById('checklistLogEntries');
+  if (!container) return;
+  try {
+    const res = await api('GET', '/api/checklist-instances');
+    const instances = await res.json();
+    const completed = instances.filter(i => i.status === 'completed').sort((a, b) =>
+      (b.completed_at ? new Date(b.completed_at) : 0) - (a.completed_at ? new Date(a.completed_at) : 0)
+    );
+    if (completed.length === 0) {
+      container.innerHTML = `<em style="color:var(--text-dim)">${t('checklist_logs_empty')||'No completed checklists yet.'}</em>`;
+      return;
+    }
+    container.innerHTML = completed.map(ci => {
+      const total = ci.items ? ci.items.length : 0;
+      const checked = ci.items ? ci.items.filter(it => it.checked).length : 0;
+      const skipped = ci.items ? ci.items.filter(it => it.skipped).length : 0;
+      return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:6px;background:var(--bg2);cursor:pointer" data-action="openChecklistInstance" data-arg="${ci.id}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <strong style="font-size:var(--fs-sm)">${escHtml(ci.name)}</strong>
+          <span style="font-size:10px;color:var(--text-dim)">${ci.completed_at ? new Date(ci.completed_at).toLocaleString() : ''}</span>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim)">
+          ${ci.completed_by_name ? `${t('checklist_completed_by')||'Completed by'}: <strong>${escHtml(ci.completed_by_name)}</strong>` : ''}
+          ${ci.created_by_name ? ` · Started by: ${escHtml(ci.created_by_name)}` : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">
+          ✅ ${checked} checked · ⏭ ${skipped} skipped · ${total} total
+        </div>
+      </div>`;
+    }).join('');
+    _bindActions(container);
+  } catch(e) {
+    container.innerHTML = `<em style="color:var(--danger)">Failed to load checklist log</em>`;
   }
 }
 
@@ -8120,7 +8170,9 @@ async function openChecklistInstance(idOrStr) {
       // Footer
       const footerEl = modal.querySelector('#checklistInstanceFooter');
       if (isComplete) {
+        const completedInfo = ci.completed_by_name ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);margin-right:auto">${t('checklist_completed_by')||'Completed by'}: <strong>${escHtml(ci.completed_by_name)}</strong>${ci.completed_at ? ' · ' + new Date(ci.completed_at).toLocaleString() : ''}</span>` : '';
         footerEl.innerHTML = `
+          ${completedInfo}
           <button class="btn btn-sm btn-secondary" id="_cl_reopen">↩ ${t('checklist_reopen')||'Reopen'}</button>
           <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>`;
         footerEl.querySelector('#_cl_reopen').addEventListener('click', async () => {
@@ -8201,12 +8253,22 @@ function _addChecklistItemRow(container, text, category) {
   row.className = 'cl-item-row';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
   row.innerHTML = `
+    <button class="btn btn-sm cl-move-up" style="padding:1px 4px;font-size:9px;flex-shrink:0;opacity:.6" title="${t('checklist_move_up')||'Move up'}">▲</button>
+    <button class="btn btn-sm cl-move-down" style="padding:1px 4px;font-size:9px;flex-shrink:0;opacity:.6" title="${t('checklist_move_down')||'Move down'}">▼</button>
     <input type="text" class="cl-item-text" placeholder="${t('checklist_item_text')||'Item text...'}" value="${escHtml(text)}"
       style="flex:1;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
     <input type="text" class="cl-item-cat" placeholder="${t('checklist_item_category')||'Category'}" value="${escHtml(category||'')}"
       style="width:100px;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
     <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;flex-shrink:0" title="${t('checklist_remove')||'Remove'}">✕</button>`;
   row.querySelector('.btn-danger').addEventListener('click', () => row.remove());
+  row.querySelector('.cl-move-up').addEventListener('click', () => {
+    const prev = row.previousElementSibling;
+    if (prev && prev.classList.contains('cl-item-row')) container.insertBefore(row, prev);
+  });
+  row.querySelector('.cl-move-down').addEventListener('click', () => {
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('cl-item-row')) container.insertBefore(next, row);
+  });
   container.appendChild(row);
 }
 
@@ -8223,11 +8285,12 @@ async function openChecklistEditor() {
         <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
           ${t('checklists_desc')||'Create and manage reusable checklist templates.'}
         </p>
-        <div style="display:flex;gap:12px;margin-bottom:12px">
-          <select id="clEditorList" style="flex:1;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+          <select id="clEditorList" style="flex:1;min-width:200px;padding:6px 8px;font-size:var(--fs-sm);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
             <option value="__new__">── ${t('checklist_new')||'New Checklist'} ──</option>
           </select>
           <button class="btn btn-sm btn-primary" id="clEditorNewBtn">+ ${t('checklist_new')||'New'}</button>
+          <button class="btn btn-sm btn-secondary" id="clEditorCloneBtn" style="display:none">📋 ${t('checklist_clone')||'Clone'}</button>
         </div>
         <div id="clEditorForm" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;background:var(--bg2)">
           <div style="margin-bottom:8px">
@@ -8269,6 +8332,7 @@ async function openChecklistEditor() {
   const deleteBtn = modal.querySelector('#clEditorDeleteBtn');
   const saveBtn = modal.querySelector('#clEditorSaveBtn');
   const builtinNote = modal.querySelector('#clEditorBuiltinNote');
+  const cloneBtn = modal.querySelector('#clEditorCloneBtn');
 
   async function loadList() {
     try {
@@ -8292,20 +8356,18 @@ async function openChecklistEditor() {
     if (tmpl && tmpl.items) {
       tmpl.items.forEach(it => _addChecklistItemRow(itemsEl, it.text, it.category));
     }
-    nameEl.disabled = !!isBuiltIn;
-    descEl.disabled = !!isBuiltIn;
+    nameEl.disabled = false;
+    descEl.disabled = false;
     deleteBtn.style.display = (tmpl && !isBuiltIn && tmpl.id > 0) ? '' : 'none';
-    saveBtn.style.display = isBuiltIn ? 'none' : '';
+    saveBtn.style.display = '';
+    saveBtn.textContent = isBuiltIn ? ('💾 ' + (t('checklist_save')||'Save as Custom')) : ('💾 ' + (t('checklist_save')||'Save Checklist'));
     builtinNote.style.display = isBuiltIn ? '' : 'none';
-    if (isBuiltIn) {
-      itemsEl.querySelectorAll('input').forEach(el => el.disabled = true);
-      itemsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = 'none');
-      modal.querySelector('#clEditorAddItem').style.display = 'none';
-    } else {
-      itemsEl.querySelectorAll('input').forEach(el => el.disabled = false);
-      itemsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
-      modal.querySelector('#clEditorAddItem').style.display = '';
-    }
+    builtinNote.innerHTML = isBuiltIn ? `${t('checklist_builtin')||'Built-in'} — ${t('checklist_clone')||'editing will save as a new custom checklist'}` : '';
+    cloneBtn.style.display = tmpl ? '' : 'none';
+    itemsEl.querySelectorAll('input').forEach(el => el.disabled = false);
+    itemsEl.querySelectorAll('.btn-danger').forEach(el => el.style.display = '');
+    itemsEl.querySelectorAll('.cl-move-up,.cl-move-down').forEach(el => el.style.display = '');
+    modal.querySelector('#clEditorAddItem').style.display = '';
   }
 
   listEl.addEventListener('change', () => {
@@ -8337,9 +8399,12 @@ async function openChecklistEditor() {
     });
     if (items.length === 0) { showError(t('checklist_add_item')||'Add at least one item'); return; }
     const selectedId = listEl.value;
+    const selectedTmpl = templates.find(x => String(x.id) === selectedId);
+    const isBuiltIn = selectedTmpl && selectedTmpl.built_in;
     const body = { name, description: descEl.value.trim(), items };
     try {
-      if (selectedId === '__new__') {
+      if (selectedId === '__new__' || isBuiltIn) {
+        // Built-in templates are saved as new custom checklists
         await api('POST', '/api/checklist-templates', body);
         showNotification('success', `${name} created`);
       } else {
@@ -8362,6 +8427,22 @@ async function openChecklistEditor() {
       loadForm(null);
       listEl.value = '__new__';
     } catch(e) { showError('Failed to delete: ' + (e.message||e)); }
+  });
+
+  cloneBtn.addEventListener('click', async () => {
+    const selectedId = listEl.value;
+    if (selectedId === '__new__') return;
+    const tmpl = templates.find(x => String(x.id) === selectedId);
+    if (!tmpl) return;
+    const cloneName = (t('checklist_clone_name')||'Clone of') + ' ' + tmpl.name;
+    const cloneItems = (tmpl.items || []).map(it => ({ text: it.text, category: it.category || '' }));
+    try {
+      await api('POST', '/api/checklist-templates', { name: cloneName, description: tmpl.description || '', items: cloneItems });
+      showNotification('success', `${cloneName} created`);
+      await loadList();
+      loadForm(null);
+      listEl.value = '__new__';
+    } catch(e) { showError('Failed to clone: ' + (e.message||e)); }
   });
 
   await loadList();
@@ -12479,6 +12560,7 @@ async function openTeamLeadToolbox() {
                 <option value="high">${t('priority_high')||'High'}</option>
                 <option value="critical">${t('priority_critical')||'Critical'}</option>
               </select>
+              <span style="flex:1"></span>
               <button class="btn btn-sm btn-primary" data-action="sendQuickReport">📋 ${t('btn_send_report')||'Send Report'}</button>
             </div>
           </div>
@@ -12547,6 +12629,17 @@ async function openTeamLeadToolbox() {
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
             <div style="display:flex;justify-content:flex-end">
               <button class="btn btn-sm btn-primary" data-action="sendTeamPoll">📊 ${t('btn_send_poll')||'Send Poll'}</button>
+            </div>
+          </div>
+
+          <!-- Team Checklists -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">📋 ${t('checklist_team_checklists')||'Team Checklists'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('checklist_team_desc')||'Team-oriented checklists for group coordination and assessment.'}</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-sm btn-primary" data-action="showChecklistsInSidebar">📋 ${t('checklists')||'Checklists'}</button>
+              <button class="btn btn-sm btn-secondary" data-action="openChecklistStart">▶ ${t('checklist_start')||'Start Checklist'}</button>
+              <button class="btn btn-sm btn-secondary" data-action="openChecklistEditor">✏ ${t('checklist_editor')||'Editor'}</button>
             </div>
           </div>
 
@@ -15377,9 +15470,12 @@ function _renderReferencesTab(el) {
   const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
   el.innerHTML = `
     <div class="sidebar-section">
-      <div class="sidebar-section-title">
-        ${t('references_title') || 'References'}
-        ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
+      <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${t('references_title') || 'References'}</span>
+        <span style="display:flex;gap:4px;align-items:center">
+          ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
+          <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" id="btnDetachReferences" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+        </span>
       </div>
       <input type="text" id="refSearch" list="refSearchSuggestions" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)" autocomplete="off">
       <datalist id="refSearchSuggestions"></datalist>
@@ -15411,6 +15507,8 @@ function _renderReferencesTab(el) {
   _checkRefGitIntegration();
   const addBtn = document.getElementById('btnAddReference');
   if (addBtn) addBtn.addEventListener('click', () => _openReferenceUploadModal());
+  const detachRefBtn = document.getElementById('btnDetachReferences');
+  if (detachRefBtn) detachRefBtn.addEventListener('click', () => openDetachedReferences());
   const searchEl = document.getElementById('refSearch');
   if (searchEl) searchEl.addEventListener('input', () => _filterReferences());
   const catEl = document.getElementById('refCategoryFilter');
