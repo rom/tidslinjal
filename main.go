@@ -4,11 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -22,6 +26,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/big"
 	"mime"
 	"net"
 	"net/http"
@@ -428,6 +433,8 @@ type App struct {
 	oidc            *OIDCConfig // nil if OIDC not configured
 	oidcExclusive   bool        // when true, disable local username/password login
 	oidcDefaultRole Role        // role assigned to auto-created OIDC users (default: RoleReadWrite)
+	jwksCache       *jwksKeySet // C-01 fix: cached JWKS keys for RSA/EC signature verification
+	jwksMu          sync.Mutex  // protects jwksCache
 	webhookCh       chan webhookJob
 	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
 	authLimiter     *ipRateLimiter
@@ -438,6 +445,27 @@ type App struct {
 	enabledLangs    []string      // languages available to users (nil = all)
 	stopCh          chan struct{} // closed to stop background goroutines
 	stopOnce        sync.Once
+}
+
+// jwksKeySet holds cached JWKS keys from an OIDC provider.
+type jwksKeySet struct {
+	Keys      []jwksKey
+	FetchedAt time.Time
+}
+
+// jwksKey represents a single JWK (JSON Web Key).
+type jwksKey struct {
+	Kty string `json:"kty"` // RSA or EC
+	Kid string `json:"kid"` // key ID
+	Alg string `json:"alg"` // RS256, ES256, etc.
+	Use string `json:"use"` // sig
+	// RSA fields
+	N string `json:"n"` // modulus (base64url)
+	E string `json:"e"` // exponent (base64url)
+	// EC fields
+	Crv string `json:"crv"` // P-256, P-384, P-521
+	X   string `json:"x"`   // x coordinate (base64url)
+	Y   string `json:"y"`   // y coordinate (base64url)
 }
 
 // ipRateLimiter implements a simple per-IP sliding-window rate limiter.
@@ -13631,6 +13659,110 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 // handleOIDCCallback exchanges the auth code for tokens, fetches user info, and creates a session.
 // validateIDToken performs local validation of OIDC ID token claims and verifies
 // the cryptographic signature. It checks issuer, audience, expiry, nonce, and signature.
+// fetchJWKS fetches and caches the OIDC provider's JSON Web Key Set.
+// Keys are cached for 1 hour. If kid is not found in cache, a refresh is forced once.
+func (app *App) fetchJWKS(forceRefresh bool) (*jwksKeySet, error) {
+	app.jwksMu.Lock()
+	defer app.jwksMu.Unlock()
+
+	// Return cached keys if fresh (1 hour TTL)
+	if !forceRefresh && app.jwksCache != nil && time.Since(app.jwksCache.FetchedAt) < time.Hour {
+		return app.jwksCache, nil
+	}
+
+	if app.oidc == nil || app.oidc.JWKSEndpoint == "" {
+		return nil, fmt.Errorf("OIDC JWKS endpoint not configured")
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(app.oidc.JWKSEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("fetch JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("JWKS endpoint returned %d", resp.StatusCode)
+	}
+
+	var jwks struct {
+		Keys []jwksKey `json:"keys"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&jwks); err != nil {
+		return nil, fmt.Errorf("decode JWKS: %w", err)
+	}
+
+	app.jwksCache = &jwksKeySet{Keys: jwks.Keys, FetchedAt: time.Now()}
+	return app.jwksCache, nil
+}
+
+// findJWK finds a key by kid in the JWKS, refreshing if needed.
+func (app *App) findJWK(kid string) (*jwksKey, error) {
+	keySet, err := app.fetchJWKS(false)
+	if err != nil {
+		return nil, err
+	}
+	for i := range keySet.Keys {
+		if keySet.Keys[i].Kid == kid {
+			return &keySet.Keys[i], nil
+		}
+	}
+	// Key not found — try a forced refresh (key rotation may have occurred)
+	keySet, err = app.fetchJWKS(true)
+	if err != nil {
+		return nil, err
+	}
+	for i := range keySet.Keys {
+		if keySet.Keys[i].Kid == kid {
+			return &keySet.Keys[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no JWK found for kid %q", kid)
+}
+
+// parseRSAPublicKey constructs an *rsa.PublicKey from JWK fields.
+func parseRSAPublicKey(jwk *jwksKey) (*rsa.PublicKey, error) {
+	nBytes, err := base64.RawURLEncoding.DecodeString(jwk.N)
+	if err != nil {
+		return nil, fmt.Errorf("decode JWK modulus: %w", err)
+	}
+	eBytes, err := base64.RawURLEncoding.DecodeString(jwk.E)
+	if err != nil {
+		return nil, fmt.Errorf("decode JWK exponent: %w", err)
+	}
+	n := new(big.Int).SetBytes(nBytes)
+	e := 0
+	for _, b := range eBytes {
+		e = e<<8 | int(b)
+	}
+	return &rsa.PublicKey{N: n, E: e}, nil
+}
+
+// parseECPublicKey constructs an *ecdsa.PublicKey from JWK fields.
+func parseECPublicKey(jwk *jwksKey) (*ecdsa.PublicKey, error) {
+	var curve elliptic.Curve
+	switch jwk.Crv {
+	case "P-256":
+		curve = elliptic.P256()
+	case "P-384":
+		curve = elliptic.P384()
+	case "P-521":
+		curve = elliptic.P521()
+	default:
+		return nil, fmt.Errorf("unsupported EC curve: %s", jwk.Crv)
+	}
+	xBytes, err := base64.RawURLEncoding.DecodeString(jwk.X)
+	if err != nil {
+		return nil, fmt.Errorf("decode JWK x coordinate: %w", err)
+	}
+	yBytes, err := base64.RawURLEncoding.DecodeString(jwk.Y)
+	if err != nil {
+		return nil, fmt.Errorf("decode JWK y coordinate: %w", err)
+	}
+	x := new(big.Int).SetBytes(xBytes)
+	y := new(big.Int).SetBytes(yBytes)
+	return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}, nil
+}
+
 func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 	// JWT is three base64url-encoded segments separated by dots
 	parts := strings.SplitN(rawToken, ".", 3)
@@ -13645,12 +13777,13 @@ func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 	}
 	var header struct {
 		Alg string `json:"alg"`
+		Kid string `json:"kid"`
 	}
 	if err := json.Unmarshal(headerJSON, &header); err != nil {
 		return fmt.Errorf("parse JWT header: %w", err)
 	}
 
-	// Verify signature using client secret for HMAC algorithms
+	// Verify signature
 	signingInput := parts[0] + "." + parts[1]
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
@@ -13679,10 +13812,91 @@ func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 		if subtle.ConstantTimeCompare(signature, expected) != 1 {
 			return fmt.Errorf("HS512 signature verification failed")
 		}
-	case "RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512":
-		// For RSA/EC algorithms, we cannot verify without fetching the provider's JWKS.
-		// Log a warning and rely on the TLS-secured token endpoint for integrity.
-		log.Printf("[SECURITY] OIDC ID token uses %s algorithm — JWKS signature verification not implemented; relying on TLS channel integrity from token endpoint", header.Alg)
+	case "RS256", "RS384", "RS512":
+		// C-01 fix: verify RSA signature using JWKS
+		jwk, err := app.findJWK(header.Kid)
+		if err != nil {
+			return fmt.Errorf("RSA signature verification failed: %w", err)
+		}
+		pubKey, err := parseRSAPublicKey(jwk)
+		if err != nil {
+			return fmt.Errorf("RSA key parse failed: %w", err)
+		}
+		var hashFunc crypto.Hash
+		switch header.Alg {
+		case "RS256":
+			hashFunc = crypto.SHA256
+		case "RS384":
+			hashFunc = crypto.SHA384
+		case "RS512":
+			hashFunc = crypto.SHA512
+		}
+		h := hashFunc.New()
+		h.Write([]byte(signingInput))
+		digest := h.Sum(nil)
+		if err := rsa.VerifyPKCS1v15(pubKey, hashFunc, digest, signature); err != nil {
+			return fmt.Errorf("%s signature verification failed", header.Alg)
+		}
+	case "PS256", "PS384", "PS512":
+		// C-01 fix: verify RSA-PSS signature using JWKS
+		jwk, err := app.findJWK(header.Kid)
+		if err != nil {
+			return fmt.Errorf("RSA-PSS signature verification failed: %w", err)
+		}
+		pubKey, err := parseRSAPublicKey(jwk)
+		if err != nil {
+			return fmt.Errorf("RSA-PSS key parse failed: %w", err)
+		}
+		var hashFunc crypto.Hash
+		switch header.Alg {
+		case "PS256":
+			hashFunc = crypto.SHA256
+		case "PS384":
+			hashFunc = crypto.SHA384
+		case "PS512":
+			hashFunc = crypto.SHA512
+		}
+		h := hashFunc.New()
+		h.Write([]byte(signingInput))
+		digest := h.Sum(nil)
+		if err := rsa.VerifyPSS(pubKey, hashFunc, digest, signature, nil); err != nil {
+			return fmt.Errorf("%s signature verification failed", header.Alg)
+		}
+	case "ES256", "ES384", "ES512":
+		// C-01 fix: verify ECDSA signature using JWKS
+		jwk, err := app.findJWK(header.Kid)
+		if err != nil {
+			return fmt.Errorf("ECDSA signature verification failed: %w", err)
+		}
+		pubKey, err := parseECPublicKey(jwk)
+		if err != nil {
+			return fmt.Errorf("ECDSA key parse failed: %w", err)
+		}
+		var hashFunc crypto.Hash
+		var keySize int
+		switch header.Alg {
+		case "ES256":
+			hashFunc = crypto.SHA256
+			keySize = 32
+		case "ES384":
+			hashFunc = crypto.SHA384
+			keySize = 48
+		case "ES512":
+			hashFunc = crypto.SHA512
+			keySize = 66
+		}
+		h := hashFunc.New()
+		h.Write([]byte(signingInput))
+		digest := h.Sum(nil)
+		// ECDSA JWT signatures are r||s concatenated (not ASN.1 DER)
+		if len(signature) != 2*keySize {
+			return fmt.Errorf("%s signature has wrong length: got %d, want %d", header.Alg, len(signature), 2*keySize)
+		}
+		r := new(big.Int).SetBytes(signature[:keySize])
+		s := new(big.Int).SetBytes(signature[keySize:])
+		if !ecdsa.Verify(pubKey, digest, r, s) {
+			return fmt.Errorf("%s signature verification failed", header.Alg)
+		}
 	case "none":
 		return fmt.Errorf("unsigned JWT (alg=none) rejected")
 	default:

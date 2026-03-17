@@ -636,6 +636,7 @@ type OIDCConfig struct {
 	AuthorizationEndpoint string `json:"authorization_endpoint"`
 	TokenEndpoint         string `json:"token_endpoint"`
 	UserinfoEndpoint      string `json:"userinfo_endpoint"`
+	JWKSEndpoint          string `json:"jwks_uri"`
 	ClientID              string `json:"-"`
 	ClientSecret          string `json:"-"`
 	RedirectURL           string `json:"-"`
