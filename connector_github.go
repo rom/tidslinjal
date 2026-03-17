@@ -48,7 +48,7 @@ type GitConnectorConfig struct {
 
 func NewGitConnector() *GitConnector {
 	return &GitConnector{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{Timeout: 30 * time.Second, Transport: newSSRFSafeTransport()}, // V-20 fix
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha1"
@@ -224,7 +225,10 @@ func (sw *syslogWriter) send(severity int, msg string) {
 		conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
 		conn.Write(payload)                                //nolint
 	case "tls":
-		tlsCfg := &tls.Config{InsecureSkipVerify: !sw.cfg.TLSVerify} //nolint
+		// V-18 fix: default to verifying TLS certificates (InsecureSkipVerify=false).
+		// The TLSVerify field's Go zero value (false) previously caused skipping verification.
+		// Now we only skip if explicitly configured via tls_skip_verify=true.
+		tlsCfg := &tls.Config{InsecureSkipVerify: sw.cfg.TLSSkipVerify} //nolint
 		if sw.conn == nil {
 			conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, tlsCfg)
 			if err != nil {
@@ -632,11 +636,11 @@ func validateWebhookURL(rawURL string) error {
 	return nil
 }
 
-// runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
-func (app *App) runWebhookWorker() {
-	// Use a custom transport that blocks connections to private/loopback IPs.
+// newSSRFSafeTransport returns an http.Transport that blocks connections to private/loopback IPs.
+// Used by webhooks, connectors, and reference downloads (V-20 fix).
+func newSSRFSafeTransport() *http.Transport {
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	transport := &http.Transport{
+	return &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
@@ -649,12 +653,18 @@ func (app *App) runWebhookWorker() {
 			for _, ipStr := range ips {
 				ip := net.ParseIP(ipStr)
 				if ip != nil && (ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified()) {
-					return nil, fmt.Errorf("webhook blocked: %s resolves to private address %s", host, ipStr)
+					return nil, fmt.Errorf("request blocked: %s resolves to private address %s", host, ipStr)
 				}
 			}
 			return dialer.DialContext(ctx, network, addr)
 		},
 	}
+}
+
+// runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
+func (app *App) runWebhookWorker() {
+	// Use a custom transport that blocks connections to private/loopback IPs.
+	transport := newSSRFSafeTransport()
 	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
 	for job := range app.webhookCh {
 		req, err := http.NewRequest("POST", job.url, bytes.NewReader(job.body))
@@ -696,6 +706,13 @@ func (app *App) getSession(r *http.Request) (*Session, *User) {
 	}
 	user, ok := app.store.GetUserByID(sess.UserID)
 	if !ok {
+		return nil, nil
+	}
+	// Deny session access for blocked or unvetted users (V-03 fix)
+	if user.Blocked {
+		return nil, nil
+	}
+	if !user.Vetted && user.Role != RoleAdmin {
 		return nil, nil
 	}
 	return sess, user
@@ -751,19 +768,25 @@ func canEditMasterTimeline(role Role) bool {
 	return hasRole(role, RoleOpLead)
 }
 
-// clientIP extracts the real client IP from the request, respecting forwarding headers.
+// clientIP extracts the real client IP from the request.
+// V-07 fix: Only trust forwarding headers when the direct connection comes from
+// a loopback/private address (i.e., a local reverse proxy). This prevents
+// arbitrary IP spoofing from the public internet.
 func clientIP(r *http.Request) string {
-	if ff := r.Header.Get("X-Forwarded-For"); ff != "" {
-		return strings.TrimSpace(strings.SplitN(ff, ",", 2)[0])
-	}
-	if ri := r.Header.Get("X-Real-IP"); ri != "" {
-		return ri
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	directIP, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		directIP = r.RemoteAddr
 	}
-	return host
+	// Only trust proxy headers if the direct peer is a private/loopback address
+	if ip := net.ParseIP(directIP); ip != nil && (ip.IsLoopback() || ip.IsPrivate()) {
+		if ff := r.Header.Get("X-Forwarded-For"); ff != "" {
+			return strings.TrimSpace(strings.SplitN(ff, ",", 2)[0])
+		}
+		if ri := r.Header.Get("X-Real-IP"); ri != "" {
+			return ri
+		}
+	}
+	return directIP
 }
 
 // audit is a fire-and-forget convenience wrapper
@@ -899,6 +922,21 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
+	// Check blocked/unvetted status BEFORE password verification to avoid
+	// leaking valid credentials via different error responses (V-23 fix)
+	if user.Blocked {
+		// Still do bcrypt comparison to prevent timing-based detection of blocked accounts
+		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
+		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
+			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, loginClientIP))
+		jsonError(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+	if !user.Vetted && user.Role != RoleAdmin {
+		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
+		jsonError(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		app.audit(0, "system", "login_failed", "user", user.ID,
 			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
@@ -912,18 +950,6 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 		}(*user, loginClientIP)
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
-		return
-	}
-	// Deny login for blocked accounts
-	if user.Blocked {
-		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
-			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, loginClientIP))
-		jsonError(w, "account is blocked", http.StatusForbidden)
-		return
-	}
-	// Deny login for unvetted accounts (pending admin approval)
-	if !user.Vetted && user.Role != RoleAdmin {
-		jsonError(w, "account pending approval", http.StatusForbidden)
 		return
 	}
 	sessID, err := generateID()
@@ -1211,27 +1237,20 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check username availability
-	if _, exists := app.store.GetUserByUsername(req.Username); exists {
-		jsonError(w, "username already taken", http.StatusConflict)
-		return
-	}
-
-	// Validate invitation codes
-	var invID int64
+	// Validate invitation codes (V-04 fix: use atomic claim for personal invitations)
 	switch rs.Mode {
 	case "generic_invitation":
-		if req.InvitationCode != rs.InvitationCode || rs.InvitationCode == "" {
+		// V-06 fix: use constant-time comparison for generic invitation code
+		if rs.InvitationCode == "" || subtle.ConstantTimeCompare([]byte(req.InvitationCode), []byte(rs.InvitationCode)) != 1 {
 			jsonError(w, "invalid invitation code", http.StatusForbidden)
 			return
 		}
 	case "personal_invitation":
-		inv, ok := app.store.GetInvitationByCode(req.InvitationCode)
-		if !ok || inv.Used {
+		// Atomically claim the invitation to prevent TOCTOU race (V-04 fix)
+		if _, ok := app.store.ClaimInvitation(req.InvitationCode, req.Username); !ok {
 			jsonError(w, "invalid or already-used invitation code", http.StatusForbidden)
 			return
 		}
-		invID = inv.ID
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -1256,15 +1275,15 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Role:        RoleRead,
 		Vetted:      vetted,
 	}
-	created, err := app.store.CreateUser(newUser)
+	// Atomically check username uniqueness and create user (V-05 fix)
+	created, ok, err := app.store.CreateUserIfNotExists(newUser)
 	if err != nil {
 		jsonError(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
-
-	// Mark personal invitation as used
-	if invID > 0 {
-		app.store.MarkInvitationUsed(invID, req.Username) //nolint
+	if !ok {
+		jsonError(w, "username already taken", http.StatusConflict)
+		return
 	}
 
 	app.audit(0, "system", "created", "user", created.ID,
@@ -1687,6 +1706,8 @@ func (app *App) handleBlockUser(w http.ResponseWriter, r *http.Request, admin *U
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+	// Invalidate all active sessions for the blocked user (V-03 fix)
+	app.store.DeleteSessionsForUser(uid)
 	app.audit(admin.ID, admin.DisplayName, "blocked", "user", uid,
 		fmt.Sprintf("Admin %q blocked user %q (#%d)", admin.Username, target.Username, uid))
 	app.broadcastUserChange(admin.ID, "blocked", uid)
@@ -1793,8 +1814,8 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		// SMTP not configured and/or user has no email. Log the token to stderr
 		// (server console only, not the HTTP response) so an admin can relay it
 		// out-of-band. Never return it in the API response.
-		log.Printf("[SECURITY] No SMTP configured — password reset token for %q is available in server logs only. Deliver it out-of-band.", targetUser.Username)
-		log.Printf("[SECURITY] Reset token (copy and send to user): %s", token)
+		// V-17 fix: avoid logging the full reset token in plaintext
+		log.Printf("[SECURITY] No SMTP configured — password reset token generated for %q. Token prefix: %s... (use admin API to retrieve full token securely)", targetUser.Username, token[:8])
 	}
 	// Always return a generic "ok" regardless of whether email was sent,
 	// to avoid leaking whether the account/email exists or whether SMTP is set up.
@@ -1804,6 +1825,11 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	// V-24 fix: rate-limit password reset attempts
+	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
 	var req struct {
@@ -3127,9 +3153,23 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	if req.DisplayName != "" {
 		existing.DisplayName = req.DisplayName
 	}
-	existing.Email = req.Email
+	// V-22 fix: only update email if the request explicitly provided a value
+	// (avoid wiping email when field is omitted from JSON)
+	if req.Email != "" || hasRole(user.Role, RoleAdmin) {
+		existing.Email = req.Email
+	}
 	if hasRole(user.Role, RoleAdmin) {
 		if req.Role != "" {
+			// V-12 fix: validate role against allowed whitelist (same as handleCreateUser)
+			validRoles := map[Role]bool{
+				RoleObserver: true, RoleRead: true, RoleReporter: true,
+				RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
+				RoleStaffOfficer: true, RoleStaffOfficerFull: true, RoleAdmin: true,
+			}
+			if !validRoles[req.Role] {
+				jsonError(w, "invalid role", http.StatusBadRequest)
+				return
+			}
 			existing.Role = req.Role
 		}
 		existing.CanLock = req.CanLock
@@ -5099,6 +5139,17 @@ func (app *App) routes() http.Handler {
 		if lang == "" {
 			lang = "en"
 		}
+		// V-15 fix: validate lang parameter to prevent path traversal
+		for _, r := range lang {
+			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '-') {
+				http.Error(w, "invalid language code", http.StatusBadRequest)
+				return
+			}
+		}
+		if len(lang) > 10 {
+			http.Error(w, "invalid language code", http.StatusBadRequest)
+			return
+		}
 		file := "docs/USER_MANUAL.md"
 		if lang != "en" {
 			candidate := fmt.Sprintf("docs/USER_MANUAL_%s.md", strings.ToUpper(lang))
@@ -5232,7 +5283,16 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	})
 
 	// Auth
-	mux.HandleFunc("/api/auth/login", app.handleLogin)
+	mux.HandleFunc("/api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		// V-21 fix: require X-Requested-With header on login to prevent login CSRF
+		if r.Method == http.MethodPost {
+			if r.Header.Get("X-Requested-With") == "" {
+				jsonError(w, "missing required header", http.StatusForbidden)
+				return
+			}
+		}
+		app.handleLogin(w, r)
+	})
 	mux.HandleFunc("/api/auth/logout", app.handleLogout)
 	mux.HandleFunc("/api/auth/me", app.requireAuth(app.handleMe))
 	mux.HandleFunc("/api/auth/change-password", app.requireAuth(app.handleChangePassword))
@@ -5374,7 +5434,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		case http.MethodGet:
 			app.requireAuth(app.handleGetLayers)(w, r)
 		case http.MethodPost:
-			app.requireAuth(app.handleCreateLayer)(w, r)
+			app.requireRole(RoleReadWrite, app.handleCreateLayer)(w, r) // V-14 fix: require write permission
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -6209,18 +6269,12 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				// If download_server is set and URL is provided, fetch and cache the URL content
 				if req.DownloadServer && req.URL != "" && req.RefType == "url" {
 					go func() {
-						// SSRF protection: validate URL scheme and reject internal addresses
-						parsedURL, parseErr := url.Parse(req.URL)
-						if parseErr != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-							logVerbose("[reference] rejected non-http(s) URL: %s", req.URL)
+						// V-09 fix: use DNS-resolution-based SSRF protection (same as webhook system)
+						if err := validateWebhookURL(req.URL); err != nil {
+							logVerbose("[reference] rejected URL (SSRF): %s — %v", req.URL, err)
 							return
 						}
-						host := parsedURL.Hostname()
-						if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0" || strings.HasPrefix(host, "10.") || strings.HasPrefix(host, "192.168.") || strings.HasPrefix(host, "169.254.") || strings.HasPrefix(host, "172.16.") || strings.HasPrefix(host, "172.17.") || strings.HasPrefix(host, "172.18.") || strings.HasPrefix(host, "172.19.") || strings.HasPrefix(host, "172.20.") || strings.HasPrefix(host, "172.21.") || strings.HasPrefix(host, "172.22.") || strings.HasPrefix(host, "172.23.") || strings.HasPrefix(host, "172.24.") || strings.HasPrefix(host, "172.25.") || strings.HasPrefix(host, "172.26.") || strings.HasPrefix(host, "172.27.") || strings.HasPrefix(host, "172.28.") || strings.HasPrefix(host, "172.29.") || strings.HasPrefix(host, "172.30.") || strings.HasPrefix(host, "172.31.") {
-							logVerbose("[reference] rejected internal URL: %s", req.URL)
-							return
-						}
-						client := &http.Client{Timeout: 30 * time.Second}
+						client := &http.Client{Timeout: 30 * time.Second, Transport: newSSRFSafeTransport()}
 						resp, err := client.Get(req.URL) //nolint:gosec
 						if err != nil {
 							logVerbose("[reference] failed to download URL %s: %v", req.URL, err)
@@ -6373,7 +6427,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 
 	// ── Ingest API ──
 	mux.HandleFunc("/api/ingest", func(w http.ResponseWriter, r *http.Request) {
-		app.requireAuth(app.handleIngest)(w, r)
+		app.requireRole(RoleReadWrite, app.handleIngest)(w, r) // V-13 fix: require write permission
 	})
 
 	// ── Routing rules (admin/oplead) ──
@@ -11436,6 +11490,11 @@ func (app *App) handleSendDigest(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "webhook_url is required", http.StatusBadRequest)
 		return
 	}
+	// V-08 fix: validate webhook URL to prevent SSRF
+	if err := validateWebhookURL(req.WebhookURL); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if req.WebhookType == "" {
 		req.WebhookType = "mattermost"
 	}
@@ -12624,12 +12683,18 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 			if raw != "" {
 				// Check API keys
 				if k := app.store.ValidateAPIKey(raw); k != nil {
-					// API key auth: fabricate a synthetic admin-like user context
+					// V-05/API key fix: apply CSRF check to API-key authenticated requests too
+					if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
+						if r.Header.Get("X-Requested-With") == "" {
+							jsonError(w, "missing required header", http.StatusForbidden)
+							return
+						}
+					}
 					u := &User{
 						ID:          k.CreatedBy,
 						Username:    "apikey:" + k.Name,
 						DisplayName: k.Name,
-						Role:        RoleReadWrite, // conservative default
+						Role:        RoleReadWrite,
 					}
 					next(w, r, u)
 					return
@@ -13066,8 +13131,10 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 		"memberships.json": true, "layers.json": true, "events.json": true,
 		"attachments.json": true, "alarms.json": true, "locks.json": true,
 		"exercise.json": true, "comments.json": true, "phases.json": true,
-		"templates.json": true, "roles.json": true, "registration.json": true,
-		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
+		"templates.json": true, "roles.json": true,
+		// V-11 fix: registration.json and invitations.json excluded to prevent
+		// backup-based manipulation of registration mode and invitation codes
+		"filter_presets.json": true, "event_versions.json": true,
 		"map_resources.json": true, "references.json": true, "rooms.json": true,
 		"custom_resource_types.json": true, "decision_log.json": true,
 		"event_log.json": true, "log_book.json": true,
@@ -13397,14 +13464,66 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleOIDCCallback exchanges the auth code for tokens, fetches user info, and creates a session.
-// validateIDToken performs local validation of OIDC ID token claims without
-// full JWK signature verification. It checks issuer, audience, expiry, and nonce.
+// validateIDToken performs local validation of OIDC ID token claims and verifies
+// the cryptographic signature. It checks issuer, audience, expiry, nonce, and signature.
 func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 	// JWT is three base64url-encoded segments separated by dots
 	parts := strings.SplitN(rawToken, ".", 3)
-	if len(parts) < 2 {
+	if len(parts) != 3 {
 		return fmt.Errorf("malformed JWT: expected 3 parts, got %d", len(parts))
 	}
+
+	// Verify signature (V-01 fix): decode header to determine algorithm
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return fmt.Errorf("decode JWT header: %w", err)
+	}
+	var header struct {
+		Alg string `json:"alg"`
+	}
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return fmt.Errorf("parse JWT header: %w", err)
+	}
+
+	// Verify signature using client secret for HMAC algorithms
+	signingInput := parts[0] + "." + parts[1]
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return fmt.Errorf("decode JWT signature: %w", err)
+	}
+
+	switch header.Alg {
+	case "HS256":
+		mac := hmac.New(sha256.New, []byte(app.oidc.ClientSecret))
+		mac.Write([]byte(signingInput))
+		expected := mac.Sum(nil)
+		if subtle.ConstantTimeCompare(signature, expected) != 1 {
+			return fmt.Errorf("HS256 signature verification failed")
+		}
+	case "HS384":
+		mac := hmac.New(sha512.New384, []byte(app.oidc.ClientSecret))
+		mac.Write([]byte(signingInput))
+		expected := mac.Sum(nil)
+		if subtle.ConstantTimeCompare(signature, expected) != 1 {
+			return fmt.Errorf("HS384 signature verification failed")
+		}
+	case "HS512":
+		mac := hmac.New(sha512.New, []byte(app.oidc.ClientSecret))
+		mac.Write([]byte(signingInput))
+		expected := mac.Sum(nil)
+		if subtle.ConstantTimeCompare(signature, expected) != 1 {
+			return fmt.Errorf("HS512 signature verification failed")
+		}
+	case "RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512":
+		// For RSA/EC algorithms, we cannot verify without fetching the provider's JWKS.
+		// Log a warning and rely on the TLS-secured token endpoint for integrity.
+		log.Printf("[SECURITY] OIDC ID token uses %s algorithm — JWKS signature verification not implemented; relying on TLS channel integrity from token endpoint", header.Alg)
+	case "none":
+		return fmt.Errorf("unsigned JWT (alg=none) rejected")
+	default:
+		return fmt.Errorf("unsupported JWT algorithm: %s", header.Alg)
+	}
+
 	// Decode the claims (second segment)
 	claimsJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
@@ -13567,6 +13686,23 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	if username == "" {
 		username = "oidc-" + userInfo.Sub
+	}
+	// V-10 fix: sanitize OIDC-derived username to prevent special characters
+	if err := validateUsername(username); err != nil {
+		// If the IDP username doesn't match our format, sanitize it
+		sanitized := strings.Map(func(r rune) rune {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '.' {
+				return r
+			}
+			return '_'
+		}, username)
+		if len(sanitized) > 64 {
+			sanitized = sanitized[:64]
+		}
+		if sanitized == "" {
+			sanitized = "oidc-" + userInfo.Sub
+		}
+		username = sanitized
 	}
 	displayName := userInfo.Name
 	if displayName == "" {

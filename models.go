@@ -201,7 +201,7 @@ func (u *User) Public() UserPublic {
 		LastLoginAt:       u.LastLoginAt,
 		LoginCount:        u.LoginCount,
 		LastFailedLoginAt: u.LastFailedLoginAt,
-		LastFailedLoginIP: u.LastFailedLoginIP,
+		// V-26 fix: LastFailedLoginIP omitted from public view to prevent IP leakage
 		PrevLoginAt:       u.PrevLoginAt,
 		PrevLoginIP:       u.PrevLoginIP,
 		PrevLoginDomain:   u.PrevLoginDomain,
@@ -873,7 +873,8 @@ type SyslogConfig struct {
 	Format    string `json:"format"`               // classic | json
 	AppName   string `json:"app_name,omitempty"`   // tag/app name in syslog messages (default: tidslinjal)
 	Facility  int    `json:"facility,omitempty"`   // syslog facility 0-23 (default 1 = user-level)
-	TLSVerify bool   `json:"tls_verify,omitempty"` // verify TLS certificate (default true)
+	TLSVerify     bool `json:"tls_verify,omitempty"`      // deprecated: use tls_skip_verify instead
+	TLSSkipVerify bool `json:"tls_skip_verify,omitempty"` // V-18: explicitly skip TLS verification (default false = verify)
 }
 
 // SecuritySettings controls server-side password quality enforcement

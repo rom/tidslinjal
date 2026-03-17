@@ -758,6 +758,31 @@ func (s *Store) GetInvitationByCode(code string) (*PersonalInvitation, bool) {
 	return nil, false
 }
 
+// ClaimInvitation atomically checks that the invitation is valid+unused and marks it as used (V-04 fix).
+// Returns the invitation and true on success, or nil and false if invalid/already used.
+func (s *Store) ClaimInvitation(code string, usedBy string) (*PersonalInvitation, bool) {
+	s.mu.Lock()
+	for i := range s.invitations {
+		if s.invitations[i].Code == code {
+			if s.invitations[i].Used {
+				s.mu.Unlock()
+				return nil, false
+			}
+			now := time.Now()
+			s.invitations[i].Used = true
+			s.invitations[i].UsedBy = usedBy
+			s.invitations[i].UsedAt = &now
+			inv := s.invitations[i]
+			snap := append([]PersonalInvitation(nil), s.invitations...)
+			s.mu.Unlock()
+			s.persist("invitations.json", snap) //nolint
+			return &inv, true
+		}
+	}
+	s.mu.Unlock()
+	return nil, false
+}
+
 func (s *Store) MarkInvitationUsed(id int64, usedBy string) error {
 	s.mu.Lock()
 	now := time.Now()
@@ -1025,6 +1050,26 @@ func (s *Store) CreateUser(u User) (User, error) {
 	snap := append([]User(nil), s.users...)
 	s.mu.Unlock()
 	return u, s.persist("users.json", snap)
+}
+
+// CreateUserIfNotExists atomically checks username uniqueness and creates the user (V-05 fix).
+// Returns the created user and true, or zero-value User and false if username already exists.
+func (s *Store) CreateUserIfNotExists(u User) (User, bool, error) {
+	s.mu.Lock()
+	for i := range s.users {
+		if s.users[i].Username == u.Username {
+			s.mu.Unlock()
+			return User{}, false, nil
+		}
+	}
+	s.nextUserID++
+	u.ID = s.nextUserID
+	u.CreatedAt = time.Now()
+	s.users = append(s.users, u)
+	s.userByID[u.ID] = u
+	snap := append([]User(nil), s.users...)
+	s.mu.Unlock()
+	return u, true, s.persist("users.json", snap)
 }
 
 func (s *Store) UpdateUser(u User) error {
@@ -1732,6 +1777,23 @@ func (s *Store) DeleteSession(id string) error {
 	}
 	s.mu.Unlock()
 	return nil
+}
+
+// DeleteSessionsForUser removes all sessions belonging to a specific user (V-03 fix).
+func (s *Store) DeleteSessionsForUser(userID int64) {
+	s.mu.Lock()
+	filtered := s.sessions[:0]
+	for _, sess := range s.sessions {
+		if sess.UserID == userID {
+			delete(s.sessionByID, sess.ID)
+		} else {
+			filtered = append(filtered, sess)
+		}
+	}
+	s.sessions = filtered
+	snap := append([]Session(nil), s.sessions...)
+	s.mu.Unlock()
+	s.persist("sessions.json", snap) //nolint
 }
 
 func (s *Store) CleanExpiredSessions() {
@@ -4277,6 +4339,10 @@ func (s *Store) GetTestStats() TestStats {
 }
 
 func runGoTests() TestStats {
+	// V-19 fix: only allow test execution when GO_TEST_ENABLED env var is set
+	if os.Getenv("GO_TEST_ENABLED") != "1" {
+		return TestStats{} // test execution disabled in production
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-v", "-cover", "./...")
