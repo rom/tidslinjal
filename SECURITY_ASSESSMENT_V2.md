@@ -11,7 +11,7 @@
 
 This second assessment was conducted after an initial round of security fixes. The application has significantly improved — OIDC JWKS verification is now implemented, CSRF protection covers login, rate limiters have cleanup, and many IDOR issues were addressed. However, **critical gaps remain in layer-based access control across multiple data paths**, and several new findings emerge from deeper analysis of session management, SSE broadcasting, export endpoints, and concurrency handling.
 
-**Finding breakdown**: 5 High, 9 Medium, 8 Low, 6 Informational = **28 findings total**
+**Finding breakdown**: 5 High, 12 Medium, 8 Low, 6 Informational = **31 findings total**
 
 ---
 
@@ -43,6 +43,8 @@ This effectively nullifies the entire layer visibility system for any user with 
 - `connector_stix.go:259` — STIX export: `app.store.GetEventsInRange(...)` — **no layer filter**
 - `main.go:7476` — Report download: `app.store.GetEvents(from, to, nil)` — **no layer filter**
 - `main.go:7602` — Auto-report email: `app.store.GetEvents(...)` — **no layer filter**
+- `main.go:10871` — Stats export: `app.allEvents()` — **no layer filter, only requireAuth**
+- `main.go:13393` — WebCal: delegates to ICS export — **no layer filter, token-authenticated**
 
 **Severity**: **HIGH**
 **CVSS**: 7.5
@@ -174,7 +176,18 @@ A network attacker who strips cookies can downgrade the OIDC flow.
 
 ---
 
-### M-07: Session Tokens and Password Reset Tokens Stored in Plaintext on Disk
+### M-07: Webhook HTTP Client Follows Redirects (SSRF Bypass Vector)
+
+**Location**: `main.go:722` (`runWebhookWorker`)
+**Severity**: **MEDIUM**
+
+The webhook `http.Client` (line 722) has no `CheckRedirect` function set. While the custom `DialContext` in `newSSRFSafeTransport()` blocks connections to private IPs at dial time, the client follows HTTP 302/307 redirects by default. An attacker could set a webhook to `https://evil.com/redirect` which passes SSRF validation (public IP), then `evil.com` returns a redirect to `http://internal-service:8080/`. The safe transport's DialContext should block this at connection time, but adding an explicit redirect policy provides defense-in-depth.
+
+**Remediation**: Set `CheckRedirect` on the webhook client to re-validate each redirect URL against private IP ranges, or disable redirects entirely for webhooks.
+
+---
+
+### M-08: Session Tokens and Password Reset Tokens Stored in Plaintext on Disk
 
 **Location**: `store.go` — sessions.json, users.json (reset tokens)
 **Severity**: **MEDIUM**
@@ -185,7 +198,7 @@ Session IDs are stored in plaintext in `sessions.json`. Password reset tokens ar
 
 ---
 
-### M-08: OIDC Discovery Issuer Not Validated
+### M-09: OIDC Discovery Issuer Not Validated
 
 **Location**: `main.go:13536-13562`
 **Severity**: **MEDIUM**
@@ -196,7 +209,7 @@ Session IDs are stored in plaintext in `sessions.json`. Password reset tokens ar
 
 ---
 
-### M-09: No Concurrent Session Limit / No Session Limit Per User
+### M-10: No Concurrent Session Limit / No Session Limit Per User
 
 **Location**: `main.go:1028-1046`
 **Severity**: **MEDIUM**
@@ -204,6 +217,28 @@ Session IDs are stored in plaintext in `sessions.json`. Password reset tokens ar
 There is no limit on active sessions per user. Each login creates a new 24-hour session. An attacker with stolen credentials can create unlimited sessions, making it hard to revoke all access even if the password is changed (unless `DeleteSessionsForUser` is called).
 
 **Remediation**: Limit to N concurrent sessions per user (e.g., 10). On new login, if the limit is reached, either reject or expire the oldest session.
+
+---
+
+### M-11: No SSE Connection Limit Per User/IP
+
+**Location**: `main.go:334-345` (`SSEBroker.Subscribe`)
+**Severity**: **MEDIUM**
+
+There is no limit on concurrent SSE connections per user or per IP. Each SSE connection holds a goroutine and two buffered channels. An attacker with a single session can open thousands of SSE connections, exhausting server goroutines and file descriptors.
+
+**Remediation**: Limit to 5 SSE connections per user and 20 per IP. Drop oldest connection when limit is exceeded.
+
+---
+
+### M-12: Connector Config API Returns Secrets in Plaintext
+
+**Location**: Connector config GET endpoint
+**Severity**: **MEDIUM**
+
+The connector config GET endpoint returns raw `Config` JSON which may contain API keys, tokens, and passwords for GitHub, Jira, Google Calendar, and STIX connectors. While admin-only, secrets should be masked in API responses.
+
+**Remediation**: Strip or mask secret fields (api_key, token, password) in connector config GET responses, similar to how OIDC client_secret is masked.
 
 ---
 
@@ -412,9 +447,12 @@ Backup encryption uses the admin account's bcrypt hash as PBKDF2 key material. I
 | M-04 | MEDIUM | AuthZ | handleDeleteEvent missing layer access check |
 | M-05 | MEDIUM | CSRF | Logout endpoint accepts GET (CSRF logout) |
 | M-06 | MEDIUM | AuthZ | Webhook payloads include events from all layers |
-| M-07 | MEDIUM | Data | Session/reset tokens stored in plaintext on disk |
-| M-08 | MEDIUM | AuthN | OIDC discovery issuer not validated |
-| M-09 | MEDIUM | AuthN | No concurrent session limit |
+| M-07 | MEDIUM | SSRF | Webhook HTTP client follows redirects without re-validation |
+| M-08 | MEDIUM | Data | Session/reset tokens stored in plaintext on disk |
+| M-09 | MEDIUM | AuthN | OIDC discovery issuer not validated |
+| M-10 | MEDIUM | AuthN | No concurrent session limit |
+| M-11 | MEDIUM | DoS | No SSE connection limit per user/IP |
+| M-12 | MEDIUM | Data | Connector config API returns secrets in plaintext |
 | L-01 | LOW | AuthZ | handleUploadAttachment missing layer write check |
 | L-02 | LOW | AuthZ | handleCreateComment missing layer write check |
 | L-03 | LOW | AuthZ | Auto-report email includes all events |
