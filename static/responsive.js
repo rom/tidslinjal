@@ -28,8 +28,8 @@ function setupPointerEvents() {
   const container = document.getElementById('timeline-container');
   if (!container) return;
 
-  // Disable browser-level touch scroll during gestures
-  container.style.touchAction = 'pan-y';
+  // Allow vertical scroll + pinch-zoom; horizontal swipe handled by JS
+  container.style.touchAction = 'pan-y pinch-zoom';
 
   // ── Pinch-to-zoom ──────────────────────────────────────────────────────
   let _pinchActive = false;
