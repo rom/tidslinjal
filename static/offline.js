@@ -1,4 +1,4 @@
-/* ── Offline Mode ── */
+/* ── Offline Mode, Caching, Queued Actions ── */
 // ── Offline Mode ────────────────────────────────────────────────────────────
 window._offlineMode = false;
 window._offlineModeForced = false;
@@ -160,3 +160,4 @@ if (_origApiPost) {
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', _initOfflineMode);
 }
+

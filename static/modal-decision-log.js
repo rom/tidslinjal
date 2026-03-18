@@ -1,4 +1,4 @@
-/* ── Decision Log Modal ── */
+/* ── Decision Log Modal, Rendering, Close, Detach ── */
 // ── Decision Log Modal ──────────────────────────────────────────────────────
 let _decisionLogEntries = [];
 
@@ -376,3 +376,5 @@ function openDetachedDecisionLog() {
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
   closeDecisionLogModal();
 }
+
+// ── Analysis Modal ──────────────────────────────────────────────────────────

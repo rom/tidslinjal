@@ -1,4 +1,4 @@
-/* ── Personal Notifications ── */
+/* ── Notification Bell, Panel Rendering ── */
 // ── Personal Notifications ─────────────────────────────────────────────────
 let _notifUnreadCount = 0;
 let _notifPanelOpen = false;
@@ -136,3 +136,4 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load notifications on page load (after a short delay to let auth settle)
   setTimeout(() => _loadNotifications(), 1500);
 });
+

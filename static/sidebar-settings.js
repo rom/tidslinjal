@@ -1,4 +1,4 @@
-/* ── Sidebar Settings (Enrollment, Webhook, Tactical Font, Freeze, Exercise, OIDC, Teams/Zoom) ── */
+/* ── Sidebar Settings ── */
 // ── Webhook helpers, preference setters: setOOHPref, setRedLinePref, setSynthLabelPref, toggleFreeze, saveExercise, setDefaultView, setPref, setHourPref, toggleType, toggleLayer, toggleAllLayers ──
 
 // ── Enrollment settings helpers ─────────────────────────────────────────────

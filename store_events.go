@@ -48,6 +48,11 @@ func (s *Store) GetEventsInRange(from, to time.Time) []Event {
 func (s *Store) GetEventByID(id int64) (*Event, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if idx, ok := s.eventByID[id]; ok && idx < len(s.events) && s.events[idx].ID == id {
+		e := s.events[idx]
+		return &e, true
+	}
+	// Fallback to linear scan (defensive, in case index is stale)
 	for i := range s.events {
 		if s.events[i].ID == id {
 			e := s.events[i]
@@ -65,6 +70,7 @@ func (s *Store) CreateEvent(e Event) (Event, error) {
 	e.CreatedAt = now
 	e.UpdatedAt = now
 	s.events = append(s.events, e)
+	s.eventByID[e.ID] = len(s.events) - 1
 	snap := append([]Event(nil), s.events...)
 	s.mu.Unlock()
 	return e, s.persist("events.json", snap)
@@ -73,12 +79,19 @@ func (s *Store) CreateEvent(e Event) (Event, error) {
 func (s *Store) UpdateEvent(e Event) error {
 	s.mu.Lock()
 	found := false
-	for i := range s.events {
-		if s.events[i].ID == e.ID {
-			e.UpdatedAt = time.Now()
-			s.events[i] = e
-			found = true
-			break
+	if idx, ok := s.eventByID[e.ID]; ok && idx < len(s.events) && s.events[idx].ID == e.ID {
+		e.UpdatedAt = time.Now()
+		s.events[idx] = e
+		found = true
+	} else {
+		for i := range s.events {
+			if s.events[i].ID == e.ID {
+				e.UpdatedAt = time.Now()
+				s.events[i] = e
+				s.eventByID[e.ID] = i
+				found = true
+				break
+			}
 		}
 	}
 	if !found {
@@ -93,11 +106,16 @@ func (s *Store) UpdateEvent(e Event) error {
 func (s *Store) DeleteEvent(id int64) error {
 	s.mu.Lock()
 	found := false
-	for i, e := range s.events {
-		if e.ID == id {
-			s.events = append(s.events[:i], s.events[i+1:]...)
-			found = true
-			break
+	if idx, ok := s.eventByID[id]; ok && idx < len(s.events) && s.events[idx].ID == id {
+		s.events = append(s.events[:idx], s.events[idx+1:]...)
+		found = true
+	} else {
+		for i, e := range s.events {
+			if e.ID == id {
+				s.events = append(s.events[:i], s.events[i+1:]...)
+				found = true
+				break
+			}
 		}
 	}
 	if !found {

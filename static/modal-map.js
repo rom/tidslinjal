@@ -67,3 +67,4 @@ function saveMapLocation() {
   if (_mapCallback) _mapCallback(lat, lng, name);
   closeModal('mapModal');
 }
+

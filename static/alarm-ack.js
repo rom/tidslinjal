@@ -1,4 +1,4 @@
-/* ── Alarm ACK ── */
+/* ── Alarm Acknowledgement ── */
 // ── Alarm ACK ──────────────────────────────────────────────────────────────
 const unackedAlarms = new Map(); // alarmID → {data, level, timerID, element}
 

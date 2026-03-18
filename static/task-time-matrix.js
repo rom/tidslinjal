@@ -1,25 +1,4 @@
-/* ── Task-Time Matrix ── */
-// ── Event Modal Close Hook (for editing lock release) ─────────────────────────
-// Observe when the eventModal is closed and release editing lock
-(function() {
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach(m => {
-      if (m.target.id === 'eventModal' && m.attributeName === 'class') {
-        const isOpen = m.target.classList.contains('open');
-        if (!isOpen) {
-          const evIdEl = document.getElementById('eventId');
-          const evId = evIdEl ? parseInt(evIdEl.value, 10) : null;
-          if (evId && state.user) releaseEditingLock(evId);
-        }
-      }
-    });
-  });
-  document.addEventListener('DOMContentLoaded', () => {
-    const modal = document.getElementById('eventModal');
-    if (modal) observer.observe(modal, { attributes: true });
-  });
-})();
-
+/* ── Task-Time Matrix Rendering, Detach, Print ── */
 // ── Task-Time Matrix ──────────────────────────────────────────────────────────
 function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   const el = document.getElementById('taskTimeMatrixContent');
@@ -207,3 +186,4 @@ ${content}
 function _printTaskTimeMatrix() {
   _detachTaskTimeMatrix();
 }
+

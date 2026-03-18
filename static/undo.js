@@ -130,3 +130,4 @@ async function performUndo() {
   }
   updateUndoButton();
 }
+

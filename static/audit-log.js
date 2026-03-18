@@ -1,4 +1,4 @@
-/* ── Audit Log ── */
+/* ── Audit Log Display, Export ── */
 // ── Audit Log ─────────────────────────────────────────────────────────────
 async function refreshAuditLog() {
   const container = document.getElementById('auditLog');
@@ -74,3 +74,4 @@ async function requestPushPermission() {
     showError('Notifications blocked. Please allow them in your browser settings and reload.', 'Push Notifications');
   }
 }
+

@@ -1,4 +1,4 @@
-/* ── Role Editor ── */
+/* ── Role Editor UI ── */
 // ── Role Editor ─────────────────────────────────────────────────────────────
 
 // Default role configurations
@@ -264,3 +264,4 @@ async function saveRoles() {
     renderSidebar();
   }
 }
+

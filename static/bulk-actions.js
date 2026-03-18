@@ -1,4 +1,4 @@
-/* ── Bulk Actions ── */
+/* ── Bulk Actions Modal, Legacy Bulk Operations ── */
 // ── Bulk Event Actions (Tools panel, admin) ────────────────────────────────
 
 function openBulkActionsModal() {
@@ -194,3 +194,4 @@ async function bulkDeleteSelected() {
     showError('Failed to delete some events.', 'Bulk Delete');
   }
 }
+
