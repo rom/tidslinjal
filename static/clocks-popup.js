@@ -733,6 +733,7 @@ function detachCountdown(id) {
   cd.detached = true;
   cd._detachedWin = w;
   renderCountdowns();
+  w.__initData = { cd: JSON.parse(cdState), cdColor: cdColor, bgColor: bgColor };
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Countdown — ' + escH(cd.label) + '</title>' +
 '<link rel="stylesheet" href="/static/vendor/seven-segment.css">' +
 '<style>' +
@@ -766,65 +767,8 @@ function detachCountdown(id) {
 '  <button id="btnReset">\u21BA</button>' +
 '  <button id="btnAck" style="display:none;background:var(--danger);color:#fff;border-color:var(--danger)">\u2713 Ack</button>' +
 '</div>' +
-'<div class="cd-size-bar"><span>Size:</span><input type="range" id="cdSizeSlider" min="0" max="5" value="2" step="1"><span id="cdSizeLbl">M</span></div>');
-  w.document.write('<script>' +
-'var cd = ' + cdState + ';\n' +
-'var cdColor = "' + cdColor + '";\n' +
-'var _audioCtx = null;\n' +
-'function pad(n){return String(n).padStart(2,"0");}\n' +
-'function playCdAlarm(type){\n' +
-'  try{if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();var ctx=_audioCtx;\n' +
-'  if(type==="beep"){for(var i=0;i<3;i++){var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;o.type="square";g.gain.value=0.15;var t=ctx.currentTime+i*0.3;o.start(t);o.stop(t+0.15);}}\n' +
-'  else if(type==="klaxon"){for(var i=0;i<4;i++){var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=i%2===0?440:550;o.type="sawtooth";g.gain.value=0.2;var t=ctx.currentTime+i*0.4;o.start(t);o.stop(t+0.35);}}\n' +
-'  }catch(e){}\n' +
-'}\n' +
-'function tick(){\n' +
-'  var ms,isOT=false;\n' +
-'  if(cd.paused){ms=Math.max(0,cd.pausedRemaining);}\n' +
-'  else{var rem=cd.targetTime-Date.now();if(rem>0){ms=rem;}else{isOT=cd.continueUp;ms=isOT?-rem:0;}}\n' +
-'  var ts=Math.floor(ms/1000),h=Math.floor(ts/3600),m=Math.floor((ts%3600)/60),s=ts%60;\n' +
-'  var el=document.getElementById("cdTime");\n' +
-'  el.textContent=(isOT?"+":"")+pad(h)+":"+pad(m)+":"+pad(s);\n' +
-'  el.classList.toggle("cd-overtime",isOT);\n' +
-'  el.classList.toggle("cd-blink",cd.paused);\n' +
-'  document.getElementById("btnPause").textContent=cd.paused?"\\u25B6":"\\u23F8";\n' +
-'  var bar=document.getElementById("cdBar");\n' +
-'  if(bar&&cd.totalMs>0){var elapsed=cd.totalMs-(cd.paused?cd.pausedRemaining:(cd.targetTime-Date.now()));var pct=isOT?100:Math.min(100,Math.max(0,(elapsed/cd.totalMs)*100));bar.style.width=pct+"%";if(isOT)bar.style.background="var(--danger)";}\n' +
-'  var ackBtn=document.getElementById("btnAck");\n' +
-'  if(isOT&&!cd.acknowledged&&ackBtn)ackBtn.style.display="";\n' +
-'  // Fire alarm\n' +
-'  if(!cd.paused&&!cd.expired&&cd.targetTime<=Date.now()){cd.expired=true;if(cd.playSound)playCdAlarm(cd.soundType);}\n' +
-'  // Sync state back to opener\n' +
-'  try{var oc=window.opener&&window.opener._countdowns?window.opener._countdowns.find(function(c){return c.id===cd.id}):null;if(oc){oc.targetTime=cd.targetTime;oc.paused=cd.paused;oc.pausedRemaining=cd.pausedRemaining;oc.expired=cd.expired;oc.acknowledged=cd.acknowledged;}}catch(e){}\n' +
-'}\n' +
-'document.getElementById("btnPause").onclick=function(){\n' +
-'  if(cd.paused){cd.targetTime=Date.now()+cd.pausedRemaining;cd.paused=false;}\n' +
-'  else{cd.pausedRemaining=cd.targetTime-Date.now();cd.paused=true;}\n' +
-'};\n' +
-'document.getElementById("btnReset").onclick=function(){\n' +
-'  cd.targetTime=Date.now()+cd.totalMs;cd.paused=false;cd.expired=false;cd.acknowledged=false;\n' +
-'  document.getElementById("btnAck").style.display="none";\n' +
-'};\n' +
-'document.getElementById("btnAck").onclick=function(){\n' +
-'  cd.acknowledged=true;document.getElementById("btnAck").style.display="none";\n' +
-'};\n' +
-'var cdSzCls=["cd-sz-xs","cd-sz-sm","cd-sz-md","cd-sz-lg","cd-sz-xl","cd-sz-xxl"];\n' +
-'var cdSzLbl=["XS","S","M","L","XL","XXL"];\n' +
-'document.getElementById("cdSizeSlider").oninput=function(){\n' +
-'  var v=parseInt(this.value,10);\n' +
-'  document.body.className=document.body.className.replace(/cd-sz-\\S+/g,"").trim()+" "+cdSzCls[v];\n' +
-'  document.getElementById("cdSizeLbl").textContent=cdSzLbl[v];\n' +
-'};\n' +
-'// BroadcastChannel theme sync\n' +
-'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme"){document.body.className=document.body.className.replace(/theme-\\S+/g,"").trim()+" theme-"+(e.data.theme||"dark");}};}catch(e){}\n' +
-'// Custom background color\n' +
-'document.body.style.background="' + bgColor + '";\n' +
-'// On window close: re-attach countdown to parent\n' +
-'window.addEventListener("beforeunload",function(){\n' +
-'  try{var oc=window.opener&&window.opener._countdowns?window.opener._countdowns.find(function(c){return c.id===cd.id}):null;if(oc){oc.detached=false;oc._detachedWin=null;window.opener.renderCountdowns();}}catch(e){}\n' +
-'});\n' +
-'setInterval(tick,200);tick();\n' +
-'<\\/script></body></html>');
+'<div class="cd-size-bar"><span>Size:</span><input type="range" id="cdSizeSlider" min="0" max="5" value="2" step="1"><span id="cdSizeLbl">M</span></div>' +
+'<script src="/static/detached-countdown.js"><\/script></body></html>');
   w.document.close();
 }
 
@@ -1376,6 +1320,7 @@ function detachTimer(id) {
   tm.detached = true;
   tm._detachedWin = w;
   renderTimers();
+  w.__initData = { tm: JSON.parse(tmState), timerColor: timerColor, bgColor: bgColor };
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timer — ' + escH(tm.label) + '</title>' +
 '<link rel="stylesheet" href="/static/vendor/seven-segment.css">' +
 '<style>' +
@@ -1417,81 +1362,8 @@ function detachTimer(id) {
 '  <button id="btnReset">\u21BA</button>' +
 '</div>' +
 '<div id="lapArea"></div>' +
-'<div class="tm-size-bar"><span>Size:</span><input type="range" id="tmSizeSlider" min="0" max="5" value="2" step="1"><span id="tmSizeLbl">M</span></div>');
-  w.document.write('<script>' +
-'var tm = ' + tmState + ';\n' +
-'var timerColor = "' + timerColor + '";\n' +
-'function pad(n){return String(n).padStart(2,"0");}\n' +
-'function fmtMs(ms){var s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60,cs=Math.floor((ms%1000)/10);return pad(h)+":"+pad(m)+":"+pad(sec)+"."+pad(cs);}\n' +
-'function tick(){\n' +
-'  var elapsed=tm.paused?tm.pausedElapsed:(Date.now()-tm.startTime);\n' +
-'  var isOver=tm.targetMs>0&&elapsed>=tm.targetMs;\n' +
-'  var displayMs=(isOver&&!tm.continueAfter)?tm.targetMs:elapsed;\n' +
-'  var ts=Math.floor(displayMs/1000),h=Math.floor(ts/3600),m=Math.floor((ts%3600)/60),s=ts%60;\n' +
-'  var el=document.getElementById("tmTime");\n' +
-'  el.textContent=pad(h)+":"+pad(m)+":"+pad(s);\n' +
-'  el.classList.toggle("tm-blink",tm.paused);\n' +
-'  if(isOver)el.style.color="var(--danger)";else el.style.color="";\n' +
-'  if(tm.targetMs>0){\n' +
-'    var bar=document.getElementById("tmBar");\n' +
-'    if(bar){bar.style.width=Math.min(100,(elapsed/tm.targetMs)*100)+"%";if(isOver)bar.style.background="var(--danger)";}\n' +
-'    document.body.classList.toggle("tm-overtime",isOver);\n' +
-'  }\n' +
-'  document.getElementById("btnPause").textContent=tm.paused?"\\u25B6":"\\u23F8";\n' +
-'  // Sync state back to opener if available\n' +
-'  try{var ot=window.opener&&window.opener._timers?window.opener._timers.find(function(t){return t.id===tm.id}):null;if(ot){ot.startTime=tm.startTime;ot.paused=tm.paused;ot.pausedElapsed=tm.pausedElapsed;ot.alarmFired=tm.alarmFired;ot.laps=tm.laps;ot.lastLapTime=tm.lastLapTime;ot.targetMs=tm.targetMs;}}catch(e){}\n' +
-'  // Fire alarm\n' +
-'  if(isOver&&!tm.alarmFired){tm.alarmFired=true;if(tm.playSound)try{window.opener.playCdAlarm(tm.soundType)}catch(e){}}\n' +
-'  // Stop at target\n' +
-'  if(isOver&&!tm.continueAfter&&!tm.paused){tm.pausedElapsed=tm.targetMs;tm.paused=true;}\n' +
-'}\n' +
-'document.getElementById("btnPause").onclick=function(){\n' +
-'  if(tm.paused){tm.startTime=Date.now()-tm.pausedElapsed;tm.paused=false;}\n' +
-'  else{tm.pausedElapsed=Date.now()-tm.startTime;tm.paused=true;}\n' +
-'};\n' +
-'document.getElementById("btnReset").onclick=function(){\n' +
-'  tm.startTime=Date.now();tm.paused=false;tm.pausedElapsed=0;tm.alarmFired=false;tm.laps=[];tm.lastLapTime=tm.startTime;renderLaps();\n' +
-'};\n' +
-'document.getElementById("btnLap").onclick=function(){\n' +
-'  if(tm.paused)return;\n' +
-'  var now=Date.now(),totalMs=now-tm.startTime,splitMs=now-tm.lastLapTime;\n' +
-'  tm.laps.push({num:tm.laps.length+1,splitMs:splitMs,totalMs:totalMs});\n' +
-'  tm.lastLapTime=now;\n' +
-'  renderLaps();\n' +
-'};\n' +
-'function renderLaps(){\n' +
-'  var area=document.getElementById("lapArea");if(!area)return;\n' +
-'  if(tm.laps.length===0){area.innerHTML="";return;}\n' +
-'  var h=\'<div class="lap-list">\';\n' +
-'  tm.laps.forEach(function(l){h+=\'<div class="lap-row"><span class="lap-num">#\'+l.num+\'</span><span class="lap-split">\'+fmtMs(l.splitMs)+\'</span><span class="lap-total">\'+fmtMs(l.totalMs)+\'</span></div>\';});\n' +
-'  h+="</div>";\n' +
-'  h+=\'<div class="lap-export"><button id="btnCsv">CSV</button><button id="btnPrint">Print</button></div>\';\n' +
-'  area.innerHTML=h;\n' +
-'  document.getElementById("btnCsv").onclick=function(){var csv="Lap,Split,Total\\n";tm.laps.forEach(function(l){csv+=l.num+","+fmtMs(l.splitMs)+","+fmtMs(l.totalMs)+"\\n";});var b=new Blob([csv],{type:"text/csv"});var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=(tm.label||"timer")+"-laps.csv";a.click();};\n' +
-'  document.getElementById("btnPrint").onclick=function(){var pw=window.open("","","width=400,height=500");if(!pw)return;var ph="<html><head><title>Laps</title><style>body{font-family:monospace;padding:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:4px 8px;text-align:right}th{background:#eee}</style></head><body><h2>"+tm.label+" — Lap Times</h2><table><tr><th>#</th><th>Split</th><th>Total</th></tr>";tm.laps.forEach(function(l){ph+="<tr><td>"+l.num+"</td><td>"+fmtMs(l.splitMs)+"</td><td>"+fmtMs(l.totalMs)+"</td></tr>";});ph+="</table></body></html>";pw.document.write(ph);pw.document.close();pw.print();};\n' +
-'}\n' +
-'// Scroll to adjust target on progress bar\n' +
-'var pw=document.getElementById("tmProgressWrap");\n' +
-'if(pw)pw.addEventListener("wheel",function(e){e.preventDefault();var delta=e.deltaY<0?60000:-60000;tm.targetMs=Math.max(10000,tm.targetMs+delta);tm.alarmFired=false;},{passive:false});\n' +
-'// Size slider\n' +
-'var tmSzCls=["tm-sz-xs","tm-sz-sm","tm-sz-md","tm-sz-lg","tm-sz-xl","tm-sz-xxl"];\n' +
-'var tmSzLbl=["XS","S","M","L","XL","XXL"];\n' +
-'document.getElementById("tmSizeSlider").oninput=function(){\n' +
-'  var v=parseInt(this.value,10);\n' +
-'  document.body.className=document.body.className.replace(/tm-sz-\\S+/g,"").trim()+" "+tmSzCls[v];\n' +
-'  document.getElementById("tmSizeLbl").textContent=tmSzLbl[v];\n' +
-'};\n' +
-'// BroadcastChannel theme sync\n' +
-'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme"){document.body.className=document.body.className.replace(/theme-\\S+/g,"").trim()+" theme-"+(e.data.theme||"dark");}};}catch(e){}\n' +
-'// Custom background color\n' +
-'document.body.style.background="' + bgColor + '";\n' +
-'// On window close: re-attach timer to parent\n' +
-'window.addEventListener("beforeunload",function(){\n' +
-'  try{var ot=window.opener&&window.opener._timers?window.opener._timers.find(function(t){return t.id===tm.id}):null;if(ot){ot.detached=false;ot._detachedWin=null;window.opener.renderTimers();}}catch(e){}\n' +
-'});\n' +
-'renderLaps();\n' +
-'setInterval(tick,200);tick();\n' +
-'<\\/script></body></html>');
+'<div class="tm-size-bar"><span>Size:</span><input type="range" id="tmSizeSlider" min="0" max="5" value="2" step="1"><span id="tmSizeLbl">M</span></div>' +
+'<script src="/static/detached-timer.js"><\/script></body></html>');
   w.document.close();
 }
 
@@ -1657,6 +1529,7 @@ function fireTimedAlarm(te, label) {
 function openTimedEventWindow(te, theme) {
   const w = window.open('', 'te-' + te.eventId + '-' + Date.now(), 'width=450,height=280,menubar=no,toolbar=no');
   if (!w) return null;
+  w.__initData = { teId: te.id };
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>⏱ ${escH(te.label)}</title>
 <style>
 body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252;--success:#2ecc71}
@@ -1689,85 +1562,7 @@ body{background:color-mix(in srgb, var(--accent) 6%, var(--bg));color:var(--text
   <button id="btnReset">↺</button>
   <button id="btnAck" style="display:none;background:var(--danger);color:#fff;border-color:var(--danger)">✓ Acknowledge</button>
 </div>
-<script>
-let paused = false, pausedAt = 0;
-const teId = '${te.id}';
-function pad(n){return String(n).padStart(2,'0');}
-document.getElementById('btnPause').onclick = () => {
-  try {
-    const te = window.opener._timedEvents?.find(t => t.id === teId);
-    if (!te) return;
-    if (!paused) { paused = true; pausedAt = Date.now(); }
-    else { te.startTime += (Date.now() - pausedAt); paused = false; }
-    document.getElementById('btnPause').textContent = paused ? '▶' : '⏸';
-  } catch(e) {}
-};
-document.getElementById('btnReset').onclick = () => {
-  try {
-    const te = window.opener._timedEvents?.find(t => t.id === teId);
-    if (!te) return;
-    te.startTime = Date.now();
-    te.state = 'running';
-    te.alarmsFired = {};
-    te.acknowledged = false;
-    paused = false;
-    document.getElementById('btnPause').textContent = '⏸';
-    document.getElementById('btnAck').style.display = 'none';
-  } catch(e) {}
-};
-document.getElementById('btnAck').onclick = () => {
-  try {
-    const te = window.opener._timedEvents?.find(t => t.id === teId);
-    if (te) te.acknowledged = true;
-    document.getElementById('btnAck').style.display = 'none';
-    document.body.classList.remove('te-flash');
-  } catch(e) {}
-};
-// Self-contained tick loop — keeps working even if opener reference breaks
-setInterval(() => {
-  try {
-    const te = window.opener?._timedEvents?.find(t => t.id === teId);
-    if (!te) return;
-    const now = Date.now();
-    const elapsed = now - te.startTime;
-    const remaining = te.durationMs - elapsed;
-    const pct = Math.min(100, Math.max(0, (elapsed / te.durationMs) * 100));
-    const timeEl = document.getElementById('teTime');
-    const statusEl = document.getElementById('teStatus');
-    const barEl = document.getElementById('teBar');
-    const ackBtn = document.getElementById('btnAck');
-    if (te.state === 'waiting') {
-      const s = Math.floor((te.startTime - now) / 1000);
-      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-      if (timeEl) timeEl.textContent = '-'+pad(h)+':'+pad(m)+':'+pad(sec);
-      if (statusEl) statusEl.textContent = 'Starting in...';
-      if (barEl) barEl.style.width = '0%';
-      document.body.className = document.body.className.replace(/te-\\w+/g,'') + ' te-waiting';
-    } else if (te.state === 'running') {
-      const s = Math.max(0, Math.floor(remaining/1000));
-      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-      if (timeEl) timeEl.textContent = pad(h)+':'+pad(m)+':'+pad(sec);
-      if (statusEl) statusEl.textContent = 'In progress';
-      if (barEl) barEl.style.width = pct+'%';
-      document.body.className = document.body.className.replace(/te-\\w+/g,'');
-    } else if (te.state === 'overtime') {
-      const overMs = elapsed - te.durationMs;
-      const s = Math.floor(overMs/1000);
-      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-      if (timeEl) timeEl.textContent = '+'+pad(h)+':'+pad(m)+':'+pad(sec);
-      if (statusEl) statusEl.textContent = 'Overtime';
-      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--danger)'; }
-      document.body.className = document.body.className.replace(/te-\\w+/g,'') + ' te-overtime';
-      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
-    } else if (te.state === 'completed') {
-      if (timeEl) timeEl.textContent = '00:00:00';
-      if (statusEl) statusEl.textContent = 'Completed';
-      if (barEl) { barEl.style.width = '100%'; barEl.style.background = 'var(--success)'; }
-      if (ackBtn && !te.acknowledged) ackBtn.style.display = '';
-    }
-  } catch(e) {}
-}, 500);
-<\/script></body></html>`);
+<script src="/static/detached-timed-event.js"><\/script></body></html>`);
   w.document.close();
   return w;
 }
@@ -2405,6 +2200,7 @@ function _detachMainClock() {
   var theme = document.body.className || 'theme-dark';
   var w = window.open('', 'tidslinjal-main-clock-' + Date.now(), 'width=300,height=200,menubar=no,toolbar=no');
   if (!w) return;
+  w.__initData = { utc: isUTC };
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Clock</title>' +
     '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
@@ -2414,14 +2210,7 @@ function _detachMainClock() {
     '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.d{font-size:11px;color:var(--text-dim);margin-top:4px}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
     '</style></head><body class="' + theme + '">' +
     '<div class="t" id="t">--:--:--</div><div class="d" id="d"></div><div class="z" id="z"></div>' +
-    '<script>var utc=' + isUTC + ';function p(n){return String(n).padStart(2,"0");}' +
-    'setInterval(function(){var n=new Date();var h,m,s,tz,d;' +
-    'if(utc){h=n.getUTCHours();m=n.getUTCMinutes();s=n.getUTCSeconds();tz="UTC/Z";d=n.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"});}' +
-    'else{h=n.getHours();m=n.getMinutes();s=n.getSeconds();tz="Local";d=n.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});}' +
-    'document.getElementById("t").textContent=p(h)+":"+p(m)+":"+p(s);' +
-    'document.getElementById("d").textContent=d;document.getElementById("z").textContent=tz;},1000);' +
-    'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme")document.body.className="theme-"+(e.data.theme||"dark")};}catch(e){}' +
-    '<\\/script></body></html>');
+    '<script src="/static/detached-clock.js"><\/script></body></html>');
   w.document.close();
 }
 
@@ -2433,6 +2222,7 @@ function _detachExtraClock(ecId) {
   var theme = document.body.className || 'theme-dark';
   var w = window.open('', 'tidslinjal-ec-' + ecId + '-' + Date.now(), 'width=300,height=200,menubar=no,toolbar=no');
   if (!w) return;
+  w.__initData = { timezone: ec.timezone };
   w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + escH(ec.label || ec.timezone) + '</title>' +
     '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
@@ -2444,16 +2234,7 @@ function _detachExtraClock(ecId) {
     '</style></head><body class="' + theme + '">' +
     '<div class="l">' + escH(ec.label || ec.timezone) + '</div>' +
     '<div class="t" id="t">--:--:--</div><div class="z" id="z"></div>' +
-    '<script>var tz="' + escH(ec.timezone) + '";function p(n){return String(n).padStart(2,"0");}' +
-    'setInterval(function(){var n=new Date();try{' +
-    'var h=parseInt(n.toLocaleTimeString("en-GB",{hour:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
-    'var m=parseInt(n.toLocaleTimeString("en-GB",{minute:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
-    'var s=parseInt(n.toLocaleTimeString("en-GB",{second:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
-    'document.getElementById("t").textContent=p(h)+":"+p(m)+":"+p(s);' +
-    'var tzl=n.toLocaleTimeString("en-GB",{timeZoneName:"short",timeZone:tz}).split(" ").pop();' +
-    'document.getElementById("z").textContent=tzl;}catch(e){document.getElementById("t").textContent="??:??:??";}},1000);' +
-    'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme")document.body.className="theme-"+(e.data.theme||"dark")};}catch(e){}' +
-    '<\\/script></body></html>');
+    '<script src="/static/detached-extraclock.js"><\/script></body></html>');
   w.document.close();
 }
 
