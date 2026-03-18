@@ -574,6 +574,19 @@ function toggleListView() {
         typeEl.appendChild(opt);
       });
     }
+    // Populate responsible filter
+    const respEl = document.getElementById('listResponsibleFilter');
+    if (respEl) {
+      respEl.options[0].textContent = t('lv_all_responsible') || 'All responsible';
+      if (respEl.options.length <= 1) {
+        (state.users || []).forEach(u => {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = u.display_name || u.username;
+          respEl.appendChild(opt);
+        });
+      }
+    }
     renderListView();
   } else {
     if (timeline) timeline.style.display = '';
@@ -623,6 +636,9 @@ function renderListView() {
   const search     = (document.getElementById('listSearch')?.value || '').toLowerCase();
   const statusFil  = document.getElementById('listStatusFilter')?.value || '';
   const typeFil    = document.getElementById('listTypeFilter')?.value || '';
+  const dateFrom   = document.getElementById('listDateFrom')?.value || '';
+  const dateTo     = document.getElementById('listDateTo')?.value || '';
+  const respFil    = document.getElementById('listResponsibleFilter')?.value || '';
 
   const hl = state.preferences.hidden_layers || [];
   let events = (state.events || []).filter(ev => {
@@ -630,6 +646,20 @@ function renderListView() {
     if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
     if (statusFil && ev.status !== statusFil) return false;
     if (typeFil   && ev.event_type !== typeFil) return false;
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      const evStart = new Date(ev.start_time);
+      if (evStart < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo + 'T23:59:59');
+      const evStart = new Date(ev.start_time);
+      if (evStart > to) return false;
+    }
+    if (respFil) {
+      const effRespId = ev.responsible_id || ev.created_by || null;
+      if (String(effRespId) !== respFil) return false;
+    }
     if (search) {
       const hay = (ev.title + ' ' + (ev.description||'') + ' ' + (ev.responsible_name||'')).toLowerCase();
       if (!hay.includes(search)) return false;
@@ -744,6 +774,7 @@ function renderListView() {
       <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) + _listWeekLabel(new Date(ev.end_time)) : '—'}</td>
       <td style="padding:8px 10px">${responsibleCell}</td>
       <td style="padding:8px 10px;white-space:nowrap">
+        ${ev.contact_url ? `<a href="${escAttr(ev.contact_url)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="margin-right:4px;text-decoration:none" title="${escHtml(ev.contact_url)}" onclick="event.stopPropagation()">🔗</a>` : ''}
         <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">${t('lv_view')}</button>
         ${canEdit ? `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">${t('lv_edit')}</button>` : ''}
         ${canEdit ? `<button class="btn btn-secondary btn-sm" style="margin-left:4px;color:var(--red,#e74c3c)" data-ev-del="${ev.id}">${t('lv_delete')}</button>` : ''}

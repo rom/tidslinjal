@@ -30,7 +30,7 @@
 - **Drag-to-reschedule** — drag event blocks to move them to a new time
 - **Display range options** — Day, 2 Days, 3 Days, 4 Days, 5 Days, Week, 2 Weeks, 3 Weeks, Month, 2–3 Months
 - **Live current-time indicator** — red line across the grid, updated every 30 s
-- **List / table view** — alternative to the grid view; sortable columns and full-text search
+- **List / table view** — alternative to the grid view; sortable columns, full-text search, date range picker, responsible filter, type filter, status filter, inline delete with undo, and meeting URL quick-link buttons
 - **Multi-select events** — Ctrl+click to select multiple events; a floating bar shows count with Move and Clear actions
 - **Right-click context menu** — "Move to new time/date" for single or multi-selected events
 
@@ -157,12 +157,40 @@ Administrators can configure a startup message displayed to all users when they 
 
 ### Countdown & Timer System
 
-Enhanced clock system with countdown timers and stopwatch timers:
+Enhanced clock system with multiple clock types and a redesigned detached clock window:
 
 - **Countdown timers** — set target time or duration; visual progress bar; alarm on expiry; acknowledge workflow; detachable to standalone window
 - **Stopwatch timers** — configurable target duration (hours/minutes/seconds); preset buttons (5/10/15/30/60 min); option to stop or continue after target; audible alarm with sound selection; progress bar with overtime indicator; detachable to standalone window
-- **Color pickers** — customize background, countdown accent, and timer accent colors from the clock toolbar
+- **Alarm clocks** — set absolute or exercise-epoch-relative alarms; audible alert with selectable sound; pulsing indicator when triggered
+- **Phase clocks** — visualize exercise phases with progress bars showing elapsed time within each phase
+- **Narrative clocks** — display a scrolling narrative log of recent events and activities
+- **F1 start clocks** — Formula 1-style start sequence with configurable light count (3-7), countdown timer, and go signal
+- **Synthetic exercise clock** — shows elapsed time since exercise epoch (H+00:00:00 format)
+- **Color pickers** — customize background, countdown accent, timer accent, and alarm accent colors from the clock toolbar
 - **VCR seven-segment display** — retro digital clock styling with configurable colors and segment thickness
+- **Redesigned detached clock window** — collapsible settings panel with gear button; display mode (digital/analog/VCR), size slider (XS to XXL), style selector (standard/minimal/compact), time format (local/ZULU, 24h/12h), and add buttons for all clock types
+- **Drag-to-detach** — drag any clock card to the edge of the window to open it in its own standalone popup
+- **Per-clock color pickers** — hover over any clock card to access individual background color customization
+- **Country flag backgrounds** — timezone clocks can show a watermark flag of the associated country
+- **Clock pinning** — pin clocks to the main Tidslinjal window via BroadcastChannel sync
+
+### Checklists
+
+Operational checklists for tracking structured tasks:
+
+- **26 built-in templates** organized into 5 categories:
+  - **Generic** — Meeting Preparation, Project Kickoff, Decision Log Entry, Weekly Review, Onboarding New Member
+  - **Exercise** — Exercise Setup, STARTEX, ENDEX, Observer Checklist, Inject Preparation, After Action Review Prep
+  - **Incident** — Initial Response, Incident Handover, Incident Closure, Crisis Communication
+  - **Operations** — TeamLead Battle Rhythm Prep, Shift Handover, Team Status Assessment, Team Briefing, Team Coordination Check, Daily Standup, Communication Check
+  - **Tidslinjal** — Initial Setup, Pre-Event Check, Data Export, Upgrade
+- **Custom templates** — create your own checklist templates with named items and categories
+- **Checklist instances** — start a checklist from any template; track per-item check/skip states with user attribution and timestamps
+- **Category grouping** — items within a checklist are grouped by category headers
+- **Progress tracking** — real-time progress bar with percentage; skipped items contribute to completion
+- **Completion workflow** — mark complete when all items are checked/skipped; reopen if needed
+- **Sidebar integration** — active and completed checklists shown in the Checklists sidebar tab
+- **Audit logging** — all checklist lifecycle events are logged
 
 ### Layers
 
@@ -889,6 +917,19 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v8.0.0 — Clocks, Checklists & List View Enhancements
+
+- **New clock types** — alarm clocks (absolute/epoch-relative), phase clocks, narrative clocks, F1 start clocks, and synthetic exercise clocks; all fully integrated into the detached clock popup
+- **Redesigned detached clock window** — new settings panel with gear toggle; display mode selector (digital/analog/VCR); size slider (XS-XXL); style options; time format controls; add buttons for all clock types; per-clock color pickers; drag-to-detach individual clocks; country flag watermarks
+- **Checklists system** — 26 built-in checklist templates organized into 5 categories (Generic, Exercise, Incident, Operations, Tidslinjal); custom template creation; instance tracking with per-item check/skip states and user attribution; category-grouped display; progress bars; completion workflow
+- **List view date range picker** — filter events by start/end date range in the list view
+- **List view responsible filter** — filter events by assigned responsible person
+- **Event meeting URL button** — events with a `contact_url` show a quick-link button in the list view
+- **Event delete button** — inline delete buttons with undo support in the list view
+- **Task-time matrix fixes** — fixed event type color lookup; fixed text color for sticky columns when scrolling; fixed event filtering to correctly show events when changing timespan
+- **i18n: ttm_phase** — proper translations for the Phase row label in the task-time matrix (all 14 languages)
+- **Cache-busting** — detached clock popup and its resources use version-tagged URLs to prevent stale browser caches
 
 ### v7.0.0 — Language Expansion, Polls & Ready Checks
 
