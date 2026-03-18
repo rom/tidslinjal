@@ -15517,7 +15517,7 @@ async function _openReferenceIndex() {
 
   let html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal — Document Index</title>
 <style>
-body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#212630;color:#c8d0e0}
+body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#1a2233;color:#c8d8e8}
 body{font-family:'Segoe UI',system-ui,sans-serif;padding:24px;line-height:1.6;font-size:13px}
 h1{font-size:18px;margin-bottom:16px;letter-spacing:.05em}
 h2{font-size:14px;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(128,128,128,.3);padding-bottom:4px}
@@ -15782,7 +15782,7 @@ function _showReferenceInWindow(ref, localContent) {
     if (!w) return;
     const content = localContent || ref.content || '';
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title>
-<style>body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#212630;color:#c8d0e0}body{font-family:'Segoe UI',system-ui,sans-serif;padding:24px;white-space:pre-wrap;line-height:1.6}</style>
+<style>body.theme-dark{background:#1a1d23;color:#e8eaf0}body.theme-light{background:#f0f2f5;color:#1a1d23}body.theme-city-camo{background:#2b3325;color:#d4dbc0}body.theme-urban-camo{background:#1a2233;color:#c8d8e8}body{font-family:'Segoe UI',system-ui,sans-serif;padding:24px;white-space:pre-wrap;line-height:1.6}</style>
 </head><body class="theme-${escHtml(theme)}">${escHtml(content)}</body></html>`);
     w.document.close();
     return;

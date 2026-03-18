@@ -739,7 +739,7 @@ function detachCountdown(id) {
 'body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252}' +
 'body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b}' +
 'body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252}' +
-'body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252}' +
+'body.theme-urban-camo{--bg:#1a2233;--bg2:#1e293b;--text:#c8d8e8;--text-dim:#7a90a8;--accent:#4a90d9;--border:#3a4a5c;--danger:#e05252}' +
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px}' +
 '.cd-label{font-size:1.2rem;color:var(--text-dim)}' +
@@ -1382,7 +1382,7 @@ function detachTimer(id) {
 'body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252}' +
 'body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b}' +
 'body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252}' +
-'body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252}' +
+'body.theme-urban-camo{--bg:#1a2233;--bg2:#1e293b;--text:#c8d8e8;--text-dim:#7a90a8;--accent:#4a90d9;--border:#3a4a5c;--danger:#e05252}' +
 '*{box-sizing:border-box;margin:0;padding:0}' +
 'body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px}' +
 '.tm-label{font-size:1.2rem;color:var(--text-dim)}' +
@@ -1662,7 +1662,7 @@ function openTimedEventWindow(te, theme) {
 body.theme-dark{--bg:#1a1d23;--bg2:#22262e;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff;--border:#2e3340;--danger:#e05252;--success:#2ecc71}
 body.theme-light{--bg:#f0f2f5;--bg2:#fff;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8;--border:#d0d4de;--danger:#c0392b;--success:#27ae60}
 body.theme-city-camo{--bg:#2b3325;--bg2:#333d2c;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c;--border:#404d34;--danger:#e05252;--success:#2ecc71}
-body.theme-urban-camo{--bg:#212630;--bg2:#282e3a;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf;--border:#333d50;--danger:#e05252;--success:#2ecc71}
+body.theme-urban-camo{--bg:#1a2233;--bg2:#1e293b;--text:#c8d8e8;--text-dim:#7a90a8;--accent:#4a90d9;--border:#3a4a5c;--danger:#e05252;--success:#2ecc71}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:color-mix(in srgb, var(--accent) 6%, var(--bg));color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:8px;transition:background .3s}
 .te-label{font-size:1.1rem;color:var(--text-dim);text-align:center}
@@ -2410,7 +2410,7 @@ function _detachMainClock() {
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
     'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
     'body.theme-city-camo{--bg:#2b3325;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c}' +
-    'body.theme-urban-camo{--bg:#212630;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf}' +
+    'body.theme-urban-camo{--bg:#1a2233;--text:#c8d8e8;--text-dim:#7a90a8;--accent:#4a90d9}' +
     '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.d{font-size:11px;color:var(--text-dim);margin-top:4px}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
     '</style></head><body class="' + theme + '">' +
     '<div class="t" id="t">--:--:--</div><div class="d" id="d"></div><div class="z" id="z"></div>' +
@@ -2438,7 +2438,7 @@ function _detachExtraClock(ecId) {
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
     'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
     'body.theme-city-camo{--bg:#2b3325;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c}' +
-    'body.theme-urban-camo{--bg:#212630;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf}' +
+    'body.theme-urban-camo{--bg:#1a2233;--text:#c8d8e8;--text-dim:#7a90a8;--accent:#4a90d9}' +
     '.l{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}' +
     '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
     '</style></head><body class="' + theme + '">' +

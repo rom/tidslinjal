@@ -33,6 +33,7 @@
   --tactical-font: 'Tactical Task Graphics to Cyber', sans-serif;
   /* Font */
   --fs-base:    13px;
+  --fs-md:      12px;
   --fs-sm:      11px;
   --fs-xs:      10px;
   --fs-lg:      15px;
@@ -135,7 +136,7 @@ body.urban-camo ::-webkit-scrollbar-thumb { background: #3a5278; }
 
 /* ── Size variants ────────────────────────────────────────────────────────── */
 body.size-normal {
-  --fs-base:    15px;  --fs-sm: 13px; --fs-xs: 11px; --fs-lg: 17px; --fs-xl: 26px; --fs-2xl: 30px;
+  --fs-base:    15px;  --fs-md: 14px; --fs-sm: 13px; --fs-xs: 11px; --fs-lg: 17px; --fs-xl: 26px; --fs-2xl: 30px;
   --slot-h-ten:     30px;
   --slot-h-quarter: 22px;
   --slot-h-hour:    52px;
@@ -144,7 +145,7 @@ body.size-normal {
   --time-col-w:     60px;
 }
 body.size-large {
-  --fs-base:    18px;  --fs-sm: 15px; --fs-xs: 13px; --fs-lg: 21px; --fs-xl: 32px; --fs-2xl: 38px;
+  --fs-base:    18px;  --fs-md: 16px; --fs-sm: 15px; --fs-xs: 13px; --fs-lg: 21px; --fs-xl: 32px; --fs-2xl: 38px;
   --header-h:   68px;
   --slot-h-ten:     40px;
   --slot-h-quarter: 30px;
@@ -154,7 +155,7 @@ body.size-large {
   --time-col-w:     70px;
 }
 body.size-huge {
-  --fs-base:    22px;  --fs-sm: 18px; --fs-xs: 15px; --fs-lg: 26px; --fs-xl: 42px; --fs-2xl: 50px;
+  --fs-base:    22px;  --fs-md: 20px; --fs-sm: 18px; --fs-xs: 15px; --fs-lg: 26px; --fs-xl: 42px; --fs-2xl: 50px;
   --header-h:   80px;
   --slot-h-ten:     56px;
   --slot-h-quarter: 42px;
