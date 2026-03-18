@@ -1,4 +1,4 @@
-/* ── Multi-Select Events ── */
+/* ── Multi-Select Events, Move Dialogs ── */
 // ── Multi-select events ─────────────────────────────────────────────────────
 
 function updateMultiselectBar() {
@@ -189,3 +189,4 @@ async function openEventHistory() {
     if (listEl) listEl.innerHTML = '<p style="color:var(--danger);font-size:var(--fs-sm)">Failed to load history.</p>';
   }
 }
+

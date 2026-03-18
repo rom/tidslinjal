@@ -1,4 +1,4 @@
-/* ── Detach Windows ── */
+/* ── Detached Windows (Resources, References, Map, Tools, Log Book) ── */
 // ── Resources Window (detached) ──────────────────────────────────────────────
 let _resourcesPopout = null;
 

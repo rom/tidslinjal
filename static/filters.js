@@ -1,4 +1,4 @@
-/* ── Filter System ── */
+/* ── Filters ── */
 // ── Filter System ──────────────────────────────────────────────────────────
 function openFilterPopover(btn) {
   const pop = document.getElementById('filterPopover');

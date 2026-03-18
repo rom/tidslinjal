@@ -1,4 +1,165 @@
 /* ── Event Detail Modal ── */
+
+// ── patchEventStatus, deleteEvent, showRecurDeleteDialog, showEventDetail, comments, attachments ──
+async function patchEventStatus(id, status, rejectionReason) {
+  const res = await api('PATCH', `/api/events/${id}/status`, {status, rejection_reason: rejectionReason});
+  if (res.ok) {
+    await refreshAll();
+    closeModal('detailModal');
+    showNotification('success', t('notif_status_changed'));
+  } else {
+    const err = await res.json();
+    showError(err.error);
+  }
+}
+
+async function deleteEvent(id) {
+  const ev = state.events.find(x => x.id === id);
+  if (ev && ev.is_recurring) {
+    showRecurDeleteDialog(ev);
+    return;
+  }
+  // Push undo entry before deletion
+  if (ev) pushUndo('delete_event', { ...ev });
+  if (!confirm(t('confirm_delete_event'))) return;
+  const res = await apiDel(`/api/events/${id}`);
+  if (res.ok) {
+    closeModal('eventModal'); closeModal('detailModal');
+    await refreshAll();
+    showNotification('success', t('notif_event_deleted'));
+  } else { showError('Failed to delete event'); }
+}
+
+function showRecurDeleteDialog(ev) {
+  const occTime = state._currentOccurrenceTime;
+  const msg = occTime
+    ? `"${ev.title}" — occurrence on ${fmtDateTime(occTime)}`
+    : `"${ev.title}" — recurring series`;
+  document.getElementById('recurDeleteMsg').textContent =
+    `This is a recurring event. What would you like to delete?\n${msg}`;
+
+  const thisBtn   = document.getElementById('recurDelThis');
+  const futureBtn = document.getElementById('recurDelFuture');
+  const allBtn    = document.getElementById('recurDelAll');
+
+  // "Delete only this occurrence" (only shown when viewing a specific occurrence)
+  thisBtn.style.display = occTime ? '' : 'none';
+  thisBtn.onclick = async () => {
+    if (!occTime) return;
+    closeModal('recurDeleteModal');
+    // Add occurrence to exclusion list
+    const excl = [...(ev.recurrence_excl || []), occTime.toISOString()];
+    const res = await apiPut(`/api/events/${ev.id}`, {...ev, recurrence_excl: excl});
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { const err = await res.json(); showError(err.error); }
+  };
+
+  // "Delete this and all future"
+  futureBtn.style.display = occTime ? '' : 'none';
+  futureBtn.onclick = async () => {
+    if (!occTime) return;
+    closeModal('recurDeleteModal');
+    // Set recurrence_end to just before this occurrence
+    const newEnd = new Date(occTime.getTime() - 60000); // 1 min before
+    const res = await apiPut(`/api/events/${ev.id}`, {...ev, recurrence_end: newEnd.toISOString()});
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { const err = await res.json(); showError(err.error); }
+  };
+
+  // "Delete all occurrences"
+  allBtn.onclick = async () => {
+    closeModal('recurDeleteModal');
+    const res = await apiDel(`/api/events/${ev.id}`);
+    if (res.ok) {
+      closeModal('eventModal'); closeModal('detailModal');
+      await refreshAll();
+      showNotification('success', t('notif_event_deleted'));
+    } else { showError('Failed to delete event'); }
+  };
+
+  openModal('recurDeleteModal');
+}
+
+// ── Recurring Event Edit Dialog ────────────────────────────────────────────
+
+async function _saveRecurringEventWithChoice(id, payload, masterEv, occTime) {
+  return new Promise((resolve) => {
+    const msg = `"${masterEv.title}" — occurrence on ${fmtDateTime(occTime)}`;
+    const msgEl = document.getElementById('recurEditMsg');
+    if (msgEl) msgEl.textContent = `This is a recurring event. What would you like to edit?\n${msg}`;
+
+    const thisBtn   = document.getElementById('recurEditThis');
+    const futureBtn = document.getElementById('recurEditFuture');
+    const allBtn    = document.getElementById('recurEditAll');
+
+    const cleanup = () => {
+      thisBtn.onclick   = null;
+      futureBtn.onclick = null;
+      allBtn.onclick    = null;
+    };
+
+    // Edit only this occurrence: exclude this occurrence from series, create a new one-off event
+    thisBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      // 1. Add this occurrence to exclusion list of master
+      const excl = [...(masterEv.recurrence_excl || []), occTime.toISOString()];
+      await apiPut(`/api/events/${masterEv.id}`, { ...masterEv, recurrence_excl: excl });
+      // 2. Create a new non-recurring event for this occurrence with the edited payload
+      const oneOff = { ...payload, is_recurring: false, recurrence_pattern: '', recurrence_end: null };
+      const res = await apiPost('/api/events', oneOff);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'This occurrence updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    // Edit this and future: truncate master series before this occurrence, create new series from here
+    futureBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      // 1. Truncate master series to end just before this occurrence
+      const newEnd = new Date(occTime.getTime() - 60000);
+      await apiPut(`/api/events/${masterEv.id}`, { ...masterEv, recurrence_end: newEnd.toISOString() });
+      // 2. Create a new series starting from this occurrence with the edited payload
+      const newSeries = { ...payload, start_time: occTime.toISOString() };
+      const res = await apiPost('/api/events', newSeries);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'This and future occurrences updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    // Edit all occurrences: just update the master event
+    allBtn.onclick = async () => {
+      closeModal('recurEditModal');
+      cleanup();
+      const res = await apiPut(`/api/events/${masterEv.id}`, payload);
+      if (res.ok) {
+        closeModal('eventModal'); closeModal('detailModal');
+        state._currentOccurrenceTime = null;
+        await refreshAll();
+        showNotification('success', t('notif_event_updated') || 'All occurrences updated');
+      } else { const err = await res.json(); showError(err.error); }
+      resolve();
+    };
+
+    openModal('recurEditModal');
+  });
+}
+
 // ── Event Detail Modal ─────────────────────────────────────────────────────
 function showEventDetail(ev) {
   document.getElementById('detailTitle').textContent = ev.title;
@@ -382,4 +543,3 @@ async function deleteAttachment(id, eventId) {
     if (ev) showEventDetail(ev);
   }
 }
-

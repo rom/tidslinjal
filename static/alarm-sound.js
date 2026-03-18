@@ -1,4 +1,4 @@
-/* ── Alarm Sound Engine (Web Audio API) ── */
+/* ── Alarm Sound Engine ── */
 // ── Alarm sound engine (Web Audio API) ─────────────────────────────────────
 function playAlarmSound(sound) {
   if (!sound || sound === 'none') return;
@@ -71,6 +71,4 @@ function playAlarmSound(sound) {
     setTimeout(() => ctx.close(), 3000);
   } catch (e) { /* Audio not available */ }
 }
-
-// ── SSE ────────────────────────────────────────────────────────────────────
 

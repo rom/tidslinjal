@@ -1,4 +1,4 @@
-/* ── Backup Settings & Restore ── */
+/* ── Backup Settings, Gradual Backup, Backup Modal ── */
 // ── Gradual Backup Settings (admin) ───────────────────────────────────────────
 
 async function openGradualBackupModal() {
@@ -145,3 +145,4 @@ async function uploadRestore() {
   }
 }
 
+// ── Planned vs. Actual Modal ──────────────────────────────────────────────────

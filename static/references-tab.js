@@ -1,4 +1,4 @@
-/* ── References Tab ── */
+/* ── References Tab, Upload, Checksums, Edit ── */
 // ── References Tab ──────────────────────────────────────────────────────────
 
 async function _openReferenceIndex() {

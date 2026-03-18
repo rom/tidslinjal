@@ -1,4 +1,4 @@
-/* ── Collaborative Editing ── */
+/* ── Collaborative Editing Lock Indicators ── */
 // ── Collaborative Editing ─────────────────────────────────────────────────────
 
 // Track which events are being edited by other users
@@ -56,4 +56,26 @@ async function releaseEditingLock(eventId) {
 
 // Expose for SSE event handler in app.js
 window._handleEditingLockEvent = handleEditingLockEvent;
+
+
+// ── Event Modal Close Hook (for editing lock release) ─────────────────────────
+// Observe when the eventModal is closed and release editing lock
+(function() {
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach(m => {
+      if (m.target.id === 'eventModal' && m.attributeName === 'class') {
+        const isOpen = m.target.classList.contains('open');
+        if (!isOpen) {
+          const evIdEl = document.getElementById('eventId');
+          const evId = evIdEl ? parseInt(evIdEl.value, 10) : null;
+          if (evId && state.user) releaseEditingLock(evId);
+        }
+      }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const modal = document.getElementById('eventModal');
+    if (modal) observer.observe(modal, { attributes: true });
+  });
+})();
 

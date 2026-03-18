@@ -1,4 +1,6 @@
 /* ── SSE Connection ── */
+// ── SSE ────────────────────────────────────────────────────────────────────
+
 // ── SSE, Alarm ACK: connectSSE, unackedAlarms, showAlarmNotification, dismissAlarmNotif, ackAlarm ──
 // ── SSE ────────────────────────────────────────────────────────────────────
 let _sseConnection = null;
