@@ -1,0 +1,39 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - gosec          # Security checks
+    - errorlint      # Proper error wrapping/comparison
+    - ineffassign    # Detect unused assignments
+    - staticcheck    # Advanced static analysis
+    - govet          # Reports suspicious constructs
+    - unused         # Find unused code
+    - bodyclose      # Ensure HTTP response bodies are closed
+    - nilerr         # Detect returning nil after checking error
+  disable:
+    - errcheck       # Too noisy — intentional ignores documented with //nolint
+
+linters-settings:
+  gosec:
+    excludes:
+      # TLS InsecureSkipVerify is user-configurable for LDAP/syslog
+      - G402
+      # HTTP requests with variable URLs are validated via SSRF-safe transport
+      - G107
+  staticcheck:
+    checks:
+      - "all"
+
+issues:
+  exclude-rules:
+    # Test files can be more lenient
+    - path: _test\.go
+      linters:
+        - gosec
+        - errorlint
+    # Simulation test code
+    - path: tests/simulation/
+      linters:
+        - gosec
+        - errorlint

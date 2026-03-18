@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"os"
@@ -156,7 +157,9 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
-	os.Remove(path) //nolint
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Printf("warning: failed to remove attachment file %s: %v", path, err)
+	}
 	if err := app.store.DeleteAttachment(id); err != nil {
 		jsonError(w, "failed to delete", http.StatusInternalServerError)
 		return

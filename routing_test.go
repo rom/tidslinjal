@@ -260,6 +260,29 @@ func itoa(n int64) string {
 	return json.Number(json.Number(string(rune('0'+n%10)) + "").String()).String()
 }
 
+func TestAPIv1Rewrite(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	// /api/v1/version should behave identically to /api/version
+	resp := apiDo(t, srv, http.MethodGet, "/api/v1/version", nil, cookies)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/version: expected 200, got %d", resp.StatusCode)
+	}
+
+	// /api/v1/events should behave identically to /api/events
+	resp = apiDo(t, srv, http.MethodGet, "/api/v1/events", nil, cookies)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/events: expected 200, got %d", resp.StatusCode)
+	}
+
+	// Original /api/ paths still work
+	resp = apiDo(t, srv, http.MethodGet, "/api/version", nil, cookies)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/version: expected 200, got %d", resp.StatusCode)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
 }
