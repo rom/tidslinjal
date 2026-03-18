@@ -43,7 +43,7 @@ function setupNavLongPress(btn, dir) {
   let timer = null;
   let longPressed = false;
 
-  btn.addEventListener('mousedown', () => {
+  btn.addEventListener('pointerdown', () => {
     longPressed = false;
     timer = setTimeout(() => {
       longPressed = true;
@@ -57,8 +57,8 @@ function setupNavLongPress(btn, dir) {
     }, 400);
   });
 
-  btn.addEventListener('mouseup', () => { clearTimeout(timer); });
-  btn.addEventListener('mouseleave', () => { clearTimeout(timer); });
+  btn.addEventListener('pointerup', () => { clearTimeout(timer); });
+  btn.addEventListener('pointerleave', () => { clearTimeout(timer); });
 
   btn.addEventListener('click', () => {
     if (longPressed) { longPressed = false; return; }
@@ -846,15 +846,17 @@ function setupZoomDrag() {
   let dragging = false, startY = 0, startZoom = 1.0;
   let _zoomRafPending = false;
 
-  container.addEventListener('mousedown', e => {
+  container.addEventListener('pointerdown', e => {
     if (!e.target.closest('.tl-time-label, .tl-corner')) return;
+    if (e.pointerType === 'touch' && e.isPrimary === false) return; // ignore multi-touch
     dragging  = true;
     startY    = e.clientY;
     startZoom = state.zoomFactor;
+    container.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', e => {
+  container.addEventListener('pointermove', e => {
     if (!dragging) return;
     const newZoom = Math.max(0.2, Math.min(6.0, startZoom + (startY - e.clientY) / 150));
     if (Math.abs(newZoom - state.zoomFactor) > 0.01) {
@@ -866,7 +868,8 @@ function setupZoomDrag() {
     }
   });
 
-  document.addEventListener('mouseup', () => { dragging = false; });
+  container.addEventListener('pointerup', () => { dragging = false; });
+  container.addEventListener('pointercancel', () => { dragging = false; });
 
   container.addEventListener('dblclick', e => {
     if (!e.target.closest('.tl-time-label, .tl-corner')) return;
@@ -883,7 +886,8 @@ function setupDragToReschedule() {
   const container = document.getElementById('timeline-container');
   let dragging = false, ghost = null, dragEvId = null, dragOrigEl = null, ghostHalfW = 0;
 
-  container.addEventListener('mousedown', e => {
+  container.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return; // touch drag handled by responsive.js long-press
     const block = e.target.closest('.event-block[data-ev-id]');
     if (!block) return;
     dragging    = true;
@@ -903,7 +907,7 @@ function setupDragToReschedule() {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('pointermove', e => {
     if (!dragging || !ghost) return;
     ghost.style.left = (e.clientX - ghostHalfW) + 'px';
     ghost.style.top  = (e.clientY - 12) + 'px';
@@ -915,7 +919,7 @@ function setupDragToReschedule() {
     if (cell) cell.classList.add('drag-target');
   });
 
-  document.addEventListener('mouseup', async e => {
+  document.addEventListener('pointerup', async e => {
     if (!dragging) return;
     dragging = false;
     if (ghost) { ghost.remove(); ghost = null; }
@@ -1030,7 +1034,8 @@ function setupHorizontalDrag() {
   const container = document.getElementById('timeline-container');
   let dragging = false, startX = 0, startScrollLeft = 0;
 
-  container.addEventListener('mousedown', e => {
+  container.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return; // touch pan handled by browser + responsive.js swipe
     if (e.target.closest('.event-block,.tl-time-label,.tl-corner,.lock-overlay')) return;
     dragging = true;
     startX = e.clientX;
@@ -1039,12 +1044,12 @@ function setupHorizontalDrag() {
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('pointermove', e => {
     if (!dragging) return;
     container.scrollLeft = startScrollLeft - (e.clientX - startX);
   });
 
-  document.addEventListener('mouseup', e => {
+  document.addEventListener('pointerup', e => {
     if (!dragging) return;
     dragging = false;
     container.style.cursor = '';
@@ -1100,7 +1105,7 @@ function setupEventResize() {
   const container = document.getElementById('timeline-container');
   let resizing = false, resizeEvId = null, startY = 0, origHeight = 0, resizeBlock = null;
 
-  container.addEventListener('mousedown', e => {
+  container.addEventListener('pointerdown', e => {
     const handle = e.target.closest('.ev-resize-handle[data-ev-id]');
     if (!handle) return;
     resizing = true;
@@ -1110,18 +1115,19 @@ function setupEventResize() {
     origHeight = resizeBlock.offsetHeight;
     document.body.style.cursor = 'ns-resize';
     document.body.style.userSelect = 'none';
+    if (handle.setPointerCapture) handle.setPointerCapture(e.pointerId);
     e.preventDefault();
     e.stopPropagation();
   });
 
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('pointermove', e => {
     if (!resizing || !resizeBlock) return;
     const dy = e.clientY - startY;
     const newHeight = Math.max(14, origHeight + dy);
     resizeBlock.style.height = newHeight + 'px';
   });
 
-  document.addEventListener('mouseup', async e => {
+  document.addEventListener('pointerup', async e => {
     if (!resizing) return;
     resizing = false;
     document.body.style.cursor = '';
