@@ -8,14 +8,26 @@
 <link rel="stylesheet" href="/static/vendor/seven-segment.css">
 <style>
 /* ── Theme application ── */
-body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
-body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
-body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
-body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; }
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; --success:#2ecc71; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; --success:#27ae60; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; --success:#2ecc71; }
+body.theme-urban-camo { --bg:#212630; --bg2:#282e3a; --bg3:#2f3644; --text:#c8d0e0; --text-dim:#7a88a0; --accent:#5c8abf; --border:#333d50; --danger:#e05252; --success:#2ecc71; }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
   display:flex; flex-direction:column; align-items:center; min-height:100vh; gap:16px; padding:16px; }
-/* ── Toolbar ── */
+/* ── Redesigned Header ── */
+.header-bar { width:100%; max-width:800px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.header-top { display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--border); }
+.header-title { font-size:13px; font-weight:700; color:var(--accent); letter-spacing:.08em; text-transform:uppercase; }
+.header-gear { background:none; border:none; color:var(--text-dim); font-size:16px; cursor:pointer; padding:2px 6px; border-radius:4px; }
+.header-gear:hover { background:var(--bg3); color:var(--text); }
+.header-gear.active { color:var(--accent); }
+.settings-panel { display:none; padding:10px 14px; }
+.settings-panel.open { display:block; }
+.settings-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.settings-row:last-child { margin-bottom:0; }
+.settings-row-label { font-size:11px; color:var(--text-dim); min-width:50px; font-weight:600; }
+/* ── Toolbar (kept for backward compat) ── */
 .toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--bg2);
   border:1px solid var(--border); border-radius:10px; padding:8px 14px; width:100%; max-width:600px; }
 .toolbar label { font-size:11px; color:var(--text-dim); }
@@ -140,52 +152,151 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 .color-row { display:flex; align-items:center; gap:6px; }
 .color-row label { font-size:10px; color:var(--text-dim); min-width:24px; }
 .color-row input[type=color] { width:28px; height:22px; border:1px solid var(--border); border-radius:4px; background:var(--bg3); cursor:pointer; padding:1px; }
+/* ── Per-clock color pickers ── */
+.card-color-pickers { position:absolute; top:4px; left:4px; display:flex; gap:2px; opacity:0; transition:opacity .2s; z-index:5; }
+.clock-card:hover .card-color-pickers { opacity:1; }
+.card-color-pickers input[type=color] { width:16px; height:16px; border:1px solid var(--border); border-radius:3px; cursor:pointer; padding:0; background:var(--bg3); }
+/* ── Country flag background ── */
+.clock-card[data-flag-bg]::before { content:attr(data-flag-bg); position:absolute; font-size:80px; opacity:0.08; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:0; }
+.clock-card[data-flag-bg] > * { position:relative; z-index:1; }
+.flag-toggle { position:absolute; bottom:4px; right:6px; background:none; border:none; color:var(--text-dim); font-size:10px; cursor:pointer; opacity:0; transition:opacity .2s; border-radius:3px; padding:1px 4px; }
+.clock-card:hover .flag-toggle { opacity:0.7; }
+.flag-toggle:hover { opacity:1 !important; background:var(--bg3); }
+/* ── Pulsing frame border for expired ── */
+.pulse-frame { --pulse-color:var(--danger,#e05252); animation:pulse-border 1.5s ease-in-out infinite; }
+@keyframes pulse-border {
+  0%,100% { box-shadow:0 0 0 2px var(--pulse-color), inset 0 0 4px rgba(0,0,0,0); }
+  50% { box-shadow:0 0 12px 4px var(--pulse-color), inset 0 0 8px color-mix(in srgb, var(--pulse-color) 20%, transparent); }
+}
+/* ── Dragging ── */
+.clock-card.dragging { opacity:0.6; transform:scale(0.95); cursor:grabbing; }
+.clock-card { cursor:grab; }
+/* ── Pin icon ── */
+.pin-icon { position:absolute; top:6px; left:28px; background:none; border:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:2px 4px; border-radius:3px; opacity:0; transition:opacity .2s; }
+.clock-card:hover .pin-icon { opacity:0.7; }
+.pin-icon:hover { opacity:1 !important; background:var(--bg3); color:var(--accent); }
+.pin-dropdown { position:absolute; top:22px; left:24px; background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:4px 0; z-index:20; min-width:140px; box-shadow:0 4px 16px rgba(0,0,0,.4); display:none; }
+.pin-dropdown.show { display:block; }
+.pin-dropdown button { display:block; width:100%; text-align:left; background:none; border:none; color:var(--text); padding:4px 10px; font-size:11px; cursor:pointer; }
+.pin-dropdown button:hover { background:var(--bg3); color:var(--accent); }
+/* ── Alarm cards ── */
+.alarm-card { position:relative; background:color-mix(in srgb, #ff9500 8%, var(--bg2)); border-color:color-mix(in srgb, #ff9500 25%, var(--border)); }
+.alarm-card .clock-label { color:#ff9500; }
+.alarm-active { animation:alarm-pulse 0.8s ease-in-out infinite; --pulse-color:#ff9500; }
+@keyframes alarm-pulse {
+  0%,100% { box-shadow:0 0 0 2px #ff9500; }
+  50% { box-shadow:0 0 20px 6px #ff9500; }
+}
+.alarm-past { animation:alarm-past-pulse 2s ease-in-out infinite; }
+@keyframes alarm-past-pulse {
+  0%,100% { box-shadow:0 0 0 2px #cc6600; }
+  50% { box-shadow:0 0 12px 3px #cc6600; }
+}
+/* ── Narrative cards ── */
+.narrative-card { position:relative; background:color-mix(in srgb, #9b59b6 10%, var(--bg2)); border-color:color-mix(in srgb, #9b59b6 30%, var(--border)); }
+.narrative-card .clock-label { color:#9b59b6; }
+.narrative-list { max-height:120px; overflow-y:auto; font-size:10px; text-align:left; margin:4px 0; }
+.narrative-entry { padding:3px 0; border-bottom:1px solid var(--border); display:flex; gap:4px; align-items:baseline; }
+.narrative-entry:last-child { border-bottom:none; }
+.narrative-ts { color:var(--text-dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.narrative-icon { font-size:12px; }
+.narrative-summary { color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* ── Phase cards ── */
+.phase-card { position:relative; }
+.phase-card .clock-label { font-size:12px; }
+.phase-progress { width:90%; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:6px auto 2px; border:1px solid var(--border); }
+.phase-progress-bar { height:100%; transition:width .5s; border-radius:3px; }
+/* ── F1 Start cards ── */
+.f1-card { position:relative; background:color-mix(in srgb, #e74c3c 6%, var(--bg2)); border-color:color-mix(in srgb, #e74c3c 20%, var(--border)); min-width:220px; }
+.f1-card .clock-label { color:#e74c3c; }
+.f1-lights { display:flex; gap:8px; justify-content:center; margin:8px 0; }
+.f1-light { width:24px; height:24px; border-radius:50%; background:#333; border:2px solid #555; transition:background .3s, box-shadow .3s; }
+.f1-light.on { background:#e74c3c; box-shadow:0 0 12px 4px rgba(231,76,60,.6); }
+.f1-light.go { background:#2ecc71; box-shadow:0 0 16px 6px rgba(46,204,113,.7); }
+/* F1 light scaling */
+.sz-xs .f1-light { width:16px; height:16px; } .sz-xs .f1-lights { gap:4px; }
+.sz-sm .f1-light { width:20px; height:20px; } .sz-sm .f1-lights { gap:6px; }
+.sz-md .f1-light { width:24px; height:24px; }
+.sz-lg .f1-light { width:32px; height:32px; } .sz-lg .f1-lights { gap:10px; }
+.sz-xl .f1-light { width:40px; height:40px; } .sz-xl .f1-lights { gap:12px; }
+.sz-xxl .f1-light { width:56px; height:56px; } .sz-xxl .f1-lights { gap:16px; }
 </style>
 </head>
 <body class="theme-dark sz-md">
-<p class="page-header">Tidslinjal — Clocks</p>
-<div class="toolbar" id="toolbar">
+<!-- ── Redesigned Header ── -->
+<div class="header-bar" id="headerBar">
+  <div class="header-top">
+    <span class="header-title" id="headerTitle">TIDSLINJAL CLOCKS</span>
+    <button class="header-gear" id="btnGear" title="Toggle settings panel">&#9881;</button>
+  </div>
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-row">
+      <span class="settings-row-label">Display</span>
+      <select id="selStyle" class="btn-tb" style="padding:3px 6px">
+        <option value="">Standard</option>
+        <option value="style-minimal">Minimal</option>
+        <option value="style-compact">Compact</option>
+      </select>
+      <button class="btn-tb active" id="btnDigital" data-mode="digital">Digital</button>
+      <button class="btn-tb" id="btnAnalog" data-mode="analog">Analog</button>
+      <button class="btn-tb" id="btnVCR" data-mode="vcr">VCR</button>
+      <input type="range" id="sizeSlider" min="0" max="5" value="2" step="1" style="width:80px;cursor:pointer">
+      <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Time</span>
+      <button class="btn-tb active" id="btnTzLocal" data-tz="local">Local</button>
+      <button class="btn-tb" id="btnTzZulu" data-tz="zulu">ZULU</button>
+      <button class="btn-tb active" id="btnFmt24" data-fmt="24">24h</button>
+      <button class="btn-tb" id="btnFmt12" data-fmt="12">12h</button>
+      <label id="lblVcrColor" style="display:none;font-size:11px;color:var(--text-dim)">VCR Color</label>
+      <select id="selVcrColor" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 6px;font-size:11px">
+        <option value="red">Red</option>
+        <option value="green">Green</option>
+        <option value="blue">Blue</option>
+        <option value="orange">Orange</option>
+      </select>
+      <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Add</span>
+      <button class="btn-tb" id="btnAddCountdown" title="Add countdown timer">Countdown</button>
+      <button class="btn-tb" id="btnAddTimer" title="Add stopwatch timer">Timer</button>
+      <button class="btn-tb" id="btnAddAlarm" title="Add alarm clock">Alarm</button>
+      <button class="btn-tb" id="btnAddPhase" title="Add phase clock">Phase</button>
+      <button class="btn-tb" id="btnAddNarrative" title="Add narrative clock">Narrative</button>
+      <button class="btn-tb" id="btnAddF1" title="Add F1 start clock">F1</button>
+      <button class="btn-tb" id="btnAddSynth" title="Add synthetic exercise clock">Synthetic</button>
+    </div>
+    <div class="settings-row">
+      <span class="settings-row-label">Colors</span>
+      <span class="color-row">
+        <label title="Background color">BG</label>
+        <input type="color" id="colorBg" value="#1a1d23" title="Background color">
+        <label title="Countdown color">CD</label>
+        <input type="color" id="colorCountdown" value="#4a9eff" title="Countdown accent color">
+        <label title="Timer color">TM</label>
+        <input type="color" id="colorTimer" value="#2ecc71" title="Timer accent color">
+        <label title="Alarm color">AL</label>
+        <input type="color" id="colorAlarm" value="#ff9500" title="Alarm accent color">
+      </span>
+    </div>
+  </div>
+</div>
+<!-- Hidden toolbar kept for backward compatibility / ID references -->
+<div class="toolbar" id="toolbar" style="display:none">
   <label>Style</label>
-  <select id="selStyle">
-    <option value="">Standard</option>
-    <option value="style-minimal">Minimal</option>
-    <option value="style-compact">Compact</option>
-  </select>
   <label>Mode</label>
-  <button class="btn-tb active" id="btnDigital" data-mode="digital">Digital</button>
-  <button class="btn-tb" id="btnAnalog" data-mode="analog">Analog</button>
-  <button class="btn-tb" id="btnVCR" data-mode="vcr">VCR</button>
   <label>Size</label>
-  <input type="range" id="sizeSlider" min="0" max="5" value="2" step="1">
-  <span id="sizeLbl" style="font-size:11px;color:var(--text-dim);min-width:18px">M</span>
-  <button class="btn-tb" id="btnDigits" title="Show hour numbers on analog face">1-12</button>
-  <label>TZ</label>
-  <button class="btn-tb active" id="btnTzLocal" data-tz="local">Local</button>
-  <button class="btn-tb" id="btnTzZulu" data-tz="zulu">ZULU</button>
-  <label id="lblHourFmt">Format</label>
-  <button class="btn-tb active" id="btnFmt24" data-fmt="24">24h</button>
-  <button class="btn-tb" id="btnFmt12" data-fmt="12">12h</button>
-  <button class="btn-tb" id="btnAddCountdown" title="Add countdown timer">⏱ Countdown</button>
-  <button class="btn-tb" id="btnAddTimer" title="Add stopwatch timer">⏲ Timer</button>
-  <button class="btn-tb" id="btnAddSynth" title="Add synthetic exercise clock">⏱ Synthetic</button>
-  <label id="lblVcrColor" style="display:none">VCR Color</label>
-  <select id="selVcrColor" style="display:none">
-    <option value="red">Red</option>
-    <option value="green">Green</option>
-    <option value="blue">Blue</option>
-    <option value="orange">Orange</option>
-  </select>
-  <span class="color-row">
-    <label title="Background color">BG</label>
-    <input type="color" id="colorBg" value="#1a1d23" title="Background color">
-    <label title="Countdown color">CD</label>
-    <input type="color" id="colorCountdown" value="#4a9eff" title="Countdown accent color">
-    <label title="Timer color">TM</label>
-    <input type="color" id="colorTimer" value="#2ecc71" title="Timer accent color">
-  </span>
 </div>
 <div class="clocks-wrap" id="clocksWrap"></div>
 <div class="clocks-wrap" id="countdownWrap"></div>
+<div class="clocks-wrap" id="alarmWrap"></div>
+<div class="clocks-wrap" id="timerWrap"></div>
+<div class="clocks-wrap" id="narrativeWrap"></div>
+<div class="clocks-wrap" id="phaseWrap"></div>
+<div class="clocks-wrap" id="f1Wrap"></div>
+
 <!-- Countdown setup popover -->
 <div id="countdownPopover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
   <div style="font-weight:700;color:var(--accent);margin-bottom:12px;font-size:14px">Add Countdown Timer</div>
@@ -224,13 +335,13 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     </label>
     <div id="cdSoundRow" style="margin-top:4px;display:flex;align-items:center;gap:6px">
       <select id="cdSoundType" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">
-        <option value="beep">Beep (3× short)</option>
+        <option value="beep">Beep (3x short)</option>
         <option value="klaxon">Klaxon</option>
         <option value="bell">Bell</option>
         <option value="siren">Siren</option>
         <option value="chime">Chime</option>
       </select>
-      <button class="btn-tb" id="cdSoundPreview" style="font-size:10px;padding:2px 8px">▶ Test</button>
+      <button class="btn-tb" id="cdSoundPreview" style="font-size:10px;padding:2px 8px">Test</button>
     </div>
   </div>
   <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
@@ -239,7 +350,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   </div>
 </div>
 <div id="countdownOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
-<div class="clocks-wrap" id="timerWrap"></div>
+
 <!-- Timer setup popover -->
 <div id="timerPopover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
   <div style="font-weight:700;color:var(--accent);margin-bottom:12px;font-size:14px">Add Stopwatch Timer</div>
@@ -249,7 +360,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
       style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
   </div>
   <div style="margin-bottom:8px">
-    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Target duration (optional — enables progress bar)</label>
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Target duration (optional)</label>
     <div style="display:flex;gap:6px;align-items:center">
       <input type="number" id="tmrHours" min="0" max="999" value="0" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
       <span style="font-size:11px;color:var(--text-dim)">h</span>
@@ -278,13 +389,13 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     </label>
     <div id="tmrSoundRow" style="margin-top:4px;display:flex;align-items:center;gap:6px">
       <select id="tmrSoundType" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">
-        <option value="beep">Beep (3× short)</option>
+        <option value="beep">Beep (3x short)</option>
         <option value="klaxon">Klaxon</option>
         <option value="bell">Bell</option>
         <option value="siren">Siren</option>
         <option value="chime">Chime</option>
       </select>
-      <button class="btn-tb" id="tmrSoundPreview" style="font-size:10px;padding:2px 8px">▶ Test</button>
+      <button class="btn-tb" id="tmrSoundPreview" style="font-size:10px;padding:2px 8px">Test</button>
     </div>
   </div>
   <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
@@ -293,6 +404,83 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
   </div>
 </div>
 <div id="timerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
+
+<!-- Alarm setup popover -->
+<div id="alarmPopover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  <div style="font-weight:700;color:#ff9500;margin-bottom:12px;font-size:14px">Add Alarm</div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Label</label>
+    <input type="text" id="alLabel" placeholder="e.g. Phase 2 begins" maxlength="40"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Mode</label>
+    <select id="alMode" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+      <option value="absolute">Absolute time</option>
+      <option value="epoch_relative">Relative to exercise epoch</option>
+    </select>
+  </div>
+  <div id="alAbsoluteRow" style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Target time</label>
+    <input type="datetime-local" id="alTargetTime"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div id="alRelativeRow" style="margin-bottom:8px;display:none">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Offset from epoch (e.g. +02:30 or -00:15)</label>
+    <input type="text" id="alEpochOffset" placeholder="H+HH:MM or -HH:MM" maxlength="10"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="alPlaySound" checked> Play sound when alarm fires
+    </label>
+    <div id="alSoundRow" style="margin-top:4px;display:flex;align-items:center;gap:6px">
+      <select id="alSoundType" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">
+        <option value="beep">Beep</option>
+        <option value="klaxon">Klaxon</option>
+        <option value="bell">Bell</option>
+        <option value="siren">Siren</option>
+        <option value="chime">Chime</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="alContinuePulse" checked> Continue pulsing after firing
+    </label>
+  </div>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+    <button class="btn-tb" id="alCancel">Cancel</button>
+    <button class="btn-tb active" id="alStart">Add Alarm</button>
+  </div>
+</div>
+<div id="alarmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
+
+<!-- F1 Start popover -->
+<div id="f1Popover" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+  <div style="font-weight:700;color:#e74c3c;margin-bottom:12px;font-size:14px">Add F1 Start Clock</div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Label</label>
+    <input type="text" id="f1Label" placeholder="e.g. Exercise Start" maxlength="40"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Number of lights (3-7)</label>
+    <input type="number" id="f1NumLights" min="3" max="7" value="5"
+      style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Countdown seconds before sequence</label>
+    <input type="number" id="f1CountdownSec" min="3" max="30" value="10"
+      style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;text-align:center">
+  </div>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+    <button class="btn-tb" id="f1Cancel">Cancel</button>
+    <button class="btn-tb active" id="f1Start">Add F1 Clock</button>
+  </div>
+</div>
+<div id="f1Overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
+
 <script src="/static/clocks-popup.js"></script>
 </body>
 </html>
