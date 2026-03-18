@@ -40,8 +40,13 @@ func (app *App) handleGetReference(w http.ResponseWriter, r *http.Request, user 
 }
 
 func (app *App) handleUploadReference(w http.ResponseWriter, r *http.Request, user *User) {
-	if err := r.ParseMultipartForm(50 << 20); err != nil { // 50 MB
-		jsonError(w, "file too large (max 50 MB)", http.StatusBadRequest)
+	r.Body = http.MaxBytesReader(w, r.Body, 500<<20) // 500 MB hard limit
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if err.Error() == "http: request body too large" {
+			jsonError(w, "file too large (max 500 MB)", http.StatusRequestEntityTooLarge)
+		} else {
+			jsonError(w, "upload failed: "+err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -287,8 +292,13 @@ func (app *App) handleDeleteReference(w http.ResponseWriter, r *http.Request, us
 
 // handleBulkUploadReferences handles uploading multiple reference files at once
 func (app *App) handleBulkUploadReferences(w http.ResponseWriter, r *http.Request, user *User) {
-	if err := r.ParseMultipartForm(200 << 20); err != nil { // 200 MB
-		jsonError(w, "files too large (max 200 MB total)", http.StatusBadRequest)
+	r.Body = http.MaxBytesReader(w, r.Body, 500<<20) // 500 MB hard limit
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if err.Error() == "http: request body too large" {
+			jsonError(w, "files too large (max 500 MB total)", http.StatusRequestEntityTooLarge)
+		} else {
+			jsonError(w, "upload failed: "+err.Error(), http.StatusBadRequest)
+		}
 		return
 	}
 	files := r.MultipartForm.File["files"]
