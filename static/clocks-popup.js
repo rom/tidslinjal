@@ -2409,6 +2409,8 @@ function _detachMainClock() {
     '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
     'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
+    'body.theme-city-camo{--bg:#2b3325;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c}' +
+    'body.theme-urban-camo{--bg:#212630;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf}' +
     '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.d{font-size:11px;color:var(--text-dim);margin-top:4px}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
     '</style></head><body class="' + theme + '">' +
     '<div class="t" id="t">--:--:--</div><div class="d" id="d"></div><div class="z" id="z"></div>' +
@@ -2435,6 +2437,8 @@ function _detachExtraClock(ecId) {
     '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
     'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
     'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
+    'body.theme-city-camo{--bg:#2b3325;--text:#d4dbc0;--text-dim:#8d9a78;--accent:#8fb85c}' +
+    'body.theme-urban-camo{--bg:#212630;--text:#c8d0e0;--text-dim:#7a88a0;--accent:#5c8abf}' +
     '.l{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}' +
     '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
     '</style></head><body class="' + theme + '">' +
