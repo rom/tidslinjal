@@ -812,13 +812,21 @@ function renderLayerPopover() {
   `;
 
   // Attach layer popover listeners (CSP-safe)
+  // Checkboxes: clicking them stops propagation (so parent click won't double-fire),
+  // but we add a change handler so they still call toggleLayer/toggleAllLayers.
   list.querySelectorAll('[data-stop-prop]').forEach(cb => {
     cb.addEventListener('click', e => e.stopPropagation());
   });
   const allBtn = list.querySelector('[data-toggle-all-layers]');
   if (allBtn) allBtn.addEventListener('click', () => toggleAllLayers());
+  // Checkbox inside "All layers" row
+  const allCb = allBtn ? allBtn.querySelector('input[type="checkbox"]') : null;
+  if (allCb) allCb.addEventListener('change', () => toggleAllLayers());
   list.querySelectorAll('[data-toggle-layer]').forEach(el => {
     el.addEventListener('click', () => toggleLayer(parseInt(el.dataset.toggleLayer, 10)));
+    // Checkbox inside each layer row
+    const cb = el.querySelector('input[type="checkbox"]');
+    if (cb) cb.addEventListener('change', () => toggleLayer(parseInt(el.dataset.toggleLayer, 10)));
   });
   const addBtn = list.querySelector('[data-add-layer]');
   if (addBtn) addBtn.addEventListener('click', () => {

@@ -1063,7 +1063,7 @@ function renderSidebar() {
             </div>
             ${filtered.length === 0 ? `<p style="color:var(--text-dim);font-size:var(--fs-sm)">No ${sectionLabel.toLowerCase()} yet.</p>` : ''}
             ${filtered.map(r => `
-              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;cursor:pointer" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}' data-arg-el>
+              <div style="display:flex;gap:8px;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px;cursor:pointer" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}'>
                 ${r.image_name ? `<img src="/api/rooms/${r.id}/image" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius);border:1px solid var(--border)">` :
                   `<span style="font-size:24px;width:48px;text-align:center">${r.icon || sectionIcon}</span>`}
                 <div style="flex:1;min-width:0">
@@ -1073,11 +1073,29 @@ function renderSidebar() {
                   ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
                 </div>
-                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}' data-arg-el data-stop-prop>✏️</button>
+                <button class="btn btn-ghost btn-icon btn-sm" data-action="openRoomModal" data-arg='${escAttr(JSON.stringify(r))}' data-stop-prop>✏️</button>
+                <button class="btn btn-danger btn-icon btn-sm" data-delete-room="${r.id}" data-room-name="${escAttr(r.name)}" data-stop-prop title="${t('btn_delete')||'Delete'}" style="padding:2px 6px;font-size:var(--fs-xs)">✕</button>
               </div>`).join('')}
           </div>`;
         _bindResSubTabs(el);
         _bindActions(el);
+        // Bind delete buttons for resources
+        el.querySelectorAll('[data-delete-room]').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            const roomId = parseInt(btn.dataset.deleteRoom, 10);
+            const roomName = btn.dataset.roomName || '';
+            if (!confirm((t('confirm_delete_resource')||'Delete this resource?') + (roomName ? ' (' + roomName + ')' : ''))) return;
+            const res = await apiDel('/api/rooms/' + roomId);
+            if (res.ok) {
+              showNotification('success', t('resource_deleted')||'Resource deleted');
+              renderSidebar();
+            } else {
+              const err = await res.json().catch(() => ({}));
+              showError(err.error || 'Failed to delete');
+            }
+          });
+        });
       });
     } else if (resSubTab === 'manage_types') {
       // Manage custom resource types

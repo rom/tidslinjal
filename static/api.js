@@ -5,6 +5,7 @@
 'use strict';
 
 // ── HTTP helpers ────────────────────────────────────────────────────────────
+let _authRedirectPending = false;
 async function api(method, path, body) {
   const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest' } };
   if (body !== undefined && !(body instanceof FormData)) {
@@ -14,7 +15,27 @@ async function api(method, path, body) {
     opts.body = body;
   }
   const res = await fetch(path, opts);
-  if (res.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }
+  if (res.status === 401) {
+    // Avoid multiple simultaneous redirects and allow multi-device sessions.
+    // Verify the session is truly gone before redirecting (handles transient errors).
+    if (_authRedirectPending) throw new Error('unauth');
+    _authRedirectPending = true;
+    try {
+      // Double-check session validity with a lightweight probe
+      const probe = await fetch('/api/auth/me', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (probe.status === 401) {
+        window.location.href = '/login';
+      } else {
+        // Session is actually valid — the 401 was transient or from a different cause
+        _authRedirectPending = false;
+        return res;
+      }
+    } catch {
+      // Network error on probe — don't redirect, let the caller handle the error
+      _authRedirectPending = false;
+    }
+    throw new Error('unauth');
+  }
   return res;
 }
 async function apiGet(p) {

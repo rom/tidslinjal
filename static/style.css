@@ -903,8 +903,23 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
   #timeline-container { flex: 1; min-height: 0; }
   .toolbar { gap: 3px; }
 
-  /* Hide sidebar resize handle on mobile */
+  /* Hide sidebar resize handle on tablet/phone */
   #sidebarResizeHandle { display: none; }
+
+  /* Hide language flags on tablet — use overflow menu instead */
+  .lang-flags { display: none !important; }
+
+  /* Hide logo on tablet to save header space */
+  #header .logo { display: none; }
+
+  /* Hide less-used header elements */
+  .control-label { display: none; }
+  #appVersionLink { display: none; }
+  #btnExportICS { display: none; }
+
+  /* Compact header */
+  #header { padding: 0 8px; gap: 4px; }
+  .header-right { gap: 5px; }
 
   /* Toolbar overflow: hide groups moved to overflow menu */
   .toolbar-hidden { display: none !important; }
@@ -1762,7 +1777,7 @@ body.light-mode { --danger: #c0392b; }
 }
 
 /* Ensure touch-action allows our gesture handling */
-#timeline-container { touch-action: pan-x pan-y; }
+#timeline-container { touch-action: pan-y pinch-zoom; }
 .event-block { touch-action: none; }
 .tl-time-label { touch-action: none; }
 .tl-corner { touch-action: none; }

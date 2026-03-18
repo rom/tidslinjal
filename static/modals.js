@@ -7924,31 +7924,31 @@ function openRoomModal(argJson) {
       btn.style.background = 'var(--accent)';
       btn.style.borderColor = 'var(--accent)';
       btn.classList.add('rm-icon-selected');
-      document.getElementById('rmIcon').value = btn.dataset.icon;
+      modal.querySelector('#rmIcon').value = btn.dataset.icon;
     });
   });
 
   modal.querySelector('#rmSaveBtn').addEventListener('click', async () => {
     const room = {
-      name: document.getElementById('rmName').value.trim(),
+      name: (modal.querySelector('#rmName')?.value || '').trim(),
       type: data.type || 'room',
-      sub_type: document.getElementById('rmSubType')?.value || '',
-      description: document.getElementById('rmDesc')?.value?.trim() || '',
-      location: document.getElementById('rmLoc')?.value?.trim() || '',
-      capacity: parseInt(document.getElementById('rmCap')?.value) || 0,
-      icon: document.getElementById('rmIcon')?.value || '',
+      sub_type: modal.querySelector('#rmSubType')?.value || '',
+      description: (modal.querySelector('#rmDesc')?.value || '').trim(),
+      location: (modal.querySelector('#rmLoc')?.value || '').trim(),
+      capacity: parseInt(modal.querySelector('#rmCap')?.value) || 0,
+      icon: modal.querySelector('#rmIcon')?.value || '',
       enabled: true,
     };
     if (isEdit) {
       room.id = data.id;
       room.image_name = data.image_name || '';
     }
-    if (!room.name) { showError(t('name')||'Name required'); return; }
+    if (!room.name) { showError(t('resource_name_required')||'A name is required for this resource.'); return; }
     const res = await apiPut('/api/rooms', room);
     if (!res.ok) { showError('Failed to save'); return; }
 
     // Upload image if selected
-    const imgFile = document.getElementById('rmImageFile')?.files?.[0];
+    const imgFile = modal.querySelector('#rmImageFile')?.files?.[0];
     const roomId = isEdit ? data.id : (await (async () => {
       // For new rooms, fetch the room list to find the one we just created
       const rooms = await apiGet('/api/rooms');
