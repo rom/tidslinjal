@@ -13963,16 +13963,17 @@ function setupSidebarResize() {
   let startX = 0;
   let startWidth = 0;
 
-  handle.addEventListener('mousedown', e => {
+  handle.addEventListener('pointerdown', e => {
     dragging = true;
     startX = e.clientX;
     startWidth = sidebar.offsetWidth;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    if (handle.setPointerCapture) handle.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
 
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('pointermove', e => {
     if (!dragging) return;
     const dx = startX - e.clientX;
     const newWidth = Math.max(200, Math.min(800, startWidth + dx));
@@ -13981,7 +13982,7 @@ function setupSidebarResize() {
     sidebar.style.maxWidth = newWidth + 'px';
   });
 
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('pointerup', () => {
     if (!dragging) return;
     dragging = false;
     document.body.style.cursor = '';

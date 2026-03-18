@@ -870,6 +870,26 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
 
 /* ── Responsive / mobile ──────────────────────────────────────────────────── */
 
+/* Touch target sizing — ensure ≥44px hit areas on touch devices */
+@media (pointer: coarse) {
+  .btn, .toolbar-btn { min-height: 44px; min-width: 44px; }
+  .btn-icon { min-height: 44px; min-width: 44px; padding: 0 10px; }
+  .btn-sm { min-height: 38px; }
+  .sidebar-tab { min-height: 44px; padding: 10px 12px; }
+  .mobile-nav-btn { min-height: 52px; }
+  .lang-flag-btn { min-height: 44px; min-width: 40px; padding: 4px 6px; }
+  .legend-item { min-height: 44px; padding: 6px 8px; }
+  .layer-item { min-height: 44px; }
+  .context-menu-item { min-height: 44px; padding: 10px 16px; display: flex; align-items: center; }
+  .nav-jump-item { min-height: 44px; padding: 10px 16px; display: flex; align-items: center; }
+  .filter-cb-label { min-height: 38px; padding: 6px 10px; }
+  select.ctrl-select { min-height: 44px; }
+  /* Enlarge event resize handle for touch */
+  .ev-resize-handle { height: 14px; }
+  /* Event blocks need minimum touch height */
+  .event-block { min-height: 28px; }
+}
+
 /* Tablet (≤ 1024px): collapsible sidebar overlay */
 @media (max-width: 1024px) {
   #sidebar {
@@ -882,6 +902,32 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
   #main { flex-direction: column; }
   #timeline-container { flex: 1; min-height: 0; }
   .toolbar { gap: 3px; }
+
+  /* Hide sidebar resize handle on mobile */
+  #sidebarResizeHandle { display: none; }
+
+  /* Toolbar overflow: hide groups moved to overflow menu */
+  .toolbar-hidden { display: none !important; }
+
+  /* Toolbar overflow button */
+  .toolbar-overflow-btn { font-size: 18px; font-weight: 700; }
+
+  /* Toolbar overflow dropdown menu */
+  .toolbar-overflow-menu {
+    display: none; position: fixed; top: var(--header-h); right: 8px;
+    z-index: 150; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px;
+    box-shadow: 0 8px 32px var(--shadow-lg);
+    min-width: 240px; max-width: 90vw;
+    max-height: 70vh; overflow-y: auto;
+  }
+  .toolbar-overflow-menu.visible { display: block; }
+  .toolbar-overflow-group {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0;
+    border-bottom: 1px solid var(--border); align-items: center;
+  }
+  .toolbar-overflow-group:last-child { border-bottom: none; }
+  .toolbar-overflow-group .control-label { display: block !important; }
 }
 
 /* Phone (≤ 768px): hide header clutter, show mobile nav */
@@ -916,14 +962,40 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
   #app { padding-bottom: 56px; }
   #sidebar { bottom: 56px; }
 
-  /* Modals become full-screen on phones */
-  .modal-box {
+  /* Modals become bottom sheets on phones */
+  .modal {
     width: 100vw !important; max-width: 100vw !important;
-    max-height: 90vh !important;
+    max-height: 85vh !important;
     border-radius: 16px 16px 0 0; margin: 0 !important;
-    position: fixed; bottom: 56px; left: 0;
   }
-  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-overlay.open { align-items: flex-end; padding: 0; }
+  /* Bottom sheet drag handle indicator */
+  .modal::before {
+    content: ''; display: block; width: 36px; height: 4px;
+    background: var(--border); border-radius: 2px;
+    margin: 8px auto 4px;
+  }
+
+  /* Hide primary add event button (FAB replaces it) */
+  #btnAddEvent { display: none !important; }
+
+  /* Notification area repositioned above mobile nav */
+  #notification-area { bottom: 64px; right: 12px; width: 280px; }
+
+  /* Calendar nav arrows larger for touch */
+  .cal-nav-arrow { width: 36px; height: 64px; font-size: 26px; }
+
+  /* List view adaptations */
+  #list-view { padding: 8px; }
+  #list-view-toolbar { gap: 4px; }
+  #list-view-toolbar input, #list-view-toolbar select { font-size: 11px; }
+  #listSearch { width: 100% !important; }
+  /* Hide some columns on small screens */
+  #list-view-table th:nth-child(3), #list-view-table td:nth-child(3),
+  #list-view-table th:nth-child(6), #list-view-table td:nth-child(6),
+  #list-view-table th:nth-child(7), #list-view-table td:nth-child(7) {
+    display: none;
+  }
 }
 
 /* Small phone (≤ 480px) */
@@ -934,6 +1006,43 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
     --slot-h-hour: 36px;
   }
   .toolbar select.ctrl-select { max-width: 70px; font-size: 9px; }
+}
+
+/* ── Vertical day layout (phone, ≤600px with multi-day) ─────────────────── */
+#timeline.vertical-day-layout {
+  grid-template-columns: var(--time-col-w) 1fr !important;
+}
+#timeline.vertical-day-layout .tl-day-header {
+  grid-column: 1 / -1;
+  position: static;
+  min-width: unset;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent2);
+}
+#timeline.vertical-day-layout .tl-day-header .tl-day-date { color: #fff; }
+#timeline.vertical-day-layout .tl-day-header .tl-day-name { color: rgba(255,255,255,.8); }
+#timeline.vertical-day-layout .tl-cell { min-width: unset; }
+
+/* ── FAB (floating action button) ────────────────────────────────────────── */
+.fab-btn {
+  display: none; /* shown by JS on mobile */
+  position: fixed; bottom: 72px; right: 16px;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  font-size: 28px; font-weight: 300; line-height: 1;
+  box-shadow: 0 4px 16px var(--shadow-lg);
+  z-index: 180; cursor: pointer;
+  transition: background .15s, transform .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.fab-btn:hover { background: var(--accent2); transform: scale(1.05); }
+.fab-btn:active { transform: scale(0.95); }
+@media (min-width: 1025px) {
+  .fab-btn { display: none !important; }
 }
 
 /* ── Mobile navigation bar ────────────────────────────────────────────────── */
@@ -1612,3 +1721,48 @@ body.light-mode { --danger: #c0392b; }
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
+
+/* ── Responsive utilities ────────────────────────────────────────────────── */
+
+/* Prevent pull-to-refresh interfering with vertical scroll on timeline */
+#timeline-container { overscroll-behavior: contain; }
+
+/* Smooth scrolling for timeline on touch devices */
+@media (pointer: coarse) {
+  #timeline-container { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+}
+
+/* Reduced motion: disable animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Tablet landscape: ensure good use of horizontal space */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+  #sidebar.visible { width: 320px; }
+  .toolbar-overflow-menu { min-width: 300px; }
+}
+
+/* Tablet portrait: more compact */
+@media (min-width: 600px) and (max-width: 1024px) and (orientation: portrait) {
+  :root {
+    --day-col-min: 100px;
+  }
+  .clock-area { display: none; }
+  .lang-flags { display: none; }
+  #appVersionLink { display: none; }
+}
+
+/* Event blocks on small screens: reduce info density */
+@media (max-width: 768px) {
+  .event-block .ev-time { display: none; }
+  .event-block .ev-creator { display: none; }
+  .event-block .ev-icon { font-size: 8px; }
+  .ev-participant { display: none; }
+}
+
+/* Ensure touch-action allows our gesture handling */
+#timeline-container { touch-action: pan-x pan-y; }
+.event-block { touch-action: none; }
+.tl-time-label { touch-action: none; }
+.tl-corner { touch-action: none; }

@@ -311,7 +311,8 @@ async function init() {
   // Handle tab focus/blur — restart timers that browsers throttle in background
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      // Release any mouse-button-held state by dispatching a synthetic mouseup
+      // Release any pointer/mouse-button-held state by dispatching synthetic events
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
       // Clear intervals to save resources while hidden
       if (state._clockInterval)    { clearInterval(state._clockInterval);    state._clockInterval = null; }
