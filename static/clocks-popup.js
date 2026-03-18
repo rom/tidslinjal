@@ -1858,12 +1858,669 @@ try {
   if (_opTs === 'dot') _timeSep = '.';
 } catch(e) {}
 
+// ── Header gear toggle ──────────────────────────────────────────────────────
+(function() {
+  var gear = document.getElementById('btnGear');
+  var panel = document.getElementById('settingsPanel');
+  if (gear && panel) {
+    gear.addEventListener('click', function() {
+      panel.classList.toggle('open');
+      gear.classList.toggle('active');
+    });
+  }
+})();
+
+// ── Alarm Clock system ──────────────────────────────────────────────────────
+let _alarms = [];
+window._alarms = _alarms;
+let _nextAlarmId = 1;
+
+function addAlarm(label, targetTime, mode, epochOffset, playSound, soundType, continuePulse) {
+  var target = targetTime;
+  if (mode === 'epoch_relative') {
+    try {
+      var ex = window.opener && window.opener.state && window.opener.state.exercise;
+      if (ex && ex.epoch) {
+        var epochMs = new Date(ex.epoch).getTime();
+        target = epochMs + epochOffset;
+      } else {
+        target = Date.now() + epochOffset;
+      }
+    } catch(e) { target = Date.now() + epochOffset; }
+  }
+  var alarm = {
+    id: _nextAlarmId++,
+    label: label || 'Alarm',
+    targetTime: target,
+    mode: mode || 'absolute',
+    epochOffset: epochOffset || 0,
+    playSound: playSound !== false,
+    soundType: soundType || 'klaxon',
+    continuePulse: continuePulse !== false,
+    fired: false,
+    acknowledged: false
+  };
+  _alarms.push(alarm);
+  window._alarms = _alarms;
+  renderAlarms();
+}
+
+function removeAlarm(id) {
+  var idx = _alarms.findIndex(function(a) { return a.id === id; });
+  if (idx !== -1) _alarms.splice(idx, 1);
+  window._alarms = _alarms;
+  renderAlarms();
+}
+
+function acknowledgeAlarm(id) {
+  var al = _alarms.find(function(a) { return a.id === id; });
+  if (al) al.acknowledged = true;
+  renderAlarms();
+}
+
+function renderAlarms() {
+  var wrap = document.getElementById('alarmWrap');
+  if (!wrap) return;
+  if (_alarms.length === 0) { wrap.innerHTML = ''; return; }
+  var html = '';
+  _alarms.forEach(function(al) {
+    var now = _getEffectiveNow().getTime();
+    var isFired = now >= al.targetTime;
+    var isPast = isFired && !al.acknowledged;
+    var classes = ['clock-card', 'alarm-card'];
+    if (isPast && al.continuePulse) classes.push('alarm-past');
+    else if (isPast) classes.push('alarm-active');
+    if (al.acknowledged) classes.push('alarm-acked');
+
+    var remaining = al.targetTime - now;
+    var timeText;
+    if (!isFired) {
+      var s = Math.floor(Math.abs(remaining) / 1000);
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      timeText = pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+    } else {
+      var elapsed = now - al.targetTime;
+      var s = Math.floor(elapsed / 1000);
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      timeText = '+' + pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+    }
+
+    var targetStr = new Date(al.targetTime).toLocaleTimeString();
+    html += '<div class="' + classes.join(' ') + '" id="al-card-' + al.id + '">' +
+      '<button class="clock-remove" title="Remove" data-rm-al="' + al.id + '">&times;</button>' +
+      '<div class="clock-label" style="color:#e67e22">' + escH(al.label) + '</div>' +
+      '<div class="clock-time" id="al-time-' + al.id + '" style="' + (isFired ? 'color:var(--danger)' : '') + '">' + timeText + '</div>' +
+      '<div class="clock-date" style="font-size:10px">Target: ' + escH(targetStr) + '</div>' +
+      (isPast ? '<div class="countdown-controls"><button data-al-ack="' + al.id + '" style="background:var(--danger);color:#fff;border-color:var(--danger)">✓ Acknowledge</button></div>' : '') +
+      '</div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-al]').forEach(function(btn) {
+    btn.addEventListener('click', function() { removeAlarm(parseInt(btn.dataset.rmAl, 10)); });
+  });
+  wrap.querySelectorAll('[data-al-ack]').forEach(function(btn) {
+    btn.addEventListener('click', function() { acknowledgeAlarm(parseInt(btn.dataset.alAck, 10)); });
+  });
+}
+
+function tickAlarms() {
+  var now = _getEffectiveNow().getTime();
+  _alarms.forEach(function(al) {
+    if (!al.fired && now >= al.targetTime) {
+      al.fired = true;
+      if (al.playSound) playCdAlarm(al.soundType);
+      renderAlarms();
+    }
+    // Update time display
+    var el = document.getElementById('al-time-' + al.id);
+    if (!el) return;
+    if (now < al.targetTime) {
+      var rem = al.targetTime - now;
+      var s = Math.floor(rem / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      el.textContent = pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+      el.style.color = '';
+    } else {
+      var over = now - al.targetTime;
+      var s = Math.floor(over / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      el.textContent = '+' + pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+      el.style.color = 'var(--danger)';
+    }
+  });
+}
+
+// Alarm popover bindings
+(function() {
+  var btnAdd = document.getElementById('btnAddAlarm');
+  var popover = document.getElementById('alarmPopover');
+  var overlay = document.getElementById('alarmOverlay');
+  var modeSelect = document.getElementById('alMode');
+  var absRow = document.getElementById('alAbsoluteRow');
+  var relRow = document.getElementById('alRelativeRow');
+  if (!btnAdd || !popover) return;
+  function showAlarmPopover() { popover.style.display = ''; overlay.style.display = ''; }
+  function hideAlarmPopover() { popover.style.display = 'none'; overlay.style.display = 'none'; }
+  btnAdd.addEventListener('click', showAlarmPopover);
+  document.getElementById('alCancel').addEventListener('click', hideAlarmPopover);
+  overlay.addEventListener('click', hideAlarmPopover);
+  modeSelect.addEventListener('change', function() {
+    absRow.style.display = this.value === 'absolute' ? '' : 'none';
+    relRow.style.display = this.value === 'epoch_relative' ? '' : 'none';
+  });
+  document.getElementById('alPlaySound').addEventListener('change', function() {
+    document.getElementById('alSoundRow').style.display = this.checked ? '' : 'none';
+  });
+  document.getElementById('alStart').addEventListener('click', function() {
+    var label = document.getElementById('alLabel').value.trim();
+    var mode = modeSelect.value;
+    var playSound = document.getElementById('alPlaySound').checked;
+    var soundType = document.getElementById('alSoundType').value;
+    var continuePulse = document.getElementById('alContinuePulse').checked;
+    var targetTime, epochOffset = 0;
+    if (mode === 'absolute') {
+      var dt = document.getElementById('alTargetTime').value;
+      if (!dt) return;
+      targetTime = new Date(dt).getTime();
+    } else {
+      var offsetStr = document.getElementById('alEpochOffset').value.trim();
+      var neg = offsetStr.startsWith('-');
+      var clean = offsetStr.replace(/^[H+\-]+/, '');
+      var parts = clean.split(':');
+      var hrs = parseInt(parts[0], 10) || 0;
+      var mins = parseInt(parts[1], 10) || 0;
+      epochOffset = (hrs * 3600 + mins * 60) * 1000;
+      if (neg) epochOffset = -epochOffset;
+      targetTime = 0; // will be calculated from epoch
+    }
+    addAlarm(label, targetTime, mode, epochOffset, playSound, soundType, continuePulse);
+    hideAlarmPopover();
+    document.getElementById('alLabel').value = '';
+  });
+})();
+
+// ── Phase Clock system ──────────────────────────────────────────────────────
+let _phaseClocks = [];
+
+function addPhaseClock() {
+  var phases;
+  try { phases = window.opener && window.opener.state && window.opener.state.phases; } catch(e) {}
+  if (!phases || phases.length === 0) {
+    // Try fetching
+    fetch('/api/phases', { credentials: 'include' })
+      .then(function(r) { return r.ok ? r.json() : []; })
+      .then(function(p) { if (p.length > 0) _addPhaseClockWithData(p); })
+      .catch(function() {});
+    return;
+  }
+  _addPhaseClockWithData(phases);
+}
+
+function _addPhaseClockWithData(phases) {
+  if (!phases || phases.length === 0) return;
+  // Add clock for the current phase (or next)
+  var now = _getEffectiveNow().getTime();
+  var current = null;
+  phases.forEach(function(p) {
+    var start = new Date(p.start_time).getTime();
+    var end = new Date(p.end_time).getTime();
+    if (now >= start && now <= end) current = p;
+  });
+  if (!current) {
+    // Find next upcoming phase
+    var upcoming = phases.filter(function(p) { return new Date(p.start_time).getTime() > now; });
+    upcoming.sort(function(a, b) { return new Date(a.start_time).getTime() - new Date(b.start_time).getTime(); });
+    if (upcoming.length > 0) current = upcoming[0];
+    else current = phases[phases.length - 1];
+  }
+  _phaseClocks.push({
+    id: 'phase-' + (current.id || Date.now()),
+    phaseId: current.id,
+    phaseName: current.name,
+    phaseColor: current.color || 'var(--accent)',
+    startTime: new Date(current.start_time).getTime(),
+    endTime: new Date(current.end_time).getTime()
+  });
+  renderPhaseClocks();
+}
+
+function removePhaseClockAt(idx) {
+  _phaseClocks.splice(idx, 1);
+  renderPhaseClocks();
+}
+
+function renderPhaseClocks() {
+  var wrap = document.getElementById('phaseWrap');
+  if (!wrap) return;
+  if (_phaseClocks.length === 0) { wrap.innerHTML = ''; return; }
+  var html = '';
+  _phaseClocks.forEach(function(pc, i) {
+    html += '<div class="clock-card phase-card" style="border-left-color:' + escH(pc.phaseColor) + '">' +
+      '<button class="clock-remove" data-rm-phase="' + i + '">&times;</button>' +
+      '<div class="clock-label" style="color:' + escH(pc.phaseColor) + '">' + escH(pc.phaseName) + '</div>' +
+      '<div class="clock-time" id="phase-time-' + i + '">--:--:--</div>' +
+      '<div class="timer-progress"><div class="timer-progress-bar" id="phase-bar-' + i + '" style="width:0%;background:' + escH(pc.phaseColor) + '"></div></div>' +
+      '<div class="clock-date" id="phase-status-' + i + '"></div>' +
+      '</div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-phase]').forEach(function(btn) {
+    btn.addEventListener('click', function() { removePhaseClockAt(parseInt(btn.dataset.rmPhase, 10)); });
+  });
+}
+
+function tickPhaseClocks() {
+  var now = _getEffectiveNow().getTime();
+  _phaseClocks.forEach(function(pc, i) {
+    var el = document.getElementById('phase-time-' + i);
+    var bar = document.getElementById('phase-bar-' + i);
+    var status = document.getElementById('phase-status-' + i);
+    if (!el) return;
+    if (now < pc.startTime) {
+      var rem = pc.startTime - now;
+      var s = Math.floor(rem / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      el.textContent = '-' + pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+      if (status) status.textContent = 'Starts in...';
+      if (bar) bar.style.width = '0%';
+    } else if (now <= pc.endTime) {
+      var rem = pc.endTime - now;
+      var s = Math.floor(rem / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      el.textContent = pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+      if (status) status.textContent = 'Remaining';
+      var elapsed = now - pc.startTime;
+      var total = pc.endTime - pc.startTime;
+      if (bar && total > 0) bar.style.width = Math.min(100, (elapsed / total) * 100) + '%';
+    } else {
+      var over = now - pc.endTime;
+      var s = Math.floor(over / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      el.textContent = '+' + pad(h) + _timeSep + pad(m) + _timeSep + pad(sec);
+      el.style.color = 'var(--danger)';
+      if (status) status.textContent = 'Phase ended';
+      if (bar) { bar.style.width = '100%'; bar.style.background = 'var(--danger)'; }
+    }
+  });
+}
+
+// Phase clock button binding
+(function() {
+  var btn = document.getElementById('btnAddPhase');
+  if (btn) btn.addEventListener('click', addPhaseClock);
+})();
+
+// ── Narrative Clock system ──────────────────────────────────────────────────
+let _narrativeClocks = [];
+let _narrativeData = null;
+let _narrativeLastFetch = 0;
+
+function addNarrativeClock() {
+  _narrativeClocks.push({
+    id: 'narr-' + Date.now(),
+    label: 'Narrative',
+    maxEntries: 8
+  });
+  renderNarrativeClocks();
+  fetchNarrativeData();
+}
+
+function removeNarrativeClockAt(idx) {
+  _narrativeClocks.splice(idx, 1);
+  renderNarrativeClocks();
+}
+
+function fetchNarrativeData() {
+  if (Date.now() - _narrativeLastFetch < 15000) return;
+  _narrativeLastFetch = Date.now();
+  fetch('/api/narrative?limit=20', { credentials: 'include' })
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(data) { _narrativeData = data; renderNarrativeClocks(); })
+    .catch(function() {});
+}
+
+function renderNarrativeClocks() {
+  var wrap = document.getElementById('narrativeWrap');
+  if (!wrap) return;
+  if (_narrativeClocks.length === 0) { wrap.innerHTML = ''; return; }
+  var html = '';
+  _narrativeClocks.forEach(function(nc, i) {
+    var entries = (_narrativeData || []).slice(0, nc.maxEntries);
+    var listHtml = '';
+    entries.forEach(function(e) {
+      var ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
+      var icon = e.type === 'event_started' ? '▶' : e.type.startsWith('decision') ? '⚖' : '•';
+      var sev = e.severity === 'critical' ? 'color:var(--danger)' : e.severity === 'warning' ? 'color:#e67e22' : '';
+      listHtml += '<div style="display:flex;gap:6px;padding:2px 0;border-bottom:1px solid var(--border);font-size:10px">' +
+        '<span style="color:var(--text-dim);min-width:50px">' + escH(ts) + '</span>' +
+        '<span>' + icon + '</span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + sev + '">' + escH(e.summary || '') + '</span>' +
+        '</div>';
+    });
+    if (!entries.length) listHtml = '<div style="text-align:center;color:var(--text-dim);font-size:11px;padding:8px">No narrative entries</div>';
+    html += '<div class="clock-card narrative-card" style="min-width:280px;text-align:left">' +
+      '<button class="clock-remove" data-rm-narr="' + i + '">&times;</button>' +
+      '<div class="clock-label" style="color:#9b59b6">Narrative / Scenario</div>' +
+      '<div style="max-height:150px;overflow-y:auto">' + listHtml + '</div>' +
+      '</div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-narr]').forEach(function(btn) {
+    btn.addEventListener('click', function() { removeNarrativeClockAt(parseInt(btn.dataset.rmNarr, 10)); });
+  });
+}
+
+(function() {
+  var btn = document.getElementById('btnAddNarrative');
+  if (btn) btn.addEventListener('click', addNarrativeClock);
+})();
+
+// ── F1 Start Clock system ───────────────────────────────────────────────────
+let _f1Starts = [];
+let _nextF1Id = 1;
+
+function addF1Start(label, numLights, countdownSec) {
+  var totalMs = countdownSec * 1000;
+  var f1 = {
+    id: _nextF1Id++,
+    label: label || 'F1 START',
+    numLights: numLights || 5,
+    countdownSeconds: countdownSec || 10,
+    targetTime: Date.now() + totalMs,
+    state: 'countdown', // countdown → sequence → go → done
+    litCount: 0,
+    lastLightAt: 0,
+    goAt: 0,
+    goDelay: 500 + Math.random() * 2500 // random 0.5-3s
+  };
+  _f1Starts.push(f1);
+  renderF1Starts();
+}
+
+function removeF1Start(id) {
+  var idx = _f1Starts.findIndex(function(f) { return f.id === id; });
+  if (idx !== -1) _f1Starts.splice(idx, 1);
+  renderF1Starts();
+}
+
+function resetF1Start(id) {
+  var f1 = _f1Starts.find(function(f) { return f.id === id; });
+  if (!f1) return;
+  f1.targetTime = Date.now() + f1.countdownSeconds * 1000;
+  f1.state = 'countdown';
+  f1.litCount = 0;
+  f1.lastLightAt = 0;
+  f1.goAt = 0;
+  f1.goDelay = 500 + Math.random() * 2500;
+  renderF1Starts();
+}
+
+function renderF1Starts() {
+  var wrap = document.getElementById('f1Wrap');
+  if (!wrap) return;
+  if (_f1Starts.length === 0) { wrap.innerHTML = ''; return; }
+  var html = '';
+  _f1Starts.forEach(function(f1) {
+    var lights = '';
+    for (var i = 0; i < f1.numLights; i++) {
+      var cls = 'f1-light';
+      if (f1.state === 'sequence' && i < f1.litCount) cls += ' on';
+      if (f1.state === 'go') cls += ' go';
+      lights += '<div class="' + cls + '" id="f1-light-' + f1.id + '-' + i + '"></div>';
+    }
+    html += '<div class="clock-card f1-card" style="min-width:220px" id="f1-card-' + f1.id + '">' +
+      '<button class="clock-remove" data-rm-f1="' + f1.id + '">&times;</button>' +
+      '<div class="clock-label" style="color:#e74c3c">' + escH(f1.label) + '</div>' +
+      '<div class="f1-lights" id="f1-lights-' + f1.id + '">' + lights + '</div>' +
+      '<div class="clock-time" id="f1-time-' + f1.id + '" style="font-size:inherit">--</div>' +
+      '<div class="countdown-controls">' +
+      '<button data-f1-reset="' + f1.id + '">↺ Reset</button>' +
+      '</div></div>';
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-rm-f1]').forEach(function(btn) {
+    btn.addEventListener('click', function() { removeF1Start(parseInt(btn.dataset.rmF1, 10)); });
+  });
+  wrap.querySelectorAll('[data-f1-reset]').forEach(function(btn) {
+    btn.addEventListener('click', function() { resetF1Start(parseInt(btn.dataset.f1Reset, 10)); });
+  });
+}
+
+function tickF1Starts() {
+  var now = Date.now();
+  _f1Starts.forEach(function(f1) {
+    var timeEl = document.getElementById('f1-time-' + f1.id);
+    if (f1.state === 'countdown') {
+      var rem = f1.targetTime - now;
+      if (rem <= 0) {
+        f1.state = 'sequence';
+        f1.lastLightAt = now;
+        f1.litCount = 0;
+      } else {
+        var s = Math.ceil(rem / 1000);
+        if (timeEl) timeEl.textContent = s + 's';
+      }
+    } else if (f1.state === 'sequence') {
+      // Light one light per second
+      if (now - f1.lastLightAt >= 1000 && f1.litCount < f1.numLights) {
+        f1.litCount++;
+        f1.lastLightAt = now;
+        // Update light DOM
+        var lightEl = document.getElementById('f1-light-' + f1.id + '-' + (f1.litCount - 1));
+        if (lightEl) lightEl.classList.add('on');
+        if (f1.litCount >= f1.numLights) {
+          f1.goAt = now + f1.goDelay;
+        }
+      }
+      if (f1.litCount >= f1.numLights && now >= f1.goAt) {
+        f1.state = 'go';
+        // All lights go green
+        for (var i = 0; i < f1.numLights; i++) {
+          var le = document.getElementById('f1-light-' + f1.id + '-' + i);
+          if (le) { le.classList.remove('on'); le.classList.add('go'); }
+        }
+        if (timeEl) { timeEl.textContent = 'GO!'; timeEl.style.color = '#00ff00'; }
+        playCdAlarm('beep');
+        setTimeout(function() {
+          f1.state = 'done';
+          for (var i = 0; i < f1.numLights; i++) {
+            var le = document.getElementById('f1-light-' + f1.id + '-' + i);
+            if (le) le.classList.remove('go');
+          }
+        }, 2000);
+      } else if (f1.litCount < f1.numLights) {
+        if (timeEl) timeEl.textContent = 'SEQUENCE';
+      } else {
+        if (timeEl) { timeEl.textContent = 'HOLD'; timeEl.style.color = '#ff0000'; }
+      }
+    } else if (f1.state === 'done') {
+      if (timeEl) { timeEl.textContent = 'DONE'; timeEl.style.color = ''; }
+    }
+  });
+}
+
+// F1 popover bindings
+(function() {
+  var btn = document.getElementById('btnAddF1');
+  var popover = document.getElementById('f1Popover');
+  var overlay = document.getElementById('f1Overlay');
+  if (!btn || !popover) return;
+  function show() { popover.style.display = ''; overlay.style.display = ''; }
+  function hide() { popover.style.display = 'none'; overlay.style.display = 'none'; }
+  btn.addEventListener('click', show);
+  document.getElementById('f1Cancel').addEventListener('click', hide);
+  overlay.addEventListener('click', hide);
+  document.getElementById('f1Start').addEventListener('click', function() {
+    var label = document.getElementById('f1Label').value.trim();
+    var numLights = parseInt(document.getElementById('f1NumLights').value, 10) || 5;
+    var countdownSec = parseInt(document.getElementById('f1CountdownSec').value, 10) || 10;
+    addF1Start(label, numLights, countdownSec);
+    hide();
+    document.getElementById('f1Label').value = '';
+  });
+})();
+
+// ── Drag-to-detach clocks ───────────────────────────────────────────────────
+let _dragState = null;
+
+function initDragToDetach() {
+  document.addEventListener('mousedown', function(e) {
+    var card = e.target.closest('.clock-card');
+    if (!card || e.target.closest('.clock-remove') || e.target.closest('button') || e.target.closest('input')) return;
+    _dragState = { card: card, startX: e.clientX, startY: e.clientY, dragging: false };
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!_dragState) return;
+    var dx = e.clientX - _dragState.startX;
+    var dy = e.clientY - _dragState.startY;
+    if (Math.abs(dx) > 50 || Math.abs(dy) > 50) {
+      _dragState.dragging = true;
+      _dragState.card.classList.add('dragging');
+    }
+  });
+  document.addEventListener('mouseup', function(e) {
+    if (!_dragState || !_dragState.dragging) { _dragState = null; return; }
+    _dragState.card.classList.remove('dragging');
+    // Check if mouse is near window edge
+    var margin = 40;
+    var nearEdge = e.clientX < margin || e.clientY < margin ||
+      e.clientX > window.innerWidth - margin || e.clientY > window.innerHeight - margin;
+    if (nearEdge) {
+      var card = _dragState.card;
+      // Determine clock type and detach
+      if (card.id && card.id.startsWith('cd-card-')) {
+        var cdId = parseInt(card.id.replace('cd-card-', ''), 10);
+        detachCountdown(cdId);
+      } else if (card.id && card.id.startsWith('tm-card-')) {
+        var tmId = parseInt(card.id.replace('tm-card-', ''), 10);
+        detachTimer(tmId);
+      } else if (card.id && card.id.startsWith('card-') && card.id !== 'card-main' && card.id !== 'card-synth') {
+        var ecId = parseInt(card.id.replace('card-', ''), 10);
+        _detachExtraClock(ecId);
+      } else if (card.id === 'card-main') {
+        _detachMainClock();
+      }
+    }
+    _dragState = null;
+  });
+}
+
+function _detachMainClock() {
+  var isUTC = _localIsUTC || false;
+  var theme = document.body.className || 'theme-dark';
+  var w = window.open('', 'tidslinjal-main-clock-' + Date.now(), 'width=300,height=200,menubar=no,toolbar=no');
+  if (!w) return;
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Clock</title>' +
+    '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
+    'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
+    'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
+    '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.d{font-size:11px;color:var(--text-dim);margin-top:4px}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
+    '</style></head><body class="' + theme + '">' +
+    '<div class="t" id="t">--:--:--</div><div class="d" id="d"></div><div class="z" id="z"></div>' +
+    '<script>var utc=' + isUTC + ';function p(n){return String(n).padStart(2,"0");}' +
+    'setInterval(function(){var n=new Date();var h,m,s,tz,d;' +
+    'if(utc){h=n.getUTCHours();m=n.getUTCMinutes();s=n.getUTCSeconds();tz="UTC/Z";d=n.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"});}' +
+    'else{h=n.getHours();m=n.getMinutes();s=n.getSeconds();tz="Local";d=n.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});}' +
+    'document.getElementById("t").textContent=p(h)+":"+p(m)+":"+p(s);' +
+    'document.getElementById("d").textContent=d;document.getElementById("z").textContent=tz;},1000);' +
+    'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme")document.body.className="theme-"+(e.data.theme||"dark")};}catch(e){}' +
+    '<\\/script></body></html>');
+  w.document.close();
+}
+
+function _detachExtraClock(ecId) {
+  var extra;
+  try { extra = (window.opener && window.opener.state && window.opener.state.preferences && window.opener.state.preferences.extra_clocks) || []; } catch(e) { extra = []; }
+  var ec = extra.find(function(c) { return c.id === ecId; });
+  if (!ec) return;
+  var theme = document.body.className || 'theme-dark';
+  var w = window.open('', 'tidslinjal-ec-' + ecId + '-' + Date.now(), 'width=300,height=200,menubar=no,toolbar=no');
+  if (!w) return;
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + escH(ec.label || ec.timezone) + '</title>' +
+    '<style>body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh}' +
+    'body.theme-dark{--bg:#1a1d23;--text:#e8eaf0;--text-dim:#9098b0;--accent:#4a9eff}' +
+    'body.theme-light{--bg:#f0f2f5;--text:#1a1d23;--text-dim:#666;--accent:#1a6ed8}' +
+    '.l{font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}' +
+    '.t{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums}.z{font-size:11px;color:var(--accent);margin-top:2px}' +
+    '</style></head><body class="' + theme + '">' +
+    '<div class="l">' + escH(ec.label || ec.timezone) + '</div>' +
+    '<div class="t" id="t">--:--:--</div><div class="z" id="z"></div>' +
+    '<script>var tz="' + escH(ec.timezone) + '";function p(n){return String(n).padStart(2,"0");}' +
+    'setInterval(function(){var n=new Date();try{' +
+    'var h=parseInt(n.toLocaleTimeString("en-GB",{hour:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
+    'var m=parseInt(n.toLocaleTimeString("en-GB",{minute:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
+    'var s=parseInt(n.toLocaleTimeString("en-GB",{second:"2-digit",hour12:false,timeZone:tz}),10)||0;' +
+    'document.getElementById("t").textContent=p(h)+":"+p(m)+":"+p(s);' +
+    'var tzl=n.toLocaleTimeString("en-GB",{timeZoneName:"short",timeZone:tz}).split(" ").pop();' +
+    'document.getElementById("z").textContent=tzl;}catch(e){document.getElementById("t").textContent="??:??:??";}},1000);' +
+    'try{var bc=new BroadcastChannel("tidslinjal-sync");bc.onmessage=function(e){if(e.data&&e.data.type==="theme")document.body.className="theme-"+(e.data.theme||"dark")};}catch(e){}' +
+    '<\\/script></body></html>');
+  w.document.close();
+}
+
+initDragToDetach();
+
+// ── Country flag background for timezone clocks ─────────────────────────────
+// Adds a flag watermark behind timezone clocks. Activated by clicking the flag in the label.
+// Done in rebuildClocks — we inject data-flag-bg attribute and CSS handles the rest via ::before
+
+// ── Clock pinning / attach ──────────────────────────────────────────────────
+function pinClock(type, id, config) {
+  try {
+    var bc = new BroadcastChannel('tidslinjal-sync');
+    bc.postMessage({ type: 'pin-clock', clockType: type, clockId: id, clockConfig: config });
+    bc.close();
+  } catch(e) {}
+}
+
+// ── Per-clock background color ──────────────────────────────────────────────
+let _clockColors = {};
+
+// Extend rebuildClocks to add per-clock color pickers and flag backgrounds
+var _origRebuildClocks = rebuildClocks;
+rebuildClocks = function() {
+  _origRebuildClocks();
+  // Add flag backgrounds to extra clock cards
+  var wrap = document.getElementById('clocksWrap');
+  if (!wrap) return;
+  var data = getClockData();
+  if (data.showFlags) {
+    data.extra.forEach(function(ec) {
+      var card = document.getElementById('card-' + ec.id);
+      if (!card) return;
+      var flag = _getClockFlag(ec.timezone);
+      if (flag) card.setAttribute('data-flag-bg', flag);
+    });
+  }
+  // Add hover color pickers to all clock cards
+  wrap.querySelectorAll('.clock-card').forEach(function(card) {
+    if (card.querySelector('.clock-color-picker')) return;
+    var picker = document.createElement('span');
+    picker.className = 'clock-color-picker';
+    picker.innerHTML = '<input type="color" title="Background color" value="#22262e" data-color-type="bg">' +
+      '<span class="clock-pin" title="Pin/attach this clock">📌</span>';
+    card.appendChild(picker);
+    picker.querySelector('[data-color-type="bg"]').addEventListener('input', function() {
+      card.style.background = this.value;
+    });
+    picker.querySelector('.clock-pin').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var clockId = card.id || 'unknown';
+      pinClock('clock', clockId, { label: card.querySelector('.clock-label')?.textContent || '' });
+    });
+  });
+};
+
 // Initial build + start ticking
 rebuildClocks();
 applySize(2);
 loadEventCountdowns();
 loadTimedEvents();
 tick();
-setInterval(function() { tick(); tickCountdowns(); tickTimers(); tickTimedEvents(); }, 1000);
-// Reload timed events periodically
+setInterval(function() {
+  tick();
+  tickCountdowns();
+  tickTimers();
+  tickTimedEvents();
+  tickAlarms();
+  tickPhaseClocks();
+  tickF1Starts();
+}, 1000);
+// Reload timed events and narrative periodically
 setInterval(loadTimedEvents, 30000);
+setInterval(function() { if (_narrativeClocks.length > 0) fetchNarrativeData(); }, 30000);
