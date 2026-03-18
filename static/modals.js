@@ -15822,21 +15822,7 @@ function _showReferenceInWindow(ref, localContent) {
     return;
   }
   // File-type reference — open inline via download endpoint
-  const ct = (ref.content_type || ref.filename || '').toLowerCase();
-  const isPDF = ct.includes('pdf') || (ref.original_name || '').toLowerCase().endsWith('.pdf');
-  if (isPDF) {
-    // Open PDF in a detached window with an embedded iframe for reliable rendering
-    const pdfUrl = '/api/references/' + ref.id + '/download?inline=1';
-    const w = window.open('', 'tidslinjal-ref-' + ref.id, 'width=900,height=700,resizable=yes,scrollbars=yes');
-    if (w) {
-      w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(ref.title || 'PDF')}</title>
-<style>*{margin:0;padding:0}body,html{width:100%;height:100%;overflow:hidden}iframe{border:none;width:100%;height:100%}</style>
-</head><body><iframe src="${escHtml(pdfUrl)}"></iframe></body></html>`);
-      w.document.close();
-    }
-  } else {
-    window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
-  }
+  window.open('/api/references/' + ref.id + '/download?inline=1', '_blank', 'width=900,height=700,resizable=yes,scrollbars=yes');
 }
 
 async function _deleteReference(id) {
@@ -16045,6 +16031,15 @@ async function _populateRefUserSelects(selectIds, selectedValues) {
 async function _handleReferenceUpload() {
   const title = document.getElementById('refUpTitle').value.trim();
   if (!title) { alert(t('ref_title_required') || 'Title is required'); return; }
+  const saveBtn = document.getElementById('btnDoUploadRef');
+  const saveBtnOrigText = saveBtn ? saveBtn.textContent : '';
+  const saveBtnOrigBg = saveBtn ? saveBtn.style.background : '';
+  function _setUploading(busy) {
+    if (!saveBtn) return;
+    if (busy) { saveBtn.textContent = t('uploading') || 'Uploading\u2026'; saveBtn.style.background = 'var(--text-dim)'; saveBtn.disabled = true; }
+    else { saveBtn.textContent = saveBtnOrigText; saveBtn.style.background = saveBtnOrigBg; saveBtn.disabled = false; }
+  }
+  _setUploading(true);
   // Determine active type
   const activeType = document.querySelector('[data-ref-type].active')?.dataset?.refType || 'file';
 
@@ -16070,7 +16065,7 @@ async function _handleReferenceUpload() {
     };
     try {
       const res = await api('POST', '/api/references/link', body);
-      if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      if (!res.ok) { _setUploading(false); const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
       // Trigger local browser download if option was checked
       if (downloadLocal && url) {
         const a = document.createElement('a');
@@ -16082,13 +16077,14 @@ async function _handleReferenceUpload() {
         a.click();
         document.body.removeChild(a);
       }
+      _setUploading(false);
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
-    } catch (e) { alert('Error: ' + e.message); }
+    } catch (e) { _setUploading(false); alert('Error: ' + e.message); }
   } else if (activeType === 'local') {
     // Local/inline resource
     const content = document.getElementById('refUpLocalContent')?.value?.trim() || '';
-    if (!content) { alert('Content is required'); return; }
+    if (!content) { _setUploading(false); alert('Content is required'); return; }
     const body = {
       title, content,
       description: document.getElementById('refUpDesc').value.trim(),
@@ -16103,14 +16099,15 @@ async function _handleReferenceUpload() {
     };
     try {
       const res = await api('POST', '/api/references/link', body);
-      if (!res.ok) { const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      if (!res.ok) { _setUploading(false); const err = await res.json().catch(() => ({})); alert('Failed: ' + (err.error || 'Unknown error')); return; }
+      _setUploading(false);
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
-    } catch (e) { alert('Error: ' + e.message); }
+    } catch (e) { _setUploading(false); alert('Error: ' + e.message); }
   } else {
     // File upload (original behavior)
     const file = document.getElementById('refUpFile').files[0];
-    if (!file) { alert('File is required'); return; }
+    if (!file) { _setUploading(false); alert('File is required'); return; }
     const fd = new FormData();
     fd.append('file', file);
     fd.append('title', title);
@@ -16131,10 +16128,11 @@ async function _handleReferenceUpload() {
     if (copyMode) fd.append('copy_mode', copyMode);
     try {
       const res = await fetch('/api/references', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      if (!res.ok) { let txt = ''; try { const ct = res.headers.get('content-type')||''; if (ct.includes('application/json')) { const j = await res.json(); txt = j.error||''; } } catch {} showError(txt || ('Upload failed — HTTP ' + res.status)); return; }
+      if (!res.ok) { _setUploading(false); let txt = ''; try { const ct = res.headers.get('content-type')||''; if (ct.includes('application/json')) { const j = await res.json(); txt = j.error||''; } } catch {} showError(txt || ('Upload failed — HTTP ' + res.status)); return; }
+      _setUploading(false);
       document.getElementById('referenceUploadModal').classList.remove('open');
       _loadAndRenderReferences();
-    } catch (e) { alert('Upload error: ' + e.message); }
+    } catch (e) { _setUploading(false); alert('Upload error: ' + e.message); }
   }
 }
 

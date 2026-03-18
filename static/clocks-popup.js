@@ -2240,6 +2240,38 @@ function _detachExtraClock(ecId) {
 
 initDragToDetach();
 
+// ── Pinch-to-resize for all clock faces ─────────────────────────────────────
+(function initPinchToResize() {
+  var _pinchDist0 = 0;
+  var _pinchSize0 = 2;
+  document.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      _pinchDist0 = Math.hypot(dx, dy);
+      _pinchSize0 = parseInt(document.getElementById('sizeSlider').value, 10) || 2;
+    }
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    if (e.touches.length === 2 && _pinchDist0 > 0) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.hypot(dx, dy);
+      var ratio = dist / _pinchDist0;
+      var newSize;
+      if (ratio > 1.3) newSize = Math.min(5, _pinchSize0 + Math.round((ratio - 1) * 3));
+      else if (ratio < 0.7) newSize = Math.max(0, _pinchSize0 - Math.round((1 - ratio) * 3));
+      else return;
+      var slider = document.getElementById('sizeSlider');
+      if (slider && parseInt(slider.value, 10) !== newSize) {
+        slider.value = newSize;
+        applySize(newSize);
+      }
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', function() { _pinchDist0 = 0; }, { passive: true });
+})();
+
 // ── Country flag background for timezone clocks ─────────────────────────────
 // Adds a flag watermark behind timezone clocks. Activated by clicking the flag in the label.
 // Done in rebuildClocks — we inject data-flag-bg attribute and CSS handles the rest via ::before

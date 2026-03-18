@@ -149,13 +149,13 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 .lap-export-row button { background:var(--bg3); border:1px solid var(--border); border-radius:4px; color:var(--text-dim); padding:1px 6px; font-size:9px; cursor:pointer; }
 .lap-export-row button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
 /* ── Color picker row ── */
-.color-row { display:flex; align-items:center; gap:6px; }
-.color-row label { font-size:10px; color:var(--text-dim); min-width:24px; }
-.color-row input[type=color] { width:28px; height:22px; border:1px solid var(--border); border-radius:4px; background:var(--bg3); cursor:pointer; padding:1px; }
+.color-row { display:flex; align-items:center; gap:4px; }
+.color-row label { font-size:9px; color:var(--text-dim); min-width:16px; }
+.color-row input[type=color] { width:18px; height:16px; border:1px solid var(--border); border-radius:3px; background:var(--bg3); cursor:pointer; padding:0; }
 /* ── Per-clock color pickers ── */
-.card-color-pickers { position:absolute; top:4px; left:4px; display:flex; gap:2px; opacity:0; transition:opacity .2s; z-index:5; }
+.card-color-pickers { position:absolute; top:3px; left:3px; display:flex; gap:1px; opacity:0; transition:opacity .2s; z-index:5; }
 .clock-card:hover .card-color-pickers { opacity:1; }
-.card-color-pickers input[type=color] { width:16px; height:16px; border:1px solid var(--border); border-radius:3px; cursor:pointer; padding:0; background:var(--bg3); }
+.card-color-pickers input[type=color] { width:12px; height:12px; border:1px solid var(--border); border-radius:2px; cursor:pointer; padding:0; background:var(--bg3); }
 /* ── Country flag background ── */
 .clock-card[data-flag-bg]::before { content:attr(data-flag-bg); position:absolute; font-size:80px; opacity:0.08; top:50%; left:50%; transform:translate(-50%,-50%); pointer-events:none; z-index:0; }
 .clock-card[data-flag-bg] > * { position:relative; z-index:1; }
