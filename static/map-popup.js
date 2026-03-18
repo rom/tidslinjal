@@ -1,5 +1,57 @@
 'use strict';
 
+// ── Co-located marker spread ────────────────────────────────────────────────
+// When multiple markers share the same (or very close) coordinates, offset
+// them in a circle so they don't completely overlap and hide each other.
+const _COLOCATE_THRESHOLD = 0.0001; // ~11 meters — markers closer than this are "co-located"
+const _COLOCATE_OFFSET    = 0.0003; // ~33 meters — radius of the spread circle
+
+/**
+ * Given an array of items with lat/lng, returns a Map of item→[offsetLat, offsetLng].
+ * Items at unique positions get their original coords; co-located items get
+ * spread in a circle around their shared position.
+ * @param {Array} items - objects with lat/lng properties
+ * @param {Function} getCoords - (item) => [lat, lng] or null
+ * @returns {Map} item → [adjustedLat, adjustedLng]
+ */
+function spreadColocatedMarkers(items, getCoords) {
+  // Group items by approximate location
+  const groups = new Map(); // "lat,lng" key → [{item, lat, lng}]
+  const result = new Map();
+
+  items.forEach(item => {
+    const coords = getCoords(item);
+    if (!coords) return;
+    const [lat, lng] = coords;
+    // Quantize to threshold grid to find co-located items
+    const key = (Math.round(lat / _COLOCATE_THRESHOLD) * _COLOCATE_THRESHOLD).toFixed(5) + ',' +
+                (Math.round(lng / _COLOCATE_THRESHOLD) * _COLOCATE_THRESHOLD).toFixed(5);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ item, lat, lng });
+  });
+
+  groups.forEach(group => {
+    if (group.length === 1) {
+      // Single item — no offset needed
+      result.set(group[0].item, [group[0].lat, group[0].lng]);
+    } else {
+      // Multiple items at same spot — spread in a circle
+      const centerLat = group.reduce((s, g) => s + g.lat, 0) / group.length;
+      const centerLng = group.reduce((s, g) => s + g.lng, 0) / group.length;
+      // Scale offset by number of items (more items → bigger circle)
+      const radius = _COLOCATE_OFFSET * Math.max(1, Math.sqrt(group.length / 3));
+      group.forEach((g, i) => {
+        const angle = (2 * Math.PI * i) / group.length - Math.PI / 2;
+        const offsetLat = centerLat + radius * Math.sin(angle);
+        const offsetLng = centerLng + radius * Math.cos(angle) / Math.cos(centerLat * Math.PI / 180);
+        result.set(g.item, [offsetLat, offsetLng]);
+      });
+    }
+  });
+
+  return result;
+}
+
 // Helper: ensure X-Requested-With header on all state-changing requests (CSRF protection)
 function _mapFetch(url, opts) {
   if (!opts) opts = {};
@@ -239,19 +291,20 @@ async function loadMeetings() {
     }
     if (!events) return;
     _meetingsLayer.clearLayers();
-    events.forEach(ev => {
-      if (ev.latitude && ev.longitude) {
-        const color = ev.color || '#D35400';
-        const marker = L.circleMarker([ev.latitude, ev.longitude], {
-          radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.8
-        });
-        const popupHtml = `<b>${escH(ev.title)}</b><br>` +
-          (ev.physical_location ? escH(ev.physical_location) + '<br>' : '') +
-          (ev.start_time ? new Date(ev.start_time).toLocaleString() : '');
-        marker.bindPopup(popupHtml);
-        marker.bindTooltip(ev.title, { direction: 'top', offset: [0, -8] });
-        _meetingsLayer.addLayer(marker);
-      }
+    const geoEvents = events.filter(ev => ev.latitude && ev.longitude);
+    const spreadMap = spreadColocatedMarkers(geoEvents, ev => [ev.latitude, ev.longitude]);
+    geoEvents.forEach(ev => {
+      const coords = spreadMap.get(ev) || [ev.latitude, ev.longitude];
+      const color = ev.color || '#D35400';
+      const marker = L.circleMarker(coords, {
+        radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.8
+      });
+      const popupHtml = `<b>${escH(ev.title)}</b><br>` +
+        (ev.physical_location ? escH(ev.physical_location) + '<br>' : '') +
+        (ev.start_time ? new Date(ev.start_time).toLocaleString() : '');
+      marker.bindPopup(popupHtml);
+      marker.bindTooltip(ev.title, { direction: 'top', offset: [0, -8] });
+      _meetingsLayer.addLayer(marker);
     });
   } catch(e) {}
 }
@@ -270,27 +323,30 @@ async function loadUsers() {
     }
     if (!users) return;
     _usersLayer.clearLayers();
-    users.forEach(u => {
+    // Resolve coordinates for all users first
+    const resolvedUsers = users.map(u => {
       let lat = u.latitude, lng = u.longitude;
-      // Fallback: resolve generic country name to capital coordinates
       if ((!lat || !lng) && u.location) {
         const resolved = resolveCountryCoords(u.location);
         if (resolved) { lat = resolved[0]; lng = resolved[1]; }
       }
-      if (lat && lng) {
-        const marker = L.marker([lat, lng], {
-          icon: L.divIcon({
-            className: 'user-marker',
-            html: `<div style="background:var(--accent,#4a9eff);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700">${(u.display_name||'?')[0]}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
-          })
-        });
-        const locInfo = u.location ? '<br>' + escH(u.location) : '';
-        marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${(u.nato_designations||[]).join(', ')}`);
-        marker.bindTooltip(u.display_name, { direction: 'top', offset: [0, -12] });
-        _usersLayer.addLayer(marker);
-      }
+      return { ...u, _lat: lat, _lng: lng };
+    }).filter(u => u._lat && u._lng);
+    const spreadMap = spreadColocatedMarkers(resolvedUsers, u => [u._lat, u._lng]);
+    resolvedUsers.forEach(u => {
+      const coords = spreadMap.get(u) || [u._lat, u._lng];
+      const marker = L.marker(coords, {
+        icon: L.divIcon({
+          className: 'user-marker',
+          html: `<div style="background:var(--accent,#4a9eff);width:24px;height:24px;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700">${(u.display_name||'?')[0]}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      });
+      const locInfo = u.location ? '<br>' + escH(u.location) : '';
+      marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${(u.nato_designations||[]).join(', ')}`);
+      marker.bindTooltip(u.display_name, { direction: 'top', offset: [0, -12] });
+      _usersLayer.addLayer(marker);
     });
   } catch(e) {}
 }
@@ -303,10 +359,16 @@ async function loadResourceLayers() {
     const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9', exercise_area: '#e74c3c', work_area: '#3498db', rest_room: '#1abc9c', training_ground: '#d35400'};
     const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧', exercise_area: '🏋', work_area: '💼', rest_room: '☕', training_ground: '🎯'};
     Object.values(layerMap).forEach(l => l.clearLayers());
-    (rooms || []).forEach(r => {
-      if (!r.location) return;
+    // Resolve coordinates and spread co-located resources
+    const geoRooms = (rooms || []).map(r => {
+      if (!r.location) return null;
       const coords = geocodeSync(r.location);
-      if (!coords) return;
+      if (!coords) return null;
+      return { ...r, _coords: coords };
+    }).filter(Boolean);
+    const spreadMap = spreadColocatedMarkers(geoRooms, r => r._coords);
+    geoRooms.forEach(r => {
+      const coords = spreadMap.get(r) || r._coords;
       const layer = layerMap[r.type] || _roomsLayer;
       const color = colorMap[r.type] || '#27ae60';
       const icon = r.icon || iconMap[r.type] || '🏠';
