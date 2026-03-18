@@ -2302,7 +2302,7 @@ func main() {
 	srv := &http.Server{
 		Addr:           addr,
 		Handler:        handler,
-		ReadTimeout:    30 * time.Second,
+		ReadHeaderTimeout: 30 * time.Second,
 		WriteTimeout:   5 * time.Minute,
 		IdleTimeout:    120 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
