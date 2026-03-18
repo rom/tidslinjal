@@ -247,7 +247,10 @@ func TestAPI_ImportICS_AllDay(t *testing.T) {
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -289,7 +292,10 @@ func TestAPI_ImportICS_RecurringEvent(t *testing.T) {
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -339,7 +345,10 @@ func TestAPI_ImportICS_EmptyCalendar(t *testing.T) {
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -368,7 +377,10 @@ func TestAPI_ImportICS_MultipleEvents(t *testing.T) {
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -402,7 +414,10 @@ func TestAPI_ImportICS_WithLocation(t *testing.T) {
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)

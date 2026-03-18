@@ -465,7 +465,7 @@ function rebuildClocks() {
   if (mainLbl) mainLbl.addEventListener('click', toggleUTC);
 }
 
-function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 /* ── Synthetic clock helpers ── */
 function _getSynthElapsed() {

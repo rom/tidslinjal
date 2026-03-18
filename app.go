@@ -83,12 +83,19 @@ type rateBucket struct {
 	resetAt time.Time
 }
 
-func newIPRateLimiter() *ipRateLimiter {
+func newIPRateLimiter(stopCh <-chan struct{}) *ipRateLimiter {
 	rl := &ipRateLimiter{buckets: make(map[string]*rateBucket)}
 	// M-02 fix: periodically clean up expired rate limit buckets to prevent memory exhaustion
 	go func() {
-		for range time.NewTicker(10 * time.Minute).C {
-			rl.cleanup()
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				rl.cleanup()
+			case <-stopCh:
+				return
+			}
 		}
 	}()
 	return rl
@@ -182,15 +189,16 @@ func NewApp(dataDir string) (*App, error) {
 	if err := store.SeedEventTypes(); err != nil {
 		return nil, err
 	}
+	stopCh := make(chan struct{})
 	app := &App{
 		store:       store,
 		broker:      NewSSEBroker(),
 		webhookCh:   make(chan webhookJob, 256),
-		authLimiter: newIPRateLimiter(),
+		authLimiter: newIPRateLimiter(stopCh),
 		eventBus:    NewEventBus(),
 		connectors:  NewConnectorRegistry(),
 		metrics:     NewMetrics(),
-		stopCh:      make(chan struct{}),
+		stopCh:      stopCh,
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
 	for i := 0; i < webhookConcurrency; i++ {
