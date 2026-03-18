@@ -463,7 +463,7 @@ function detachClock() {
   const w = Math.min(window.screen.availWidth, 720);
   const extraClocks = (state.preferences && state.preferences.extra_clocks) || [];
   const h = Math.min(window.screen.availHeight - 100, Math.max(340, 220 + extraClocks.length * 160));
-  _clockPopout = window.open('/static/clocks-popup.html', 'tidslinjal-clocks',
+  _clockPopout = window.open('/static/clocks-popup.html?v=' + Date.now(), 'tidslinjal-clocks',
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
 
   // Poll for popout closure so we can restore the main clock display

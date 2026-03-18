@@ -929,6 +929,7 @@ function showEventDetail(ev) {
           ${(ev.latitude != null && ev.longitude != null) ? `<b>🗺️ Coords:</b><span>${Number(ev.latitude).toFixed(4)}, ${Number(ev.longitude).toFixed(4)} <a href="https://www.openstreetmap.org/?mlat=${ev.latitude}&mlon=${ev.longitude}#map=15/${ev.latitude}/${ev.longitude}" target="_blank" style="color:var(--accent)">View on map ↗</a></span>` : ''}
           ${ev.depends_on && ev.depends_on.length ? `<b>🔗 Depends on:</b><span>${ev.depends_on.map(id => { const dep = state.events.find(e => e.id === id); return dep ? escHtml(dep.title) : 'Event #'+id; }).join(', ')}</span>` : ''}
           ${ev.planned_start ? `<b>📅 Planned:</b><span>${new Date(ev.planned_start).toLocaleString()}${ev.planned_end ? ' → ' + new Date(ev.planned_end).toLocaleString() : ''}</span>` : ''}
+          ${ev.contact_url ? `<b>🔗 Meeting link:</b><span><a href="${escAttr(ev.contact_url)}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">${escHtml(ev.contact_url)}</a></span>` : ''}
         </div>
       </div>
     </div>
@@ -8089,19 +8090,43 @@ async function openChecklistStart() {
       listEl.innerHTML = '<p style="color:var(--text-dim)">No templates available.</p>';
       return;
     }
-    listEl.innerHTML = templates.map(tmpl =>
-      `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:6px;background:var(--bg2)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <strong>${escHtml(tmpl.name)}</strong>
-            ${tmpl.built_in ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">(${t('checklist_builtin')||'Built-in'})</span>` : ''}
-            <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${escHtml(tmpl.description||'')}</div>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${tmpl.items?.length||0} items</div>
+    // Group templates by category
+    const catOrder = ['Generic', 'Exercise', 'Incident', 'Operations', 'Tidslinjal'];
+    const catIcons = { Generic: '📎', Exercise: '🎯', Incident: '🚨', Operations: '⚙', Tidslinjal: '📐' };
+    const byCategory = {};
+    templates.forEach(tmpl => {
+      const cat = tmpl.category || (tmpl.built_in ? 'Generic' : t('checklist_custom') || 'Custom');
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(tmpl);
+    });
+    const sortedCats = Object.keys(byCategory).sort((a, b) => {
+      const ia = catOrder.indexOf(a), ib = catOrder.indexOf(b);
+      if (ia >= 0 && ib >= 0) return ia - ib;
+      if (ia >= 0) return -1;
+      if (ib >= 0) return 1;
+      return a.localeCompare(b);
+    });
+    let catHtml = '';
+    sortedCats.forEach(cat => {
+      const icon = catIcons[cat] || '📋';
+      catHtml += `<div style="margin-bottom:12px">
+        <div style="font-size:var(--fs-xs);font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;display:flex;align-items:center;gap:4px">${icon} ${escHtml(cat)}</div>`;
+      byCategory[cat].forEach(tmpl => {
+        catHtml += `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:6px;background:var(--bg2)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <strong>${escHtml(tmpl.name)}</strong>
+              ${tmpl.built_in ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">(${t('checklist_builtin')||'Built-in'})</span>` : ''}
+              <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${escHtml(tmpl.description||'')}</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${tmpl.items?.length||0} items</div>
+            </div>
+            <button class="btn btn-sm btn-primary _cl_start_btn" data-tmpl-id="${tmpl.id}" data-tmpl-name="${escHtml(tmpl.name)}">▶ ${t('checklist_start')||'Start'}</button>
           </div>
-          <button class="btn btn-sm btn-primary _cl_start_btn" data-tmpl-id="${tmpl.id}" data-tmpl-name="${escHtml(tmpl.name)}">▶ ${t('checklist_start')||'Start'}</button>
-        </div>
-      </div>`
-    ).join('');
+        </div>`;
+      });
+      catHtml += '</div>';
+    });
+    listEl.innerHTML = catHtml;
     listEl.querySelectorAll('._cl_start_btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const tid = parseInt(btn.dataset.tmplId);

@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "7.0.0"
+const AppVersion = "8.0.0"
 
 
 // AppGitHub is the project repository URL
@@ -1284,6 +1284,7 @@ type ChecklistTemplate struct {
 	ID          int64              `json:"id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description,omitempty"`
+	Category    string             `json:"category,omitempty"` // template category: Generic, Exercise, Incident, Operations, Tidslinjal
 	Items       []ChecklistItemDef `json:"items"`
 	BuiltIn     bool               `json:"built_in"`
 	CreatedBy   int64              `json:"created_by,omitempty"`
@@ -1331,8 +1332,9 @@ type ChecklistInstanceItem struct {
 func BuiltInChecklists() []ChecklistTemplate {
 	now := time.Now()
 	return []ChecklistTemplate{
+		// ── Operations ──────────────────────────────────────────────────
 		{
-			ID: -1, Name: "TeamLead Battle Rhythm Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			ID: -1, Name: "TeamLead Battle Rhythm Prep", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
 			Description: "Preparation checklist before answering the TeamLead Battle Rhythm Check poll.",
 			Items: []ChecklistItemDef{
 				{Text: "Review current task status and progress", Category: "Situational Awareness"},
@@ -1348,7 +1350,7 @@ func BuiltInChecklists() []ChecklistTemplate {
 			},
 		},
 		{
-			ID: -2, Name: "Shift Handover", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			ID: -2, Name: "Shift Handover", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
 			Description: "Standard checklist for shift handover procedures.",
 			Items: []ChecklistItemDef{
 				{Text: "Brief incoming shift on current operational situation", Category: "Briefing"},
@@ -1363,7 +1365,83 @@ func BuiltInChecklists() []ChecklistTemplate {
 			},
 		},
 		{
-			ID: -3, Name: "Exercise Setup", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			ID: -5, Name: "Team Status Assessment", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for assessing overall team status and readiness.",
+			Items: []ChecklistItemDef{
+				{Text: "Verify all team members have checked in", Category: "Personnel"},
+				{Text: "Confirm team member roles and responsibilities are clear", Category: "Personnel"},
+				{Text: "Check team fatigue levels and schedule rest rotations", Category: "Personnel"},
+				{Text: "Review team communication channels are working", Category: "Communications"},
+				{Text: "Verify all team members have access to shared resources", Category: "Communications"},
+				{Text: "Confirm team understands current priorities", Category: "Situational Awareness"},
+				{Text: "Review team workload distribution and balance", Category: "Situational Awareness"},
+				{Text: "Identify any skill gaps for current tasks", Category: "Capability"},
+				{Text: "Check equipment and tools availability for team", Category: "Capability"},
+				{Text: "Confirm backup personnel are identified", Category: "Capability"},
+			},
+		},
+		{
+			ID: -6, Name: "Team Briefing Checklist", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for conducting effective team briefings.",
+			Items: []ChecklistItemDef{
+				{Text: "Gather all team members or confirm remote attendance", Category: "Preparation"},
+				{Text: "Prepare situation overview with latest updates", Category: "Preparation"},
+				{Text: "Share current operational picture with the team", Category: "Briefing"},
+				{Text: "Review assigned tasks and their current status", Category: "Briefing"},
+				{Text: "Communicate priorities and any changes", Category: "Briefing"},
+				{Text: "Address questions and concerns from team members", Category: "Interaction"},
+				{Text: "Collect status updates from each team member", Category: "Interaction"},
+				{Text: "Assign new tasks and confirm understanding", Category: "Tasking"},
+				{Text: "Set next check-in time and communication plan", Category: "Tasking"},
+				{Text: "Document key decisions and action items", Category: "Documentation"},
+			},
+		},
+		{
+			ID: -7, Name: "Team Coordination Check", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Team-oriented checklist for inter-team and intra-team coordination.",
+			Items: []ChecklistItemDef{
+				{Text: "Review dependencies with other teams", Category: "Inter-team"},
+				{Text: "Confirm shared information is up to date", Category: "Inter-team"},
+				{Text: "Check for conflicting activities between teams", Category: "Inter-team"},
+				{Text: "Verify team internal task assignments are clear", Category: "Intra-team"},
+				{Text: "Confirm all sub-tasks have owners", Category: "Intra-team"},
+				{Text: "Check progress against team milestones", Category: "Progress"},
+				{Text: "Identify and address bottlenecks", Category: "Progress"},
+				{Text: "Update team status board/timeline", Category: "Reporting"},
+				{Text: "Report team status to team lead", Category: "Reporting"},
+			},
+		},
+		{
+			ID: -8, Name: "Daily Operations Standup", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Daily standup meeting checklist for operational teams.",
+			Items: []ChecklistItemDef{
+				{Text: "Review overnight events and alerts", Category: "Review"},
+				{Text: "Check status of all ongoing tasks", Category: "Review"},
+				{Text: "Identify tasks completed since last standup", Category: "Review"},
+				{Text: "List blockers and issues needing resolution", Category: "Issues"},
+				{Text: "Confirm priorities for the day", Category: "Planning"},
+				{Text: "Assign new tasks from backlog", Category: "Planning"},
+				{Text: "Review upcoming deadlines for next 24-48 hours", Category: "Planning"},
+				{Text: "Update timeline with current status", Category: "Documentation"},
+			},
+		},
+		{
+			ID: -9, Name: "Communication Check", Category: "Operations", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Verify all communication channels and systems are operational.",
+			Items: []ChecklistItemDef{
+				{Text: "Test primary communication channel", Category: "Primary"},
+				{Text: "Test backup communication channel", Category: "Backup"},
+				{Text: "Verify contact lists are up to date", Category: "Contacts"},
+				{Text: "Confirm all team members know escalation procedures", Category: "Procedures"},
+				{Text: "Test notification system (email/SMS)", Category: "Notifications"},
+				{Text: "Verify shared document access for all participants", Category: "Access"},
+				{Text: "Check radio/phone battery and signal levels", Category: "Equipment"},
+			},
+		},
+
+		// ── Exercise ────────────────────────────────────────────────────
+		{
+			ID: -3, Name: "Exercise Setup", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
 			Description: "Checklist for setting up a new exercise or operation in Tidslinjal.",
 			Items: []ChecklistItemDef{
 				{Text: "Configure exercise name, dates, and time settings", Category: "Configuration"},
@@ -1380,7 +1458,7 @@ func BuiltInChecklists() []ChecklistTemplate {
 			},
 		},
 		{
-			ID: -4, Name: "After Action Review Prep", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			ID: -4, Name: "After Action Review Prep", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
 			Description: "Preparation checklist for conducting an After Action Review.",
 			Items: []ChecklistItemDef{
 				{Text: "Export timeline data and reports", Category: "Data Collection"},
@@ -1395,50 +1473,266 @@ func BuiltInChecklists() []ChecklistTemplate {
 			},
 		},
 		{
-			ID: -5, Name: "Team Status Assessment", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
-			Description: "Team-oriented checklist for assessing overall team status and readiness.",
+			ID: -10, Name: "Exercise STARTEX", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for the start of an exercise (STARTEX).",
 			Items: []ChecklistItemDef{
-				{Text: "Verify all team members have checked in", Category: "Personnel"},
-				{Text: "Confirm team member roles and responsibilities are clear", Category: "Personnel"},
-				{Text: "Check team fatigue levels and schedule rest rotations", Category: "Personnel"},
-				{Text: "Review team communication channels are working", Category: "Communications"},
-				{Text: "Verify all team members have access to shared resources", Category: "Communications"},
-				{Text: "Confirm team understands current priorities", Category: "Situational Awareness"},
-				{Text: "Review team workload distribution and balance", Category: "Situational Awareness"},
-				{Text: "Identify any skill gaps for current tasks", Category: "Capability"},
-				{Text: "Check equipment and tools availability for team", Category: "Capability"},
-				{Text: "Confirm backup personnel are identified", Category: "Capability"},
+				{Text: "Confirm all participants are present and logged in", Category: "Personnel"},
+				{Text: "Verify exercise inject schedule is loaded", Category: "Scenario"},
+				{Text: "Confirm scenario briefing has been delivered", Category: "Scenario"},
+				{Text: "Start exercise clock / set epoch time", Category: "Timing"},
+				{Text: "Activate synthetic time if applicable", Category: "Timing"},
+				{Text: "Verify all communication channels are active", Category: "Communications"},
+				{Text: "Confirm EXCON team is ready", Category: "Control"},
+				{Text: "Send STARTEX signal to all participants", Category: "Control"},
+				{Text: "Begin audit logging", Category: "Documentation"},
+				{Text: "Activate first phase on timeline", Category: "Timeline"},
 			},
 		},
 		{
-			ID: -6, Name: "Team Briefing Checklist", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
-			Description: "Team-oriented checklist for conducting effective team briefings.",
+			ID: -11, Name: "Exercise ENDEX", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for ending an exercise (ENDEX).",
 			Items: []ChecklistItemDef{
-				{Text: "Gather all team members or confirm remote attendance", Category: "Preparation"},
-				{Text: "Prepare situation overview with latest updates", Category: "Preparation"},
-				{Text: "Share current operational picture with the team", Category: "Briefing"},
-				{Text: "Review assigned tasks and their current status", Category: "Briefing"},
-				{Text: "Communicate priorities and any changes", Category: "Briefing"},
-				{Text: "Address questions and concerns from team members", Category: "Interaction"},
-				{Text: "Collect status updates from each team member", Category: "Interaction"},
-				{Text: "Assign new tasks and confirm understanding", Category: "Tasking"},
-				{Text: "Set next check-in time and communication plan", Category: "Tasking"},
-				{Text: "Document key decisions and action items", Category: "Documentation"},
+				{Text: "Send ENDEX signal to all participants", Category: "Notification"},
+				{Text: "Stop exercise clock", Category: "Timing"},
+				{Text: "Collect final status reports from all teams", Category: "Reports"},
+				{Text: "Export all timeline data", Category: "Data"},
+				{Text: "Export audit log", Category: "Data"},
+				{Text: "Export poll results and decisions", Category: "Data"},
+				{Text: "Create full backup of exercise data", Category: "Backup"},
+				{Text: "Distribute initial feedback forms", Category: "Feedback"},
+				{Text: "Schedule AAR / hot wash session", Category: "Follow-up"},
+				{Text: "Thank all participants", Category: "Follow-up"},
 			},
 		},
 		{
-			ID: -7, Name: "Team Coordination Check", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
-			Description: "Team-oriented checklist for inter-team and intra-team coordination.",
+			ID: -12, Name: "Exercise Observer Checklist", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for exercise observers and evaluators.",
 			Items: []ChecklistItemDef{
-				{Text: "Review dependencies with other teams", Category: "Inter-team"},
-				{Text: "Confirm shared information is up to date", Category: "Inter-team"},
-				{Text: "Check for conflicting activities between teams", Category: "Inter-team"},
-				{Text: "Verify team internal task assignments are clear", Category: "Intra-team"},
-				{Text: "Confirm all sub-tasks have owners", Category: "Intra-team"},
-				{Text: "Check progress against team milestones", Category: "Progress"},
-				{Text: "Identify and address bottlenecks", Category: "Progress"},
-				{Text: "Update team status board/timeline", Category: "Reporting"},
-				{Text: "Report team status to team lead", Category: "Reporting"},
+				{Text: "Review exercise objectives and evaluation criteria", Category: "Preparation"},
+				{Text: "Obtain observer credentials and access", Category: "Preparation"},
+				{Text: "Note timeline of key events observed", Category: "Observation"},
+				{Text: "Document decision-making processes observed", Category: "Observation"},
+				{Text: "Record communication effectiveness", Category: "Observation"},
+				{Text: "Note deviations from SOPs", Category: "Observation"},
+				{Text: "Identify best practices demonstrated", Category: "Analysis"},
+				{Text: "Identify areas for improvement", Category: "Analysis"},
+				{Text: "Prepare observer debrief notes", Category: "Reporting"},
+			},
+		},
+		{
+			ID: -13, Name: "Inject Preparation", Category: "Exercise", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Prepare and verify exercise injects before delivery.",
+			Items: []ChecklistItemDef{
+				{Text: "Review inject content for accuracy", Category: "Content"},
+				{Text: "Verify inject timing matches exercise plan", Category: "Timing"},
+				{Text: "Confirm inject delivery channel is ready", Category: "Delivery"},
+				{Text: "Check inject dependencies are met", Category: "Dependencies"},
+				{Text: "Prepare contingency injects if needed", Category: "Contingency"},
+				{Text: "Brief inject team on delivery procedure", Category: "Coordination"},
+				{Text: "Set up inject tracking in Tidslinjal", Category: "Tracking"},
+			},
+		},
+
+		// ── Incident ────────────────────────────────────────────────────
+		{
+			ID: -14, Name: "Incident Initial Response", Category: "Incident", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Initial response checklist when an incident is reported.",
+			Items: []ChecklistItemDef{
+				{Text: "Acknowledge incident report", Category: "Acknowledgement"},
+				{Text: "Assess severity and impact", Category: "Assessment"},
+				{Text: "Determine if escalation is needed", Category: "Assessment"},
+				{Text: "Activate incident response team", Category: "Activation"},
+				{Text: "Establish incident communication channel", Category: "Communications"},
+				{Text: "Notify stakeholders of incident", Category: "Notifications"},
+				{Text: "Begin incident timeline logging", Category: "Documentation"},
+				{Text: "Assign incident commander / lead", Category: "Organization"},
+				{Text: "Set initial objectives and priorities", Category: "Planning"},
+				{Text: "Schedule first status update", Category: "Planning"},
+			},
+		},
+		{
+			ID: -15, Name: "Incident Handover", Category: "Incident", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Handover during an ongoing incident to new responders.",
+			Items: []ChecklistItemDef{
+				{Text: "Brief incoming team on current situation", Category: "Briefing"},
+				{Text: "Summarize actions taken so far", Category: "Briefing"},
+				{Text: "Highlight outstanding issues and risks", Category: "Briefing"},
+				{Text: "Transfer incident lead responsibility", Category: "Handover"},
+				{Text: "Confirm access to all incident systems", Category: "Handover"},
+				{Text: "Share contact list and escalation paths", Category: "Handover"},
+				{Text: "Document handover in incident log", Category: "Documentation"},
+				{Text: "Confirm incoming team understands objectives", Category: "Verification"},
+			},
+		},
+		{
+			ID: -16, Name: "Incident Closure", Category: "Incident", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for properly closing an incident.",
+			Items: []ChecklistItemDef{
+				{Text: "Confirm root cause identified", Category: "Analysis"},
+				{Text: "Verify all corrective actions completed", Category: "Resolution"},
+				{Text: "Confirm normal operations restored", Category: "Resolution"},
+				{Text: "Notify all stakeholders of resolution", Category: "Notification"},
+				{Text: "Export incident timeline and logs", Category: "Documentation"},
+				{Text: "Complete incident report", Category: "Documentation"},
+				{Text: "Schedule post-incident review", Category: "Follow-up"},
+				{Text: "Update SOPs if needed", Category: "Follow-up"},
+				{Text: "Archive incident data", Category: "Closure"},
+			},
+		},
+		{
+			ID: -17, Name: "Crisis Communication", Category: "Incident", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for managing crisis communications.",
+			Items: []ChecklistItemDef{
+				{Text: "Identify spokesperson and backup", Category: "Organization"},
+				{Text: "Draft initial public statement", Category: "Messaging"},
+				{Text: "Get legal/leadership approval on messaging", Category: "Approval"},
+				{Text: "Notify internal stakeholders first", Category: "Internal"},
+				{Text: "Notify external stakeholders", Category: "External"},
+				{Text: "Set up media monitoring", Category: "Monitoring"},
+				{Text: "Prepare Q&A document", Category: "Preparation"},
+				{Text: "Schedule regular communication updates", Category: "Scheduling"},
+				{Text: "Document all communications sent", Category: "Documentation"},
+			},
+		},
+
+		// ── Generic ─────────────────────────────────────────────────────
+		{
+			ID: -18, Name: "Meeting Preparation", Category: "Generic", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "General checklist for preparing and running effective meetings.",
+			Items: []ChecklistItemDef{
+				{Text: "Define meeting objective and desired outcome", Category: "Preparation"},
+				{Text: "Prepare agenda and distribute to participants", Category: "Preparation"},
+				{Text: "Confirm meeting room/link is set up", Category: "Logistics"},
+				{Text: "Ensure all required materials are ready", Category: "Logistics"},
+				{Text: "Take attendance", Category: "During Meeting"},
+				{Text: "Follow agenda and manage time", Category: "During Meeting"},
+				{Text: "Capture decisions and action items", Category: "During Meeting"},
+				{Text: "Distribute meeting minutes", Category: "Follow-up"},
+				{Text: "Update task assignments in system", Category: "Follow-up"},
+			},
+		},
+		{
+			ID: -19, Name: "Project Kickoff", Category: "Generic", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for starting a new project or initiative.",
+			Items: []ChecklistItemDef{
+				{Text: "Define project scope and objectives", Category: "Planning"},
+				{Text: "Identify key stakeholders", Category: "Planning"},
+				{Text: "Assign project roles and responsibilities", Category: "Organization"},
+				{Text: "Set up communication channels", Category: "Organization"},
+				{Text: "Create project timeline with milestones", Category: "Timeline"},
+				{Text: "Identify risks and mitigation strategies", Category: "Risk"},
+				{Text: "Secure required resources and budget", Category: "Resources"},
+				{Text: "Schedule regular status meetings", Category: "Scheduling"},
+				{Text: "Document project charter/plan", Category: "Documentation"},
+			},
+		},
+		{
+			ID: -20, Name: "Decision Log Entry", Category: "Generic", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for documenting important decisions properly.",
+			Items: []ChecklistItemDef{
+				{Text: "State the decision clearly", Category: "Decision"},
+				{Text: "Document the rationale and alternatives considered", Category: "Decision"},
+				{Text: "Record who made the decision and when", Category: "Attribution"},
+				{Text: "Identify who is affected by the decision", Category: "Impact"},
+				{Text: "Define follow-up actions resulting from decision", Category: "Actions"},
+				{Text: "Communicate decision to relevant parties", Category: "Communication"},
+				{Text: "Set review date if decision is temporary", Category: "Follow-up"},
+			},
+		},
+		{
+			ID: -21, Name: "Weekly Review", Category: "Generic", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Weekly review checklist for teams and leaders.",
+			Items: []ChecklistItemDef{
+				{Text: "Review completed tasks from the past week", Category: "Review"},
+				{Text: "Update status of ongoing tasks", Category: "Review"},
+				{Text: "Identify tasks that are behind schedule", Category: "Review"},
+				{Text: "Review upcoming deadlines for next week", Category: "Planning"},
+				{Text: "Prioritize tasks for the coming week", Category: "Planning"},
+				{Text: "Address any unresolved blockers", Category: "Issues"},
+				{Text: "Recognize team achievements", Category: "Team"},
+				{Text: "Update reports and dashboards", Category: "Reporting"},
+			},
+		},
+		{
+			ID: -22, Name: "Onboarding New Member", Category: "Generic", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for onboarding a new team member.",
+			Items: []ChecklistItemDef{
+				{Text: "Create user account with appropriate role", Category: "Access"},
+				{Text: "Assign to relevant groups", Category: "Access"},
+				{Text: "Share login credentials and system access guide", Category: "Access"},
+				{Text: "Brief on current operational situation", Category: "Orientation"},
+				{Text: "Introduce to team members and key contacts", Category: "Orientation"},
+				{Text: "Share relevant reference documents", Category: "Documentation"},
+				{Text: "Explain communication protocols and tools", Category: "Training"},
+				{Text: "Walk through Tidslinjal interface and features", Category: "Training"},
+				{Text: "Assign initial tasks", Category: "Tasks"},
+				{Text: "Schedule follow-up check-in after first day", Category: "Follow-up"},
+			},
+		},
+
+		// ── Tidslinjal ──────────────────────────────────────────────────
+		{
+			ID: -23, Name: "Tidslinjal Initial Setup", Category: "Tidslinjal", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "First-time setup checklist for a new Tidslinjal instance.",
+			Items: []ChecklistItemDef{
+				{Text: "Set admin password and secure the instance", Category: "Security"},
+				{Text: "Configure SMTP for email notifications", Category: "Configuration"},
+				{Text: "Set default language and timezone", Category: "Configuration"},
+				{Text: "Configure SSO if applicable", Category: "Authentication"},
+				{Text: "Create user accounts", Category: "Users"},
+				{Text: "Set up groups and team structure", Category: "Users"},
+				{Text: "Configure event types and layers", Category: "Content"},
+				{Text: "Upload organization logo and customize theme", Category: "Branding"},
+				{Text: "Create initial reference documents", Category: "Content"},
+				{Text: "Test backup and restore procedure", Category: "Safety"},
+				{Text: "Verify all features are working correctly", Category: "Testing"},
+			},
+		},
+		{
+			ID: -24, Name: "Tidslinjal Pre-Event Check", Category: "Tidslinjal", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Verify Tidslinjal is ready before a major event or exercise.",
+			Items: []ChecklistItemDef{
+				{Text: "Verify server is running and accessible", Category: "System"},
+				{Text: "Check disk space and system resources", Category: "System"},
+				{Text: "Create a fresh backup", Category: "Backup"},
+				{Text: "Verify all user accounts are active", Category: "Users"},
+				{Text: "Test notification delivery", Category: "Communications"},
+				{Text: "Verify timeline loads correctly", Category: "Functionality"},
+				{Text: "Test creating, editing, and deleting events", Category: "Functionality"},
+				{Text: "Verify polls and ready checks work", Category: "Functionality"},
+				{Text: "Check that reports can be generated", Category: "Functionality"},
+				{Text: "Ensure reference documents are uploaded", Category: "Content"},
+			},
+		},
+		{
+			ID: -25, Name: "Tidslinjal Data Export", Category: "Tidslinjal", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for comprehensive data export from Tidslinjal.",
+			Items: []ChecklistItemDef{
+				{Text: "Export timeline events (JSON/CSV)", Category: "Events"},
+				{Text: "Export audit log", Category: "Logs"},
+				{Text: "Export poll results", Category: "Polls"},
+				{Text: "Export decision log", Category: "Decisions"},
+				{Text: "Download reference documents", Category: "Documents"},
+				{Text: "Export user activity report", Category: "Reports"},
+				{Text: "Generate status reports for all periods", Category: "Reports"},
+				{Text: "Create full backup archive", Category: "Backup"},
+				{Text: "Verify export data integrity", Category: "Verification"},
+			},
+		},
+		{
+			ID: -26, Name: "Tidslinjal Upgrade", Category: "Tidslinjal", BuiltIn: true, CreatedAt: now, UpdatedAt: now,
+			Description: "Checklist for upgrading Tidslinjal to a new version.",
+			Items: []ChecklistItemDef{
+				{Text: "Read release notes for the new version", Category: "Preparation"},
+				{Text: "Create full backup of current data", Category: "Backup"},
+				{Text: "Note current version number", Category: "Preparation"},
+				{Text: "Stop the Tidslinjal service", Category: "Upgrade"},
+				{Text: "Replace binary with new version", Category: "Upgrade"},
+				{Text: "Start the service and verify it starts correctly", Category: "Upgrade"},
+				{Text: "Verify data migration completed successfully", Category: "Verification"},
+				{Text: "Test core functionality (login, timeline, events)", Category: "Testing"},
+				{Text: "Verify all users can log in", Category: "Testing"},
+				{Text: "Confirm new features are working", Category: "Testing"},
 			},
 		},
 	}

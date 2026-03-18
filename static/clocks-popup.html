@@ -5,7 +5,7 @@
 <title>Tidslinjal — Clocks</title>
 <link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
 <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/static/vendor/seven-segment.css">
+<link rel="stylesheet" href="/static/vendor/seven-segment.css?v=8">
 <style>
 /* ── Theme application ── */
 body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; --success:#2ecc71; }
@@ -481,6 +481,6 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
 </div>
 <div id="f1Overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99"></div>
 
-<script src="/static/clocks-popup.js"></script>
+<script>document.write('<script src="/static/clocks-popup.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>

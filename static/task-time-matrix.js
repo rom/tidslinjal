@@ -59,14 +59,14 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   });
   html += '</tr></thead><tbody>';
   const etMap = {};
-  (state.eventTypes||[]).forEach(et => etMap[et.id] = et);
+  (state.eventTypes||[]).forEach(et => etMap[et.key] = et);
   sorted.forEach(ev => {
     const evStart = new Date(ev.start_time).getTime();
     const evEnd = new Date(ev.end_time || ev.start_time).getTime();
     if (evEnd < minT.getTime() || evStart > maxT.getTime()) return; // outside range
-    const et = etMap[ev.event_type_id];
+    const et = etMap[ev.event_type];
     const color = et?.color || ev.color || 'var(--accent)';
-    html += `<tr><td style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="${escHtml(ev.title)}">${escHtml(ev.title)}</td>`;
+    html += `<tr><td style="padding:4px 6px;position:sticky;left:0;background:var(--bg2);color:var(--text);z-index:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="${escHtml(ev.title)}">${escHtml(ev.title)}</td>`;
     hours.forEach(h => {
       const hStart = h.getTime();
       const hEnd = hStart + 3600000;
