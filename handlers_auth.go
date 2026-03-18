@@ -60,6 +60,7 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !user.Vetted && user.Role != RoleAdmin {
+		// Timing-attack mitigation: dummy bcrypt to prevent detection of unvetted accounts
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return

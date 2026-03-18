@@ -40,7 +40,8 @@ type App struct {
 	jwksCache       *jwksKeySet // C-01 fix: cached JWKS keys for RSA/EC signature verification
 	jwksMu          sync.Mutex  // protects jwksCache
 	webhookCh       chan webhookJob
-	secureMode      bool        // true when serving over HTTPS (enables Secure cookie flag)
+	webhookWG       sync.WaitGroup // tracks active webhook workers for graceful shutdown
+	secureMode      bool           // true when serving over HTTPS (enables Secure cookie flag)
 	authLimiter     *ipRateLimiter
 	eventBus        *EventBus
 	connectors      *ConnectorRegistry
@@ -201,6 +202,7 @@ func NewApp(dataDir string) (*App, error) {
 		stopCh:      stopCh,
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
+	app.webhookWG.Add(webhookConcurrency)
 	for i := 0; i < webhookConcurrency; i++ {
 		go app.runWebhookWorker()
 	}
@@ -258,11 +260,14 @@ func NewApp(dataDir string) (*App, error) {
 }
 
 // Stop shuts down background goroutines (event bus, connector poller, webhook workers).
+// It first signals all background goroutines to stop, then closes the webhook
+// channel and waits for in-flight webhook deliveries to complete.
 func (app *App) Stop() {
 	app.stopOnce.Do(func() {
 		close(app.stopCh)
 		app.eventBus.Stop()
 		close(app.webhookCh)
+		app.webhookWG.Wait() // drain in-flight webhook deliveries
 	})
 }
 
@@ -329,6 +334,7 @@ func newSSRFSafeTransport() *http.Transport {
 
 // runWebhookWorker processes outbound webhook HTTP calls from the shared job queue.
 func (app *App) runWebhookWorker() {
+	defer app.webhookWG.Done()
 	// Use a custom transport that blocks connections to private/loopback IPs.
 	transport := newSSRFSafeTransport()
 	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
@@ -349,10 +355,18 @@ func (app *App) runWebhookWorker() {
 }
 
 // enqueueWebhook submits a webhook call to the worker pool.
-// If the queue is full the call is silently dropped rather than blocking.
+// If the queue is full or the app is shutting down, the call is dropped.
 func (app *App) enqueueWebhook(wtype, webhookURL string, body []byte) {
 	select {
+	case <-app.stopCh:
+		logVerbose("webhook dropped during shutdown: %q", webhookURL)
+		return
+	default:
+	}
+	select {
 	case app.webhookCh <- webhookJob{url: webhookURL, wtype: wtype, body: body}:
+	case <-app.stopCh:
+		logVerbose("webhook dropped during shutdown: %q", webhookURL)
 	default:
 		logVerbose("webhook queue full; dropping call to %q", webhookURL)
 	}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1887,11 +1888,40 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		http.ServeFile(w, r, "static/map-popup.html")
 	})
 
+	// API versioning: /api/v1/* is rewritten to /api/* for forward compatibility.
+	// When a v2 is introduced, v1 routes can be frozen and v2 handled separately.
+	var handler http.Handler = apiVersionRewrite(mux)
+
 	// Wrap the entire mux with security headers.
 	if app.secureMode {
-		return securityHeadersWithHSTS(mux)
+		return securityHeadersWithHSTS(handler)
 	}
-	return securityHeaders(mux)
+	return securityHeaders(handler)
+}
+
+// apiVersionRewrite transparently rewrites /api/v1/* requests to /api/* so that
+// clients can start using versioned URLs today. The /api/* paths continue to work
+// as an alias for the current (v1) API version.
+func apiVersionRewrite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+			r2 := r.Clone(r.Context())
+			r2.URL = cloneURL(r.URL)
+			r2.URL.Path = "/api/" + strings.TrimPrefix(r.URL.Path, "/api/v1/")
+			if r2.URL.RawPath != "" {
+				r2.URL.RawPath = "/api/" + strings.TrimPrefix(r2.URL.RawPath, "/api/v1/")
+			}
+			next.ServeHTTP(w, r2)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// cloneURL returns a shallow copy of a URL.
+func cloneURL(u *url.URL) *url.URL {
+	u2 := *u
+	return &u2
 }
 
 func main() {

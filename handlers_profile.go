@@ -73,7 +73,10 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	}
 	if req.GenerateWebCal && fullUser.WebCalToken == "" {
 		tokBytes := make([]byte, 16)
-		rand.Read(tokBytes) //nolint
+		if _, err := rand.Read(tokBytes); err != nil {
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 		fullUser.WebCalToken = hex.EncodeToString(tokBytes)
 	}
 	if err := app.store.UpdateUser(*fullUser); err != nil {
