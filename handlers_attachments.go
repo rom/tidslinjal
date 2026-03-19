@@ -145,9 +145,9 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	// H-02 fix: verify user can access the event's layer before allowing delete
+	// L-06 fix: verify user has write access to the event's layer before allowing delete
 	if ev, ok := app.store.GetEventByID(att.EventID); ok && ev.LayerID != nil {
-		if !app.canReadLayer(*ev.LayerID, user) {
+		if !app.canWriteLayer(*ev.LayerID, user) {
 			jsonError(w, "forbidden", http.StatusForbidden)
 			return
 		}

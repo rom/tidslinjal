@@ -175,7 +175,21 @@ func (s *Store) load() error {
 	s.loadFile("oidc.json", &s.oidcSettings)
 	s.loadFile("mail.json", &s.mailConfig)
 	s.loadFile("syslog.json", &s.syslogConfig)
+	// Set session management defaults before loading (they're overridden if present in JSON)
+	s.securitySettings = SecuritySettings{
+		SessionTimeHours:          100,
+		IdleTimeoutHours:          100,
+		LogoffOnPasswordChange:    true,
+		RotateSessionOnRoleChange: true,
+	}
 	s.loadFile("security.json", &s.securitySettings)
+	// Apply defaults for session management if JSON had zero values
+	if s.securitySettings.SessionTimeHours == 0 {
+		s.securitySettings.SessionTimeHours = 100
+	}
+	if s.securitySettings.IdleTimeoutHours == 0 {
+		s.securitySettings.IdleTimeoutHours = 100
+	}
 	s.loadFile("tls.json", &s.tlsConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
 	s.loadFile("filter_presets.json", &s.filterPresets)
@@ -482,6 +496,12 @@ func (s *Store) saveFile(filename string, v interface{}) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(v); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	// M-13 fix: fsync before rename to prevent data loss on power failure
+	if err := f.Sync(); err != nil {
 		f.Close()
 		os.Remove(tmp)
 		return err

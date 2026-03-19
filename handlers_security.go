@@ -23,6 +23,13 @@ func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Reques
 	if ss.MinLength == 0 {
 		ss.MinLength = 8
 	}
+	// Apply session management defaults
+	if ss.SessionTimeHours == 0 {
+		ss.SessionTimeHours = 100
+	}
+	if ss.IdleTimeoutHours == 0 {
+		ss.IdleTimeoutHours = 100
+	}
 	if err := app.store.SaveSecuritySettings(ss); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return

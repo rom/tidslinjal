@@ -52,7 +52,7 @@ func (s *Store) SaveGradualBackupSettings(cfg GradualBackupSettings) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.dataDir, "gradual_backup.json"), data, 0644)
+	return os.WriteFile(filepath.Join(s.dataDir, "gradual_backup.json"), data, 0600)
 }
 
 // snapshotDir returns the path to the snapshots subdirectory, creating it if needed.
@@ -183,16 +183,21 @@ func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
 		if !allowed[f.Name] {
 			continue
 		}
+		// H-09 fix: limit decompressed size to prevent zip bomb attacks (100MB per file)
+		if f.UncompressedSize64 > 100<<20 {
+			continue
+		}
 		rc, err := f.Open()
 		if err != nil {
 			continue
 		}
-		fdata, err := io.ReadAll(rc)
+		fdata, err := io.ReadAll(io.LimitReader(rc, 100<<20))
 		rc.Close()
 		if err != nil {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(s.dataDir, f.Name), fdata, 0644); err != nil {
+		// M-17 fix: write restored files with 0600 permissions (not world-readable)
+		if err := os.WriteFile(filepath.Join(s.dataDir, f.Name), fdata, 0600); err != nil {
 			continue
 		}
 		restored++

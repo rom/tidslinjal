@@ -6213,6 +6213,13 @@ async function _initSecuritySettingsUI() {
     setCb('secReqLower',    ss.require_lowercase);
     setCb('secReqNumbers',  ss.require_numbers);
     setCb('secReqSymbols',  ss.require_symbols);
+    // Session management settings
+    setCb('secSessionTimeEnabled',  ss.session_time_enabled);
+    setVal('secSessionTimeHours',   ss.session_time_hours || 100);
+    setCb('secIdleTimeoutEnabled',  ss.idle_timeout_enabled);
+    setVal('secIdleTimeoutHours',   ss.idle_timeout_hours || 100);
+    setCb('secLogoffOnPwChange',    ss.logoff_on_password_change !== false);
+    setCb('secRotateOnRoleChange',  ss.rotate_session_on_role_change !== false);
   } catch { /* not configured yet */ }
 }
 
@@ -6226,10 +6233,17 @@ async function saveSecuritySettings() {
     require_lowercase: cb('secReqLower'),
     require_numbers:   cb('secReqNumbers'),
     require_symbols:   cb('secReqSymbols'),
+    // Session management settings
+    session_time_enabled:         cb('secSessionTimeEnabled'),
+    session_time_hours:           parseInt(val('secSessionTimeHours'), 10) || 100,
+    idle_timeout_enabled:         cb('secIdleTimeoutEnabled'),
+    idle_timeout_hours:           parseInt(val('secIdleTimeoutHours'), 10) || 100,
+    logoff_on_password_change:    cb('secLogoffOnPwChange'),
+    rotate_session_on_role_change: cb('secRotateOnRoleChange'),
   };
   const res = await api('PUT', '/api/admin/security', ss);
   if (res.ok) {
-    showNotification('success', 'Password policy saved');
+    showNotification('success', 'Security settings saved');
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to save password policy');

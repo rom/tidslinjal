@@ -264,6 +264,10 @@ func (app *App) configureOIDC(issuer, clientID, clientSecret, redirectURL string
 	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
 		return fmt.Errorf("decode discovery document: %w", err)
 	}
+	// M-09 fix: verify discovery document issuer matches configured issuer (OIDC spec §4.3)
+	if cfg.Issuer != issuer {
+		return fmt.Errorf("issuer mismatch in discovery document: got %q, configured %q", cfg.Issuer, issuer)
+	}
 	cfg.ClientID     = clientID
 	cfg.ClientSecret = clientSecret
 	cfg.RedirectURL  = redirectURL
@@ -685,21 +689,23 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	// Clear state cookie
 	http.SetCookie(w, &http.Cookie{Name: "oidc_state", Path: "/", MaxAge: -1})
 
-	// Retrieve PKCE code_verifier from cookie
-	pkceCookie, _ := r.Cookie("oidc_pkce")
-	codeVerifier := ""
-	if pkceCookie != nil {
-		codeVerifier = pkceCookie.Value
+	// M-03 fix: PKCE and nonce cookies are required — reject callback if either is missing
+	pkceCookie, err := r.Cookie("oidc_pkce")
+	if err != nil || pkceCookie.Value == "" {
+		http.Redirect(w, r, "/login?error=pkce_missing", http.StatusFound)
+		return
 	}
+	codeVerifier := pkceCookie.Value
 	// Clear PKCE cookie
 	http.SetCookie(w, &http.Cookie{Name: "oidc_pkce", Path: "/", MaxAge: -1})
 
 	// Retrieve nonce from cookie for ID token validation
-	nonceCookie, _ := r.Cookie("oidc_nonce")
-	expectedNonce := ""
-	if nonceCookie != nil {
-		expectedNonce = nonceCookie.Value
+	nonceCookie, err := r.Cookie("oidc_nonce")
+	if err != nil || nonceCookie.Value == "" {
+		http.Redirect(w, r, "/login?error=nonce_missing", http.StatusFound)
+		return
 	}
+	expectedNonce := nonceCookie.Value
 	http.SetCookie(w, &http.Cookie{Name: "oidc_nonce", Path: "/", MaxAge: -1})
 
 	code := r.URL.Query().Get("code")
@@ -973,7 +979,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			fullUser.LoginCount++
 			app.store.UpdateUser(*fullUser) //nolint
 		}
-	}(*user, r.RemoteAddr)
+	// L-05 fix: use clientIP(r) instead of raw r.RemoteAddr for correct IP behind reverse proxy
+	}(*user, clientIP(r))
 
 	logVerbose("OIDC login success: user=%s role=%s", username, user.Role)
 	logDebug("OIDC: session created id=%s expires=%s", sessID, sess.ExpiresAt.Format(time.RFC3339))

@@ -58,6 +58,24 @@ func (s *Store) DeleteSessionsForUser(userID int64) {
 	s.persist("sessions.json", snap) //nolint
 }
 
+// DeleteSessionsForUserExcept removes all sessions for a user except the specified session ID.
+// Used when a user changes their own password — keeps current session alive, logs out others.
+func (s *Store) DeleteSessionsForUserExcept(userID int64, exceptID string) {
+	s.mu.Lock()
+	filtered := s.sessions[:0]
+	for _, sess := range s.sessions {
+		if sess.UserID == userID && sess.ID != exceptID {
+			delete(s.sessionByID, sess.ID)
+		} else {
+			filtered = append(filtered, sess)
+		}
+	}
+	s.sessions = filtered
+	snap := append([]Session(nil), s.sessions...)
+	s.mu.Unlock()
+	s.persist("sessions.json", snap) //nolint
+}
+
 func (s *Store) CleanExpiredSessions() {
 	s.mu.Lock()
 	now := time.Now()

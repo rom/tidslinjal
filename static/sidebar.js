@@ -2111,6 +2111,37 @@ function renderSidebar() {
         <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Policy</button>
       </div>
 
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">⏱ Session Management</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="secSessionTimeEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enforce maximum session duration
+        </label>
+        <div class="form-group" style="margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">Max session (hours)</label>
+          <input type="number" id="secSessionTimeHours" placeholder="100" min="1" max="8760" value="100"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="secIdleTimeoutEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enforce idle timeout
+        </label>
+        <div class="form-group" style="margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">Idle timeout (hours)</label>
+          <input type="number" id="secIdleTimeoutHours" placeholder="100" min="1" max="8760" value="100"
+            style="width:80px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" id="secLogoffOnPwChange" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          Auto-logoff other devices on password change
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secRotateOnRoleChange" checked style="width:14px;height:14px;accent-color:var(--accent)">
+          Rotate session on role change
+        </label>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Session Settings</button>
+      </div>
+
       <div class="sidebar-section" id="enrollmentSettingsSection">
         <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>
