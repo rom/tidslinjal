@@ -297,7 +297,7 @@ async function loadMeetings() {
         (ev.physical_location ? escH(ev.physical_location) + '<br>' : '') +
         (ev.start_time ? new Date(ev.start_time).toLocaleString() : '');
       marker.bindPopup(popupHtml);
-      marker.bindTooltip(ev.title, { direction: 'top', offset: [0, -8] });
+      marker.bindTooltip(escH(ev.title), { direction: 'top', offset: [0, -8] });
       _meetingsLayer.addLayer(marker);
     });
   } catch(e) {}
@@ -339,7 +339,7 @@ async function loadUsers() {
       });
       const locInfo = u.location ? '<br>' + escH(u.location) : '';
       marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${escH((u.nato_designations||[]).join(', '))}`);
-      marker.bindTooltip(u.display_name, { direction: 'top', offset: [0, -12] });
+      marker.bindTooltip(escH(u.display_name), { direction: 'top', offset: [0, -12] });
       _usersLayer.addLayer(marker);
     });
   } catch(e) {}
@@ -378,7 +378,7 @@ async function loadResourceLayers() {
       });
       const popupImg = r.image_name ? `<img src="/api/rooms/${r.id}/image" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px">` : '';
       marker.bindPopup(`${popupImg}<b>${icon} ${escH(r.name)}</b><br>${escH(r.type)}<br>${escH(r.location||'')}${r.capacity ? '<br>Capacity: '+r.capacity : ''}${r.description ? '<br><em>'+escH(r.description)+'</em>' : ''}`);
-      marker.bindTooltip(r.name, { direction: 'top', offset: [0, -14] });
+      marker.bindTooltip(escH(r.name), { direction: 'top', offset: [0, -14] });
       layer.addLayer(marker);
     });
     updateLegend();

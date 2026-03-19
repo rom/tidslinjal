@@ -270,6 +270,10 @@ func (app *App) handleSaveMapOverlays(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "map is locked", http.StatusForbidden)
+		return
+	}
 	var overlays []MapOverlay
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&overlays); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
@@ -533,6 +537,10 @@ func (app *App) handleUpdateMapResourceOverlays(w http.ResponseWriter, r *http.R
 	mr, ok := app.store.GetMapResource(id)
 	if !ok {
 		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "map is locked", http.StatusForbidden)
 		return
 	}
 	var overlays []MapOverlay

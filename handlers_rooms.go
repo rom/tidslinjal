@@ -129,9 +129,14 @@ func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	defer file.Close()
-	ext := filepath.Ext(header.Filename)
+	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext == "" {
 		ext = ".jpg"
+	}
+	allowedImageExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true}
+	if !allowedImageExts[ext] {
+		jsonError(w, "unsupported image type; allowed: JPG, PNG, GIF, WebP", http.StatusBadRequest)
+		return
 	}
 	storedName := fmt.Sprintf("room_%d_%d%s", id, time.Now().UnixNano(), ext)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
