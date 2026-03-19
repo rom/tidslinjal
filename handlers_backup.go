@@ -31,7 +31,12 @@ func (app *App) runGradualBackupScheduler() {
 	var lastSnap time.Time
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+		}
 		cfg := app.store.GetGradualBackupSettings()
 		if !cfg.Enabled {
 			continue

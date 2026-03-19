@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,10 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -2366,13 +2369,34 @@ func main() {
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
+	// Graceful shutdown: listen for SIGINT/SIGTERM and drain in-flight requests.
+	shutdownCh := make(chan os.Signal, 1)
+	signal.Notify(shutdownCh, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-shutdownCh
+		log.Printf("Received %v — initiating graceful shutdown...", sig)
+
+		// Give in-flight requests up to 30 seconds to finish
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("HTTP server shutdown error: %v", err)
+		}
+
+		// Stop background goroutines and drain webhook queue
+		app.Stop()
+		log.Printf("Graceful shutdown complete.")
+	}()
+
 	if useTLS {
 		log.Printf("TLS enabled — cert=%s key=%s", tlsCert, tlsKey)
-		if err := srv.ListenAndServeTLS(tlsCert, tlsKey); err != nil {
+		if err := srv.ListenAndServeTLS(tlsCert, tlsKey); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	} else {
-		if err := srv.ListenAndServe(); err != nil {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -480,10 +481,12 @@ func (s *Store) DataDir() string {
 func (s *Store) loadFile(filename string, v interface{}) {
 	f, err := os.Open(filepath.Join(s.dataDir, filename))
 	if err != nil {
-		return
+		return // file doesn't exist yet — that's fine on first run
 	}
 	defer f.Close()
-	json.NewDecoder(f).Decode(v) //nolint
+	if err := json.NewDecoder(f).Decode(v); err != nil {
+		log.Printf("[WARN] failed to decode %s: %v (data may be empty or corrupt)", filename, err)
+	}
 }
 
 func (s *Store) saveFile(filename string, v interface{}) error {

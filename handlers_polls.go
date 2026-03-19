@@ -167,7 +167,12 @@ func (app *App) sendPRCNotifications(check PersonReadyCheck, excludeUserID int64
 func (app *App) runPRCScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+		}
 		now := time.Now()
 		checks := app.store.GetPersonReadyChecks()
 		for _, check := range checks {
@@ -199,7 +204,12 @@ func (app *App) runPRCScheduler() {
 func (app *App) runPollScheduler() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+		}
 		now := time.Now()
 		polls := app.store.GetPolls()
 		for _, poll := range polls {

@@ -122,9 +122,20 @@ func (s *Store) DeleteEvent(id int64) error {
 		s.mu.Unlock()
 		return fmt.Errorf("event not found")
 	}
+	// Rebuild index after deletion — splice shifts all subsequent indices
+	s.rebuildEventIndex()
 	snap := append([]Event(nil), s.events...)
 	s.mu.Unlock()
 	return s.persist("events.json", snap)
+}
+
+// rebuildEventIndex rebuilds the eventByID map from the current slice.
+// Caller must hold s.mu (write lock).
+func (s *Store) rebuildEventIndex() {
+	s.eventByID = make(map[int64]int, len(s.events))
+	for i, e := range s.events {
+		s.eventByID[e.ID] = i
+	}
 }
 
 // ── Attachments ───────────────────────────────────────────────────────────────

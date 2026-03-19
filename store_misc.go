@@ -22,6 +22,10 @@ func (s *Store) AddDecisionLogEntry(entry DecisionLogEntry) (DecisionLogEntry, e
 	s.nextDecisionLogID++
 	entry.ID = s.nextDecisionLogID
 	s.decisionLog = append(s.decisionLog, entry)
+	// Cap at 10000 entries — drop oldest first
+	if len(s.decisionLog) > 10000 {
+		s.decisionLog = s.decisionLog[len(s.decisionLog)-10000:]
+	}
 	snap := append([]DecisionLogEntry(nil), s.decisionLog...)
 	s.mu.Unlock()
 	return entry, s.persist("decision_log.json", snap)
@@ -316,6 +320,10 @@ func (s *Store) AddEventLogEntry(entry EventLogEntry) (EventLogEntry, error) {
 		entry.Timestamp = time.Now()
 	}
 	s.eventLog = append(s.eventLog, entry)
+	// Cap at 10000 entries — drop oldest first
+	if len(s.eventLog) > 10000 {
+		s.eventLog = s.eventLog[len(s.eventLog)-10000:]
+	}
 	snap := append([]EventLogEntry(nil), s.eventLog...)
 	s.mu.Unlock()
 	return entry, s.persist("event_log.json", snap)
@@ -339,6 +347,10 @@ func (s *Store) AddLogBookEntry(entry LogBookEntry) (LogBookEntry, error) {
 		entry.Timestamp = time.Now()
 	}
 	s.logBook = append(s.logBook, entry)
+	// Cap at 10000 entries — drop oldest first
+	if len(s.logBook) > 10000 {
+		s.logBook = s.logBook[len(s.logBook)-10000:]
+	}
 	snap := append([]LogBookEntry(nil), s.logBook...)
 	s.mu.Unlock()
 	return entry, s.persist("log_book.json", snap)

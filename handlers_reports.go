@@ -136,8 +136,13 @@ func (app *App) startAutoReportScheduler() {
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			app.runDueAutoReports()
+		for {
+			select {
+			case <-app.stopCh:
+				return
+			case <-ticker.C:
+				app.runDueAutoReports()
+			}
 		}
 	}()
 }

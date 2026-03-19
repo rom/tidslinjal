@@ -11,7 +11,12 @@ import (
 func (app *App) runAlarmScheduler() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+		}
 		now := time.Now()
 		active := app.store.GetActiveAlarms()
 		logDebug("alarm scheduler tick: checking %d alarms", len(active))
@@ -47,25 +52,20 @@ func (app *App) runAlarmScheduler() {
 						fmt.Sprintf("Alarm notification posted to user webhook for %q", alarm.EventTitle))
 				}
 				app.callWebhook(alarm.UserID, msg, notif)
-				// Send alarm email if user has email and SMTP is configured
-				go func(uID int64, aMsg, aTitle string, aTime time.Time) {
-					users := app.store.GetUsers()
-					for _, u := range users {
-						if u.ID == uID && u.Email != "" {
-							cfg := app.store.GetMailConfig()
-							if cfg.Enabled && cfg.SMTPHost != "" {
-								body := fmt.Sprintf(`<p><strong>Alarm:</strong> %s</p>
+				// Send alarm email if user has email and SMTP is configured.
+				// Runs inline (within the scheduler tick) to avoid unbounded goroutine growth.
+				if u, ok := app.store.GetUserByID(alarm.UserID); ok && u.Email != "" {
+					cfg := app.store.GetMailConfig()
+					if cfg.Enabled && cfg.SMTPHost != "" {
+						body := fmt.Sprintf(`<p><strong>Alarm:</strong> %s</p>
 <p><strong>Event:</strong> %s</p><p><strong>Time:</strong> %s</p>
 <p>Log in to Tidslinjal to acknowledge this alarm.</p>`,
-									htmlEscape(aMsg), htmlEscape(aTitle), aTime.Format("2006-01-02 15:04 MST"))
-								if err := app.sendMail(cfg, u.Email, "Tidslinjal — Alarm: "+aTitle, body); err != nil {
-									log.Printf("alarm email failed for user %d: %v", uID, err)
-								}
-							}
-							break
+							htmlEscape(msg), htmlEscape(alarm.EventTitle), alarm.EventTime.Format("2006-01-02 15:04 MST"))
+						if err := app.sendMail(cfg, u.Email, "Tidslinjal — Alarm: "+alarm.EventTitle, body); err != nil {
+							log.Printf("alarm email failed for user %d: %v", alarm.UserID, err)
 						}
 					}
-				}(alarm.UserID, msg, alarm.EventTitle, alarm.EventTime)
+				}
 			}
 		}
 	}
@@ -74,7 +74,12 @@ func (app *App) runAlarmScheduler() {
 func (app *App) runSessionCleaner() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
-	for range ticker.C {
-		app.store.CleanExpiredSessions()
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+			app.store.CleanExpiredSessions()
+		}
 	}
 }
