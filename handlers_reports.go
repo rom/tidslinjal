@@ -178,7 +178,8 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 	if creator, ok := app.store.GetUserByID(s.CreatedBy); ok {
 		events = filterVisibleEvents(allEvs, app.visibleLayerSet(creator))
 	} else {
-		events = allEvs // fallback if creator deleted — admin-level access
+		// Creator deleted — restrict to master-timeline events only (no layer escalation)
+		events = filterVisibleEvents(allEvs, make(map[int64]bool))
 	}
 	subject := fmt.Sprintf("Auto %s Report — %s", s.ReportType, time.Now().Format("2006-01-02"))
 	// Build comments map for report

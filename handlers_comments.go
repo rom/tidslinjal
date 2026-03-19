@@ -158,6 +158,18 @@ func (app *App) handleDeleteComment(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// Verify the user can read the event's layer before allowing comment deletion
+	comment := app.store.GetCommentByID(id)
+	if comment == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if ev, ok := app.store.GetEventByID(comment.EventID); ok {
+		if ev.LayerID != nil && !app.canReadLayer(*ev.LayerID, user) {
+			jsonError(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	isAdmin := hasRole(user.Role, RoleAdmin)
 	if err := app.store.DeleteComment(id, user.ID, isAdmin); err != nil {
 		if err.Error() == "forbidden" {

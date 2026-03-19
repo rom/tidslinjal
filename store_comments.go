@@ -19,6 +19,18 @@ func (s *Store) GetCommentsByEvent(eventID int64) []EventComment {
 	return result
 }
 
+// GetCommentByID returns a comment by ID, or nil if not found.
+func (s *Store) GetCommentByID(id int64) *EventComment {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, c := range s.comments {
+		if c.ID == id {
+			return &c
+		}
+	}
+	return nil
+}
+
 func (s *Store) CreateComment(c EventComment) (EventComment, error) {
 	s.mu.Lock()
 	s.nextCommentID++

@@ -171,8 +171,8 @@ func (app *App) handleUploadMapResource(w http.ResponseWriter, r *http.Request, 
 	}
 
 	mr := MapResource{
-		Name:          name,
-		Description:   r.FormValue("description"),
+		Name:          stripHTMLTags(name),
+		Description:   stripHTMLTags(r.FormValue("description")),
 		MapType:       mapType,
 		Filename:      storedName,
 		OriginalName:  header.Filename,
@@ -513,10 +513,10 @@ func (app *App) handleUpdateMapResourceMeta(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if req.Name != nil {
-		mr.Name = *req.Name
+		mr.Name = stripHTMLTags(*req.Name)
 	}
 	if req.Description != nil {
-		mr.Description = *req.Description
+		mr.Description = stripHTMLTags(*req.Description)
 	}
 	if req.MapType != nil {
 		mr.MapType = *req.MapType
