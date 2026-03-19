@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -1259,26 +1260,34 @@ func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *U
 	// ── Logins over time ──
 	loginsByDay := make(map[string]int)
 	failedByDay := make(map[string]int)
+	totalLogins := 0
+	totalFailed := 0
 	for _, a := range audit {
 		day := a.Timestamp.Format("2006-01-02")
 		if a.Action == "login" {
 			loginsByDay[day]++
-		} else if a.Action == "login_failed" || a.Action == "login_blocked" {
+			totalLogins++
+		} else if strings.HasPrefix(a.Action, "login_failed") || a.Action == "login_blocked" {
 			failedByDay[day]++
+			totalFailed++
 		}
 	}
 
 	// ── Security audit breakdown ──
 	securityActions := map[string]int{}
+	securitySet := map[string]bool{
+		"login": true, "login_failed": true, "login_blocked": true,
+		"login_failed_unknown_account": true, "login_failed_password": true,
+		"login_failed_blocked": true, "login_failed_lockout": true,
+		"login_failed_unvetted": true, "login_failed_sso_only": true,
+		"email_changed": true, "password_changed": true, "password_reset": true,
+		"blocked": true, "unblocked": true,
+	}
 	for _, a := range audit {
-		switch a.Action {
-		case "login", "login_failed", "login_blocked", "email_changed",
-			"password_changed", "password_reset", "updated":
-			if a.EntityType == "security_settings" || a.EntityType == "user" || a.Action == "login" ||
-				a.Action == "login_failed" || a.Action == "login_blocked" ||
-				a.Action == "email_changed" || a.Action == "password_changed" || a.Action == "password_reset" {
-				securityActions[a.Action]++
-			}
+		if securitySet[a.Action] {
+			securityActions[a.Action]++
+		} else if a.EntityType == "security_settings" {
+			securityActions["security_config_change"]++
 		}
 	}
 
@@ -1419,6 +1428,8 @@ func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *U
 	jsonOK(w, map[string]any{
 		"logins_by_day":          loginsByDay,
 		"failed_logins_by_day":   failedByDay,
+		"total_logins":           totalLogins,
+		"total_failed_logins":    totalFailed,
 		"security_actions":       securityActions,
 		"audit_by_action":        actionCounts,
 		"audit_by_entity":        entityCounts,
