@@ -172,8 +172,6 @@ function syncLanguage() {
     const btn = (id, key) => { const b = document.getElementById(id); if (b) b.textContent = _t(key); };
     btn('btnLayers', 'map_layers');
     btn('btnImport', 'map_import');
-    btn('btnMeetings', 'map_meetings');
-    btn('btnUsers', 'map_users');
     btn('btnFitAll', 'map_fit_all');
     // Tile layer options
     const sel = document.getElementById('selTileLayer');
@@ -219,10 +217,8 @@ let _roomsLayer = null;
 let _buildingsLayer = null;
 let _computersLayer = null;
 let _dataCentersLayer = null;
-let _exerciseAreaLayer = null;
 let _workAreaLayer = null;
-let _restRoomLayer = null;
-let _trainingGroundLayer = null;
+let _alliancePartnerLayer = null;
 let _showRooms = true;
 let _showBuildings = true;
 let _showComputers = true;
@@ -253,10 +249,8 @@ function initMapProjection() {
   _buildingsLayer = L.layerGroup().addTo(_map);
   _computersLayer = L.layerGroup().addTo(_map);
   _dataCentersLayer = L.layerGroup().addTo(_map);
-  _exerciseAreaLayer = L.layerGroup().addTo(_map);
   _workAreaLayer = L.layerGroup().addTo(_map);
-  _restRoomLayer = L.layerGroup().addTo(_map);
-  _trainingGroundLayer = L.layerGroup().addTo(_map);
+  _alliancePartnerLayer = L.layerGroup().addTo(_map);
 
   loadMeetings();
   loadUsers();
@@ -355,9 +349,9 @@ async function loadUsers() {
 async function loadResourceLayers() {
   try {
     const rooms = await fetch('/api/rooms').then(r => r.ok ? r.json() : []);
-    const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer, exercise_area: _exerciseAreaLayer, work_area: _workAreaLayer, rest_room: _restRoomLayer, training_ground: _trainingGroundLayer};
-    const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9', exercise_area: '#e74c3c', work_area: '#3498db', rest_room: '#1abc9c', training_ground: '#d35400'};
-    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧', exercise_area: '🏋', work_area: '💼', rest_room: '☕', training_ground: '🎯'};
+    const layerMap = {room: _roomsLayer, building: _buildingsLayer, computer_service: _computersLayer, data_center: _dataCentersLayer, work_area: _workAreaLayer, alliance_partner: _alliancePartnerLayer};
+    const colorMap = {room: '#27ae60', building: '#8e44ad', computer_service: '#e67e22', data_center: '#2980b9', work_area: '#3498db', alliance_partner: '#9b59b6'};
+    const iconMap = {room: '🏠', building: '🏢', computer_service: '💻', data_center: '🖥', vehicle: '🚗', equipment: '🔧', work_area: '💼', alliance_partner: '🤝'};
     Object.values(layerMap).forEach(l => l.clearLayers());
     // Resolve coordinates and spread co-located resources
     const geoRooms = (rooms || []).map(r => {
@@ -566,10 +560,7 @@ function updateLegend() {
       const layer = it.getLayer();
       if (this.checked) _map.addLayer(layer);
       else _map.removeLayer(layer);
-      // Sync toolbar button active state
-      const btnMap = { meetings:'btnMeetings', users:'btnUsers', rooms:'btnRooms', buildings:'btnBuildings', computers:'btnComputers', dataCenters:'btnDataCenters' };
-      const btn = document.getElementById(btnMap[it.key]);
-      if (btn) btn.classList.toggle('active', this.checked);
+      // Layer toggled via legend checkbox
     });
     el.appendChild(div);
   });
@@ -648,50 +639,58 @@ document.getElementById('btnCancelImport').addEventListener('click', function() 
   document.getElementById('importOverlay').classList.remove('open');
 });
 
-document.getElementById('btnMeetings').addEventListener('click', function() {
-  _showMeetings = !_showMeetings;
-  this.classList.toggle('active', _showMeetings);
-  if (_showMeetings) _map.addLayer(_meetingsLayer);
-  else _map.removeLayer(_meetingsLayer);
-});
-
-document.getElementById('btnUsers').addEventListener('click', function() {
-  _showUsers = !_showUsers;
-  this.classList.toggle('active', _showUsers);
-  if (_showUsers) _map.addLayer(_usersLayer);
-  else _map.removeLayer(_usersLayer);
-});
-
-document.getElementById('btnRooms').addEventListener('click', function() {
-  _showRooms = !_showRooms;
-  this.classList.toggle('active', _showRooms);
-  if (_showRooms) _map.addLayer(_roomsLayer); else _map.removeLayer(_roomsLayer);
-});
-document.getElementById('btnBuildings').addEventListener('click', function() {
-  _showBuildings = !_showBuildings;
-  this.classList.toggle('active', _showBuildings);
-  if (_showBuildings) _map.addLayer(_buildingsLayer); else _map.removeLayer(_buildingsLayer);
-});
-document.getElementById('btnComputers').addEventListener('click', function() {
-  _showComputers = !_showComputers;
-  this.classList.toggle('active', _showComputers);
-  if (_showComputers) _map.addLayer(_computersLayer); else _map.removeLayer(_computersLayer);
-});
-document.getElementById('btnDataCenters').addEventListener('click', function() {
-  _showDataCenters = !_showDataCenters;
-  this.classList.toggle('active', _showDataCenters);
-  if (_showDataCenters) _map.addLayer(_dataCentersLayer); else _map.removeLayer(_dataCentersLayer);
-});
-
 document.getElementById('btnFitAll').addEventListener('click', fitAll);
 
-// Set initial active state for all layers
-document.getElementById('btnMeetings').classList.add('active');
-document.getElementById('btnUsers').classList.add('active');
-document.getElementById('btnRooms').classList.add('active');
-document.getElementById('btnBuildings').classList.add('active');
-document.getElementById('btnComputers').classList.add('active');
-document.getElementById('btnDataCenters').classList.add('active');
+/* ── Delete Map ── */
+document.getElementById('btnDeleteMap').addEventListener('click', async function() {
+  if (!_currentMapResource) return;
+  if (!confirm(_t('map_delete_confirm'))) return;
+  try {
+    const res = await _mapFetch('/api/map-resources/' + _currentMapResource.id, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById('mapSelector').value = '';
+      switchMap('');
+      await loadMapResources();
+    } else {
+      alert('Failed to delete map');
+    }
+  } catch(e) { alert('Failed to delete map: ' + e.message); }
+});
+
+/* ── Change Map Type ── */
+document.getElementById('btnChangeMapType').addEventListener('click', function() {
+  if (!_currentMapResource) return;
+  document.getElementById('changeMapTypeSelect').value = _currentMapResource.map_type || 'geographical';
+  document.getElementById('changeMapTypeDialog').classList.add('open');
+});
+document.getElementById('btnCancelChangeType').addEventListener('click', function() {
+  document.getElementById('changeMapTypeDialog').classList.remove('open');
+});
+document.getElementById('btnDoChangeType').addEventListener('click', async function() {
+  if (!_currentMapResource) return;
+  const newType = document.getElementById('changeMapTypeSelect').value;
+  try {
+    const res = await _mapFetch('/api/map-resources/' + _currentMapResource.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ map_type: newType })
+    });
+    if (res.ok) {
+      _currentMapResource.map_type = newType;
+      document.getElementById('changeMapTypeDialog').classList.remove('open');
+      await loadMapResources();
+      // Update selector to show new type
+      const sel = document.getElementById('mapSelector');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === String(_currentMapResource.id)) {
+          sel.options[i].textContent = _currentMapResource.name + ' (' + newType + ')';
+        }
+      }
+    } else {
+      alert('Failed to change map type');
+    }
+  } catch(e) { alert('Failed: ' + e.message); }
+});
 
 /* ── BroadcastChannel theme sync ── */
 try {
@@ -847,12 +846,15 @@ document.getElementById('btnToggleDraw').addEventListener('click', function() {
 
 function _setDrawMode(mode) {
   _drawMode = mode;
-  ['btnDrawPen','btnDrawLine','btnDrawRect','btnDrawCircle','btnDrawHighlight','btnDropNeedle','btnDropSymbol','btnDrawErase'].forEach(id => {
+  ['btnDrawPen','btnDrawLine','btnDrawRect','btnDrawCircle','btnDrawHighlight','btnDropNeedle','btnDropSymbol','btnDrawText','btnDrawErase'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) btn.classList.toggle('active', false);
   });
   const modeMap = { pen:'btnDrawPen', line:'btnDrawLine', rect:'btnDrawRect', circle:'btnDrawCircle',
-    highlight:'btnDrawHighlight', needle:'btnDropNeedle', symbol:'btnDropSymbol', erase:'btnDrawErase' };
+    highlight:'btnDrawHighlight', needle:'btnDropNeedle', symbol:'btnDropSymbol', text:'btnDrawText', erase:'btnDrawErase' };
+  // Show/hide font selector when text mode is active
+  const fontSel = document.getElementById('drawFontFamily');
+  if (fontSel) fontSel.style.display = (mode === 'text') ? '' : 'none';
   if (mode && modeMap[mode]) document.getElementById(modeMap[mode])?.classList.add('active');
 
   // Toggle map dragging
@@ -922,6 +924,41 @@ function _showDrawSymbolPicker(show) {
   picker.style.display = '';
 }
 var _drawSymbolIcon = '📍';
+var _pendingTextLatLng = null;
+
+document.getElementById('btnDrawText').addEventListener('click', () => _setDrawMode(_drawMode === 'text' ? null : 'text'));
+
+document.getElementById('btnCancelDrawText').addEventListener('click', function() {
+  document.getElementById('drawTextDialog').classList.remove('open');
+  _pendingTextLatLng = null;
+});
+
+document.getElementById('btnDoDrawText').addEventListener('click', function() {
+  const text = document.getElementById('drawTextInput').value.trim();
+  if (!text || !_pendingTextLatLng) return;
+  const fontSize = parseInt(document.getElementById('drawTextSize').value, 10) || 14;
+  const fontFamily = document.getElementById('drawFontFamily').value || 'sans-serif';
+  const color = _drawColor;
+  const html = '<div style="font-size:' + fontSize + 'px;font-family:' + fontFamily + ';color:' + color + ';white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5);padding:2px 4px;background:rgba(0,0,0,.25);border-radius:3px">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+  const marker = L.marker(_pendingTextLatLng, {
+    icon: L.divIcon({
+      className: 'draw-text',
+      html: html,
+      iconSize: null, iconAnchor: [0, 0]
+    })
+  });
+  _initDrawingLayer();
+  marker.addTo(_drawingsLayer);
+  marker.on('click', function() {
+    if (_drawMode === 'erase') { _drawingsLayer.removeLayer(marker); _saveDrawings(); }
+  });
+  _drawHistory.push(marker);
+  _saveDrawings();
+  document.getElementById('drawTextDialog').classList.remove('open');
+  document.getElementById('drawTextInput').value = '';
+  _pendingTextLatLng = null;
+});
+
 document.getElementById('btnDrawErase').addEventListener('click', () => _setDrawMode(_drawMode === 'erase' ? null : 'erase'));
 document.getElementById('btnDrawOff').addEventListener('click', () => _setDrawMode(null));
 document.getElementById('drawColor').addEventListener('input', function() { _drawColor = this.value; });
@@ -981,6 +1018,12 @@ function _initDrawEvents() {
       _drawHistory.push(marker);
       _isDrawing = false;
       _saveDrawings();
+    }
+    if (_drawMode === 'text') {
+      _pendingTextLatLng = e.latlng;
+      _isDrawing = false;
+      document.getElementById('drawTextDialog').classList.add('open');
+      document.getElementById('drawTextInput').focus();
     }
     if (_drawMode === 'erase') {
       _isDrawing = false;
@@ -1296,6 +1339,8 @@ function switchMap(mapResourceId) {
     tileCtrl.disabled = false;
     if (overlayCtrl) overlayCtrl.style.display = 'none';
     document.getElementById('btnLockMap').style.display = 'none';
+    document.getElementById('btnDeleteMap').style.display = 'none';
+    document.getElementById('btnChangeMapType').style.display = 'none';
     // Restore tile layer
     if (!_tileLayer) setTileLayer(document.getElementById('selTileLayer').value || 'osm');
     // Force tile reload after CRS restoration
@@ -1346,8 +1391,10 @@ function switchMap(mapResourceId) {
   // Load drawings for this map
   _loadDrawings(mr);
 
-  // Show lock button and update state
+  // Show lock button and map management buttons
   document.getElementById('btnLockMap').style.display = '';
+  document.getElementById('btnDeleteMap').style.display = '';
+  document.getElementById('btnChangeMapType').style.display = '';
   _mapLocked = mr.locked || false;
   document.getElementById('btnLockMap').textContent = _mapLocked ? '🔓 Unlock' : '🔒 Lock';
   _applyMapLock();

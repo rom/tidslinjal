@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tidslinjal — Map Projection</title>
+<title>Tidslinjal — Maps and Charts</title>
 <link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
 <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="stylesheet" href="/static/vendor/leaflet.css">
@@ -106,7 +106,7 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 </head>
 <body class="theme-dark">
 <div class="map-toolbar">
-  <span class="page-header">Tidslinjal — Map Projection</span>
+  <span class="page-header">Tidslinjal — Maps and Charts</span>
   <label id="lblMapSource">Map</label>
   <select id="mapSelector">
     <option value="">OpenStreetMap (Live)</option>
@@ -119,14 +119,10 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <option value="dark">Dark</option>
   </select>
   <button class="btn-map" id="btnUploadMap" title="Upload a map file">Upload Map</button>
+  <button class="btn-map" id="btnDeleteMap" title="Delete selected map" style="display:none;color:var(--danger)">🗑</button>
+  <button class="btn-map" id="btnChangeMapType" title="Change map type" style="display:none">Type</button>
   <button class="btn-map" id="btnLayers" title="Toggle overlay layers">Layers</button>
   <button class="btn-map" id="btnImport" title="Import GeoJSON or KML file">Import</button>
-  <button class="btn-map" id="btnMeetings" title="Show physical meetings">Meetings</button>
-  <button class="btn-map" id="btnUsers" title="Show user locations">Users</button>
-  <button class="btn-map" id="btnRooms" title="Show rooms">&#127968; Rooms</button>
-  <button class="btn-map" id="btnBuildings" title="Show buildings">&#127970; Buildings</button>
-  <button class="btn-map" id="btnComputers" title="Show computer services">&#128187; IT</button>
-  <button class="btn-map" id="btnDataCenters" title="Show data centers">&#128421; DC</button>
   <button class="btn-map" id="btnFitAll" title="Fit all markers in view">Fit All</button>
   <button class="btn-map" id="btnGeoAddItem" title="Add item to geographical map">+ Add Item</button>
   <div class="overlay-controls" id="overlayControls" style="display:none">
@@ -145,10 +141,19 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
     <button class="draw-btn" id="btnDrawHighlight" title="Highlight area">🖍</button>
     <button class="draw-btn" id="btnDropNeedle" title="Drop pin/needle">📌</button>
     <button class="draw-btn" id="btnDropSymbol" title="Place symbol">🔣</button>
+    <button class="draw-btn" id="btnDrawText" title="Place text box">🔤</button>
     <button class="draw-btn" id="btnDrawErase" title="Eraser">🧹</button>
     <button class="draw-btn" id="btnDrawUndo" title="Undo last drawing">↩</button>
     <input type="color" id="drawColor" value="#FF0000" title="Drawing color">
     <input type="range" id="drawWidth" min="1" max="12" value="3" title="Line width">
+    <select id="drawFontFamily" title="Font family" style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:11px;padding:1px 4px;display:none">
+      <option value="sans-serif">Sans-serif</option>
+      <option value="serif">Serif</option>
+      <option value="monospace">Monospace</option>
+      <option value="'Courier New', monospace">Courier New</option>
+      <option value="'Georgia', serif">Georgia</option>
+      <option value="'Tactical Task Graphics to Cyber', sans-serif">Tactical Task Graphics</option>
+    </select>
     <button class="draw-btn" id="btnDrawOff" title="Stop drawing">🚫</button>
   </div>
   <button class="btn-map" id="btnToggleDraw" title="Toggle drawing tools">🎨 Draw</button>
@@ -247,6 +252,37 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
   <div class="dialog-buttons">
     <button class="btn-map" id="btnCancelAddItem">Cancel</button>
     <button class="btn-map" id="btnPlaceItem">Place on Map</button>
+  </div>
+</div>
+<!-- Change map type dialog -->
+<div class="new-overlay-dialog" id="changeMapTypeDialog">
+  <h4>Change Map Type</h4>
+  <label>Type</label>
+  <select id="changeMapTypeSelect">
+    <option value="geographical">Geographical</option>
+    <option value="political">Political</option>
+    <option value="logical">Logical</option>
+    <option value="floor_plan">Floor Plan</option>
+    <option value="network">Network</option>
+    <option value="electrical">Electrical</option>
+    <option value="org_chart">Organisational Chart</option>
+    <option value="custom">Custom</option>
+  </select>
+  <div class="dialog-buttons">
+    <button class="btn-map" id="btnCancelChangeType">Cancel</button>
+    <button class="btn-map" id="btnDoChangeType">Save</button>
+  </div>
+</div>
+<!-- Text input dialog for draw text -->
+<div class="new-overlay-dialog" id="drawTextDialog">
+  <h4>Add Text</h4>
+  <label>Text</label>
+  <input type="text" id="drawTextInput" placeholder="Enter text...">
+  <label>Font Size (px)</label>
+  <input type="number" id="drawTextSize" value="14" min="8" max="72" style="width:80px">
+  <div class="dialog-buttons">
+    <button class="btn-map" id="btnCancelDrawText">Cancel</button>
+    <button class="btn-map" id="btnDoDrawText">Place</button>
   </div>
 </div>
 <script src="/static/vendor/leaflet.js"></script>

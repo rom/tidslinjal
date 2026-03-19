@@ -3308,14 +3308,11 @@ function renderSidebar() {
       ${subBtn('buildings', t('resource_buildings')||'Buildings', '🏢')}
       ${subBtn('computers', t('resource_computer_services')||'IT Services', '💻')}
       ${subBtn('datacenters', t('resource_data_centers')||'Data Centers', '🖥')}
-      ${subBtn('exercise_areas', t('resource_exercise_areas')||'Exercise Areas', '🏋')}
       ${subBtn('work_areas', t('resource_work_areas')||'Work Areas', '💼')}
-      ${subBtn('rest_rooms', t('resource_rest_rooms')||'Rest Rooms', '☕')}
-      ${subBtn('training_grounds', t('resource_training_grounds')||'Training Ground', '🎯')}
+      ${subBtn('alliance_partners', t('resource_alliance_partners')||'Alliance Partners', '🤝')}
       ${customTypes.map(ct => subBtn('custom_'+ct.key, ct.label, ct.icon||'📦')).join('')}
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
-      ${subBtn('manage_types', t('manage_resource_types')||'Manage Types', '⚙')}
       <button class="toggle-btn" data-action="openDetachedResources" title="${t('detach_window')||'Open in separate window'}" style="margin-left:auto">⧉</button>
     </div>`;
     // Load custom resource types if not cached
@@ -3384,10 +3381,10 @@ function renderSidebar() {
         </div>`;
       _bindResSubTabs(el);
       _bindActions(el);
-    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'exercise_areas' || resSubTab === 'work_areas' || resSubTab === 'rest_rooms' || resSubTab === 'training_grounds' || resSubTab.startsWith('custom_')) {
-      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', exercise_areas:'exercise_area', work_areas:'work_area', rest_rooms:'rest_room', training_grounds:'training_ground'};
-      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', exercise_areas:t('resource_exercise_areas')||'Exercise Areas', work_areas:t('resource_work_areas')||'Work Areas', rest_rooms:t('resource_rest_rooms')||'Rest Rooms', training_grounds:t('resource_training_grounds')||'Training Ground'};
-      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', exercise_areas:'🏋', work_areas:'💼', rest_rooms:'☕', training_grounds:'🎯'};
+    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'work_areas' || resSubTab === 'alliance_partners' || resSubTab.startsWith('custom_')) {
+      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', work_areas:'work_area', alliance_partners:'alliance_partner'};
+      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', work_areas:t('resource_work_areas')||'Work Areas', alliance_partners:t('resource_alliance_partners')||'Alliance Partners'};
+      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', work_areas:'💼', alliance_partners:'🤝'};
       let roomType, sectionLabel, sectionIcon;
       if (resSubTab.startsWith('custom_')) {
         const customKey = resSubTab.replace('custom_', '');
@@ -4755,6 +4752,7 @@ function renderSidebar() {
         <div class="toggle-btn-group">
           ${[
             {code:'en',name:'English'},{code:'sv',name:'Svenska'},{code:'fr',name:'Français'},
+            {code:'de',name:'Deutsch'},{code:'nl',name:'Nederlands'},
             {code:'fi',name:'Suomi'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
             {code:'et',name:'Eesti'},{code:'lv',name:'Latviešu'},{code:'lt',name:'Lietuvių'},
             {code:'it',name:'Italiano'},{code:'es',name:'Español'},{code:'pt',name:'Português'},
