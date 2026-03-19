@@ -1768,7 +1768,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		// /api/map-resources/{id}/overlays (GET or PUT)
 		if len(parts) == 4 && parts[3] == "overlays" {
 			if r.Method == http.MethodPut {
-				app.requireAuth(app.handleUpdateMapResourceOverlays)(w, r)
+				app.requireRole(RoleReadWrite, app.handleUpdateMapResourceOverlays)(w, r)
 			} else if r.Method == http.MethodGet {
 				app.requireAuth(app.handleGetMapOverlays)(w, r)
 			} else {
@@ -1801,7 +1801,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			if r.Method == http.MethodGet {
 				app.requireAuth(app.handleGetMapDrawings)(w, r)
 			} else if r.Method == http.MethodPut {
-				app.requireAuth(app.handleUpdateMapDrawings)(w, r)
+				app.requireRole(RoleReadWrite, app.handleUpdateMapDrawings)(w, r)
 			} else {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			}
@@ -1812,7 +1812,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		case http.MethodGet:
 			app.requireAuth(app.handleGetMapResource)(w, r)
 		case http.MethodPut:
-			app.requireAuth(app.handleUpdateMapResourceMeta)(w, r)
+			app.requireRole(RoleTeamLead, app.handleUpdateMapResourceMeta)(w, r)
 		case http.MethodDelete:
 			app.requireRole(RoleTeamLead, app.handleDeleteMapResource)(w, r)
 		default:
