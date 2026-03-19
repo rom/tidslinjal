@@ -1309,13 +1309,25 @@ func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *U
 		}
 		integrationsBySource[src]++
 	}
-	// Count webhook-configured users
+	// Count webhook-configured users and language/theme preferences
 	allPrefs := app.store.GetAllPreferences()
 	webhookUsers := 0
+	langCounts := map[string]int{}
+	themeCounts := map[string]int{}
 	for _, p := range allPrefs {
 		if p.WebhookURL != "" {
 			webhookUsers++
 		}
+		lang := p.Language
+		if lang == "" {
+			lang = "en"
+		}
+		langCounts[lang]++
+		theme := p.Theme
+		if theme == "" {
+			theme = "dark"
+		}
+		themeCounts[theme]++
 	}
 
 	// ── Reference material usage ──
@@ -1441,6 +1453,8 @@ func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *U
 		"total_maps":             len(mapResources),
 		"map_popularity":         mapPopularity,
 		"feature_usage":          featureUsage,
+		"language_distribution":   langCounts,
+		"theme_distribution":     themeCounts,
 		"readychecks": map[string]any{
 			"total":         rcTotal,
 			"response_rate": math.Round(rcResponseRate*100) / 100,

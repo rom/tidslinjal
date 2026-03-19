@@ -377,6 +377,10 @@ async function renderUsage(container) {
   var secActions = data.security_actions||{}, secLabels = Object.keys(secActions), secData = Object.values(secActions);
   var featEntries = Object.entries(data.feature_usage||{}).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
   var featLabels = featEntries.map(function(e){return e[0];}), featData = featEntries.map(function(e){return e[1];});
+  var langDist = data.language_distribution||{};
+  var langNames = {en:'English',sv:'Svenska',fi:'Suomi',fr:'Français',de:'Deutsch',no:'Norsk',da:'Dansk',es:'Español'};
+  var langLabels = Object.keys(langDist).map(function(k){return langNames[k]||k;}), langData = Object.values(langDist);
+  var themeDist = data.theme_distribution||{};
   container.innerHTML =
     '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">System usage statistics showing how TidsLinjal is being used.</p>' +
     '<div class="anl-grid anl-grid-6">' +
@@ -386,11 +390,17 @@ async function renderUsage(container) {
     '</div>' +
     '<div class="anl-section"><div class="anl-section-title">Logins Over Time</div><canvas id="anlLoginTimeline" height="200"></canvas></div>' +
     '<div class="anl-grid anl-grid-2">' +
+      '<div class="anl-section"><div class="anl-section-title">Language Settings</div><canvas id="anlLangPie" height="200"></canvas></div>' +
+      '<div class="anl-section"><div class="anl-section-title">Theme Preferences</div><canvas id="anlThemePie" height="200"></canvas></div>' +
+    '</div>' +
+    '<div class="anl-grid anl-grid-2">' +
       '<div class="anl-section"><div class="anl-section-title">Security Audit Records</div><canvas id="anlSecBar" height="'+Math.max(200,secLabels.length*22+20)+'"></canvas></div>' +
       '<div class="anl-section"><div class="anl-section-title">Most Used Features (Top 15)</div><canvas id="anlFeatBar" height="'+Math.max(200,featLabels.length*22+20)+'"></canvas></div>' +
     '</div>';
   setTimeout(function(){
     if(allDays.length)drawLineChart('anlLoginTimeline',allDays,[{data:loginData,color:'#27AE60',label:'Successful'},{data:failedData,color:'#E74C3C',label:'Failed'}],{showArea:true,showPoints:false});
+    if(langLabels.length)drawPieChart('anlLangPie',langLabels,langData);
+    if(Object.keys(themeDist).length)drawPieChart('anlThemePie',Object.keys(themeDist),Object.values(themeDist));
     if(secLabels.length)drawBarChart('anlSecBar',secLabels,secData,{horizontal:true,maxBarWidth:22});
     if(featLabels.length)drawBarChart('anlFeatBar',featLabels,featData,{horizontal:true,maxBarWidth:22});
   },50);
