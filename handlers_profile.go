@@ -122,6 +122,7 @@ func (app *App) handleCascadeReschedule(w http.ResponseWriter, r *http.Request, 
 	visited := map[int64]bool{req.EventID: true}
 	queue := []int64{req.EventID}
 	updated := []Event{}
+	skipped := 0
 
 	for len(queue) > 0 {
 		cur := queue[0]
@@ -129,6 +130,11 @@ func (app *App) handleCascadeReschedule(w http.ResponseWriter, r *http.Request, 
 		for _, dep := range dependents[cur] {
 			if !visited[dep.ID] {
 				visited[dep.ID] = true
+				// V3-M04 fix: verify user has write access to each dependent event's layer
+				if dep.LayerID != nil && !app.canWriteLayer(*dep.LayerID, user) {
+					skipped++
+					continue
+				}
 				dep.StartTime = dep.StartTime.Add(shift)
 				if dep.EndTime != nil {
 					t := dep.EndTime.Add(shift)
@@ -145,6 +151,7 @@ func (app *App) handleCascadeReschedule(w http.ResponseWriter, r *http.Request, 
 
 	jsonOK(w, map[string]interface{}{
 		"rescheduled": len(updated),
+		"skipped":     skipped,
 		"events":      updated,
 	})
 }

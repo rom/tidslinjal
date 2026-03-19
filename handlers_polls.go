@@ -17,7 +17,8 @@ func (app *App) handleReadyCheck(w http.ResponseWriter, r *http.Request, user *U
 	// Get all events by using a very wide time range
 	farPast := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	farFuture := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
-	events := app.store.GetEventsInRange(farPast, farFuture)
+	// V3-H02 fix: filter events by layer visibility
+	events := filterVisibleEvents(app.store.GetEventsInRange(farPast, farFuture), app.visibleLayerSet(user))
 	var notReady []map[string]interface{}
 	for _, ev := range events {
 		if string(ev.Status) == string(StatusPlanned) {

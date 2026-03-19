@@ -22,6 +22,16 @@ func (app *App) handleGetComments(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
+	// V3-L02 fix: verify user can read the event's layer before returning comments
+	ev, ok := app.store.GetEventByID(eventID)
+	if !ok {
+		jsonError(w, "event not found", http.StatusNotFound)
+		return
+	}
+	if ev.LayerID != nil && !app.canReadLayer(*ev.LayerID, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	comments := app.store.GetCommentsByEvent(eventID)
 	if comments == nil {
 		comments = []EventComment{}
@@ -40,8 +50,14 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
-	if _, ok := app.store.GetEventByID(eventID); !ok {
+	ev, ok := app.store.GetEventByID(eventID)
+	if !ok {
 		jsonError(w, "event not found", http.StatusNotFound)
+		return
+	}
+	// V3-L02 fix: verify user can read the event's layer before allowing comments
+	if ev.LayerID != nil && !app.canReadLayer(*ev.LayerID, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	var req struct {

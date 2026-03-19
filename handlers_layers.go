@@ -57,6 +57,53 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 	return false
 }
 
+// visibleLayerSet returns the set of layer IDs the user can read.
+// Admins get nil (meaning "all layers visible").
+// V3-H02 fix: centralized layer filtering for all event queries.
+func (app *App) visibleLayerSet(user *User) map[int64]bool {
+	if hasRole(user.Role, RoleAdmin) {
+		return nil // nil = no filter, admin sees everything
+	}
+	vis := make(map[int64]bool)
+	userGroups := app.userGroups(user.ID)
+	for _, l := range app.store.GetLayersVisibleTo(user.ID, userGroups) {
+		vis[l.ID] = true
+	}
+	return vis
+}
+
+// filterVisibleEvents filters a slice of events to only those the user can see.
+// Master-timeline events (LayerID == nil) are always included.
+// V3-H02 fix: centralized layer filtering for all event queries.
+func filterVisibleEvents(events []Event, visibleLayers map[int64]bool) []Event {
+	if visibleLayers == nil {
+		return events // admin — no filtering
+	}
+	result := make([]Event, 0, len(events))
+	for _, e := range events {
+		if e.LayerID == nil || visibleLayers[*e.LayerID] {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+// canUserSeeEvent checks whether a single event is visible to the user.
+// V3-H01 fix: used by SSE broadcast to filter per-client.
+func (app *App) canUserSeeEvent(userID int64, ev *Event) bool {
+	if ev.LayerID == nil {
+		return true // master timeline
+	}
+	user, ok := app.store.GetUserByID(userID)
+	if !ok {
+		return false
+	}
+	if hasRole(user.Role, RoleAdmin) {
+		return true
+	}
+	return app.canReadLayer(*ev.LayerID, user)
+}
+
 // ── Layer handlers ─────────────────────────────────────────────────────────────
 
 func (app *App) handleGetLayers(w http.ResponseWriter, r *http.Request, user *User) {

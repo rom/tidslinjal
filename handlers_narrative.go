@@ -47,8 +47,10 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 
 	var entries []NarrativeEntry
 
+	// V3-H02 fix: filter events by layer visibility
+	visLayers := app.visibleLayerSet(user)
 	// Gather events that started/changed in range
-	for _, e := range app.store.GetEventsInRange(fromTime, toTime) {
+	for _, e := range filterVisibleEvents(app.store.GetEventsInRange(fromTime, toTime), visLayers) {
 		severity := "info"
 		if e.Status == StatusActive {
 			severity = "warning"

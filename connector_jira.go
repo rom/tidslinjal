@@ -204,7 +204,8 @@ func (c *JiraConnector) SyncStats() (JiraStats, error) {
 		jql = fmt.Sprintf("project = %s", cfg.Project)
 	}
 
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=100", cfg.BaseURL, jql)
+	// V3-M03 fix: URL-encode JQL to prevent injection (matching Poll V-16 fix)
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=100", cfg.BaseURL, neturl.QueryEscape(jql))
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

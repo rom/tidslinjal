@@ -31,34 +31,8 @@ func (app *App) handleGetEvents(w http.ResponseWriter, r *http.Request, user *Us
 		to = time.Now().AddDate(0, 1, 0)
 	}
 
-	// H-04 fix: enforce server-side layer visibility filtering
-	allEvents := app.store.GetEvents(from, to, nil)
-	// Build set of layer IDs this user can read
-	var visibleLayerIDs map[int64]bool
-	if !hasRole(user.Role, RoleAdmin) {
-		visibleLayerIDs = make(map[int64]bool)
-		userGroups := app.userGroups(user.ID)
-		for _, l := range app.store.GetLayersVisibleTo(user.ID, userGroups) {
-			visibleLayerIDs[l.ID] = true
-		}
-	}
-	events := make([]Event, 0, len(allEvents))
-	for _, e := range allEvents {
-		// Master timeline events (no layer) are visible to all authenticated users
-		if e.LayerID == nil {
-			events = append(events, e)
-			continue
-		}
-		// Admins see all layers
-		if hasRole(user.Role, RoleAdmin) {
-			events = append(events, e)
-			continue
-		}
-		// Non-admins: only include events from visible layers
-		if visibleLayerIDs[*e.LayerID] {
-			events = append(events, e)
-		}
-	}
+	// H-04 fix + V3-H02 refactor: enforce server-side layer visibility filtering
+	events := filterVisibleEvents(app.store.GetEvents(from, to, nil), app.visibleLayerSet(user))
 	if events == nil {
 		events = []Event{}
 	}

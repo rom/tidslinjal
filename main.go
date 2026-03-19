@@ -224,9 +224,34 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("/api/auth/me", app.requireAuth(app.handleMe))
 	mux.HandleFunc("/api/auth/change-password", app.requireAuth(app.handleChangePassword))
 	mux.HandleFunc("/api/auth/password-policy", app.requireAuth(app.handlePasswordPolicy))
-	mux.HandleFunc("/api/auth/register", app.handleRegister)
-	mux.HandleFunc("/api/auth/forgot-password", app.handleForgotPassword)
-	mux.HandleFunc("/api/auth/reset-password", app.handleResetPassword)
+	// V3-L01 fix: add CSRF header check to pre-auth POST endpoints (matching login pattern)
+	mux.HandleFunc("/api/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			if r.Header.Get("X-Requested-With") == "" {
+				jsonError(w, "missing required header", http.StatusForbidden)
+				return
+			}
+		}
+		app.handleRegister(w, r)
+	})
+	mux.HandleFunc("/api/auth/forgot-password", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			if r.Header.Get("X-Requested-With") == "" {
+				jsonError(w, "missing required header", http.StatusForbidden)
+				return
+			}
+		}
+		app.handleForgotPassword(w, r)
+	})
+	mux.HandleFunc("/api/auth/reset-password", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			if r.Header.Get("X-Requested-With") == "" {
+				jsonError(w, "missing required header", http.StatusForbidden)
+				return
+			}
+		}
+		app.handleResetPassword(w, r)
+	})
 	mux.HandleFunc("/api/auth/update-email", app.requireAuth(app.handleUpdateEmail))
 
 	// Preferences

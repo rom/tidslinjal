@@ -27,6 +27,16 @@ func (app *App) handleGetAttachments(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
+	// V3-L02 fix: verify user can read the event's layer before returning attachments
+	ev, ok := app.store.GetEventByID(eventID)
+	if !ok {
+		jsonError(w, "event not found", http.StatusNotFound)
+		return
+	}
+	if ev.LayerID != nil && !app.canReadLayer(*ev.LayerID, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	atts := app.store.GetAttachmentsByEvent(eventID)
 	if atts == nil {
 		atts = []Attachment{}
@@ -45,8 +55,14 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
-	if _, ok := app.store.GetEventByID(eventID); !ok {
+	ev, ok := app.store.GetEventByID(eventID)
+	if !ok {
 		jsonError(w, "event not found", http.StatusNotFound)
+		return
+	}
+	// V3-L03 fix: verify user has write access to the event's layer before upload
+	if ev.LayerID != nil && !app.canWriteLayer(*ev.LayerID, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 

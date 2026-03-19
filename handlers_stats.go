@@ -11,15 +11,23 @@ import (
 
 // ── Analysis / Statistics handlers ────────────────────────────────────────────
 
-// allEvents returns all events using a very wide time range
+// allEvents returns all events using a very wide time range.
+// Deprecated: use visibleEvents(user) for layer-filtered results.
 func (app *App) allEvents() []Event {
 	far := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	farEnd := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 	return app.store.GetEvents(far, farEnd, nil)
 }
 
+// visibleEvents returns all events visible to the given user, respecting layer access.
+// V3-H02 fix: centralized filtered event access for stats/export handlers.
+func (app *App) visibleEvents(user *User) []Event {
+	all := app.allEvents()
+	return filterVisibleEvents(all, app.visibleLayerSet(user))
+}
+
 func (app *App) handleStatsOverview(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	users := app.store.GetUsers()
 	layers := app.store.GetAllLayers()
 	decisions := app.store.GetDecisionLog()
@@ -56,7 +64,7 @@ func (app *App) handleStatsOverview(w http.ResponseWriter, r *http.Request, user
 }
 
 func (app *App) handleStatsEventsTimeline(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	resolution := r.URL.Query().Get("resolution")
 	if resolution == "" {
 		resolution = "day"
@@ -79,7 +87,7 @@ func (app *App) handleStatsEventsTimeline(w http.ResponseWriter, r *http.Request
 }
 
 func (app *App) handleStatsEventsStatus(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	counts := map[string]int{}
 	for _, e := range events {
 		counts[string(e.Status)]++
@@ -88,7 +96,7 @@ func (app *App) handleStatsEventsStatus(w http.ResponseWriter, r *http.Request, 
 }
 
 func (app *App) handleStatsEventsType(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	counts := map[string]int{}
 	for _, e := range events {
 		counts[string(e.EventType)]++
@@ -97,7 +105,7 @@ func (app *App) handleStatsEventsType(w http.ResponseWriter, r *http.Request, us
 }
 
 func (app *App) handleStatsEventsHeatmap(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	// 7 days × 24 hours matrix
 	heatmap := make([][]int, 7)
 	for i := range heatmap {
@@ -118,7 +126,7 @@ func (app *App) handleStatsEventsHeatmap(w http.ResponseWriter, r *http.Request,
 }
 
 func (app *App) handleStatsUsersWorkload(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	workload := map[string]map[string]int{}
 	for _, e := range events {
 		name := e.ResponsibleName
@@ -163,7 +171,7 @@ func (app *App) handleStatsDecisions(w http.ResponseWriter, r *http.Request, use
 // ── Stats: Slip Histogram ───────────────────────────────────────────────────
 
 func (app *App) handleStatsSlipHistogram(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	buckets := map[string]int{
 		"on_time":       0,
 		"early":         0,
@@ -224,7 +232,7 @@ func (app *App) handleStatsSlipHistogram(w http.ResponseWriter, r *http.Request,
 // ── Stats: Operational Tempo ────────────────────────────────────────────────
 
 func (app *App) handleStatsOpTempo(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	now := time.Now()
 	cutoff := now.Add(-24 * time.Hour)
 
@@ -366,7 +374,7 @@ func (app *App) handleStatsDecisionAnalytics(w http.ResponseWriter, r *http.Requ
 // ── Stats: Dependency Graph ─────────────────────────────────────────────────
 
 func (app *App) handleStatsDependencyGraph(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 
 	type node struct {
 		ID        int64     `json:"id"`
@@ -449,7 +457,7 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 		format = "json"
 	}
 
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	decisions := app.store.GetDecisionLog()
 	layers := app.store.GetAllLayers()
 
@@ -524,7 +532,7 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 
 func (app *App) handleStatsLeadershipDashboard(w http.ResponseWriter, r *http.Request, user *User) {
 	now := time.Now()
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	decisions := app.store.GetDecisionLog()
 	phases := app.store.GetPhases()
 	layers := app.store.GetAllLayers()
@@ -1054,7 +1062,7 @@ func (app *App) handleStatsLeadershipDashboard(w http.ResponseWriter, r *http.Re
 // ── Personnel Performance Stats ─────────────────────────────────────────────
 
 func (app *App) handleStatsPersonnelPerformance(w http.ResponseWriter, r *http.Request, user *User) {
-	events := app.allEvents()
+	events := app.visibleEvents(user)
 	decisions := app.store.GetDecisionLog()
 	users := app.store.GetUsers()
 	auditEntries := app.store.GetAudit(1000)
