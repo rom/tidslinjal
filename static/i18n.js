@@ -3523,6 +3523,59 @@ const TRANSLATIONS = {
     digest_last_4h: 'Senaste 4 timmarna',
     digest_last_12h: 'Senaste 12 timmarna',
     digest_last_24h: 'Senaste 24 timmarna',
+    digest_webhook_url: 'Webhook-URL',
+    digest_webhook_type: 'Webhook-typ',
+
+    // Roles
+    help_role_deputy_teamlead: 'Ställföreträdande teamledare, kan ersätta teamledaren.',
+    help_role_deputy_oplead: 'Ställföreträdande operationsledare, kan ersätta operationsledaren.',
+    help_role_staff_assistant: 'Assistent till en stabsofficer med begränsade rättigheter.',
+
+    // Analysis
+    analysis_status_dist: 'Statusfördelning',
+    analysis_type_breakdown: 'Händelsetypsfördelning',
+    analysis_heatmap: 'Aktivitetskarta (Dag x Timme)',
+    analysis_workload: 'Användarbelastning (Topp 15)',
+    analysis_decisions: 'Beslut',
+    total_events: 'Totalt händelser',
+    total_users: 'Totalt användare',
+    active_alarms: 'Aktiva larm',
+    approved_decisions: 'Godkända',
+    pending_decisions: 'Väntande beslut',
+    denied_decisions: 'Avslagna',
+    avg_response_time: 'Genomsnittlig svarstid',
+    to: 'Till',
+
+    // TeamLead tools
+    tl_quick_response_desc: 'Skicka ett snabbt svar till ledningsgruppen.',
+    tl_quick_response_placeholder: 'Ditt snabbsvar...',
+    tl_quick_response_sent: 'Snabbsvar skickat',
+    tl_decision_placeholder: 'Beskriv beslutet...',
+    tl_escalate_title_placeholder: 'Eskaleringens titel',
+    tl_escalate_placeholder: 'Beskriv problemet att eskalera...',
+    tl_escalate_reason: 'Anledning till eskalering',
+    tl_decision_escalated: 'Beslut eskalerat',
+    tl_ready_check_desc: 'Kontrollera teamets beredskap.',
+    tl_ready_check_msg: 'Kontrollmeddelande',
+    tl_ready_check_sent: 'Beredskapskontroll skickad',
+    tl_team_poll_desc: 'Skicka en snabbomröstning till dina teammedlemmar',
+    tl_poll_question: 'Omröstningsfråga',
+    tl_poll_options_placeholder: 'Alternativ (ett per rad)',
+    tl_poll_min_options: 'Minst 2 alternativ krävs',
+    tl_poll_sent: 'Omröstning skickad',
+
+    // Priority & Urgency
+    priority_normal: 'Normal',
+    priority_high: 'Hög',
+    priority_critical: 'Kritisk',
+    urgency_normal: 'Normal',
+    urgency_urgent: 'Brådskande',
+    urgency_critical: 'Kritisk',
+
+    // Misc
+    message_required: 'Meddelande krävs',
+    group_required: 'Grupp krävs',
+    question_required: 'Fråga krävs',
   },
 
   fr: {
@@ -5254,6 +5307,13 @@ const TRANSLATIONS = {
     message_required: 'Le message est requis',
     question_required: 'La question est requise',
     resource_alliance_partners: 'Partenaires alliés',
+
+    // TeamLead toolbox
+    teamlead_toolbox_title: 'Boîte à outils chef d\'équipe',
+    tl_team_poll: 'Sondage d\'équipe',
+    tl_team_poll_desc: 'Envoyer un sondage rapide aux membres de votre équipe',
+    deputy_teamleads: 'Chefs d\'équipe adjoints',
+    deputy_opsleads: 'Chefs d\'opérations adjoints',
   },
 
   // ── Finnish ──────────────────────────────────────────────────────────────
@@ -19904,8 +19964,8 @@ manage_resource_types: 'Gerir Tipos',
     res_day: 'Tag',
 
     // Days of week (short)
-    day_mon: 'Mon\', day_tue: \'Tue\', day_wed: \'Wed',
-    day_thu: 'Thu\', day_fri: \'Fri\', day_sat: \'Sat\', day_sun: \'Sun',
+    day_mon: 'Mo', day_tue: 'Di', day_wed: 'Mi',
+    day_thu: 'Do', day_fri: 'Fr', day_sat: 'Sa', day_sun: 'So',
 
     // Sidebar tabs
     tab_legend: 'Legende',
@@ -21697,6 +21757,20 @@ manage_resource_types: 'Gerir Tipos',
     digest_last_24h: 'Letzte 24 Stunden',
     digest_webhook_url: 'Webhook-URL',
     digest_webhook_type: 'Webhook-Typ',
+
+    // Map features
+    map_type: 'Typ',
+    map_upload_map: 'Karte hochladen',
+    map_delete_map: 'Karte löschen',
+    map_delete_confirm: 'Diese Karte löschen?',
+    map_change_type: 'Typ ändern',
+    map_draw_text: 'Text',
+    map_text_placeholder: 'Text eingeben...',
+    map_font_size: 'Größe',
+    map_font_family: 'Schriftart',
+
+    // Resources
+    resource_alliance_partners: 'Bündnispartner',
   },
   nl: {
 
