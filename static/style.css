@@ -478,7 +478,7 @@ body.hover-zoom-enabled .event-block:hover {
 }
 #sidebar.hidden { display: none; }
 .sidebar-tabs {
-  display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .sidebar-tab {
   flex-shrink: 0; padding: 8px 10px; background: none; border: none; border-bottom: 2px solid transparent;
@@ -561,7 +561,7 @@ body.hover-zoom-enabled .event-block:hover {
 .setting-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .setting-label { font-size: var(--fs-sm); color: var(--text-dim); min-width: 90px; }
 .setting-control { flex: 1; }
-.toggle-btn-group { display: flex; gap: 4px; }
+.toggle-btn-group { display: flex; gap: 4px; flex-wrap: wrap; }
 .toggle-btn {
   flex: 1; padding: 5px 8px; background: var(--bg3); border: 1px solid var(--border);
   border-radius: 4px; font-size: var(--fs-xs); color: var(--text-dim); cursor: pointer; text-align: center;
