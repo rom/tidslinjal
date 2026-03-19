@@ -81,8 +81,9 @@ func (s *Store) GetDBStats() map[string]any {
 		})
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// H-08 fix: use full Lock (not RLock) since we write to cachedDBStats/cachedDBStatsAt
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	result := map[string]any{
 		"created_at":      createdAt.Format(time.RFC3339),
 		"size_bytes":      totalSize,

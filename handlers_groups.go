@@ -50,6 +50,9 @@ func (app *App) handleCreateGroup(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "name required", http.StatusBadRequest)
 		return
 	}
+	// H-05 fix: sanitize group name/description to prevent stored XSS
+	g.Name = stripHTMLTags(g.Name)
+	g.Description = stripHTMLTags(g.Description)
 	g.CreatedBy = user.ID
 	created, err := app.store.CreateGroup(g)
 	if err != nil {
@@ -95,6 +98,9 @@ func (app *App) handleUpdateGroup(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// H-05 fix: sanitize group name/description to prevent stored XSS
+	g.Name = stripHTMLTags(g.Name)
+	g.Description = stripHTMLTags(g.Description)
 	g.ID = id
 	g.CreatedBy = existing.CreatedBy
 	g.CreatedAt = existing.CreatedAt

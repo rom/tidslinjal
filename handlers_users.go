@@ -64,6 +64,8 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 	if req.DisplayName == "" {
 		req.DisplayName = req.Username
 	}
+	// H-05 fix: sanitize display name to prevent stored XSS
+	req.DisplayName = stripHTMLTags(req.DisplayName)
 	// Admin-created users are always vetted
 	created, err := app.store.CreateUser(User{
 		Username: req.Username, PasswordHash: string(hash),
@@ -151,7 +153,8 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		app.store.DeleteSessionsForUser(id)
 	}
 	if req.DisplayName != "" {
-		existing.DisplayName = req.DisplayName
+		// H-05 fix: sanitize display name to prevent stored XSS
+		existing.DisplayName = stripHTMLTags(req.DisplayName)
 	}
 	// V-22 fix: only update email if the request explicitly provided a value
 	// (avoid wiping email when field is omitted from JSON)
@@ -169,6 +172,13 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			if !validRoles[req.Role] {
 				jsonError(w, "invalid role", http.StatusBadRequest)
 				return
+			}
+			// Session rotation on role change: invalidate sessions when role changes
+			if existing.Role != req.Role {
+				ss := app.store.GetSecuritySettings()
+				if ss.RotateSessionOnRoleChange {
+					app.store.DeleteSessionsForUser(id)
+				}
 			}
 			existing.Role = req.Role
 		}

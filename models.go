@@ -895,7 +895,7 @@ type SyslogConfig struct {
 	TLSSkipVerify bool `json:"tls_skip_verify,omitempty"` // V-18: explicitly skip TLS verification (default false = verify)
 }
 
-// SecuritySettings controls server-side password quality enforcement
+// SecuritySettings controls server-side password quality enforcement and session management
 type SecuritySettings struct {
 	PasswordPolicyEnabled bool `json:"password_policy_enabled"`
 	MinLength             int  `json:"min_length,omitempty"`      // minimum password length (default 8)
@@ -903,6 +903,14 @@ type SecuritySettings struct {
 	RequireLowercase      bool `json:"require_lowercase,omitempty"` // at least one a-z
 	RequireNumbers        bool `json:"require_numbers,omitempty"`   // at least one 0-9
 	RequireSymbols        bool `json:"require_symbols,omitempty"`   // at least one symbol
+
+	// Session management settings
+	SessionTimeEnabled bool `json:"session_time_enabled"`            // enforce max session duration
+	SessionTimeHours   int  `json:"session_time_hours,omitempty"`    // max session lifetime in hours (default 100)
+	IdleTimeoutEnabled bool `json:"idle_timeout_enabled"`            // enforce idle timeout
+	IdleTimeoutHours   int  `json:"idle_timeout_hours,omitempty"`    // idle timeout in hours (default 100)
+	LogoffOnPasswordChange bool `json:"logoff_on_password_change"`   // invalidate sessions on other devices when password changes (default true)
+	RotateSessionOnRoleChange bool `json:"rotate_session_on_role_change"` // invalidate sessions when user role changes (default true)
 }
 
 // TLSConfig stores TLS certificate and key file paths for persistent server configuration.

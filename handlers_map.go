@@ -32,6 +32,8 @@ func (app *App) handleAddMapLocation(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "name required", http.StatusBadRequest)
 		return
 	}
+	// H-05 fix: sanitize map location name to prevent stored XSS
+	loc.Name = stripHTMLTags(loc.Name)
 	created, err := app.store.AddMapLocation(loc)
 	if err != nil {
 		jsonError(w, "failed to save", http.StatusInternalServerError)
@@ -60,6 +62,8 @@ func (app *App) handleUpdateMapLocation(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	loc.ID = id
+	// H-05 fix: sanitize map location name to prevent stored XSS
+	loc.Name = stripHTMLTags(loc.Name)
 	if err := app.store.UpdateMapLocation(loc); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return

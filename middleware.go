@@ -251,6 +251,18 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 	}
 }
 
+// noDirListing wraps an http.Handler and returns 404 for directory requests.
+// L-16 fix: prevents http.FileServer from exposing directory contents.
+func noDirListing(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/") || r.URL.Path == "" {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // securityHeaders wraps an http.Handler and injects security-related HTTP
 // response headers on every reply. This provides defence-in-depth against
 // clickjacking, MIME-sniffing, and other common web vulnerabilities.

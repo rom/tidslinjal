@@ -32,6 +32,10 @@ func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *
 	if entry.Source == "" {
 		entry.Source = "manual"
 	}
+	// H-05 fix: sanitize event log fields to prevent stored XSS
+	entry.Message = stripHTMLTags(entry.Message)
+	entry.Summary = stripHTMLTags(entry.Summary)
+	entry.Source = stripHTMLTags(entry.Source)
 	entry.UserID = user.ID
 	entry.UserName = user.DisplayName
 	created, err := app.store.AddEventLogEntry(entry)

@@ -190,10 +190,17 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "only operations leads and admins may edit master-timeline events", http.StatusForbidden)
 		return
 	}
-	// Layer events: creator or readwrite+
+	// Layer events: creator or readwrite+ with layer write access
 	if existing.LayerID != nil && existing.CreatedBy != user.ID && !hasRole(user.Role, RoleReadWrite) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
+	}
+	// H-04 fix: verify canWriteLayer for layer events (even for readwrite users)
+	if existing.LayerID != nil && !hasRole(user.Role, RoleAdmin) {
+		if !app.canWriteLayer(*existing.LayerID, user) {
+			jsonError(w, "no write permission on this layer", http.StatusForbidden)
+			return
+		}
 	}
 	var e Event
 	if err := decode(r, &e); err != nil {
@@ -356,6 +363,13 @@ func (app *App) handleDeleteEvent(w http.ResponseWriter, r *http.Request, user *
 	if existing.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
+	}
+	// M-04 fix: check layer write access for non-admin users
+	if existing.LayerID != nil && !hasRole(user.Role, RoleAdmin) {
+		if !app.canWriteLayer(*existing.LayerID, user) {
+			jsonError(w, "no write permission on this layer", http.StatusForbidden)
+			return
+		}
 	}
 	title := existing.Title
 	if err := app.store.DeleteEvent(id); err != nil {

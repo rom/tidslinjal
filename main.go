@@ -19,8 +19,8 @@ import (
 func (app *App) routes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Static files
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	// Static files — L-16 fix: wrap with noDirListing to prevent directory listing exposure
+	mux.Handle("/static/", http.StripPrefix("/static/", noDirListing(http.FileServer(http.Dir("static")))))
 
 	// Favicon at root (browsers request /favicon.ico by default)
 	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
@@ -1117,6 +1117,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	})
 
 	// Backend restart (admin only)
+	// L-15 fix: use graceful shutdown via app.shutdownCh instead of os.Exit(0)
 	mux.HandleFunc("/api/admin/restart-backend", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
@@ -1124,7 +1125,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				jsonOK(w, map[string]string{"ok": "true"})
 				go func() {
 					time.Sleep(500 * time.Millisecond)
-					os.Exit(0) // Supervisor/systemd should restart the process
+					app.Stop()
+					os.Exit(0)
 				}()
 			})(w, r)
 		} else {
@@ -1740,7 +1742,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		case http.MethodGet:
 			app.requireAuth(app.handleGetGeoItems)(w, r)
 		case http.MethodPut:
-			app.requireAuth(app.handleSetGeoItems)(w, r)
+			// L-12 fix: require RoleReadWrite to modify geo items (was any auth)
+			app.requireRole(RoleReadWrite, app.handleSetGeoItems)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

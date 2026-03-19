@@ -98,7 +98,13 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	sess := Session{ID: sessID, UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)}
+	// Compute session expiry from security settings
+	sessionDuration := 24 * time.Hour
+	secSettings := app.store.GetSecuritySettings()
+	if secSettings.SessionTimeEnabled && secSettings.SessionTimeHours > 0 {
+		sessionDuration = time.Duration(secSettings.SessionTimeHours) * time.Hour
+	}
+	sess := Session{ID: sessID, UserID: user.ID, ExpiresAt: time.Now().Add(sessionDuration)}
 	if err := app.store.CreateSession(sess); err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
@@ -145,6 +151,11 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	// M-05 fix: require POST to prevent CSRF logout via <img src="/api/auth/logout">
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	_, user := app.getSession(r)
 	if c, err := r.Cookie("session"); err == nil {
 		logDebug("logout: session=%s", c.Value[:min(8, len(c.Value))])
@@ -247,6 +258,16 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 	if err := app.store.UpdateUser(*fullUser); err != nil {
 		jsonError(w, "failed to update password", http.StatusInternalServerError)
 		return
+	}
+	// H-07 fix: invalidate sessions on other devices when password changes
+	ss := app.store.GetSecuritySettings()
+	if ss.LogoffOnPasswordChange {
+		// Get current session ID to preserve it
+		currentSessID := ""
+		if c, err := r.Cookie("session"); err == nil {
+			currentSessID = c.Value
+		}
+		app.store.DeleteSessionsForUserExcept(user.ID, currentSessID)
 	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
@@ -407,7 +428,7 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	displayName := req.DisplayName
+	displayName := stripHTMLTags(req.DisplayName)
 	if displayName == "" {
 		displayName = req.Username
 	}
@@ -799,6 +820,8 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "failed to update password", http.StatusInternalServerError)
 		return
 	}
+	// H-07 fix: invalidate all existing sessions after password reset
+	app.store.DeleteSessionsForUser(user.ID)
 	app.audit(user.ID, user.Username, "updated", "user", user.ID, "password reset via token")
 	jsonOK(w, map[string]string{"status": "ok"})
 }

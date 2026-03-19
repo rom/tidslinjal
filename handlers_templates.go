@@ -30,6 +30,13 @@ func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "name required", http.StatusBadRequest)
 		return
 	}
+	// M-19 fix: sanitize template name/description/items to prevent stored XSS
+	tmpl.Name = stripHTMLTags(tmpl.Name)
+	tmpl.Description = stripHTMLTags(tmpl.Description)
+	for i := range tmpl.Items {
+		tmpl.Items[i].Title = stripHTMLTags(tmpl.Items[i].Title)
+		tmpl.Items[i].Description = stripHTMLTags(tmpl.Items[i].Description)
+	}
 	if tmpl.Scope == "public" && !hasRole(user.Role, RoleOpLead) {
 		jsonError(w, "only operations leads and admins may create public templates", http.StatusForbidden)
 		return
