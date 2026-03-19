@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,10 +56,33 @@ func NewMetrics() *Metrics {
 }
 
 // IncHTTPRequest increments the HTTP request counter.
+// Paths are normalized to prevent unbounded sync.Map growth from unique IDs.
 func (m *Metrics) IncHTTPRequest(path string) {
 	m.httpRequestsTotal.Add(1)
-	v, _ := m.httpRequestsByPath.LoadOrStore(path, &atomic.Int64{})
+	normalized := normalizeMetricsPath(path)
+	v, _ := m.httpRequestsByPath.LoadOrStore(normalized, &atomic.Int64{})
 	v.(*atomic.Int64).Add(1)
+}
+
+// normalizeMetricsPath replaces numeric path segments with {id} to bound the
+// number of unique keys in the metrics map.
+func normalizeMetricsPath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, p := range parts {
+		if len(p) > 0 && isNumeric(p) {
+			parts[i] = "{id}"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func isNumeric(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // IncEventCreated increments the events created counter.

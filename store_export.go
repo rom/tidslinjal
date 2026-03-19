@@ -524,6 +524,11 @@ func (s *Store) ResetDatabase() error {
 	s.tags = nil
 	s.nextTagID = 0
 
+	// Clear index maps to prevent stale lookups after reset
+	s.eventByID = make(map[int64]int)
+	s.userByID = make(map[int64]User)
+	s.sessionByID = make(map[string]Session)
+
 	// Save all cleared files
 	files := map[string]interface{}{
 		"event_types.json":            s.eventTypes,

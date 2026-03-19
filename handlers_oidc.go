@@ -174,7 +174,7 @@ func (app *App) handleOIDCTest(w http.ResponseWriter, r *http.Request, user *Use
 		return
 	}
 	var disc map[string]interface{}
-	if err := json.NewDecoder(discResp.Body).Decode(&disc); err != nil {
+	if err := json.NewDecoder(io.LimitReader(discResp.Body, 1<<20)).Decode(&disc); err != nil {
 		addStep("discovery", false, "Discovery document is not valid JSON", err.Error())
 		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
 		return
@@ -265,7 +265,7 @@ func (app *App) configureOIDC(issuer, clientID, clientSecret, redirectURL string
 		return fmt.Errorf("discovery document returned %d", resp.StatusCode)
 	}
 	var cfg OIDCConfig
-	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&cfg); err != nil {
 		return fmt.Errorf("decode discovery document: %w", err)
 	}
 	// M-09 fix: verify discovery document issuer matches configured issuer (OIDC spec §4.3)
@@ -757,7 +757,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		IDToken     string `json:"id_token"`
 		TokenType   string `json:"token_type"`
 	}
-	if err := json.NewDecoder(tokenResp.Body).Decode(&tokens); err != nil {
+	if err := json.NewDecoder(io.LimitReader(tokenResp.Body, 1<<20)).Decode(&tokens); err != nil {
 		http.Redirect(w, r, "/login?error=token_parse_failed", http.StatusFound)
 		return
 	}
@@ -794,7 +794,7 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		// Address can be a structured object or a string; capture as raw JSON
 		AddressRaw json.RawMessage `json:"address"`
 	}
-	if err := json.NewDecoder(uiResp.Body).Decode(&userInfo); err != nil {
+	if err := json.NewDecoder(io.LimitReader(uiResp.Body, 1<<20)).Decode(&userInfo); err != nil {
 		http.Redirect(w, r, "/login?error=userinfo_parse_failed", http.StatusFound)
 		return
 	}

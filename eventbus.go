@@ -99,12 +99,13 @@ func (eb *EventBus) Stop() {
 }
 
 // Run processes messages from the bus channel and fans out to all subscribers.
-// Should be called as a goroutine.
+// Subscriber callbacks run inline (sequentially) to prevent unbounded goroutine
+// growth. Each subscriber is protected by panic recovery.
 func (eb *EventBus) Run() {
 	for msg := range eb.ch {
 		eb.mu.RLock()
 		for name, sub := range eb.subscribers {
-			go func(n string, s EventBusSubscriber, m EventBusMessage) {
+			func(n string, s EventBusSubscriber, m EventBusMessage) {
 				defer func() {
 					if r := recover(); r != nil {
 						log.Printf("[ERROR] event bus subscriber %q panicked: %v", n, r)
