@@ -3,9 +3,17 @@
 'use strict';
 
 const DEFAULT_COLORS = ['#3498DB','#E67E22','#27AE60','#E74C3C','#9B59B6','#1ABC9C','#F39C12','#2980B9','#D35400','#16A085'];
-const TEXT_COLOR = '#ccc';
-const GRID_COLOR = 'rgba(255,255,255,0.08)';
 const FONT = '12px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif';
+
+function _isLightTheme() {
+  return document.body && document.body.classList.contains('theme-light');
+}
+function _textColor() {
+  return _isLightTheme() ? '#333' : '#ccc';
+}
+function _gridColor() {
+  return _isLightTheme() ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)';
+}
 
 /* ── helpers ───────────────────────────────────────────────────────────────── */
 
@@ -92,7 +100,7 @@ function drawPieChart(canvasId, labels, data, colors) {
   for (let i = 0; i < labels.length; i++) {
     ctx.fillStyle = pickColor(i, colors);
     ctx.fillRect(lx, legendY, 10, 10);
-    ctx.fillStyle = TEXT_COLOR;
+    ctx.fillStyle = _textColor();
     const pct = ((data[i] / total) * 100).toFixed(0);
     const lbl = labels[i] + ' (' + pct + '%)';
     ctx.fillText(lbl, lx + 14, legendY + 9);
@@ -112,7 +120,7 @@ function drawBarChart(canvasId, labels, data, options) {
   const maxVal = niceMax(Math.max(...data, 1));
   const maxBarW = options.maxBarWidth || 999;
 
-  ctx.fillStyle = TEXT_COLOR;
+  ctx.fillStyle = _textColor();
   ctx.font = '11px sans-serif';
 
   if (horiz) {
@@ -121,7 +129,7 @@ function drawBarChart(canvasId, labels, data, options) {
     const barH = Math.min(maxBarW, Math.max(10, (h - 20) / labels.length - 4));
     for (let i = 0; i < labels.length; i++) {
       const y = 10 + i * (barH + 4);
-      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillStyle = _textColor();
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(truncText(ctx, labels[i], labelW - 8), labelW - 4, y + barH / 2);
@@ -130,7 +138,7 @@ function drawBarChart(canvasId, labels, data, options) {
       ctx.beginPath();
       ctx.roundRect(labelW, y, bw, barH, 3);
       ctx.fill();
-      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillStyle = _textColor();
       ctx.textAlign = 'left';
       ctx.fillText(String(data[i]), labelW + bw + 4, y + barH / 2);
     }
@@ -141,12 +149,12 @@ function drawBarChart(canvasId, labels, data, options) {
     const barArea = w - padding * 2;
     const barW = Math.min(maxBarW, Math.max(6, barArea / labels.length - 4));
     // grid
-    ctx.strokeStyle = GRID_COLOR;
+    ctx.strokeStyle = _gridColor();
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = top + (bottom - top) * (1 - i / 4);
       ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(w - 10, y); ctx.stroke();
-      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillStyle = _textColor();
       ctx.textAlign = 'right';
       ctx.fillText(String(Math.round(maxVal * i / 4)), padding - 4, y + 4);
     }
@@ -157,7 +165,7 @@ function drawBarChart(canvasId, labels, data, options) {
       ctx.beginPath();
       ctx.roundRect(x, bottom - bh, barW, bh, [3, 3, 0, 0]);
       ctx.fill();
-      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillStyle = _textColor();
       ctx.textAlign = 'center';
       ctx.font = '10px sans-serif';
       ctx.save();
@@ -184,15 +192,15 @@ function drawLineChart(canvasId, labels, datasets, options) {
   allMax = niceMax(allMax) || 1;
 
   // grid
-  ctx.strokeStyle = GRID_COLOR; ctx.lineWidth = 1;
-  ctx.fillStyle = TEXT_COLOR; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  ctx.strokeStyle = _gridColor(); ctx.lineWidth = 1;
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = padT + plotH * (1 - i / 4);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
     ctx.fillText(String(Math.round(allMax * i / 4)), padL - 4, y + 3);
   }
   // x labels
-  ctx.textAlign = 'center'; ctx.fillStyle = TEXT_COLOR;
+  ctx.textAlign = 'center'; ctx.fillStyle = _textColor();
   const step = Math.max(1, Math.floor(labels.length / 10));
   for (let i = 0; i < labels.length; i += step) {
     const x = padL + (i / (labels.length - 1 || 1)) * plotW;
@@ -236,7 +244,7 @@ function drawLineChart(canvasId, labels, datasets, options) {
       const c = ds.color || pickColor(di);
       ctx.fillStyle = c;
       ctx.fillRect(lx, 2, 10, 10);
-      ctx.fillStyle = TEXT_COLOR;
+      ctx.fillStyle = _textColor();
       ctx.textAlign = 'left';
       ctx.fillText(ds.label || '', lx + 14, 11);
       lx += ctx.measureText(ds.label || '').width + 28;
@@ -251,7 +259,7 @@ function drawHeatmap(canvasId, rowLabels, colLabels, data, options) {
   const s = setupCanvas(canvasId);
   if (!s) return;
   const { ctx, w, h } = s;
-  const colorLow = options.colorLow || '#1a1a2e';
+  const colorLow = options.colorLow || (_isLightTheme() ? '#e8eef5' : '#1a1a2e');
   const colorHigh = options.colorHigh || '#3498DB';
   const cellSize = options.cellSize || Math.min(
     (w - 60) / (colLabels.length || 1),
@@ -264,13 +272,13 @@ function drawHeatmap(canvasId, rowLabels, colLabels, data, options) {
 
   ctx.font = '10px sans-serif';
   // col headers
-  ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'center';
+  ctx.fillStyle = _textColor(); ctx.textAlign = 'center';
   for (let c = 0; c < colLabels.length; c++) {
     ctx.fillText(truncText(ctx, colLabels[c], cellSize - 2), labelW + c * cellSize + cellSize / 2, 10);
   }
   // rows
   for (let r = 0; r < rowLabels.length; r++) {
-    ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'right';
+    ctx.fillStyle = _textColor(); ctx.textAlign = 'right';
     ctx.fillText(truncText(ctx, rowLabels[r], labelW - 4), labelW - 4, 22 + r * cellSize + cellSize / 2 + 3);
     for (let c = 0; c < colLabels.length; c++) {
       const v = (data[r] && data[r][c]) || 0;
@@ -278,7 +286,7 @@ function drawHeatmap(canvasId, rowLabels, colLabels, data, options) {
       ctx.fillStyle = lerpColor(colorLow, colorHigh, t);
       ctx.fillRect(labelW + c * cellSize + 1, 16 + r * cellSize + 1, cellSize - 2, cellSize - 2);
       if (v > 0 && cellSize >= 18) {
-        ctx.fillStyle = t > 0.5 ? '#fff' : TEXT_COLOR;
+        ctx.fillStyle = t > 0.5 ? '#fff' : _textColor();
         ctx.textAlign = 'center';
         ctx.fillText(String(v), labelW + c * cellSize + cellSize / 2, 16 + r * cellSize + cellSize / 2 + 4);
       }
@@ -301,8 +309,8 @@ function drawStackedBar(canvasId, labels, datasets, options) {
   const barW = Math.max(6, plotW / labels.length - 4);
 
   // grid
-  ctx.strokeStyle = GRID_COLOR; ctx.lineWidth = 1;
-  ctx.fillStyle = TEXT_COLOR; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  ctx.strokeStyle = _gridColor(); ctx.lineWidth = 1;
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = padT + plotH * (1 - i / 4);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
@@ -319,7 +327,7 @@ function drawStackedBar(canvasId, labels, datasets, options) {
       ctx.fillStyle = datasets[di].color || pickColor(di);
       ctx.fillRect(x, base, barW, bh);
     }
-    ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'center'; ctx.font = '10px sans-serif';
+    ctx.fillStyle = _textColor(); ctx.textAlign = 'center'; ctx.font = '10px sans-serif';
     ctx.fillText(truncText(ctx, labels[li], 50), x + barW / 2, h - 5);
   }
 
@@ -328,7 +336,7 @@ function drawStackedBar(canvasId, labels, datasets, options) {
   datasets.forEach((ds, di) => {
     const c = ds.color || pickColor(di);
     ctx.fillStyle = c; ctx.fillRect(lx, 2, 10, 10);
-    ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'left';
+    ctx.fillStyle = _textColor(); ctx.textAlign = 'left';
     ctx.fillText(ds.label || '', lx + 14, 11);
     lx += ctx.measureText(ds.label || '').width + 28;
   });
@@ -349,8 +357,8 @@ function drawHistogram(canvasId, bucketLabels, values, options) {
   const barW = plotW / values.length;
 
   // grid
-  ctx.strokeStyle = GRID_COLOR; ctx.lineWidth = 1;
-  ctx.fillStyle = TEXT_COLOR; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  ctx.strokeStyle = _gridColor(); ctx.lineWidth = 1;
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = padT + plotH * (1 - i / 4);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
@@ -363,10 +371,10 @@ function drawHistogram(canvasId, bucketLabels, values, options) {
     ctx.fillStyle = color;
     ctx.fillRect(x + 1, padT + plotH - bh, barW - 2, bh);
     if (showValues && values[i] > 0) {
-      ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'center';
+      ctx.fillStyle = _textColor(); ctx.textAlign = 'center';
       ctx.fillText(String(values[i]), x + barW / 2, padT + plotH - bh - 4);
     }
-    ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
+    ctx.fillStyle = _textColor(); ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
     ctx.fillText(truncText(ctx, bucketLabels[i] || '', barW - 2), x + barW / 2, h - 5);
     ctx.font = '10px sans-serif';
   }
@@ -422,7 +430,7 @@ function drawNetworkGraph(canvasId, nodes, edges, options) {
   const directed = options.directed !== false;
 
   if (!nodes.length) {
-    ctx.fillStyle = TEXT_COLOR; ctx.textAlign = 'center';
+    ctx.fillStyle = _textColor(); ctx.textAlign = 'center';
     ctx.fillText('No dependency data', w / 2, h / 2);
     return;
   }
@@ -519,7 +527,7 @@ function drawNetworkGraph(canvasId, nodes, edges, options) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (n.label) {
-        ctx.fillStyle = TEXT_COLOR;
+        ctx.fillStyle = _textColor();
         ctx.textAlign = 'center';
         ctx.font = '10px sans-serif';
         ctx.fillText(truncText(ctx, n.label, 60), n.x, n.y + r + 12);
@@ -643,8 +651,8 @@ function drawAreaChart(canvasId, labels, data, options) {
   const maxVal = niceMax(Math.max(...data, 1));
 
   // grid
-  ctx.strokeStyle = GRID_COLOR; ctx.lineWidth = 1;
-  ctx.fillStyle = TEXT_COLOR; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  ctx.strokeStyle = _gridColor(); ctx.lineWidth = 1;
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
   for (let i = 0; i <= 4; i++) {
     const y = padT + plotH * (1 - i / 4);
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();

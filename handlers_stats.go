@@ -1250,3 +1250,203 @@ func (app *App) handleStatsPersonnelPerformance(w http.ResponseWriter, r *http.R
 		"generated_at":          time.Now().Format(time.RFC3339),
 	})
 }
+
+// ── Usage Statistics ─────────────────────────────────────────────────────────
+
+func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *User) {
+	audit := app.store.GetAudit(10000)
+
+	// ── Logins over time ──
+	loginsByDay := make(map[string]int)
+	failedByDay := make(map[string]int)
+	for _, a := range audit {
+		day := a.Timestamp.Format("2006-01-02")
+		if a.Action == "login" {
+			loginsByDay[day]++
+		} else if a.Action == "login_failed" || a.Action == "login_blocked" {
+			failedByDay[day]++
+		}
+	}
+
+	// ── Security audit breakdown ──
+	securityActions := map[string]int{}
+	for _, a := range audit {
+		switch a.Action {
+		case "login", "login_failed", "login_blocked", "email_changed",
+			"password_changed", "password_reset", "updated":
+			if a.EntityType == "security_settings" || a.EntityType == "user" || a.Action == "login" ||
+				a.Action == "login_failed" || a.Action == "login_blocked" ||
+				a.Action == "email_changed" || a.Action == "password_changed" || a.Action == "password_reset" {
+				securityActions[a.Action]++
+			}
+		}
+	}
+
+	// ── Audit actions by type ──
+	actionCounts := map[string]int{}
+	entityCounts := map[string]int{}
+	for _, a := range audit {
+		actionCounts[a.Action]++
+		entityCounts[a.EntityType]++
+	}
+
+	// ── Integrations usage ──
+	eventLog := app.store.GetEventLog()
+	integrationsBySource := map[string]int{}
+	for _, el := range eventLog {
+		src := el.Source
+		if src == "" {
+			src = "manual"
+		}
+		integrationsBySource[src]++
+	}
+	// Count webhook-configured users
+	allPrefs := app.store.GetAllPreferences()
+	webhookUsers := 0
+	for _, p := range allPrefs {
+		if p.WebhookURL != "" {
+			webhookUsers++
+		}
+	}
+
+	// ── Reference material usage ──
+	refDocs := app.store.GetReferenceDocs()
+	refByCategory := map[string]int{}
+	for _, d := range refDocs {
+		cat := d.Category
+		if cat == "" {
+			cat = "other"
+		}
+		refByCategory[cat]++
+	}
+
+	// ── Map resources ──
+	mapResources := app.store.GetMapResources()
+	mapsByType := map[string]int{}
+	for _, m := range mapResources {
+		mt := m.MapType
+		if mt == "" {
+			mt = "custom"
+		}
+		mapsByType[mt]++
+	}
+	// Most popular maps by overlay/drawing count
+	type mapPop struct {
+		Name     string `json:"name"`
+		Type     string `json:"type"`
+		Overlays int    `json:"overlays"`
+		Drawings int    `json:"drawings"`
+		Activity int    `json:"activity"`
+	}
+	var mapPopularity []mapPop
+	for _, m := range mapResources {
+		drawings := 0
+		for _, o := range m.Overlays {
+			drawings += len(o.Items)
+		}
+		drawings += len(m.Drawings)
+		if drawings > 0 || len(m.Overlays) > 0 {
+			mapPopularity = append(mapPopularity, mapPop{
+				Name: m.Name, Type: m.MapType,
+				Overlays: len(m.Overlays), Drawings: drawings,
+				Activity: drawings + len(m.Overlays),
+			})
+		}
+	}
+	sort.Slice(mapPopularity, func(i, j int) bool {
+		return mapPopularity[i].Activity > mapPopularity[j].Activity
+	})
+	if len(mapPopularity) > 10 {
+		mapPopularity = mapPopularity[:10]
+	}
+
+	// ── Most used features (audit entity types as proxy) ──
+	featureUsage := map[string]int{}
+	for _, a := range audit {
+		if a.Action == "login" || a.Action == "login_failed" || a.Action == "login_blocked" {
+			continue // Skip auth actions from feature usage
+		}
+		featureUsage[a.EntityType]++
+	}
+
+	// ── Readychecks, checklists, polls summary ──
+	readyChecks := app.store.GetPersonReadyChecks()
+	checklists := app.store.GetChecklistInstances()
+	polls := app.store.GetPolls()
+
+	rcTotal := len(readyChecks)
+	rcResponseRate := 0.0
+	rcTotalParticipants := 0
+	rcTotalResponded := 0
+	for _, rc := range readyChecks {
+		for _, p := range rc.Participants {
+			rcTotalParticipants++
+			if p.Status != "pending" {
+				rcTotalResponded++
+			}
+		}
+	}
+	if rcTotalParticipants > 0 {
+		rcResponseRate = float64(rcTotalResponded) / float64(rcTotalParticipants) * 100
+	}
+
+	clTotal := len(checklists)
+	clCompleted := 0
+	clTotalItems := 0
+	clCheckedItems := 0
+	for _, cl := range checklists {
+		if cl.Status == "completed" {
+			clCompleted++
+		}
+		for _, item := range cl.Items {
+			clTotalItems++
+			if item.Checked {
+				clCheckedItems++
+			}
+		}
+	}
+
+	pollTotal := len(polls)
+	pollClosed := 0
+	pollTotalResponses := 0
+	for _, p := range polls {
+		if p.Status == "closed" {
+			pollClosed++
+		}
+		pollTotalResponses += len(p.Responses)
+	}
+
+	jsonOK(w, map[string]any{
+		"logins_by_day":          loginsByDay,
+		"failed_logins_by_day":   failedByDay,
+		"security_actions":       securityActions,
+		"audit_by_action":        actionCounts,
+		"audit_by_entity":        entityCounts,
+		"integrations_by_source": integrationsBySource,
+		"webhook_users":          webhookUsers,
+		"ref_docs_by_category":   refByCategory,
+		"total_ref_docs":         len(refDocs),
+		"maps_by_type":           mapsByType,
+		"total_maps":             len(mapResources),
+		"map_popularity":         mapPopularity,
+		"feature_usage":          featureUsage,
+		"readychecks": map[string]any{
+			"total":         rcTotal,
+			"response_rate": math.Round(rcResponseRate*100) / 100,
+			"participants":  rcTotalParticipants,
+			"responded":     rcTotalResponded,
+		},
+		"checklists": map[string]any{
+			"total":         clTotal,
+			"completed":     clCompleted,
+			"total_items":   clTotalItems,
+			"checked_items": clCheckedItems,
+		},
+		"polls": map[string]any{
+			"total":           pollTotal,
+			"closed":          pollClosed,
+			"total_responses": pollTotalResponses,
+		},
+		"generated_at": time.Now().Format(time.RFC3339),
+	})
+}
