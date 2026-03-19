@@ -62,7 +62,7 @@ function applyI18n() {
   // Tab labels
   document.querySelectorAll('#anlTabBar .btn').forEach(function(btn) {
     var tab = btn.dataset.tab;
-    var map = {overview:'analysis_tab_overview', activity:'analysis_tab_activity', optempo:'analysis_tab_optempo', decisions:'analysis_tab_decisions', dependencies:'analysis_tab_dependencies', export:'analysis_tab_export'};
+    var map = {overview:'analysis_tab_overview', activity:'analysis_tab_activity', optempo:'analysis_tab_optempo', decisions:'analysis_tab_decisions', dependencies:'analysis_tab_dependencies', leadership:'analysis_tab_leadership', jstaff:'analysis_tab_jstaff', teamleads:'analysis_tab_teamleads', opsleads:'analysis_tab_opsleads', teammembers:'analysis_tab_teammembers', usage:'analysis_tab_usage', export:'analysis_tab_export'};
     if (map[tab]) btn.textContent = t(map[tab]) || btn.textContent;
   });
 }
@@ -145,15 +145,18 @@ async function renderActivity(container) {
   var hmDays = heatmap?.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var hmHours = Array.from({length:24}, function(_, i) { return String(i).padStart(2,'0'); });
 
-  var tlLabels = timeline?.labels || timeline?.dates || [];
-  var tlData = timeline?.data || timeline?.counts || [];
+  var tlLabels = [], tlData = [];
+  if (timeline && typeof timeline === 'object' && !Array.isArray(timeline)) {
+    if (timeline.labels) { tlLabels = timeline.labels; tlData = timeline.data || []; }
+    else { var sorted = Object.entries(timeline).sort(function(a,b){return a[0].localeCompare(b[0]);}); tlLabels = sorted.map(function(e){return e[0];}); tlData = sorted.map(function(e){return e[1];}); }
+  }
 
   container.innerHTML =
     '<div class="anl-section"><div class="anl-section-title">' + (t('analysis_heatmap')||'Activity Heatmap (Day x Hour)') + '</div><canvas id="anlHeatmap" height="' + Math.max(200, hmDays.length * 28 + 30) + '"></canvas></div>' +
     '<div class="anl-section"><div class="anl-section-title">' + (t('analysis_events_timeline')||'Events Over Time') + '</div><canvas id="anlAreaTimeline" height="250"></canvas></div>';
 
   setTimeout(function() {
-    if (hmData.length) drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorLow: '#1a1a2e', colorHigh: '#3498DB' });
+    if (hmData.length) drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorHigh: '#3498DB' });
     if (tlLabels.length) drawAreaChart('anlAreaTimeline', tlLabels, tlData, { color: '#3498DB' });
   }, 50);
 }
@@ -166,19 +169,30 @@ async function renderOpTempo(container) {
   ]);
   var opTempo = results[0], slipHist = results[1];
 
-  var tempoLabels = opTempo?.labels || opTempo?.dates || [];
-  var tempoDatasets = [];
-  if (opTempo?.datasets && Array.isArray(opTempo.datasets)) {
-    opTempo.datasets.forEach(function(ds) { tempoDatasets.push({data: ds.data||[], color: ds.color||'#3498DB', label: ds.label||''}); });
-  } else if (opTempo?.data) {
-    tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: t('op_tempo')||'Op Tempo'});
+  var tempoLabels = [], tempoDatasets = [];
+  if (opTempo?.events_per_hour && typeof opTempo.events_per_hour === 'object') {
+    var sorted = Object.entries(opTempo.events_per_hour).sort(function(a,b){return a[0].localeCompare(b[0]);});
+    tempoLabels = sorted.map(function(e){return e[0]+':00';}); tempoDatasets.push({data: sorted.map(function(e){return e[1];}), color: '#3498DB', label: 'Events/Hour'});
+  } else if (opTempo?.labels) {
+    tempoLabels = opTempo.labels;
+    if (opTempo.datasets) opTempo.datasets.forEach(function(ds){tempoDatasets.push({data:ds.data||[],color:ds.color||'#3498DB',label:ds.label||''});});
+    else if (opTempo.data) tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: 'Op Tempo'});
   }
 
-  var slipBuckets = slipHist?.labels || slipHist?.buckets || [];
-  var slipValues = slipHist?.data || slipHist?.values || [];
+  var slipBuckets = [], slipValues = [];
+  if (slipHist?.buckets && typeof slipHist.buckets === 'object' && !Array.isArray(slipHist.buckets)) {
+    slipBuckets = Object.keys(slipHist.buckets); slipValues = Object.values(slipHist.buckets);
+  } else if (Array.isArray(slipHist?.labels)) {
+    slipBuckets = slipHist.labels; slipValues = slipHist.data || [];
+  }
 
   container.innerHTML =
-    '<div class="anl-section"><div class="anl-section-title">' + (t('analysis_optempo')||'Operational Tempo') + '</div><canvas id="anlLineOpTempo" height="250"></canvas></div>' +
+    '<div class="anl-grid anl-grid-3">' +
+      card(opTempo?.concurrent_peak||0, 'Concurrent Peak', '#E67E22') +
+      card((opTempo?.avg_events_per_day||0).toFixed(1), 'Avg Events/Day', 'var(--accent)') +
+      card(slipHist?.mean_slip_minutes ? slipHist.mean_slip_minutes.toFixed(1)+'m' : '—', 'Mean Slip', '#E74C3C') +
+    '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">' + (t('analysis_optempo')||'Operational Tempo (Events per Hour)') + '</div><canvas id="anlLineOpTempo" height="250"></canvas></div>' +
     '<div class="anl-section"><div class="anl-section-title">' + (t('analysis_slip_histogram')||'Slip / Delay Histogram') + '</div><canvas id="anlHistSlip" height="250"></canvas></div>';
 
   setTimeout(function() {
@@ -191,17 +205,18 @@ async function renderDecisions(container) {
   var qs = dateParams();
   var analytics = await cachedGet('/api/stats/decision-analytics' + qs) || {};
 
-  var byStatus = analytics.by_status || {};
-  var outcomeLabels = Object.keys(byStatus).map(function(k) { return k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1); });
-  var outcomeData = Object.values(byStatus);
-  var outcomeColors = Object.keys(byStatus).map(function(k) { return {approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C'}[k] || '#9B59B6'; });
+  var byStatus = analytics.decisions_by_type || analytics.by_status || {};
+  var filteredKeys = Object.keys(byStatus).filter(function(k){return byStatus[k]>0;});
+  var outcomeLabels = filteredKeys.map(function(k) { return k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1); });
+  var outcomeData = filteredKeys.map(function(k){return byStatus[k];});
+  var outcomeColors = filteredKeys.map(function(k) { return {approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C',requested:'#9B59B6',direct:'#3498DB'}[k] || '#9B59B6'; });
 
-  var avgMs = analytics.average_response_ms || analytics.avg_response_ms || 0;
-  var avgResponse = avgMs ? (avgMs / 60000).toFixed(1) + ' min' : 'N/A';
+  var avgMin = analytics.avg_approval_time_minutes || (analytics.average_response_ms ? analytics.average_response_ms / 60000 : 0);
+  var avgResponse = avgMin ? avgMin.toFixed(1) + ' min' : 'N/A';
 
-  var perReq = analytics.per_requester || analytics.by_requester || {};
-  var reqLabels = Object.keys(perReq);
-  var reqData = Object.values(perReq);
+  var topReq = analytics.top_requesters || [];
+  var reqLabels = topReq.length ? topReq.map(function(r){return r.name;}) : Object.keys(analytics.per_requester || {});
+  var reqData = topReq.length ? topReq.map(function(r){return r.count;}) : Object.values(analytics.per_requester || {});
 
   container.innerHTML =
     '<div class="anl-grid anl-grid-2">' +
@@ -243,6 +258,142 @@ async function renderDependencies(container) {
   requestAnimationFrame(function() {
     drawNetworkGraph('anlNetGraph', nodes, edges, { directed: true, interactive: true, nodeRadius: 10 });
   });
+}
+
+/* ── Personnel table helper ────────────────────────────────────────────── */
+function perfTable(users) {
+  if (!users || !users.length) return '<div class="anl-empty">No data available.</div>';
+  var rows = users.map(function(u) {
+    return '<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)">' + escHtml(u.display_name||'') + '</td>' +
+      '<td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">' + (u.total_events||0) + '</td>' +
+      '<td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center;color:#27AE60">' + (u.completed||0) + '</td>' +
+      '<td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">' + (u.completion_rate||0).toFixed(1) + '%</td>' +
+      '<td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">' + (u.decisions_made||0) + '</td></tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">' +
+    '<thead><tr style="background:var(--bg2)"><th style="padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)">Name</th>' +
+    '<th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Total</th>' +
+    '<th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Done</th>' +
+    '<th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Rate</th>' +
+    '<th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Decisions</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+/* ── Leadership Tab ───────────────────────────────────────────────────── */
+async function renderLeadership(container) {
+  var data = await cachedGet('/api/stats/leadership-dashboard');
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available. Requires OpLead role.</div>'; return; }
+  var T = data.tempo||{}, P = data.progress||{}, D = data.delay||{}, DL = data.decision_load||{}, C = data.confidence||{}, S = data.summary||{};
+  var confColor = function(v){return v>=75?'#27AE60':v>=50?'#E67E22':'#E74C3C';};
+  var trendIcon = function(tr){return tr==='accelerating'?'▲':tr==='decelerating'?'▼':'●';};
+  var trendColor = function(tr){return tr==='accelerating'?'#27AE60':tr==='decelerating'?'#E74C3C':'var(--text-dim)';};
+  container.innerHTML =
+    '<div class="anl-grid anl-grid-3" style="margin-bottom:16px">' +
+      card(Math.round(C.overall_confidence||0)+'%', 'Overall Confidence', confColor(C.overall_confidence||0)) +
+      card(Math.round(C.completion_confidence||0)+'%', 'Completion', confColor(C.completion_confidence||0)) +
+      card(Math.round(C.readiness_score||0)+'%', 'Readiness', confColor(C.readiness_score||0)) +
+    '</div>' +
+    '<div class="anl-grid anl-grid-6">' +
+      card(T.events_last_hour||0, 'Last 1h') + card(T.events_last_4h||0, 'Last 4h') + card(T.events_last_24h||0, 'Last 24h') +
+      '<div class="anl-card"><div class="anl-card-value" style="color:'+trendColor(T.tempo_trend)+'">'+trendIcon(T.tempo_trend)+' '+ escHtml(T.tempo_trend||'—')+'</div><div class="anl-card-label">Trend</div></div>' +
+      card(P.completed_count||0, 'Completed', '#27AE60') + card(Math.round(P.completion_rate||0)+'%', 'Rate', confColor(P.completion_rate||0)) +
+    '</div>' +
+    '<div class="anl-grid anl-grid-6">' +
+      card(Math.round(D.mean_slip_minutes||0)+'m', 'Mean Slip', D.mean_slip_minutes>15?'#E74C3C':'#27AE60') +
+      card(DL.total_decisions||0, 'Decisions') + card(DL.pending||0, 'Pending', DL.pending>5?'#E74C3C':'#E67E22') +
+      card(S.active_users_count||0, 'Active Users') + card(S.logbook_entries_24h||0, 'Logbook 24h') +
+      card(S.lock_count||0, 'Locks') +
+    '</div>';
+}
+
+/* ── J-Staff Tab ──────────────────────────────────────────────────────── */
+async function renderJStaff(container) {
+  var data = await cachedGet('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available.</div>'; return; }
+  var byType = data.j_staff_by_type || [], individuals = data.j_staff_individual || [];
+  var typeLabels = byType.map(function(jt){return jt.designation;}), typeData = byType.map(function(jt){return jt.total_events;});
+  container.innerHTML =
+    '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">Performance analysis of NATO J-coded staff officers (J1–J9).</p>' +
+    '<div class="anl-grid anl-grid-3">' + card(individuals.length, 'J-Staff Participants', 'var(--accent)') + card(byType.length, 'Designations Active', '#3498DB') + '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">J-Staff Performance by Designation</div><canvas id="anlJStaffTypeChart" height="'+Math.max(180,typeLabels.length*28+20)+'"></canvas></div>' +
+    '<div class="anl-section"><div class="anl-section-title">Individual J-Staff Officer Performance</div>' + perfTable(individuals) + '</div>';
+  setTimeout(function(){if(typeLabels.length)drawBarChart('anlJStaffTypeChart',typeLabels,typeData,{horizontal:true,maxBarWidth:28});},50);
+}
+
+/* ── TeamLeads Tab ────────────────────────────────────────────────────── */
+async function renderTeamLeads(container) {
+  var results = await Promise.all([cachedGet('/api/stats/personnel-performance'), cachedGet('/api/stats/usage')]);
+  var data = results[0], usage = results[1];
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available.</div>'; return; }
+  var leads = data.team_leads||[], deputies = data.deputy_team_leads||[], allLeads = leads.concat(deputies);
+  var chartLabels = allLeads.map(function(u){return u.display_name;}), chartData = allLeads.map(function(u){return u.total_events||0;});
+  var rc = usage?.readychecks||{}, cl = usage?.checklists||{}, po = usage?.polls||{};
+  container.innerHTML =
+    '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">TeamLead and Deputy TeamLead performance metrics and toolbox utilisation.</p>' +
+    '<div class="anl-grid anl-grid-6">' + card(leads.length,'TeamLeads','var(--accent)') + card(deputies.length,'Deputies','var(--accent)') +
+      card(rc.total||0,'ReadyChecks','#3498DB') + card(cl.total||0,'Checklists','#9B59B6') + card(po.total||0,'Polls','#E67E22') + card(po.total_responses||0,'Poll Responses','#1ABC9C') +
+    '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">Event Distribution</div><canvas id="anlTLChart" height="'+Math.max(180,chartLabels.length*22+20)+'"></canvas></div>' +
+    '<div class="anl-section"><div class="anl-section-title">Individual Performance</div>' + perfTable(allLeads) + '</div>';
+  setTimeout(function(){if(chartLabels.length)drawBarChart('anlTLChart',chartLabels,chartData,{horizontal:true,maxBarWidth:22});},50);
+}
+
+/* ── OpsLeads Tab ─────────────────────────────────────────────────────── */
+async function renderOpsLeads(container) {
+  var data = await cachedGet('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available.</div>'; return; }
+  var leads = data.ops_leads||[], deputies = data.deputy_ops_leads||[], allLeads = leads.concat(deputies);
+  var chartLabels = allLeads.map(function(u){return u.display_name;}), chartData = allLeads.map(function(u){return u.total_events||0;});
+  container.innerHTML =
+    '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">Operations Lead and Deputy Operations Lead performance analysis.</p>' +
+    '<div class="anl-grid anl-grid-3">' + card(leads.length,'OpsLeads','var(--accent)') + card(deputies.length,'Deputies','var(--accent)') + '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">Event Distribution</div><canvas id="anlOLChart" height="'+Math.max(180,chartLabels.length*22+20)+'"></canvas></div>' +
+    '<div class="anl-section"><div class="anl-section-title">Individual Performance</div>' + perfTable(allLeads) + '</div>';
+  setTimeout(function(){if(chartLabels.length)drawBarChart('anlOLChart',chartLabels,chartData,{horizontal:true,maxBarWidth:22});},50);
+}
+
+/* ── Team Members Tab ─────────────────────────────────────────────────── */
+async function renderTeamMembers(container) {
+  var data = await cachedGet('/api/stats/personnel-performance');
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available.</div>'; return; }
+  var members = data.team_members||[];
+  var chartLabels = members.slice(0,20).map(function(u){return u.display_name;}), chartData = members.slice(0,20).map(function(u){return u.total_events||0;});
+  container.innerHTML =
+    '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">Individual team member workload and performance.</p>' +
+    '<div class="anl-grid anl-grid-3">' + card(members.length,'Team Members','var(--accent)') + '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">Member Workload (Top 20)</div><canvas id="anlMemberChart" height="'+Math.max(180,chartLabels.length*22+20)+'"></canvas></div>' +
+    '<div class="anl-section"><div class="anl-section-title">Individual Performance</div>' + perfTable(members) + '</div>';
+  setTimeout(function(){if(chartLabels.length)drawBarChart('anlMemberChart',chartLabels,chartData,{horizontal:true,colors:'#2980B9',maxBarWidth:22});},50);
+}
+
+/* ── System Usage Tab ─────────────────────────────────────────────────── */
+async function renderUsage(container) {
+  var data = await cachedGet('/api/stats/usage');
+  if (!data) { container.innerHTML = '<div class="anl-empty">No data available.</div>'; return; }
+  var rc = data.readychecks||{}, cl = data.checklists||{}, po = data.polls||{};
+  var loginsByDay = data.logins_by_day||{}, failedByDay = data.failed_logins_by_day||{};
+  var allDays = [].concat(Object.keys(loginsByDay), Object.keys(failedByDay)).filter(function(v,i,a){return a.indexOf(v)===i;}).sort();
+  var loginData = allDays.map(function(d){return loginsByDay[d]||0;}), failedData = allDays.map(function(d){return failedByDay[d]||0;});
+  var secActions = data.security_actions||{}, secLabels = Object.keys(secActions), secData = Object.values(secActions);
+  var featEntries = Object.entries(data.feature_usage||{}).sort(function(a,b){return b[1]-a[1];}).slice(0,15);
+  var featLabels = featEntries.map(function(e){return e[0];}), featData = featEntries.map(function(e){return e[1];});
+  container.innerHTML =
+    '<p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:14px">System usage statistics showing how TidsLinjal is being used.</p>' +
+    '<div class="anl-grid anl-grid-6">' +
+      card(data.total_logins||0,'Total Logins','#27AE60') + card(data.total_failed_logins||0,'Failed Logins', (data.total_failed_logins||0)>0?'#E74C3C':'#27AE60') +
+      card(rc.total||0,'ReadyChecks','#3498DB') + card(cl.total||0,'Checklists','#9B59B6') + card(po.total||0,'Polls','#E67E22') +
+      card(data.total_ref_docs||0,'Ref Docs','#3498DB') +
+    '</div>' +
+    '<div class="anl-section"><div class="anl-section-title">Logins Over Time</div><canvas id="anlLoginTimeline" height="200"></canvas></div>' +
+    '<div class="anl-grid anl-grid-2">' +
+      '<div class="anl-section"><div class="anl-section-title">Security Audit Records</div><canvas id="anlSecBar" height="'+Math.max(200,secLabels.length*22+20)+'"></canvas></div>' +
+      '<div class="anl-section"><div class="anl-section-title">Most Used Features (Top 15)</div><canvas id="anlFeatBar" height="'+Math.max(200,featLabels.length*22+20)+'"></canvas></div>' +
+    '</div>';
+  setTimeout(function(){
+    if(allDays.length)drawLineChart('anlLoginTimeline',allDays,[{data:loginData,color:'#27AE60',label:'Successful'},{data:failedData,color:'#E74C3C',label:'Failed'}],{showArea:true,showPoints:false});
+    if(secLabels.length)drawBarChart('anlSecBar',secLabels,secData,{horizontal:true,maxBarWidth:22});
+    if(featLabels.length)drawBarChart('anlFeatBar',featLabels,featData,{horizontal:true,maxBarWidth:22});
+  },50);
 }
 
 /* ── Export Tab ─────────────────────────────────────────────────────────── */
@@ -348,6 +499,12 @@ async function loadTab(tab) {
       case 'optempo':      await renderOpTempo(container); break;
       case 'decisions':    await renderDecisions(container); break;
       case 'dependencies': await renderDependencies(container); break;
+      case 'leadership':   await renderLeadership(container); break;
+      case 'jstaff':       await renderJStaff(container); break;
+      case 'teamleads':    await renderTeamLeads(container); break;
+      case 'opsleads':     await renderOpsLeads(container); break;
+      case 'teammembers':  await renderTeamMembers(container); break;
+      case 'usage':        await renderUsage(container); break;
       case 'export':       renderExport(container); break;
     }
   } catch(e) {

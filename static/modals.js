@@ -2740,7 +2740,7 @@ async function _loadLogBook() {
     return;
   }
   const isAdmin = state.user?.role === 'admin';
-  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',meeting:'📝',other:'📌'};
+  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',logistics:'🚚',meeting:'📝',other:'📌'};
   el.innerHTML = _logBookEntries.slice().reverse().map(e => {
     const ts = new Date(e.timestamp).toLocaleString();
     const icon = catIcons[e.category] || '📌';
@@ -2803,17 +2803,17 @@ async function deleteLogBookEntry(id) {
 // ── Log Book modal (accessible from Tools) ──
 function openLogBookModal() {
   const cats = [
-    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
-    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
-    {v:'incident',l:t('lb_incident')||'Special incident'},
-    {v:'directive',l:t('lb_directive')||'Directive'},
-    {v:'decision',l:t('lb_decision')||'Decision'},
-    {v:'action',l:t('lb_action')||'Action taken'},
-    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
-    {v:'situation',l:t('lb_situation')||'Situation change'},
-    {v:'logistics',l:t('lb_logistics')||'Logistics'},
-    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
-    {v:'other',l:t('lb_other')||'Other'}
+    {v:'incoming',l:'📥 '+(t('lb_incoming')||'Incoming matter')},
+    {v:'outgoing',l:'📤 '+(t('lb_outgoing')||'Outgoing matter')},
+    {v:'incident',l:'🚨 '+(t('lb_incident')||'Special incident')},
+    {v:'directive',l:'🎯 '+(t('lb_directive')||'Directive')},
+    {v:'decision',l:'⚖️ '+(t('lb_decision')||'Decision')},
+    {v:'action',l:'✅ '+(t('lb_action')||'Action taken')},
+    {v:'briefing',l:'📊 '+(t('lb_briefing')||'Briefing content')},
+    {v:'situation',l:'🔄 '+(t('lb_situation')||'Situation change')},
+    {v:'logistics',l:'🚚 '+(t('lb_logistics')||'Logistics')},
+    {v:'meeting',l:'📝 '+(t('lb_meeting')||'Meeting protocol')},
+    {v:'other',l:'📌 '+(t('lb_other')||'Other')}
   ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
@@ -13332,17 +13332,17 @@ function openDetachedLogBook() {
 
   // Build logbook categories
   const cats = [
-    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
-    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
-    {v:'incident',l:t('lb_incident')||'Special incident'},
-    {v:'directive',l:t('lb_directive')||'Directive'},
-    {v:'decision',l:t('lb_decision')||'Decision'},
-    {v:'action',l:t('lb_action')||'Action taken'},
-    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
-    {v:'situation',l:t('lb_situation')||'Situation change'},
-    {v:'logistics',l:t('lb_logistics')||'Logistics'},
-    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
-    {v:'other',l:t('lb_other')||'Other'}
+    {v:'incoming',l:'📥 '+(t('lb_incoming')||'Incoming matter')},
+    {v:'outgoing',l:'📤 '+(t('lb_outgoing')||'Outgoing matter')},
+    {v:'incident',l:'🚨 '+(t('lb_incident')||'Special incident')},
+    {v:'directive',l:'🎯 '+(t('lb_directive')||'Directive')},
+    {v:'decision',l:'⚖️ '+(t('lb_decision')||'Decision')},
+    {v:'action',l:'✅ '+(t('lb_action')||'Action taken')},
+    {v:'briefing',l:'📊 '+(t('lb_briefing')||'Briefing content')},
+    {v:'situation',l:'🔄 '+(t('lb_situation')||'Situation change')},
+    {v:'logistics',l:'🚚 '+(t('lb_logistics')||'Logistics')},
+    {v:'meeting',l:'📝 '+(t('lb_meeting')||'Meeting protocol')},
+    {v:'other',l:'📌 '+(t('lb_other')||'Other')}
   ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
 
   const theme = document.body.className || '';
