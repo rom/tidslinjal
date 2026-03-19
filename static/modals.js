@@ -2740,7 +2740,7 @@ async function _loadLogBook() {
     return;
   }
   const isAdmin = state.user?.role === 'admin';
-  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',meeting:'📝',other:'📌'};
+  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',logistics:'🚚',meeting:'📝',other:'📌'};
   el.innerHTML = _logBookEntries.slice().reverse().map(e => {
     const ts = new Date(e.timestamp).toLocaleString();
     const icon = catIcons[e.category] || '📌';
@@ -2803,17 +2803,17 @@ async function deleteLogBookEntry(id) {
 // ── Log Book modal (accessible from Tools) ──
 function openLogBookModal() {
   const cats = [
-    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
-    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
-    {v:'incident',l:t('lb_incident')||'Special incident'},
-    {v:'directive',l:t('lb_directive')||'Directive'},
-    {v:'decision',l:t('lb_decision')||'Decision'},
-    {v:'action',l:t('lb_action')||'Action taken'},
-    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
-    {v:'situation',l:t('lb_situation')||'Situation change'},
-    {v:'logistics',l:t('lb_logistics')||'Logistics'},
-    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
-    {v:'other',l:t('lb_other')||'Other'}
+    {v:'incoming',l:'📥 '+(t('lb_incoming')||'Incoming matter')},
+    {v:'outgoing',l:'📤 '+(t('lb_outgoing')||'Outgoing matter')},
+    {v:'incident',l:'🚨 '+(t('lb_incident')||'Special incident')},
+    {v:'directive',l:'🎯 '+(t('lb_directive')||'Directive')},
+    {v:'decision',l:'⚖️ '+(t('lb_decision')||'Decision')},
+    {v:'action',l:'✅ '+(t('lb_action')||'Action taken')},
+    {v:'briefing',l:'📊 '+(t('lb_briefing')||'Briefing content')},
+    {v:'situation',l:'🔄 '+(t('lb_situation')||'Situation change')},
+    {v:'logistics',l:'🚚 '+(t('lb_logistics')||'Logistics')},
+    {v:'meeting',l:'📝 '+(t('lb_meeting')||'Meeting protocol')},
+    {v:'other',l:'📌 '+(t('lb_other')||'Other')}
   ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
@@ -11629,7 +11629,7 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="opsleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_opsleads')||'OpsLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="teammembers" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teammembers')||'Team Members'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'System Usage'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'Usage'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
         </div>
@@ -12458,8 +12458,15 @@ async function _renderUsageTab(container) {
   const totalLogins = data.total_logins || 0;
   const totalFailed = data.total_failed_logins || 0;
 
+  // Language and theme distribution
+  const langDist = data.language_distribution || {};
+  const langNames = {en:'English',sv:'Svenska',fi:'Suomi',fr:'Français',de:'Deutsch',no:'Norsk',da:'Dansk',es:'Español'};
+  const langLabels = Object.keys(langDist).map(k => langNames[k] || k);
+  const langData = Object.values(langDist);
+  const themeDist = data.theme_distribution || {};
+
   container.innerHTML = `
-    ${_analysisDesc('System usage statistics showing how TidsLinjal is being used during the exercise. Includes login activity, security audit records, most used features, reference material, maps and charts, integrations, and collaboration tools (ReadyChecks, checklists, polls).')}
+    ${_analysisDesc('System usage statistics showing how TidsLinjal is being used during the exercise. Includes login activity, language preferences, security audit records, most used features, reference material, maps and charts, integrations, and collaboration tools.')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
       ${_analysisCard(totalLogins, 'Total Logins', '#27AE60')}
       ${_analysisCard(totalFailed, 'Failed Logins', totalFailed > 0 ? '#E74C3C' : '#27AE60')}
@@ -12476,6 +12483,19 @@ async function _renderUsageTab(container) {
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Logins Over Time</div>
       <canvas id="anlLoginTimeline" height="200"></canvas>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Language Settings</div>
+        <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:8px">Distribution of interface language preferences across users.</p>
+        <canvas id="anlLangPie" height="200"></canvas>
+      </div>
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Theme Preferences</div>
+        <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:8px">Visual theme distribution across users.</p>
+        <canvas id="anlThemePie" height="200"></canvas>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
@@ -12532,6 +12552,12 @@ async function _renderUsageTab(container) {
         {data: loginData, color: '#27AE60', label: 'Successful'},
         {data: failedData, color: '#E74C3C', label: 'Failed'}
       ], { showArea: true, showPoints: false });
+    }
+    if (langLabels.length && typeof drawPieChart === 'function') {
+      drawPieChart('anlLangPie', langLabels, langData);
+    }
+    if (Object.keys(themeDist).length && typeof drawPieChart === 'function') {
+      drawPieChart('anlThemePie', Object.keys(themeDist), Object.values(themeDist));
     }
     if (secLabels.length && typeof drawBarChart === 'function') {
       drawBarChart('anlSecBar', secLabels, secData, { horizontal: true, maxBarWidth: 22 });
@@ -13332,17 +13358,17 @@ function openDetachedLogBook() {
 
   // Build logbook categories
   const cats = [
-    {v:'incoming',l:t('lb_incoming')||'Incoming matter'},
-    {v:'outgoing',l:t('lb_outgoing')||'Outgoing matter'},
-    {v:'incident',l:t('lb_incident')||'Special incident'},
-    {v:'directive',l:t('lb_directive')||'Directive'},
-    {v:'decision',l:t('lb_decision')||'Decision'},
-    {v:'action',l:t('lb_action')||'Action taken'},
-    {v:'briefing',l:t('lb_briefing')||'Briefing content'},
-    {v:'situation',l:t('lb_situation')||'Situation change'},
-    {v:'logistics',l:t('lb_logistics')||'Logistics'},
-    {v:'meeting',l:t('lb_meeting')||'Meeting protocol'},
-    {v:'other',l:t('lb_other')||'Other'}
+    {v:'incoming',l:'📥 '+(t('lb_incoming')||'Incoming matter')},
+    {v:'outgoing',l:'📤 '+(t('lb_outgoing')||'Outgoing matter')},
+    {v:'incident',l:'🚨 '+(t('lb_incident')||'Special incident')},
+    {v:'directive',l:'🎯 '+(t('lb_directive')||'Directive')},
+    {v:'decision',l:'⚖️ '+(t('lb_decision')||'Decision')},
+    {v:'action',l:'✅ '+(t('lb_action')||'Action taken')},
+    {v:'briefing',l:'📊 '+(t('lb_briefing')||'Briefing content')},
+    {v:'situation',l:'🔄 '+(t('lb_situation')||'Situation change')},
+    {v:'logistics',l:'🚚 '+(t('lb_logistics')||'Logistics')},
+    {v:'meeting',l:'📝 '+(t('lb_meeting')||'Meeting protocol')},
+    {v:'other',l:'📌 '+(t('lb_other')||'Other')}
   ].filter(c => !(c.v === 'decision' && state.preferences && state.preferences.logbook_hide_decisions));
 
   const theme = document.body.className || '';
