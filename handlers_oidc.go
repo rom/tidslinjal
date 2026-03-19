@@ -956,8 +956,8 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Deny login for blocked accounts (even via OIDC)
 	if user.Blocked {
-		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
-			fmt.Sprintf("Blocked OIDC user %q attempted login", username))
+		app.audit(user.ID, "system", "login_failed_blocked", "user", user.ID,
+			fmt.Sprintf("Login failed: blocked account %q attempted SSO login", username))
 		http.Redirect(w, r, "/login?error=account_blocked", http.StatusFound)
 		return
 	}

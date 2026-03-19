@@ -185,7 +185,7 @@ function drawLineChart(canvasId, labels, datasets, options) {
   const s = setupCanvas(canvasId);
   if (!s) return;
   const { ctx, w, h } = s;
-  const padL = 45, padR = 15, padT = 15, padB = 35;
+  const padL = 45, padR = 15, padT = 15, padB = 55;
   const plotW = w - padL - padR, plotH = h - padT - padB;
   let allMax = 0;
   datasets.forEach(ds => { ds.data.forEach(v => { if (v > allMax) allMax = v; }); });
@@ -199,12 +199,17 @@ function drawLineChart(canvasId, labels, datasets, options) {
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
     ctx.fillText(String(Math.round(allMax * i / 4)), padL - 4, y + 3);
   }
-  // x labels
-  ctx.textAlign = 'center'; ctx.fillStyle = _textColor();
-  const step = Math.max(1, Math.floor(labels.length / 10));
+  // x labels — angled for date strings
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif';
+  const step = Math.max(1, Math.floor(labels.length / 12));
   for (let i = 0; i < labels.length; i += step) {
     const x = padL + (i / (labels.length - 1 || 1)) * plotW;
-    ctx.fillText(truncText(ctx, labels[i], 50), x, h - 5);
+    ctx.save();
+    ctx.translate(x, h - padB + 8);
+    ctx.rotate(-0.45);
+    ctx.textAlign = 'right';
+    ctx.fillText(truncText(ctx, labels[i], 70), 0, 0);
+    ctx.restore();
   }
 
   datasets.forEach((ds, di) => {
@@ -646,7 +651,7 @@ function drawAreaChart(canvasId, labels, data, options) {
   if (!s) return;
   const { ctx, w, h } = s;
   const color = options.color || DEFAULT_COLORS[0];
-  const padL = 45, padR = 15, padT = 15, padB = 35;
+  const padL = 45, padR = 15, padT = 15, padB = 55;
   const plotW = w - padL - padR, plotH = h - padT - padB;
   const maxVal = niceMax(Math.max(...data, 1));
 
@@ -658,12 +663,17 @@ function drawAreaChart(canvasId, labels, data, options) {
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
     ctx.fillText(String(Math.round(maxVal * i / 4)), padL - 4, y + 3);
   }
-  // x labels
-  ctx.textAlign = 'center';
-  const step = Math.max(1, Math.floor(labels.length / 10));
+  // x labels — angled for date strings
+  ctx.fillStyle = _textColor(); ctx.font = '10px sans-serif';
+  const step = Math.max(1, Math.floor(labels.length / 12));
   for (let i = 0; i < labels.length; i += step) {
     const x = padL + (i / (labels.length - 1 || 1)) * plotW;
-    ctx.fillText(truncText(ctx, labels[i], 50), x, h - 5);
+    ctx.save();
+    ctx.translate(x, h - padB + 8);
+    ctx.rotate(-0.45);
+    ctx.textAlign = 'right';
+    ctx.fillText(truncText(ctx, labels[i], 70), 0, 0);
+    ctx.restore();
   }
 
   const pts = data.map((v, i) => ({

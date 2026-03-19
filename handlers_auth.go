@@ -30,13 +30,10 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// or when the admin has disabled password login in security settings.
 	// The built-in admin account is always exempted so admins can recover if OIDC breaks.
 	if req.Username != "admin" && app.oidc != nil {
-		if app.oidcExclusive {
-			logVerbose("local login blocked for %q — OIDC exclusive mode", req.Username)
-			jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
-			return
-		}
-		if app.store.GetSecuritySettings().DisablePasswordLogin {
-			logVerbose("local login blocked for %q — password login disabled in security settings", req.Username)
+		if app.oidcExclusive || app.store.GetSecuritySettings().DisablePasswordLogin {
+			logVerbose("local login blocked for %q — SSO-only mode", req.Username)
+			app.audit(0, "system", "login_failed_sso_only", "user", 0,
+				fmt.Sprintf("Login failed: password login disabled (SSO-only) for %q from %s", req.Username, clientIP(r)))
 			jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
 			return
 		}
@@ -46,14 +43,16 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// Perform a dummy bcrypt comparison to prevent timing-based user enumeration.
 		bcrypt.CompareHashAndPassword([]byte("$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"), []byte(req.Password)) //nolint:errcheck
-		app.audit(0, "system", "login_failed", "user", 0,
-			fmt.Sprintf("Failed login attempt for unknown account %q from %s", req.Username, loginClientIP))
+		app.audit(0, "system", "login_failed_unknown_account", "user", 0,
+			fmt.Sprintf("Login failed: unknown account %q from %s", req.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	// L-06 fix: check progressive account lockout
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
+		app.audit(user.ID, "system", "login_failed_lockout", "user", user.ID,
+			fmt.Sprintf("Login failed: account %q locked out (repeated failures) from %s", user.Username, loginClientIP))
 		jsonError(w, "account temporarily locked — try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -62,20 +61,22 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if user.Blocked {
 		// Still do bcrypt comparison to prevent timing-based detection of blocked accounts
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
-		app.audit(user.ID, "system", "login_blocked", "user", user.ID,
-			fmt.Sprintf("Blocked user %q attempted login from %s", user.Username, loginClientIP))
+		app.audit(user.ID, "system", "login_failed_blocked", "user", user.ID,
+			fmt.Sprintf("Login failed: administratively blocked account %q from %s", user.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	if !user.Vetted && user.Role != RoleAdmin {
 		// Timing-attack mitigation: dummy bcrypt to prevent detection of unvetted accounts
 		bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) //nolint:errcheck
+		app.audit(user.ID, "system", "login_failed_unvetted", "user", user.ID,
+			fmt.Sprintf("Login failed: unvetted account %q from %s", user.Username, loginClientIP))
 		jsonError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		app.audit(0, "system", "login_failed", "user", user.ID,
-			fmt.Sprintf("Failed login attempt for account %q from %s (wrong password)", user.Username, loginClientIP))
+		app.audit(0, "system", "login_failed_password", "user", user.ID,
+			fmt.Sprintf("Login failed: wrong password for %q from %s", user.Username, loginClientIP))
 		// Record failed login attempt and apply progressive lockout (L-06 fix)
 		go func(u User, ip string) {
 			if fullUser, ok := app.store.GetUserByID(u.ID); ok {

@@ -11629,7 +11629,7 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="opsleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_opsleads')||'OpsLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="teammembers" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teammembers')||'Team Members'}</button>
-            <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'Usage'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'System Usage'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
         </div>
@@ -11682,6 +11682,10 @@ function _analysisDateParams() {
   if (from) qs += (qs ? '&' : '?') + 'from=' + encodeURIComponent(from);
   if (to) qs += (qs ? '&' : '?') + 'to=' + encodeURIComponent(to);
   return qs;
+}
+
+function _analysisDesc(text) {
+  return `<p style="font-size:var(--fs-xs);color:var(--text);margin:0 0 14px;line-height:1.5">${text}</p>`;
 }
 
 function _analysisCard(value, label, color) {
@@ -11740,6 +11744,7 @@ async function _renderOverviewTab(container) {
   const wlData = wlEntries.map(e => e[1].total || 0);
 
   container.innerHTML = `
+    ${_analysisDesc('High-level summary of exercise activity: total events, users, alarms, and decisions. Charts show the distribution of events by status and type, plus the top 15 most active users.')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
       ${_analysisCard(overview?.total_events||0, t('total_events')||'Total Events', 'var(--accent)')}
       ${_analysisCard(overview?.total_users||0, t('total_users')||'Total Users', 'var(--accent)')}
@@ -11790,6 +11795,7 @@ async function _renderActivityTab(container) {
   }
 
   container.innerHTML = `
+    ${_analysisDesc('Activity patterns across the exercise period. The heatmap shows when events occur by day of week and hour. The timeline shows the total number of events per day over the selected period.')}
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
       <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_heatmap')||'Activity Heatmap (Day x Hour)'}</div>
       <canvas id="anlHeatmap" height="${Math.max(200, hmDays.length * 28 + 30)}"></canvas>
@@ -11828,6 +11834,7 @@ async function _renderDecisionsTab(container) {
   const reqData = topReq.length ? topReq.map(r => r.count) : Object.values(analytics.per_requester || {});
 
   container.innerHTML = `
+    ${_analysisDesc('Decision log analytics showing the breakdown of decision outcomes (approved, denied, requested, direct), average response time, and the most active decision requesters.')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
         <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_approval_rate')||'Approval Rate'}</div>
@@ -11884,6 +11891,7 @@ async function _renderOpTempoTab(container) {
   const medianSlip = slipHist?.median_slip_minutes ? slipHist.median_slip_minutes.toFixed(1) + 'm' : '—';
 
   container.innerHTML = `
+    ${_analysisDesc('Operational tempo measures the pace of activity. Shows events per hour over the last 24 hours, concurrent peak load, and the distribution of schedule slip (how late or early events started compared to their planned time).')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
       ${_analysisCard(concPeak, t('concurrent_peak')||'Concurrent Peak', '#E67E22')}
       ${_analysisCard(avgPerDay, t('avg_events_day')||'Avg Events/Day', 'var(--accent)')}
@@ -11928,6 +11936,7 @@ async function _renderDependenciesTab(container) {
   const stats = graph?.stats || {};
 
   container.innerHTML = `
+    ${_analysisDesc('Interactive dependency graph showing how events are linked. Drag nodes to reposition. Red nodes and edges mark the critical path — the longest chain of dependent events that determines the minimum project duration.')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
       ${_analysisCard(stats.total_nodes || nodes.length, t('total_nodes')||'Nodes', 'var(--accent)')}
       ${_analysisCard(stats.total_edges || edges.length, t('total_edges')||'Edges', 'var(--accent)')}
@@ -12031,7 +12040,10 @@ async function _renderLeadershipTab(container) {
             card(T.events_last_hour||0, t('ld_last_1h')||'Last 1h'),
             card(T.events_last_4h||0, t('ld_last_4h')||'Last 4h'),
             card(T.events_last_24h||0, t('ld_last_24h')||'Last 24h'),
-            card(`<span style="color:${trendColor(T.tempo_trend)}">${trendIcon(T.tempo_trend)} ${T.tempo_trend||'—'}</span>`, t('ld_trend')||'Trend')
+            `<div style="padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);text-align:center">
+              <div style="font-size:24px;font-weight:700;color:${trendColor(T.tempo_trend)}">${trendIcon(T.tempo_trend)} ${escHtml(T.tempo_trend||'—')}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text)">${escHtml(t('ld_trend')||'Trend')}</div>
+            </div>`
           )}
           <div style="font-size:var(--fs-xs);color:var(--text)">${t('ld_concurrent_active')||'Concurrent active'}: <b>${T.concurrent_active||0}</b></div>
         `)}
@@ -12182,10 +12194,12 @@ async function _renderJStaffTab(container) {
 
   const byType = data.j_staff_by_type || [];
   const individuals = data.j_staff_individual || [];
+  const totalJStaff = individuals.length;
+  const totalDesignations = byType.length;
 
   // J-staff type summary cards
   const typeCards = byType.map(jt => _analysisCard(
-    `${jt.user_count} / ${jt.total_events}`,
+    `${jt.user_count} staff / ${jt.total_events} events`,
     `${jt.designation} (${(jt.completion_rate||0).toFixed(0)}%)`,
     jt.completion_rate >= 75 ? '#27AE60' : jt.completion_rate >= 50 ? '#E67E22' : '#E74C3C'
   )).join('');
@@ -12195,13 +12209,18 @@ async function _renderJStaffTab(container) {
   const typeData = byType.map(jt => jt.total_events);
 
   container.innerHTML = `
+    ${_analysisDesc('Performance analysis of NATO J-coded staff officers (J1–J9). Each designation card shows the number of assigned staff and their total events. The chart compares event load across designations, and the table shows individual officer performance metrics.')}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(totalJStaff, 'J-Staff Participants', 'var(--accent)')}
+      ${_analysisCard(totalDesignations, 'Designations Active', '#3498DB')}
+    </div>
     <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">⭐ ${t('jstaff_type_performance')||'J-Staff Performance by Designation'}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px">${typeCards}</div>
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">${t('jstaff_type_performance')||'J-Staff Performance by Designation (J1–J9)'}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:12px">${typeCards}</div>
       <canvas id="anlJStaffTypeChart" height="${Math.max(180, typeLabels.length * 28 + 20)}"></canvas>
     </div>
     <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('jstaff_individual_performance')||'Individual J-Staff Officer Performance'}</div>
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">${t('jstaff_individual_performance')||'Individual J-Staff Officer Performance'}</div>
       ${_perfTable(individuals)}
     </div>`;
 
@@ -12253,6 +12272,7 @@ async function _renderTeamLeadsTab(container) {
   const tbData = toolbox.map(t => t.used);
 
   container.innerHTML = `
+    ${_analysisDesc('TeamLead and Deputy TeamLead performance metrics including event completion rates and toolbox utilisation. The toolbox section shows which leadership tools (ReadyChecks, checklists, polls, reports, decisions) have been actively used during the exercise.')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
         <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">TeamLead Performance</div>
@@ -12332,6 +12352,7 @@ async function _renderOpsLeadsTab(container) {
   const chartData = allLeads.map(u => u.total_events||0);
 
   container.innerHTML = `
+    ${_analysisDesc('Operations Lead and Deputy Operations Lead performance analysis. Shows event distribution, completion rates, and individual performance metrics for the operations leadership team.')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
         <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">⚙ ${t('opslead_type_perf')||'OperationsLead Performance (by type)'}</div>
@@ -12374,6 +12395,7 @@ async function _renderTeamMembersTab(container) {
   const overallRate = totalEvents > 0 ? (totalCompleted/totalEvents*100) : 0;
 
   container.innerHTML = `
+    ${_analysisDesc('Individual team member workload and performance. The top 20 most active members are charted. The table shows completion rates, average schedule slip, and decision activity for each team member.')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
       ${_analysisCard(members.length, t('total_members')||'Team Members', 'var(--accent)')}
       ${_analysisCard(totalEvents, t('total_events')||'Total Events', 'var(--accent)')}
@@ -12433,8 +12455,14 @@ async function _renderUsageTab(container) {
   const mapData = Object.values(mapTypes);
   const mapPop = data.map_popularity || [];
 
+  const totalLogins = data.total_logins || 0;
+  const totalFailed = data.total_failed_logins || 0;
+
   container.innerHTML = `
+    ${_analysisDesc('System usage statistics showing how TidsLinjal is being used during the exercise. Includes login activity, security audit records, most used features, reference material, maps and charts, integrations, and collaboration tools (ReadyChecks, checklists, polls).')}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(totalLogins, 'Total Logins', '#27AE60')}
+      ${_analysisCard(totalFailed, 'Failed Logins', totalFailed > 0 ? '#E74C3C' : '#27AE60')}
       ${_analysisCard(rc.total||0, 'ReadyChecks', '#3498DB')}
       ${_analysisCard((rc.response_rate||0).toFixed(0)+'%', 'RC Response Rate', rc.response_rate >= 75 ? '#27AE60' : '#E67E22')}
       ${_analysisCard(cl.total||0, 'Checklists', '#9B59B6')}
@@ -12453,7 +12481,8 @@ async function _renderUsageTab(container) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
         <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Security Audit Records</div>
-        <canvas id="anlSecPie" height="200"></canvas>
+        <p style="font-size:var(--fs-xs);color:var(--text);margin-bottom:8px">Includes logins, password changes, account blocks/unblocks, and security configuration changes.</p>
+        <canvas id="anlSecBar" height="${Math.max(200, secLabels.length * 22 + 20)}"></canvas>
       </div>
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
         <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Most Used Features (Top 15)</div>
@@ -12504,8 +12533,8 @@ async function _renderUsageTab(container) {
         {data: failedData, color: '#E74C3C', label: 'Failed'}
       ], { showArea: true, showPoints: false });
     }
-    if (secLabels.length && typeof drawPieChart === 'function') {
-      drawPieChart('anlSecPie', secLabels, secData);
+    if (secLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlSecBar', secLabels, secData, { horizontal: true, maxBarWidth: 22 });
     }
     if (featLabels.length && typeof drawBarChart === 'function') {
       drawBarChart('anlFeatBar', featLabels, featData, { horizontal: true, maxBarWidth: 22 });
