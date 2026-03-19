@@ -2142,6 +2142,16 @@ function renderSidebar() {
         <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Session Settings</button>
       </div>
 
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">🔒 SSO-Only Login</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">When enabled, password login is disabled for all users except the built-in admin account. Requires SSO/OIDC to be configured.</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secDisablePasswordLogin" style="width:14px;height:14px;accent-color:var(--accent)">
+          Disable password login (SSO only)
+        </label>
+        <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">Save</button>
+      </div>
+
       <div class="sidebar-section" id="enrollmentSettingsSection">
         <div class="sidebar-section-title">🚪 ${t('settings_enrollment')||'User Enrollment'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_enrollment_desc')||'Controls how new users can register for access.'}</p>

@@ -911,6 +911,10 @@ type SecuritySettings struct {
 	IdleTimeoutHours   int  `json:"idle_timeout_hours,omitempty"`    // idle timeout in hours (default 100)
 	LogoffOnPasswordChange bool `json:"logoff_on_password_change"`   // invalidate sessions on other devices when password changes (default true)
 	RotateSessionOnRoleChange bool `json:"rotate_session_on_role_change"` // invalidate sessions when user role changes (default true)
+
+	// SSO-only mode: when enabled, password login is disabled for all users
+	// except the built-in admin account. Requires OIDC/SSO to be configured.
+	DisablePasswordLogin bool `json:"disable_password_login"`
 }
 
 // TLSConfig stores TLS certificate and key file paths for persistent server configuration.

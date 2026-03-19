@@ -289,7 +289,7 @@ func (app *App) handleOIDCInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	exclusive := "false"
-	if app.oidcExclusive {
+	if app.oidcExclusive || app.store.GetSecuritySettings().DisablePasswordLogin {
 		exclusive = "true"
 	}
 	jsonOK(w, map[string]string{
