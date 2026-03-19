@@ -511,12 +511,19 @@ func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 		return fmt.Errorf("decode JWT signature: %w", err)
 	}
 
-	// V3-M01 fix: reject HMAC algorithms when JWKS contains asymmetric keys.
-	// This prevents algorithm confusion attacks where an attacker forges tokens
-	// using the client secret as HMAC key when the provider uses RSA/EC.
+	// V3-M01 fix: reject HMAC algorithms when JWKS endpoint is configured.
+	// If JWKS fetch succeeds and contains keys, the provider uses asymmetric signing.
+	// If JWKS fetch fails, reject HMAC as a precaution — an attacker could cause
+	// the fetch to fail and then submit a forged HS256 token using the client secret.
 	if header.Alg == "HS256" || header.Alg == "HS384" || header.Alg == "HS512" {
-		if ks, err := app.fetchJWKS(false); err == nil && len(ks.Keys) > 0 {
-			return fmt.Errorf("HMAC algorithm %s rejected: provider uses asymmetric keys (JWKS has %d keys)", header.Alg, len(ks.Keys))
+		if app.oidc.JWKSEndpoint != "" {
+			ks, err := app.fetchJWKS(false)
+			if err != nil {
+				return fmt.Errorf("HMAC algorithm %s rejected: JWKS fetch failed (%v), cannot verify provider key type", header.Alg, err)
+			}
+			if len(ks.Keys) > 0 {
+				return fmt.Errorf("HMAC algorithm %s rejected: provider uses asymmetric keys (JWKS has %d keys)", header.Alg, len(ks.Keys))
+			}
 		}
 	}
 

@@ -834,7 +834,8 @@ func (app *App) handleUpdateEmail(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	var req struct {
-		Email string `json:"email"`
+		Email           string `json:"email"`
+		CurrentPassword string `json:"current_password"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -844,6 +845,15 @@ func (app *App) handleUpdateEmail(w http.ResponseWriter, r *http.Request, user *
 	if !ok {
 		jsonError(w, "user not found", http.StatusNotFound)
 		return
+	}
+	// Require current password verification for email changes (prevents account
+	// takeover via session hijack → email change → password reset).
+	// OIDC-only users and admins acting on behalf of others are exempt.
+	if !fullUser.IsOIDC && fullUser.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(fullUser.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+			jsonError(w, "current password is incorrect", http.StatusForbidden)
+			return
+		}
 	}
 	fullUser.Email = req.Email
 	if err := app.store.UpdateUser(*fullUser); err != nil {

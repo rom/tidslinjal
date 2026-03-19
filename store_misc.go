@@ -17,6 +17,18 @@ func (s *Store) GetDecisionLog() []DecisionLogEntry {
 	return out
 }
 
+// GetDecisionLogEntryByID returns a decision log entry by ID, or nil if not found.
+func (s *Store) GetDecisionLogEntryByID(id int64) *DecisionLogEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, e := range s.decisionLog {
+		if e.ID == id {
+			return &e
+		}
+	}
+	return nil
+}
+
 func (s *Store) AddDecisionLogEntry(entry DecisionLogEntry) (DecisionLogEntry, error) {
 	s.mu.Lock()
 	s.nextDecisionLogID++
@@ -337,6 +349,18 @@ func (s *Store) GetLogBook() []LogBookEntry {
 	out := make([]LogBookEntry, len(s.logBook))
 	copy(out, s.logBook)
 	return out
+}
+
+// GetLogBookEntryByID returns a log book entry by ID, or nil if not found.
+func (s *Store) GetLogBookEntryByID(id int64) *LogBookEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, e := range s.logBook {
+		if e.ID == id {
+			return &e
+		}
+	}
+	return nil
 }
 
 func (s *Store) AddLogBookEntry(entry LogBookEntry) (LogBookEntry, error) {

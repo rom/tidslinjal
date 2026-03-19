@@ -176,13 +176,36 @@ func (app *App) handleLogBookAttachment(w http.ResponseWriter, r *http.Request, 
 
 func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.Request) {
 	// Path: /api/log-book/{id}/attachment/{filename}
-	path := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
-	parts := strings.SplitN(path, "/attachment/", 2)
+	trimmed := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
+	parts := strings.SplitN(trimmed, "/attachment/", 2)
 	if len(parts) != 2 || parts[1] == "" {
 		http.NotFound(w, r)
 		return
 	}
+	// Validate the log book entry exists and the attachment belongs to it
+	entryID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	storedName := filepath.Base(parts[1])
+	entry := app.store.GetLogBookEntryByID(entryID)
+	if entry == nil {
+		http.NotFound(w, r)
+		return
+	}
+	// Verify the requested file actually belongs to this entry
+	found := false
+	for _, att := range entry.Attachments {
+		if att.StoredName == storedName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
 	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
 	http.ServeFile(w, r, filePath)
 }

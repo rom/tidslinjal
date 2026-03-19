@@ -392,7 +392,29 @@ func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Reque
 }
 
 func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *http.Request) {
+	entryID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	storedName := filepath.Base(r.PathValue("filename"))
+	// Validate the decision log entry exists and the attachment belongs to it
+	entry := app.store.GetDecisionLogEntryByID(entryID)
+	if entry == nil {
+		http.NotFound(w, r)
+		return
+	}
+	found := false
+	for _, att := range entry.Attachments {
+		if att.StoredName == storedName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
 	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
 	if _, err := os.Stat(filePath); err != nil {
 		http.Error(w, "file not found", http.StatusNotFound)
