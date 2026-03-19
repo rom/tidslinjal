@@ -26,12 +26,20 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	// Deny local login when OIDC exclusive mode is enabled.
-	// The built-in admin account is exempted so admins can recover if OIDC breaks.
-	if app.oidcExclusive && app.oidc != nil && req.Username != "admin" {
-		logVerbose("local login blocked for %q — OIDC exclusive mode", req.Username)
-		jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
-		return
+	// Deny local login when OIDC exclusive mode is enabled (via CLI/OIDC config)
+	// or when the admin has disabled password login in security settings.
+	// The built-in admin account is always exempted so admins can recover if OIDC breaks.
+	if req.Username != "admin" && app.oidc != nil {
+		if app.oidcExclusive {
+			logVerbose("local login blocked for %q — OIDC exclusive mode", req.Username)
+			jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
+			return
+		}
+		if app.store.GetSecuritySettings().DisablePasswordLogin {
+			logVerbose("local login blocked for %q — password login disabled in security settings", req.Username)
+			jsonError(w, "local login disabled — use SSO", http.StatusForbidden)
+			return
+		}
 	}
 	loginClientIP := clientIP(r)
 	user, ok := app.store.GetUserByUsername(req.Username)

@@ -6220,6 +6220,7 @@ async function _initSecuritySettingsUI() {
     setVal('secIdleTimeoutHours',   ss.idle_timeout_hours || 100);
     setCb('secLogoffOnPwChange',    ss.logoff_on_password_change !== false);
     setCb('secRotateOnRoleChange',  ss.rotate_session_on_role_change !== false);
+    setCb('secDisablePasswordLogin', ss.disable_password_login);
   } catch { /* not configured yet */ }
 }
 
@@ -6240,6 +6241,7 @@ async function saveSecuritySettings() {
     idle_timeout_hours:           parseInt(val('secIdleTimeoutHours'), 10) || 100,
     logoff_on_password_change:    cb('secLogoffOnPwChange'),
     rotate_session_on_role_change: cb('secRotateOnRoleChange'),
+    disable_password_login:       cb('secDisablePasswordLogin'),
   };
   const res = await api('PUT', '/api/admin/security', ss);
   if (res.ok) {

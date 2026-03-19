@@ -418,6 +418,7 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     <select id="alMode" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
       <option value="absolute">Absolute time</option>
       <option value="epoch_relative">Relative to exercise epoch</option>
+      <option value="relative_now">Relative to now</option>
     </select>
   </div>
   <div id="alAbsoluteRow" style="margin-bottom:8px">
@@ -429,6 +430,16 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
     <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Offset from epoch (e.g. +02:30 or -00:15)</label>
     <input type="text" id="alEpochOffset" placeholder="H+HH:MM or -HH:MM" maxlength="10"
       style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div id="alRelativeNowRow" style="margin-bottom:8px;display:none">
+    <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:3px">Time from now (e.g. 01:30 = 1h 30m)</label>
+    <input type="text" id="alRelativeNowOffset" placeholder="HH:MM" maxlength="10"
+      style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px">
+  </div>
+  <div style="margin-bottom:8px">
+    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="alContinuePulse" checked> Continue pulsing after firing
+    </label>
   </div>
   <div style="margin-bottom:8px">
     <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
@@ -443,11 +454,6 @@ body.vcr-orange { --vcr-fg:#ff8800; --vcr-glow1:rgba(255,136,0,.9); --vcr-glow2:
         <option value="chime">Chime</option>
       </select>
     </div>
-  </div>
-  <div style="margin-bottom:8px">
-    <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="alContinuePulse" checked> Continue pulsing after firing
-    </label>
   </div>
   <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
     <button class="btn-tb" id="alCancel">Cancel</button>
