@@ -141,14 +141,25 @@ func (app *App) broadcastUserChange(senderID int64, action string, userID int64)
 	app.broker.BroadcastAll(SSEMessage{Event: "user_change", Data: string(data)})
 }
 
-// broadcastEventChange sends an SSE notification to all clients about an event change
+// broadcastEventChange sends an SSE notification to clients about an event change.
+// V3-H01 fix: only sends to clients whose user has read access to the event's layer.
 func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
 	payload := map[string]interface{}{
 		"action": action,
 		"event":  ev,
 	}
 	data, _ := json.Marshal(payload)
-	app.broker.Broadcast(senderID, SSEMessage{Event: "event_change", Data: string(data)})
+	msg := SSEMessage{Event: "event_change", Data: string(data)}
+
+	// If event is on master timeline (no layer), broadcast to everyone
+	if ev.LayerID == nil {
+		app.broker.Broadcast(senderID, msg)
+	} else {
+		// Only send to users who can see this event's layer
+		app.broker.BroadcastFiltered(senderID, msg, func(userID int64) bool {
+			return app.canUserSeeEvent(userID, ev)
+		})
+	}
 
 	// Fire outbound webhook if configured for the event creator
 	go app.fireWebhooks(action, ev)

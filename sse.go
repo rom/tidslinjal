@@ -106,6 +106,31 @@ func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
 	}
 }
 
+// BroadcastFiltered sends an SSE message only to clients whose user passes the filter.
+// V3-H01 fix: layer-aware SSE broadcasting.
+func (b *SSEBroker) BroadcastFiltered(senderID int64, msg SSEMessage, canSee func(userID int64) bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	// Cache per-user visibility decisions to avoid repeated canReadLayer calls
+	checked := make(map[int64]bool)
+	for c := range b.clients {
+		if c.userID == senderID {
+			continue
+		}
+		allowed, ok := checked[c.userID]
+		if !ok {
+			allowed = canSee(c.userID)
+			checked[c.userID] = allowed
+		}
+		if allowed {
+			select {
+			case c.broadcast <- msg:
+			default:
+			}
+		}
+	}
+}
+
 // SendToUser sends an SSE message to all clients for a specific user — O(1) via byUser index.
 func (b *SSEBroker) SendToUser(userID int64, msg SSEMessage) {
 	b.mu.RLock()

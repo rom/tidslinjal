@@ -137,9 +137,10 @@ func (app *App) handleUploadMapResource(w http.ResponseWriter, r *http.Request, 
 	}
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	allowed := map[string]bool{".pdf": true, ".svg": true, ".jpg": true, ".jpeg": true, ".png": true, ".json": true, ".geojson": true}
+	// V3-H06 fix: removed .svg to prevent stored XSS via embedded JavaScript in SVG files
+	allowed := map[string]bool{".pdf": true, ".jpg": true, ".jpeg": true, ".png": true, ".json": true, ".geojson": true}
 	if !allowed[ext] {
-		jsonError(w, "unsupported file type; allowed: PDF, SVG, JPG, PNG, JSON, GeoJSON", http.StatusBadRequest)
+		jsonError(w, "unsupported file type; allowed: PDF, JPG, PNG, JSON, GeoJSON", http.StatusBadRequest)
 		return
 	}
 

@@ -40,7 +40,8 @@ func (app *App) handleReportDownload(w http.ResponseWriter, r *http.Request, use
 		}
 	}
 
-	events := app.store.GetEvents(from, to, nil)
+	// V3-H02 fix: filter events by layer visibility
+	events := filterVisibleEvents(app.store.GetEvents(from, to, nil), app.visibleLayerSet(user))
 	commentsMap := make(map[int64][]EventComment)
 	for _, ev := range events {
 		if cs := app.store.GetCommentsByEvent(ev.ID); len(cs) > 0 {
@@ -166,7 +167,14 @@ func (app *App) sendAutoReportEmail(s AutoReportSchedule) {
 		return
 	}
 	now2 := time.Now()
-	events := app.store.GetEvents(now2.Add(-30*24*time.Hour), now2.Add(30*24*time.Hour), nil)
+	allEvs := app.store.GetEvents(now2.Add(-30*24*time.Hour), now2.Add(30*24*time.Hour), nil)
+	// V3-H02 fix: filter by the report creator's layer visibility
+	var events []Event
+	if creator, ok := app.store.GetUserByID(s.CreatedBy); ok {
+		events = filterVisibleEvents(allEvs, app.visibleLayerSet(creator))
+	} else {
+		events = allEvs // fallback if creator deleted — admin-level access
+	}
 	subject := fmt.Sprintf("Auto %s Report — %s", s.ReportType, time.Now().Format("2006-01-02"))
 	// Build comments map for report
 	commentsMap := make(map[int64][]EventComment)

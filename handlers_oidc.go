@@ -157,7 +157,9 @@ func (app *App) handleOIDCTest(w http.ResponseWriter, r *http.Request, user *Use
 	// Step 2: Fetch discovery document (re-fetch live)
 	discURL := strings.TrimRight(app.oidc.Issuer, "/") + "/.well-known/openid-configuration"
 	log.Printf("[INFO] OIDC test: fetching discovery document from %s", discURL)
-	discResp, err := http.Get(discURL) //nolint:gosec
+	// V3-M02 fix: use SSRF-safe transport for OIDC discovery test
+	ssrfTestClient := &http.Client{Timeout: 10 * time.Second, Transport: newSSRFSafeTransport()}
+	discResp, err := ssrfTestClient.Get(discURL)
 	if err != nil {
 		addStep("discovery", false, "Cannot reach OIDC discovery endpoint", err.Error())
 		jsonOK(w, map[string]interface{}{"steps": steps, "overall": false})
@@ -251,8 +253,10 @@ func (app *App) configureOIDC(issuer, clientID, clientSecret, redirectURL string
 		return fmt.Errorf("issuer URL is required")
 	}
 	// Fetch discovery document
+	// V3-M02 fix: use SSRF-safe transport for OIDC discovery
 	discURL := strings.TrimRight(issuer, "/") + "/.well-known/openid-configuration"
-	resp, err := http.Get(discURL) //nolint:gosec
+	ssrfClient := &http.Client{Timeout: 10 * time.Second, Transport: newSSRFSafeTransport()}
+	resp, err := ssrfClient.Get(discURL)
 	if err != nil {
 		return fmt.Errorf("fetch discovery document: %w", err)
 	}
@@ -390,7 +394,8 @@ func (app *App) fetchJWKS(forceRefresh bool) (*jwksKeySet, error) {
 		return nil, fmt.Errorf("OIDC JWKS endpoint not configured")
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	// V3-M02 fix: use SSRF-safe transport for OIDC JWKS fetch
+	client := &http.Client{Timeout: 10 * time.Second, Transport: newSSRFSafeTransport()}
 	resp, err := client.Get(app.oidc.JWKSEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("fetch JWKS: %w", err)
@@ -504,6 +509,15 @@ func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return fmt.Errorf("decode JWT signature: %w", err)
+	}
+
+	// V3-M01 fix: reject HMAC algorithms when JWKS contains asymmetric keys.
+	// This prevents algorithm confusion attacks where an attacker forges tokens
+	// using the client secret as HMAC key when the provider uses RSA/EC.
+	if header.Alg == "HS256" || header.Alg == "HS384" || header.Alg == "HS512" {
+		if ks, err := app.fetchJWKS(false); err == nil && len(ks.Keys) > 0 {
+			return fmt.Errorf("HMAC algorithm %s rejected: provider uses asymmetric keys (JWKS has %d keys)", header.Alg, len(ks.Keys))
+		}
 	}
 
 	switch header.Alg {
@@ -729,7 +743,9 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if codeVerifier != "" {
 		tokenParams.Set("code_verifier", codeVerifier)
 	}
-	tokenResp, err := http.PostForm(app.oidc.TokenEndpoint, tokenParams)
+	// V3-M02 fix: use SSRF-safe transport for token exchange
+	oidcHTTPClient := &http.Client{Timeout: 10 * time.Second, Transport: newSSRFSafeTransport()}
+	tokenResp, err := oidcHTTPClient.PostForm(app.oidc.TokenEndpoint, tokenParams)
 	if err != nil || tokenResp.StatusCode != http.StatusOK {
 		http.Redirect(w, r, "/login?error=token_exchange_failed", http.StatusFound)
 		return
@@ -756,9 +772,10 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch user info
+	// V3-M02 fix: use SSRF-safe transport for userinfo fetch
 	req, _ := http.NewRequest("GET", app.oidc.UserinfoEndpoint, nil)
 	req.Header.Set("Authorization", tokens.TokenType+" "+tokens.AccessToken)
-	uiResp, err := http.DefaultClient.Do(req)
+	uiResp, err := oidcHTTPClient.Do(req)
 	if err != nil || uiResp.StatusCode != http.StatusOK {
 		http.Redirect(w, r, "/login?error=userinfo_failed", http.StatusFound)
 		return

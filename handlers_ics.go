@@ -26,7 +26,8 @@ func (app *App) handleExportICS(w http.ResponseWriter, r *http.Request, user *Us
 		to = time.Now().Add(90 * 24 * time.Hour)
 	}
 
-	events := app.store.GetEventsInRange(from, to)
+	// V3-H02 fix: filter events by layer visibility
+	events := filterVisibleEvents(app.store.GetEventsInRange(from, to), app.visibleLayerSet(user))
 
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="tidslinjal.ics"`)

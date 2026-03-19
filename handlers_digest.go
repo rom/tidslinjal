@@ -51,8 +51,8 @@ func (app *App) handleSendDigest(w http.ResponseWriter, r *http.Request, user *U
 	now := time.Now()
 	cutoff := now.Add(-duration)
 
-	// Gather events in period
-	events := app.allEvents()
+	// V3-H02 fix: filter events by layer visibility
+	events := app.visibleEvents(user)
 	statusCounts := make(map[string]int)
 	eventCount := 0
 	for _, ev := range events {

@@ -256,7 +256,11 @@ func (app *App) handleSTIXExport(w http.ResponseWriter, r *http.Request, user *U
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	events := app.store.GetEventsInRange(time.Time{}, time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC))
+	// V3-H02 fix: filter events by layer visibility
+	events := filterVisibleEvents(
+		app.store.GetEventsInRange(time.Time{}, time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)),
+		app.visibleLayerSet(user),
+	)
 	bundle := EventToSTIXBundle(events)
 	w.Header().Set("Content-Type", "application/stix+json;version=2.1")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"tidslinjal-stix-export.json\"")

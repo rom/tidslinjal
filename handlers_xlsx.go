@@ -27,7 +27,8 @@ func (app *App) handleExportXLSX(w http.ResponseWriter, r *http.Request, user *U
 			to = t
 		}
 	}
-	events := app.store.GetEvents(from, to, nil)
+	// V3-H02 fix: filter events by layer visibility
+	events := filterVisibleEvents(app.store.GetEvents(from, to, nil), app.visibleLayerSet(user))
 
 	// Fetch comments for each event
 	commentsMap := make(map[int64][]EventComment)
