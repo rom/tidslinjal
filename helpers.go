@@ -8,6 +8,27 @@ import (
 
 var _xmlReplacer = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;")
 
+// dangerousFileExtensions are blocked from upload to prevent serving executable content.
+var dangerousFileExtensions = map[string]bool{
+	".exe": true, ".bat": true, ".cmd": true, ".com": true, ".msi": true,
+	".sh": true, ".bash": true, ".ps1": true, ".vbs": true, ".js": true,
+	".html": true, ".htm": true, ".svg": true, ".php": true, ".jsp": true,
+	".asp": true, ".aspx": true, ".cgi": true, ".pl": true, ".py": true,
+	".rb": true, ".jar": true, ".war": true, ".dll": true, ".so": true,
+}
+
+// isDangerousFilename returns true if the filename has an extension that could
+// be executed by a browser or OS when served/downloaded.
+func isDangerousFilename(filename string) bool {
+	ext := strings.ToLower(strings.TrimSpace(filename))
+	if dot := strings.LastIndex(ext, "."); dot >= 0 {
+		ext = ext[dot:]
+	} else {
+		return false
+	}
+	return dangerousFileExtensions[ext]
+}
+
 func xmlEsc(s string) string { return _xmlReplacer.Replace(s) }
 
 // stripHTMLTags removes HTML/script tags from user input to prevent stored XSS.
