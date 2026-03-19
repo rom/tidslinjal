@@ -42,6 +42,7 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="opsleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_opsleads')||'OpsLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="teammembers" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teammembers')||'Team Members'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'Usage'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
         </div>
@@ -120,6 +121,7 @@ async function _loadAnalysisTab(tab) {
       case 'teamleads': await _renderTeamLeadsTab(container); break;
       case 'opsleads': await _renderOpsLeadsTab(container); break;
       case 'teammembers': await _renderTeamMembersTab(container); break;
+      case 'usage': await _renderUsageTab(container); break;
       case 'export': _renderExportTab(container); break;
     }
   } catch(e) {
@@ -193,8 +195,12 @@ async function _renderActivityTab(container) {
   const hmDays = heatmap?.days || ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const hmHours = Array.from({length:24}, (_, i) => String(i).padStart(2,'0'));
 
-  const tlLabels = timeline?.labels || timeline?.dates || [];
-  const tlData = timeline?.data || timeline?.counts || [];
+  // Timeline endpoint returns {date: count} object — convert to sorted arrays
+  let tlLabels = [], tlData = [];
+  if (timeline && typeof timeline === 'object' && !Array.isArray(timeline)) {
+    if (timeline.labels) { tlLabels = timeline.labels; tlData = timeline.data || []; }
+    else { const sorted = Object.entries(timeline).sort((a,b) => a[0].localeCompare(b[0])); tlLabels = sorted.map(e => e[0]); tlData = sorted.map(e => e[1]); }
+  }
 
   container.innerHTML = `
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
@@ -208,7 +214,7 @@ async function _renderActivityTab(container) {
 
   setTimeout(() => {
     if (hmData.length) {
-      drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorLow: '#1a1a2e', colorHigh: '#3498DB' });
+      drawHeatmap('anlHeatmap', hmDays, hmHours, hmData, { colorHigh: '#3498DB' });
     }
     if (tlLabels.length) {
       drawAreaChart('anlAreaTimeline', tlLabels, tlData, { color: '#3498DB' });
@@ -221,17 +227,18 @@ async function _renderDecisionsTab(container) {
   const qs = _analysisDateParams();
   const analytics = await _analysisFetch('/api/stats/decision-analytics' + qs).catch(() => ({})) || {};
 
-  const byStatus = analytics.by_status || {};
-  const outcomeLabels = Object.keys(byStatus).map(k => k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1));
-  const outcomeData = Object.values(byStatus);
-  const outcomeColors = Object.keys(byStatus).map(k => ({approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C'}[k] || '#9B59B6'));
+  const byStatus = analytics.decisions_by_type || analytics.by_status || {};
+  const outcomeLabels = Object.keys(byStatus).filter(k => byStatus[k] > 0).map(k => k === 'rejected' ? 'Denied' : k.charAt(0).toUpperCase() + k.slice(1));
+  const outcomeData = Object.keys(byStatus).filter(k => byStatus[k] > 0).map(k => byStatus[k]);
+  const outcomeColors = Object.keys(byStatus).filter(k => byStatus[k] > 0).map(k => ({approved:'#27AE60',rejected:'#E74C3C',pending:'#E67E22',denied:'#E74C3C',requested:'#9B59B6',direct:'#3498DB'}[k] || '#9B59B6'));
 
-  const avgMs = analytics.average_response_ms || analytics.avg_response_ms || 0;
-  const avgResponse = avgMs ? (avgMs / 60000).toFixed(1) + ' min' : 'N/A';
+  const avgMin = analytics.avg_approval_time_minutes || analytics.average_response_ms ? ((analytics.average_response_ms||0) / 60000) : 0;
+  const avgResponse = avgMin ? avgMin.toFixed(1) + ' min' : 'N/A';
 
-  const perReq = analytics.per_requester || analytics.by_requester || {};
-  const reqLabels = Object.keys(perReq);
-  const reqData = Object.values(perReq);
+  // top_requesters is [{name, count}] — convert to chart-friendly format
+  const topReq = analytics.top_requesters || [];
+  const reqLabels = topReq.length ? topReq.map(r => r.name) : Object.keys(analytics.per_requester || {});
+  const reqData = topReq.length ? topReq.map(r => r.count) : Object.values(analytics.per_requester || {});
 
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
@@ -263,20 +270,41 @@ async function _renderOpTempoTab(container) {
     _analysisFetch('/api/stats/slip-histogram' + qs).catch(() => null),
   ]);
 
-  const tempoLabels = opTempo?.labels || opTempo?.dates || [];
-  const tempoDatasets = [];
-  if (opTempo?.datasets && Array.isArray(opTempo.datasets)) {
-    opTempo.datasets.forEach(ds => tempoDatasets.push({data: ds.data||[], color: ds.color||'#3498DB', label: ds.label||''}));
-  } else if (opTempo?.data) {
-    tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: t('op_tempo')||'Op Tempo'});
+  // Op-tempo endpoint returns {events_per_hour: {"00": n, ...}} — convert to sorted arrays
+  let tempoLabels = [], tempoDatasets = [];
+  if (opTempo?.events_per_hour && typeof opTempo.events_per_hour === 'object') {
+    const sorted = Object.entries(opTempo.events_per_hour).sort((a,b) => a[0].localeCompare(b[0]));
+    tempoLabels = sorted.map(e => e[0] + ':00');
+    tempoDatasets.push({data: sorted.map(e => e[1]), color: '#3498DB', label: t('op_tempo')||'Events/Hour'});
+  } else if (opTempo?.labels) {
+    tempoLabels = opTempo.labels;
+    if (opTempo.datasets) opTempo.datasets.forEach(ds => tempoDatasets.push({data: ds.data||[], color: ds.color||'#3498DB', label: ds.label||''}));
+    else if (opTempo.data) tempoDatasets.push({data: opTempo.data, color: '#3498DB', label: t('op_tempo')||'Op Tempo'});
   }
 
-  const slipBuckets = slipHist?.labels || slipHist?.buckets || [];
-  const slipValues = slipHist?.data || slipHist?.values || [];
+  // Slip histogram: backend returns {buckets: {key: val}} — convert to arrays
+  let slipBuckets = [], slipValues = [];
+  if (slipHist?.buckets && typeof slipHist.buckets === 'object' && !Array.isArray(slipHist.buckets)) {
+    slipBuckets = Object.keys(slipHist.buckets);
+    slipValues = Object.values(slipHist.buckets);
+  } else if (Array.isArray(slipHist?.labels)) {
+    slipBuckets = slipHist.labels; slipValues = slipHist.data || [];
+  }
+
+  const concPeak = opTempo?.concurrent_peak || 0;
+  const avgPerDay = (opTempo?.avg_events_per_day || 0).toFixed(1);
+  const meanSlip = slipHist?.mean_slip_minutes ? slipHist.mean_slip_minutes.toFixed(1) + 'm' : '—';
+  const medianSlip = slipHist?.median_slip_minutes ? slipHist.median_slip_minutes.toFixed(1) + 'm' : '—';
 
   container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(concPeak, t('concurrent_peak')||'Concurrent Peak', '#E67E22')}
+      ${_analysisCard(avgPerDay, t('avg_events_day')||'Avg Events/Day', 'var(--accent)')}
+      ${_analysisCard(meanSlip, t('mean_slip')||'Mean Slip', '#E74C3C')}
+      ${_analysisCard(medianSlip, t('median_slip')||'Median Slip', '#E67E22')}
+    </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
-      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_optempo')||'Operational Tempo'}</div>
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">${t('analysis_optempo')||'Operational Tempo (Events per Hour, Last 24h)'}</div>
       <canvas id="anlLineOpTempo" height="250"></canvas>
     </div>
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
@@ -599,7 +627,10 @@ async function _renderJStaffTab(container) {
 
 /* ── TeamLeads Performance Tab ────────────────────────────────────────────── */
 async function _renderTeamLeadsTab(container) {
-  const data = await _analysisFetch('/api/stats/personnel-performance');
+  const [data, usage] = await Promise.all([
+    _analysisFetch('/api/stats/personnel-performance'),
+    _analysisFetch('/api/stats/usage').catch(() => null),
+  ]);
   if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
 
   const leads = data.team_leads || [];
@@ -617,30 +648,83 @@ async function _renderTeamLeadsTab(container) {
   const chartLabels = allLeads.map(u => u.display_name);
   const chartData = allLeads.map(u => u.total_events||0);
 
+  // Toolbox usage from usage stats
+  const rc = usage?.readychecks || {};
+  const cl = usage?.checklists || {};
+  const po = usage?.polls || {};
+
+  // Toolbox coverage — which tools are being used
+  const toolbox = [
+    { name: 'ReadyChecks', used: rc.total||0, icon: '✅' },
+    { name: 'Checklists', used: cl.total||0, icon: '📋' },
+    { name: 'Polls', used: po.total||0, icon: '📊' },
+    { name: 'Quick Reports', used: allLeads.reduce((s,u) => s + (u.audit_actions||0), 0) > 0 ? 1 : 0, icon: '📝' },
+    { name: 'Decisions', used: allLeads.reduce((s,u) => s + (u.decisions_made||0), 0), icon: '⚖' },
+  ];
+  const toolboxUsed = toolbox.filter(t => t.used > 0).length;
+  const toolboxTotal = toolbox.length;
+  const toolboxRate = toolboxTotal > 0 ? Math.round(toolboxUsed / toolboxTotal * 100) : 0;
+
+  // Toolbox usage chart data
+  const tbLabels = toolbox.map(t => t.name);
+  const tbData = toolbox.map(t => t.used);
+
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">🧰 ${t('teamlead_type_perf')||'TeamLead Performance (by type)'}</div>
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">TeamLead Performance</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          ${_analysisCard(leads.length, t('teamleads')||'TeamLeads', 'var(--accent)')}
-          ${_analysisCard(deputies.length, t('deputy_teamleads')||'Deputy TeamLeads', 'var(--accent)')}
-          ${_analysisCard(tlRate.toFixed(0)+'%', t('tl_completion')||'TL Completion', tlRate >= 75 ? '#27AE60' : '#E67E22')}
-          ${_analysisCard(dtlRate.toFixed(0)+'%', t('dtl_completion')||'DTL Completion', dtlRate >= 75 ? '#27AE60' : '#E67E22')}
+          ${_analysisCard(leads.length, 'TeamLeads', 'var(--accent)')}
+          ${_analysisCard(deputies.length, 'Deputy TeamLeads', 'var(--accent)')}
+          ${_analysisCard(tlRate.toFixed(0)+'%', 'TL Completion', tlRate >= 75 ? '#27AE60' : '#E67E22')}
+          ${_analysisCard(dtlRate.toFixed(0)+'%', 'DTL Completion', dtlRate >= 75 ? '#27AE60' : '#E67E22')}
         </div>
       </div>
       <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">📊 ${t('event_distribution')||'Event Distribution'}</div>
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Event Distribution</div>
         <canvas id="anlTLChart" height="${Math.max(180, chartLabels.length * 22 + 20)}"></canvas>
       </div>
     </div>
+
+    <!-- Toolbox Usage Section -->
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">TeamLead Toolbox Usage</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+        ${_analysisCard(toolboxRate + '%', 'Toolbox Coverage', toolboxRate >= 80 ? '#27AE60' : toolboxRate >= 50 ? '#E67E22' : '#E74C3C')}
+        ${_analysisCard(rc.total||0, 'ReadyChecks', '#3498DB')}
+        ${_analysisCard((rc.response_rate||0).toFixed(0)+'%', 'RC Response Rate', rc.response_rate >= 75 ? '#27AE60' : '#E67E22')}
+        ${_analysisCard(cl.total||0, 'Checklists', '#9B59B6')}
+        ${_analysisCard(cl.completed||0, 'CL Completed', '#27AE60')}
+        ${_analysisCard(po.total||0, 'Polls', '#E67E22')}
+        ${_analysisCard(po.total_responses||0, 'Poll Responses', '#1ABC9C')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <canvas id="anlTLToolbox" height="180"></canvas>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text)">
+          <div style="font-weight:600;margin-bottom:6px">Toolbox Checklist</div>
+          ${toolbox.map(t => `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span>${t.icon}</span>
+            <span style="flex:1">${escHtml(t.name)}</span>
+            <span style="font-weight:700;color:${t.used > 0 ? '#27AE60' : '#E74C3C'}">${t.used > 0 ? t.used + ' used' : 'Not used'}</span>
+          </div>`).join('')}
+          ${cl.total_items > 0 ? `<div style="margin-top:8px;color:var(--text-dim)">Checklist item completion: <b>${cl.checked_items}/${cl.total_items}</b> (${cl.total_items > 0 ? Math.round(cl.checked_items/cl.total_items*100) : 0}%)</div>` : ''}
+        </div>
+      </div>
+    </div>
+
     <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">👤 ${t('individual_teamlead_perf')||'Individual TeamLead & Deputy TeamLead Performance'}</div>
+      <div style="font-weight:700;margin-bottom:10px;font-size:var(--fs-sm)">Individual TeamLead & Deputy TeamLead Performance</div>
       ${_perfTable(allLeads)}
     </div>`;
 
   setTimeout(() => {
     if (chartLabels.length && typeof drawBarChart === 'function') {
       drawBarChart('anlTLChart', chartLabels, chartData, { horizontal: true, maxBarWidth: 22 });
+    }
+    if (tbLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlTLToolbox', tbLabels, tbData, { horizontal: true, maxBarWidth: 28, colors: ['#3498DB','#9B59B6','#E67E22','#1ABC9C','#27AE60'] });
     }
   }, 50);
 }
@@ -725,6 +809,150 @@ async function _renderTeamMembersTab(container) {
   setTimeout(() => {
     if (chartLabels.length && typeof drawBarChart === 'function') {
       drawBarChart('anlMemberChart', chartLabels, chartData, { horizontal: true, colors: '#2980B9', maxBarWidth: 22 });
+    }
+  }, 50);
+}
+
+/* ── Usage Tab ─────────────────────────────────────────────────────────────── */
+async function _renderUsageTab(container) {
+  const data = await _analysisFetch('/api/stats/usage');
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">No data available.</p>`; return; }
+
+  const rc = data.readychecks || {};
+  const cl = data.checklists || {};
+  const po = data.polls || {};
+
+  // Logins chart data
+  const loginsByDay = data.logins_by_day || {};
+  const failedByDay = data.failed_logins_by_day || {};
+  const allDays = [...new Set([...Object.keys(loginsByDay), ...Object.keys(failedByDay)])].sort();
+  const loginData = allDays.map(d => loginsByDay[d] || 0);
+  const failedData = allDays.map(d => failedByDay[d] || 0);
+
+  // Security breakdown
+  const secActions = data.security_actions || {};
+  const secLabels = Object.keys(secActions);
+  const secData = Object.values(secActions);
+
+  // Feature usage
+  const featureUsage = data.feature_usage || {};
+  const featEntries = Object.entries(featureUsage).sort((a,b) => b[1]-a[1]).slice(0, 15);
+  const featLabels = featEntries.map(e => e[0]);
+  const featData = featEntries.map(e => e[1]);
+
+  // Integrations
+  const integ = data.integrations_by_source || {};
+  const integLabels = Object.keys(integ);
+  const integData = Object.values(integ);
+
+  // Reference docs
+  const refCats = data.ref_docs_by_category || {};
+  const refLabels = Object.keys(refCats);
+  const refData = Object.values(refCats);
+
+  // Maps
+  const mapTypes = data.maps_by_type || {};
+  const mapLabels = Object.keys(mapTypes);
+  const mapData = Object.values(mapTypes);
+  const mapPop = data.map_popularity || [];
+
+  container.innerHTML = `
+    <!-- Toolbox summary -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      ${_analysisCard(rc.total||0, 'ReadyChecks', '#3498DB')}
+      ${_analysisCard((rc.response_rate||0).toFixed(0)+'%', 'RC Response Rate', rc.response_rate >= 75 ? '#27AE60' : '#E67E22')}
+      ${_analysisCard(cl.total||0, 'Checklists', '#9B59B6')}
+      ${_analysisCard(cl.completed||0, 'CL Completed', '#27AE60')}
+      ${_analysisCard(po.total||0, 'Polls', '#E67E22')}
+      ${_analysisCard(po.total_responses||0, 'Poll Responses', '#1ABC9C')}
+      ${_analysisCard(data.total_ref_docs||0, 'Reference Docs', '#3498DB')}
+      ${_analysisCard(data.total_maps||0, 'Maps & Charts', '#E67E22')}
+    </div>
+
+    <!-- Logins over time -->
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Logins Over Time</div>
+      <canvas id="anlLoginTimeline" height="200"></canvas>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <!-- Security audit breakdown -->
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Security Audit Records</div>
+        <canvas id="anlSecPie" height="200"></canvas>
+      </div>
+      <!-- Most used features -->
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Most Used Features (Top 15)</div>
+        <canvas id="anlFeatBar" height="${Math.max(200, featLabels.length * 22 + 20)}"></canvas>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <!-- Reference material by category -->
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Reference Material by Category</div>
+        <canvas id="anlRefPie" height="200"></canvas>
+      </div>
+      <!-- Maps by type -->
+      <div style="padding:12px;background:var(--bg3);border-radius:var(--radius)">
+        <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Maps & Charts by Type</div>
+        <canvas id="anlMapPie" height="200"></canvas>
+      </div>
+    </div>
+
+    ${integLabels.length ? `
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Integration Sources (${data.webhook_users||0} users with webhooks)</div>
+      <canvas id="anlIntegBar" height="${Math.max(160, integLabels.length * 28 + 20)}"></canvas>
+    </div>` : ''}
+
+    ${mapPop.length ? `
+    <div style="padding:12px;background:var(--bg3);border-radius:var(--radius);margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px;font-size:var(--fs-sm)">Most Active Maps & Charts</div>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)">Name</th>
+          <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Type</th>
+          <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Overlays</th>
+          <th style="padding:6px 8px;text-align:center;border-bottom:2px solid var(--border)">Drawings</th>
+        </tr></thead>
+        <tbody>${mapPop.map(m => `<tr>
+          <td style="padding:4px 8px;border-bottom:1px solid var(--border)">${escHtml(m.name)}</td>
+          <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${escHtml(m.type)}</td>
+          <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${m.overlays}</td>
+          <td style="padding:4px 8px;border-bottom:1px solid var(--border);text-align:center">${m.drawings}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}`;
+
+  setTimeout(() => {
+    // Logins over time (line chart with two datasets)
+    if (allDays.length && typeof drawLineChart === 'function') {
+      drawLineChart('anlLoginTimeline', allDays, [
+        {data: loginData, color: '#27AE60', label: 'Successful'},
+        {data: failedData, color: '#E74C3C', label: 'Failed'}
+      ], { showArea: true, showPoints: false });
+    }
+    // Security pie
+    if (secLabels.length && typeof drawPieChart === 'function') {
+      drawPieChart('anlSecPie', secLabels, secData);
+    }
+    // Feature usage bar
+    if (featLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlFeatBar', featLabels, featData, { horizontal: true, maxBarWidth: 22 });
+    }
+    // Reference docs pie
+    if (refLabels.length && typeof drawPieChart === 'function') {
+      drawPieChart('anlRefPie', refLabels, refData);
+    }
+    // Maps pie
+    if (mapLabels.length && typeof drawPieChart === 'function') {
+      drawPieChart('anlMapPie', mapLabels, mapData);
+    }
+    // Integrations bar
+    if (integLabels.length && typeof drawBarChart === 'function') {
+      drawBarChart('anlIntegBar', integLabels, integData, { horizontal: true, maxBarWidth: 28 });
     }
   }, 50);
 }
