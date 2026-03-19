@@ -109,6 +109,8 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Invalidate all previous sessions for this user to prevent session hijack persistence
+	app.store.DeleteSessionsForUserExcept(user.ID, sessID)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    sessID,
@@ -855,10 +857,13 @@ func (app *App) handleUpdateEmail(w http.ResponseWriter, r *http.Request, user *
 			return
 		}
 	}
+	oldEmail := fullUser.Email
 	fullUser.Email = req.Email
 	if err := app.store.UpdateUser(*fullUser); err != nil {
 		jsonError(w, "failed to update", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "email_changed", "user", user.ID,
+		fmt.Sprintf("Email changed from %q to %q", oldEmail, req.Email))
 	jsonOK(w, map[string]string{"status": "ok"})
 }

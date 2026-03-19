@@ -361,6 +361,10 @@ func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Reque
 	if safeFilename == "." || safeFilename == "/" {
 		safeFilename = "upload"
 	}
+	if isDangerousFilename(safeFilename) {
+		jsonError(w, "file type not allowed", http.StatusBadRequest)
+		return
+	}
 	storedName := fmt.Sprintf("dl_%d_%d_%s", id, time.Now().UnixNano(), safeFilename)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
 	dst, err := os.Create(destPath)
