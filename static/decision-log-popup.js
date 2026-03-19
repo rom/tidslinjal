@@ -290,8 +290,9 @@ document.getElementById('btnRequest').onclick = async () => {
   }
 };
 
-// Listen for theme changes from parent
+// Listen for theme changes from parent (validate origin to prevent cross-origin attacks)
 window.addEventListener('message', function(e) {
+  if (e.origin !== window.location.origin) return;
   if (e.data && e.data.type === 'theme') {
     document.body.className = 'theme-' + (e.data.theme || 'dark');
   }

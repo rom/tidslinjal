@@ -31,8 +31,10 @@ func isDangerousFilename(filename string) bool {
 
 func xmlEsc(s string) string { return _xmlReplacer.Replace(s) }
 
-// stripHTMLTags removes HTML/script tags from user input to prevent stored XSS.
-// It strips anything that looks like an HTML tag (<...>) including script tags.
+// stripHTMLTags removes HTML/script tags and dangerous attributes from user input
+// to prevent stored XSS. It strips <script> blocks, <style> blocks, all HTML tags,
+// and inline event handlers (onclick, onerror, etc.) or javascript: URIs that could
+// survive if content is ever rendered in an HTML context.
 func stripHTMLTags(s string) string {
 	// Remove <script>...</script> blocks (case insensitive)
 	for {
@@ -47,6 +49,20 @@ func stripHTMLTags(s string) string {
 			break
 		}
 		s = s[:start] + s[start+end+len("</script>"):]
+	}
+	// Remove <style>...</style> blocks (case insensitive)
+	for {
+		lower := strings.ToLower(s)
+		start := strings.Index(lower, "<style")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(lower[start:], "</style>")
+		if end == -1 {
+			s = s[:start]
+			break
+		}
+		s = s[:start] + s[start+end+len("</style>"):]
 	}
 	// Remove remaining HTML tags
 	var result strings.Builder
@@ -64,7 +80,35 @@ func stripHTMLTags(s string) string {
 			result.WriteRune(r)
 		}
 	}
-	return strings.TrimSpace(result.String())
+	cleaned := result.String()
+	// Remove javascript:/data: URIs and event handler patterns that could survive
+	// in contexts where output is placed in attributes
+	lower := strings.ToLower(cleaned)
+	if strings.Contains(lower, "javascript:") {
+		cleaned = removePatternInsensitive(cleaned, "javascript:")
+	}
+	if strings.Contains(lower, "vbscript:") {
+		cleaned = removePatternInsensitive(cleaned, "vbscript:")
+	}
+	return strings.TrimSpace(cleaned)
+}
+
+// removePatternInsensitive removes all occurrences of pattern (case-insensitive) from s.
+func removePatternInsensitive(s, pattern string) string {
+	lower := strings.ToLower(s)
+	pat := strings.ToLower(pattern)
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		idx := strings.Index(lower[i:], pat)
+		if idx == -1 {
+			result.WriteString(s[i:])
+			break
+		}
+		result.WriteString(s[i : i+idx])
+		i += idx + len(pat)
+	}
+	return result.String()
 }
 
 

@@ -334,16 +334,22 @@ function _generatePassword(policy) {
   const minLen = (policy && policy.min_length > 0) ? Math.max(policy.min_length, 12) : 12;
   let chars = lower + upper + digits;
   let pwd = [];
-  if (!policy || policy.require_uppercase) { pwd.push(upper[Math.floor(Math.random()*upper.length)]); }
-  if (!policy || policy.require_lowercase) { pwd.push(lower[Math.floor(Math.random()*lower.length)]); }
-  if (!policy || policy.require_numbers)   { pwd.push(digits[Math.floor(Math.random()*digits.length)]); }
-  if (policy && policy.require_symbols)    { pwd.push(syms[Math.floor(Math.random()*syms.length)]); chars += syms; }
-  while (pwd.length < minLen) {
-    pwd.push(chars[Math.floor(Math.random()*chars.length)]);
+  // Security: use crypto.getRandomValues() instead of Math.random() for password generation
+  function secureRandom(max) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % max;
   }
-  // Shuffle
+  if (!policy || policy.require_uppercase) { pwd.push(upper[secureRandom(upper.length)]); }
+  if (!policy || policy.require_lowercase) { pwd.push(lower[secureRandom(lower.length)]); }
+  if (!policy || policy.require_numbers)   { pwd.push(digits[secureRandom(digits.length)]); }
+  if (policy && policy.require_symbols)    { pwd.push(syms[secureRandom(syms.length)]); chars += syms; }
+  while (pwd.length < minLen) {
+    pwd.push(chars[secureRandom(chars.length)]);
+  }
+  // Shuffle (Fisher-Yates with CSPRNG)
   for (let i = pwd.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = secureRandom(i + 1);
     [pwd[i], pwd[j]] = [pwd[j], pwd[i]];
   }
   return pwd.join('');

@@ -24,8 +24,14 @@ function renderMarkdown(md) {
   html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // Links (sanitize href to prevent javascript: XSS)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, text, url) {
+    var trimmed = url.replace(/\s/g, '').toLowerCase();
+    if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) {
+      return text;
+    }
+    return '<a href="' + url + '">' + text + '</a>';
+  });
   // Blockquotes
   html = html.replace(/^&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>');
   // Tables
