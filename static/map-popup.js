@@ -297,7 +297,7 @@ async function loadMeetings() {
         (ev.physical_location ? escH(ev.physical_location) + '<br>' : '') +
         (ev.start_time ? new Date(ev.start_time).toLocaleString() : '');
       marker.bindPopup(popupHtml);
-      marker.bindTooltip(ev.title, { direction: 'top', offset: [0, -8] });
+      marker.bindTooltip(escH(ev.title), { direction: 'top', offset: [0, -8] });
       _meetingsLayer.addLayer(marker);
     });
   } catch(e) {}
@@ -338,8 +338,8 @@ async function loadUsers() {
         })
       });
       const locInfo = u.location ? '<br>' + escH(u.location) : '';
-      marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${(u.nato_designations||[]).join(', ')}`);
-      marker.bindTooltip(u.display_name, { direction: 'top', offset: [0, -12] });
+      marker.bindPopup(`<b>${escH(u.display_name)}</b><br>${escH(u.role||'')}${locInfo}<br>${escH((u.nato_designations||[]).join(', '))}`);
+      marker.bindTooltip(escH(u.display_name), { direction: 'top', offset: [0, -12] });
       _usersLayer.addLayer(marker);
     });
   } catch(e) {}
@@ -378,7 +378,7 @@ async function loadResourceLayers() {
       });
       const popupImg = r.image_name ? `<img src="/api/rooms/${r.id}/image" style="width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:4px">` : '';
       marker.bindPopup(`${popupImg}<b>${icon} ${escH(r.name)}</b><br>${escH(r.type)}<br>${escH(r.location||'')}${r.capacity ? '<br>Capacity: '+r.capacity : ''}${r.description ? '<br><em>'+escH(r.description)+'</em>' : ''}`);
-      marker.bindTooltip(r.name, { direction: 'top', offset: [0, -14] });
+      marker.bindTooltip(escH(r.name), { direction: 'top', offset: [0, -14] });
       layer.addLayer(marker);
     });
     updateLegend();
@@ -615,6 +615,42 @@ function fitAll() {
 
 /* ── Escape HTML ── */
 function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Sanitize stored drawing HTML to prevent XSS ── */
+function _sanitizeDrawingHtml(html) {
+  if (!html) return '';
+  // Parse with DOMParser and rebuild with only safe elements/attributes
+  var tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  var safeEls = ['div', 'span', 'b', 'i', 'em', 'strong', 'small', 'br'];
+  var safeAttrs = ['style', 'class'];
+  function sanitizeNode(node) {
+    if (node.nodeType === 3) return node.textContent; // text node
+    if (node.nodeType !== 1) return '';
+    var tag = node.tagName.toLowerCase();
+    if (safeEls.indexOf(tag) < 0) return escH(node.textContent || '');
+    var out = '<' + tag;
+    for (var i = 0; i < node.attributes.length; i++) {
+      var attr = node.attributes[i];
+      if (safeAttrs.indexOf(attr.name.toLowerCase()) >= 0) {
+        // Sanitize style to prevent url(), expression(), etc.
+        var val = attr.value.replace(/expression\s*\(/gi, '').replace(/url\s*\(/gi, '').replace(/javascript:/gi, '');
+        out += ' ' + attr.name + '="' + escH(val) + '"';
+      }
+    }
+    out += '>';
+    for (var j = 0; j < node.childNodes.length; j++) {
+      out += sanitizeNode(node.childNodes[j]);
+    }
+    out += '</' + tag + '>';
+    return out;
+  }
+  var result = '';
+  for (var k = 0; k < tmp.childNodes.length; k++) {
+    result += sanitizeNode(tmp.childNodes[k]);
+  }
+  return result;
+}
 
 /* ── Event bindings ── */
 document.getElementById('selTileLayer').addEventListener('change', function() {
@@ -1113,8 +1149,10 @@ async function _loadDrawings(mapResource) {
     (drawings || []).forEach(d => {
       let layer;
       if (d.type === 'marker') {
+        // Sanitize stored HTML to prevent XSS — only allow safe inline styles and text
+        const safeHtml = _sanitizeDrawingHtml(d.html || '');
         layer = L.marker([d.lat, d.lng], {
-          icon: L.divIcon({ className: 'draw-pin', html: d.html, iconSize: [24, 24], iconAnchor: [12, 12] })
+          icon: L.divIcon({ className: 'draw-pin', html: safeHtml, iconSize: [24, 24], iconAnchor: [12, 12] })
         });
       } else if (d.type === 'polyline') {
         layer = L.polyline(d.latlngs, { color: d.color, weight: d.weight, opacity: d.opacity || 1 });

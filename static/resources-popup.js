@@ -46,7 +46,7 @@ function apiGet(url) {
 }
 
 function apiDelete(url) {
-  return fetch(url, { method: 'DELETE', credentials: 'include' });
+  return fetch(url, { method: 'DELETE', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
 }
 
 // Check current user role for edit/delete permissions

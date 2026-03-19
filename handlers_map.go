@@ -154,7 +154,13 @@ func (app *App) handleUploadMapResource(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	ct := header.Header.Get("Content-Type")
+	// Derive Content-Type from file extension (don't trust client header)
+	extToMime := map[string]string{
+		".pdf": "application/pdf", ".svg": "image/svg+xml",
+		".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+		".json": "application/json", ".geojson": "application/geo+json",
+	}
+	ct := extToMime[ext]
 	if ct == "" {
 		ct = "application/octet-stream"
 	}
@@ -262,6 +268,10 @@ func (app *App) handleSaveMapOverlays(w http.ResponseWriter, r *http.Request, us
 	mr, ok := app.store.GetMapResource(id)
 	if !ok {
 		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "map is locked", http.StatusForbidden)
 		return
 	}
 	var overlays []MapOverlay
@@ -463,6 +473,10 @@ func (app *App) handleServeMapResourceFile(w http.ResponseWriter, r *http.Reques
 	}
 	filePath := filepath.Join(app.store.MapResourceDir(), mr.Filename)
 	w.Header().Set("Content-Type", mr.ContentType)
+	// Prevent script execution in served SVG/HTML files
+	if strings.Contains(mr.ContentType, "svg") || strings.Contains(mr.ContentType, "html") {
+		w.Header().Set("Content-Security-Policy", "sandbox")
+	}
 	safeDisp := strings.Map(func(r rune) rune {
 		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
 			return -1
@@ -523,6 +537,10 @@ func (app *App) handleUpdateMapResourceOverlays(w http.ResponseWriter, r *http.R
 	mr, ok := app.store.GetMapResource(id)
 	if !ok {
 		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "map is locked", http.StatusForbidden)
 		return
 	}
 	var overlays []MapOverlay
