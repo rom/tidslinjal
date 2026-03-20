@@ -1935,9 +1935,9 @@ function renderSidebar() {
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
+          ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
           ${(isTeamLead || isAdminOrOplead || userHasCapability('analysis')) ? toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()') : ''}
-          ${userHasCapability('boards') ? toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
