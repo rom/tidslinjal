@@ -1929,16 +1929,19 @@ function renderSidebar() {
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
           ${(isTeamLead || isAdminOrOplead || userHasCapability('teamlead_toolbox')) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
-          ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
+          ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
+          ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
           ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
