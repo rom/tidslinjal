@@ -1555,7 +1555,19 @@
       </p>
       <div class="form-group">
         <label>Backup ZIP file</label>
-        <input type="file" id="restoreFile" accept=".zip" style="width:100%">
+        <input type="file" id="restoreFile" accept=".zip,.enc" style="width:100%">
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label style="font-size:var(--fs-sm);margin-bottom:6px;display:block">Select areas to restore <span style="color:var(--text-dim);font-size:var(--fs-xs)">(leave all unchecked to restore everything)</span></label>
+        <div class="group-picker" id="restoreAreaPicker">
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="calendars" style="margin-right:4px"> Calendars &amp; Events</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="boards" style="margin-right:4px"> Boards</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="resources" style="margin-right:4px"> Resources &amp; Maps</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="users" style="margin-right:4px"> Users &amp; Groups</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="logs" style="margin-right:4px"> Logs &amp; Audit</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="checklists" style="margin-right:4px"> Checklists</label>
+          <label class="group-chip"><input type="checkbox" class="restore-area-cb" value="other" style="margin-right:4px"> Other</label>
+        </div>
       </div>
       <div id="restoreStatus" style="font-size:var(--fs-sm);margin-top:8px"></div>
     </div>
@@ -1597,7 +1609,7 @@
         </div>
         <div class="form-group" style="flex:1;min-width:160px">
           <label style="font-size:var(--fs-xs);color:var(--text-dim)">Max snapshots to keep</label>
-          <input type="number" id="gbMaxSnapshots" min="2" max="500" value="48"
+          <input type="number" id="gbMaxSnapshots" min="2" max="2000" value="480"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
         </div>
       </div>
@@ -2613,9 +2625,17 @@
           <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="groups" checked style="margin-right:4px"> Groups</label>
           <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="layers" checked style="margin-right:4px"> Layers</label>
           <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="alarms" checked style="margin-right:4px"> Alarms</label>
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="event_types" checked style="margin-right:4px"> Event Types</label>
+          <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="comments" checked style="margin-right:4px"> Comments</label>
           <label class="group-chip" id="exportUsersCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="users" style="margin-right:4px"> Users</label>
           <label class="group-chip" id="exportPhasesCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="phases" checked style="margin-right:4px"> Phases</label>
+          <label class="group-chip" id="exportDecisionLogCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="decision_log" checked style="margin-right:4px"> Decision Log</label>
+          <label class="group-chip" id="exportRoleConfigsCb" style="display:none"><input type="checkbox" class="export-cat-cb" value="role_configs" style="margin-right:4px"> Role Configs</label>
           <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="resources" style="margin-right:4px"> Resources</label>
+          <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="map_resources" style="margin-right:4px"> Map Resources</label>
+          <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="references" style="margin-right:4px"> References</label>
+          <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="rooms" style="margin-right:4px"> Rooms</label>
+          <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="boards" style="margin-right:4px"> Boards</label>
           <label class="group-chip"><input type="checkbox" class="export-cat-cb" value="clock_settings" style="margin-right:4px"> Clock Settings</label>
           <label class="group-chip selected"><input type="checkbox" class="export-cat-cb" value="day_labels" checked style="margin-right:4px"> Day Labels</label>
         </div>
@@ -2686,7 +2706,11 @@
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="groups" checked style="margin-right:4px"> Groups</label>
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="layers" checked style="margin-right:4px"> Layers</label>
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="alarms" checked style="margin-right:4px"> Alarms</label>
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="event_types" checked style="margin-right:4px"> Event Types</label>
+          <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="comments" checked style="margin-right:4px"> Comments</label>
           <label class="group-chip" id="importUsersCb" style="display:none"><input type="checkbox" class="import-cat-cb" value="users" style="margin-right:4px"> Users</label>
+          <label class="group-chip" id="importDecisionLogCb" style="display:none"><input type="checkbox" class="import-cat-cb" value="decision_log" style="margin-right:4px"> Decision Log</label>
+          <label class="group-chip" id="importRoleConfigsCb" style="display:none"><input type="checkbox" class="import-cat-cb" value="role_configs" style="margin-right:4px"> Role Configs</label>
           <label class="group-chip selected"><input type="checkbox" class="import-cat-cb" value="day_labels" checked style="margin-right:4px"> Day Labels</label>
         </div>
       </div>

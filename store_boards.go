@@ -145,21 +145,63 @@ func (s *Store) DeleteBoardItem(id int64) error {
 	return fmt.Errorf("board item %d not found", id)
 }
 
-// MoveBoardItem moves an item to a different column (and optionally reorders).
+// MoveBoardItem moves an item to a column at the given sort position, shifting other items.
 func (s *Store) MoveBoardItem(itemID int64, columnID string, sortOrder int) error {
 	s.mu.Lock()
+	// Find the item
+	itemIdx := -1
+	var boardID int64
 	for i, x := range s.boardItems {
 		if x.ID == itemID {
-			s.boardItems[i].ColumnID = columnID
-			s.boardItems[i].SortOrder = sortOrder
-			s.boardItems[i].UpdatedAt = time.Now()
-			snap := append([]BoardItem(nil), s.boardItems...)
-			s.mu.Unlock()
-			return s.persist("board_items.json", snap)
+			itemIdx = i
+			boardID = x.BoardID
+			break
 		}
 	}
+	if itemIdx < 0 {
+		s.mu.Unlock()
+		return fmt.Errorf("board item %d not found", itemID)
+	}
+
+	// Update the item's column and sort order
+	s.boardItems[itemIdx].ColumnID = columnID
+	s.boardItems[itemIdx].SortOrder = sortOrder
+	s.boardItems[itemIdx].UpdatedAt = time.Now()
+
+	// Reorder all items in the target column to have sequential sort orders
+	// Collect indices of items in this column for this board (sorted by sort_order, with moved item at its new position)
+	type idxOrder struct {
+		idx       int
+		sortOrder int
+	}
+	var colIdxs []idxOrder
+	for i, x := range s.boardItems {
+		if x.BoardID == boardID && x.ColumnID == columnID {
+			colIdxs = append(colIdxs, idxOrder{i, x.SortOrder})
+		}
+	}
+	// Sort: by sort_order, but if equal, the moved item comes first (to place it at the requested position)
+	for i := 0; i < len(colIdxs); i++ {
+		for j := i + 1; j < len(colIdxs); j++ {
+			swap := false
+			if colIdxs[i].sortOrder > colIdxs[j].sortOrder {
+				swap = true
+			} else if colIdxs[i].sortOrder == colIdxs[j].sortOrder && colIdxs[i].idx != itemIdx && colIdxs[j].idx == itemIdx {
+				swap = true
+			}
+			if swap {
+				colIdxs[i], colIdxs[j] = colIdxs[j], colIdxs[i]
+			}
+		}
+	}
+	// Assign sequential sort orders
+	for seq, ci := range colIdxs {
+		s.boardItems[ci.idx].SortOrder = seq
+	}
+
+	snap := append([]BoardItem(nil), s.boardItems...)
 	s.mu.Unlock()
-	return fmt.Errorf("board item %d not found", itemID)
+	return s.persist("board_items.json", snap)
 }
 
 // AddBoardItemHistory appends a history entry to a board item.

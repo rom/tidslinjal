@@ -29,6 +29,8 @@ type ExportData struct {
 	CustomResourceTypes []CustomResourceType `json:"custom_resource_types,omitempty"`
 	ClockSettings       []ExtraClock       `json:"clock_settings,omitempty"`
 	DayLabels           []DayLabel         `json:"day_labels,omitempty"`
+	Boards              []Board            `json:"boards,omitempty"`
+	BoardItems          []BoardItem        `json:"board_items,omitempty"`
 }
 
 func (s *Store) GetExportData() ExportData {
@@ -180,6 +182,22 @@ func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include m
 	if include["day_labels"] {
 		out.DayLabels = make([]DayLabel, len(s.dayLabels))
 		copy(out.DayLabels, s.dayLabels)
+	}
+	if include["boards"] {
+		for _, b := range s.boards {
+			if isPrivileged || b.OwnerID == userID || b.Visibility == "global" {
+				out.Boards = append(out.Boards, b)
+			}
+		}
+		for _, item := range s.boardItems {
+			// Include items for boards we're exporting
+			for _, b := range out.Boards {
+				if item.BoardID == b.ID {
+					out.BoardItems = append(out.BoardItems, item)
+					break
+				}
+			}
+		}
 	}
 	return out
 }

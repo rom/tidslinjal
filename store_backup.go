@@ -15,7 +15,7 @@ import (
 // ── Gradual Backup ─────────────────────────────────────────────────────────────
 
 const gradualBackupDefaultInterval = 15
-const gradualBackupDefaultMax      = 48
+const gradualBackupDefaultMax      = 480
 const gradualBackupDir             = "snapshots"
 
 // GetGradualBackupSettings reads the gradual backup configuration from disk.
@@ -74,13 +74,20 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	files := []string{
-		"event_types.json", "preferences.json", "groups.json",
+		"event_types.json", "users.json", "preferences.json", "groups.json",
 		"memberships.json", "layers.json", "events.json", "attachments.json",
 		"alarms.json", "locks.json", "audit.json", "exercise.json",
 		"comments.json", "phases.json", "templates.json", "roles.json",
 		"registration.json", "invitations.json", "filter_presets.json",
 		"event_versions.json", "auto_report_schedules.json",
-		"map_resources.json", "references.json", "day_labels.json",
+		"map_resources.json", "map_locations.json", "references.json",
+		"rooms.json", "custom_resource_types.json", "day_labels.json",
+		"boards.json", "board_items.json",
+		"decision_log.json", "event_log.json", "log_book.json",
+		"routing_rules.json", "connectors.json",
+		"questionnaires.json", "checklist_templates.json", "checklist_instances.json",
+		"tags.json", "notifications.json", "polls.json",
+		"person_ready_checks.json",
 	}
 	for _, fn := range files {
 		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
@@ -143,8 +150,9 @@ func (s *Store) ListGradualBackupSnapshots() ([]GradualBackupSnapshot, error) {
 }
 
 // RestoreGradualBackupSnapshot restores data files from a named snapshot ZIP.
-// Returns the count of files restored.
-func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
+// Returns the count of files restored. If areas is non-empty, only files in
+// those areas are restored (uses backupRestoreAreas from handlers_backup.go).
+func (s *Store) RestoreGradualBackupSnapshot(filename string, areas []string) (int, error) {
 	// Sanitise: filename must be a plain name with no path separators
 	if strings.ContainsAny(filename, "/\\") {
 		return 0, fmt.Errorf("invalid snapshot filename")
@@ -169,15 +177,40 @@ func (s *Store) RestoreGradualBackupSnapshot(filename string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("invalid zip: %w", err)
 	}
-	allowed := map[string]bool{
-		"event_types.json": true, "preferences.json": true, "groups.json": true,
-		"memberships.json": true, "layers.json": true, "events.json": true,
-		"attachments.json": true, "alarms.json": true, "locks.json": true,
-		"exercise.json": true, "comments.json": true, "phases.json": true,
-		"templates.json": true, "roles.json": true, "registration.json": true,
-		"invitations.json": true, "filter_presets.json": true, "event_versions.json": true,
-		"auto_report_schedules.json": true,
+
+	// Build allowed file set from areas, or use default allow-all
+	allowed := map[string]bool{}
+	if len(areas) > 0 {
+		for _, area := range areas {
+			if files, ok := backupRestoreAreas[area]; ok {
+				for _, f := range files {
+					allowed[f] = true
+				}
+			}
+		}
 	}
+	if len(allowed) == 0 {
+		allowed = map[string]bool{
+			"event_types.json": true, "users.json": true, "preferences.json": true,
+			"groups.json": true, "memberships.json": true, "layers.json": true,
+			"events.json": true, "attachments.json": true, "alarms.json": true,
+			"locks.json": true, "exercise.json": true, "comments.json": true,
+			"phases.json": true, "templates.json": true, "roles.json": true,
+			"registration.json": true, "invitations.json": true,
+			"filter_presets.json": true, "event_versions.json": true,
+			"auto_report_schedules.json": true, "map_resources.json": true,
+			"map_locations.json": true, "references.json": true,
+			"rooms.json": true, "custom_resource_types.json": true,
+			"decision_log.json": true, "event_log.json": true, "log_book.json": true,
+			"day_labels.json": true, "boards.json": true, "board_items.json": true,
+			"routing_rules.json": true, "connectors.json": true,
+			"questionnaires.json": true, "checklist_templates.json": true,
+			"checklist_instances.json": true, "tags.json": true,
+			"notifications.json": true, "polls.json": true,
+			"person_ready_checks.json": true,
+		}
+	}
+
 	restored := 0
 	for _, f := range zr.File {
 		if !allowed[f.Name] {

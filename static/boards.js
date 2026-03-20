@@ -8,6 +8,7 @@ let _boardsState = {
   items: [],
   dragItem: null,
   dragOverCol: null,
+  zoom: 1.0,
 };
 
 // ── Close board modal helper ──
@@ -231,9 +232,14 @@ function _renderKanbanBoard() {
           </div>
         </div>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardConfirm" title="${t('board_delete')||'Delete board'}">🗑</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 4px"></span>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomOut" title="${t('board_zoom_out')||'Zoom out'}" style="font-size:14px;padding:4px 6px">−</button>
+        <span id="boardZoomLevel" style="font-size:var(--fs-xs);min-width:36px;text-align:center">${Math.round(_boardsState.zoom * 100)}%</span>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomIn" title="${t('board_zoom_in')||'Zoom in'}" style="font-size:14px;padding:4px 6px">+</button>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="font-size:var(--fs-xs);padding:4px 6px">100%</button>
       </div>
     </div>
-    <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start">`;
+    <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
 
   for (const col of board.columns) {
     const collapsed = col.collapsed;
@@ -331,6 +337,7 @@ function _kanbanDragEnd(e) {
   _boardsState.dragItem = null;
   _boardsState.dragOverCol = null;
   document.querySelectorAll('.kanban-col').forEach(c => c.style.outline = '');
+  document.querySelectorAll('.kanban-drop-indicator').forEach(el => el.remove());
   // Clear justDragged after click event has fired
   setTimeout(() => { _boardsState.justDragged = false; }, 100);
 }
@@ -338,26 +345,87 @@ function _kanbanDragOver(e, colId) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   _boardsState.dragOverCol = colId;
-  // Visual feedback
   const col = e.currentTarget;
   col.style.outline = '2px solid var(--accent)';
+
+  // Show drop position indicator between cards
+  const itemsContainer = col.querySelector('.kanban-items');
+  if (!itemsContainer) return;
+  const cards = [...itemsContainer.querySelectorAll('.kanban-card')];
+  // Remove old indicators
+  col.querySelectorAll('.kanban-drop-indicator').forEach(el => el.remove());
+  // Find insertion position based on mouse Y
+  let insertBefore = null;
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) {
+      insertBefore = card;
+      break;
+    }
+  }
+  const indicator = document.createElement('div');
+  indicator.className = 'kanban-drop-indicator';
+  indicator.style.cssText = 'height:3px;background:var(--accent);border-radius:2px;margin:2px 0;';
+  if (insertBefore) {
+    itemsContainer.insertBefore(indicator, insertBefore);
+  } else {
+    itemsContainer.appendChild(indicator);
+  }
 }
 function _kanbanDragLeave(e) {
   e.currentTarget.style.outline = '';
+  e.currentTarget.querySelectorAll('.kanban-drop-indicator').forEach(el => el.remove());
 }
 async function _kanbanDrop(e, colId) {
   e.preventDefault();
   e.currentTarget.style.outline = '';
+  e.currentTarget.querySelectorAll('.kanban-drop-indicator').forEach(el => el.remove());
   const itemId = _boardsState.dragItem;
   if (!itemId) return;
-  // Calculate sort order: append to end (use loose == to handle string/int column_id mismatch)
-  const colItems = _boardsState.items.filter(i => String(i.column_id) === String(colId));
-  const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
+
+  // Determine drop position based on mouse Y relative to cards
+  const col = e.currentTarget;
+  const itemsContainer = col.querySelector('.kanban-items');
+  const cards = itemsContainer ? [...itemsContainer.querySelectorAll('.kanban-card')] : [];
+  const colItems = _boardsState.items
+    .filter(i => String(i.column_id) === String(colId))
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  let dropIndex = colItems.length; // default: append to end
+  for (let ci = 0; ci < cards.length; ci++) {
+    const rect = cards[ci].getBoundingClientRect();
+    if (e.clientY < rect.top + rect.height / 2) {
+      dropIndex = ci;
+      break;
+    }
+  }
+
+  // Recompute sort orders: assign sequential values with the dragged item inserted at dropIndex
+  const draggedItem = _boardsState.items.find(i => i.id === itemId);
+  const otherItems = colItems.filter(i => i.id !== itemId);
+  otherItems.splice(dropIndex > otherItems.length ? otherItems.length : dropIndex, 0, draggedItem || {id: itemId});
+
+  // The new sort_order for the dragged item
+  const sortOrder = dropIndex;
+
   try {
     await _boardApi('POST', '/board-items/' + itemId + '/move', { column_id: colId, sort_order: sortOrder });
-    // Update local state
-    const item = _boardsState.items.find(i => i.id === itemId);
-    if (item) { item.column_id = colId; item.sort_order = sortOrder; }
+    // Update local state: reassign sort orders for all items in the column
+    if (draggedItem) {
+      draggedItem.column_id = colId;
+    }
+    // Reorder all items in this column
+    const updatedColItems = _boardsState.items
+      .filter(i => String(i.column_id) === String(colId))
+      .sort((a, b) => a.sort_order - b.sort_order);
+    // Remove dragged item from its current position
+    const withoutDragged = updatedColItems.filter(i => i.id !== itemId);
+    // Insert at drop position
+    const insertIdx = Math.min(dropIndex, withoutDragged.length);
+    withoutDragged.splice(insertIdx, 0, draggedItem || updatedColItems.find(i => i.id === itemId));
+    // Reassign sort_order values
+    withoutDragged.forEach((item, idx) => { if (item) item.sort_order = idx; });
+
     _renderKanbanBoard();
   } catch (e2) { alert(e2.message); }
 }
@@ -670,6 +738,20 @@ async function _deleteBoardConfirm() {
     await _boardApi('DELETE', '/boards/' + board.id);
     openBoardsModal();
   } catch (e) { alert(e.message); }
+}
+
+// ── Zoom ──
+function _boardZoomIn() {
+  _boardsState.zoom = Math.min(2.0, _boardsState.zoom + 0.1);
+  _renderKanbanBoard();
+}
+function _boardZoomOut() {
+  _boardsState.zoom = Math.max(0.4, _boardsState.zoom - 0.1);
+  _renderKanbanBoard();
+}
+function _boardZoomReset() {
+  _boardsState.zoom = 1.0;
+  _renderKanbanBoard();
 }
 
 // ── Print ──

@@ -117,13 +117,22 @@ func (app *App) handleGradualBackupRestore(w http.ResponseWriter, r *http.Reques
 		jsonError(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
-	restored, err := app.store.RestoreGradualBackupSnapshot(filename)
+	// Parse optional areas from request body
+	var reqBody struct {
+		Areas []string `json:"areas"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&reqBody)
+	restored, err := app.store.RestoreGradualBackupSnapshot(filename, reqBody.Areas)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	areasDesc := "all"
+	if len(reqBody.Areas) > 0 {
+		areasDesc = strings.Join(reqBody.Areas, ",")
+	}
 	app.audit(user.ID, user.DisplayName, "restore", "gradual_backup_snapshot", 0,
-		fmt.Sprintf("Restored %d files from snapshot: %s", restored, filename))
+		fmt.Sprintf("Restored %d files from snapshot: %s (areas: %s)", restored, filename, areasDesc))
 	jsonOK(w, map[string]interface{}{
 		"restored": restored,
 		"message":  fmt.Sprintf("Restored %d files. Please restart the server for changes to take full effect.", restored),
@@ -252,8 +261,14 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"registration.json", "invitations.json", "oidc.json", "mail.json",
 		"apikeys.json", "filter_presets.json", "event_versions.json",
 		"decision_log.json", "event_log.json", "log_book.json",
-		"map_resources.json", "references.json", "rooms.json", "custom_resource_types.json",
-		"day_labels.json",
+		"map_resources.json", "map_locations.json", "references.json",
+		"rooms.json", "custom_resource_types.json",
+		"day_labels.json", "boards.json", "board_items.json",
+		"routing_rules.json", "connectors.json",
+		"auto_report_schedules.json", "questionnaires.json",
+		"checklist_templates.json", "checklist_instances.json",
+		"tags.json", "notifications.json", "polls.json",
+		"person_ready_checks.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)
@@ -282,6 +297,22 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		Action: "backup", EntityType: "system", EntityID: 0,
 		Summary: "Admin downloaded encrypted data backup",
 	})
+}
+
+// backupRestoreAreas maps area names to the JSON files they include.
+var backupRestoreAreas = map[string][]string{
+	"calendars": {"events.json", "event_types.json", "layers.json", "alarms.json",
+		"event_versions.json", "phases.json", "exercise.json", "day_labels.json", "comments.json"},
+	"boards":    {"boards.json", "board_items.json"},
+	"resources": {"map_resources.json", "map_locations.json", "references.json",
+		"rooms.json", "custom_resource_types.json"},
+	"users":     {"groups.json", "memberships.json", "preferences.json", "roles.json"},
+	"logs":      {"decision_log.json", "event_log.json", "log_book.json", "audit.json"},
+	"checklists": {"checklist_templates.json", "checklist_instances.json"},
+	"other":     {"templates.json", "filter_presets.json", "locks.json",
+		"routing_rules.json", "connectors.json", "auto_report_schedules.json",
+		"questionnaires.json", "tags.json", "notifications.json", "polls.json",
+		"person_ready_checks.json", "attachments.json"},
 }
 
 func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User) {
@@ -323,19 +354,39 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 	}
 
 	dataDir := app.store.DataDir()
-	allowed := map[string]bool{
-		"event_types.json": true, "preferences.json": true, "groups.json": true,
-		"memberships.json": true, "layers.json": true, "events.json": true,
-		"attachments.json": true, "alarms.json": true, "locks.json": true,
-		"exercise.json": true, "comments.json": true, "phases.json": true,
-		"templates.json": true, "roles.json": true,
-		// V-11 fix: registration.json and invitations.json excluded to prevent
-		// backup-based manipulation of registration mode and invitation codes
-		"filter_presets.json": true, "event_versions.json": true,
-		"map_resources.json": true, "references.json": true, "rooms.json": true,
-		"custom_resource_types.json": true, "decision_log.json": true,
-		"event_log.json": true, "log_book.json": true,
-		"day_labels.json": true,
+	// Build allowed set from selected areas (or all if none specified)
+	areas := r.FormValue("areas") // comma-separated area names
+	allowed := map[string]bool{}
+	if areas != "" {
+		for _, area := range strings.Split(areas, ",") {
+			area = strings.TrimSpace(area)
+			if files, ok := backupRestoreAreas[area]; ok {
+				for _, f := range files {
+					allowed[f] = true
+				}
+			}
+		}
+	}
+	if len(allowed) == 0 {
+		// Default: allow all known files (backwards compatible)
+		allowed = map[string]bool{
+			"event_types.json": true, "preferences.json": true, "groups.json": true,
+			"memberships.json": true, "layers.json": true, "events.json": true,
+			"attachments.json": true, "alarms.json": true, "locks.json": true,
+			"exercise.json": true, "comments.json": true, "phases.json": true,
+			"templates.json": true, "roles.json": true,
+			"filter_presets.json": true, "event_versions.json": true,
+			"map_resources.json": true, "map_locations.json": true,
+			"references.json": true, "rooms.json": true,
+			"custom_resource_types.json": true, "decision_log.json": true,
+			"event_log.json": true, "log_book.json": true,
+			"day_labels.json": true, "boards.json": true, "board_items.json": true,
+			"routing_rules.json": true, "connectors.json": true,
+			"auto_report_schedules.json": true, "questionnaires.json": true,
+			"checklist_templates.json": true, "checklist_instances.json": true,
+			"tags.json": true, "notifications.json": true, "polls.json": true,
+			"person_ready_checks.json": true,
+		}
 	}
 	// Note: users.json, sessions.json, apikeys.json, oidc.json, mail.json excluded for security
 	restored := 0
@@ -360,7 +411,7 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 	app.store.LogAudit(AuditEntry{ //nolint
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "restore", EntityType: "system", EntityID: 0,
-		Summary: fmt.Sprintf("Admin restored %d data files from backup", restored),
+		Summary: fmt.Sprintf("Admin restored %d data files from backup (areas: %s)", restored, areas),
 	})
 	jsonOK(w, map[string]interface{}{
 		"status":   "restored",
