@@ -74,6 +74,8 @@ type Store struct {
 	checklistTemplates   []ChecklistTemplate
 	checklistInstances   []ChecklistInstance
 	tags                 []Tag
+	boards               []Board
+	boardItems           []BoardItem
 	startupText          string
 	geoItems             []map[string]any
 
@@ -113,6 +115,8 @@ type Store struct {
 	nextChecklistTemplateID  int64
 	nextChecklistInstanceID  int64
 	nextTagID                int64
+	nextBoardID              int64
+	nextBoardItemID          int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -145,6 +149,9 @@ func NewStore(dataDir string) (*Store, error) {
 	}
 	if err := os.MkdirAll(filepath.Join(dataDir, "references"), 0700); err != nil {
 		return nil, fmt.Errorf("create references dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dataDir, "board_attachments"), 0700); err != nil {
+		return nil, fmt.Errorf("create board_attachments dir: %w", err)
 	}
 	if err := s.load(); err != nil {
 		return nil, fmt.Errorf("load data: %w", err)
@@ -220,6 +227,8 @@ func (s *Store) load() error {
 	s.loadFile("checklist_templates.json", &s.checklistTemplates)
 	s.loadFile("checklist_instances.json", &s.checklistInstances)
 	s.loadFile("tags.json", &s.tags)
+	s.loadFile("boards.json", &s.boards)
+	s.loadFile("board_items.json", &s.boardItems)
 
 	// Load startup text (persisted as {"text":"..."})
 	var startupTextData map[string]string
@@ -428,6 +437,16 @@ func (s *Store) load() error {
 	for _, x := range s.tags {
 		if x.ID > s.nextTagID {
 			s.nextTagID = x.ID
+		}
+	}
+	for _, x := range s.boards {
+		if x.ID > s.nextBoardID {
+			s.nextBoardID = x.ID
+		}
+	}
+	for _, x := range s.boardItems {
+		if x.ID > s.nextBoardItemID {
+			s.nextBoardItemID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.

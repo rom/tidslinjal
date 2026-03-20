@@ -1928,7 +1928,7 @@ function renderSidebar() {
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedTools" title="${t('btn_detach')||'Detach to window'}">⧉</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          ${(isTeamLead || isAdminOrOplead) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
+          ${(isTeamLead || isAdminOrOplead || userHasCapability('teamlead_toolbox')) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
@@ -1936,7 +1936,8 @@ function renderSidebar() {
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
-          ${toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()')}
+          ${(isTeamLead || isAdminOrOplead || userHasCapability('analysis')) ? toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()') : ''}
+          ${userHasCapability('boards') ? toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}

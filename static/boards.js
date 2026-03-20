@@ -1,0 +1,641 @@
+/* ── Boards (Kanban) UI ─────────────────────────────────────────────────── */
+'use strict';
+
+// ── State ──
+let _boardsState = {
+  boards: [],
+  activeBoard: null,
+  items: [],
+  dragItem: null,
+  dragOverCol: null,
+};
+
+// ── Modal helper (creates dynamic overlay modals) ──
+function _boardModal(id, content, width) {
+  let el = document.getElementById(id);
+  if (el) el.remove();
+  const html = `<div class="modal-overlay" id="${id}">
+    <div class="modal" style="max-width:${width||'800px'};width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative">
+      <button class="modal-close" onclick="closeModal('${id}');document.getElementById('${id}')?.remove()" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&#x2715;</button>
+      ${content}
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  void document.getElementById(id).offsetHeight;
+  document.getElementById(id).classList.add('open');
+}
+
+// ── API helpers ──
+async function _boardApi(method, path, body) {
+  const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+
+// ── Open Boards Modal ──
+async function openBoardsModal() {
+  try {
+    _boardsState.boards = await _boardApi('GET', '/boards');
+  } catch { _boardsState.boards = []; }
+  _boardsState.activeBoard = null;
+  _boardsState.items = [];
+  _renderBoardListModal();
+}
+
+function _renderBoardListModal() {
+  const boards = _boardsState.boards;
+  let html = `<div style="max-width:900px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="margin:0">📌 ${t('board_title')||'Boards'}</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-primary" onclick="_openCreateBoardDialog()">+ ${t('board_new')||'New Board'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="_openImportBoardDialog()">⬆ ${t('btn_import')||'Import'}</button>
+      </div>
+    </div>`;
+
+  if (boards.length === 0) {
+    html += `<p style="color:var(--text-dim)">${t('board_empty')||'No boards yet. Create one or use a template.'}</p>`;
+  } else {
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`;
+    for (const b of boards) {
+      const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
+      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)" onclick="_openBoard(${b.id})">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${escHtml(b.name)}</strong> <span title="${b.visibility}">${vis}</span>
+        </div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${escHtml(b.description||'')}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${b.columns ? b.columns.length : 3} columns · by ${escHtml(b.owner_name||'')}</div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Templates section
+  html += `<div style="margin-top:24px"><h3>📋 ${t('board_templates')||'Templates'}</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">`;
+  for (const tmpl of (window._boardTemplates || [])) {
+    html += `<div class="card" style="padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer" onclick="_createFromTemplate(${tmpl.id})">
+      <strong style="font-size:var(--fs-sm)">${escHtml(tmpl.name)}</strong>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(tmpl.description||'')}</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${tmpl.columns.length} columns</div>
+    </div>`;
+  }
+  html += `</div></div></div>`;
+
+  _boardModal('boardsModal', html, '960px');
+
+  // Load templates
+  _boardApi('GET', '/boards/templates').then(t => { window._boardTemplates = t; }).catch(() => {});
+}
+
+// ── Create Board Dialog ──
+function _openCreateBoardDialog() {
+  const groups = state.groups || [];
+  let html = `<div style="max-width:500px">
+    <h3>${t('board_new')||'New Board'}</h3>
+    <label>${t('board_name')||'Name'}</label>
+    <input id="newBoardName" class="input" style="width:100%;margin-bottom:8px" placeholder="${t('board_name_placeholder')||'Board name'}">
+    <label>${t('board_description')||'Description'}</label>
+    <input id="newBoardDesc" class="input" style="width:100%;margin-bottom:8px" placeholder="${t('board_desc_placeholder')||'Optional description'}">
+    <label>${t('board_visibility')||'Visibility'}</label>
+    <select id="newBoardVis" class="input" style="width:100%;margin-bottom:8px" onchange="_toggleBoardVisFields()">
+      <option value="private">🔒 ${t('board_vis_private')||'Private'}</option>
+      <option value="group">👥 ${t('board_vis_group')||'Group'}</option>
+      <option value="role">🎭 ${t('board_vis_role')||'Role'}</option>
+      <option value="global">🌐 ${t('board_vis_global')||'Global'}</option>
+    </select>
+    <div id="newBoardGroupDiv" style="display:none;margin-bottom:8px">
+      <label>${t('board_group')||'Group'}</label>
+      <select id="newBoardGroup" class="input" style="width:100%">
+        ${groups.map(g => `<option value="${g.id}">${escHtml(g.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="newBoardRoleDiv" style="display:none;margin-bottom:8px">
+      <label>${t('board_role')||'Role'}</label>
+      <select id="newBoardRole" class="input" style="width:100%">
+        <option value="teammember">Team Member</option>
+        <option value="teamlead">Team Lead</option>
+        <option value="deputy_teamlead">Deputy Team Lead</option>
+        <option value="oplead">Operations Lead</option>
+        <option value="deputy_oplead">Deputy Operations Lead</option>
+        <option value="staffofficer">Staff Officer</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="_doCreateBoard()">✔ ${t('btn_create')||'Create'}</button>
+      <button class="btn btn-secondary" onclick="closeModal('boardCreateModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardCreateModal', html, '520px');
+}
+
+function _toggleBoardVisFields() {
+  const vis = document.getElementById('newBoardVis').value;
+  document.getElementById('newBoardGroupDiv').style.display = vis === 'group' ? '' : 'none';
+  document.getElementById('newBoardRoleDiv').style.display = vis === 'role' ? '' : 'none';
+}
+
+async function _doCreateBoard() {
+  const name = document.getElementById('newBoardName').value.trim();
+  if (!name) return;
+  const body = {
+    name,
+    description: document.getElementById('newBoardDesc').value.trim(),
+    visibility: document.getElementById('newBoardVis').value,
+    group_id: parseInt(document.getElementById('newBoardGroup')?.value) || 0,
+    role_key: document.getElementById('newBoardRole')?.value || '',
+  };
+  try {
+    await _boardApi('POST', '/boards', body);
+    closeModal('boardCreateModal');
+    openBoardsModal();
+  } catch (e) { alert(e.message); }
+}
+
+async function _createFromTemplate(templateId) {
+  const name = prompt(t('board_name_placeholder')||'Board name:');
+  if (!name) return;
+  try {
+    await _boardApi('POST', '/boards', { name, template_id: templateId, visibility: 'private' });
+    openBoardsModal();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Open single board (Kanban view) ──
+async function _openBoard(boardId) {
+  try {
+    const [board, items] = await Promise.all([
+      _boardApi('GET', '/boards/' + boardId),
+      _boardApi('GET', '/boards/' + boardId + '/items'),
+    ]);
+    _boardsState.activeBoard = board;
+    _boardsState.items = items;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+function _renderKanbanBoard() {
+  const board = _boardsState.activeBoard;
+  const items = _boardsState.items;
+  if (!board) return;
+
+  const colItems = {};
+  for (const col of board.columns) colItems[col.id] = [];
+  for (const item of items) {
+    if (!colItems[item.column_id]) colItems[item.column_id] = [];
+    colItems[item.column_id].push(item);
+  }
+  // Sort by sort_order
+  for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
+
+  let html = `<div style="max-width:100%;overflow-x:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-sm btn-secondary" onclick="openBoardsModal()" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
+        <h2 style="margin:0">${escHtml(board.name)}</h2>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm btn-secondary" onclick="_openBoardSettings()" title="${t('board_settings')||'Settings'}">⚙</button>
+        <button class="btn btn-sm btn-secondary" onclick="_printBoard()">🖨</button>
+        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('json')">JSON</button>
+        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('csv')">CSV</button>
+        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('svg')">SVG</button>
+        <button class="btn btn-sm btn-secondary" onclick="_deleteBoardConfirm()">🗑</button>
+      </div>
+    </div>
+    <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start">`;
+
+  for (const col of board.columns) {
+    const collapsed = col.collapsed;
+    const cItems = colItems[col.id] || [];
+    if (collapsed) {
+      html += `<div class="kanban-col kanban-col-collapsed" style="min-width:40px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed" onclick="_toggleColCollapse('${col.id}')">
+        <strong>${escHtml(col.name)} (${cItems.length})</strong>
+      </div>`;
+    } else {
+      html += `<div class="kanban-col" data-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px"
+        ondragover="_kanbanDragOver(event,'${col.id}')" ondrop="_kanbanDrop(event,'${col.id}')" ondragleave="_kanbanDragLeave(event)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <strong style="cursor:pointer" ondblclick="_renameCol('${col.id}','${escHtml(col.name)}')">${escHtml(col.name)} (${cItems.length})</strong>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" onclick="_addItemToCol('${col.id}')" title="${t('board_add_item')||'Add item'}">+</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" onclick="_toggleColCollapse('${col.id}')" title="${t('board_collapse')||'Collapse'}">−</button>
+          </div>
+        </div>
+        <div class="kanban-items" style="display:flex;flex-direction:column;gap:6px;min-height:40px">`;
+
+      for (const item of cItems) {
+        const bgColor = item.color || 'var(--bg3)';
+        html += `<div class="kanban-card" draggable="true" data-item-id="${item.id}"
+          ondragstart="_kanbanDragStart(event,${item.id})" ondragend="_kanbanDragEnd(event)"
+          style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
+          onclick="_openBoardItem(${item.id})">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <strong style="font-size:var(--fs-sm)">${escHtml(item.subject)}</strong>
+            <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
+          </div>
+          ${item.note ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;max-height:40px;overflow:hidden">${escHtml(item.note).substring(0, 100)}</div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:var(--fs-xs)">
+            <span style="color:var(--text-dim)">${escHtml(item.creator_name||'')}</span>
+            <div style="display:flex;gap:4px">
+              ${item.tags ? item.tags.map(tag => `<span style="background:var(--accent);color:#fff;padding:0 4px;border-radius:3px;font-size:9px">${escHtml(tag)}</span>`).join('') : ''}
+              ${item.attachments && item.attachments.length ? `<span title="${item.attachments.length} attachment(s)">📎${item.attachments.length}</span>` : ''}
+              ${item.checklist_id ? '<span title="Linked checklist">📋</span>' : ''}
+              ${item.event_id ? '<span title="Linked event">📅</span>' : ''}
+            </div>
+          </div>
+        </div>`;
+      }
+      html += `</div></div>`;
+    }
+  }
+  html += `</div></div>`;
+
+  _boardModal('boardsModal', html, '95vw');
+}
+
+// ── Drag & Drop ──
+function _kanbanDragStart(e, itemId) {
+  _boardsState.dragItem = itemId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', itemId);
+  e.target.style.opacity = '0.5';
+}
+function _kanbanDragEnd(e) {
+  e.target.style.opacity = '1';
+  _boardsState.dragItem = null;
+  _boardsState.dragOverCol = null;
+  document.querySelectorAll('.kanban-col').forEach(c => c.style.outline = '');
+}
+function _kanbanDragOver(e, colId) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  _boardsState.dragOverCol = colId;
+  // Visual feedback
+  const col = e.currentTarget;
+  col.style.outline = '2px solid var(--accent)';
+}
+function _kanbanDragLeave(e) {
+  e.currentTarget.style.outline = '';
+}
+async function _kanbanDrop(e, colId) {
+  e.preventDefault();
+  e.currentTarget.style.outline = '';
+  const itemId = _boardsState.dragItem;
+  if (!itemId) return;
+  // Calculate sort order: append to end
+  const colItems = _boardsState.items.filter(i => i.column_id === colId);
+  const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/move', { column_id: colId, sort_order: sortOrder });
+    // Update local state
+    const item = _boardsState.items.find(i => i.id === itemId);
+    if (item) { item.column_id = colId; item.sort_order = sortOrder; }
+    _renderKanbanBoard();
+  } catch (e2) { alert(e2.message); }
+}
+
+// ── Column operations ──
+async function _toggleColCollapse(colId) {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  const cols = board.columns.map(c => c.id === colId ? { ...c, collapsed: !c.collapsed } : c);
+  try {
+    await _boardApi('PUT', '/boards/' + board.id, { columns: cols });
+    board.columns = cols;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+async function _renameCol(colId, oldName) {
+  const newName = prompt(t('board_rename_col')||'Column name:', oldName);
+  if (!newName || newName === oldName) return;
+  const board = _boardsState.activeBoard;
+  const cols = board.columns.map(c => c.id === colId ? { ...c, name: newName } : c);
+  try {
+    await _boardApi('PUT', '/boards/' + board.id, { columns: cols });
+    board.columns = cols;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Add item to column ──
+async function _addItemToCol(colId) {
+  const subject = prompt(t('board_item_subject')||'Subject:');
+  if (!subject) return;
+  const board = _boardsState.activeBoard;
+  const colItems = _boardsState.items.filter(i => i.column_id === colId);
+  const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
+  try {
+    const created = await _boardApi('POST', '/boards/' + board.id + '/items', {
+      column_id: colId, subject, sort_order: sortOrder
+    });
+    _boardsState.items.push(created);
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Open item detail ──
+function _openBoardItem(itemId) {
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+  const board = _boardsState.activeBoard;
+  const colName = (board.columns.find(c => c.id === item.column_id) || {}).name || item.column_id;
+
+  let html = `<div style="max-width:700px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0">#${item.id} ${escHtml(item.subject)}</h3>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-secondary" onclick="_editBoardItem(${item.id})">✏ ${t('btn_edit')||'Edit'}</button>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="_deleteBoardItem(${item.id})">🗑</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:var(--fs-sm);margin-bottom:12px">
+      <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
+      <div><strong>${t('board_type')||'Type'}:</strong> ${escHtml(item.item_type||'-')}</div>
+      <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
+      <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
+    </div>
+    ${item.color ? `<div style="margin-bottom:8px"><strong>${t('board_color')||'Color'}:</strong> <span style="display:inline-block;width:20px;height:14px;background:${item.color};border-radius:3px;vertical-align:middle"></span></div>` : ''}
+    ${item.tags && item.tags.length ? `<div style="margin-bottom:8px"><strong>${t('tags_title')||'Tags'}:</strong> ${item.tags.map(t2 => `<span style="background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;font-size:var(--fs-xs);margin-right:4px">${escHtml(t2)}</span>`).join('')}</div>` : ''}
+    <div style="margin-bottom:12px">
+      <strong>${t('board_note')||'Note'}:</strong>
+      <div style="background:var(--bg3);padding:8px;border-radius:var(--radius);margin-top:4px;white-space:pre-wrap;font-size:var(--fs-sm);min-height:40px">${escHtml(item.note||'-')}</div>
+    </div>`;
+
+  // Attachments
+  html += `<div style="margin-bottom:12px">
+    <strong>📎 ${t('board_attachments')||'Attachments'} (${(item.attachments||[]).length})</strong>
+    <div style="margin-top:4px">`;
+  for (const att of (item.attachments || [])) {
+    html += `<div style="font-size:var(--fs-xs);margin-bottom:2px"><a href="/api/board-items/${item.id}/attachments/${att.id}" target="_blank">${escHtml(att.filename)}</a> (${_formatSize(att.size)})</div>`;
+  }
+  html += `<form id="boardAttUploadForm" style="margin-top:6px">
+    <input type="file" id="boardAttFile" style="font-size:var(--fs-xs)">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="_uploadBoardAttachment(${item.id})" style="margin-left:4px">⬆ ${t('btn_upload')||'Upload'}</button>
+  </form></div></div>`;
+
+  // History
+  html += `<div><strong>📜 ${t('board_history')||'History'}</strong>
+    <div style="max-height:200px;overflow-y:auto;margin-top:4px;font-size:var(--fs-xs)">`;
+  for (const h of (item.history || []).slice().reverse()) {
+    html += `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-dim)">${new Date(h.timestamp).toLocaleString()}</span>
+      <strong>${escHtml(h.user_name)}</strong>: ${escHtml(h.action)} ${h.detail ? '— ' + escHtml(h.detail) : ''}
+    </div>`;
+  }
+  html += `</div></div></div>`;
+
+  _boardModal('boardItemModal', html, '720px');
+}
+
+function _formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ── Edit item ──
+function _editBoardItem(itemId) {
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+  const board = _boardsState.activeBoard;
+
+  let html = `<div style="max-width:600px">
+    <h3>${t('board_edit_item')||'Edit Item'} #${item.id}</h3>
+    <label>${t('board_item_subject')||'Subject'}</label>
+    <input id="editItemSubject" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(item.subject)}">
+    <label>${t('board_note')||'Note'}</label>
+    <textarea id="editItemNote" class="input" style="width:100%;height:100px;margin-bottom:8px">${escHtml(item.note||'')}</textarea>
+    <label>${t('board_type')||'Type'}</label>
+    <select id="editItemType" class="input" style="width:100%;margin-bottom:8px">
+      <option value="" ${!item.item_type?'selected':''}>—</option>
+      <option value="task" ${item.item_type==='task'?'selected':''}>Task</option>
+      <option value="meeting" ${item.item_type==='meeting'?'selected':''}>Meeting</option>
+      <option value="checklist" ${item.item_type==='checklist'?'selected':''}>Checklist</option>
+      <option value="issue" ${item.item_type==='issue'?'selected':''}>Issue</option>
+      <option value="note" ${item.item_type==='note'?'selected':''}>Note</option>
+    </select>
+    <label>${t('board_color')||'Color'}</label>
+    <input id="editItemColor" type="color" value="${item.color||'#1a1a2e'}" style="margin-bottom:8px">
+    <label>${t('tags_title')||'Tags'} (${t('tags_placeholder')||'comma-separated'})</label>
+    <input id="editItemTags" class="input" style="width:100%;margin-bottom:8px" value="${(item.tags||[]).join(', ')}">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="_doEditBoardItem(${item.id})">✔ ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary" onclick="closeModal('boardItemEditModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardItemEditModal', html, '620px');
+}
+
+async function _doEditBoardItem(itemId) {
+  const subject = document.getElementById('editItemSubject').value.trim();
+  if (!subject) return;
+  const tags = document.getElementById('editItemTags').value.split(',').map(s => s.trim()).filter(Boolean);
+  const color = document.getElementById('editItemColor').value;
+  try {
+    await _boardApi('PUT', '/board-items/' + itemId, {
+      subject,
+      note: document.getElementById('editItemNote').value,
+      item_type: document.getElementById('editItemType').value,
+      color: color === '#1a1a2e' ? '' : color,
+      tags,
+    });
+    closeModal('boardItemEditModal');
+    closeModal('boardItemModal');
+    await _openBoard(_boardsState.activeBoard.id);
+  } catch (e) { alert(e.message); }
+}
+
+async function _deleteBoardItem(itemId) {
+  if (!confirm(t('board_delete_item_confirm')||'Delete this item?')) return;
+  try {
+    await _boardApi('DELETE', '/board-items/' + itemId);
+    closeModal('boardItemModal');
+    _boardsState.items = _boardsState.items.filter(i => i.id !== itemId);
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Upload attachment ──
+async function _uploadBoardAttachment(itemId) {
+  const fileInput = document.getElementById('boardAttFile');
+  if (!fileInput || !fileInput.files.length) return;
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  try {
+    const res = await fetch('/api/board-items/' + itemId + '/attachments', {
+      method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: form
+    });
+    if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+    closeModal('boardItemModal');
+    await _openBoard(_boardsState.activeBoard.id);
+    _openBoardItem(itemId);
+  } catch (e) { alert(e.message); }
+}
+
+// ── Board Settings ──
+function _openBoardSettings() {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  const groups = state.groups || [];
+
+  let colsHtml = '';
+  for (let i = 0; i < board.columns.length; i++) {
+    const col = board.columns[i];
+    colsHtml += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+      <input class="input boardSettCol" data-idx="${i}" value="${escHtml(col.name)}" style="flex:1">
+      <button class="btn btn-sm" onclick="_moveBoardCol(${i},-1)" ${i===0?'disabled':''}>↑</button>
+      <button class="btn btn-sm" onclick="_moveBoardCol(${i},1)" ${i===board.columns.length-1?'disabled':''}>↓</button>
+      <button class="btn btn-sm" style="color:var(--danger)" onclick="_removeBoardCol(${i})">✖</button>
+    </div>`;
+  }
+
+  let html = `<div style="max-width:500px">
+    <h3>⚙ ${t('board_settings')||'Board Settings'}</h3>
+    <label>${t('board_name')||'Name'}</label>
+    <input id="settBoardName" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(board.name)}">
+    <label>${t('board_description')||'Description'}</label>
+    <input id="settBoardDesc" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(board.description||'')}">
+    <label>${t('board_visibility')||'Visibility'}</label>
+    <select id="settBoardVis" class="input" style="width:100%;margin-bottom:8px" onchange="_toggleSettVisFields()">
+      <option value="private" ${board.visibility==='private'?'selected':''}>🔒 ${t('board_vis_private')||'Private'}</option>
+      <option value="group" ${board.visibility==='group'?'selected':''}>👥 ${t('board_vis_group')||'Group'}</option>
+      <option value="role" ${board.visibility==='role'?'selected':''}>🎭 ${t('board_vis_role')||'Role'}</option>
+      <option value="global" ${board.visibility==='global'?'selected':''}>🌐 ${t('board_vis_global')||'Global'}</option>
+    </select>
+    <div id="settBoardGroupDiv" style="display:${board.visibility==='group'?'':'none'};margin-bottom:8px">
+      <label>${t('board_group')||'Group'}</label>
+      <select id="settBoardGroup" class="input" style="width:100%">
+        ${groups.map(g => `<option value="${g.id}" ${g.id===board.group_id?'selected':''}>${escHtml(g.name)}</option>`).join('')}
+      </select>
+    </div>
+    <label>${t('board_columns')||'Columns'}</label>
+    <div id="settBoardCols">${colsHtml}</div>
+    <button class="btn btn-sm btn-secondary" onclick="_addBoardCol()" style="margin-top:4px;margin-bottom:12px">+ ${t('board_add_col')||'Add Column'}</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="_saveBoardSettings()">✔ ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary" onclick="closeModal('boardSettingsModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardSettingsModal', html, '540px');
+}
+
+function _toggleSettVisFields() {
+  const vis = document.getElementById('settBoardVis').value;
+  document.getElementById('settBoardGroupDiv').style.display = vis === 'group' ? '' : 'none';
+}
+
+window._settCols = null;
+function _addBoardCol() {
+  const board = _boardsState.activeBoard;
+  const id = 'col_' + Date.now();
+  board.columns.push({ id, name: 'New Column' });
+  _openBoardSettings();
+}
+function _removeBoardCol(idx) {
+  const board = _boardsState.activeBoard;
+  board.columns.splice(idx, 1);
+  _openBoardSettings();
+}
+function _moveBoardCol(idx, dir) {
+  const board = _boardsState.activeBoard;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= board.columns.length) return;
+  const tmp = board.columns[idx];
+  board.columns[idx] = board.columns[newIdx];
+  board.columns[newIdx] = tmp;
+  _openBoardSettings();
+}
+
+async function _saveBoardSettings() {
+  const board = _boardsState.activeBoard;
+  const inputs = document.querySelectorAll('.boardSettCol');
+  const cols = [];
+  inputs.forEach(inp => {
+    const idx = parseInt(inp.dataset.idx);
+    cols.push({ id: board.columns[idx].id, name: inp.value.trim() || board.columns[idx].name, collapsed: board.columns[idx].collapsed });
+  });
+  try {
+    await _boardApi('PUT', '/boards/' + board.id, {
+      name: document.getElementById('settBoardName').value.trim(),
+      description: document.getElementById('settBoardDesc').value.trim(),
+      visibility: document.getElementById('settBoardVis').value,
+      group_id: parseInt(document.getElementById('settBoardGroup')?.value) || 0,
+      columns: cols,
+    });
+    closeModal('boardSettingsModal');
+    await _openBoard(board.id);
+  } catch (e) { alert(e.message); }
+}
+
+// ── Delete board ──
+async function _deleteBoardConfirm() {
+  if (!confirm(t('board_delete_confirm')||'Delete this board and all its items?')) return;
+  const board = _boardsState.activeBoard;
+  try {
+    await _boardApi('DELETE', '/boards/' + board.id);
+    openBoardsModal();
+  } catch (e) { alert(e.message); }
+}
+
+// ── Print ──
+function _printBoard() {
+  window.print();
+}
+
+// ── Export ──
+function _exportBoard(format) {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  window.open('/api/boards/' + board.id + '/export/' + format, '_blank');
+}
+
+// ── Import ──
+function _openImportBoardDialog() {
+  let html = `<div style="max-width:500px">
+    <h3>⬆ ${t('board_import')||'Import Board'}</h3>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_import_desc')||'Upload a JSON file exported from Boards.'}</p>
+    <input type="file" id="boardImportFile" accept=".json" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="_doImportBoard()">⬆ ${t('btn_import')||'Import'}</button>
+      <button class="btn btn-secondary" onclick="closeModal('boardImportModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardImportModal', html, '520px');
+}
+
+async function _doImportBoard() {
+  const file = document.getElementById('boardImportFile')?.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    await _boardApi('POST', '/boards/import', data);
+    closeModal('boardImportModal');
+    openBoardsModal();
+  } catch (e) { alert(e.message); }
+}
+
+// ── SSE listener ──
+if (typeof window._boardSSESetup === 'undefined') {
+  window._boardSSESetup = true;
+  document.addEventListener('sse:board_change', async (e) => {
+    try {
+      const data = JSON.parse(e.detail);
+      if (_boardsState.activeBoard && _boardsState.activeBoard.id === data.board_id) {
+        // Refresh current board
+        const [board, items] = await Promise.all([
+          _boardApi('GET', '/boards/' + data.board_id),
+          _boardApi('GET', '/boards/' + data.board_id + '/items'),
+        ]);
+        _boardsState.activeBoard = board;
+        _boardsState.items = items;
+        _renderKanbanBoard();
+      }
+    } catch { /* ignore */ }
+  });
+}

@@ -1672,6 +1672,109 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 
+	// ── Boards (Kanban) ──
+	mux.HandleFunc("/api/boards", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetBoards)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleCreateBoard)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/boards/templates", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleGetBoardTemplates)(w, r)
+	})
+	mux.HandleFunc("/api/boards/import", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireAuth(app.handleImportBoard)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/boards/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/boards/{id}/items
+		if len(parts) == 4 && parts[3] == "items" {
+			switch r.Method {
+			case http.MethodGet:
+				app.requireAuth(app.handleGetBoardItems)(w, r)
+			case http.MethodPost:
+				app.requireAuth(app.handleCreateBoardItem)(w, r)
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		// /api/boards/{id}/export/{format}
+		if len(parts) == 5 && parts[3] == "export" {
+			app.requireAuth(app.handleExportBoard)(w, r)
+			return
+		}
+		// /api/boards/{id}
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetBoard)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleUpdateBoard)(w, r)
+		case http.MethodDelete:
+			app.requireAuth(app.handleDeleteBoard)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/board-items/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/board-items/{id}/move
+		if len(parts) == 3 && parts[2] == "move" {
+			jsonError(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		if len(parts) >= 4 && parts[2] != "" {
+			itemSeg := parts[1]
+			_ = itemSeg
+			// /api/board-items/{id}/move
+			if len(parts) == 4 && parts[3] == "move" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleMoveBoardItem)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+			// /api/board-items/{id}/attachments
+			if len(parts) == 4 && parts[3] == "attachments" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleUploadBoardItemAttachment)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+			// /api/board-items/{id}/attachments/{attId}
+			if len(parts) == 5 && parts[3] == "attachments" {
+				if r.Method == http.MethodGet {
+					app.requireAuth(app.handleDownloadBoardItemAttachment)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+		}
+		// /api/board-items/{id}
+		switch r.Method {
+		case http.MethodPut:
+			app.requireAuth(app.handleUpdateBoardItem)(w, r)
+		case http.MethodDelete:
+			app.requireAuth(app.handleDeleteBoardItem)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// ── Resource Notes ──
 	mux.HandleFunc("/api/resource-notes", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
