@@ -6,8 +6,12 @@ function openExportModal() {
   const isPriv = hasRole2(state.user?.role, 'oplead');
   const usersCb  = document.getElementById('exportUsersCb');
   const phasesCb = document.getElementById('exportPhasesCb');
+  const decisionLogCb = document.getElementById('exportDecisionLogCb');
+  const roleConfigsCb = document.getElementById('exportRoleConfigsCb');
   if (usersCb)  usersCb.style.display  = isPriv ? '' : 'none';
   if (phasesCb) phasesCb.style.display = isPriv ? '' : 'none';
+  if (decisionLogCb) decisionLogCb.style.display = isPriv ? '' : 'none';
+  if (roleConfigsCb) roleConfigsCb.style.display = isPriv ? '' : 'none';
   // Toggle chip style on checkbox change
   document.querySelectorAll('.export-cat-cb').forEach(cb => {
     cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
@@ -43,8 +47,12 @@ function openImportModal() {
   const isPriv = hasRole2(state.user?.role, 'oplead');
   const usersCb     = document.getElementById('importUsersCb');
   const reassignRow = document.getElementById('importReassignRow');
+  const importDecisionLogCb = document.getElementById('importDecisionLogCb');
+  const importRoleConfigsCb = document.getElementById('importRoleConfigsCb');
   if (usersCb)     usersCb.style.display     = isPriv ? '' : 'none';
   if (reassignRow) reassignRow.style.display = isPriv ? '' : 'none';
+  if (importDecisionLogCb) importDecisionLogCb.style.display = isPriv ? '' : 'none';
+  if (importRoleConfigsCb) importRoleConfigsCb.style.display = isPriv ? '' : 'none';
   // Toggle chip style on checkbox change
   document.querySelectorAll('.import-cat-cb').forEach(cb => {
     cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);

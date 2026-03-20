@@ -74,7 +74,17 @@ func (app *App) handleGetBoards(w http.ResponseWriter, r *http.Request, user *Us
 }
 
 func (app *App) handleGetBoardTemplates(w http.ResponseWriter, r *http.Request, user *User) {
-	jsonOK(w, BuiltInBoardTemplates())
+	templates := BuiltInBoardTemplates()
+	exampleItems := BuiltInBoardTemplateItems()
+	type templateWithItems struct {
+		Board
+		ExampleItems []BoardItem `json:"example_items,omitempty"`
+	}
+	out := make([]templateWithItems, len(templates))
+	for i, t := range templates {
+		out[i] = templateWithItems{Board: t, ExampleItems: exampleItems[t.ID]}
+	}
+	jsonOK(w, out)
 }
 
 func (app *App) handleCreateBoard(w http.ResponseWriter, r *http.Request, user *User) {
@@ -105,8 +115,10 @@ func (app *App) handleCreateBoard(w http.ResponseWriter, r *http.Request, user *
 	}
 
 	cols := req.Columns
+	var templateID int64
 	// If creating from template, use template columns
 	if req.TemplateID != 0 {
+		templateID = req.TemplateID
 		for _, t := range BuiltInBoardTemplates() {
 			if t.ID == req.TemplateID {
 				cols = t.Columns
@@ -139,6 +151,23 @@ func (app *App) handleCreateBoard(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "failed to create board", http.StatusInternalServerError)
 		return
 	}
+
+	// Add example items from template
+	if templateID != 0 {
+		exampleItems := BuiltInBoardTemplateItems()
+		if items, ok := exampleItems[templateID]; ok {
+			for _, item := range items {
+				item.BoardID = created.ID
+				item.CreatorID = user.ID
+				item.CreatorName = user.DisplayName
+				item.History = []BoardHistory{
+					{Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName, Action: "created", Detail: "Added from template"},
+				}
+				_, _ = app.store.CreateBoardItem(item)
+			}
+		}
+	}
+
 	app.audit(user.ID, user.Username, "create", "board", created.ID, fmt.Sprintf("Created board %q", created.Name))
 	app.broadcastBoardChange("board_created", created.ID)
 	w.WriteHeader(http.StatusCreated)

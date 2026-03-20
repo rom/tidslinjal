@@ -156,3 +156,53 @@ func BuiltInBoardTemplates() []Board {
 		},
 	}
 }
+
+// BuiltInBoardTemplateItems returns example items for each template (keyed by template ID).
+// The "Basic Task Board" (ID -1) has no example items.
+func BuiltInBoardTemplateItems() map[int64][]BoardItem {
+	now := time.Now()
+	return map[int64][]BoardItem{
+		-2: { // Incident Response
+			{Subject: "Server room temperature alert", ColumnID: "reported", SortOrder: 0, ItemType: "issue", Note: "Temperature sensors triggered in server room B.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Network outage sector 3", ColumnID: "triaging", SortOrder: 0, ItemType: "issue", Note: "Investigating root cause of connectivity loss.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Phishing email campaign detected", ColumnID: "in_progress", SortOrder: 0, ItemType: "task", Note: "Blocking sender domains and notifying affected users.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Badge system malfunction", ColumnID: "resolved", SortOrder: 0, ItemType: "issue", Note: "Firmware update applied, system restored.", CreatedAt: now, UpdatedAt: now},
+		},
+		-3: { // Meeting Planner
+			{Subject: "Weekly status briefing", ColumnID: "planned", SortOrder: 0, ItemType: "meeting", Note: "Monday 09:00, all team leads.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Stakeholder update", ColumnID: "planned", SortOrder: 1, ItemType: "meeting", Note: "Prepare slides and talking points.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Safety review board", ColumnID: "preparing", SortOrder: 0, ItemType: "meeting", Note: "Collecting agenda items from department heads.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Post-exercise debrief", ColumnID: "completed", SortOrder: 0, ItemType: "meeting", Note: "Lessons learned documented.", CreatedAt: now, UpdatedAt: now},
+		},
+		-4: { // Resource Allocation
+			{Subject: "3x portable radios", ColumnID: "requested", SortOrder: 0, ItemType: "task", Note: "Needed for field team deployment.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Transport vehicle", ColumnID: "approved", SortOrder: 0, ItemType: "task", Note: "Approved for logistics run Thursday.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Projector + screen", ColumnID: "allocated", SortOrder: 0, ItemType: "task", Note: "Set up in briefing room A.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Generator unit #4", ColumnID: "returned", SortOrder: 0, ItemType: "task", Note: "Returned and inspected, ready for next use.", CreatedAt: now, UpdatedAt: now},
+		},
+		-5: { // Decision Tracker
+			{Subject: "Switch to encrypted radio channels", ColumnID: "proposed", SortOrder: 0, ItemType: "note", Note: "Proposal to migrate all comms to encrypted channels.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Extend shift rotation to 12h", ColumnID: "under_review", SortOrder: 0, ItemType: "note", Note: "HR and operations reviewing feasibility.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Adopt new reporting template", ColumnID: "approved", SortOrder: 0, ItemType: "note", Note: "Approved by ops lead, rollout next week.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Relocate command post", ColumnID: "implemented", SortOrder: 0, ItemType: "note", Note: "Moved to building C, all systems operational.", CreatedAt: now, UpdatedAt: now},
+		},
+		-6: { // Shift Handover
+			{Subject: "Monitor water level sensor #7", ColumnID: "carry_over", SortOrder: 0, ItemType: "task", Note: "Rising trend, check every 30 min.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Coordinate with external agency", ColumnID: "carry_over", SortOrder: 1, ItemType: "task", Note: "Awaiting callback from regional HQ.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Update situation report", ColumnID: "in_progress", SortOrder: 0, ItemType: "task", Note: "Draft due by end of shift.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Perimeter check zone A-D", ColumnID: "handed_over", SortOrder: 0, ItemType: "task", Note: "Completed, no issues found.", CreatedAt: now, UpdatedAt: now},
+		},
+		-7: { // Exercise Planning
+			{Subject: "Scenario: chemical spill at dock", ColumnID: "backlog", SortOrder: 0, ItemType: "task", Note: "Draft scenario with 5 injects.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Inject: comms failure", ColumnID: "ready", SortOrder: 0, ItemType: "task", Note: "Trigger at T+45min, test fallback procedures.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Scenario: mass casualty event", ColumnID: "active", SortOrder: 0, ItemType: "task", Note: "Currently running, 3 injects delivered.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Evacuation drill building A", ColumnID: "evaluated", SortOrder: 0, ItemType: "task", Note: "Completed in 4:32. Target was 5:00.", CreatedAt: now, UpdatedAt: now},
+		},
+		-8: { // Logistics Pipeline
+			{Subject: "500x bottled water", ColumnID: "requested", SortOrder: 0, ItemType: "task", Note: "For forward operating base.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Medical supply kit (10x)", ColumnID: "sourcing", SortOrder: 0, ItemType: "task", Note: "Contacting suppliers for availability.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Fuel tanker resupply", ColumnID: "in_transit", SortOrder: 0, ItemType: "task", Note: "ETA 14:00, tracking active.", CreatedAt: now, UpdatedAt: now},
+			{Subject: "Tent package (20-person)", ColumnID: "delivered", SortOrder: 0, ItemType: "task", Note: "Delivered and assembled at site B.", CreatedAt: now, UpdatedAt: now},
+		},
+	}
+}

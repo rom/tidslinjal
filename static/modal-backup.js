@@ -17,7 +17,7 @@ async function loadGradualBackupData() {
   const maxSnaps = document.getElementById('gbMaxSnapshots');
   if (en) en.checked = cfg.enabled !== false;
   if (interval) interval.value = cfg.interval_minutes || 15;
-  if (maxSnaps) maxSnaps.value = cfg.max_snapshots || 48;
+  if (maxSnaps) maxSnaps.value = cfg.max_snapshots || 480;
   renderGradualBackupSnapshots(snaps);
 }
 
@@ -51,7 +51,7 @@ function renderGradualBackupSnapshots(snaps) {
 async function saveGradualBackupSettings() {
   const enabled = document.getElementById('gbEnabled')?.checked ?? true;
   const interval = parseInt(document.getElementById('gbInterval')?.value||'15', 10);
-  const max = parseInt(document.getElementById('gbMaxSnapshots')?.value||'48', 10);
+  const max = parseInt(document.getElementById('gbMaxSnapshots')?.value||'480', 10);
   const res = await api('PUT', '/api/admin/gradual-backup', {
     enabled, interval_minutes: interval, max_snapshots: max
   });
@@ -83,15 +83,56 @@ function downloadGradualSnapshot(filename) {
 }
 
 async function restoreGradualSnapshot(filename) {
-  if (!confirm(`Restore from snapshot "${filename}"?\n\nThis will overwrite current data. A server restart is recommended after restore.`)) return;
-  const res = await api('POST', `/api/admin/gradual-backup/restore/${encodeURIComponent(filename)}`, {});
-  if (res.ok) {
-    const d = await res.json().catch(()=>({}));
-    showNotification('success', d.message || 'Restored successfully');
-  } else {
-    const e = await res.json().catch(()=>({}));
-    showError(e.error || 'Restore failed');
-  }
+  // Show area selection dialog
+  const areaOptions = [
+    {value:'calendars', label:'Calendars & Events'},
+    {value:'boards', label:'Boards'},
+    {value:'resources', label:'Resources & Maps'},
+    {value:'users', label:'Users & Groups'},
+    {value:'logs', label:'Logs & Audit'},
+    {value:'checklists', label:'Checklists'},
+    {value:'other', label:'Other'}
+  ];
+  let html = `<div style="max-width:500px">
+    <h3>↩ Restore from Snapshot</h3>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:10px">Restoring: <strong>${escHtml(filename)}</strong></p>
+    <p style="font-size:var(--fs-sm);margin-bottom:8px">Select areas to restore <span style="color:var(--text-dim)">(leave all unchecked to restore everything)</span>:</p>
+    <div class="group-picker" style="margin-bottom:12px">
+      ${areaOptions.map(a => `<label class="group-chip"><input type="checkbox" class="gb-restore-area-cb" value="${a.value}" style="margin-right:4px"> ${a.label}</label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" id="btnConfirmGbRestore">↩ Restore</button>
+      <button class="btn btn-secondary" onclick="closeModal('gbRestoreModal')">Cancel</button>
+    </div>
+  </div>`;
+  // Use a simple modal approach - inject into DOM
+  let overlay = document.getElementById('gbRestoreModal');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'gbRestoreModal';
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal" style="max-width:520px;padding:20px">${html}</div>`;
+  document.body.appendChild(overlay);
+  if (typeof _bindActions === 'function') _bindActions(overlay);
+  // Toggle chip style
+  overlay.querySelectorAll('.gb-restore-area-cb').forEach(cb => {
+    cb.onchange = () => cb.closest('.group-chip').classList.toggle('selected', cb.checked);
+  });
+
+  document.getElementById('btnConfirmGbRestore').onclick = async () => {
+    const areas = [...overlay.querySelectorAll('.gb-restore-area-cb:checked')].map(cb => cb.value);
+    const areaDesc = areas.length ? areas.join(', ') : 'all areas';
+    if (!confirm(`Restore ${areaDesc} from snapshot "${filename}"?\n\nThis will overwrite current data. A server restart is recommended after restore.`)) return;
+    overlay.remove();
+    const res = await api('POST', `/api/admin/gradual-backup/restore/${encodeURIComponent(filename)}`, {areas});
+    if (res.ok) {
+      const d = await res.json().catch(()=>({}));
+      showNotification('success', d.message || 'Restored successfully');
+    } else {
+      const e = await res.json().catch(()=>({}));
+      showError(e.error || 'Restore failed');
+    }
+  };
 }
 
 async function deleteGradualSnapshot(filename) {
@@ -125,10 +166,13 @@ async function uploadRestore() {
     if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">Please select a backup ZIP file first.</span>';
     return;
   }
-  if (!confirm('Are you sure you want to restore from this backup? Current data will be overwritten. A server restart is required after restore.')) return;
+  const areas = [...document.querySelectorAll('.restore-area-cb:checked')].map(cb => cb.value);
+  const areaDesc = areas.length ? areas.join(', ') : 'all areas';
+  if (!confirm(`Are you sure you want to restore ${areaDesc} from this backup? Current data will be overwritten. A server restart is required after restore.`)) return;
 
   const formData = new FormData();
   formData.append('backup', fileEl.files[0]);
+  if (areas.length) formData.append('areas', areas.join(','));
 
   try {
     if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-dim)">Uploading and restoring…</span>';
