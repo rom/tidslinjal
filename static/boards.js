@@ -23,7 +23,7 @@ function _boardModal(id, content, width) {
   let el = document.getElementById(id);
   if (el) el.remove();
   const html = `<div class="modal-overlay" id="${id}">
-    <div class="modal" style="max-width:${width||'800px'};width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative">
+    <div class="modal" style="max-width:${width||'800px'};width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px">
       <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&#x2715;</button>
       ${content}
     </div>
@@ -47,7 +47,12 @@ async function _boardApi(method, path, body) {
 // ── Open Boards Modal ──
 async function openBoardsModal() {
   try {
-    _boardsState.boards = await _boardApi('GET', '/boards');
+    const [boards, templates] = await Promise.all([
+      _boardApi('GET', '/boards').catch(() => []),
+      _boardApi('GET', '/boards/templates').catch(() => []),
+    ]);
+    _boardsState.boards = boards;
+    window._boardTemplates = templates;
   } catch { _boardsState.boards = []; }
   _boardsState.activeBoard = null;
   _boardsState.items = [];
@@ -71,8 +76,8 @@ function _renderBoardListModal() {
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`;
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
-      const cardBorderTop = b.color ? `border-top:3px solid ${b.color};` : '';
-      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);${cardBorderTop}" data-action="_openBoard" data-arg="${b.id}">
+      const cardBg = b.color ? `background:${b.color}22;border:1px solid ${b.color}44;` : 'background:var(--bg2);border:1px solid var(--border);';
+      html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg}" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(b.name)}</strong> <span title="${b.visibility}">${vis}</span>
         </div>
@@ -96,9 +101,6 @@ function _renderBoardListModal() {
   html += `</div></div></div>`;
 
   _boardModal('boardsModal', html, '960px');
-
-  // Load templates
-  _boardApi('GET', '/boards/templates').then(t => { window._boardTemplates = t; }).catch(() => {});
 }
 
 // ── Create Board Dialog ──
@@ -203,20 +205,22 @@ function _renderKanbanBoard() {
   // Sort by sort_order
   for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
 
-  const boardColorStyle = board.color ? `border-top:4px solid ${board.color};` : '';
-  let html = `<div style="max-width:100%;overflow-x:auto;${boardColorStyle}">
+  const boardBg = board.color ? `background:${board.color}22;border:1px solid ${board.color}44;border-radius:var(--radius);padding:12px;` : '';
+  const btnStyle = 'min-width:32px;height:28px;padding:4px 8px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;';
+  let html = `<div style="max-width:100%;overflow-x:auto;${boardBg}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}" style="${btnStyle}">← ${t('board_back_short')||'Boards'}</button>
         ${board.color ? `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${board.color}"></span>` : ''}
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-right:28px">
-        <button class="btn btn-sm btn-secondary" data-action="_shareBoardLink" title="${t('board_share')||'Share link'}" style="font-size:14px;padding:4px 8px">🔗</button>
-        <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}" style="font-size:18px;padding:2px 10px">⚙</button>
-        <button class="btn btn-sm btn-secondary" data-action="_printBoard">🖨</button>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-right:28px">
+        <button class="btn btn-sm btn-secondary" data-action="_shareBoardLink" title="${t('board_share')||'Share link'}" style="${btnStyle}">🔗</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}" style="${btnStyle}">⚙</button>
+        <button class="btn btn-sm btn-secondary" data-action="_detachBoard" title="${t('board_detach')||'Detach window'}" style="${btnStyle}">⧉</button>
+        <button class="btn btn-sm btn-secondary" data-action="_printBoard" title="${t('board_print')||'Print'}" style="${btnStyle}">🖨</button>
         <div style="position:relative;display:inline-block" id="boardExportDropdown">
-          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardExportMenu">⬇ ${t('btn_export')||'Export'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardExportMenu" style="${btnStyle}">⬇ ${t('btn_export')||'Export'}</button>
           <div id="boardExportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:120px;margin-top:4px">
             <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="json">JSON</button>
             <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="csv">CSV</button>
@@ -225,18 +229,19 @@ function _renderKanbanBoard() {
           </div>
         </div>
         <div style="position:relative;display:inline-block" id="boardImportDropdown">
-          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardImportMenu">⬆ ${t('btn_import')||'Import'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardImportMenu" style="${btnStyle}">⬆ ${t('btn_import')||'Import'}</button>
           <div id="boardImportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:120px;margin-top:4px">
             <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="json">JSON</button>
             <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="csv">CSV</button>
           </div>
         </div>
-        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardConfirm" title="${t('board_delete')||'Delete board'}">🗑</button>
-        <span style="border-left:1px solid var(--border);height:20px;margin:0 4px"></span>
-        <button class="btn btn-sm btn-secondary" data-action="_boardZoomOut" title="${t('board_zoom_out')||'Zoom out'}" style="font-size:14px;padding:4px 6px">−</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger);${btnStyle}" data-action="_deleteBoardConfirm" title="${t('board_delete')||'Delete board'}">🗑</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomOut" title="${t('board_zoom_out')||'Zoom out'}" style="${btnStyle}">−</button>
         <span id="boardZoomLevel" style="font-size:var(--fs-xs);min-width:36px;text-align:center">${Math.round(_boardsState.zoom * 100)}%</span>
-        <button class="btn btn-sm btn-secondary" data-action="_boardZoomIn" title="${t('board_zoom_in')||'Zoom in'}" style="font-size:14px;padding:4px 6px">+</button>
-        <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="font-size:var(--fs-xs);padding:4px 6px">100%</button>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomIn" title="${t('board_zoom_in')||'Zoom in'}" style="${btnStyle}">+</button>
+        <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="${btnStyle}font-size:var(--fs-xs);">100%</button>
       </div>
     </div>
     <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
@@ -480,40 +485,58 @@ function _openBoardItem(itemId) {
 
   let html = `<div style="max-width:700px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0">#${item.id} ${escHtml(item.subject)}</h3>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}">🔗</button>
-        <button class="btn btn-sm btn-secondary" data-action="_editBoardItem" data-arg="${item.id}">✏ ${t('btn_edit')||'Edit'}</button>
-        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}">🗑</button>
+      <h3 style="margin:0">#${item.id}
+        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:60%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent';_inlineSaveBoardItem(${item.id})">
+      </h3>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger);min-width:32px;height:28px;padding:4px 8px" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete item'}">🗑</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:var(--fs-sm);margin-bottom:12px">
       <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
-      <div><strong>${t('board_type')||'Type'}:</strong> ${escHtml(item.item_type||'-')}</div>
+      <div><strong>${t('board_type')||'Type'}:</strong>
+        <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:1px 4px;border:1px solid transparent;background:transparent;border-radius:var(--radius)" onchange="_inlineSaveBoardItem(${item.id})" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+          <option value="" ${!item.item_type?'selected':''}>—</option>
+          <option value="task" ${item.item_type==='task'?'selected':''}>Task</option>
+          <option value="meeting" ${item.item_type==='meeting'?'selected':''}>Meeting</option>
+          <option value="checklist" ${item.item_type==='checklist'?'selected':''}>Checklist</option>
+          <option value="issue" ${item.item_type==='issue'?'selected':''}>Issue</option>
+          <option value="note" ${item.item_type==='note'?'selected':''}>Note</option>
+        </select>
+      </div>
       <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
       <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
     </div>
-    ${item.color ? `<div style="margin-bottom:8px"><strong>${t('board_color')||'Color'}:</strong> <span style="display:inline-block;width:20px;height:14px;background:${item.color};border-radius:3px;vertical-align:middle"></span></div>` : ''}
-    ${item.tags && item.tags.length ? `<div style="margin-bottom:8px"><strong>${t('tags_title')||'Tags'}:</strong> ${item.tags.map(t2 => `<span style="background:var(--accent);color:#fff;padding:1px 6px;border-radius:3px;font-size:var(--fs-xs);margin-right:4px">${escHtml(t2)}</span>`).join('')}</div>` : ''}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <strong style="font-size:var(--fs-sm)">${t('board_color')||'Color'}:</strong>
+      <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" onchange="_inlineSaveBoardItem(${item.id})">
+      ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemColor').value='#1a1a2e';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
+    </div>
+    <div style="margin-bottom:8px;font-size:var(--fs-sm)">
+      <strong>${t('tags_title')||'Tags'}:</strong>
+      <input id="inlineItemTags" class="input" style="width:calc(100% - 50px);font-size:var(--fs-sm);padding:2px 6px;border:1px solid transparent;background:transparent;border-radius:var(--radius);margin-left:4px" value="${escHtml((item.tags||[]).join(', '))}" placeholder="${t('tags_placeholder')||'comma-separated'}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent';_inlineSaveBoardItem(${item.id})">
+    </div>
     <div style="margin-bottom:12px">
-      <strong>${t('board_note')||'Note'}:</strong>
-      <div style="background:var(--bg3);padding:8px;border-radius:var(--radius);margin-top:4px;white-space:pre-wrap;font-size:var(--fs-sm);min-height:40px">${escHtml(item.note||'-')}</div>
+      <strong style="font-size:var(--fs-sm)">${t('board_note')||'Note'}:</strong>
+      <textarea id="inlineItemNote" class="input" style="width:100%;min-height:80px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)" onblur="_inlineSaveBoardItem(${item.id})">${escHtml(item.note||'')}</textarea>
     </div>`;
 
   // Attachments
   html += `<div style="margin-bottom:12px">
-    <strong>📎 ${t('board_attachments')||'Attachments'} (${(item.attachments||[]).length})</strong>
+    <strong style="font-size:var(--fs-sm)">📎 ${t('board_attachments')||'Attachments'} (${(item.attachments||[]).length})</strong>
     <div style="margin-top:4px">`;
   for (const att of (item.attachments || [])) {
     html += `<div style="font-size:var(--fs-xs);margin-bottom:2px"><a href="/api/board-items/${item.id}/attachments/${att.id}" target="_blank">${escHtml(att.filename)}</a> (${_formatSize(att.size)})</div>`;
   }
-  html += `<form id="boardAttUploadForm" style="margin-top:6px">
+  html += `<form id="boardAttUploadForm" style="margin-top:6px;display:flex;align-items:center;gap:6px">
     <input type="file" id="boardAttFile" style="font-size:var(--fs-xs)">
-    <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="margin-left:4px">⬆ ${t('btn_upload')||'Upload'}</button>
+    <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="min-width:32px;height:28px;padding:4px 8px">⬆ Upload</button>
   </form></div></div>`;
 
   // History
-  html += `<div><strong>📜 ${t('board_history')||'History'}</strong>
+  html += `<div><strong style="font-size:var(--fs-sm)">📜 ${t('board_history')||'History'}</strong>
     <div style="max-height:200px;overflow-y:auto;margin-top:4px;font-size:var(--fs-xs)">`;
   for (const h of (item.history || []).slice().reverse()) {
     html += `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
@@ -524,6 +547,33 @@ function _openBoardItem(itemId) {
   html += `</div></div></div>`;
 
   _boardModal('boardItemModal', html, '720px');
+  // Setup tag autocomplete on inline tags input
+  _loadBoardTags().then(() => {
+    const tagInput = document.getElementById('inlineItemTags');
+    if (tagInput) _setupTagAutocomplete(tagInput);
+  });
+}
+
+// ── Inline save for board item (auto-save on blur/change) ──
+let _inlineSaveTimer = null;
+async function _inlineSaveBoardItem(itemId) {
+  clearTimeout(_inlineSaveTimer);
+  _inlineSaveTimer = setTimeout(async () => {
+    const subject = (document.getElementById('inlineItemSubject') || {}).value;
+    if (!subject || !subject.trim()) return;
+    const note = (document.getElementById('inlineItemNote') || {}).value || '';
+    const itemType = (document.getElementById('inlineItemType') || {}).value || '';
+    const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
+    const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
+    const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
+    const color = colorVal === '#1a1a2e' ? '' : colorVal;
+    try {
+      await _boardApi('PUT', '/board-items/' + itemId, { subject: subject.trim(), note, item_type: itemType, color, tags });
+      // Refresh items in state
+      const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+      _boardsState.items = items;
+    } catch (e) { /* silent - inline save */ }
+  }, 400);
 }
 
 function _formatSize(bytes) {
@@ -730,12 +780,40 @@ async function _saveBoardSettings() {
   } catch (e) { alert(e.message); }
 }
 
-// ── Delete board ──
-async function _deleteBoardConfirm() {
-  if (!confirm(t('board_delete_confirm')||'Delete this board and all its items?')) return;
+// ── Delete board (requires typing "delete") ──
+function _deleteBoardConfirm() {
   const board = _boardsState.activeBoard;
+  if (!board) return;
+  const html = `<div style="max-width:400px;text-align:center">
+    <h3 style="color:var(--danger);margin-bottom:12px">🗑 ${t('board_delete')||'Delete Board'}</h3>
+    <p style="margin-bottom:8px">${t('board_delete_type_confirm')||'To delete this board and all its items, type'} <strong>delete</strong> ${t('board_delete_type_below')||'below'}:</p>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">"${escHtml(board.name)}"</p>
+    <input id="deleteBoardConfirmInput" class="input" style="width:100%;text-align:center;margin-bottom:12px" placeholder="delete" autocomplete="off">
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="btn btn-sm" style="background:var(--danger);color:#fff;min-width:80px;height:28px;padding:4px 12px" id="deleteBoardConfirmBtn" disabled data-action="_doDeleteBoard">🗑 ${t('board_delete')||'Delete'}</button>
+      <button class="btn btn-sm btn-secondary" data-action="_closeBoardModal" data-arg="boardDeleteConfirmModal" style="min-width:80px;height:28px;padding:4px 12px">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardDeleteConfirmModal', html, '440px');
+  const inp = document.getElementById('deleteBoardConfirmInput');
+  const btn = document.getElementById('deleteBoardConfirmBtn');
+  if (inp && btn) {
+    inp.addEventListener('input', function() {
+      btn.disabled = inp.value.trim().toLowerCase() !== 'delete';
+      btn.style.opacity = btn.disabled ? '0.5' : '1';
+    });
+    inp.focus();
+  }
+}
+
+async function _doDeleteBoard() {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  const inp = document.getElementById('deleteBoardConfirmInput');
+  if (!inp || inp.value.trim().toLowerCase() !== 'delete') return;
   try {
     await _boardApi('DELETE', '/boards/' + board.id);
+    _closeBoardModal('boardDeleteConfirmModal');
     openBoardsModal();
   } catch (e) { alert(e.message); }
 }
@@ -757,6 +835,28 @@ function _boardZoomReset() {
 // ── Print ──
 function _printBoard() {
   window.print();
+}
+
+// ── Detach board into a new window ──
+function _detachBoard() {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  const w = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no');
+  if (!w) { alert('Popup blocked. Please allow popups for this site.'); return; }
+  const modalEl = document.querySelector('#boardsModal .modal');
+  const content = modalEl ? modalEl.innerHTML : '';
+  w.document.write(`<!DOCTYPE html><html><head><title>${escHtml(board.name)} — Board</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>body{padding:20px;background:var(--bg1);color:var(--text);font-family:inherit;overflow:auto}
+    .modal-close{display:none}</style></head>
+    <body>${content}
+    <script src="/static/i18n.js"><\/script>
+    <script src="/static/boards.js"><\/script>
+    <script>
+      window.state = window.opener && window.opener.state ? window.opener.state : {};
+      function escHtml(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    <\/script></body></html>`);
+  w.document.close();
 }
 
 // ── Export ──
