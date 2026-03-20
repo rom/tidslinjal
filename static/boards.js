@@ -192,10 +192,11 @@ function _renderKanbanBoard() {
   if (!board) return;
 
   const colItems = {};
-  for (const col of board.columns) colItems[col.id] = [];
+  for (const col of board.columns) colItems[String(col.id)] = [];
   for (const item of items) {
-    if (!colItems[item.column_id]) colItems[item.column_id] = [];
-    colItems[item.column_id].push(item);
+    const cid = String(item.column_id);
+    if (!colItems[cid]) colItems[cid] = [];
+    colItems[cid].push(item);
   }
   // Sort by sort_order
   for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
@@ -206,20 +207,33 @@ function _renderKanbanBoard() {
         <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-right:28px">
         <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}">⚙</button>
         <button class="btn btn-sm btn-secondary" data-action="_printBoard">🖨</button>
-        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="json">JSON</button>
-        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="csv">CSV</button>
-        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="svg">SVG</button>
-        <button class="btn btn-sm btn-secondary" data-action="_deleteBoardConfirm">🗑</button>
+        <div style="position:relative;display:inline-block" id="boardExportDropdown">
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardExportMenu">⬇ ${t('btn_export')||'Export'}</button>
+          <div id="boardExportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:120px;margin-top:4px">
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="json">JSON</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="csv">CSV</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="svg">SVG</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportBoard" data-arg="pdf">PDF</button>
+          </div>
+        </div>
+        <div style="position:relative;display:inline-block" id="boardImportDropdown">
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardImportMenu">⬆ ${t('btn_import')||'Import'}</button>
+          <div id="boardImportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:120px;margin-top:4px">
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="json">JSON</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="csv">CSV</button>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardConfirm" title="${t('board_delete')||'Delete board'}">🗑</button>
       </div>
     </div>
     <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start">`;
 
   for (const col of board.columns) {
     const collapsed = col.collapsed;
-    const cItems = colItems[col.id] || [];
+    const cItems = colItems[String(col.id)] || [];
     if (collapsed) {
       html += `<div class="kanban-col kanban-col-collapsed" style="min-width:40px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed" data-action="_toggleColCollapse" data-arg="${col.id}">
         <strong>${escHtml(col.name)} (${cItems.length})</strong>
@@ -261,7 +275,12 @@ function _renderKanbanBoard() {
   }
   html += `</div></div>`;
 
-  _boardModal('boardsModal', html, '95vw');
+  // Adjust width to number of columns: ~280px per column + padding, capped at 95vw
+  const visibleCols = board.columns.filter(c => !c.collapsed).length;
+  const collapsedCols = board.columns.length - visibleCols;
+  const calcWidth = visibleCols * 300 + collapsedCols * 60 + 80;
+  const boardWidth = Math.min(calcWidth, window.innerWidth * 0.95);
+  _boardModal('boardsModal', html, boardWidth + 'px');
   _bindKanbanEvents();
 }
 
@@ -296,6 +315,7 @@ function _bindKanbanEvents() {
 // ── Drag & Drop ──
 function _kanbanDragStart(e, itemId) {
   _boardsState.dragItem = itemId;
+  _boardsState.justDragged = true;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', itemId);
   e.target.style.opacity = '0.5';
@@ -305,6 +325,8 @@ function _kanbanDragEnd(e) {
   _boardsState.dragItem = null;
   _boardsState.dragOverCol = null;
   document.querySelectorAll('.kanban-col').forEach(c => c.style.outline = '');
+  // Clear justDragged after click event has fired
+  setTimeout(() => { _boardsState.justDragged = false; }, 100);
 }
 function _kanbanDragOver(e, colId) {
   e.preventDefault();
@@ -322,8 +344,8 @@ async function _kanbanDrop(e, colId) {
   e.currentTarget.style.outline = '';
   const itemId = _boardsState.dragItem;
   if (!itemId) return;
-  // Calculate sort order: append to end
-  const colItems = _boardsState.items.filter(i => i.column_id === colId);
+  // Calculate sort order: append to end (use loose == to handle string/int column_id mismatch)
+  const colItems = _boardsState.items.filter(i => String(i.column_id) === String(colId));
   const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
   try {
     await _boardApi('POST', '/board-items/' + itemId + '/move', { column_id: colId, sort_order: sortOrder });
@@ -363,7 +385,7 @@ async function _addItemToCol(colId) {
   const subject = prompt(t('board_item_subject')||'Subject:');
   if (!subject) return;
   const board = _boardsState.activeBoard;
-  const colItems = _boardsState.items.filter(i => i.column_id === colId);
+  const colItems = _boardsState.items.filter(i => String(i.column_id) === String(colId));
   const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
   try {
     const created = await _boardApi('POST', '/boards/' + board.id + '/items', {
@@ -376,6 +398,7 @@ async function _addItemToCol(colId) {
 
 // ── Open item detail ──
 function _openBoardItem(itemId) {
+  if (_boardsState.justDragged) return;
   const item = _boardsState.items.find(i => i.id === itemId);
   if (!item) return;
   const board = _boardsState.activeBoard;
@@ -627,15 +650,51 @@ function _printBoard() {
 function _exportBoard(format) {
   const board = _boardsState.activeBoard;
   if (!board) return;
+  const menu = document.getElementById('boardExportMenu');
+  if (menu) menu.style.display = 'none';
   window.open('/api/boards/' + board.id + '/export/' + format, '_blank');
 }
 
+// ── Export/Import dropdown toggles ──
+function _toggleBoardExportMenu() {
+  const menu = document.getElementById('boardExportMenu');
+  const importMenu = document.getElementById('boardImportMenu');
+  if (importMenu) importMenu.style.display = 'none';
+  if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+}
+
+function _toggleBoardImportMenu() {
+  const menu = document.getElementById('boardImportMenu');
+  const exportMenu = document.getElementById('boardExportMenu');
+  if (exportMenu) exportMenu.style.display = 'none';
+  if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+}
+
+// Close dropdown menus when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#boardExportDropdown')) {
+    const m = document.getElementById('boardExportMenu');
+    if (m) m.style.display = 'none';
+  }
+  if (!e.target.closest('#boardImportDropdown')) {
+    const m = document.getElementById('boardImportMenu');
+    if (m) m.style.display = 'none';
+  }
+});
+
 // ── Import ──
-function _openImportBoardDialog() {
+function _importBoardAs(format) {
+  const menu = document.getElementById('boardImportMenu');
+  if (menu) menu.style.display = 'none';
+  const accept = format === 'csv' ? '.csv' : '.json';
+  const desc = format === 'csv'
+    ? (t('board_import_csv_desc') || 'Upload a CSV file to import as board items.')
+    : (t('board_import_desc') || 'Upload a JSON file exported from Boards.');
   let html = `<div style="max-width:500px">
-    <h3>⬆ ${t('board_import')||'Import Board'}</h3>
-    <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_import_desc')||'Upload a JSON file exported from Boards.'}</p>
-    <input type="file" id="boardImportFile" accept=".json" style="margin-bottom:12px">
+    <h3>⬆ ${t('board_import')||'Import Board'} (${format.toUpperCase()})</h3>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim)">${desc}</p>
+    <input type="file" id="boardImportFile" accept="${accept}" style="margin-bottom:12px">
+    <input type="hidden" id="boardImportFormat" value="${format}">
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" data-action="_doImportBoard">⬆ ${t('btn_import')||'Import'}</button>
       <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardImportModal">✖ ${t('btn_cancel')||'Cancel'}</button>
@@ -644,13 +703,23 @@ function _openImportBoardDialog() {
   _boardModal('boardImportModal', html, '520px');
 }
 
+function _openImportBoardDialog() {
+  _importBoardAs('json');
+}
+
 async function _doImportBoard() {
   const file = document.getElementById('boardImportFile')?.files[0];
   if (!file) return;
+  const format = document.getElementById('boardImportFormat')?.value || 'json';
   try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    await _boardApi('POST', '/boards/import', data);
+    if (format === 'csv') {
+      const text = await file.text();
+      await _boardApi('POST', '/boards/import/csv', { csv: text });
+    } else {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await _boardApi('POST', '/boards/import', data);
+    }
     closeModal('boardImportModal');
     openBoardsModal();
   } catch (e) { alert(e.message); }
