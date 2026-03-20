@@ -76,6 +76,7 @@ type Store struct {
 	tags                 []Tag
 	boards               []Board
 	boardItems           []BoardItem
+	reportArchive        []ReportArchiveEntry
 	startupText          string
 	geoItems             []map[string]any
 
@@ -117,6 +118,7 @@ type Store struct {
 	nextTagID                int64
 	nextBoardID              int64
 	nextBoardItemID          int64
+	nextReportArchiveID      int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -229,6 +231,7 @@ func (s *Store) load() error {
 	s.loadFile("tags.json", &s.tags)
 	s.loadFile("boards.json", &s.boards)
 	s.loadFile("board_items.json", &s.boardItems)
+	s.loadFile("report_archive.json", &s.reportArchive)
 
 	// Load startup text (persisted as {"text":"..."})
 	var startupTextData map[string]string
@@ -447,6 +450,11 @@ func (s *Store) load() error {
 	for _, x := range s.boardItems {
 		if x.ID > s.nextBoardItemID {
 			s.nextBoardItemID = x.ID
+		}
+	}
+	for _, x := range s.reportArchive {
+		if x.ID > s.nextReportArchiveID {
+			s.nextReportArchiveID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.

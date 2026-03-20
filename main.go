@@ -888,6 +888,14 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireRole(RoleTeamLead, app.handleDecisionLogAttachment))
+	mux.HandleFunc("POST /api/decision-log/{id}/share", app.requireRole(RoleTeamLead, app.handleGenerateDecisionLogShareToken))
+	mux.HandleFunc("GET /api/decision-log/shared", app.requireAuth(app.handleGetDecisionLogByShareToken))
+
+	// Report Archive
+	mux.HandleFunc("GET /api/report-archive", app.requireAuth(app.handleListReportArchive))
+	mux.HandleFunc("POST /api/report-archive", app.requireRole(RoleTeamLead, app.handleUploadReportArchive))
+	mux.HandleFunc("GET /api/report-archive/{id}/download", app.requireAuth(app.handleDownloadReportArchive))
+	mux.HandleFunc("DELETE /api/report-archive/{id}", app.requireRole(RoleTeamLead, app.handleDeleteReportArchive))
 
 	// Analysis / Statistics API
 	mux.HandleFunc("GET /api/stats/overview", app.requireAuth(app.handleStatsOverview))
@@ -1693,9 +1701,26 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/boards/shared", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleGetBoardByShareToken)(w, r)
+	})
 	mux.HandleFunc("/api/boards/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
+		// /api/boards/{id}/share
+		if len(parts) == 4 && parts[3] == "share" {
+			if r.Method == http.MethodPost {
+				app.requireAuth(app.handleGenerateBoardShareToken)(w, r)
+			} else {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		// /api/boards/{id}/tags
+		if len(parts) == 4 && parts[3] == "tags" {
+			app.requireAuth(app.handleGetBoardTags)(w, r)
+			return
+		}
 		// /api/boards/{id}/items
 		if len(parts) == 4 && parts[3] == "items" {
 			switch r.Method {
@@ -1725,6 +1750,9 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/board-items/shared", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleGetBoardItemByShareToken)(w, r)
+	})
 	mux.HandleFunc("/api/board-items/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
@@ -1736,6 +1764,15 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		if len(parts) >= 4 && parts[2] != "" {
 			itemSeg := parts[1]
 			_ = itemSeg
+			// /api/board-items/{id}/share
+			if len(parts) == 4 && parts[3] == "share" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleGenerateBoardItemShareToken)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
 			// /api/board-items/{id}/move
 			if len(parts) == 4 && parts[3] == "move" {
 				if r.Method == http.MethodPost {

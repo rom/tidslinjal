@@ -547,3 +547,70 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
 }
+
+// ── Decision Log Share Token ────────────────────────────────────────────────
+
+func (app *App) handleGenerateDecisionLogShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	entry := app.store.GetDecisionLogEntryByID(id)
+	if entry == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	token, err := generateID()
+	if err != nil {
+		jsonError(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+	entry.ShareToken = token
+	if err := app.store.UpdateDecisionLogEntry(*entry); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.Username, "share", "decision_log", entry.ID, fmt.Sprintf("Generated share link for decision #%d", entry.ID))
+	jsonOK(w, map[string]string{"share_token": token})
+}
+
+func (app *App) handleGetDecisionLogByShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "token is required", http.StatusBadRequest)
+		return
+	}
+	entries := app.store.GetDecisionLog()
+	for _, e := range entries {
+		if e.ShareToken != "" && e.ShareToken == token {
+			// Check access: confidential entries require capability
+			if e.Confidential && !app.userHasCapability(user, "confidential_read") && user.Role != RoleAdmin {
+				jsonError(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			// Private entries require being the author or admin
+			if e.LogType == "private" && e.UserID != user.ID && user.Role != RoleAdmin {
+				jsonError(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			// Group entries require group membership
+			if e.LogType == "group" && user.Role != RoleAdmin {
+				inGroup := false
+				for _, gid := range app.userGroups(user.ID) {
+					if gid == e.GroupID {
+						inGroup = true
+						break
+					}
+				}
+				if !inGroup && e.UserID != user.ID {
+					jsonError(w, "forbidden", http.StatusForbidden)
+					return
+				}
+			}
+			jsonOK(w, e)
+			return
+		}
+	}
+	jsonError(w, "invalid or expired share link", http.StatusNotFound)
+}

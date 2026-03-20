@@ -815,6 +815,11 @@ const TRANSLATIONS = {
     decision_log_group:      'Group/Unit only',
     decision_log_private:    'Private',
     decision_log_empty:      'No decisions recorded yet.',
+    decision_log_header:     'Decision Log',
+    decision_sort:           'Sort',
+    decision_sort_newest:    'Newest first',
+    decision_sort_oldest:    'Oldest first',
+    link_copied:             'Share link copied to clipboard',
     decision_added:          'Decision recorded',
     decision_delete_confirm: 'Delete this decision log entry?',
     decision_required:       'Decision text is required',
@@ -1103,9 +1108,15 @@ const TRANSLATIONS = {
     security_encryption_desc:  'Backups are encrypted with AES-256-GCM using PBKDF2-SHA256 key derivation (100,000 iterations).',
     checking:                  'Checking…',
 
-    // References tab
+    // Infomanagement tab (was References)
     tab_references:            'References',
+    tab_infomanagement:        'Infomanagement',
     references_title:          'References',
+    report_archive_title:      'Report Archive',
+    report_archive_local:      'Local Reports',
+    report_archive_incoming:   'Incoming Reports',
+    report_archive_empty:      'No reports yet.',
+    report_archive_upload:     'Upload Report',
     ref_category_faq:          'FAQ',
     ref_category_objectives:   'Objectives',
     ref_category_handbook:     'Handbook',
