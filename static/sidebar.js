@@ -1936,6 +1936,8 @@ function renderSidebar() {
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
+          ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
