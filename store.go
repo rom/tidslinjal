@@ -77,6 +77,7 @@ type Store struct {
 	boards               []Board
 	boardItems           []BoardItem
 	reportArchive        []ReportArchiveEntry
+	reportIngestConfig   ReportIngestConfig
 	startupText          string
 	geoItems             []map[string]any
 
@@ -232,6 +233,7 @@ func (s *Store) load() error {
 	s.loadFile("boards.json", &s.boards)
 	s.loadFile("board_items.json", &s.boardItems)
 	s.loadFile("report_archive.json", &s.reportArchive)
+	s.loadFile("report_ingest_config.json", &s.reportIngestConfig)
 
 	// Load startup text (persisted as {"text":"..."})
 	var startupTextData map[string]string

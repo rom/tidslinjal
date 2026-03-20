@@ -871,19 +871,27 @@ type DecisionAttachment struct {
 
 // ReportArchiveEntry is a report stored in the report archive (under infomanagement)
 type ReportArchiveEntry struct {
-	ID           int64     `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description,omitempty"`
-	Category     string    `json:"category"`                 // "local" | "incoming"
-	Filename     string    `json:"filename"`
-	StoredName   string    `json:"stored_name"`
-	OriginalName string    `json:"original_name,omitempty"`
-	ContentType  string    `json:"content_type,omitempty"`
-	Size         int64     `json:"size"`
-	UploadedBy   int64     `json:"uploaded_by"`
-	UploadedByName string  `json:"uploaded_by_name"`
-	UploadedAt   time.Time `json:"uploaded_at"`
-	Tags         []string  `json:"tags,omitempty"`
+	ID             int64     `json:"id"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description,omitempty"`
+	Category       string    `json:"category"`                 // "local" | "incoming"
+	Filename       string    `json:"filename"`
+	StoredName     string    `json:"stored_name"`
+	OriginalName   string    `json:"original_name,omitempty"`
+	ContentType    string    `json:"content_type,omitempty"`
+	Size           int64     `json:"size"`
+	UploadedBy     int64     `json:"uploaded_by"`
+	UploadedByName string    `json:"uploaded_by_name"`
+	UploadedAt     time.Time `json:"uploaded_at"`
+	Tags           []string  `json:"tags,omitempty"`
+	Sender         string    `json:"sender,omitempty"`      // external system name for incoming reports
+	ReportType     string    `json:"report_type,omitempty"` // e.g. "sitrep", "incident", "assessment"
+	Subject        string    `json:"subject,omitempty"`     // subject line from external submission
+}
+
+// ReportIngestConfig controls the incoming report interface
+type ReportIngestConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 // AutoReportSchedule defines a server-side scheduled report

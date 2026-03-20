@@ -897,6 +897,21 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/report-archive/{id}/download", app.requireAuth(app.handleDownloadReportArchive))
 	mux.HandleFunc("DELETE /api/report-archive/{id}", app.requireRole(RoleTeamLead, app.handleDeleteReportArchive))
 
+	// Report Ingest Config (admin only)
+	mux.HandleFunc("/api/integrations/report-ingest", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetReportIngestConfig)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveReportIngestConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Report Ingest API (API key auth, handled internally)
+	mux.HandleFunc("/api/reports/ingest", app.handleReportIngest)
+
 	// Analysis / Statistics API
 	mux.HandleFunc("GET /api/stats/overview", app.requireAuth(app.handleStatsOverview))
 	mux.HandleFunc("GET /api/stats/events/timeline", app.requireAuth(app.handleStatsEventsTimeline))

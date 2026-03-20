@@ -1811,6 +1811,38 @@ function renderSidebar() {
         </div>
       </div>
 
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">📨 ${t('settings_report_webhook')||'Incoming Report Interface'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          External systems can submit reports (JSON, PDF, CSV) to the report archive via webhook.
+          Authenticate with an API key using <code>Authorization: Bearer &lt;key&gt;</code>.
+          Reports are tagged with sender, timestamp, subject, and type.
+        </p>
+        <div style="font-size:var(--fs-xs);padding:6px 8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:8px">
+          <div style="margin-bottom:6px"><code style="color:var(--accent);font-size:11px">POST /api/reports/ingest</code>
+            <span style="color:var(--text-dim);margin-left:8px">— Submit a report</span></div>
+          <div style="margin-bottom:4px;font-weight:600;color:var(--text-dim)">JSON body:</div>
+          <pre style="margin:0;padding:6px;background:var(--bg2);border-radius:4px;font-size:10px;overflow-x:auto;color:var(--text)">{
+  "subject": "Daily status report",
+  "sender": "external-system-name",
+  "type": "sitrep",
+  "description": "Optional description",
+  "tags": ["daily", "sector-3"]
+}</pre>
+          <div style="margin-top:6px;font-weight:600;color:var(--text-dim)">Multipart (PDF/CSV):</div>
+          <pre style="margin:0;padding:6px;background:var(--bg2);border-radius:4px;font-size:10px;overflow-x:auto;color:var(--text)">POST /api/reports/ingest
+Content-Type: multipart/form-data
+Fields: file, subject, sender, type, tags</pre>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="reportIngestEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          Enable incoming report interface
+        </label>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-secondary btn-sm" data-action="saveReportIngestConfig">Save</button>
+        </div>
+      </div>
+
       ${state.user?.role === 'admin' ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">🔐 ${t('settings_federation')||'Federation / Trust Realms'}</div>
@@ -1904,6 +1936,7 @@ function renderSidebar() {
     setTimeout(_initOIDCSettingsUI, 0);
     setTimeout(_initMailSettingsUI, 0);
     setTimeout(_initSyslogSettingsUI, 0);
+    setTimeout(_initReportIngestConfigUI, 0);
     setTimeout(_initTLSConfigUI, 0);
     setTimeout(_loadAPIKeys, 0);
     setTimeout(_loadTeamsConfigUI, 0);

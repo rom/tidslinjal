@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -111,4 +113,166 @@ func (app *App) handleDeleteReportArchive(w http.ResponseWriter, r *http.Request
 	}
 	app.audit(user.ID, user.Username, "delete", "report_archive", id, fmt.Sprintf("Deleted report %q", entry.Title))
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// ── Report Ingest Config ─────────────────────────────────────────────────────
+
+func (app *App) handleGetReportIngestConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	cfg := app.store.GetReportIngestConfig()
+	jsonOK(w, cfg)
+}
+
+func (app *App) handleSaveReportIngestConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	var cfg ReportIngestConfig
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&cfg); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveReportIngestConfig(cfg); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "update", "report_ingest_config", 0,
+		fmt.Sprintf("Report ingest config updated: enabled=%v", cfg.Enabled))
+	jsonOK(w, cfg)
+}
+
+// ── Incoming Report Ingest Endpoint ──────────────────────────────────────────
+
+// handleReportIngest handles POST /api/reports/ingest
+// Accepts JSON or multipart/form-data with file attachment.
+// Requires API key auth (Bearer token). Creates an "incoming" report archive entry.
+func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check if ingest is enabled
+	cfg := app.store.GetReportIngestConfig()
+	if !cfg.Enabled {
+		jsonError(w, "incoming report interface is disabled", http.StatusForbidden)
+		return
+	}
+
+	// Auth via API key
+	user := app.authenticateAPIKey(r)
+	if user == nil {
+		jsonError(w, "unauthorized — provide a valid API key via Authorization: Bearer <key>", http.StatusUnauthorized)
+		return
+	}
+
+	ct := r.Header.Get("Content-Type")
+	dir := filepath.Join(app.store.DataDir(), "report_archive")
+	_ = os.MkdirAll(dir, 0700)
+
+	var entry ReportArchiveEntry
+	entry.Category = "incoming"
+	entry.UploadedBy = user.ID
+	entry.UploadedByName = user.DisplayName
+	entry.UploadedAt = time.Now()
+
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		// Multipart: file + metadata fields
+		if err := r.ParseMultipartForm(100 << 20); err != nil {
+			jsonError(w, "file too large or invalid form", http.StatusBadRequest)
+			return
+		}
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			jsonError(w, "file is required for multipart submission", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		safeName := filepath.Base(header.Filename)
+		storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
+		dst, err := os.Create(filepath.Join(dir, storedName))
+		if err != nil {
+			jsonError(w, "failed to save file", http.StatusInternalServerError)
+			return
+		}
+		n, _ := io.Copy(dst, file)
+		dst.Close()
+
+		entry.Filename = safeName
+		entry.StoredName = storedName
+		entry.OriginalName = header.Filename
+		entry.ContentType = mime.TypeByExtension(filepath.Ext(safeName))
+		entry.Size = n
+		entry.Subject = r.FormValue("subject")
+		entry.Sender = r.FormValue("sender")
+		entry.ReportType = r.FormValue("type")
+		entry.Description = r.FormValue("description")
+		if tags := r.FormValue("tags"); tags != "" {
+			entry.Tags = strings.Split(tags, ",")
+			for i := range entry.Tags {
+				entry.Tags[i] = strings.TrimSpace(entry.Tags[i])
+			}
+		}
+		entry.Title = entry.Subject
+		if entry.Title == "" {
+			entry.Title = safeName
+		}
+	} else {
+		// JSON body
+		var req struct {
+			Subject     string   `json:"subject"`
+			Sender      string   `json:"sender"`
+			Type        string   `json:"type"`
+			Description string   `json:"description"`
+			Tags        []string `json:"tags"`
+			Content     string   `json:"content"` // optional inline text content
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 10<<20)).Decode(&req); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if req.Subject == "" {
+			jsonError(w, "subject is required", http.StatusBadRequest)
+			return
+		}
+
+		entry.Subject = req.Subject
+		entry.Sender = req.Sender
+		entry.ReportType = req.Type
+		entry.Description = req.Description
+		entry.Tags = req.Tags
+		entry.Title = req.Subject
+
+		if req.Content != "" {
+			// Store inline content as a JSON file
+			safeName := fmt.Sprintf("report-%d.json", time.Now().UnixNano())
+			storedName := safeName
+			data, _ := json.Marshal(req)
+			if err := os.WriteFile(filepath.Join(dir, storedName), data, 0600); err != nil {
+				jsonError(w, "failed to save report", http.StatusInternalServerError)
+				return
+			}
+			entry.Filename = safeName
+			entry.StoredName = storedName
+			entry.ContentType = "application/json"
+			entry.Size = int64(len(data))
+		} else {
+			// No file, just metadata
+			entry.Filename = ""
+			entry.StoredName = ""
+			entry.ContentType = "application/json"
+		}
+	}
+
+	created, err := app.store.AddReportArchiveEntry(entry)
+	if err != nil {
+		jsonError(w, "failed to save report entry", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "create", "report_archive_ingest", created.ID,
+		fmt.Sprintf("Incoming report from %q: %q", entry.Sender, entry.Subject))
+
+	jsonOK(w, map[string]interface{}{
+		"id":      created.ID,
+		"title":   created.Title,
+		"status":  "accepted",
+		"message": "Report received and archived",
+	})
 }
