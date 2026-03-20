@@ -14426,13 +14426,27 @@ function _renderRoleEditorTable(roles) {
     {code:'pl',flag:'🇵🇱'},{code:'uk',flag:'🇺🇦'}
   ];
   const builtinKeys = DEFAULT_ROLE_CONFIGS.map(d => d.key).concat(['admin']);
+  // i18n columns start collapsed (only EN shown)
+  state._roleEditorLangsExpanded = false;
   tableEl.innerHTML = `
+    <style>
+      #roleEditorGrid tr.role-row-even td { background: var(--bg2); }
+      #roleEditorGrid tr.role-row-odd td  { background: var(--bg3, var(--bg)); }
+      #roleEditorGrid tr.role-row-even td[style*="sticky"] { background: var(--bg2); }
+      #roleEditorGrid tr.role-row-odd td[style*="sticky"]  { background: var(--bg3, var(--bg)); }
+      #roleEditorGrid .role-lang-col { display: none; }
+      #roleEditorGrid.langs-expanded .role-lang-col { display: table-cell; }
+    </style>
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)" id="roleEditorGrid">
       <thead>
         <tr style="background:var(--bg2)">
           <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px;white-space:nowrap;position:sticky;left:0;background:var(--bg2);z-index:1">Key</th>
-          ${_ROLE_LANGS.map(l => `<th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px">${l.flag} ${l.code.toUpperCase()}</th>`).join('')}
+          <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px">🇬🇧 EN</th>
+          <th class="role-lang-toggle" style="text-align:center;padding:8px 6px;border-bottom:2px solid var(--border);cursor:pointer;user-select:none;min-width:36px;font-size:12px" title="Show/hide translations" colspan="1">
+            <span class="role-lang-toggle-icon">▶ 13 langs</span>
+          </th>
+          ${_ROLE_LANGS.slice(1).map(l => `<th class="role-lang-col" style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);min-width:100px">${l.flag} ${l.code.toUpperCase()}</th>`).join('')}
           ${ALL_CAPABILITIES.map(cap =>
             `<th class="role-cap-header" data-cap="${cap}" style="padding:4px 3px;border-bottom:2px solid var(--border);font-size:10px;text-align:center;min-width:48px;cursor:pointer;user-select:none;vertical-align:bottom" title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}">
               <div>${_ROLE_CAP_LABELS[cap]||cap}</div>
@@ -14443,11 +14457,12 @@ function _renderRoleEditorTable(roles) {
         </tr>
       </thead>
       <tbody id="roleEditorTbody">
-        ${roles.map(role => _renderRoleRow(role, builtinKeys.includes(role.key))).join('')}
-        <tr style="opacity:0.4">
-          <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim);position:sticky;left:0;background:var(--bg2)">admin</td>
+        ${roles.map((role, i) => _renderRoleRow(role, builtinKeys.includes(role.key), i)).join('')}
+        <tr class="${roles.length % 2 === 0 ? 'role-row-even' : 'role-row-odd'}" style="opacity:0.4">
+          <td style="padding:8px 10px;font-family:monospace;font-size:var(--fs-sm);color:var(--text-dim);position:sticky;left:0;z-index:1">admin</td>
           <td style="padding:8px 10px;font-size:var(--fs-sm)">${t('role_admin')||'Admin'} 🔒</td>
-          ${_ROLE_LANGS.slice(1).map(() => '<td></td>').join('')}
+          <td class="role-lang-fold-placeholder"></td>
+          ${_ROLE_LANGS.slice(1).map(() => '<td class="role-lang-col"></td>').join('')}
           ${ALL_CAPABILITIES.map(() => `<td style="text-align:center;padding:4px"><input type="checkbox" checked disabled></td>`).join('')}
           <td></td>
         </tr>
@@ -14455,6 +14470,42 @@ function _renderRoleEditorTable(roles) {
     </table>
     </div>
   `;
+  // Toggle i18n language columns
+  const grid = document.getElementById('roleEditorGrid');
+  tableEl.querySelector('.role-lang-toggle').addEventListener('click', () => {
+    state._roleEditorLangsExpanded = !state._roleEditorLangsExpanded;
+    grid.classList.toggle('langs-expanded', state._roleEditorLangsExpanded);
+    const icon = tableEl.querySelector('.role-lang-toggle-icon');
+    if (state._roleEditorLangsExpanded) {
+      icon.textContent = '◀ hide';
+      tableEl.querySelector('.role-lang-toggle').style.display = 'none';
+    } else {
+      icon.textContent = '▶ 13 langs';
+    }
+    // Hide/show fold placeholder cells
+    tableEl.querySelectorAll('.role-lang-fold-placeholder').forEach(td => {
+      td.style.display = state._roleEditorLangsExpanded ? 'none' : '';
+    });
+  });
+  // Add a small collapse button visible when expanded — place inside first lang col header
+  const firstLangTh = tableEl.querySelectorAll('.role-lang-col')[0];
+  if (firstLangTh) {
+    const collapseBtn = document.createElement('span');
+    collapseBtn.textContent = ' ◀';
+    collapseBtn.title = 'Collapse translations';
+    collapseBtn.style.cssText = 'cursor:pointer;opacity:0.6;font-size:11px';
+    collapseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state._roleEditorLangsExpanded = false;
+      grid.classList.remove('langs-expanded');
+      tableEl.querySelector('.role-lang-toggle').style.display = '';
+      tableEl.querySelector('.role-lang-toggle-icon').textContent = '▶ 13 langs';
+      tableEl.querySelectorAll('.role-lang-fold-placeholder').forEach(td => {
+        td.style.display = '';
+      });
+    });
+    firstLangTh.appendChild(collapseBtn);
+  }
   // Bind column header click to toggle all checkboxes in that column
   tableEl.querySelectorAll('.role-cap-header').forEach(th => {
     th.addEventListener('click', () => {
@@ -14485,24 +14536,27 @@ const _ROLE_PLACEHOLDERS = {
   staffofficer_full: { en:'Staff Officer Full', sv:'Stabsofficer Full', fr:'Officier d\'état-major complet', fi:'Esikuntaupseeri täysi', da:'Stabsofficer fuld', nb:'Stabsoffiser full', et:'Staabiohvitser täis', lv:'Štāba virsnieks pilns', lt:'Štabo karininkas pilnas', it:'Ufficiale di SM completo', es:'Oficial de EM completo', pt:'Oficial de EM completo', pl:'Oficer sztabowy pełny', uk:'Штабний офіцер повний' },
 };
 
-function _renderRoleRow(role, isBuiltin) {
+function _renderRoleRow(role, isBuiltin, rowIndex) {
   const dn = role.display_names || {};
   const key = role.key;
   const s = _roleEditorInputStyle();
   const ph = _ROLE_PLACEHOLDERS[key] || {};
   const _RL = ['en','sv','fr','fi','da','nb','et','lv','lt','it','es','pt','pl','uk'];
+  const rowClass = (rowIndex != null ? (rowIndex % 2 === 0 ? 'role-row-even' : 'role-row-odd') : '');
   return `
-    <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}">
-      <td style="padding:6px 10px;position:sticky;left:0;background:var(--bg2);z-index:1">
+    <tr data-role-key="${escHtml(key)}" data-custom="${isBuiltin ? 'false' : 'true'}" class="${rowClass}">
+      <td style="padding:6px 10px;position:sticky;left:0;z-index:1">
         ${isBuiltin
           ? `<span style="font-family:monospace;color:var(--text-dim);font-size:var(--fs-sm)">${escHtml(key)}</span>`
           : `<input type="text" class="role-key-input" value="${escHtml(key)}" placeholder="e.g. analyst" style="${s};font-family:monospace">`}
       </td>
-      ${_RL.map(lang => {
+      ${_RL.map((lang, li) => {
         const val = lang === 'en' ? (dn.en || role.display_name || '') : (dn[lang] || '');
         const placeholder = ph[lang] || key;
-        return `<td style="padding:5px 6px"><input type="text" class="role-name-${lang}" data-key="${escHtml(key)}" value="${escHtml(val)}" placeholder="${escHtml(placeholder)}" style="${s}"></td>`;
+        const colClass = li === 0 ? '' : 'role-lang-col';
+        return `<td class="${colClass}" style="padding:5px 6px"><input type="text" class="role-name-${lang}" data-key="${escHtml(key)}" value="${escHtml(val)}" placeholder="${escHtml(placeholder)}" style="${s}"></td>`;
       }).join('')}
+      ${_RL.length > 1 ? '<td class="role-lang-fold-placeholder"></td>' : ''}
       ${ALL_CAPABILITIES.map(cap => {
         const checked = role.capabilities && role.capabilities[cap];
         return `<td style="text-align:center;padding:4px"><input type="checkbox" class="role-cap-cb" data-role="${escHtml(key)}" data-cap="${escHtml(cap)}" ${checked ? 'checked' : ''} title="${escHtml(_ROLE_CAP_DESCRIPTIONS[cap]||cap)}"></td>`;
@@ -14520,9 +14574,11 @@ function addNewRoleRow() {
   const key = `custom_role_${state._roleEditorCustomCounter}`;
   // All new custom roles start with see_groups and see_users enabled by default
   const role = { key, display_name: '', display_names: {}, capabilities: { see_groups: true, see_users: true, view_events: true, decision_log: true, comment: true, view_free_busy: true } };
+  const existingRows = tbody.querySelectorAll('tr[data-role-key]');
+  const rowIndex = existingRows.length;
   const adminRow = tbody.querySelector('tr[style*="opacity"]');
   const tmp = document.createElement('tbody');
-  tmp.innerHTML = _renderRoleRow(role, false);
+  tmp.innerHTML = _renderRoleRow(role, false, rowIndex);
   const newRow = tmp.firstElementChild;
   _bindActions(newRow);
   if (adminRow) tbody.insertBefore(newRow, adminRow);
