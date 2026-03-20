@@ -215,6 +215,22 @@ func (s *Store) SaveTLSConfig(cfg TLSConfig) error {
 	return s.persist("tls.json", snap)
 }
 
+// ── Report Ingest Config ──────────────────────────────────────────────────────
+
+func (s *Store) GetReportIngestConfig() ReportIngestConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.reportIngestConfig
+}
+
+func (s *Store) SaveReportIngestConfig(cfg ReportIngestConfig) error {
+	s.mu.Lock()
+	s.reportIngestConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("report_ingest_config.json", snap)
+}
+
 // ── API Keys ──────────────────────────────────────────────────────────────────
 
 func (s *Store) GetAPIKeys() []APIKey {

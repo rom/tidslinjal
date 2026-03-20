@@ -6204,6 +6204,29 @@ async function testSyslogConfig() {
   }
 }
 
+// ── Report Ingest Config UI ───────────────────────────────────────────────────
+async function _initReportIngestConfigUI() {
+  try {
+    const cfg = await apiGet('/api/integrations/report-ingest');
+    if (!cfg) return;
+    const el = document.getElementById('reportIngestEnabled');
+    if (el) el.checked = !!cfg.enabled;
+  } catch { /* not configured yet */ }
+}
+
+async function saveReportIngestConfig() {
+  const cfg = {
+    enabled: document.getElementById('reportIngestEnabled')?.checked || false,
+  };
+  const res = await api('PUT', '/api/integrations/report-ingest', cfg);
+  if (res.ok) {
+    showNotification('success', 'Report ingest settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save report ingest settings');
+  }
+}
+
 // ── Security Settings UI ──────────────────────────────────────────────────────
 async function _initSecuritySettingsUI() {
   // Wire up geoblocking country names display on input change

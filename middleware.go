@@ -251,6 +251,33 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 	}
 }
 
+// authenticateAPIKey extracts and validates an API key from the Authorization header.
+// Returns the synthetic User for the key, or nil if invalid/missing.
+func (app *App) authenticateAPIKey(r *http.Request) *User {
+	authHdr := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHdr, "Bearer ") {
+		return nil
+	}
+	raw := strings.TrimPrefix(authHdr, "Bearer ")
+	if raw == "" {
+		return nil
+	}
+	k := app.store.ValidateAPIKey(raw)
+	if k == nil {
+		return nil
+	}
+	keyRole := k.Role
+	if keyRole == "" {
+		keyRole = RoleRead
+	}
+	return &User{
+		ID:          k.CreatedBy,
+		Username:    "apikey:" + k.Name,
+		DisplayName: k.Name,
+		Role:        keyRole,
+	}
+}
+
 // noDirListing wraps an http.Handler and returns 404 for directory requests.
 // L-16 fix: prevents http.FileServer from exposing directory contents.
 func noDirListing(next http.Handler) http.Handler {

@@ -469,7 +469,8 @@ func (app *App) handleDeleteBoardItem(w http.ResponseWriter, r *http.Request, us
 }
 
 func (app *App) handleMoveBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	// URL is /api/board-items/{id}/move — pathID returns "move", use segment 2 instead
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -809,7 +810,8 @@ func (app *App) broadcastBoardChange(action string, boardID int64) {
 // ── Share Token Endpoints ───────────────────────────────────────────────────
 
 func (app *App) handleGenerateBoardShareToken(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	// URL is /api/boards/{id}/share — pathID returns "share", use segment 2 instead
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -859,7 +861,8 @@ func (app *App) handleGetBoardByShareToken(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *App) handleGenerateBoardItemShareToken(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	// URL is /api/board-items/{id}/share — pathID returns "share", use segment 2 instead
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
