@@ -10,19 +10,28 @@ let _boardsState = {
   dragOverCol: null,
 };
 
+// ── Close board modal helper ──
+function _closeBoardModal(id) {
+  closeModal(id);
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
 // ── Modal helper (creates dynamic overlay modals) ──
 function _boardModal(id, content, width) {
   let el = document.getElementById(id);
   if (el) el.remove();
   const html = `<div class="modal-overlay" id="${id}">
     <div class="modal" style="max-width:${width||'800px'};width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative">
-      <button class="modal-close" onclick="closeModal('${id}');document.getElementById('${id}')?.remove()" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&#x2715;</button>
+      <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&#x2715;</button>
       ${content}
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  void document.getElementById(id).offsetHeight;
-  document.getElementById(id).classList.add('open');
+  const modalEl = document.getElementById(id);
+  void modalEl.offsetHeight;
+  modalEl.classList.add('open');
+  if (typeof _bindActions === 'function') _bindActions(modalEl);
 }
 
 // ── API helpers ──
@@ -50,8 +59,8 @@ function _renderBoardListModal() {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="margin:0">📌 ${t('board_title')||'Boards'}</h2>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-sm btn-primary" onclick="_openCreateBoardDialog()">+ ${t('board_new')||'New Board'}</button>
-        <button class="btn btn-sm btn-secondary" onclick="_openImportBoardDialog()">⬆ ${t('btn_import')||'Import'}</button>
+        <button class="btn btn-sm btn-primary" data-action="_openCreateBoardDialog">+ ${t('board_new')||'New Board'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openImportBoardDialog">⬆ ${t('btn_import')||'Import'}</button>
       </div>
     </div>`;
 
@@ -61,7 +70,7 @@ function _renderBoardListModal() {
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`;
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
-      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)" onclick="_openBoard(${b.id})">
+      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(b.name)}</strong> <span title="${b.visibility}">${vis}</span>
         </div>
@@ -76,7 +85,7 @@ function _renderBoardListModal() {
   html += `<div style="margin-top:24px"><h3>📋 ${t('board_templates')||'Templates'}</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">`;
   for (const tmpl of (window._boardTemplates || [])) {
-    html += `<div class="card" style="padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer" onclick="_createFromTemplate(${tmpl.id})">
+    html += `<div class="card" style="padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer" data-action="_createFromTemplate" data-arg="${tmpl.id}">
       <strong style="font-size:var(--fs-sm)">${escHtml(tmpl.name)}</strong>
       <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(tmpl.description||'')}</div>
       <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${tmpl.columns.length} columns</div>
@@ -100,7 +109,7 @@ function _openCreateBoardDialog() {
     <label>${t('board_description')||'Description'}</label>
     <input id="newBoardDesc" class="input" style="width:100%;margin-bottom:8px" placeholder="${t('board_desc_placeholder')||'Optional description'}">
     <label>${t('board_visibility')||'Visibility'}</label>
-    <select id="newBoardVis" class="input" style="width:100%;margin-bottom:8px" onchange="_toggleBoardVisFields()">
+    <select id="newBoardVis" class="input" style="width:100%;margin-bottom:8px" data-action="_toggleBoardVisFields" data-event="change">
       <option value="private">🔒 ${t('board_vis_private')||'Private'}</option>
       <option value="group">👥 ${t('board_vis_group')||'Group'}</option>
       <option value="role">🎭 ${t('board_vis_role')||'Role'}</option>
@@ -125,8 +134,8 @@ function _openCreateBoardDialog() {
       </select>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-primary" onclick="_doCreateBoard()">✔ ${t('btn_create')||'Create'}</button>
-      <button class="btn btn-secondary" onclick="closeModal('boardCreateModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+      <button class="btn btn-primary" data-action="_doCreateBoard">✔ ${t('btn_create')||'Create'}</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardCreateModal">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
   _boardModal('boardCreateModal', html, '520px');
@@ -194,16 +203,16 @@ function _renderKanbanBoard() {
   let html = `<div style="max-width:100%;overflow-x:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-sm btn-secondary" onclick="openBoardsModal()" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-sm btn-secondary" onclick="_openBoardSettings()" title="${t('board_settings')||'Settings'}">⚙</button>
-        <button class="btn btn-sm btn-secondary" onclick="_printBoard()">🖨</button>
-        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('json')">JSON</button>
-        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('csv')">CSV</button>
-        <button class="btn btn-sm btn-secondary" onclick="_exportBoard('svg')">SVG</button>
-        <button class="btn btn-sm btn-secondary" onclick="_deleteBoardConfirm()">🗑</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}">⚙</button>
+        <button class="btn btn-sm btn-secondary" data-action="_printBoard">🖨</button>
+        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="json">JSON</button>
+        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="csv">CSV</button>
+        <button class="btn btn-sm btn-secondary" data-action="_exportBoard" data-arg="svg">SVG</button>
+        <button class="btn btn-sm btn-secondary" data-action="_deleteBoardConfirm">🗑</button>
       </div>
     </div>
     <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start">`;
@@ -212,27 +221,25 @@ function _renderKanbanBoard() {
     const collapsed = col.collapsed;
     const cItems = colItems[col.id] || [];
     if (collapsed) {
-      html += `<div class="kanban-col kanban-col-collapsed" style="min-width:40px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed" onclick="_toggleColCollapse('${col.id}')">
+      html += `<div class="kanban-col kanban-col-collapsed" style="min-width:40px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed" data-action="_toggleColCollapse" data-arg="${col.id}">
         <strong>${escHtml(col.name)} (${cItems.length})</strong>
       </div>`;
     } else {
-      html += `<div class="kanban-col" data-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px"
-        ondragover="_kanbanDragOver(event,'${col.id}')" ondrop="_kanbanDrop(event,'${col.id}')" ondragleave="_kanbanDragLeave(event)">
+      html += `<div class="kanban-col" data-col="${col.id}" data-drop-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <strong style="cursor:pointer" ondblclick="_renameCol('${col.id}','${escHtml(col.name)}')">${escHtml(col.name)} (${cItems.length})</strong>
+          <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(col.name)} (${cItems.length})</strong>
           <div style="display:flex;gap:4px">
-            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" onclick="_addItemToCol('${col.id}')" title="${t('board_add_item')||'Add item'}">+</button>
-            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" onclick="_toggleColCollapse('${col.id}')" title="${t('board_collapse')||'Collapse'}">−</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_addItemToCol" data-arg="${col.id}" title="${t('board_add_item')||'Add item'}">+</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_toggleColCollapse" data-arg="${col.id}" title="${t('board_collapse')||'Collapse'}">−</button>
           </div>
         </div>
         <div class="kanban-items" style="display:flex;flex-direction:column;gap:6px;min-height:40px">`;
 
       for (const item of cItems) {
         const bgColor = item.color || 'var(--bg3)';
-        html += `<div class="kanban-card" draggable="true" data-item-id="${item.id}"
-          ondragstart="_kanbanDragStart(event,${item.id})" ondragend="_kanbanDragEnd(event)"
+        html += `<div class="kanban-card" draggable="true" data-item-id="${item.id}" data-drag-item="${item.id}"
           style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
-          onclick="_openBoardItem(${item.id})">
+          data-action="_openBoardItem" data-arg="${item.id}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <strong style="font-size:var(--fs-sm)">${escHtml(item.subject)}</strong>
             <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
@@ -255,6 +262,35 @@ function _renderKanbanBoard() {
   html += `</div></div>`;
 
   _boardModal('boardsModal', html, '95vw');
+  _bindKanbanEvents();
+}
+
+// ── Bind drag/drop and dblclick events for kanban board ──
+function _bindKanbanEvents() {
+  const modal = document.getElementById('boardsModal');
+  if (!modal) return;
+
+  // Drag & drop on columns
+  modal.querySelectorAll('[data-drop-col]').forEach(col => {
+    const colId = col.dataset.dropCol;
+    col.addEventListener('dragover', e => _kanbanDragOver(e, colId));
+    col.addEventListener('drop', e => _kanbanDrop(e, colId));
+    col.addEventListener('dragleave', e => _kanbanDragLeave(e));
+  });
+
+  // Drag start/end on cards
+  modal.querySelectorAll('[data-drag-item]').forEach(card => {
+    const itemId = parseInt(card.dataset.dragItem);
+    card.addEventListener('dragstart', e => _kanbanDragStart(e, itemId));
+    card.addEventListener('dragend', e => _kanbanDragEnd(e));
+  });
+
+  // Dblclick rename on column headers
+  modal.querySelectorAll('[data-dblclick-rename]').forEach(el => {
+    const colId = el.dataset.dblclickRename;
+    const colName = el.dataset.colName;
+    el.addEventListener('dblclick', () => _renameCol(colId, colName));
+  });
 }
 
 // ── Drag & Drop ──
@@ -349,8 +385,8 @@ function _openBoardItem(itemId) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">#${item.id} ${escHtml(item.subject)}</h3>
       <div style="display:flex;gap:6px">
-        <button class="btn btn-sm btn-secondary" onclick="_editBoardItem(${item.id})">✏ ${t('btn_edit')||'Edit'}</button>
-        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" onclick="_deleteBoardItem(${item.id})">🗑</button>
+        <button class="btn btn-sm btn-secondary" data-action="_editBoardItem" data-arg="${item.id}">✏ ${t('btn_edit')||'Edit'}</button>
+        <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}">🗑</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:var(--fs-sm);margin-bottom:12px">
@@ -375,7 +411,7 @@ function _openBoardItem(itemId) {
   }
   html += `<form id="boardAttUploadForm" style="margin-top:6px">
     <input type="file" id="boardAttFile" style="font-size:var(--fs-xs)">
-    <button type="button" class="btn btn-sm btn-secondary" onclick="_uploadBoardAttachment(${item.id})" style="margin-left:4px">⬆ ${t('btn_upload')||'Upload'}</button>
+    <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="margin-left:4px">⬆ ${t('btn_upload')||'Upload'}</button>
   </form></div></div>`;
 
   // History
@@ -424,8 +460,8 @@ function _editBoardItem(itemId) {
     <label>${t('tags_title')||'Tags'} (${t('tags_placeholder')||'comma-separated'})</label>
     <input id="editItemTags" class="input" style="width:100%;margin-bottom:8px" value="${(item.tags||[]).join(', ')}">
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-primary" onclick="_doEditBoardItem(${item.id})">✔ ${t('btn_save')||'Save'}</button>
-      <button class="btn btn-secondary" onclick="closeModal('boardItemEditModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+      <button class="btn btn-primary" data-action="_doEditBoardItem" data-arg="${item.id}">✔ ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemEditModal">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
   _boardModal('boardItemEditModal', html, '620px');
@@ -488,9 +524,9 @@ function _openBoardSettings() {
     const col = board.columns[i];
     colsHtml += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
       <input class="input boardSettCol" data-idx="${i}" value="${escHtml(col.name)}" style="flex:1">
-      <button class="btn btn-sm" onclick="_moveBoardCol(${i},-1)" ${i===0?'disabled':''}>↑</button>
-      <button class="btn btn-sm" onclick="_moveBoardCol(${i},1)" ${i===board.columns.length-1?'disabled':''}>↓</button>
-      <button class="btn btn-sm" style="color:var(--danger)" onclick="_removeBoardCol(${i})">✖</button>
+      <button class="btn btn-sm" data-action="_moveBoardCol" data-args="[${i},-1]" ${i===0?'disabled':''}>↑</button>
+      <button class="btn btn-sm" data-action="_moveBoardCol" data-args="[${i},1]" ${i===board.columns.length-1?'disabled':''}>↓</button>
+      <button class="btn btn-sm" style="color:var(--danger)" data-action="_removeBoardCol" data-arg="${i}">✖</button>
     </div>`;
   }
 
@@ -501,7 +537,7 @@ function _openBoardSettings() {
     <label>${t('board_description')||'Description'}</label>
     <input id="settBoardDesc" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(board.description||'')}">
     <label>${t('board_visibility')||'Visibility'}</label>
-    <select id="settBoardVis" class="input" style="width:100%;margin-bottom:8px" onchange="_toggleSettVisFields()">
+    <select id="settBoardVis" class="input" style="width:100%;margin-bottom:8px" data-action="_toggleSettVisFields" data-event="change">
       <option value="private" ${board.visibility==='private'?'selected':''}>🔒 ${t('board_vis_private')||'Private'}</option>
       <option value="group" ${board.visibility==='group'?'selected':''}>👥 ${t('board_vis_group')||'Group'}</option>
       <option value="role" ${board.visibility==='role'?'selected':''}>🎭 ${t('board_vis_role')||'Role'}</option>
@@ -515,10 +551,10 @@ function _openBoardSettings() {
     </div>
     <label>${t('board_columns')||'Columns'}</label>
     <div id="settBoardCols">${colsHtml}</div>
-    <button class="btn btn-sm btn-secondary" onclick="_addBoardCol()" style="margin-top:4px;margin-bottom:12px">+ ${t('board_add_col')||'Add Column'}</button>
+    <button class="btn btn-sm btn-secondary" data-action="_addBoardCol" style="margin-top:4px;margin-bottom:12px">+ ${t('board_add_col')||'Add Column'}</button>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="_saveBoardSettings()">✔ ${t('btn_save')||'Save'}</button>
-      <button class="btn btn-secondary" onclick="closeModal('boardSettingsModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+      <button class="btn btn-primary" data-action="_saveBoardSettings">✔ ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardSettingsModal">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
   _boardModal('boardSettingsModal', html, '540px');
@@ -601,8 +637,8 @@ function _openImportBoardDialog() {
     <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_import_desc')||'Upload a JSON file exported from Boards.'}</p>
     <input type="file" id="boardImportFile" accept=".json" style="margin-bottom:12px">
     <div style="display:flex;gap:8px">
-      <button class="btn btn-primary" onclick="_doImportBoard()">⬆ ${t('btn_import')||'Import'}</button>
-      <button class="btn btn-secondary" onclick="closeModal('boardImportModal')">✖ ${t('btn_cancel')||'Cancel'}</button>
+      <button class="btn btn-primary" data-action="_doImportBoard">⬆ ${t('btn_import')||'Import'}</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardImportModal">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
   _boardModal('boardImportModal', html, '520px');
