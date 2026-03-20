@@ -1935,18 +1935,18 @@ function renderSidebar() {
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
+          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
-          ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
-          ${(isTeamLead || isAdminOrOplead || userHasCapability('analysis')) ? toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
+          ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}
           ${canAutoReport ? toolBtn('⏰', t('btn_auto_report')||'Auto reports', 'openAutoReportModal()') : ''}
-          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
-          ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
+          ${toolBtn('📰', t('narrative_title')||'Narrative / Storyline', 'openNarrativeModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_pva')||'Plan vs Actual', 'openPVAModal()') : ''}
           ${(isTeamLead || isAdminOrOplead || userHasCapability('critical_line_analysis')) ? toolBtn('📈', t('btn_critical_line')||'Critical Line', 'openCriticalLineModal()') : ''}
-          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
+          ${(isTeamLead || isAdminOrOplead || userHasCapability('analysis')) ? toolBtn('📈', t('analysis_title')||'Analysis', 'openAnalysisModal()') : ''}
+          ${toolBtn('🖨', t('btn_print')||'Print', 'printTimeline()')}
           ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
