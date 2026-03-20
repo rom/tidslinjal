@@ -185,6 +185,7 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 		GroupID     *int64      `json:"group_id"`
 		RoleKey     *string     `json:"role_key"`
 		Columns     *[]BoardCol `json:"columns"`
+		Color       *string     `json:"color"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -207,6 +208,9 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 	}
 	if req.Columns != nil {
 		board.Columns = *req.Columns
+	}
+	if req.Color != nil {
+		board.Color = *req.Color
 	}
 	if err := app.store.UpdateBoard(*board); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)
@@ -771,5 +775,150 @@ func (app *App) notifyBoardMentions(text string, sender *User, board *Board, ite
 func (app *App) broadcastBoardChange(action string, boardID int64) {
 	data := fmt.Sprintf(`{"action":"%s","board_id":%d}`, action, boardID)
 	app.broker.BroadcastAll(SSEMessage{Event: "board_change", Data: data})
+}
+
+// ── Share Token Endpoints ───────────────────────────────────────────────────
+
+func (app *App) handleGenerateBoardShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	board := app.store.GetBoardByID(id)
+	if board == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	token, err := generateID()
+	if err != nil {
+		jsonError(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+	board.ShareToken = token
+	if err := app.store.UpdateBoard(*board); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.Username, "share", "board", board.ID, fmt.Sprintf("Generated share link for board %q", board.Name))
+	jsonOK(w, map[string]string{"share_token": token})
+}
+
+func (app *App) handleGetBoardByShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "token is required", http.StatusBadRequest)
+		return
+	}
+	boards := app.store.GetBoards()
+	for _, b := range boards {
+		if b.ShareToken != "" && b.ShareToken == token {
+			// Share token grants access if the user is authenticated
+			items := app.store.GetBoardItems(b.ID)
+			if items == nil {
+				items = []BoardItem{}
+			}
+			jsonOK(w, map[string]interface{}{"board": b, "items": items})
+			return
+		}
+	}
+	jsonError(w, "invalid or expired share link", http.StatusNotFound)
+}
+
+func (app *App) handleGenerateBoardItemShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	token, err := generateID()
+	if err != nil {
+		jsonError(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+	item.ShareToken = token
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"share_token": token})
+}
+
+func (app *App) handleGetBoardItemByShareToken(w http.ResponseWriter, r *http.Request, user *User) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		jsonError(w, "token is required", http.StatusBadRequest)
+		return
+	}
+	// Search all board items for the token
+	boards := app.store.GetBoards()
+	for _, b := range boards {
+		items := app.store.GetBoardItems(b.ID)
+		for _, item := range items {
+			if item.ShareToken != "" && item.ShareToken == token {
+				// Share token grants access if user is authenticated
+				colName := ""
+				for _, c := range b.Columns {
+					if c.ID == item.ColumnID {
+						colName = c.Name
+						break
+					}
+				}
+				jsonOK(w, map[string]interface{}{
+					"item":       item,
+					"board_name": b.Name,
+					"board_id":   b.ID,
+					"column_name": colName,
+				})
+				return
+			}
+		}
+	}
+	jsonError(w, "invalid or expired share link", http.StatusNotFound)
+}
+
+// ── Board Tags Endpoint ─────────────────────────────────────────────────────
+
+func (app *App) handleGetBoardTags(w http.ResponseWriter, r *http.Request, user *User) {
+	boardID, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid board id", http.StatusBadRequest)
+		return
+	}
+	board := app.store.GetBoardByID(boardID)
+	if board == nil {
+		jsonError(w, "board not found", http.StatusNotFound)
+		return
+	}
+	if !app.canAccessBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	items := app.store.GetBoardItems(boardID)
+	tagSet := map[string]bool{}
+	for _, item := range items {
+		for _, tag := range item.Tags {
+			tagSet[tag] = true
+		}
+	}
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	jsonOK(w, tags)
 }
 

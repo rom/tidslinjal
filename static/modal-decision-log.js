@@ -1,6 +1,7 @@
 /* ── Decision Log Modal, Rendering, Close, Detach ── */
 // ── Decision Log Modal ──────────────────────────────────────────────────────
 let _decisionLogEntries = [];
+let _decisionLogSortNewest = true; // true = newest first (default), false = oldest first
 
 async function openDecisionLogModal() {
   await _loadDecisionLog();
@@ -82,6 +83,13 @@ async function openDecisionLogModal() {
               </div>
             </div>
           </div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 0;border-bottom:2px solid var(--accent)">
+            <h3 style="margin:0;font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)">📋 ${t('decision_log_header')||'Decision Log'}</h3>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('decision_sort')||'Sort'}:</span>
+              <button class="btn btn-sm" id="dlSortToggle" style="font-size:10px;padding:2px 8px" data-action="_toggleDecisionSort">↓ ${t('decision_sort_newest')||'Newest first'}</button>
+            </div>
+          </div>
           <div id="dlEntries" style="font-size:var(--fs-sm)">
             ${_renderDecisionLogEntries()}
           </div>
@@ -156,10 +164,34 @@ async function _loadDecisionLog() {
   try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch { _decisionLogEntries = []; }
 }
 
+function _toggleDecisionSort() {
+  _decisionLogSortNewest = !_decisionLogSortNewest;
+  const btn = document.getElementById('dlSortToggle');
+  if (btn) {
+    btn.textContent = _decisionLogSortNewest
+      ? ('↓ ' + (t('decision_sort_newest') || 'Newest first'))
+      : ('↑ ' + (t('decision_sort_oldest') || 'Oldest first'));
+  }
+  const el = document.getElementById('dlEntries');
+  if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+}
+
+async function _shareDecisionLogEntry(id) {
+  try {
+    const res = await apiPost('/api/decision-log/' + id + '/share', {});
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed'); }
+    const data = await res.json();
+    const url = window.location.origin + '/#decision-share=' + data.share_token;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    showNotification('success', t('link_copied') || 'Share link copied to clipboard');
+  } catch (e) { showError(e.message); }
+}
+
 function _renderDecisionLogEntries() {
   if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
   const canReview = hasRole2(state.user?.role, 'teamlead');
-  return _decisionLogEntries.slice().reverse().map(e => {
+  const sorted = _decisionLogSortNewest ? _decisionLogEntries.slice().reverse() : _decisionLogEntries.slice();
+  return sorted.map(e => {
     const ts = fmtDateTime(new Date(e.timestamp));
     const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
     const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
@@ -213,7 +245,10 @@ function _renderDecisionLogEntries() {
           <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
           ${statusBadge}${execHtml}
         </div>
-        ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
+        <div style="display:flex;gap:4px">
+          ${canReview ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_shareDecisionLogEntry" data-arg="${e.id}" title="${t('board_share')||'Share link'}">🔗</button>` : ''}
+          ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
+        </div>
       </div>
       ${titleHtml}
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
@@ -366,6 +401,32 @@ async function coSignDecision(id) {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to co-sign decision');
   }
+}
+
+// ── Handle Decision Share Link on Page Load ──
+function _handleDecisionShareLinks() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#decision-share=')) {
+    const token = hash.substring('#decision-share='.length);
+    window.location.hash = '';
+    fetch('/api/decision-log/shared?token=' + token, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(res => {
+      if (!res.ok) throw new Error('Access denied or invalid link');
+      return res.json();
+    }).then(entry => {
+      // Open the decision log modal, which loads all entries
+      openDecisionLogModal();
+    }).catch(e => {
+      if (typeof showError === 'function') showError(e.message);
+      else alert(e.message);
+    });
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(_handleDecisionShareLinks, 1000));
+} else {
+  setTimeout(_handleDecisionShareLinks, 1000);
 }
 
 // ── Decision Log Window (detached) ───────────────────────────────────────────

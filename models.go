@@ -855,6 +855,8 @@ type DecisionLogEntry struct {
 	CoSignedByName    string     `json:"co_signed_by_name,omitempty"`
 	CoSignedAt        *time.Time `json:"co_signed_at,omitempty"`
 	CoSignComment     string     `json:"co_sign_comment,omitempty"`
+	// Sharable link token
+	ShareToken        string               `json:"share_token,omitempty"`
 	// File attachments
 	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
 }
@@ -865,6 +867,23 @@ type DecisionAttachment struct {
 	StoredName string `json:"stored_name"`
 	Size       int64  `json:"size"`
 	MimeType   string `json:"mime_type"`
+}
+
+// ReportArchiveEntry is a report stored in the report archive (under infomanagement)
+type ReportArchiveEntry struct {
+	ID           int64     `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Category     string    `json:"category"`                 // "local" | "incoming"
+	Filename     string    `json:"filename"`
+	StoredName   string    `json:"stored_name"`
+	OriginalName string    `json:"original_name,omitempty"`
+	ContentType  string    `json:"content_type,omitempty"`
+	Size         int64     `json:"size"`
+	UploadedBy   int64     `json:"uploaded_by"`
+	UploadedByName string  `json:"uploaded_by_name"`
+	UploadedAt   time.Time `json:"uploaded_at"`
+	Tags         []string  `json:"tags,omitempty"`
 }
 
 // AutoReportSchedule defines a server-side scheduled report

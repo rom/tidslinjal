@@ -90,6 +90,51 @@ func (s *Store) AddDecisionLogAttachment(entryID int64, att DecisionAttachment) 
 	return s.persist("decision_log.json", snap)
 }
 
+// ── Report Archive ──────────────────────────────────────────────────────────
+
+func (s *Store) GetReportArchive() []ReportArchiveEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]ReportArchiveEntry, len(s.reportArchive))
+	copy(out, s.reportArchive)
+	return out
+}
+
+func (s *Store) GetReportArchiveByID(id int64) *ReportArchiveEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, e := range s.reportArchive {
+		if e.ID == id {
+			return &e
+		}
+	}
+	return nil
+}
+
+func (s *Store) AddReportArchiveEntry(entry ReportArchiveEntry) (ReportArchiveEntry, error) {
+	s.mu.Lock()
+	s.nextReportArchiveID++
+	entry.ID = s.nextReportArchiveID
+	s.reportArchive = append(s.reportArchive, entry)
+	snap := append([]ReportArchiveEntry(nil), s.reportArchive...)
+	s.mu.Unlock()
+	return entry, s.persist("report_archive.json", snap)
+}
+
+func (s *Store) DeleteReportArchiveEntry(id int64) error {
+	s.mu.Lock()
+	for i, e := range s.reportArchive {
+		if e.ID == id {
+			s.reportArchive = append(s.reportArchive[:i], s.reportArchive[i+1:]...)
+			snap := append([]ReportArchiveEntry(nil), s.reportArchive...)
+			s.mu.Unlock()
+			return s.persist("report_archive.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("report archive entry %d not found", id)
+}
+
 // ── Person Ready Checks ─────────────────────────────────────────────────────
 
 func (s *Store) GetPersonReadyChecks() []PersonReadyCheck {

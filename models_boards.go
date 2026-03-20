@@ -13,6 +13,8 @@ type Board struct {
 	GroupID     int64       `json:"group_id,omitempty"`
 	RoleKey     string      `json:"role_key,omitempty"`
 	Columns     []BoardCol  `json:"columns"`
+	Color       string      `json:"color,omitempty"`       // board background/accent color
+	ShareToken  string      `json:"share_token,omitempty"` // token for sharable link
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
@@ -22,6 +24,7 @@ type BoardCol struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Collapsed bool   `json:"collapsed,omitempty"`
+	Color     string `json:"color,omitempty"` // column background color (e.g. orange, yellow, green)
 }
 
 // BoardItem is a card/issue on the board
@@ -41,6 +44,7 @@ type BoardItem struct {
 	History       []BoardHistory    `json:"history,omitempty"`
 	ChecklistID   int64             `json:"checklist_id,omitempty"`  // linked checklist
 	EventID       int64             `json:"event_id,omitempty"`      // linked event/meeting
+	ShareToken    string            `json:"share_token,omitempty"`   // token for sharable link
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
 }

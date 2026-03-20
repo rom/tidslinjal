@@ -70,7 +70,8 @@ function _renderBoardListModal() {
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`;
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
-      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)" data-action="_openBoard" data-arg="${b.id}">
+      const cardBorderTop = b.color ? `border-top:3px solid ${b.color};` : '';
+      html += `<div class="card" style="cursor:pointer;padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);${cardBorderTop}" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(b.name)}</strong> <span title="${b.visibility}">${vis}</span>
         </div>
@@ -201,14 +202,17 @@ function _renderKanbanBoard() {
   // Sort by sort_order
   for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
 
-  let html = `<div style="max-width:100%;overflow-x:auto">
+  const boardColorStyle = board.color ? `border-top:4px solid ${board.color};` : '';
+  let html = `<div style="max-width:100%;overflow-x:auto;${boardColorStyle}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}">← ${t('board_back_short')||'Boards'}</button>
+        ${board.color ? `<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${board.color}"></span>` : ''}
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-right:28px">
-        <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}">⚙</button>
+        <button class="btn btn-sm btn-secondary" data-action="_shareBoardLink" title="${t('board_share')||'Share link'}" style="font-size:14px;padding:4px 8px">🔗</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}" style="font-size:18px;padding:2px 10px">⚙</button>
         <button class="btn btn-sm btn-secondary" data-action="_printBoard">🖨</button>
         <div style="position:relative;display:inline-block" id="boardExportDropdown">
           <button class="btn btn-sm btn-secondary" data-action="_toggleBoardExportMenu">⬇ ${t('btn_export')||'Export'}</button>
@@ -239,7 +243,9 @@ function _renderKanbanBoard() {
         <strong>${escHtml(col.name)} (${cItems.length})</strong>
       </div>`;
     } else {
-      html += `<div class="kanban-col" data-col="${col.id}" data-drop-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px">
+      const colBg = col.color ? col.color : 'var(--bg2)';
+      const colBorder = col.color ? `border:1px solid ${col.color};` : 'border:1px solid var(--border);';
+      html += `<div class="kanban-col" data-col="${col.id}" data-drop-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:${colBg};${colBorder}border-radius:var(--radius);padding:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(col.name)} (${cItems.length})</strong>
           <div style="display:flex;gap:4px">
@@ -408,6 +414,7 @@ function _openBoardItem(itemId) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">#${item.id} ${escHtml(item.subject)}</h3>
       <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}">🔗</button>
         <button class="btn btn-sm btn-secondary" data-action="_editBoardItem" data-arg="${item.id}">✏ ${t('btn_edit')||'Edit'}</button>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}">🗑</button>
       </div>
@@ -488,6 +495,11 @@ function _editBoardItem(itemId) {
     </div>
   </div>`;
   _boardModal('boardItemEditModal', html, '620px');
+  // Setup tag autocomplete
+  _loadBoardTags().then(() => {
+    const tagInput = document.getElementById('editItemTags');
+    if (tagInput) _setupTagAutocomplete(tagInput);
+  });
 }
 
 async function _doEditBoardItem(itemId) {
@@ -542,11 +554,23 @@ function _openBoardSettings() {
   if (!board) return;
   const groups = state.groups || [];
 
+  const colColorPresets = [
+    {label:'None',value:''},
+    {label:'🟠 Orange',value:'rgba(230,126,34,0.15)'},
+    {label:'🟡 Yellow',value:'rgba(241,196,15,0.15)'},
+    {label:'🟢 Green',value:'rgba(39,174,96,0.15)'},
+    {label:'🔵 Blue',value:'rgba(52,152,219,0.15)'},
+    {label:'🔴 Red',value:'rgba(231,76,60,0.15)'},
+    {label:'🟣 Purple',value:'rgba(155,89,182,0.15)'}
+  ];
   let colsHtml = '';
   for (let i = 0; i < board.columns.length; i++) {
     const col = board.columns[i];
     colsHtml += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
       <input class="input boardSettCol" data-idx="${i}" value="${escHtml(col.name)}" style="flex:1">
+      <select class="input boardSettColColor" data-idx="${i}" style="width:100px;font-size:var(--fs-xs)">
+        ${colColorPresets.map(p => `<option value="${p.value}" ${col.color===p.value?'selected':''}>${p.label}</option>`).join('')}
+      </select>
       <button class="btn btn-sm" data-action="_moveBoardCol" data-args="[${i},-1]" ${i===0?'disabled':''}>↑</button>
       <button class="btn btn-sm" data-action="_moveBoardCol" data-args="[${i},1]" ${i===board.columns.length-1?'disabled':''}>↓</button>
       <button class="btn btn-sm" style="color:var(--danger)" data-action="_removeBoardCol" data-arg="${i}">✖</button>
@@ -559,6 +583,9 @@ function _openBoardSettings() {
     <input id="settBoardName" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(board.name)}">
     <label>${t('board_description')||'Description'}</label>
     <input id="settBoardDesc" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(board.description||'')}">
+    <label>${t('board_color')||'Board Color'}</label>
+    <input id="settBoardColor" type="color" value="${board.color||'#1a1a2e'}" style="margin-bottom:8px;width:48px;height:28px;cursor:pointer">
+    <button class="btn btn-sm btn-secondary" data-action="_clearBoardColor" style="margin-left:6px;margin-bottom:8px;font-size:var(--fs-xs)">✖ ${t('board_color_clear')||'Clear'}</button>
     <label>${t('board_visibility')||'Visibility'}</label>
     <select id="settBoardVis" class="input" style="width:100%;margin-bottom:8px" data-action="_toggleSettVisFields" data-event="change">
       <option value="private" ${board.visibility==='private'?'selected':''}>🔒 ${t('board_vis_private')||'Private'}</option>
@@ -613,11 +640,14 @@ function _moveBoardCol(idx, dir) {
 async function _saveBoardSettings() {
   const board = _boardsState.activeBoard;
   const inputs = document.querySelectorAll('.boardSettCol');
+  const colorInputs = document.querySelectorAll('.boardSettColColor');
   const cols = [];
   inputs.forEach(inp => {
     const idx = parseInt(inp.dataset.idx);
-    cols.push({ id: board.columns[idx].id, name: inp.value.trim() || board.columns[idx].name, collapsed: board.columns[idx].collapsed });
+    const colColor = colorInputs[idx]?.value || '';
+    cols.push({ id: board.columns[idx].id, name: inp.value.trim() || board.columns[idx].name, collapsed: board.columns[idx].collapsed, color: colColor });
   });
+  const boardColor = document.getElementById('settBoardColor')?.value || '';
   try {
     await _boardApi('PUT', '/boards/' + board.id, {
       name: document.getElementById('settBoardName').value.trim(),
@@ -625,6 +655,7 @@ async function _saveBoardSettings() {
       visibility: document.getElementById('settBoardVis').value,
       group_id: parseInt(document.getElementById('settBoardGroup')?.value) || 0,
       columns: cols,
+      color: boardColor === '#1a1a2e' ? '' : boardColor,
     });
     closeModal('boardSettingsModal');
     await _openBoard(board.id);
@@ -723,6 +754,137 @@ async function _doImportBoard() {
     closeModal('boardImportModal');
     openBoardsModal();
   } catch (e) { alert(e.message); }
+}
+
+// ── Share Link Functions ──
+async function _shareBoardLink() {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  try {
+    const res = await _boardApi('POST', '/boards/' + board.id + '/share');
+    const url = window.location.origin + '/#board-share=' + res.share_token;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    _boardModal('boardShareModal', `<div style="max-width:500px">
+      <h3>🔗 ${t('board_share')||'Share Link'}</h3>
+      <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_share_desc')||'Anyone with an account and appropriate access rights can use this link to view the board.'}</p>
+      <input class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly onclick="this.select()">
+      <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('board_share_access_note')||'Access is checked: the user must be authenticated and have visibility rights to this board.'}</p>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardShareModal">✖ ${t('btn_close')||'Close'}</button>
+    </div>`, '520px');
+  } catch (e) { alert(e.message); }
+}
+
+async function _shareBoardItemLink(itemId) {
+  try {
+    const res = await _boardApi('POST', '/board-items/' + itemId + '/share');
+    const url = window.location.origin + '/#board-item-share=' + res.share_token;
+    await navigator.clipboard.writeText(url).catch(() => {});
+    _boardModal('boardItemShareModal', `<div style="max-width:500px">
+      <h3>🔗 ${t('board_share_item')||'Share Item Link'}</h3>
+      <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_share_item_desc')||'Anyone with an account and access to this board can use this link to view the item.'}</p>
+      <input class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly onclick="this.select()">
+      <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('board_share_access_note')||'Access is checked: the user must be authenticated and have visibility rights to this board.'}</p>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardItemShareModal">✖ ${t('btn_close')||'Close'}</button>
+    </div>`, '520px');
+  } catch (e) { alert(e.message); }
+}
+
+// ── Board Color ──
+function _clearBoardColor() {
+  const el = document.getElementById('settBoardColor');
+  if (el) el.value = '#1a1a2e';
+}
+
+// ── Tag Autocomplete ──
+let _boardTagsCache = [];
+async function _loadBoardTags() {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  try {
+    _boardTagsCache = await _boardApi('GET', '/boards/' + board.id + '/tags');
+  } catch { _boardTagsCache = []; }
+}
+
+function _setupTagAutocomplete(inputEl) {
+  if (!inputEl || inputEl._tagAcSetup) return;
+  inputEl._tagAcSetup = true;
+  let acDiv = null;
+
+  function showSuggestions() {
+    const val = inputEl.value;
+    const parts = val.split(',');
+    const current = (parts[parts.length - 1] || '').trim().toLowerCase();
+    if (!current || _boardTagsCache.length === 0) { hideSuggestions(); return; }
+    const existingTags = parts.slice(0, -1).map(s => s.trim().toLowerCase());
+    const matches = _boardTagsCache.filter(tag =>
+      tag.toLowerCase().includes(current) && !existingTags.includes(tag.toLowerCase())
+    );
+    if (matches.length === 0) { hideSuggestions(); return; }
+    if (!acDiv) {
+      acDiv = document.createElement('div');
+      acDiv.style.cssText = 'position:absolute;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);max-height:150px;overflow-y:auto;width:' + inputEl.offsetWidth + 'px;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+      inputEl.parentNode.style.position = 'relative';
+      inputEl.parentNode.appendChild(acDiv);
+    }
+    acDiv.innerHTML = matches.map(tag =>
+      `<div style="padding:4px 8px;cursor:pointer;font-size:var(--fs-xs)" onmousedown="_selectTag(this,'${escHtml(tag)}')">${escHtml(tag)}</div>`
+    ).join('');
+  }
+
+  function hideSuggestions() {
+    if (acDiv) { acDiv.remove(); acDiv = null; }
+  }
+
+  inputEl.addEventListener('input', showSuggestions);
+  inputEl.addEventListener('blur', () => setTimeout(hideSuggestions, 200));
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Escape') hideSuggestions();
+  });
+}
+
+// Global function for tag selection from autocomplete dropdown
+window._selectTag = function(el, tag) {
+  const inputEl = document.getElementById('editItemTags');
+  if (!inputEl) return;
+  const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
+  parts[parts.length - 1] = tag;
+  inputEl.value = parts.join(', ') + ', ';
+  inputEl.focus();
+};
+
+// ── Handle Share Link on Page Load ──
+function _handleBoardShareLinks() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#board-share=')) {
+    const token = hash.substring('#board-share='.length);
+    window.location.hash = '';
+    _boardApi('GET', '/boards/shared?token=' + token).then(data => {
+      _boardsState.activeBoard = data.board;
+      _boardsState.items = data.items || [];
+      _renderKanbanBoard();
+    }).catch(e => alert(e.message));
+  } else if (hash.startsWith('#board-item-share=')) {
+    const token = hash.substring('#board-item-share='.length);
+    window.location.hash = '';
+    _boardApi('GET', '/board-items/shared?token=' + token).then(data => {
+      // Open the board, then show the item
+      _boardApi('GET', '/boards/' + data.board_id).then(board => {
+        _boardApi('GET', '/boards/' + data.board_id + '/items').then(items => {
+          _boardsState.activeBoard = board;
+          _boardsState.items = items;
+          _renderKanbanBoard();
+          setTimeout(() => _openBoardItem(data.item.id), 300);
+        });
+      });
+    }).catch(e => alert(e.message));
+  }
+}
+
+// Check share links on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _handleBoardShareLinks);
+} else {
+  setTimeout(_handleBoardShareLinks, 500);
 }
 
 // ── SSE listener ──

@@ -100,41 +100,56 @@ function _renderReferencesTab(el) {
   el.innerHTML = `
     <div class="sidebar-section">
       <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>${t('references_title') || 'References'}</span>
-        <span style="display:flex;gap:4px;align-items:center">
+        <span>${t('tab_infomanagement') || 'Infomanagement'}</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px">
+        <button class="btn btn-sm _infomgmt-tab-btn" id="btnInfoTabRefs" style="flex:1;font-weight:700;background:var(--accent);color:#fff">${t('references_title') || 'References'}</button>
+        <button class="btn btn-sm _infomgmt-tab-btn" id="btnInfoTabArchive" style="flex:1">${t('report_archive_title') || 'Report Archive'}</button>
+      </div>
+      <div id="infoTabRefs">
+        <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:6px">
           ${canEdit ? '<button class="btn btn-primary btn-sm" id="btnAddReference">+ Add</button>' : ''}
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" id="btnRefIndex" title="${t('ref_index')||'Document Index'}">Index</button>
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" id="btnDetachReferences" title="${t('btn_detach')||'Detach to window'}">⧉</button>
-        </span>
+        </div>
+        <input type="text" id="refSearch" list="refSearchSuggestions" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)" autocomplete="off">
+        <datalist id="refSearchSuggestions"></datalist>
+        <select id="refCategoryFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+          <option value="">${t('all_categories') || 'All categories'}</option>
+          <option value="handbook">${t('ref_category_handbook') || 'Handbook'}</option>
+          <option value="sop">${t('ref_category_sop') || 'SOP'}</option>
+          <option value="policy">${t('ref_category_policy') || 'Policy'}</option>
+          <option value="map">${t('ref_category_map') || 'Map'}</option>
+          <option value="reference">${t('ref_category_reference') || 'Reference'}</option>
+          <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
+          <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
+          <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
+          <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
+          <option value="other">${t('ref_category_other') || 'Other'}</option>
+        </select>
+        <select id="refLanguageFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
+          <option value="">${t('all_languages') || 'All languages'}</option>
+        </select>
+        <div id="refInfoArea" style="margin-bottom:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim)"></div>
+        <div id="refGitActions" style="display:none;margin-bottom:8px;display:flex;gap:6px;align-items:center">
+          <button class="btn btn-secondary btn-sm" id="btnRefGitSave" style="font-size:10px">💾 ${t('ref_git_save')||'Save to Git'}</button>
+          <button class="btn btn-secondary btn-sm" id="btnRefGitLoad" style="font-size:10px">📥 ${t('ref_git_load')||'Load from Git'}</button>
+          <span id="refGitStatus" style="font-size:var(--fs-xs);color:var(--text-dim)"></span>
+        </div>
+        <div id="refList" style="max-height:60vh;overflow-y:auto"></div>
       </div>
-      <input type="text" id="refSearch" list="refSearchSuggestions" placeholder="${t('search') || 'Search...'}" style="width:100%;margin-bottom:8px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)" autocomplete="off">
-      <datalist id="refSearchSuggestions"></datalist>
-      <select id="refCategoryFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
-        <option value="">${t('all_categories') || 'All categories'}</option>
-        <option value="handbook">${t('ref_category_handbook') || 'Handbook'}</option>
-        <option value="sop">${t('ref_category_sop') || 'SOP'}</option>
-        <option value="policy">${t('ref_category_policy') || 'Policy'}</option>
-        <option value="map">${t('ref_category_map') || 'Map'}</option>
-        <option value="reference">${t('ref_category_reference') || 'Reference'}</option>
-        <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
-        <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
-        <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
-        <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
-        <option value="other">${t('ref_category_other') || 'Other'}</option>
-      </select>
-      <select id="refLanguageFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
-        <option value="">${t('all_languages') || 'All languages'}</option>
-      </select>
-      <div id="refInfoArea" style="margin-bottom:8px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-dim)"></div>
-      <div id="refGitActions" style="display:none;margin-bottom:8px;display:flex;gap:6px;align-items:center">
-        <button class="btn btn-secondary btn-sm" id="btnRefGitSave" style="font-size:10px">💾 ${t('ref_git_save')||'Save to Git'}</button>
-        <button class="btn btn-secondary btn-sm" id="btnRefGitLoad" style="font-size:10px">📥 ${t('ref_git_load')||'Load from Git'}</button>
-        <span id="refGitStatus" style="font-size:var(--fs-xs);color:var(--text-dim)"></span>
+      <div id="infoTabArchive" style="display:none">
+        <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:8px">
+          ${canEdit ? `<button class="btn btn-primary btn-sm" id="btnUploadReport">${t('report_archive_upload') || 'Upload Report'}</button>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button class="btn btn-sm _report-cat-btn" id="btnReportLocal" style="flex:1;font-weight:700;background:var(--accent);color:#fff">${t('report_archive_local') || 'Local Reports'}</button>
+          <button class="btn btn-sm _report-cat-btn" id="btnReportIncoming" style="flex:1">${t('report_archive_incoming') || 'Incoming Reports'}</button>
+        </div>
+        <div id="reportArchiveList" style="max-height:60vh;overflow-y:auto"></div>
       </div>
-      <div id="refList" style="max-height:60vh;overflow-y:auto"></div>
     </div>`;
   _loadAndRenderReferences();
-  // Check if GitHub is enabled for refs
   _checkRefGitIntegration();
   const addBtn = document.getElementById('btnAddReference');
   if (addBtn) addBtn.addEventListener('click', () => _openReferenceUploadModal());
@@ -148,6 +163,137 @@ function _renderReferencesTab(el) {
   if (catEl) catEl.addEventListener('change', () => _filterReferences());
   const langEl = document.getElementById('refLanguageFilter');
   if (langEl) langEl.addEventListener('change', () => _filterReferences());
+
+  // Infomanagement tab switching
+  document.getElementById('btnInfoTabRefs')?.addEventListener('click', () => {
+    document.getElementById('infoTabRefs').style.display = '';
+    document.getElementById('infoTabArchive').style.display = 'none';
+    document.getElementById('btnInfoTabRefs').style.background = 'var(--accent)';
+    document.getElementById('btnInfoTabRefs').style.color = '#fff';
+    document.getElementById('btnInfoTabArchive').style.background = '';
+    document.getElementById('btnInfoTabArchive').style.color = '';
+  });
+  document.getElementById('btnInfoTabArchive')?.addEventListener('click', () => {
+    document.getElementById('infoTabRefs').style.display = 'none';
+    document.getElementById('infoTabArchive').style.display = '';
+    document.getElementById('btnInfoTabArchive').style.background = 'var(--accent)';
+    document.getElementById('btnInfoTabArchive').style.color = '#fff';
+    document.getElementById('btnInfoTabRefs').style.background = '';
+    document.getElementById('btnInfoTabRefs').style.color = '';
+    _loadAndRenderReportArchive();
+  });
+
+  // Report archive category switching
+  let _reportCategory = 'local';
+  document.getElementById('btnReportLocal')?.addEventListener('click', () => {
+    _reportCategory = 'local';
+    document.getElementById('btnReportLocal').style.background = 'var(--accent)';
+    document.getElementById('btnReportLocal').style.color = '#fff';
+    document.getElementById('btnReportIncoming').style.background = '';
+    document.getElementById('btnReportIncoming').style.color = '';
+    _renderReportArchiveList();
+  });
+  document.getElementById('btnReportIncoming')?.addEventListener('click', () => {
+    _reportCategory = 'incoming';
+    document.getElementById('btnReportIncoming').style.background = 'var(--accent)';
+    document.getElementById('btnReportIncoming').style.color = '#fff';
+    document.getElementById('btnReportLocal').style.background = '';
+    document.getElementById('btnReportLocal').style.color = '';
+    _renderReportArchiveList();
+  });
+
+  const uploadReportBtn = document.getElementById('btnUploadReport');
+  if (uploadReportBtn) uploadReportBtn.addEventListener('click', () => _openReportUploadModal(_reportCategory));
+
+  // Report archive data and rendering
+  let _reportArchiveData = [];
+
+  async function _loadAndRenderReportArchive() {
+    try {
+      const res = await fetch('/api/report-archive', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      if (res.ok) _reportArchiveData = await res.json() || [];
+    } catch { _reportArchiveData = []; }
+    _renderReportArchiveList();
+  }
+
+  function _renderReportArchiveList() {
+    const listEl = document.getElementById('reportArchiveList');
+    if (!listEl) return;
+    const filtered = _reportArchiveData.filter(r => r.category === _reportCategory);
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:12px;text-align:center">${t('report_archive_empty') || 'No reports yet.'}</div>`;
+      return;
+    }
+    listEl.innerHTML = filtered.map(r => {
+      const sizeStr = r.size < 1024 ? r.size + ' B' : r.size < 1048576 ? (r.size / 1024).toFixed(1) + ' KB' : (r.size / 1048576).toFixed(1) + ' MB';
+      const dateStr = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString() : '';
+      return `<div style="padding:8px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <strong style="font-size:var(--fs-sm)">${escHtml(r.title)}</strong>
+            ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:4px">
+            <a href="/api/report-archive/${r.id}/download" target="_blank" class="btn btn-sm">⬇</a>
+            ${canEdit ? `<button class="btn btn-sm" style="color:var(--danger);font-size:10px" onclick="_deleteReportArchive(${r.id})">✖</button>` : ''}
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${escHtml(r.filename)} · ${sizeStr} · ${escHtml(r.uploaded_by_name || '')} · ${dateStr}</div>
+      </div>`;
+    }).join('');
+  }
+
+  window._deleteReportArchive = async function(id) {
+    if (!confirm('Delete this report?')) return;
+    try {
+      await fetch('/api/report-archive/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      _loadAndRenderReportArchive();
+    } catch (e) { alert(e.message); }
+  };
+
+  window._openReportUploadModal = function(category) {
+    const html = `<div class="modal-overlay" id="reportUploadModal">
+      <div class="modal" style="max-width:500px;width:90vw;padding:20px;position:relative">
+        <button class="modal-close" onclick="document.getElementById('reportUploadModal')?.remove()">✕</button>
+        <h3>${t('report_archive_upload') || 'Upload Report'}</h3>
+        <label>Title</label>
+        <input id="reportTitle" class="input" style="width:100%;margin-bottom:8px" placeholder="Report title">
+        <label>Description</label>
+        <input id="reportDesc" class="input" style="width:100%;margin-bottom:8px" placeholder="Optional description">
+        <label>Category</label>
+        <select id="reportCat" class="input" style="width:100%;margin-bottom:8px">
+          <option value="local" ${category==='local'?'selected':''}>${t('report_archive_local') || 'Local Reports'}</option>
+          <option value="incoming" ${category==='incoming'?'selected':''}>${t('report_archive_incoming') || 'Incoming Reports'}</option>
+        </select>
+        <label>File</label>
+        <input type="file" id="reportFile" style="margin-bottom:12px">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="_doUploadReport()">Upload</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('reportUploadModal')?.remove()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = document.getElementById('reportUploadModal');
+    void modal.offsetHeight;
+    modal.classList.add('open');
+  };
+
+  window._doUploadReport = async function() {
+    const file = document.getElementById('reportFile')?.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('title', document.getElementById('reportTitle')?.value || '');
+    fd.append('description', document.getElementById('reportDesc')?.value || '');
+    fd.append('category', document.getElementById('reportCat')?.value || 'local');
+    try {
+      const res = await fetch('/api/report-archive', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Upload failed'); }
+      document.getElementById('reportUploadModal')?.remove();
+      _loadAndRenderReportArchive();
+    } catch (e) { alert(e.message); }
+  };
 }
 
 async function _loadAndRenderReferences() {
