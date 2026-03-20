@@ -1475,3 +1475,149 @@ func (app *App) handleStatsUsage(w http.ResponseWriter, r *http.Request, user *U
 		"generated_at": time.Now().Format(time.RFC3339),
 	})
 }
+
+// ── Poll Statistics ────────────────────────────────────────────────────────
+func (app *App) handleStatsPollAnalytics(w http.ResponseWriter, r *http.Request, user *User) {
+	polls := app.store.GetPolls()
+
+	total := len(polls)
+	open := 0
+	closed := 0
+	totalResponses := 0
+	totalQuestions := 0
+	byCreator := map[string]int{}
+	responseTimesMinutes := []float64{}
+
+	for _, p := range polls {
+		switch p.Status {
+		case "open":
+			open++
+		case "closed":
+			closed++
+		}
+		totalResponses += len(p.Responses)
+		totalQuestions += len(p.Questions)
+		byCreator[p.CreatedByName]++
+
+		for _, resp := range p.Responses {
+			if !resp.AnsweredAt.IsZero() && !p.CreatedAt.IsZero() {
+				dur := resp.AnsweredAt.Sub(p.CreatedAt).Minutes()
+				if dur >= 0 {
+					responseTimesMinutes = append(responseTimesMinutes, dur)
+				}
+			}
+		}
+	}
+
+	avgResponseTime := 0.0
+	if len(responseTimesMinutes) > 0 {
+		sum := 0.0
+		for _, t := range responseTimesMinutes {
+			sum += t
+		}
+		avgResponseTime = math.Round(sum/float64(len(responseTimesMinutes))*100) / 100
+	}
+
+	// Top creators
+	type creatorCount struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	creators := []creatorCount{}
+	for name, count := range byCreator {
+		creators = append(creators, creatorCount{name, count})
+	}
+	sort.Slice(creators, func(i, j int) bool { return creators[i].Count > creators[j].Count })
+
+	// Question type distribution
+	questionTypes := map[string]int{}
+	for _, p := range polls {
+		for _, q := range p.Questions {
+			questionTypes[string(q.Type)]++
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"total":                   total,
+		"open":                    open,
+		"closed":                  closed,
+		"total_responses":         totalResponses,
+		"total_questions":         totalQuestions,
+		"avg_response_time_mins":  avgResponseTime,
+		"by_creator":              creators,
+		"question_type_distribution": questionTypes,
+	})
+}
+
+// ── Board Statistics ───────────────────────────────────────────────────────
+func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request, user *User) {
+	boards := app.store.GetBoards()
+	allItems := []BoardItem{}
+	for _, b := range boards {
+		items := app.store.GetBoardItems(b.ID)
+		allItems = append(allItems, items...)
+	}
+
+	totalBoards := len(boards)
+	totalItems := len(allItems)
+	openItems := 0
+	inProgressItems := 0
+	closedItems := 0
+
+	// Count items by column name (convention: Open, In Progress, Closed)
+	colNameMap := map[string]string{}
+	for _, b := range boards {
+		for _, col := range b.Columns {
+			colNameMap[col.ID] = strings.ToLower(col.Name)
+		}
+	}
+
+	for _, item := range allItems {
+		colName := colNameMap[item.ColumnID]
+		switch {
+		case strings.Contains(colName, "closed") || strings.Contains(colName, "done") || strings.Contains(colName, "complete"):
+			closedItems++
+		case strings.Contains(colName, "progress") || strings.Contains(colName, "doing") || strings.Contains(colName, "active"):
+			inProgressItems++
+		default:
+			openItems++
+		}
+	}
+
+	// Boards per owner
+	type ownerCount struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	byOwner := map[string]int{}
+	for _, b := range boards {
+		byOwner[b.OwnerName]++
+	}
+	owners := []ownerCount{}
+	for name, count := range byOwner {
+		owners = append(owners, ownerCount{name, count})
+	}
+	sort.Slice(owners, func(i, j int) bool { return owners[i].Count > owners[j].Count })
+
+	// Items per board
+	type boardItemCount struct {
+		BoardName string `json:"board_name"`
+		Count     int    `json:"count"`
+	}
+	itemsPerBoard := []boardItemCount{}
+	for _, b := range boards {
+		items := app.store.GetBoardItems(b.ID)
+		itemsPerBoard = append(itemsPerBoard, boardItemCount{b.Name, len(items)})
+	}
+	sort.Slice(itemsPerBoard, func(i, j int) bool { return itemsPerBoard[i].Count > itemsPerBoard[j].Count })
+
+	jsonOK(w, map[string]any{
+		"total_boards":     totalBoards,
+		"total_items":      totalItems,
+		"open_items":       openItems,
+		"in_progress_items": inProgressItems,
+		"closed_items":     closedItems,
+		"by_owner":         owners,
+		"items_per_board":  itemsPerBoard,
+	})
+}

@@ -933,6 +933,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 	mux.HandleFunc("GET /api/stats/personnel-performance", app.requireAuth(app.handleStatsPersonnelPerformance))
 	mux.HandleFunc("GET /api/stats/usage", app.requireAuth(app.handleStatsUsage))
+	mux.HandleFunc("GET /api/stats/polls", app.requireAuth(app.handleStatsPollAnalytics))
+	mux.HandleFunc("GET /api/stats/boards", app.requireAuth(app.handleStatsBoardAnalytics))
 
 	// Narrative / Storyline API
 	mux.HandleFunc("GET /api/narrative", app.requireAuth(app.handleNarrative))
@@ -1307,6 +1309,12 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				case "event_log":
 					data = app.store.GetEventLog()
 					filename = "event_log"
+				case "pollster_log":
+					data = app.store.GetPolls()
+					filename = "pollster_log"
+				case "checklist_log":
+					data = app.store.GetChecklistInstances()
+					filename = "checklist_log"
 				default:
 					http.Error(w, `{"error":"invalid log type"}`, http.StatusBadRequest)
 					return

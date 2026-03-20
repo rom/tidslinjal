@@ -42,6 +42,8 @@ async function openAnalysisModal() {
             <button class="btn btn-sm analysisTab" data-tab="teamleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teamleads')||'TeamLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="opsleads" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_opsleads')||'OpsLeads'}</button>
             <button class="btn btn-sm analysisTab" data-tab="teammembers" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_teammembers')||'Team Members'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="polls" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_polls')||'Polls'}</button>
+            <button class="btn btn-sm analysisTab" data-tab="boards" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_boards')||'Boards'}</button>
             <button class="btn btn-sm analysisTab" data-tab="usage" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_usage')||'Usage'}</button>
             <button class="btn btn-sm analysisTab" data-tab="export" style="border-radius:var(--radius) var(--radius) 0 0;font-size:11px;padding:4px 10px">${t('analysis_tab_export')||'Export'}</button>
           </div>
@@ -121,6 +123,8 @@ async function _loadAnalysisTab(tab) {
       case 'teamleads': await _renderTeamLeadsTab(container); break;
       case 'opsleads': await _renderOpsLeadsTab(container); break;
       case 'teammembers': await _renderTeamMembersTab(container); break;
+      case 'polls': await _renderPollsAnalysisTab(container); break;
+      case 'boards': await _renderBoardsAnalysisTab(container); break;
       case 'usage': await _renderUsageTab(container); break;
       case 'export': _renderExportTab(container); break;
     }
@@ -1208,5 +1212,115 @@ function detachAnalysis() {
 async function exportAnalysis() {
   const fmt = document.getElementById('analysisExportFmt')?.value || 'csv';
   _downloadAnalysisExport(fmt);
+}
+
+/* ── Polls Analysis Tab ─────────────────────────────────────────────────── */
+async function _renderPollsAnalysisTab(container) {
+  const data = await _analysisFetch('/api/stats/polls');
+  const card = (title, value, sub) => `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
+    <div style="font-size:24px;font-weight:bold;color:var(--accent)">${value}</div>
+    <div style="font-size:var(--fs-sm);font-weight:600;margin-top:4px">${title}</div>
+    ${sub ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${sub}</div>` : ''}
+  </div>`;
+
+  let html = `<h3 style="margin-bottom:12px">${t('analysis_polls_title')||'Poll Statistics'}</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px">
+      ${card(t('analysis_polls_total')||'Total Polls', data.total || 0)}
+      ${card(t('analysis_polls_open')||'Open', data.open || 0)}
+      ${card(t('analysis_polls_closed')||'Closed', data.closed || 0)}
+      ${card(t('analysis_polls_responses')||'Total Responses', data.total_responses || 0)}
+      ${card(t('analysis_polls_questions')||'Total Questions', data.total_questions || 0)}
+      ${card(t('analysis_polls_avg_response')||'Avg Response Time', (data.avg_response_time_mins || 0).toFixed(1) + ' min')}
+    </div>`;
+
+  // Question type distribution
+  if (data.question_type_distribution && Object.keys(data.question_type_distribution).length > 0) {
+    html += `<h4 style="margin-bottom:8px">${t('analysis_polls_question_types')||'Question Type Distribution'}</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">`;
+    for (const [type, count] of Object.entries(data.question_type_distribution)) {
+      html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm)">
+        <strong>${escHtml(type)}</strong>: ${count}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Top creators
+  if (data.by_creator && data.by_creator.length > 0) {
+    html += `<h4 style="margin-bottom:8px">${t('analysis_polls_top_creators')||'Top Poll Creators'}</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">#</th>
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">${t('analysis_name')||'Name'}</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">${t('analysis_count')||'Polls'}</th>
+        </tr></thead><tbody>`;
+    data.by_creator.forEach((c, i) => {
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 10px">${i + 1}</td>
+        <td style="padding:4px 10px">${escHtml(c.name)}</td>
+        <td style="padding:4px 10px;text-align:right">${c.count}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  container.innerHTML = html;
+}
+
+/* ── Boards Analysis Tab ────────────────────────────────────────────────── */
+async function _renderBoardsAnalysisTab(container) {
+  const data = await _analysisFetch('/api/stats/boards');
+  const card = (title, value, sub) => `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">
+    <div style="font-size:24px;font-weight:bold;color:var(--accent)">${value}</div>
+    <div style="font-size:var(--fs-sm);font-weight:600;margin-top:4px">${title}</div>
+    ${sub ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${sub}</div>` : ''}
+  </div>`;
+
+  let html = `<h3 style="margin-bottom:12px">${t('analysis_boards_title')||'Board Statistics'}</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px">
+      ${card(t('analysis_boards_total')||'Total Boards', data.total_boards || 0)}
+      ${card(t('analysis_boards_items')||'Total Issues', data.total_items || 0)}
+      ${card(t('analysis_boards_open')||'Open', data.open_items || 0, t('analysis_boards_items_label')||'issues')}
+      ${card(t('analysis_boards_in_progress')||'In Progress', data.in_progress_items || 0, t('analysis_boards_items_label')||'issues')}
+      ${card(t('analysis_boards_closed')||'Closed', data.closed_items || 0, t('analysis_boards_items_label')||'issues')}
+    </div>`;
+
+  // Boards by owner
+  if (data.by_owner && data.by_owner.length > 0) {
+    html += `<h4 style="margin-bottom:8px">${t('analysis_boards_by_owner')||'Most Boards by Owner'}</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">#</th>
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">${t('analysis_name')||'Name'}</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">${t('analysis_boards_count')||'Boards'}</th>
+        </tr></thead><tbody>`;
+    data.by_owner.forEach((o, i) => {
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 10px">${i + 1}</td>
+        <td style="padding:4px 10px">${escHtml(o.name)}</td>
+        <td style="padding:4px 10px;text-align:right">${o.count}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  // Items per board
+  if (data.items_per_board && data.items_per_board.length > 0) {
+    html += `<h4 style="margin-top:16px;margin-bottom:8px">${t('analysis_boards_items_per_board')||'Issues per Board'}</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">${t('analysis_board_name')||'Board'}</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">${t('analysis_issues_count')||'Issues'}</th>
+        </tr></thead><tbody>`;
+    data.items_per_board.forEach(b => {
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 10px">${escHtml(b.board_name)}</td>
+        <td style="padding:4px 10px;text-align:right">${b.count}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+
+  container.innerHTML = html;
 }
 
