@@ -114,6 +114,16 @@ async function _loadStaffData() {
 
 // ── Render helpers ──────────────────────────────────────────────────────────
 
+function _staffMattermostLink(userId) {
+  const mmBase = (state.exercise || {}).mattermost_dm_url;
+  if (!mmBase) return '';
+  const user = (state.users || []).find(u => u.id === userId);
+  const handle = user ? (user.mattermost_handle || user.username) : '';
+  if (!handle) return '';
+  const cleanHandle = handle.replace(/^@/, '');
+  return `<a href="${escHtml(mmBase)}/@${escHtml(cleanHandle)}" target="_blank" rel="noopener" class="btn btn-sm" style="padding:2px 6px;font-size:11px;text-decoration:none" title="${t('staff_mm_dm')||'Mattermost DM'}">💬</a>`;
+}
+
 function _renderStaffDuties(duties) {
   const el = document.getElementById('staffDutyList');
   if (!el) return;
@@ -127,6 +137,7 @@ function _renderStaffDuties(duties) {
       <span style="flex:1">${escHtml(d.user_name || '-')}</span>
       ${d.start_time ? `<span style="font-size:11px;color:var(--text-muted)">${escHtml(d.start_time)} \u2013 ${escHtml(d.end_time||'')}</span>` : ''}
       ${d.note ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(d.note)}">\u{1F4DD}</span>` : ''}
+      ${_staffMattermostLink(d.user_id)}
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteDuty" data-arg="${d.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
     </div>`).join('');
   _bindActions(el);
@@ -146,6 +157,7 @@ function _renderStaffMembers(members) {
       <strong style="min-width:140px">${escHtml(posLabel)}</strong>
       <span style="flex:1">${escHtml(m.user_name || '-')}</span>
       ${m.note ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(m.note)}">\u{1F4DD}</span>` : ''}
+      ${_staffMattermostLink(m.user_id)}
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteMember" data-arg="${m.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
     </div>`;
   }).join('');
@@ -164,6 +176,7 @@ function _renderStaffAreas(areas) {
       <strong style="min-width:140px">${escHtml(a.name)}</strong>
       <span style="flex:1">${escHtml(a.assigned_name || '-')}</span>
       ${a.description ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(a.description)}">\u{1F4C4}</span>` : ''}
+      ${_staffMattermostLink(a.assigned_to)}
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditArea" data-arg="${a.id}" title="${t('btn_edit')||'Edit'}">\u270E</button>
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteArea" data-arg="${a.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
     </div>`).join('');

@@ -12,10 +12,11 @@ async function _openReferenceIndex() {
     checklist: t('ref_category_checklist') || 'Checklist',
     faq: t('ref_category_faq') || 'FAQ',
     objectives: t('ref_category_objectives') || 'Objectives',
+    presentation_material: t('ref_category_presentation_material') || 'Presentation Material',
     exercise_documents: t('ref_category_exercise_documents') || 'Exercise Documents',
     other: t('ref_category_other') || 'Other'
   };
-  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', exercise_documents:'#8E44AD', other:'#95A5A6' };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', other:'#95A5A6' };
   const langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',uk:'Українська',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
 
   let data;
@@ -352,14 +353,14 @@ async function _loadAndRenderReferences() {
   // Populate info area with category counts
   const infoArea = document.getElementById('refInfoArea');
   if (infoArea) {
-    const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', other:'#95A5A6' };
+    const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', other:'#95A5A6' };
     const catCounts = {};
     (state.references || []).forEach(r => {
       const c = r.category || 'other';
       catCounts[c] = (catCounts[c] || 0) + 1;
     });
     const total = (state.references || []).length;
-    const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','other'];
+    const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','presentation_material','exercise_documents','other'];
     const badges = catKeys.filter(k => catCounts[k]).map(k =>
       `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:${catColors[k]};color:#fff;margin-right:4px">${t('ref_category_'+k)||k} ${catCounts[k]}</span>`
     ).join('');
@@ -592,6 +593,7 @@ function _openReferenceUploadModal() {
             <option value="checklist">${t('ref_category_checklist') || 'Checklist'}</option>
             <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
+            <option value="presentation_material">${t('ref_category_presentation_material') || 'Presentation Material'}</option>
             <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
             <option value="other">${t('ref_category_other') || 'Other'}</option>
           </select>
@@ -635,8 +637,8 @@ function _openReferenceUploadModal() {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-close-ref-modal>${t('btn_cancel') || 'Cancel'}</button>
           <button class="btn btn-primary" id="btnDoUploadRef">${t('btn_save') || 'Save'}</button>
+          <button class="btn btn-secondary" data-close-ref-modal>${t('btn_cancel') || 'Cancel'}</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -850,7 +852,7 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
       <select id="refEditCategory" class="form-input">
-        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'exercise_documents',l:t('ref_category_exercise_documents')||'Exercise Documents'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
+        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'presentation_material',l:t('ref_category_presentation_material')||'Presentation Material'},{v:'exercise_documents',l:t('ref_category_exercise_documents')||'Exercise Documents'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
       </select>
       <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
@@ -864,8 +866,8 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditTags" class="form-input" value="${escHtml((ref.tags || []).join(', '))}">
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" data-close-overlay>${t('btn_cancel') || 'Cancel'}</button>
       <button class="btn btn-primary" id="btnSaveRefEdit">${t('btn_save') || 'Save'}</button>
+      <button class="btn btn-secondary" data-close-overlay>${t('btn_cancel') || 'Cancel'}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);

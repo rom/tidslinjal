@@ -49,6 +49,21 @@ async function saveEnrollSettings() {
   }
 }
 
+// ── Mattermost DM helpers ──────────────────────────────────────────────────
+async function saveMattermostDMPref() {
+  const url = (document.getElementById('prefMattermostDMURL') || {}).value || '';
+  const trimmed = url.trim().replace(/\/+$/, ''); // strip trailing slash
+  try {
+    const ex = state.exercise || {};
+    ex.mattermost_dm_url = trimmed;
+    const res = await api('PUT', '/api/exercise', ex);
+    if (res.ok) {
+      state.exercise = ex;
+      showNotification('success', t('notif_saved') || 'Saved');
+    } else { showError('Failed to save'); }
+  } catch (e) { showError('Failed to save: ' + e.message); }
+}
+
 // ── Webhook helpers ────────────────────────────────────────────────────────
 async function saveWebhookPref() {
   state.preferences.webhook_url  = document.getElementById('prefWebhookURL').value.trim();

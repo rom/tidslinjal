@@ -1505,6 +1505,29 @@ function renderSidebar() {
         </div>
       </div>
 
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">💬 ${t('settings_mattermost_dm')||'Mattermost Direct Messages'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('settings_mattermost_dm_desc')||'Configure the Mattermost DM base URL for the Staff Toolbox. Users with a Mattermost handle will get clickable DM links.'}
+        </p>
+        <div class="form-group" style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);color:var(--text-dim)">
+            ${t('settings_mattermost_dm_url')||'Mattermost DM Base URL'}
+            <span style="opacity:.55;font-style:italic;margin-left:4px">— team messages path without trailing slash or username</span>
+          </label>
+          <input type="url" id="prefMattermostDMURL" placeholder="https://mattermost.example.com/team/messages"
+            value="${escHtml((state.exercise && state.exercise.mattermost_dm_url) || '')}"
+            title="The base URL for Mattermost direct messages. The username (@handle) will be appended automatically."
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm)">
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px">
+            e.g. <code style="opacity:.7">https://mm.example.com/myteam/messages</code> — DM links become <code style="opacity:.7">…/messages/@username</code>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-secondary btn-sm" data-action="saveMattermostDMPref">${t('btn_save')||'Save'}</button>
+        </div>
+      </div>
+
       <div class="sidebar-section" id="oidcSettingsSection">
         <div class="sidebar-section-title">🔐 ${t('settings_oidc')||'Single Sign-On (OIDC)'}</div>
 

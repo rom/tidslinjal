@@ -1289,6 +1289,7 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     questionnaire_builtin_acknowledged: 'Edycja potwierdzona — zmiany utworzą nową kopię',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Dokumenty ćwiczenia',
 
     analysis_tab_overview: 'Przegląd',

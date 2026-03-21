@@ -1290,6 +1290,7 @@ admin_view: 'Administraatori vaade',
     questionnaire_builtin_acknowledged: 'Muutmine kinnitatud — muudatused loovad uue koopia',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Õppuse dokumendid',
 
     analysis_tab_overview: 'Ülevaade',

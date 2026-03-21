@@ -357,14 +357,29 @@ function _renderKanbanBoard() {
   _bindKanbanEvents();
   _setupKanbanDragScroll();
 
-  // Watch modal resize and adjust inner pane
+  // Watch modal resize and adjust inner pane to fill available space
   const boardModalEl = document.querySelector('#boardsModal .modal');
   if (boardModalEl && typeof ResizeObserver !== 'undefined') {
     const kanbanCols = boardModalEl.querySelector('.kanban-columns');
+    const outerWrap = kanbanCols ? kanbanCols.parentElement : null;
     new ResizeObserver(() => {
-      if (kanbanCols) {
-        const avail = boardModalEl.clientWidth - 40; // 20px padding each side
-        kanbanCols.style.width = avail > 0 ? avail + 'px' : '100%';
+      if (!kanbanCols) return;
+      const zoom = _boardsState.zoom || 1;
+      const avail = boardModalEl.clientWidth - 40; // 20px padding each side
+      if (avail > 0) {
+        // The outer scrollable wrapper should match modal width
+        if (outerWrap) outerWrap.style.width = avail + 'px';
+        // Kanban columns need width adjusted for zoom transform
+        kanbanCols.style.width = (avail / zoom) + 'px';
+        // Update column max-widths to fill space evenly
+        const cols = kanbanCols.querySelectorAll('.kanban-col:not(.kanban-col-collapsed)');
+        if (cols.length > 0) {
+          const colGap = 12;
+          const collapseWidth = kanbanCols.querySelectorAll('.kanban-col-collapsed').length * 52;
+          const colAvail = (avail / zoom) - collapseWidth - (cols.length - 1) * colGap - 20;
+          const perCol = Math.max(240, Math.floor(colAvail / cols.length));
+          cols.forEach(c => { c.style.maxWidth = perCol + 'px'; c.style.flex = '1 1 ' + perCol + 'px'; });
+        }
       }
     }).observe(boardModalEl);
   }

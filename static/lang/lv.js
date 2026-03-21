@@ -1290,6 +1290,7 @@ admin_view: 'Administrātora skats',
     questionnaire_builtin_acknowledged: 'Rediģēšana apstiprināta — izmaiņas izveidos jaunu kopiju',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Mācību dokumenti',
 
     analysis_tab_overview: 'Pārskats',
