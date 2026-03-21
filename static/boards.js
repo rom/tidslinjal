@@ -284,7 +284,7 @@ function _renderKanbanBoard() {
       for (const item of cItems) {
         const bgColor = item.color || 'var(--bg3)';
         const typeIcon = _itemTypeIcons[item.item_type] || '';
-        const priorityBadge = item.priority ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
+        const priorityBadge = item.priority && item.priority !== 'normal' ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
         // Due date display and urgency
         let dueDateHtml = '';
         if (item.due_date) {
@@ -619,7 +619,7 @@ function _openBoardItem(itemId) {
       <div style="display:flex;align-items:center;gap:6px">
         <strong>${t('board_priority')||'Priority'}:</strong>
         <select id="inlineItemPriority" class="input" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer;min-width:140px;appearance:auto">
-          <option value="" ${!item.priority?'selected':''}>— ${t('board_none')||'None'} —</option>
+          <option value="normal" ${!item.priority||item.priority==='normal'?'selected':''}>⚪ ${t('board_priority_normal')||'Normal'}</option>
           <option value="low" ${item.priority==='low'?'selected':''} style="color:#3498db">🔵 ${t('board_priority_low')||'Low'}</option>
           <option value="high" ${item.priority==='high'?'selected':''} style="color:#e67e22">🟠 ${t('board_priority_high')||'High'}</option>
           <option value="critical" ${item.priority==='critical'?'selected':''} style="color:#e74c3c">🔴 ${t('board_priority_critical')||'Critical'}</option>
@@ -802,7 +802,7 @@ function _showBoardItemHelp() {
     <h3>❓ ${t('board_item_help_title')||'How to Edit Items'}</h3>
     <div style="font-size:var(--fs-sm);line-height:1.6">
       <p><strong>${t('board_item_help_subject')||'Subject'}:</strong> ${t('board_item_help_subject_desc')||'Click the title field to edit the item name.'}</p>
-      <p><strong>${t('board_item_help_priority')||'Priority'}:</strong> ${t('board_item_help_priority_desc')||'Set priority to Low (blue), High (orange), or Critical (red). The card color changes automatically.'}</p>
+      <p><strong>${t('board_item_help_priority')||'Priority'}:</strong> ${t('board_item_help_priority_desc')||'Set priority: Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically.'}</p>
       <p><strong>${t('board_item_help_type')||'Type'}:</strong> ${t('board_item_help_type_desc')||'Choose the item type from the dropdown (Task, Meeting, Issue, etc.).'}</p>
       <p><strong>${t('board_item_help_responsible')||'Responsible'}:</strong> ${t('board_item_help_responsible_desc')||'Assign a team member who is responsible for this item.'}</p>
       <p><strong>${t('board_item_help_due')||'Due Date'}:</strong> ${t('board_item_help_due_desc')||'Set a deadline. Overdue items are highlighted in red on the board.'}</p>
