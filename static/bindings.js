@@ -24,7 +24,10 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#flagEN', 'click', function () { setPref('language', 'en'); });
   on('#flagSV', 'click', function () { setPref('language', 'sv'); });
   on('#flagFR', 'click', function () { setPref('language', 'fr'); });
+  on('#flagDE', 'click', function () { setPref('language', 'de'); });
+  on('#flagNL', 'click', function () { setPref('language', 'nl'); });
   on('#flagFI', 'click', function () { setPref('language', 'fi'); });
+  on('#flagIS', 'click', function () { setPref('language', 'is'); });
   on('#flagDA', 'click', function () { setPref('language', 'da'); });
   on('#flagNB', 'click', function () { setPref('language', 'nb'); });
   on('#flagET', 'click', function () { setPref('language', 'et'); });
@@ -191,6 +194,9 @@ document.addEventListener('DOMContentLoaded', function () {
   // ---------- Role editor modal ----------------------------------------------
   on('#btnAddNewRole', 'click', function () { addNewRoleRow(); });
   on('#btnSaveRoles',  'click', function () { saveRoles(); });
+  on('#btnResetRoleDefaults', 'click', function () { resetRoleDefaults(); });
+  on('#btnShowRoleChanges', 'click', function () { showRoleChanges(); });
+  on('#btnRoleEditorHelp', 'click', function () { roleEditorHelp(); });
 
   // ---------- Move event modal -----------------------------------------------
   on('#btnConfirmMove', 'click', function () { confirmMoveEvents(); });

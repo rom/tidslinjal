@@ -1581,8 +1581,12 @@ function _onBoardMentionKey(e, ta) {
   if (e.key === 'ArrowDown') { e.preventDefault(); _updateBoardMentionActive(items, Math.min(idx + 1, items.length - 1)); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); _updateBoardMentionActive(items, Math.max(idx - 1, 0)); }
   else if (e.key === 'Enter' || e.key === 'Tab') {
-    if (active) { e.preventDefault(); active.click(); }
-    else if (items.length === 1) { e.preventDefault(); items[0].click(); }
+    const target = active || (items.length === 1 ? items[0] : null);
+    if (target) {
+      e.preventDefault();
+      const username = target.dataset.username;
+      if (username) _insertBoardMention(username);
+    }
   }
   else if (e.key === 'Escape') { e.preventDefault(); _closeBoardMentionDropdown(); }
 }
@@ -1607,10 +1611,12 @@ function _showBoardMentionDropdown(ta, users) {
   users.forEach((u, i) => {
     const item = document.createElement('div');
     item.className = 'mention-item' + (i === 0 ? ' active' : '');
+    item.dataset.username = u.username;
     item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
     item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
     item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
     item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
+    item.addEventListener('click', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
     dd.appendChild(item);
   });
   // Append inside the board modal to avoid z-index/pointer-event issues with overlays
