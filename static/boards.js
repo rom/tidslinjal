@@ -122,8 +122,10 @@ function _renderBoardListModal() {
 }
 
 // ── Create Board Dialog ──
-function _openCreateBoardDialog() {
-  const groups = state.groups || [];
+async function _openCreateBoardDialog() {
+  // Fetch all groups (not just user's own) for board sharing
+  let groups = state.groups || [];
+  try { groups = await apiGet('/api/groups?all=true') || groups; } catch(e) {}
   let html = `<div style="max-width:500px">
     <h3>${t('board_new')||'New Board'}</h3>
     <label>${t('board_name')||'Name'}</label>
@@ -999,10 +1001,12 @@ async function _uploadBoardAttachment(itemId) {
 }
 
 // ── Board Settings ──
-function _openBoardSettings() {
+async function _openBoardSettings() {
   const board = _boardsState.activeBoard;
   if (!board) return;
-  const groups = state.groups || [];
+  // Fetch all groups (not just user's own) for board sharing
+  let groups = state.groups || [];
+  try { groups = await apiGet('/api/groups?all=true') || groups; } catch(e) {}
 
   const colColorPresets = [
     {label:'None',value:''},

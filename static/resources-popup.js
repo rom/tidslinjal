@@ -52,6 +52,13 @@ function apiDelete(url) {
   return fetch(url, { method: 'DELETE', credentials: 'include', headers: hdrs });
 }
 
+function apiPost(url, body) {
+  var hdrs = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+  var csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  if (csrfMatch) hdrs['X-CSRF-Token'] = csrfMatch[1];
+  return fetch(url, { method: 'POST', credentials: 'include', headers: hdrs, body: JSON.stringify(body) });
+}
+
 // Check current user role for edit/delete permissions
 var _currentUserRole = '';
 (function() {
@@ -288,16 +295,18 @@ function renderGroups(el) {
     html += '<div class="res-empty">No groups found</div>';
   } else {
     groups.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    groups.forEach(function(g) {
-      var memberCount = typeof g.member_count === 'number' ? g.member_count : (g.member_ids || g.members || []).length;
-      var createdAt = g.created_at ? new Date(g.created_at).toLocaleDateString() : '';
-      html += '<div class="res-card">' +
+    groups.forEach(function(g, idx) {
+      var memberCount = typeof g.member_count === 'number' ? g.member_count : 0;
+      var createdAt = g.created_at ? new Date(g.created_at).toLocaleDateString() + ' ' + new Date(g.created_at).toLocaleTimeString() : '';
+      var creatorName = g.created_by_name || (g.created_by === 0 ? 'System (SSO/auto)' : 'Unknown');
+      html += '<div class="res-card" style="cursor:pointer" data-group-idx="' + idx + '">' +
         '<div class="res-card-body">' +
           '<div class="res-card-name">' + escHtml(g.name) + '</div>' +
           '<div class="res-card-detail">' +
-            '<span class="res-badge">' + memberCount + ' member' + (memberCount !== 1 ? 's' : '') + '</span>' +
-            (createdAt ? ' &middot; Created: ' + createdAt : '') +
-            (g.description ? ' &middot; ' + escHtml(g.description) : '') +
+            '<span class="res-badge">👥 ' + memberCount + ' member' + (memberCount !== 1 ? 's' : '') + '</span>' +
+            ' &middot; Created by: ' + escHtml(creatorName) +
+            (createdAt ? ' &middot; ' + createdAt : '') +
+            (g.description ? '<br>' + escHtml(g.description) : '') +
           '</div>' +
         '</div>' +
       '</div>';
@@ -306,6 +315,121 @@ function renderGroups(el) {
 
   el.innerHTML = html;
   bindSearch();
+
+  // Bind click to expand group details
+  el.querySelectorAll('[data-group-idx]').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var idx = parseInt(card.dataset.groupIdx, 10);
+      var g = filterItems(_groups, ['name', 'description']);
+      g.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+      if (g[idx]) openGroupDetail(g[idx]);
+    });
+  });
+}
+
+// ── Group detail panel ──────────────────────────────────────────────────────
+function openGroupDetail(group) {
+  var el = document.getElementById('resContent');
+  el.innerHTML = '<div style="padding:8px;color:var(--text-dim)">Loading members…</div>';
+
+  Promise.all([
+    apiGet('/api/groups/' + group.id + '/members'),
+    apiGet('/api/users')
+  ]).then(function(results) {
+    var members = results[0] || [];
+    var allUsers = results[1] || [];
+    var userMap = {};
+    allUsers.forEach(function(u) { userMap[u.id] = u; });
+    var memberIDs = {};
+    members.forEach(function(m) { memberIDs[m.user_id] = true; });
+    var nonMembers = allUsers.filter(function(u) { return !memberIDs[u.id]; });
+
+    var createdAt = group.created_at ? new Date(group.created_at).toLocaleDateString() + ' ' + new Date(group.created_at).toLocaleTimeString() : 'Unknown';
+    var creatorName = group.created_by_name || (group.created_by === 0 ? 'System (SSO/auto)' : 'Unknown');
+
+    var html = '<div style="margin-bottom:12px">' +
+      '<button class="res-tab" id="backToGroups" style="margin-bottom:12px">&larr; Back to groups</button>' +
+      '<h3 style="margin:0 0 4px 0">' + escHtml(group.name) + '</h3>' +
+      (group.description ? '<div style="color:var(--text-dim);margin-bottom:4px">' + escHtml(group.description) + '</div>' : '') +
+      '<div style="font-size:12px;color:var(--text-dim)">' +
+        'Created by: <strong>' + escHtml(creatorName) + '</strong>' +
+        ' &middot; ' + createdAt +
+        ' &middot; ' + members.length + ' member' + (members.length !== 1 ? 's' : '') +
+      '</div>' +
+    '</div>';
+
+    // Members table
+    html += '<div style="font-weight:600;margin-bottom:6px">Members</div>';
+    if (members.length === 0) {
+      html += '<div style="color:var(--text-dim);font-size:13px;margin-bottom:12px">No members yet.</div>';
+    } else {
+      html += '<table class="res-table" style="margin-bottom:12px"><thead><tr>' +
+        '<th>Name</th><th>Username</th><th>Group Role</th>' +
+        (canEditResources() ? '<th style="width:40px"></th>' : '') +
+        '</tr></thead><tbody>';
+      members.forEach(function(m) {
+        var u = userMap[m.user_id];
+        var name = u ? (u.display_name || u.username) : 'User #' + m.user_id;
+        var uname = u ? u.username : '';
+        html += '<tr>' +
+          '<td>' + escHtml(name) + '</td>' +
+          '<td style="color:var(--text-dim)">' + escHtml(uname) + '</td>' +
+          '<td>' + escHtml(m.role || 'member') + '</td>' +
+          (canEditResources() ? '<td><button class="res-delete-btn" data-rm-member="' + m.user_id + '" title="Remove member" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--danger);padding:2px 6px">✕</button></td>' : '') +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+
+    // Add member form (admin/teamlead only)
+    if (canEditResources() && nonMembers.length > 0) {
+      html += '<div style="border-top:1px solid var(--border);padding-top:10px">' +
+        '<div style="font-weight:600;margin-bottom:6px">Add Member</div>' +
+        '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">' +
+          '<select id="resAddMemberUser" style="flex:1;min-width:120px;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text)">' +
+            nonMembers.map(function(u) { return '<option value="' + u.id + '">' + escHtml(u.display_name || u.username) + '</option>'; }).join('') +
+          '</select>' +
+          '<select id="resAddMemberRole" style="padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text)">' +
+            '<option value="member">Member</option>' +
+            '<option value="admin">Admin</option>' +
+          '</select>' +
+          '<button id="resAddMemberBtn" style="padding:4px 12px;border-radius:4px;background:var(--primary);color:#fff;border:none;cursor:pointer">Add</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    el.innerHTML = html;
+
+    // Back button
+    document.getElementById('backToGroups').addEventListener('click', function() {
+      _activeTab = 'groups';
+      renderContent();
+    });
+
+    // Remove member buttons
+    el.querySelectorAll('[data-rm-member]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (!confirm('Remove this member from the group?')) return;
+        apiDelete('/api/groups/' + group.id + '/members/' + btn.dataset.rmMember).then(function(res) {
+          if (res.ok) { loadAll().then(function() { openGroupDetail(group); }); }
+          else { alert('Failed to remove member'); }
+        });
+      });
+    });
+
+    // Add member button
+    var addBtn = document.getElementById('resAddMemberBtn');
+    if (addBtn) {
+      addBtn.addEventListener('click', function() {
+        var userId = parseInt(document.getElementById('resAddMemberUser').value, 10);
+        var role = document.getElementById('resAddMemberRole').value;
+        apiPost('/api/groups/' + group.id + '/members', { user_id: userId, role: role }).then(function(res) {
+          if (res.ok) { loadAll().then(function() { openGroupDetail(group); }); }
+          else { alert('Failed to add member'); }
+        });
+      });
+    }
+  });
 }
 
 function renderRoomsByType(el, roomType) {

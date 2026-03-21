@@ -9,6 +9,22 @@ import (
 
 // ── User management handlers ───────────────────────────────────────────────────
 
+// validRolesSet returns the set of all valid role keys: built-in + custom roles from the store.
+func (app *App) validRolesSet() map[Role]bool {
+	m := map[Role]bool{
+		RoleObserver: true, RoleRead: true, RoleReporter: true,
+		RoleReadWrite: true, RoleTeamLead: true, RoleDeputyTeamLead: true,
+		RoleOpLead: true, RoleDeputyOpLead: true,
+		RoleStaffOfficer: true, RoleStaffAssistant: true, RoleStaffOfficerFull: true,
+		RoleAdmin: true,
+	}
+	// Include custom roles from the role editor
+	for _, rc := range app.store.GetRoleConfigs() {
+		m[Role(rc.Key)] = true
+	}
+	return m
+}
+
 func (app *App) handleGetUsers(w http.ResponseWriter, r *http.Request, user *User) {
 	users := app.store.GetUsers()
 	pub := make([]UserPublic, len(users))
@@ -50,16 +66,9 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	validRoles := map[Role]bool{
-		RoleObserver: true, RoleRead: true, RoleReporter: true,
-		RoleReadWrite: true, RoleTeamLead: true, RoleDeputyTeamLead: true,
-		RoleOpLead: true, RoleDeputyOpLead: true,
-		RoleStaffOfficer: true, RoleStaffAssistant: true, RoleStaffOfficerFull: true,
-		RoleAdmin: true,
-	}
 	if req.Role == "" {
 		req.Role = RoleRead
-	} else if !validRoles[req.Role] {
+	} else if !app.validRolesSet()[req.Role] {
 		jsonError(w, "invalid role", http.StatusBadRequest)
 		return
 	}
@@ -165,15 +174,8 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	if hasRole(user.Role, RoleAdmin) {
 		if req.Role != "" {
-			// V-12 fix: validate role against allowed whitelist (same as handleCreateUser)
-			validRoles := map[Role]bool{
-				RoleObserver: true, RoleRead: true, RoleReporter: true,
-				RoleReadWrite: true, RoleTeamLead: true, RoleDeputyTeamLead: true,
-				RoleOpLead: true, RoleDeputyOpLead: true,
-				RoleStaffOfficer: true, RoleStaffAssistant: true, RoleStaffOfficerFull: true,
-				RoleAdmin: true,
-			}
-			if !validRoles[req.Role] {
+			// V-12 fix: validate role against allowed whitelist (built-in + custom roles)
+			if !app.validRolesSet()[req.Role] {
 				jsonError(w, "invalid role", http.StatusBadRequest)
 				return
 			}

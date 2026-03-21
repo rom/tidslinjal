@@ -11,7 +11,9 @@ import (
 
 func (app *App) handleGetGroups(w http.ResponseWriter, r *http.Request, user *User) {
 	var groups []Group
-	if hasRole(user.Role, RoleAdmin) {
+	// ?all=true allows team leads and above to see all groups (for board sharing, etc.)
+	showAll := r.URL.Query().Get("all") == "true" && hasRole(user.Role, RoleTeamLead)
+	if hasRole(user.Role, RoleAdmin) || showAll {
 		groups = app.store.GetGroups()
 	} else {
 		// Non-admins see only groups they're members of
@@ -25,17 +27,24 @@ func (app *App) handleGetGroups(w http.ResponseWriter, r *http.Request, user *Us
 	if groups == nil {
 		groups = []Group{}
 	}
-	// Enrich with member counts
+	// Enrich with member counts and creator info
 	type groupWithCount struct {
 		Group
-		MemberCount int `json:"member_count"`
+		MemberCount int    `json:"member_count"`
+		CreatedByName string `json:"created_by_name,omitempty"`
 	}
 	enriched := make([]groupWithCount, len(groups))
 	for i, g := range groups {
-		enriched[i] = groupWithCount{
+		gwc := groupWithCount{
 			Group:       g,
 			MemberCount: len(app.store.GetGroupMembers(g.ID)),
 		}
+		if g.CreatedBy == 0 {
+			gwc.CreatedByName = "System (SSO/auto)"
+		} else if u, ok := app.store.GetUserByID(g.CreatedBy); ok {
+			gwc.CreatedByName = u.DisplayName
+		}
+		enriched[i] = gwc
 	}
 	jsonOK(w, enriched)
 }
