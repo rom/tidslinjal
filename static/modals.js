@@ -986,34 +986,221 @@ async function deleteAPIKey(id) {
 }
 
 // ── Connectors list UI ──────────────────────────────────────────────────────
+const _connectorTypes = [
+  { name: 'google_calendar', label: 'Google Calendar', icon: '📅', fields: [
+    { key: 'credentials_json', label: 'Service Account JSON', type: 'textarea', placeholder: 'Paste service account JSON key' },
+    { key: 'calendar_id', label: 'Calendar ID', type: 'text', placeholder: 'primary or calendar@group.calendar.google.com' },
+    { key: 'poll_interval_sec', label: 'Poll Interval (seconds)', type: 'number', placeholder: '300' },
+  ]},
+  { name: 'github_gitlab', label: 'GitHub / GitLab', icon: '🐙', fields: [
+    { key: 'provider', label: 'Provider', type: 'select', options: ['github', 'gitlab'] },
+    { key: 'base_url', label: 'API Base URL', type: 'text', placeholder: 'https://api.github.com' },
+    { key: 'token', label: 'Access Token', type: 'password', placeholder: 'ghp_...' },
+    { key: 'owner', label: 'Owner / Namespace', type: 'text', placeholder: 'org-or-user' },
+    { key: 'repo', label: 'Repository', type: 'text', placeholder: 'repo-name' },
+    { key: 'sync_commits', label: 'Sync Commits', type: 'checkbox' },
+    { key: 'sync_issues', label: 'Sync Issues', type: 'checkbox' },
+    { key: 'sync_pull_requests', label: 'Sync Pull Requests', type: 'checkbox' },
+  ]},
+  { name: 'jira', label: 'Jira', icon: '🔧', fields: [
+    { key: 'base_url', label: 'Jira Base URL', type: 'text', placeholder: 'https://yourteam.atlassian.net' },
+    { key: 'email', label: 'Email', type: 'text', placeholder: 'user@example.com' },
+    { key: 'api_token', label: 'API Token', type: 'password', placeholder: 'API token from Jira' },
+    { key: 'project_key', label: 'Project Key', type: 'text', placeholder: 'PROJ' },
+    { key: 'jql', label: 'JQL Filter (optional)', type: 'text', placeholder: 'status changed after -1d' },
+  ]},
+  { name: 'stix_taxii', label: 'STIX / TAXII', icon: '🛡', fields: [
+    { key: 'taxii_url', label: 'TAXII Server URL', type: 'text', placeholder: 'https://taxii.example.com/taxii2/' },
+    { key: 'collection_id', label: 'Collection ID', type: 'text', placeholder: 'collection-uuid' },
+    { key: 'api_key', label: 'API Key (optional)', type: 'password', placeholder: '' },
+    { key: 'username', label: 'Username (optional)', type: 'text', placeholder: '' },
+    { key: 'password', label: 'Password (optional)', type: 'password', placeholder: '' },
+  ]},
+  { name: 'ldap', label: 'LDAP / Active Directory', icon: '👥', fields: [
+    { key: 'server_url', label: 'LDAP Server URL', type: 'text', placeholder: 'ldap://ldap.example.com:389' },
+    { key: 'bind_dn', label: 'Bind DN', type: 'text', placeholder: 'cn=admin,dc=example,dc=com' },
+    { key: 'bind_password', label: 'Bind Password', type: 'password', placeholder: '' },
+    { key: 'base_dn', label: 'Search Base DN', type: 'text', placeholder: 'ou=users,dc=example,dc=com' },
+    { key: 'user_filter', label: 'User Filter', type: 'text', placeholder: '(objectClass=person)' },
+  ]},
+  { name: 'nato_adatp3', label: 'NATO ADatP-3 / MIP', icon: '🎖', fields: [
+    { key: 'endpoint_url', label: 'Endpoint URL', type: 'text', placeholder: 'https://mip-gateway.example.com/adatp3' },
+    { key: 'certificate_path', label: 'Client Certificate Path', type: 'text', placeholder: '/path/to/cert.pem' },
+    { key: 'key_path', label: 'Client Key Path', type: 'text', placeholder: '/path/to/key.pem' },
+    { key: 'community_of_interest', label: 'Community of Interest', type: 'text', placeholder: '' },
+  ]},
+];
+
 async function _loadConnectorList() {
   const listEl = document.getElementById('connectorList');
   if (!listEl) return;
-  // Connector management requires admin role
   if (state.user?.role !== 'admin') {
     listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('connectors_admin_only')||'Connector configuration is available to administrators only.'}</p>`;
     return;
   }
   try {
     const configs = await apiGet('/api/integrations/connectors');
-    if (!configs || !configs.length) {
-      listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('connectors_none')||'No connectors configured. Available connectors: Google Calendar, STIX/TAXII, RSS, Generic Webhook.'}</p>`;
-      return;
+    let html = '';
+    if (configs && configs.length) {
+      html += configs.map(c => {
+        const cType = _connectorTypes.find(ct => ct.name === c.name);
+        const icon = cType ? cType.icon : '🔌';
+        const label = cType ? cType.label : c.name;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">${icon}</span>
+            <div>
+              <strong style="font-size:var(--fs-sm)">${escHtml(label)}</strong>
+              <span style="color:${c.enabled ? 'var(--accent)' : 'var(--text-dim)'};font-size:var(--fs-xs);margin-left:6px">${c.enabled ? '● Active' : '○ Disabled'}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm btn-secondary" data-action="_editConnector" data-arg="${escHtml(c.name)}" title="Configure">⚙</button>
+            <button class="btn btn-sm ${c.enabled ? 'btn-danger' : 'btn-secondary'}" data-action="toggleConnector" data-arg="${escHtml(c.name)}">
+              ${c.enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      html += `<p style="color:var(--text-dim);font-size:var(--fs-xs);margin-bottom:8px">${t('connectors_none')||'No connectors configured.'}</p>`;
     }
-    listEl.innerHTML = configs.map(c => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
-        <div>
-          <strong style="font-size:var(--fs-sm)">${escHtml(c.name)}</strong>
-          <span style="color:${c.enabled ? 'var(--accent)' : 'var(--text-dim)'};font-size:var(--fs-xs);margin-left:6px">${c.enabled ? '● Active' : '○ Disabled'}</span>
-        </div>
-        <button class="btn btn-sm ${c.enabled ? 'btn-danger' : 'btn-secondary'}" data-action="toggleConnector" data-arg="${c.name}">
-          ${c.enabled ? 'Disable' : 'Enable'}
-        </button>
+    // Add connector button with dropdown
+    html += `<div style="margin-top:8px">
+      <button class="btn btn-sm btn-secondary" data-action="_showAddConnectorMenu" id="addConnectorBtn">+ ${t('connector_add')||'Add Connector'}</button>
+      <div id="addConnectorMenu" style="display:none;margin-top:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:4px;max-width:280px">
+        ${_connectorTypes.map(ct => `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:var(--radius)" class="connector-type-option"
+            data-action="_addConnector" data-arg="${ct.name}">
+            <span style="font-size:16px">${ct.icon}</span>
+            <span style="font-size:var(--fs-sm)">${escHtml(ct.label)}</span>
+          </div>
+        `).join('')}
       </div>
-    `).join('');
+    </div>`;
+    listEl.innerHTML = html;
     _bindActions(listEl);
   } catch {
     listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load connectors.</p>';
+  }
+}
+
+function _showAddConnectorMenu() {
+  const menu = document.getElementById('addConnectorMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+}
+
+async function _addConnector(typeName) {
+  const menu = document.getElementById('addConnectorMenu');
+  if (menu) menu.style.display = 'none';
+  const cType = _connectorTypes.find(ct => ct.name === typeName);
+  if (!cType) return;
+  // Create a new connector config with defaults
+  const cfg = { name: typeName, enabled: false, config: {} };
+  try {
+    await apiPut('/api/integrations/connectors', cfg);
+    showNotification('success', `${cType.label} connector added`);
+    await _loadConnectorList();
+    // Open config editor
+    _editConnector(typeName);
+  } catch (e) {
+    showError('Failed to add connector');
+  }
+}
+
+async function _editConnector(name) {
+  const cType = _connectorTypes.find(ct => ct.name === name);
+  if (!cType) { showError('Unknown connector type'); return; }
+  let configs;
+  try {
+    configs = await apiGet('/api/integrations/connectors');
+  } catch { configs = []; }
+  const cfg = (configs || []).find(c => c.name === name);
+  const cfgData = cfg && cfg.config ? (typeof cfg.config === 'string' ? JSON.parse(cfg.config) : cfg.config) : {};
+
+  let fieldsHtml = cType.fields.map(f => {
+    const val = cfgData[f.key] || '';
+    if (f.type === 'textarea') {
+      return `<div style="margin-bottom:6px">
+        <label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(f.label)}</label>
+        <textarea id="conn_${f.key}" class="input" rows="3" style="width:100%;font-size:var(--fs-xs);resize:vertical" placeholder="${escHtml(f.placeholder||'')}">${escHtml(typeof val === 'string' ? val : JSON.stringify(val, null, 2))}</textarea>
+      </div>`;
+    }
+    if (f.type === 'select') {
+      return `<div style="margin-bottom:6px">
+        <label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(f.label)}</label>
+        <select id="conn_${f.key}" class="input" style="width:100%;font-size:var(--fs-xs)">
+          ${f.options.map(o => `<option value="${escHtml(o)}" ${val === o ? 'selected' : ''}>${escHtml(o)}</option>`).join('')}
+        </select>
+      </div>`;
+    }
+    if (f.type === 'checkbox') {
+      return `<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="conn_${f.key}" ${val ? 'checked' : ''}>
+        <label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(f.label)}</label>
+      </div>`;
+    }
+    return `<div style="margin-bottom:6px">
+      <label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(f.label)}</label>
+      <input type="${f.type || 'text'}" id="conn_${f.key}" class="input" style="width:100%;font-size:var(--fs-xs)" value="${escHtml(String(val))}" placeholder="${escHtml(f.placeholder||'')}">
+    </div>`;
+  }).join('');
+
+  const html = `<div style="max-width:500px">
+    <h3>${cType.icon} ${escHtml(cType.label)} — ${t('connector_config')||'Configuration'}</h3>
+    <div style="margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="connEnabled" ${cfg && cfg.enabled ? 'checked' : ''}>
+      <label style="font-size:var(--fs-sm)">${t('connector_enabled')||'Enabled'}</label>
+    </div>
+    ${fieldsHtml}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_saveConnectorConfig" data-arg="${escHtml(name)}">✔ ${t('connector_save')||'Save'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="closeModal" data-arg="connectorConfigModal">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+
+  let overlay = document.getElementById('connectorConfigModal');
+  if (overlay) overlay.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    `<div class="modal-overlay" id="connectorConfigModal"><div class="modal" style="width:520px;max-width:96vw;padding:20px">${html}</div></div>`);
+  const el = document.getElementById('connectorConfigModal');
+  if (el) {
+    void el.offsetHeight;
+    el.classList.add('open');
+    el.addEventListener('click', function(e) { if (e.target === el) closeModal('connectorConfigModal'); });
+    if (typeof _bindActions === 'function') _bindActions(el);
+  }
+}
+
+async function _saveConnectorConfig(name) {
+  const cType = _connectorTypes.find(ct => ct.name === name);
+  if (!cType) return;
+  const config = {};
+  for (const f of cType.fields) {
+    const el = document.getElementById('conn_' + f.key);
+    if (!el) continue;
+    if (f.type === 'checkbox') {
+      config[f.key] = el.checked;
+    } else if (f.type === 'number') {
+      config[f.key] = parseInt(el.value) || 0;
+    } else if (f.type === 'textarea' && f.key.endsWith('_json')) {
+      try { config[f.key] = JSON.parse(el.value); } catch { config[f.key] = el.value; }
+    } else {
+      config[f.key] = el.value;
+    }
+  }
+  const enabled = document.getElementById('connEnabled')?.checked || false;
+  try {
+    const res = await apiPut('/api/integrations/connectors', { name, enabled, config });
+    if (res.ok) {
+      showNotification('success', `${cType.label} configuration saved`);
+      closeModal('connectorConfigModal');
+      await _loadConnectorList();
+    } else {
+      showError('Failed to save connector configuration');
+    }
+  } catch {
+    showError('Failed to save connector configuration');
   }
 }
 

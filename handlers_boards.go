@@ -1099,3 +1099,65 @@ func (app *App) handleGetBoardDueItems(w http.ResponseWriter, r *http.Request, u
 	jsonOK(w, dueItems)
 }
 
+// ── Archive / Unarchive Board Items ─────────────────────────────────────────
+
+func (app *App) handleArchiveBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	item.Archived = true
+	item.UpdatedAt = time.Now()
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "archive failed", http.StatusInternalServerError)
+		return
+	}
+	_ = app.store.AddBoardItemHistory(id, BoardHistory{
+		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
+		Action: "archived", Detail: "Item archived",
+	})
+	app.broadcastBoardChange("board_item_archived", item.BoardID)
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+func (app *App) handleUnarchiveBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	item.Archived = false
+	item.UpdatedAt = time.Now()
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "unarchive failed", http.StatusInternalServerError)
+		return
+	}
+	_ = app.store.AddBoardItemHistory(id, BoardHistory{
+		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
+		Action: "unarchived", Detail: "Item unarchived",
+	})
+	app.broadcastBoardChange("board_item_unarchived", item.BoardID)
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+

@@ -1781,3 +1781,6 @@ body.light-mode { --danger: #c0392b; }
 .event-block { touch-action: none; }
 .tl-time-label { touch-action: none; }
 .tl-corner { touch-action: none; }
+
+/* Connector type option hover */
+.connector-type-option:hover { background: var(--bg2); }

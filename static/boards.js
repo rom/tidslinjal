@@ -210,9 +210,11 @@ function _renderKanbanBoard() {
   const items = _boardsState.items;
   if (!board) return;
 
+  const archivedItems = items.filter(i => i.archived);
+  const activeItems = items.filter(i => !i.archived);
   const colItems = {};
   for (const col of board.columns) colItems[String(col.id)] = [];
-  for (const item of items) {
+  for (const item of activeItems) {
     const cid = String(item.column_id);
     if (!colItems[cid]) colItems[cid] = [];
     colItems[cid].push(item);
@@ -276,6 +278,7 @@ function _renderKanbanBoard() {
           <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(col.name)} (${cItems.length})</strong>
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_addItemToCol" data-arg="${col.id}" title="${t('board_add_item')||'Add item'}">+</button>
+            ${cItems.length > 0 ? `<button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_archiveColumnItems" data-arg="${col.id}" title="${t('board_archive_col')||'Archive all items in this column'}">📦</button>` : ''}
             <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_toggleColCollapse" data-arg="${col.id}" title="${t('board_collapse')||'Collapse'}">−</button>
           </div>
         </div>
@@ -319,7 +322,31 @@ function _renderKanbanBoard() {
       html += `</div></div>`;
     }
   }
-  html += `</div></div>`;
+  html += `</div>`;
+
+  // Archived items section
+  if (archivedItems.length > 0) {
+    html += `<details style="margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);padding:8px 12px">
+      <summary style="cursor:pointer;font-size:var(--fs-sm);font-weight:600;color:var(--text-dim)">📦 ${t('board_archived')||'Archived'} (${archivedItems.length})</summary>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">`;
+    for (const item of archivedItems) {
+      const typeIcon = _itemTypeIcons[item.item_type] || '';
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
+        <div style="flex:1;min-width:0">
+          <span>${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</span>
+          <span style="color:var(--text-dim);margin-left:8px">#${item.id}</span>
+          ${item.responsible_name ? `<span style="color:var(--text-dim);margin-left:8px">— ${escHtml(item.responsible_name)}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-sm" style="font-size:10px;padding:1px 6px" data-action="_unarchiveBoardItem" data-arg="${item.id}" title="${t('board_unarchive')||'Unarchive'}">↩</button>
+          <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete'}">🗑</button>
+        </div>
+      </div>`;
+    }
+    html += `</div></details>`;
+  }
+
+  html += `</div>`;
 
   // Adjust width to number of columns: ~280px per column + padding, capped at 95vw
   const visibleCols = board.columns.filter(c => !c.collapsed).length;
@@ -573,7 +600,7 @@ function _openBoardItem(itemId) {
   let html = `<div style="max-width:720px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0;flex:1;min-width:0">#${item.id}
-        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:80%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:80%;border-radius:var(--radius)" value="${escHtml(item.subject)}">
       </h3>
       <div style="display:flex;gap:6px;align-items:center;margin-right:32px;flex-shrink:0">
         <button class="btn btn-sm btn-secondary" data-action="_showBoardItemHelp" title="${t('board_item_help')||'Help'}" style="min-width:32px;height:28px;padding:4px 8px">❓</button>
@@ -613,7 +640,7 @@ function _openBoardItem(itemId) {
       <div style="display:flex;align-items:center;gap:6px">
         <strong>📅 ${t('board_due_date')||'Due Date'}:</strong>
         <input id="inlineItemDueDate" type="date" class="input" value="${escHtml(item.due_date||'')}" style="font-size:var(--fs-sm);padding:3px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer">
-        ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemDueDate').value='';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
+        ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemDueDate" data-arg="${item.id}">✖</button>` : ''}
       </div>
 
       <div style="display:flex;align-items:center;gap:6px">
@@ -629,8 +656,8 @@ function _openBoardItem(itemId) {
 
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <strong style="font-size:var(--fs-sm)">${t('board_color')||'Color'}:</strong>
-      <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" onchange="_inlineSaveBoardItem(${item.id})">
-      ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemColor').value='#1a1a2e';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
+      <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" data-board-item-id="${item.id}">
+      ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemColor" data-arg="${item.id}">✖</button>` : ''}
     </div>
 
     <div style="margin-bottom:10px">
@@ -653,7 +680,7 @@ function _openBoardItem(itemId) {
     const link = item.links[li];
     html += `<div class="board-link-row" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:var(--fs-xs)">
       <a href="${escHtml(link.url)}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(link.label || link.url)}</a>
-      <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;color:var(--danger)" onclick="this.parentElement.remove()">✖</button>
+      <button class="btn btn-sm board-link-remove" style="font-size:9px;padding:1px 4px;color:var(--danger)">✖</button>
     </div>`;
   }
   html += `</div>
@@ -709,12 +736,28 @@ function _openBoardItem(itemId) {
   html += `</div></details>
 
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn btn-sm" style="margin-right:auto;color:var(--text-dim)" data-action="_archiveBoardItem" data-arg="${item.id}">📦 ${t('board_archive')||'Archive'}</button>
       <button class="btn btn-primary" data-action="_saveBoardItemAndClose" data-arg="${item.id}">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary" data-action="_cancelBoardItem">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
 
   _boardModal('boardItemModal', html, '720px');
+
+  // Bind events for elements that used to have inline handlers (CSP compliance)
+  const subjectEl = document.getElementById('inlineItemSubject');
+  if (subjectEl) {
+    subjectEl.addEventListener('focus', function() { this.style.borderColor='var(--accent)'; this.style.background='var(--bg3)'; });
+    subjectEl.addEventListener('blur', function() { this.style.borderColor='transparent'; this.style.background='transparent'; });
+  }
+  const colorEl = document.getElementById('inlineItemColor');
+  if (colorEl) {
+    colorEl.addEventListener('change', function() { _inlineSaveBoardItem(parseInt(this.dataset.boardItemId)); });
+  }
+  // Bind link remove buttons
+  document.querySelectorAll('#boardItemLinks .board-link-remove').forEach(function(btn) {
+    btn.addEventListener('click', function() { btn.parentElement.remove(); });
+  });
 
   // Setup tag autocomplete on inline tags input
   _loadBoardTags().then(() => {
@@ -754,7 +797,8 @@ function _addBoardItemLink() {
   row.className = 'board-link-row';
   row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:var(--fs-xs)';
   row.innerHTML = `<a href="${escHtml(url)}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label || url)}</a>
-    <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;color:var(--danger)" onclick="this.parentElement.remove()">✖</button>`;
+    <button class="btn btn-sm board-link-remove" style="font-size:9px;padding:1px 4px;color:var(--danger)">✖</button>`;
+  row.querySelector('.board-link-remove').addEventListener('click', function() { row.remove(); });
   row.dataset.url = url;
   row.dataset.label = label;
   container.appendChild(row);
@@ -864,6 +908,19 @@ function _formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// CSP-compliant action handlers for board item detail
+function _clearBoardItemDueDate(itemId) {
+  const el = document.getElementById('inlineItemDueDate');
+  if (el) el.value = '';
+  _inlineSaveBoardItem(itemId);
+}
+
+function _clearBoardItemColor(itemId) {
+  const el = document.getElementById('inlineItemColor');
+  if (el) el.value = '#1a1a2e';
+  _inlineSaveBoardItem(itemId);
 }
 
 async function _doEditBoardItem(itemId) {
@@ -1089,31 +1146,108 @@ function _boardZoomReset() {
   _renderKanbanBoard();
 }
 
+// ── Archive ──
+async function _archiveBoardItem(itemId) {
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/archive', {});
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+async function _unarchiveBoardItem(itemId) {
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/unarchive', {});
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
+async function _archiveColumnItems(colId) {
+  const board = _boardsState.activeBoard;
+  if (!board) return;
+  const colItems = _boardsState.items.filter(i => !i.archived && String(i.column_id) === String(colId));
+  if (!colItems.length) return;
+  const colName = (board.columns.find(c => String(c.id) === String(colId)) || {}).name || colId;
+  if (!confirm((t('board_archive_col_confirm') || 'Archive all %n items in "%s"?').replace('%n', colItems.length).replace('%s', colName))) return;
+  try {
+    for (const item of colItems) {
+      await _boardApi('POST', '/board-items/' + item.id + '/archive', {});
+    }
+    const items = await _boardApi('GET', '/boards/' + board.id + '/items');
+    _boardsState.items = items;
+    _renderKanbanBoard();
+  } catch (e) { alert(e.message); }
+}
+
 // ── Print ──
 function _printBoard() {
   window.print();
 }
 
 // ── Detach board into a new window ──
+let _boardPopout = null;
+let _boardPopoutMonitor = null;
+
 function _detachBoard() {
   const board = _boardsState.activeBoard;
   if (!board) return;
-  const w = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=no,status=no');
-  if (!w) { alert('Popup blocked. Please allow popups for this site.'); return; }
-  const modalEl = document.querySelector('#boardsModal .modal');
-  const content = modalEl ? modalEl.innerHTML : '';
-  w.document.write(`<!DOCTYPE html><html><head><title>${escHtml(board.name)} — Board</title>
+
+  if (_boardPopout && !_boardPopout.closed) {
+    _boardPopout.focus();
+    return;
+  }
+
+  const w = Math.min(window.screen.availWidth, 1200);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _boardPopout = window.open('', 'tidslinjal-board',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (!_boardPopout) { alert('Popup blocked. Please allow popups for this site.'); return; }
+
+  // Always use dark theme for detached board window
+  _boardPopout.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>${escHtml(board.name)} — Board</title>
     <link rel="stylesheet" href="/static/style.css">
-    <style>body{padding:20px;background:var(--bg1);color:var(--text);font-family:inherit;overflow:auto}
-    .modal-close{display:none}</style></head>
-    <body>${content}
+    <style>
+      body { margin:0; padding:16px; font-family:"Segoe UI",system-ui,sans-serif; overflow:auto; }
+      .modal-close { display:none; }
+      .kanban-card { transition: transform 0.1s ease; }
+      .kanban-card:hover { transform: translateY(-1px); }
+      #boardContainer { min-height: 90vh; }
+    </style>
+  </head><body class="dark">
+    <div id="boardContainer">
+      <div style="text-align:center;padding:40px;color:var(--text-dim)">Loading board…</div>
+    </div>
     <script src="/static/i18n.js"><\/script>
+    <script src="/static/utils.js"><\/script>
+    <script src="/static/api.js"><\/script>
     <script src="/static/boards.js"><\/script>
     <script>
+      // Bridge state from opener
       window.state = window.opener && window.opener.state ? window.opener.state : {};
-      function escHtml(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-    <\/script></body></html>`);
-  w.document.close();
+      window._detachedBoardMode = true;
+      // Load the board
+      (function() {
+        const boardId = ${board.id};
+        if (typeof _openBoard === 'function') {
+          _openBoard(boardId);
+        }
+      })();
+    <\/script>
+  </body></html>`);
+  _boardPopout.document.close();
+
+  if (_boardPopoutMonitor) clearInterval(_boardPopoutMonitor);
+  _boardPopoutMonitor = setInterval(() => {
+    if (!_boardPopout || _boardPopout.closed) {
+      clearInterval(_boardPopoutMonitor);
+      _boardPopoutMonitor = null;
+      _boardPopout = null;
+    }
+  }, 1000);
 }
 
 // ── Export ──
@@ -1325,8 +1459,11 @@ function _setupTagAutocomplete(inputEl) {
       inputEl.parentNode.appendChild(acDiv);
     }
     acDiv.innerHTML = _tagMatches.map((tag, i) =>
-      `<div class="tag-ac-item${i===0?' active':''}" style="padding:4px 8px;cursor:pointer;font-size:var(--fs-xs)" onmousedown="_selectTag(this,'${escHtml(tag)}')">${escHtml(tag)}</div>`
+      `<div class="tag-ac-item${i===0?' active':''}" style="padding:4px 8px;cursor:pointer;font-size:var(--fs-xs)" data-tag="${escHtml(tag)}">${escHtml(tag)}</div>`
     ).join('');
+    acDiv.querySelectorAll('.tag-ac-item').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) { e.preventDefault(); _doSelectTag(inputEl, el.dataset.tag); hideSuggestions(); });
+    });
   }
 
   function hideSuggestions() {
@@ -1397,7 +1534,7 @@ function _setupBoardMentionAutocomplete(textarea) {
   textarea.addEventListener('blur', () => { setTimeout(_closeBoardMentionDropdown, 150); });
 }
 
-function _onBoardMentionInput(ta) {
+async function _onBoardMentionInput(ta) {
   const val = ta.value;
   const pos = ta.selectionStart;
   let start = pos - 1;
@@ -1406,6 +1543,13 @@ function _onBoardMentionInput(ta) {
   _boardMentionStart = start;
   _boardMentionTextarea = ta;
   const query = val.slice(start + 1, pos).toLowerCase();
+  // Ensure users are loaded (may be empty on first access)
+  if (!state.users || !state.users.length) {
+    try {
+      const users = await (typeof apiGet === 'function' ? apiGet('/api/users') : _boardApi('GET', '/users'));
+      if (users && users.length) state.users = users;
+    } catch { /* ignore */ }
+  }
   const users = (state.users || []).filter(u =>
     (u.username && u.username.toLowerCase().includes(query)) ||
     (u.display_name && u.display_name.toLowerCase().includes(query))
@@ -1440,7 +1584,7 @@ function _showBoardMentionDropdown(ta, users) {
   dd.id = 'boardMentionDropdown';
   _boardMentionDropdown = dd;
   Object.assign(dd.style, {
-    position: 'fixed', zIndex: '9999', background: 'var(--bg2)',
+    position: 'fixed', zIndex: '10000', background: 'var(--bg2)',
     border: '1px solid var(--border)', borderRadius: 'var(--radius)',
     boxShadow: '0 4px 12px rgba(0,0,0,.3)', minWidth: '180px', maxHeight: '200px',
     overflowY: 'auto', left: rect.left + 'px', top: (rect.bottom + 2) + 'px'
@@ -1454,7 +1598,9 @@ function _showBoardMentionDropdown(ta, users) {
     item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
     dd.appendChild(item);
   });
-  document.body.appendChild(dd);
+  // Append inside the board modal to avoid z-index/pointer-event issues with overlays
+  const modal = ta.closest('.modal-overlay') || ta.closest('.modal') || document.body;
+  modal.appendChild(dd);
 }
 
 function _closeBoardMentionDropdown() {

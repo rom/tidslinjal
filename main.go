@@ -1838,6 +1838,24 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				}
 				return
 			}
+			// /api/board-items/{id}/archive
+			if len(parts) == 4 && parts[3] == "archive" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleArchiveBoardItem)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+			// /api/board-items/{id}/unarchive
+			if len(parts) == 4 && parts[3] == "unarchive" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleUnarchiveBoardItem)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
 			// /api/board-items/{id}/attachments/{attId}
 			if len(parts) == 5 && parts[3] == "attachments" {
 				if r.Method == http.MethodGet {
