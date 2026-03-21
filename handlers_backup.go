@@ -295,7 +295,8 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 	app.store.LogAudit(AuditEntry{ //nolint
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "backup", EntityType: "system", EntityID: 0,
-		Summary: "Admin downloaded encrypted data backup",
+		Summary: fmt.Sprintf("Admin %q downloaded encrypted data backup (%d bytes, %d files) from %s",
+			user.Username, len(encrypted), len(files), clientIP(r)),
 	})
 }
 
@@ -411,7 +412,8 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 	app.store.LogAudit(AuditEntry{ //nolint
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "restore", EntityType: "system", EntityID: 0,
-		Summary: fmt.Sprintf("Admin restored %d data files from backup (areas: %s)", restored, areas),
+		Summary: fmt.Sprintf("Admin %q restored %d data files from backup (areas: %s) from %s",
+			user.Username, restored, areas, clientIP(r)),
 	})
 	jsonOK(w, map[string]interface{}{
 		"status":   "restored",

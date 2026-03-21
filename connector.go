@@ -147,12 +147,21 @@ func (cr *ConnectorRegistry) List() []ConnectorConfig {
 }
 
 // runConnectorPoller runs in a goroutine, polling all connectors periodically.
+// The poll interval respects the ConnectorPollMinSeconds security setting (default 30s, min 30s).
 func (app *App) runConnectorPoller() {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
+			// Enforce minimum poll interval from security settings
+			ss := app.store.GetSecuritySettings()
+			minSecs := ss.ConnectorPollMinSeconds
+			if minSecs < 30 {
+				minSecs = 30 // hard minimum: 30 seconds
+			}
+			ticker.Reset(time.Duration(minSecs) * time.Second)
+
 			payloads := app.connectors.PollAll(app)
 			for _, p := range payloads {
 				app.processIngestPayload(p)

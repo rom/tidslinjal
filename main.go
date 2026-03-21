@@ -2129,6 +2129,9 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	// When a v2 is introduced, v1 routes can be frozen and v2 handled separately.
 	var handler http.Handler = apiVersionRewrite(mux)
 
+	// Add request ID middleware for audit correlation
+	handler = requestIDMiddleware(handler)
+
 	// Wrap the entire mux with security headers.
 	if app.secureMode {
 		return securityHeadersWithHSTS(handler)

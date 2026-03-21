@@ -72,6 +72,19 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 		jsonError(w, "content required", http.StatusBadRequest)
 		return
 	}
+	// Enforce max comments per event
+	ss := app.store.GetSecuritySettings()
+	maxComments := ss.MaxCommentsPerEvent
+	if maxComments <= 0 {
+		maxComments = 500 // default: 500 comments per event
+	}
+	existing := app.store.GetCommentsByEvent(eventID)
+	if len(existing) >= maxComments {
+		app.audit(user.ID, user.DisplayName, "rate_limited", "comment", eventID,
+			fmt.Sprintf("Comment limit reached on event %d (%d max) by user %q", eventID, maxComments, user.Username))
+		jsonError(w, fmt.Sprintf("comment limit reached (%d per event)", maxComments), http.StatusTooManyRequests)
+		return
+	}
 	// For reporters proposing a status change
 	pendingApproval := false
 	if req.StatusChange != "" && hasRole(user.Role, RoleReporter) && !hasRole(user.Role, RoleReadWrite) {

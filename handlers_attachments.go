@@ -66,6 +66,21 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 		return
 	}
 
+	// Enforce per-user upload quota
+	ss := app.store.GetSecuritySettings()
+	dailyLimitMB := ss.UploadQuotaDailyMB
+	if dailyLimitMB <= 0 {
+		dailyLimitMB = 500 // default 500 MB/day
+	}
+	todayMB := app.uploads.todayBytes(user.ID) / (1 << 20)
+	if todayMB >= int64(dailyLimitMB) {
+		log.Printf("[SECURITY] Upload quota exceeded for user %q (used %d MB, limit %d MB/day)", user.Username, todayMB, dailyLimitMB)
+		app.audit(user.ID, user.DisplayName, "quota_exceeded", "upload", 0,
+			fmt.Sprintf("User %q exceeded daily upload quota (%d MB used, limit %d MB)", user.Username, todayMB, dailyLimitMB))
+		jsonError(w, fmt.Sprintf("daily upload quota exceeded (%d MB/day)", dailyLimitMB), http.StatusTooManyRequests)
+		return
+	}
+
 	if err := r.ParseMultipartForm(25 << 20); err != nil {
 		jsonError(w, "file too large (max 25 MB)", http.StatusBadRequest)
 		return
@@ -114,6 +129,8 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "failed to record attachment", http.StatusInternalServerError)
 		return
 	}
+	// Track upload for quota enforcement
+	app.uploads.add(user.ID, size)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, att)
 }

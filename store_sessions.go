@@ -76,6 +76,15 @@ func (s *Store) DeleteSessionsForUserExcept(userID int64, exceptID string) {
 	s.persist("sessions.json", snap) //nolint
 }
 
+// DeleteAllSessions removes ALL sessions (used during system reset).
+func (s *Store) DeleteAllSessions() {
+	s.mu.Lock()
+	s.sessions = nil
+	s.sessionByID = make(map[string]Session)
+	s.mu.Unlock()
+	s.persist("sessions.json", []Session{}) //nolint
+}
+
 func (s *Store) CleanExpiredSessions() {
 	s.mu.Lock()
 	now := time.Now()
