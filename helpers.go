@@ -1,10 +1,20 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
 )
+
+// hashToken returns the hex-encoded SHA-256 hash of a token.
+// Used for storing high-entropy random tokens (reset tokens, webcal tokens)
+// so that plaintext tokens are never persisted to disk.
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
 
 var _xmlReplacer = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;", "'", "&apos;")
 

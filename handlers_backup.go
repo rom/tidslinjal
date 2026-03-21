@@ -430,11 +430,12 @@ func (app *App) handleWebCal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing token", http.StatusBadRequest)
 		return
 	}
-	// Find user by WebCal token
+	// Find user by WebCal token (compare SHA-256 hash)
+	hashedToken := hashToken(token)
 	users := app.store.GetUsers()
 	var calUser *User
 	for i := range users {
-		if users[i].WebCalToken != "" && subtle.ConstantTimeCompare([]byte(users[i].WebCalToken), []byte(token)) == 1 {
+		if users[i].WebCalToken != "" && subtle.ConstantTimeCompare([]byte(users[i].WebCalToken), []byte(hashedToken)) == 1 {
 			calUser = &users[i]
 			break
 		}

@@ -5,12 +5,18 @@ function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+function _getCSRFToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return m ? m[1] : '';
+}
 async function api(path, opts) {
   if (!opts) opts = {};
   if (!opts.headers) opts.headers = {};
   // Add CSRF protection header for state-changing requests
   if (opts.method && opts.method !== 'GET' && opts.method !== 'HEAD') {
     opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+    const csrf = _getCSRFToken();
+    if (csrf) opts.headers['X-CSRF-Token'] = csrf;
   }
   const r = await fetch(path, opts);
   if (r.status === 401) { window.location.href = '/login'; throw new Error('unauth'); }

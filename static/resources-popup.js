@@ -46,7 +46,10 @@ function apiGet(url) {
 }
 
 function apiDelete(url) {
-  return fetch(url, { method: 'DELETE', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+  var hdrs = { 'X-Requested-With': 'XMLHttpRequest' };
+  var csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  if (csrfMatch) hdrs['X-CSRF-Token'] = csrfMatch[1];
+  return fetch(url, { method: 'DELETE', credentials: 'include', headers: hdrs });
 }
 
 // Check current user role for edit/delete permissions

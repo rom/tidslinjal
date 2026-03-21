@@ -36,8 +36,14 @@ function _boardModal(id, content, width) {
 }
 
 // ── API helpers ──
+function _boardGetCSRF() {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return m ? m[1] : '';
+}
 async function _boardApi(method, path, body) {
+  const csrf = _boardGetCSRF();
   const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' } };
+  if (csrf) opts.headers['X-CSRF-Token'] = csrf;
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch('/api' + path, opts);
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
@@ -974,8 +980,11 @@ async function _uploadBoardAttachment(itemId) {
   const form = new FormData();
   form.append('file', fileInput.files[0]);
   try {
+    const _csrfAtt = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const _hdrsAtt = { 'X-Requested-With': 'XMLHttpRequest' };
+    if (_csrfAtt) _hdrsAtt['X-CSRF-Token'] = _csrfAtt[1];
     const res = await fetch('/api/board-items/' + itemId + '/attachments', {
-      method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: form
+      method: 'POST', headers: _hdrsAtt, body: form
     });
     if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
     closeModal('boardItemModal');

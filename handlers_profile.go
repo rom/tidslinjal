@@ -71,24 +71,32 @@ func (app *App) handleUpdateProfile(w http.ResponseWriter, r *http.Request, user
 	if req.PhotoDataURL != "" {
 		fullUser.PhotoDataURL = req.PhotoDataURL
 	}
+	var plaintextWebCal string
 	if req.GenerateWebCal && fullUser.WebCalToken == "" {
 		tokBytes := make([]byte, 16)
 		if _, err := rand.Read(tokBytes); err != nil {
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		fullUser.WebCalToken = hex.EncodeToString(tokBytes)
+		plaintextWebCal = hex.EncodeToString(tokBytes)
+		// Store SHA-256 hash — never persist plaintext token to disk
+		fullUser.WebCalToken = hashToken(plaintextWebCal)
 	}
 	if err := app.store.UpdateUser(*fullUser); err != nil {
 		jsonError(w, "failed to update profile", http.StatusInternalServerError)
 		return
 	}
-	// Return public profile plus webcal_token (owner's own data)
+	// Return public profile. Include the plaintext webcal token only when
+	// it was just generated (one-time display). Stored hash is never returned.
 	type profileResponse struct {
 		UserPublic
 		WebCalToken string `json:"webcal_token,omitempty"`
 	}
-	jsonOK(w, profileResponse{UserPublic: fullUser.Public(), WebCalToken: fullUser.WebCalToken})
+	resp := profileResponse{UserPublic: fullUser.Public()}
+	if plaintextWebCal != "" {
+		resp.WebCalToken = plaintextWebCal
+	}
+	jsonOK(w, resp)
 }
 
 // ── Cascade Reschedule ─────────────────────────────────────────────────────────

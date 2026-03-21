@@ -102,10 +102,15 @@ async function openProfileModal() {
   // WebCal section
   const webCalURL = document.getElementById('profileWebCalURL');
   const webCalLink = document.getElementById('profileWebCalLink');
-  if (u.webcal_token) {
-    const url = `${location.protocol}//${location.host}/webcal/${u.webcal_token}.ics`;
+  if (u.has_webcal || u.webcal_token) {
     if (webCalURL) webCalURL.style.display = '';
-    if (webCalLink) webCalLink.value = url;
+    if (u.webcal_token) {
+      // Plaintext token available (just generated) — show full URL
+      const url = `${location.protocol}//${location.host}/webcal/${u.webcal_token}.ics`;
+      if (webCalLink) webCalLink.value = url;
+    } else if (webCalLink) {
+      webCalLink.value = '(calendar link active — token shown only at generation time)';
+    }
   } else {
     if (webCalURL) webCalURL.style.display = 'none';
   }

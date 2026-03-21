@@ -322,7 +322,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   app.secureMode,
 		MaxAge:   300, // 5 minutes
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 
 	// PKCE: generate code_verifier (43-128 chars of unreserved URL chars)
@@ -340,7 +340,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   app.secureMode,
 		MaxAge:   300,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 	// code_challenge = BASE64URL(SHA256(code_verifier))
 	h := sha256.Sum256([]byte(codeVerifier))
@@ -360,7 +360,7 @@ func (app *App) handleOIDCLogin(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   app.secureMode,
 		MaxAge:   300,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 
 	params := url.Values{
@@ -894,13 +894,13 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		newUser := User{
 			Username:    username,
-			DisplayName: displayName,
+			DisplayName: stripHTMLTags(displayName),
 			Role:        defaultRole,
 			Vetted:      true, // SSO users are pre-authenticated by the IDP
 			IsOIDC:      true,
-			FullName:    fullName,
+			FullName:    stripHTMLTags(fullName),
 			Locale:      userInfo.Locale,
-			Address:     oidcAddress,
+			Address:     stripHTMLTags(oidcAddress),
 		}
 		// No password — OIDC-only login
 		created, err := app.store.CreateUser(newUser)
@@ -914,16 +914,18 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		app.audit(0, "system", "created", "user", created.ID,
 			fmt.Sprintf("SSO auto enrollment: user %q auto-created via OIDC (role=%s)", username, defaultRole))
 	} else {
-		// Sync profile fields from IDP on every login
+		// Sync profile fields from IDP on every login (sanitize to prevent stored XSS)
 		changed := false
-		if displayName != "" && displayName != user.DisplayName {
-			logVerbose("OIDC: updating display name for %q: %q → %q", username, user.DisplayName, displayName)
-			user.DisplayName = displayName
+		sanitizedDisplayName := stripHTMLTags(displayName)
+		if sanitizedDisplayName != "" && sanitizedDisplayName != user.DisplayName {
+			logVerbose("OIDC: updating display name for %q: %q → %q", username, user.DisplayName, sanitizedDisplayName)
+			user.DisplayName = sanitizedDisplayName
 			changed = true
 		}
-		if fullName != "" && fullName != user.FullName {
-			logVerbose("OIDC: updating full name for %q: %q → %q", username, user.FullName, fullName)
-			user.FullName = fullName
+		sanitizedFullName := stripHTMLTags(fullName)
+		if sanitizedFullName != "" && sanitizedFullName != user.FullName {
+			logVerbose("OIDC: updating full name for %q: %q → %q", username, user.FullName, sanitizedFullName)
+			user.FullName = sanitizedFullName
 			changed = true
 		}
 		if userInfo.Locale != "" && userInfo.Locale != user.Locale {
@@ -931,9 +933,10 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 			user.Locale = userInfo.Locale
 			changed = true
 		}
-		if oidcAddress != "" && oidcAddress != user.Address {
-			logVerbose("OIDC: updating address for %q: %q → %q", username, user.Address, oidcAddress)
-			user.Address = oidcAddress
+		sanitizedAddress := stripHTMLTags(oidcAddress)
+		if sanitizedAddress != "" && sanitizedAddress != user.Address {
+			logVerbose("OIDC: updating address for %q: %q → %q", username, user.Address, sanitizedAddress)
+			user.Address = sanitizedAddress
 			changed = true
 		}
 		if changed {
@@ -980,8 +983,9 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   app.secureMode,
 		Expires:  sess.ExpiresAt,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
+	app.setCSRFCookie(w, sess.ExpiresAt)
 	// Track last login and ensure IsOIDC is set
 	go func(u User, ip string) {
 		now := time.Now()

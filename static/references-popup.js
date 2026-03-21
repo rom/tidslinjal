@@ -51,7 +51,10 @@ async function gitSaveRefs() {
   const btn = document.getElementById('btnGitSave');
   btn.textContent = '⏳ Saving...';
   try {
-    const res = await fetch('/api/references/git/save', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'} });
+    const _csrfSave = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const _hdrsSave = {'X-Requested-With': 'XMLHttpRequest'};
+    if (_csrfSave) _hdrsSave['X-CSRF-Token'] = _csrfSave[1];
+    const res = await fetch('/api/references/git/save', { method: 'POST', headers: _hdrsSave });
     if (res.ok) {
       document.getElementById('gitStatus').textContent = '✓ Saved at ' + new Date().toLocaleTimeString();
     } else {
@@ -68,7 +71,10 @@ async function gitLoadRefs() {
   const btn = document.getElementById('btnGitLoad');
   btn.textContent = '⏳ Loading...';
   try {
-    const res = await fetch('/api/references/git/load', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'} });
+    const _csrfLoad = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const _hdrsLoad = {'X-Requested-With': 'XMLHttpRequest'};
+    if (_csrfLoad) _hdrsLoad['X-CSRF-Token'] = _csrfLoad[1];
+    const res = await fetch('/api/references/git/load', { method: 'POST', headers: _hdrsLoad });
     if (res.ok) {
       document.getElementById('gitStatus').textContent = '✓ Loaded at ' + new Date().toLocaleTimeString();
       await loadReferences();
