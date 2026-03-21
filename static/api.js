@@ -112,9 +112,6 @@ async function refreshAll() {
 }
 
 // ── Preferences persistence ─────────────────────────────────────────────────
-async function loadPreferences() {
-  state.preferences = await apiGet('/api/preferences');
-}
 let _savePrefTimer = null;
 async function savePreferences() {
   // Debounce rapid successive saves (e.g. toggling multiple settings quickly)

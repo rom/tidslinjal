@@ -582,18 +582,6 @@ func (s *Store) MarkNotificationRead(id int64) error {
 	return fmt.Errorf("notification %d not found", id)
 }
 
-func (s *Store) CountUnreadNotifications(userID int64) int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	count := 0
-	for _, n := range s.notifications {
-		if n.UserID == userID && !n.Read {
-			count++
-		}
-	}
-	return count
-}
-
 // ── Map Resources ──────────────────────────────────────────────────────────────
 
 func (s *Store) GetMapResources() []MapResource {

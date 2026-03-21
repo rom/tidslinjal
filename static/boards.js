@@ -582,44 +582,6 @@ function _formatSize(bytes) {
   return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-// ── Edit item ──
-function _editBoardItem(itemId) {
-  const item = _boardsState.items.find(i => i.id === itemId);
-  if (!item) return;
-  const board = _boardsState.activeBoard;
-
-  let html = `<div style="max-width:600px">
-    <h3>${t('board_edit_item')||'Edit Item'} #${item.id}</h3>
-    <label>${t('board_item_subject')||'Subject'}</label>
-    <input id="editItemSubject" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(item.subject)}">
-    <label>${t('board_note')||'Note'}</label>
-    <textarea id="editItemNote" class="input" style="width:100%;height:100px;margin-bottom:8px">${escHtml(item.note||'')}</textarea>
-    <label>${t('board_type')||'Type'}</label>
-    <select id="editItemType" class="input" style="width:100%;margin-bottom:8px">
-      <option value="" ${!item.item_type?'selected':''}>—</option>
-      <option value="task" ${item.item_type==='task'?'selected':''}>Task</option>
-      <option value="meeting" ${item.item_type==='meeting'?'selected':''}>Meeting</option>
-      <option value="checklist" ${item.item_type==='checklist'?'selected':''}>Checklist</option>
-      <option value="issue" ${item.item_type==='issue'?'selected':''}>Issue</option>
-      <option value="note" ${item.item_type==='note'?'selected':''}>Note</option>
-    </select>
-    <label>${t('board_color')||'Color'}</label>
-    <input id="editItemColor" type="color" value="${item.color||'#1a1a2e'}" style="margin-bottom:8px">
-    <label>${t('tags_title')||'Tags'} (${t('tags_placeholder')||'comma-separated'})</label>
-    <input id="editItemTags" class="input" style="width:100%;margin-bottom:8px" value="${(item.tags||[]).join(', ')}">
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-primary" data-action="_doEditBoardItem" data-arg="${item.id}">✔ ${t('btn_save')||'Save'}</button>
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemEditModal">✖ ${t('btn_cancel')||'Cancel'}</button>
-    </div>
-  </div>`;
-  _boardModal('boardItemEditModal', html, '620px');
-  // Setup tag autocomplete
-  _loadBoardTags().then(() => {
-    const tagInput = document.getElementById('editItemTags');
-    if (tagInput) _setupTagAutocomplete(tagInput);
-  });
-}
-
 async function _doEditBoardItem(itemId) {
   const subject = document.getElementById('editItemSubject').value.trim();
   if (!subject) return;

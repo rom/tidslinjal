@@ -115,25 +115,6 @@ func (s *Store) SaveConnectorConfig(cfg ConnectorConfig) error {
 	return s.persist("connectors.json", snap)
 }
 
-func (s *Store) DeleteConnectorConfig(name string) error {
-	s.mu.Lock()
-	found := false
-	for i := range s.connectorConfigs {
-		if s.connectorConfigs[i].Name == name {
-			s.connectorConfigs = append(s.connectorConfigs[:i], s.connectorConfigs[i+1:]...)
-			found = true
-			break
-		}
-	}
-	if !found {
-		s.mu.Unlock()
-		return fmt.Errorf("connector config %q not found", name)
-	}
-	snap := append([]ConnectorConfig(nil), s.connectorConfigs...)
-	s.mu.Unlock()
-	return s.persist("connectors.json", snap)
-}
-
 // ── Federated IdPs ─────────────────────────────────────────────────────────
 
 func (s *Store) GetFederatedIdPs() []FederatedIdP {
@@ -299,16 +280,6 @@ func (s *Store) DeleteCustomResourceType(id int64) error {
 	}
 	s.mu.Unlock()
 	return fmt.Errorf("custom resource type %d not found", id)
-}
-
-func (s *Store) GetRoomBookings(roomID int64, from, to time.Time) []RoomBooking {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	// Filter events that have a room booking for this room in the time range
-	var bookings []RoomBooking
-	// For now, room bookings are stored within events as metadata
-	// Future: dedicated booking storage
-	return bookings
 }
 
 // ── Free/Busy Lookup ────────────────────────────────────────────────────────

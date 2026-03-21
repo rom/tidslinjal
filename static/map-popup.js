@@ -818,16 +818,6 @@ document.getElementById('btnToggleLegend').addEventListener('click', function() 
   });
 })();
 
-/* ── Enhanced zoom for image maps ── */
-function _enhanceZoom() {
-  if (!_map) return;
-  // Allow more zoom levels for image maps
-  if (_isImageMap) {
-    _map.setMinZoom(-3);
-    _map.setMaxZoom(8);
-  }
-}
-
 /* ── PDF controls ── */
 let _pdfScale = 1;
 document.getElementById('pdfZoomIn').addEventListener('click', function() {

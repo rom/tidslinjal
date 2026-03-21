@@ -9,7 +9,6 @@
 'use strict';
 
 // ── Feature detection ────────────────────────────────────────────────────────
-const _isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const _isPhone = () => window.innerWidth < 600;
 const _isTablet = () => window.innerWidth >= 600 && window.innerWidth <= 1024;
 const _isMobile = () => window.innerWidth <= 1024;

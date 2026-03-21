@@ -245,7 +245,6 @@ func (b *bytesReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	n := copy(p, b.d[off:])
 	return n, nil
 }
-func (b *bytesReaderAt) Len() int64 { return int64(len(b.d)) }
 
 // PruneGradualBackupSnapshots removes the oldest snapshots keeping at most max.
 func (s *Store) PruneGradualBackupSnapshots(max int) error {
