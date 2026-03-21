@@ -13,7 +13,6 @@ function showError(msg, title) {
   document.getElementById('errorModalMsg').textContent  = msg;
   openModal('errorModal');
 }
-function showConfirm(msg) { return window.confirm(msg); }
 
 // ── Date utilities ──────────────────────────────────────────────────────────
 function startOfDay(d) { const r = new Date(d); r.setHours(0,0,0,0); return r; }
@@ -450,7 +449,6 @@ function _setClockAreaDetached(detached) {
   if (indicator) indicator.style.display = detached ? '' : 'none';
 }
 
-function openDetachedClock() { detachClock(); }
 function detachClock() {
   if (_clockPopout && !_clockPopout.closed) {
     _clockPopout.focus();

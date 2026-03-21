@@ -73,18 +73,6 @@ func (s *Store) CreateInvitation(inv PersonalInvitation) (PersonalInvitation, er
 	return inv, s.persist("invitations.json", snap)
 }
 
-func (s *Store) GetInvitationByCode(code string) (*PersonalInvitation, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for i := range s.invitations {
-		if s.invitations[i].Code == code {
-			inv := s.invitations[i]
-			return &inv, true
-		}
-	}
-	return nil, false
-}
-
 // ClaimInvitation atomically checks that the invitation is valid+unused and marks it as used (V-04 fix).
 // Returns the invitation and true on success, or nil and false if invalid/already used.
 func (s *Store) ClaimInvitation(code string, usedBy string) (*PersonalInvitation, bool) {
@@ -108,28 +96,6 @@ func (s *Store) ClaimInvitation(code string, usedBy string) (*PersonalInvitation
 	}
 	s.mu.Unlock()
 	return nil, false
-}
-
-func (s *Store) MarkInvitationUsed(id int64, usedBy string) error {
-	s.mu.Lock()
-	now := time.Now()
-	found := false
-	for i := range s.invitations {
-		if s.invitations[i].ID == id {
-			s.invitations[i].Used = true
-			s.invitations[i].UsedBy = usedBy
-			s.invitations[i].UsedAt = &now
-			found = true
-			break
-		}
-	}
-	if !found {
-		s.mu.Unlock()
-		return fmt.Errorf("invitation not found")
-	}
-	snap := append([]PersonalInvitation(nil), s.invitations...)
-	s.mu.Unlock()
-	return s.persist("invitations.json", snap)
 }
 
 func (s *Store) DeleteInvitation(id int64) error {

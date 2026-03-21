@@ -98,9 +98,6 @@ function isLayerActive(id) {
   // A layer is active (visible) when it is NOT in the hidden_layers exclusion list
   return !(state.preferences.hidden_layers || []).includes(id);
 }
-function isLayerHidden(id) {
-  return (state.preferences.hidden_layers || []).includes(id);
-}
 
 // ── Color-blind safe color remapping for event types ────────────────────────
 const _cbColorMap = {

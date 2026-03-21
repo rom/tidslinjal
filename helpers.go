@@ -141,16 +141,6 @@ func rtfEscape(s string) string {
 	return b.String()
 }
 
-func xmlEscape(s string) string {
-	return strings.NewReplacer(
-		"&", "&amp;",
-		"<", "&lt;",
-		">", "&gt;",
-		"\"", "&quot;",
-		"'", "&apos;",
-	).Replace(s)
-}
-
 func htmlEscape(s string) string {
 	return strings.NewReplacer(
 		"&", "&amp;",

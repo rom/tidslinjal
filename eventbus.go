@@ -16,10 +16,8 @@ import (
 type EventAction string
 
 const (
-	ActionCreated       EventAction = "created"
-	ActionUpdated       EventAction = "updated"
-	ActionDeleted       EventAction = "deleted"
-	ActionStatusChanged EventAction = "status_changed"
+	ActionCreated EventAction = "created"
+	ActionUpdated EventAction = "updated"
 )
 
 // EventBusMessage is the payload delivered to all subscribers.

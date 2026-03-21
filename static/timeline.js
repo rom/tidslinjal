@@ -27,11 +27,6 @@ function goToDate(dateStr) {
   state.startDate = startOfDay(d);
   refreshAll();
 }
-function centerToday() {
-  const today = startOfDay(new Date());
-  state.startDate = addDays(today, -Math.floor(getRangeDays() / 2));
-  refreshAll();
-}
 function centerDay(date) {
   state.startDate = addDays(startOfDay(date), -Math.floor(getRangeDays() / 2));
   refreshAll();

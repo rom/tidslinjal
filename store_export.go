@@ -33,63 +33,6 @@ type ExportData struct {
 	BoardItems          []BoardItem        `json:"board_items,omitempty"`
 }
 
-func (s *Store) GetExportData() ExportData {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	users := make([]UserPublic, len(s.users))
-	for i, u := range s.users {
-		users[i] = u.Public()
-	}
-	events := make([]Event, len(s.events))
-	copy(events, s.events)
-	groups := make([]Group, len(s.groups))
-	copy(groups, s.groups)
-	layers := make([]Layer, len(s.layers))
-	copy(layers, s.layers)
-	alarms := make([]Alarm, len(s.alarms))
-	copy(alarms, s.alarms)
-	phases := make([]ExercisePhase, len(s.phases))
-	copy(phases, s.phases)
-	eventTypes := make([]EventTypeDef, len(s.eventTypes))
-	copy(eventTypes, s.eventTypes)
-	decisionLog := make([]DecisionLogEntry, len(s.decisionLog))
-	copy(decisionLog, s.decisionLog)
-	comments := make([]EventComment, len(s.comments))
-	copy(comments, s.comments)
-	roleConfigs := make([]RoleConfig, len(s.roleConfigs))
-	copy(roleConfigs, s.roleConfigs)
-	mapResources := make([]MapResource, len(s.mapResources))
-	copy(mapResources, s.mapResources)
-	referenceDocs := make([]ReferenceDoc, len(s.referenceDocs))
-	copy(referenceDocs, s.referenceDocs)
-	rooms := make([]Room, len(s.rooms))
-	copy(rooms, s.rooms)
-	customResTypes := make([]CustomResourceType, len(s.customResourceTypes))
-	copy(customResTypes, s.customResourceTypes)
-	dayLabels := make([]DayLabel, len(s.dayLabels))
-	copy(dayLabels, s.dayLabels)
-	return ExportData{
-		Version:             AppVersion,
-		ExportAt:            time.Now(),
-		Events:              events,
-		Users:               users,
-		Groups:              groups,
-		Layers:              layers,
-		Alarms:              alarms,
-		Exercise:            s.exercise,
-		Phases:              phases,
-		EventTypes:          eventTypes,
-		DecisionLog:         decisionLog,
-		Comments:            comments,
-		RoleConfigs:         roleConfigs,
-		MapResources:        mapResources,
-		References:          referenceDocs,
-		Rooms:               rooms,
-		CustomResourceTypes: customResTypes,
-		DayLabels:           dayLabels,
-	}
-}
-
 // GetExportDataFiltered returns export data filtered by include set and role.
 // isPrivileged = admin or oplead. include keys: "users","groups","layers","alarms","events","phases"
 func (s *Store) GetExportDataFiltered(userID int64, isPrivileged bool, include map[string]bool) ExportData {

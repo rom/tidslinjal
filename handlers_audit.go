@@ -378,7 +378,7 @@ func (app *App) exportAuditDocx(w http.ResponseWriter, entries []AuditEntry, aud
 	headers := []string{"ID", "Timestamp", "User", "Action", "Entity Type", "Entity ID", "Summary"}
 	fmt.Fprintf(doc, `<w:tr>`)
 	for _, h := range headers {
-		fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEscape(h))
+		fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEsc(h))
 	}
 	fmt.Fprintf(doc, `</w:tr>`)
 	// Data rows
@@ -394,7 +394,7 @@ func (app *App) exportAuditDocx(w http.ResponseWriter, entries []AuditEntry, aud
 			e.Summary,
 		}
 		for _, c := range cells {
-			fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEscape(c))
+			fmt.Fprintf(doc, `<w:tc><w:p><w:r><w:t>%s</w:t></w:r></w:p></w:tc>`, xmlEsc(c))
 		}
 		fmt.Fprintf(doc, `</w:tr>`)
 	}

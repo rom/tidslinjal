@@ -226,24 +226,6 @@ func (app *App) handleDeleteMapResource(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (app *App) handleMapResourceFile(w http.ResponseWriter, r *http.Request) {
-	// Path: /api/map-resources/{id}/file
-	path := strings.TrimPrefix(r.URL.Path, "/api/map-resources/")
-	parts := strings.SplitN(path, "/", 2)
-	id, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	mr, ok := app.store.GetMapResource(id)
-	if !ok || mr.Filename == "" {
-		http.NotFound(w, r)
-		return
-	}
-	filePath := filepath.Join(app.store.MapResourceDir(), mr.Filename)
-	http.ServeFile(w, r, filePath)
-}
-
 func (app *App) handleGetMapOverlays(w http.ResponseWriter, r *http.Request, user *User) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-resources/"), "/")
 	id, err := strconv.ParseInt(parts[0], 10, 64)
@@ -261,35 +243,6 @@ func (app *App) handleGetMapOverlays(w http.ResponseWriter, r *http.Request, use
 		overlays = []MapOverlay{}
 	}
 	jsonOK(w, overlays)
-}
-
-func (app *App) handleSaveMapOverlays(w http.ResponseWriter, r *http.Request, user *User) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/map-resources/"), "/")
-	id, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
-	}
-	mr, ok := app.store.GetMapResource(id)
-	if !ok {
-		jsonError(w, "not found", http.StatusNotFound)
-		return
-	}
-	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
-		jsonError(w, "map is locked", http.StatusForbidden)
-		return
-	}
-	var overlays []MapOverlay
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&overlays); err != nil {
-		jsonError(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-	mr.Overlays = overlays
-	if err := app.store.UpdateMapResource(mr); err != nil {
-		jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	jsonOK(w, mr)
 }
 
 func (app *App) handleLockMapOverlay(w http.ResponseWriter, r *http.Request, user *User) {
