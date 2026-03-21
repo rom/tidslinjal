@@ -427,6 +427,9 @@ async function init() {
     _showWelcomeBanner(startupText);
   }
 
+  // Check for due/overdue board items
+  _checkBoardDueItems();
+
   // Scroll to current time or day start
   setTimeout(() => {
     const now    = new Date();
@@ -523,6 +526,32 @@ function _showWelcomeBanner(startupText) {
   };
   overlay.querySelector('#welcomeDismissBtn').addEventListener('click', dismissWelcome);
   overlay.addEventListener('click', e => { if (e.target === overlay) dismissWelcome(); });
+}
+
+// ── Due date notification banner ──
+async function _checkBoardDueItems() {
+  try {
+    const dueItems = await apiGet('/api/boards/due-items');
+    if (!dueItems || dueItems.length === 0) return;
+    const banner = document.createElement('div');
+    banner.id = 'boardDueBanner';
+    banner.style.cssText = 'background:var(--orange,#e67e22);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:var(--fs-sm);z-index:100;position:relative';
+    const overdueCount = dueItems.filter(i => i.due_date < new Date().toISOString().slice(0,10)).length;
+    const dueTodayCount = dueItems.length - overdueCount;
+    let msg = '';
+    if (overdueCount > 0) msg += (t('board_due_overdue')||'{n} overdue board item(s)').replace('{n}', overdueCount);
+    if (overdueCount > 0 && dueTodayCount > 0) msg += ' · ';
+    if (dueTodayCount > 0) msg += (t('board_due_today')||'{n} board item(s) due today').replace('{n}', dueTodayCount);
+    if (!msg) msg = (t('board_due_items_notice')||'{n} board item(s) due or overdue').replace('{n}', dueItems.length);
+    banner.innerHTML = `<span>⚠️ ${msg}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:4px 10px;cursor:pointer" onclick="if(typeof openBoardsModal==='function')openBoardsModal();this.closest('#boardDueBanner').remove()">${t('board_due_view')||'View Boards'}</button>
+        <button style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:2px 6px" onclick="this.closest('#boardDueBanner').remove()">✕</button>
+      </div>`;
+    const header = document.getElementById('top-bar') || document.querySelector('header');
+    if (header) header.insertAdjacentElement('afterend', banner);
+    else document.body.prepend(banner);
+  } catch { /* ignore if endpoint not available */ }
 }
 
 document.addEventListener('DOMContentLoaded', init);

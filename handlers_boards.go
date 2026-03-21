@@ -397,6 +397,7 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		ResponsibleID   *int64         `json:"responsible_id"`
 		ResponsibleName *string        `json:"responsible_name"`
 		Comments        *[]BoardComment `json:"comments"`
+		Priority        *string        `json:"priority"`
 		ChecklistID     *int64         `json:"checklist_id"`
 		EventID         *int64         `json:"event_id"`
 	}
@@ -453,6 +454,19 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 	if req.Comments != nil {
 		item.Comments = *req.Comments
 		changes = append(changes, "comments")
+	}
+	if req.Priority != nil {
+		item.Priority = *req.Priority
+		changes = append(changes, "priority")
+		// Auto-set color based on priority
+		switch *req.Priority {
+		case "low":
+			item.Color = "#3498db" // blue
+		case "high":
+			item.Color = "#e67e22" // orange
+		case "critical":
+			item.Color = "#e74c3c" // red
+		}
 	}
 	if req.ChecklistID != nil {
 		item.ChecklistID = *req.ChecklistID
@@ -1030,5 +1044,37 @@ func (app *App) handleGetBoardTags(w http.ResponseWriter, r *http.Request, user 
 		tags = append(tags, tag)
 	}
 	jsonOK(w, tags)
+}
+
+// handleGetBoardDueItems returns items with due dates that the user is responsible for or created
+func (app *App) handleGetBoardDueItems(w http.ResponseWriter, r *http.Request, user *User) {
+	boards := app.store.GetBoards()
+	type dueItem struct {
+		BoardItem
+		BoardName string `json:"board_name"`
+	}
+	var dueItems []dueItem
+	today := time.Now().Format("2006-01-02")
+	for _, b := range boards {
+		if !app.canAccessBoard(&b, user) {
+			continue
+		}
+		items := app.store.GetBoardItems(b.ID)
+		for _, item := range items {
+			if item.DueDate == "" {
+				continue
+			}
+			if item.DueDate > today {
+				continue
+			}
+			if item.ResponsibleID == user.ID || item.CreatorID == user.ID {
+				dueItems = append(dueItems, dueItem{BoardItem: item, BoardName: b.Name})
+			}
+		}
+	}
+	if dueItems == nil {
+		dueItems = []dueItem{}
+	}
+	jsonOK(w, dueItems)
 }
 

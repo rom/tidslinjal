@@ -1727,6 +1727,9 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("/api/boards/shared", func(w http.ResponseWriter, r *http.Request) {
 		app.requireAuth(app.handleGetBoardByShareToken)(w, r)
 	})
+	mux.HandleFunc("/api/boards/due-items", func(w http.ResponseWriter, r *http.Request) {
+		app.requireAuth(app.handleGetBoardDueItems)(w, r)
+	})
 	mux.HandleFunc("/api/boards/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Trim(r.URL.Path, "/")
 		parts := strings.Split(path, "/")
