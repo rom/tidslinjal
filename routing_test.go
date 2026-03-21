@@ -191,7 +191,7 @@ func TestIngestAPI(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/ingest?source=test", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	setCSRFHeaders(req, cookies)
 	for _, c := range cookies {
 		req.AddCookie(c)
 	}

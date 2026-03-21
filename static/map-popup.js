@@ -52,14 +52,17 @@ function spreadColocatedMarkers(items, getCoords) {
   return result;
 }
 
-// Helper: ensure X-Requested-With header on all state-changing requests (CSRF protection)
+// Helper: ensure X-Requested-With and CSRF token headers on all state-changing requests
 function _mapFetch(url, opts) {
   if (!opts) opts = {};
   if (!opts.headers) opts.headers = {};
+  const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   if (typeof opts.headers.set === 'function') {
     if (!opts.headers.has('X-Requested-With')) opts.headers.set('X-Requested-With', 'XMLHttpRequest');
+    if (csrfMatch && !opts.headers.has('X-CSRF-Token')) opts.headers.set('X-CSRF-Token', csrfMatch[1]);
   } else {
     if (!opts.headers['X-Requested-With']) opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+    if (csrfMatch && !opts.headers['X-CSRF-Token']) opts.headers['X-CSRF-Token'] = csrfMatch[1];
   }
   return fetch(url, opts);
 }

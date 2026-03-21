@@ -64,8 +64,15 @@ func apiDo(t *testing.T, srv *httptest.Server, method, path string, body any, co
 		req.Header.Set("Content-Type", "application/json")
 	}
 	// CSRF protection: state-changing requests require X-Requested-With header
+	// and X-CSRF-Token header (double-submit cookie pattern)
 	if method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions {
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+		for _, c := range cookies {
+			if c.Name == "csrf_token" {
+				req.Header.Set("X-CSRF-Token", c.Value)
+				break
+			}
+		}
 	}
 	for _, c := range cookies {
 		req.AddCookie(c)
@@ -96,6 +103,24 @@ func decodeJSON(t *testing.T, resp *http.Response, v any) {
 	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
 		t.Fatalf("decode JSON: %v", err)
+	}
+}
+
+// csrfFromCookies extracts the CSRF token value from a cookie slice.
+func csrfFromCookies(cookies []*http.Cookie) string {
+	for _, c := range cookies {
+		if c.Name == "csrf_token" {
+			return c.Value
+		}
+	}
+	return ""
+}
+
+// setCSRFHeaders sets both X-Requested-With and X-CSRF-Token headers on a request.
+func setCSRFHeaders(req *http.Request, cookies []*http.Cookie) {
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if tok := csrfFromCookies(cookies); tok != "" {
+		req.Header.Set("X-CSRF-Token", tok)
 	}
 }
 

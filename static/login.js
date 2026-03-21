@@ -176,9 +176,12 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
 
   try {
+    const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const hdrs = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    if (csrfMatch) hdrs['X-CSRF-Token'] = csrfMatch[1];
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      headers: hdrs,
       body: JSON.stringify({ username, password })
     });
     if (res.ok) {

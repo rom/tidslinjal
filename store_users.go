@@ -209,10 +209,12 @@ func (s *Store) SetPasswordResetToken(userID int64, token string, expiry time.Ti
 func (s *Store) GetUserByResetToken(token string) (*User, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	// Hash the incoming token to compare against stored SHA-256 hash
+	hashed := hashToken(token)
 	now := time.Now()
 	for i := range s.users {
 		u := &s.users[i]
-		if u.PasswordResetToken != "" && subtle.ConstantTimeCompare([]byte(u.PasswordResetToken), []byte(token)) == 1 && u.PasswordResetExpiry != nil && u.PasswordResetExpiry.After(now) {
+		if u.PasswordResetToken != "" && subtle.ConstantTimeCompare([]byte(u.PasswordResetToken), []byte(hashed)) == 1 && u.PasswordResetExpiry != nil && u.PasswordResetExpiry.After(now) {
 			cp := *u
 			return &cp, true
 		}

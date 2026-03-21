@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -12,6 +13,41 @@ import (
 	"strings"
 	"time"
 )
+
+// setCSRFCookie generates a cryptographic CSRF token and sets it as a
+// non-HttpOnly cookie so that JavaScript can read it and include it in
+// the X-CSRF-Token header (double-submit cookie pattern).
+func (app *App) setCSRFCookie(w http.ResponseWriter, expires time.Time) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    hex.EncodeToString(b),
+		Path:     "/",
+		HttpOnly: false, // JS must be able to read this
+		Secure:   app.secureMode,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  expires,
+	})
+}
+
+// validateCSRF checks that the X-CSRF-Token header matches the csrf_token cookie
+// (double-submit cookie pattern). Falls back to requiring X-Requested-With if no
+// CSRF cookie is present (backwards compatibility for API key auth).
+func validateCSRF(r *http.Request) bool {
+	cookie, err := r.Cookie("csrf_token")
+	if err == nil && cookie.Value != "" {
+		header := r.Header.Get("X-CSRF-Token")
+		if header != "" {
+			return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(header)) == 1
+		}
+		return false
+	}
+	// Fallback: require X-Requested-With header (for API key auth or legacy clients)
+	return r.Header.Get("X-Requested-With") != ""
+}
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 
@@ -46,10 +82,10 @@ func (app *App) requireAuth(next func(http.ResponseWriter, *http.Request, *User)
 			jsonError(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// CSRF protection: require X-Requested-With header on state-changing requests
+		// CSRF protection: double-submit cookie token or X-Requested-With header
 		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
-			if r.Header.Get("X-Requested-With") == "" {
-				jsonError(w, "missing required header", http.StatusForbidden)
+			if !validateCSRF(r) {
+				jsonError(w, "CSRF validation failed", http.StatusForbidden)
 				return
 			}
 		}
@@ -224,8 +260,8 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 				if k := app.store.ValidateAPIKey(raw); k != nil {
 					// V-05/API key fix: apply CSRF check to API-key authenticated requests too
 					if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
-						if r.Header.Get("X-Requested-With") == "" {
-							jsonError(w, "missing required header", http.StatusForbidden)
+						if !validateCSRF(r) {
+							jsonError(w, "CSRF validation failed", http.StatusForbidden)
 							return
 						}
 					}

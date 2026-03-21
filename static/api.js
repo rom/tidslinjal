@@ -5,9 +5,15 @@
 'use strict';
 
 // ── HTTP helpers ────────────────────────────────────────────────────────────
+function _getCSRFToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return m ? m[1] : '';
+}
 let _authRedirectPending = false;
 async function api(method, path, body) {
+  const csrf = _getCSRFToken();
   const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest' } };
+  if (csrf) opts.headers['X-CSRF-Token'] = csrf;
   if (body !== undefined && !(body instanceof FormData)) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);

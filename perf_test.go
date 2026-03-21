@@ -370,7 +370,7 @@ func benchDo(tb testing.TB, srv *httptest.Server, method, path, body string, coo
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if method != http.MethodGet && method != http.MethodHead {
-		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+		setCSRFHeaders(req, cookies)
 	}
 	for _, c := range cookies {
 		req.AddCookie(c)

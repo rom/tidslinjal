@@ -280,7 +280,10 @@ function _renderReferencesTab(el) {
   window._deleteReportArchive = async function(id) {
     if (!confirm('Delete this report?')) return;
     try {
-      await fetch('/api/report-archive/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const _csrfDel = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+      const _hdrsDel = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (_csrfDel) _hdrsDel['X-CSRF-Token'] = _csrfDel[1];
+      await fetch('/api/report-archive/' + id, { method: 'DELETE', headers: _hdrsDel });
       _loadAndRenderReportArchive();
     } catch (e) { alert(e.message); }
   };
@@ -322,7 +325,10 @@ function _renderReferencesTab(el) {
     fd.append('description', document.getElementById('reportDesc')?.value || '');
     fd.append('category', document.getElementById('reportCat')?.value || 'local');
     try {
-      const res = await fetch('/api/report-archive', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd });
+      const _csrfUp = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+      const _hdrsUp = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (_csrfUp) _hdrsUp['X-CSRF-Token'] = _csrfUp[1];
+      const res = await fetch('/api/report-archive', { method: 'POST', headers: _hdrsUp, body: fd });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Upload failed'); }
       document.getElementById('reportUploadModal')?.remove();
       _loadAndRenderReportArchive();
@@ -799,7 +805,10 @@ async function _handleReferenceUpload() {
     const copyMode = document.getElementById('refUpCopyMode')?.value || '';
     if (copyMode) fd.append('copy_mode', copyMode);
     try {
-      const res = await fetch('/api/references', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const _csrfRef = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+      const _hdrsRef = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (_csrfRef) _hdrsRef['X-CSRF-Token'] = _csrfRef[1];
+      const res = await fetch('/api/references', { method: 'POST', body: fd, headers: _hdrsRef });
       if (!res.ok) { _setUploading(false); let txt = ''; try { const ct = res.headers.get('content-type')||''; if (ct.includes('application/json')) { const j = await res.json(); txt = j.error||''; } } catch {} showError(txt || ('Upload failed — HTTP ' + res.status)); return; }
       _setUploading(false);
       document.getElementById('referenceUploadModal').classList.remove('open');

@@ -642,7 +642,10 @@ function _archiveReportToLocal(content, mimeType, filename, title, reportType, s
   fd.append('category', 'local');
   fd.append('report_type', reportType);
   fd.append('tags', source);
-  fetch('/api/report-archive', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd })
+  const _csrfRpt = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  const _hdrsRpt = { 'X-Requested-With': 'XMLHttpRequest' };
+  if (_csrfRpt) _hdrsRpt['X-CSRF-Token'] = _csrfRpt[1];
+  fetch('/api/report-archive', { method: 'POST', headers: _hdrsRpt, body: fd })
     .catch(() => { /* silent — archiving is best-effort */ });
 }
 

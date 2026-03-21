@@ -126,9 +126,10 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   app.secureMode,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Expires:  sess.ExpiresAt,
 	})
+	app.setCSRFCookie(w, sess.ExpiresAt)
 	app.audit(user.ID, user.DisplayName, "login", "user", user.ID,
 		fmt.Sprintf("User %q logged in from %s", user.Username, loginClientIP))
 	logVerbose("login: user=%q role=%s ip=%s", user.Username, user.Role, loginClientIP)
@@ -178,7 +179,9 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("User %q logged out from %s", user.Username, ip))
 		logVerbose("logout: user=%q ip=%s", user.Username, ip)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", HttpOnly: true, Secure: app.secureMode, SameSite: http.SameSiteLaxMode, Expires: time.Unix(0, 0)})
+	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", HttpOnly: true, Secure: app.secureMode, SameSite: http.SameSiteStrictMode, Expires: time.Unix(0, 0)})
+	// Clear CSRF cookie on logout
+	http.SetCookie(w, &http.Cookie{Name: "csrf_token", Value: "", Path: "/", Secure: app.secureMode, SameSite: http.SameSiteStrictMode, Expires: time.Unix(0, 0)})
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -204,14 +207,14 @@ func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
 	type meResponse struct {
 		UserPublic
 		Groups          []groupInfo `json:"groups"`
-		WebCalToken     string      `json:"webcal_token,omitempty"`
+		HasWebCal       bool        `json:"has_webcal,omitempty"`
 		LastLoginIP     string      `json:"last_login_ip,omitempty"`
 		LastLoginDomain string      `json:"last_login_domain,omitempty"`
 	}
 	jsonOK(w, meResponse{
 		UserPublic:      pub,
 		Groups:          groups,
-		WebCalToken:     user.WebCalToken,
+		HasWebCal:       user.WebCalToken != "",
 		LastLoginIP:     user.LastLoginIP,
 		LastLoginDomain: user.LastLoginDomain,
 	})
@@ -750,7 +753,8 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expiry := time.Now().Add(2 * time.Hour)
-	app.store.SetPasswordResetToken(targetUser.ID, token, expiry) //nolint
+	// Store SHA-256 hash of token — never persist the plaintext token to disk
+	app.store.SetPasswordResetToken(targetUser.ID, hashToken(token), expiry) //nolint
 
 	// Never log the token in plaintext — only note that a reset was initiated.
 	log.Printf("Password reset requested for user %q (valid 2h)", targetUser.Username)
@@ -773,7 +777,7 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		// (server console only, not the HTTP response) so an admin can relay it
 		// out-of-band. Never return it in the API response.
 		// V-17 fix: avoid logging the full reset token in plaintext
-		log.Printf("[SECURITY] No SMTP configured — password reset token generated for %q. Token prefix: %s... (use admin API to retrieve full token securely)", targetUser.Username, token[:8])
+		log.Printf("[SECURITY] No SMTP configured — password reset token generated for %q (use admin API to retrieve token securely)", targetUser.Username)
 	}
 	// Always return a generic "ok" regardless of whether email was sent,
 	// to avoid leaking whether the account/email exists or whether SMTP is set up.
