@@ -146,12 +146,17 @@ function _openCreateBoardDialog() {
     <div id="newBoardRoleDiv" style="display:none;margin-bottom:8px">
       <label>${t('board_role')||'Role'}</label>
       <select id="newBoardRole" class="input" style="width:100%">
+        <option value="observer">Observer</option>
+        <option value="read">Read</option>
+        <option value="reporter">Reporter</option>
         <option value="teammember">Team Member</option>
         <option value="teamlead">Team Lead</option>
         <option value="deputy_teamlead">Deputy Team Lead</option>
         <option value="oplead">Operations Lead</option>
         <option value="deputy_oplead">Deputy Operations Lead</option>
         <option value="staffofficer">Staff Officer</option>
+        <option value="staff_assistant">Staff Assistant</option>
+        <option value="staffofficer_full">Staff Officer (Full)</option>
         <option value="admin">Admin</option>
       </select>
     </div>
@@ -1044,6 +1049,23 @@ function _openBoardSettings() {
         ${groups.map(g => `<option value="${g.id}" ${g.id===board.group_id?'selected':''}>${escHtml(g.name)}</option>`).join('')}
       </select>
     </div>
+    <div id="settBoardRoleDiv" style="display:${board.visibility==='role'?'':'none'};margin-bottom:8px">
+      <label>${t('board_role')||'Role'}</label>
+      <select id="settBoardRole" class="input" style="width:100%">
+        <option value="observer" ${board.role_key==='observer'?'selected':''}>Observer</option>
+        <option value="read" ${board.role_key==='read'?'selected':''}>Read</option>
+        <option value="reporter" ${board.role_key==='reporter'?'selected':''}>Reporter</option>
+        <option value="teammember" ${board.role_key==='teammember'?'selected':''}>Team Member</option>
+        <option value="teamlead" ${board.role_key==='teamlead'?'selected':''}>Team Lead</option>
+        <option value="deputy_teamlead" ${board.role_key==='deputy_teamlead'?'selected':''}>Deputy Team Lead</option>
+        <option value="oplead" ${board.role_key==='oplead'?'selected':''}>Operations Lead</option>
+        <option value="deputy_oplead" ${board.role_key==='deputy_oplead'?'selected':''}>Deputy Operations Lead</option>
+        <option value="staffofficer" ${board.role_key==='staffofficer'?'selected':''}>Staff Officer</option>
+        <option value="staff_assistant" ${board.role_key==='staff_assistant'?'selected':''}>Staff Assistant</option>
+        <option value="staffofficer_full" ${board.role_key==='staffofficer_full'?'selected':''}>Staff Officer (Full)</option>
+        <option value="admin" ${board.role_key==='admin'?'selected':''}>Admin</option>
+      </select>
+    </div>
     <label>${t('board_columns')||'Columns'}</label>
     <div id="settBoardCols">${colsHtml}</div>
     <button class="btn btn-sm btn-secondary" data-action="_addBoardCol" style="margin-top:4px;margin-bottom:12px">+ ${t('board_add_col')||'Add Column'}</button>
@@ -1058,6 +1080,7 @@ function _openBoardSettings() {
 function _toggleSettVisFields() {
   const vis = document.getElementById('settBoardVis').value;
   document.getElementById('settBoardGroupDiv').style.display = vis === 'group' ? '' : 'none';
+  document.getElementById('settBoardRoleDiv').style.display = vis === 'role' ? '' : 'none';
 }
 
 window._settCols = null;
@@ -1099,6 +1122,7 @@ async function _saveBoardSettings() {
       description: document.getElementById('settBoardDesc').value.trim(),
       visibility: document.getElementById('settBoardVis').value,
       group_id: parseInt(document.getElementById('settBoardGroup')?.value) || 0,
+      role_key: document.getElementById('settBoardRole')?.value || '',
       columns: cols,
       color: boardColor === '#1a1a2e' ? '' : boardColor,
     });
