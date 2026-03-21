@@ -210,6 +210,7 @@ const LANG_TO_COUNTRY = {
   sv: 'SE',
   fr: 'FR',
   fi: 'FI',
+  is: 'IS',
   da: 'DK',
   de: 'DE',
   no: 'NO',

@@ -1029,6 +1029,14 @@ const _connectorTypes = [
     { key: 'key_path', label: 'Client Key Path', type: 'text', placeholder: '/path/to/key.pem' },
     { key: 'community_of_interest', label: 'Community of Interest', type: 'text', placeholder: '' },
   ]},
+  { name: 'generic_webhook', label: 'Generic Webhook', icon: '🔗', fields: [
+    { key: 'url', label: 'Webhook URL', type: 'text', placeholder: 'https://example.com/webhook' },
+    { key: 'method', label: 'HTTP Method', type: 'select', options: ['POST', 'PUT', 'PATCH'] },
+    { key: 'secret', label: 'Secret / Auth Token (optional)', type: 'password', placeholder: '' },
+    { key: 'headers', label: 'Custom Headers (JSON, optional)', type: 'textarea', placeholder: '{"Authorization": "Bearer ..."}' },
+    { key: 'poll_url', label: 'Poll URL (optional, for inbound)', type: 'text', placeholder: 'https://example.com/events' },
+    { key: 'poll_interval_sec', label: 'Poll Interval (seconds)', type: 'number', placeholder: '300' },
+  ]},
 ];
 
 async function _loadConnectorList() {

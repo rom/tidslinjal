@@ -91,7 +91,10 @@
         <button class="lang-flag-btn" id="flagEN" title="English">🇬🇧</button>
         <button class="lang-flag-btn" id="flagSV" title="Svenska">🇸🇪</button>
         <button class="lang-flag-btn" id="flagFR" title="Français">🇫🇷</button>
+        <button class="lang-flag-btn" id="flagDE" title="Deutsch">🇩🇪</button>
+        <button class="lang-flag-btn" id="flagNL" title="Nederlands">🇳🇱</button>
         <button class="lang-flag-btn" id="flagFI" title="Suomi">🇫🇮</button>
+        <button class="lang-flag-btn" id="flagIS" title="Íslenska">🇮🇸</button>
         <button class="lang-flag-btn" id="flagDA" title="Dansk">🇩🇰</button>
         <button class="lang-flag-btn" id="flagNB" title="Norsk (Bokmål)">🇳🇴</button>
         <button class="lang-flag-btn" id="flagET" title="Eesti">🇪🇪</button>
@@ -2745,11 +2748,16 @@
       <p id="lbl-role-editor-desc" style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">Edit role names (EN / SV / FR) and capabilities. Click a column header to select/deselect all. Hover ⓘ for descriptions. Admin role is locked.</p>
       <div id="roleEditorTable"></div>
     </div>
-    <div class="modal-footer" style="justify-content:space-between">
-      <button class="btn btn-secondary" id="btnAddNewRole">＋ Add Custom Role</button>
+    <div class="modal-footer" style="justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" id="btnAddNewRole">＋ Add Custom Role</button>
+        <button class="btn btn-secondary btn-sm" id="btnResetRoleDefaults" title="Reset all permissions to built-in defaults">↩ Reset to Default</button>
+        <button class="btn btn-secondary btn-sm" id="btnShowRoleChanges" title="Show permissions that differ from defaults">△ Show Changes</button>
+        <button class="btn btn-secondary btn-sm" id="btnRoleEditorHelp" title="Help">❓ Help</button>
+      </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" data-close-modal="roleEditorModal">Cancel</button>
         <button class="btn btn-primary" id="btnSaveRoles">Save Roles</button>
+        <button class="btn btn-secondary" data-close-modal="roleEditorModal">Cancel</button>
       </div>
     </div>
   </div>

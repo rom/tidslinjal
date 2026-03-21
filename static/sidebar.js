@@ -2598,7 +2598,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${[
             {code:'en',name:'English'},{code:'sv',name:'Svenska'},{code:'fr',name:'Français'},
             {code:'de',name:'Deutsch'},{code:'nl',name:'Nederlands'},
-            {code:'fi',name:'Suomi'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
+            {code:'fi',name:'Suomi'},{code:'is',name:'Íslenska'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
             {code:'et',name:'Eesti'},{code:'lv',name:'Latviešu'},{code:'lt',name:'Lietuvių'},
             {code:'it',name:'Italiano'},{code:'es',name:'Español'},{code:'pt',name:'Português'},
             {code:'pl',name:'Polski'},{code:'uk',name:'Українська'}
