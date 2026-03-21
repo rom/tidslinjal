@@ -23,8 +23,8 @@ function _boardModal(id, content, width) {
   let el = document.getElementById(id);
   if (el) el.remove();
   const html = `<div class="modal-overlay" id="${id}">
-    <div class="modal" style="max-width:${width||'800px'};width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px">
-      <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:8px;right:12px;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer">&#x2715;</button>
+    <div class="modal" style="width:${width||'800px'};max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px">
+      <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;z-index:10">&#x2715;</button>
       ${content}
     </div>
   </div>`;
@@ -66,7 +66,15 @@ function _renderBoardListModal() {
       <h2 style="margin:0">📌 ${t('board_title')||'Boards'}</h2>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm btn-primary" data-action="_openCreateBoardDialog">+ ${t('board_new')||'New Board'}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_openImportBoardDialog">⬆ ${t('btn_import')||'Import'}</button>
+        <div style="position:relative;display:inline-block" id="boardListImpExpDropdown">
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardListImpExpMenu">⬆⬇ ${t('board_import_export')||'Import/Export'}</button>
+          <div id="boardListImpExpMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:160px;margin-top:4px">
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="json">⬆ Import JSON</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="csv">⬆ Import CSV</button>
+            <hr style="margin:2px 0;border:0;border-top:1px solid var(--border)">
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportAllBoardsJson">⬇ Export All (JSON)</button>
+          </div>
+        </div>
       </div>
     </div>`;
 
@@ -77,9 +85,13 @@ function _renderBoardListModal() {
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
       const cardBg = b.color ? `background:${b.color}22;border:1px solid ${b.color}44;` : 'background:var(--bg2);border:1px solid var(--border);';
-      html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg}" data-action="_openBoard" data-arg="${b.id}">
+      html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg};position:relative" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>${escHtml(b.name)}</strong> <span title="${b.visibility}">${vis}</span>
+          <strong>${escHtml(b.name)}</strong>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span title="${b.visibility}">${vis}</span>
+            <button class="btn btn-sm" style="color:var(--danger);font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_removeBoardFromList" data-arg="${b.id}" data-stop-prop title="${t('board_delete')||'Remove board'}">🗑</button>
+          </div>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${escHtml(b.description||'')}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${b.columns ? b.columns.length : 3} columns · by ${escHtml(b.owner_name||'')}</div>
@@ -143,6 +155,9 @@ function _openCreateBoardDialog() {
     </div>
   </div>`;
   _boardModal('boardCreateModal', html, '520px');
+  // Ensure the select dropdown is not clipped by overflow
+  const createModalDiv = document.querySelector('#boardCreateModal .modal');
+  if (createModalDiv) createModalDiv.style.overflow = 'visible';
 }
 
 function _toggleBoardVisFields() {
@@ -300,6 +315,18 @@ function _renderKanbanBoard() {
   _boardModal('boardsModal', html, boardWidth + 'px');
   _bindKanbanEvents();
   _setupKanbanDragScroll();
+
+  // Watch modal resize and adjust inner pane
+  const boardModalEl = document.querySelector('#boardsModal .modal');
+  if (boardModalEl && typeof ResizeObserver !== 'undefined') {
+    const kanbanCols = boardModalEl.querySelector('.kanban-columns');
+    new ResizeObserver(() => {
+      if (kanbanCols) {
+        const avail = boardModalEl.clientWidth - 40; // 20px padding each side
+        kanbanCols.style.width = avail > 0 ? avail + 'px' : '100%';
+      }
+    }).observe(boardModalEl);
+  }
 }
 
 // ── Bind drag/drop and dblclick events for kanban board ──
@@ -525,7 +552,7 @@ function _openBoardItem(itemId) {
       <h3 style="margin:0">#${item.id}
         <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:60%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent';_inlineSaveBoardItem(${item.id})">
       </h3>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div style="display:flex;gap:6px;align-items:center;margin-right:32px">
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
         <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger);min-width:32px;height:28px;padding:4px 8px" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete item'}">🗑</button>
@@ -533,8 +560,9 @@ function _openBoardItem(itemId) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:var(--fs-sm);margin-bottom:12px">
       <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
+      <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
       <div><strong>${t('board_type')||'Type'}:</strong>
-        <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:1px 4px;border:1px solid transparent;background:transparent;border-radius:var(--radius)" onchange="_inlineSaveBoardItem(${item.id})" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+        <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:1px 4px;border:1px solid transparent;background:transparent;border-radius:var(--radius)" data-action="_inlineSaveBoardItem" data-arg="${item.id}" data-event="change">
           <option value="" ${!item.item_type?'selected':''}>—</option>
           <option value="task" ${item.item_type==='task'?'selected':''}>Task</option>
           <option value="meeting" ${item.item_type==='meeting'?'selected':''}>Meeting</option>
@@ -543,7 +571,6 @@ function _openBoardItem(itemId) {
           <option value="note" ${item.item_type==='note'?'selected':''}>Note</option>
         </select>
       </div>
-      <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
       <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -817,6 +844,17 @@ async function _doDeleteBoard() {
   } catch (e) { alert(e.message); }
 }
 
+// ── Remove Board from List ──
+async function _removeBoardFromList(boardId) {
+  const board = _boardsState.boards.find(b => b.id === boardId);
+  const name = board ? board.name : 'this board';
+  if (!confirm((t('board_delete_confirm') || 'Delete board "%s" and all its items?').replace('%s', name))) return;
+  try {
+    await _boardApi('DELETE', '/boards/' + boardId);
+    openBoardsModal();
+  } catch (e) { alert(e.message); }
+}
+
 // ── Zoom ──
 function _boardZoomIn() {
   _boardsState.zoom = Math.min(2.0, _boardsState.zoom + 0.1);
@@ -892,6 +930,10 @@ document.addEventListener('click', function(e) {
     const m = document.getElementById('boardImportMenu');
     if (m) m.style.display = 'none';
   }
+  if (!e.target.closest('#boardListImpExpDropdown')) {
+    const m = document.getElementById('boardListImpExpMenu');
+    if (m) m.style.display = 'none';
+  }
 });
 
 // ── Import ──
@@ -917,6 +959,30 @@ function _importBoardAs(format) {
 
 function _openImportBoardDialog() {
   _importBoardAs('json');
+}
+
+function _toggleBoardListImpExpMenu() {
+  const menu = document.getElementById('boardListImpExpMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+}
+
+async function _exportAllBoardsJson() {
+  const menu = document.getElementById('boardListImpExpMenu');
+  if (menu) menu.style.display = 'none';
+  try {
+    const boards = _boardsState.boards || [];
+    const allData = [];
+    for (const b of boards) {
+      const items = await _boardApi('GET', '/boards/' + b.id + '/items').catch(() => []);
+      allData.push({ board: b, items });
+    }
+    const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'boards-export-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) { alert(e.message); }
 }
 
 async function _doImportBoard() {
@@ -948,10 +1014,14 @@ async function _shareBoardLink() {
     _boardModal('boardShareModal', `<div style="max-width:500px">
       <h3>🔗 ${t('board_share')||'Share Link'}</h3>
       <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_share_desc')||'Anyone with an account and appropriate access rights can use this link to view the board.'}</p>
-      <input class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly onclick="this.select()">
+      <input id="boardShareUrl" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly>
       <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('board_share_access_note')||'Access is checked: the user must be authenticated and have visibility rights to this board.'}</p>
-      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardShareModal">✖ ${t('btn_close')||'Close'}</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" data-action="_copyShareUrl" data-arg="boardShareUrl">📋 ${t('btn_copy')||'Copy to clipboard'}</button>
+        <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardShareModal">✖ ${t('btn_close')||'Close'}</button>
+      </div>
     </div>`, '520px');
+    _bindShareInput('boardShareUrl');
   } catch (e) { alert(e.message); }
 }
 
@@ -963,11 +1033,30 @@ async function _shareBoardItemLink(itemId) {
     _boardModal('boardItemShareModal', `<div style="max-width:500px">
       <h3>🔗 ${t('board_share_item')||'Share Item Link'}</h3>
       <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_share_item_desc')||'Anyone with an account and access to this board can use this link to view the item.'}</p>
-      <input class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly onclick="this.select()">
+      <input id="boardItemShareUrl" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly>
       <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('board_share_access_note')||'Access is checked: the user must be authenticated and have visibility rights to this board.'}</p>
-      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardItemShareModal">✖ ${t('btn_close')||'Close'}</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" data-action="_copyShareUrl" data-arg="boardItemShareUrl">📋 ${t('btn_copy')||'Copy to clipboard'}</button>
+        <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardItemShareModal">✖ ${t('btn_close')||'Close'}</button>
+      </div>
     </div>`, '520px');
+    _bindShareInput('boardItemShareUrl');
   } catch (e) { alert(e.message); }
+}
+
+// ── Share link helpers (CSP-safe) ──
+function _bindShareInput(inputId) {
+  const inp = document.getElementById(inputId);
+  if (inp) inp.addEventListener('click', function() { this.select(); });
+}
+
+function _copyShareUrl(inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  inp.select();
+  navigator.clipboard.writeText(inp.value).then(() => {
+    if (typeof showNotification === 'function') showNotification('success', t('link_copied') || 'Copied to clipboard');
+  }).catch(() => {});
 }
 
 // ── Board Color ──
