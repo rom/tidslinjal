@@ -989,16 +989,35 @@ function _renderExportTab(container) {
   _bindActions(container);
 }
 
-function _downloadAnalysisExport(format) {
+async function _downloadAnalysisExport(format) {
   const from = document.getElementById('analysisFrom')?.value || '';
   const to = document.getElementById('analysisTo')?.value || '';
   let url = '/api/stats/export?format=' + encodeURIComponent(format);
   if (from) url += '&from=' + encodeURIComponent(from);
   if (to) url += '&to=' + encodeURIComponent(to);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,19).replace(/:/g,'') + '.' + format;
-  a.click();
+  const filename = 'tidslinjal-analysis-' + new Date().toISOString().slice(0,19).replace(/:/g,'') + '.' + format;
+
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    // Download
+    const dlUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = dlUrl; a.download = filename;
+    a.click();
+    URL.revokeObjectURL(dlUrl);
+    // Archive to infomanagement → local reports
+    const title = 'Analysis Export — ' + new Date().toISOString().slice(0, 10);
+    if (typeof _archiveReportToLocal === 'function') {
+      _archiveReportToLocal(await blob.arrayBuffer(), blob.type, filename, title, 'analysis-' + format, 'analysis');
+    }
+  } catch {
+    // Fallback: direct link download (no archiving)
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    a.click();
+  }
   showNotification('success', t('export_started')||'Export started');
 }
 
@@ -1035,9 +1054,14 @@ function _exportAnalysisVisual(format) {
     merged.toBlob(blob => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
+      const dlName = fname + '.' + format;
       const a = document.createElement('a');
-      a.href = url; a.download = fname + '.' + format; a.click();
+      a.href = url; a.download = dlName; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+      // Archive
+      if (typeof _archiveReportToLocal === 'function') {
+        blob.arrayBuffer().then(buf => _archiveReportToLocal(buf, mimeType, dlName, 'Analysis Chart — ' + dateStr, 'analysis-chart', 'analysis'));
+      }
     }, mimeType, 0.95);
     showNotification('success', t('export_started')||'Export started');
   } else if (format === 'svg') {
@@ -1057,10 +1081,13 @@ function _exportAnalysisVisual(format) {
       yOff += ch + gap;
     });
     svgParts.push('</svg>');
-    const blob = new Blob([svgParts.join('\n')], {type:'image/svg+xml'});
+    const svgContent = svgParts.join('\n');
+    const blob = new Blob([svgContent], {type:'image/svg+xml'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = fname + '.svg'; a.click();
+    const dlName = fname + '.svg';
+    const a = document.createElement('a'); a.href = url; a.download = dlName; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+    if (typeof _archiveReportToLocal === 'function') _archiveReportToLocal(svgContent, 'image/svg+xml', dlName, 'Analysis Chart — ' + dateStr, 'analysis-chart', 'analysis');
     showNotification('success', t('export_started')||'Export started');
   } else if (format === 'pdf') {
     // Simple PDF with embedded images

@@ -392,6 +392,8 @@ async function generateReport() {
   const format = document.getElementById('reportFormat')?.value || 'html';
   const dateStr = new Date().toISOString().slice(0,10);
 
+  let dlContent = html, dlMime = 'text/html;charset=utf-8', dlFilename = `report-${type}-${dateStr}.html`;
+
   if (format === 'print') {
     const printWin = window.open('', '_blank');
     if (printWin) {
@@ -401,20 +403,44 @@ async function generateReport() {
       setTimeout(() => { printWin.print(); }, 500);
     }
   } else if (format === 'docx') {
-    const content = _reportToWordXML(html);
-    _downloadBlob(content, 'application/msword', `report-${type}-${dateStr}.doc`);
+    dlContent = _reportToWordXML(html);
+    dlMime = 'application/msword';
+    dlFilename = `report-${type}-${dateStr}.doc`;
+    _downloadBlob(dlContent, dlMime, dlFilename);
   } else if (format === 'rtf') {
-    const content = _reportToRTF(html);
-    _downloadBlob(content, 'application/rtf', `report-${type}-${dateStr}.rtf`);
+    dlContent = _reportToRTF(html);
+    dlMime = 'application/rtf';
+    dlFilename = `report-${type}-${dateStr}.rtf`;
+    _downloadBlob(dlContent, dlMime, dlFilename);
   } else if (format === 'excel') {
-    const content = _reportToSpreadsheetML(html);
-    _downloadBlob(content, 'application/vnd.ms-excel', `report-${type}-${dateStr}.xls`);
+    dlContent = _reportToSpreadsheetML(html);
+    dlMime = 'application/vnd.ms-excel';
+    dlFilename = `report-${type}-${dateStr}.xls`;
+    _downloadBlob(dlContent, dlMime, dlFilename);
   } else {
-    // HTML download
-    _downloadBlob(html, 'text/html;charset=utf-8', `report-${type}-${dateStr}.html`);
+    _downloadBlob(html, 'text/html;charset=utf-8', dlFilename);
   }
+
+  // Archive to infomanagement → local reports
+  _archiveReportToLocal(dlContent, dlMime, dlFilename, title, type, 'report');
+
   closeModal('reportModal');
   showNotification('success', t('report_ready')||'Report downloaded');
+}
+
+// ── Archive report to infomanagement ─────────────────────────────────────────
+
+function _archiveReportToLocal(content, mimeType, filename, title, reportType, source) {
+  const blob = new Blob([content], { type: mimeType });
+  const fd = new FormData();
+  fd.append('file', blob, filename);
+  fd.append('title', title);
+  fd.append('description', (t('report_auto_archived') || 'Auto-saved when report was generated') + ' (' + source + ')');
+  fd.append('category', 'local');
+  fd.append('report_type', reportType);
+  fd.append('tags', source);
+  fetch('/api/report-archive', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd })
+    .catch(() => { /* silent — archiving is best-effort */ });
 }
 
 // ── Report format helpers ────────────────────────────────────────────────────
