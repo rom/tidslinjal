@@ -946,6 +946,18 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("POST /api/teamlead/team-poll", app.requireRole(RoleTeamLead, app.handleTeamLeadTeamPoll))
 	mux.HandleFunc("POST /api/teamlead/quick-report", app.requireRole(RoleTeamLead, app.handleTeamLeadQuickReport))
 	mux.HandleFunc("GET /api/teamlead/quick-reports", app.requireAuth(app.handleGetQuickReports))
+
+	// Staff Toolbox API
+	mux.HandleFunc("GET /api/staff/duties", app.requireRole(RoleStaffOfficer, app.handleGetStaffDuties))
+	mux.HandleFunc("POST /api/staff/duties", app.requireRole(RoleStaffOfficer, app.handleSetStaffDuty))
+	mux.HandleFunc("DELETE /api/staff/duties/{id}", app.requireRole(RoleStaffOfficer, app.handleDeleteStaffDuty))
+	mux.HandleFunc("GET /api/staff/members", app.requireRole(RoleStaffOfficer, app.handleGetStaffMembers))
+	mux.HandleFunc("POST /api/staff/members", app.requireRole(RoleStaffOfficer, app.handleSetStaffMember))
+	mux.HandleFunc("DELETE /api/staff/members/{id}", app.requireRole(RoleStaffOfficer, app.handleDeleteStaffMember))
+	mux.HandleFunc("GET /api/staff/areas", app.requireRole(RoleStaffOfficer, app.handleGetAreas))
+	mux.HandleFunc("POST /api/staff/areas", app.requireRole(RoleStaffOfficer, app.handleCreateArea))
+	mux.HandleFunc("PUT /api/staff/areas/{id}", app.requireRole(RoleStaffOfficer, app.handleUpdateArea))
+	mux.HandleFunc("DELETE /api/staff/areas/{id}", app.requireRole(RoleStaffOfficer, app.handleDeleteArea))
 	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
 		_, user := app.getSession(r)
 		if user == nil {
@@ -2289,7 +2301,7 @@ func main() {
 	}
 
 	// Resolve enabled languages
-	allLangs := []string{"en", "sv", "fr", "fi", "da", "de", "nb", "nl", "et", "lv", "lt", "it", "es", "pt", "pl", "uk"}
+	allLangs := []string{"en", "sv", "fr", "fi", "da", "de", "nb", "nl", "et", "lv", "lt", "it", "es", "pt", "pl", "uk", "is"}
 	if languagesFlag != "" {
 		// Explicit whitelist
 		var enabled []string

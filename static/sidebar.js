@@ -2031,6 +2031,7 @@ Fields: file, subject, sender, type, tags</pre>
           <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedTools" title="${t('btn_detach')||'Detach to window'}">⧉</button>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
+          ${(hasRole2(role, 'staffofficer') || userHasCapability('staff_toolbox')) ? toolBtn('\u{1F396}', t('staff_toolbox_title')||'Staff Toolbox', 'openStaffToolbox()') : ''}
           ${(isTeamLead || isAdminOrOplead || userHasCapability('teamlead_toolbox')) ? toolBtn('🧰', t('teamlead_toolbox_title')||'TeamLead Toolbox', 'openTeamLeadToolbox()') : ''}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}

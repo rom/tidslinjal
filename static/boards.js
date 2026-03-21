@@ -722,6 +722,12 @@ function _openBoardItem(itemId) {
     if (tagInput) _setupTagAutocomplete(tagInput);
   });
 
+  // Setup @mention autocomplete on note and comment textareas
+  const noteTA = document.getElementById('inlineItemNote');
+  if (noteTA) _setupBoardMentionAutocomplete(noteTA);
+  const commentTA = document.getElementById('newCommentText');
+  if (commentTA) _setupBoardMentionAutocomplete(commentTA);
+
   // Auto-save when modal is closed
   const modalOverlay = document.getElementById('boardItemModal');
   if (modalOverlay) {
@@ -1293,6 +1299,7 @@ function _setupTagAutocomplete(inputEl) {
   if (!inputEl || inputEl._tagAcSetup) return;
   inputEl._tagAcSetup = true;
   let acDiv = null;
+  let _tagMatches = [];
 
   function showSuggestions() {
     const val = inputEl.value;
@@ -1300,30 +1307,71 @@ function _setupTagAutocomplete(inputEl) {
     const current = (parts[parts.length - 1] || '').trim().toLowerCase();
     if (!current || _boardTagsCache.length === 0) { hideSuggestions(); return; }
     const existingTags = parts.slice(0, -1).map(s => s.trim().toLowerCase());
-    const matches = _boardTagsCache.filter(tag =>
+    _tagMatches = _boardTagsCache.filter(tag =>
       tag.toLowerCase().includes(current) && !existingTags.includes(tag.toLowerCase())
     );
-    if (matches.length === 0) { hideSuggestions(); return; }
+
+    // Auto-expand: if exactly one match starts with the typed text, auto-complete it
+    const prefixMatches = _tagMatches.filter(tag => tag.toLowerCase().startsWith(current));
+    if (prefixMatches.length === 1 && prefixMatches[0].toLowerCase() !== current) {
+      // Show suggestion but don't auto-fill yet — let user press Tab/Enter
+    }
+
+    if (_tagMatches.length === 0) { hideSuggestions(); return; }
     if (!acDiv) {
       acDiv = document.createElement('div');
       acDiv.style.cssText = 'position:absolute;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);max-height:150px;overflow-y:auto;width:' + inputEl.offsetWidth + 'px;box-shadow:0 4px 12px rgba(0,0,0,.3)';
       inputEl.parentNode.style.position = 'relative';
       inputEl.parentNode.appendChild(acDiv);
     }
-    acDiv.innerHTML = matches.map(tag =>
-      `<div style="padding:4px 8px;cursor:pointer;font-size:var(--fs-xs)" onmousedown="_selectTag(this,'${escHtml(tag)}')">${escHtml(tag)}</div>`
+    acDiv.innerHTML = _tagMatches.map((tag, i) =>
+      `<div class="tag-ac-item${i===0?' active':''}" style="padding:4px 8px;cursor:pointer;font-size:var(--fs-xs)" onmousedown="_selectTag(this,'${escHtml(tag)}')">${escHtml(tag)}</div>`
     ).join('');
   }
 
   function hideSuggestions() {
     if (acDiv) { acDiv.remove(); acDiv = null; }
+    _tagMatches = [];
+  }
+
+  function selectActiveTag() {
+    if (!acDiv) return false;
+    const active = acDiv.querySelector('.tag-ac-item.active');
+    if (active) {
+      const tag = active.textContent;
+      _doSelectTag(inputEl, tag);
+      hideSuggestions();
+      return true;
+    }
+    if (_tagMatches.length === 1) {
+      _doSelectTag(inputEl, _tagMatches[0]);
+      hideSuggestions();
+      return true;
+    }
+    return false;
   }
 
   inputEl.addEventListener('input', showSuggestions);
   inputEl.addEventListener('blur', () => setTimeout(hideSuggestions, 200));
   inputEl.addEventListener('keydown', e => {
-    if (e.key === 'Escape') hideSuggestions();
+    if (e.key === 'Escape') { hideSuggestions(); return; }
+    if (!acDiv) return;
+    const items = acDiv.querySelectorAll('.tag-ac-item');
+    const active = acDiv.querySelector('.tag-ac-item.active');
+    let idx = Array.from(items).indexOf(active);
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); items.forEach((it,i) => it.classList.toggle('active', i===idx)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); items.forEach((it,i) => it.classList.toggle('active', i===idx)); }
+    else if (e.key === 'Tab' || e.key === 'Enter') {
+      if (selectActiveTag()) e.preventDefault();
+    }
   });
+}
+
+function _doSelectTag(inputEl, tag) {
+  const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
+  parts[parts.length - 1] = tag;
+  inputEl.value = parts.join(', ') + ', ';
+  inputEl.focus();
 }
 
 // Global function for tag selection from autocomplete dropdown
@@ -1335,6 +1383,99 @@ window._selectTag = function(el, tag) {
   inputEl.value = parts.join(', ') + ', ';
   inputEl.focus();
 };
+
+// ── @Mention Autocomplete for board textareas ──
+let _boardMentionDropdown = null;
+let _boardMentionStart = -1;
+let _boardMentionTextarea = null;
+
+function _setupBoardMentionAutocomplete(textarea) {
+  if (!textarea || textarea._boardMentionBound) return;
+  textarea._boardMentionBound = true;
+  textarea.addEventListener('input', () => _onBoardMentionInput(textarea));
+  textarea.addEventListener('keydown', (e) => _onBoardMentionKey(e, textarea));
+  textarea.addEventListener('blur', () => { setTimeout(_closeBoardMentionDropdown, 150); });
+}
+
+function _onBoardMentionInput(ta) {
+  const val = ta.value;
+  const pos = ta.selectionStart;
+  let start = pos - 1;
+  while (start >= 0 && /\w/.test(val[start])) start--;
+  if (start < 0 || val[start] !== '@') { _closeBoardMentionDropdown(); return; }
+  _boardMentionStart = start;
+  _boardMentionTextarea = ta;
+  const query = val.slice(start + 1, pos).toLowerCase();
+  const users = (state.users || []).filter(u =>
+    (u.username && u.username.toLowerCase().includes(query)) ||
+    (u.display_name && u.display_name.toLowerCase().includes(query))
+  ).slice(0, 8);
+  if (!users.length) { _closeBoardMentionDropdown(); return; }
+  _showBoardMentionDropdown(ta, users);
+}
+
+function _onBoardMentionKey(e, ta) {
+  if (!_boardMentionDropdown) return;
+  const items = _boardMentionDropdown.querySelectorAll('.mention-item');
+  const active = _boardMentionDropdown.querySelector('.mention-item.active');
+  let idx = Array.from(items).indexOf(active);
+  if (e.key === 'ArrowDown') { e.preventDefault(); _updateBoardMentionActive(items, Math.min(idx + 1, items.length - 1)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _updateBoardMentionActive(items, Math.max(idx - 1, 0)); }
+  else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (active) { e.preventDefault(); active.click(); }
+    else if (items.length === 1) { e.preventDefault(); items[0].click(); }
+  }
+  else if (e.key === 'Escape') { e.preventDefault(); _closeBoardMentionDropdown(); }
+}
+
+function _updateBoardMentionActive(items, idx) {
+  items.forEach((it, i) => it.classList.toggle('active', i === idx));
+  const el = items[idx]; if (el) el.scrollIntoView({block:'nearest'});
+}
+
+function _showBoardMentionDropdown(ta, users) {
+  _closeBoardMentionDropdown();
+  const rect = ta.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.id = 'boardMentionDropdown';
+  _boardMentionDropdown = dd;
+  Object.assign(dd.style, {
+    position: 'fixed', zIndex: '9999', background: 'var(--bg2)',
+    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+    boxShadow: '0 4px 12px rgba(0,0,0,.3)', minWidth: '180px', maxHeight: '200px',
+    overflowY: 'auto', left: rect.left + 'px', top: (rect.bottom + 2) + 'px'
+  });
+  users.forEach((u, i) => {
+    const item = document.createElement('div');
+    item.className = 'mention-item' + (i === 0 ? ' active' : '');
+    item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
+    item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
+    item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
+    item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
+    dd.appendChild(item);
+  });
+  document.body.appendChild(dd);
+}
+
+function _closeBoardMentionDropdown() {
+  if (_boardMentionDropdown) { _boardMentionDropdown.remove(); _boardMentionDropdown = null; }
+  _boardMentionStart = -1;
+}
+
+function _insertBoardMention(username) {
+  const ta = _boardMentionTextarea;
+  if (!ta || _boardMentionStart < 0) return;
+  const pos = ta.selectionStart;
+  const val = ta.value;
+  const before = val.slice(0, _boardMentionStart);
+  const after = val.slice(pos);
+  const insert = '@' + username + ' ';
+  ta.value = before + insert + after;
+  const newPos = before.length + insert.length;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  _closeBoardMentionDropdown();
+}
 
 // ── Handle Share Link on Page Load ──
 function _handleBoardShareLinks() {

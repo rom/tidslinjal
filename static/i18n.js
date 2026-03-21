@@ -44,7 +44,7 @@ function t(key) {
 
 function getLocale() {
   const lang = (window.state && window.state.preferences && window.state.preferences.language) || 'en';
-  const map = { en: 'en-GB', sv: 'sv-SE', fr: 'fr-FR', de: 'de-DE', nl: 'nl-NL', fi: 'fi-FI', da: 'da-DK', nb: 'nb-NO', et: 'et-EE', lv: 'lv-LV', lt: 'lt-LT', it: 'it-IT', es: 'es-ES', pt: 'pt-PT', pl: 'pl-PL', uk: 'uk-UA' };
+  const map = { en: 'en-GB', sv: 'sv-SE', fr: 'fr-FR', de: 'de-DE', nl: 'nl-NL', fi: 'fi-FI', da: 'da-DK', nb: 'nb-NO', et: 'et-EE', lv: 'lv-LV', lt: 'lt-LT', it: 'it-IT', es: 'es-ES', pt: 'pt-PT', pl: 'pl-PL', uk: 'uk-UA', is: 'is-IS' };
   return map[lang] || 'en-GB';
 }
 
