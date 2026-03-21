@@ -1,5 +1,40 @@
 /* ── Sidebar ── */
 
+// ── Silent API helper for optional endpoints (avoids console.warn on 404) ─
+async function _optionalApiGet(url) {
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+// ── Exercise mode label helpers ───────────────────────────────────────────
+function getOperationNameLabel(ex) {
+  const mode = (ex && ex.operation_mode) || 'exercise';
+  if (mode === 'incident') return t('mode_incident') || 'Incident';
+  if (mode === 'operation') return t('mode_operation') || 'Operation';
+  return t('settings_exercise_label') || 'Exercise name';
+}
+function getStartexLabel(ex) {
+  const mode = (ex && ex.operation_mode) || 'exercise';
+  if (mode === 'incident') return t('start_of_incident') || 'Start of incident';
+  if (mode === 'operation') return t('start_of_operation') || 'Start of operation';
+  return t('settings_exercise_epoch') || 'STARTEX (Day 1 T+0)';
+}
+function getEndexLabel(ex) {
+  const mode = (ex && ex.operation_mode) || 'exercise';
+  if (mode === 'incident') return t('end_of_incident') || 'End of incident';
+  if (mode === 'operation') return t('end_of_operation') || 'End of operation';
+  return t('settings_exercise_endex') || 'ENDEX (End of exercise)';
+}
+function getExIndexLabel(ex) {
+  const mode = (ex && ex.operation_mode) || 'exercise';
+  if (mode === 'incident') return t('exercise_index_incident') || 'Incident index';
+  if (mode === 'operation') return t('exercise_index_operation') || 'Operation index';
+  return t('exercise_index') || 'Exercise index';
+}
+
 // ── Sidebar Resize Handle ─────────────────────────────────────────────────
 function setupSidebarResize() {
   const handle = document.getElementById('sidebarResizeHandle');
@@ -2293,8 +2328,8 @@ Fields: file, subject, sender, type, tags</pre>
         </div>
       </div>
     `;
-    // Load TLS status for security tab
-    apiGet('/api/tls/status').then(tls => {
+    // Load TLS status for security tab (optional endpoint, silence 404)
+    _optionalApiGet('/api/tls/status').then(tls => {
       const el = document.getElementById('secTlsCurrentStatus');
       if (el) {
         const configured = tls && tls.configured;
@@ -2311,8 +2346,8 @@ Fields: file, subject, sender, type, tags</pre>
         }
       }
     }).catch(() => {});
-    // Load OIDC status
-    apiGet('/api/oidc/config').then(oidc => {
+    // Load OIDC status (optional endpoint, silence 404)
+    _optionalApiGet('/api/oidc/config').then(oidc => {
       const statusEl = document.getElementById('secOidcStatus');
       const enableCb = document.getElementById('secSsoEnabled');
       const detailEl = document.getElementById('secOidcDetailContent');
@@ -2334,8 +2369,8 @@ Fields: file, subject, sender, type, tags</pre>
         detailEl.innerHTML = `<span style="color:var(--text-dim)">${t('security_oidc_not_configured')||'Not configured'}</span>`;
       }
     }).catch(() => {});
-    // Load password policy
-    apiGet('/api/security/policy').then(policy => {
+    // Load password policy (optional endpoint, silence 404)
+    _optionalApiGet('/api/security/policy').then(policy => {
       const el = document.getElementById('secPasswordPolicy');
       if (el && policy) {
         // Already have form fields, just update them
