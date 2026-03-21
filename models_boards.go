@@ -29,24 +29,29 @@ type BoardCol struct {
 
 // BoardItem is a card/issue on the board
 type BoardItem struct {
-	ID            int64             `json:"id"`
-	BoardID       int64             `json:"board_id"`
-	ColumnID      string            `json:"column_id"`
-	SortOrder     int               `json:"sort_order"`
-	Subject       string            `json:"subject"`
-	Note          string            `json:"note,omitempty"`
-	ItemType      string            `json:"item_type,omitempty"`   // "task", "meeting", "checklist", etc.
-	Color         string            `json:"color,omitempty"`       // card background color
-	Tags          []string          `json:"tags,omitempty"`
-	CreatorID     int64             `json:"creator_id"`
-	CreatorName   string            `json:"creator_name"`
-	Attachments   []BoardAttachment `json:"attachments,omitempty"`
-	History       []BoardHistory    `json:"history,omitempty"`
-	ChecklistID   int64             `json:"checklist_id,omitempty"`  // linked checklist
-	EventID       int64             `json:"event_id,omitempty"`      // linked event/meeting
-	ShareToken    string            `json:"share_token,omitempty"`   // token for sharable link
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
+	ID              int64             `json:"id"`
+	BoardID         int64             `json:"board_id"`
+	ColumnID        string            `json:"column_id"`
+	SortOrder       int               `json:"sort_order"`
+	Subject         string            `json:"subject"`
+	Note            string            `json:"note,omitempty"`
+	ItemType        string            `json:"item_type,omitempty"`   // "task", "meeting", "checklist", "issue", "note", "other"
+	Color           string            `json:"color,omitempty"`       // card background color
+	Tags            []string          `json:"tags,omitempty"`
+	Links           []BoardLink       `json:"links,omitempty"`
+	DueDate         string            `json:"due_date,omitempty"`    // ISO date string (YYYY-MM-DD), optional
+	ResponsibleID   int64             `json:"responsible_id,omitempty"`
+	ResponsibleName string            `json:"responsible_name,omitempty"`
+	Comments        []BoardComment    `json:"comments,omitempty"`
+	CreatorID       int64             `json:"creator_id"`
+	CreatorName     string            `json:"creator_name"`
+	Attachments     []BoardAttachment `json:"attachments,omitempty"`
+	History         []BoardHistory    `json:"history,omitempty"`
+	ChecklistID     int64             `json:"checklist_id,omitempty"`  // linked checklist
+	EventID         int64             `json:"event_id,omitempty"`      // linked event/meeting
+	ShareToken      string            `json:"share_token,omitempty"`   // token for sharable link
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 // BoardAttachment is a file attached to a board item
@@ -58,6 +63,21 @@ type BoardAttachment struct {
 	MimeType   string    `json:"mime_type"`
 	UploadedBy int64     `json:"uploaded_by"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+// BoardLink is a URL link attached to a board item
+type BoardLink struct {
+	URL   string `json:"url"`
+	Label string `json:"label,omitempty"`
+}
+
+// BoardComment is a comment on a board item
+type BoardComment struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // BoardHistory is an activity/history entry on a board item

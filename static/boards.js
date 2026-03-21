@@ -283,19 +283,32 @@ function _renderKanbanBoard() {
 
       for (const item of cItems) {
         const bgColor = item.color || 'var(--bg3)';
+        const typeIcon = _itemTypeIcons[item.item_type] || '';
+        // Due date display and urgency
+        let dueDateHtml = '';
+        if (item.due_date) {
+          const due = new Date(item.due_date + 'T23:59:59');
+          const now = new Date();
+          const daysLeft = Math.ceil((due - now) / 86400000);
+          const dueColor = daysLeft < 0 ? 'var(--danger)' : daysLeft <= 2 ? '#e67e22' : 'var(--text-dim)';
+          dueDateHtml = `<span title="${t('board_due_date')||'Due'}: ${item.due_date}" style="color:${dueColor};font-weight:${daysLeft<=0?'bold':'normal'}">📅 ${item.due_date.slice(5)}</span>`;
+        }
         html += `<div class="kanban-card" draggable="true" data-item-id="${item.id}" data-drag-item="${item.id}"
           style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
           data-action="_openBoardItem" data-arg="${item.id}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <strong style="font-size:var(--fs-sm)">${escHtml(item.subject)}</strong>
+            <strong style="font-size:var(--fs-sm)">${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</strong>
             <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
           </div>
           ${item.note ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;max-height:40px;overflow:hidden">${escHtml(item.note).substring(0, 100)}</div>` : ''}
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:var(--fs-xs)">
-            <span style="color:var(--text-dim)">${escHtml(item.creator_name||'')}</span>
-            <div style="display:flex;gap:4px">
+            <span style="color:var(--text-dim)">${item.responsible_name ? escHtml(item.responsible_name) : escHtml(item.creator_name||'')}</span>
+            <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
               ${item.tags ? item.tags.map(tag => `<span style="background:var(--accent);color:#fff;padding:0 4px;border-radius:3px;font-size:9px">${escHtml(tag)}</span>`).join('') : ''}
+              ${dueDateHtml}
               ${item.attachments && item.attachments.length ? `<span title="${item.attachments.length} attachment(s)">📎${item.attachments.length}</span>` : ''}
+              ${item.links && item.links.length ? `<span title="${item.links.length} link(s)">🔗${item.links.length}</span>` : ''}
+              ${item.comments && item.comments.length ? `<span title="${item.comments.length} comment(s)">💬${item.comments.length}</span>` : ''}
               ${item.checklist_id ? '<span title="Linked checklist">📋</span>' : ''}
               ${item.event_id ? '<span title="Linked event">📅</span>' : ''}
             </div>
@@ -539,6 +552,10 @@ async function _addItemToCol(colId) {
   } catch (e) { alert(e.message); }
 }
 
+// ── Item type icons ──
+const _itemTypeIcons = { task: '✅', meeting: '🤝', checklist: '📋', issue: '⚠️', note: '📝', other: '🔹' };
+const _itemTypeLabels = { task: 'Task', meeting: 'Meeting', checklist: 'Checklist', issue: 'Issue', note: 'Note', other: 'Other' };
+
 // ── Open item detail ──
 function _openBoardItem(itemId) {
   if (_boardsState.justDragged) return;
@@ -547,10 +564,15 @@ function _openBoardItem(itemId) {
   const board = _boardsState.activeBoard;
   const colName = (board.columns.find(c => c.id === item.column_id) || {}).name || item.column_id;
 
-  let html = `<div style="max-width:700px">
+  // Track item ID for auto-save on close
+  _boardsState._editingItemId = itemId;
+
+  const typeIcon = _itemTypeIcons[item.item_type] || '';
+
+  let html = `<div style="max-width:720px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <h3 style="margin:0">#${item.id}
-        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:60%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent';_inlineSaveBoardItem(${item.id})">
+        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:60%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
       </h3>
       <div style="display:flex;gap:6px;align-items:center;margin-right:32px">
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
@@ -558,34 +580,77 @@ function _openBoardItem(itemId) {
         <button class="btn btn-sm btn-secondary" style="color:var(--danger);min-width:32px;height:28px;padding:4px 8px" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete item'}">🗑</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:var(--fs-sm);margin-bottom:12px">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:var(--fs-sm);margin-bottom:14px">
       <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
       <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
-      <div><strong>${t('board_type')||'Type'}:</strong>
-        <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:1px 4px;border:1px solid transparent;background:transparent;border-radius:var(--radius)" data-action="_inlineSaveBoardItem" data-arg="${item.id}" data-event="change">
-          <option value="" ${!item.item_type?'selected':''}>—</option>
-          <option value="task" ${item.item_type==='task'?'selected':''}>Task</option>
-          <option value="meeting" ${item.item_type==='meeting'?'selected':''}>Meeting</option>
-          <option value="checklist" ${item.item_type==='checklist'?'selected':''}>Checklist</option>
-          <option value="issue" ${item.item_type==='issue'?'selected':''}>Issue</option>
-          <option value="note" ${item.item_type==='note'?'selected':''}>Note</option>
+
+      <div style="display:flex;align-items:center;gap:6px">
+        <strong>${t('board_type')||'Type'}:</strong>
+        <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer;min-width:140px;appearance:auto">
+          <option value="" ${!item.item_type?'selected':''}>— ${t('board_select_type')||'Select type'} —</option>
+          <option value="task" ${item.item_type==='task'?'selected':''}>✅ Task</option>
+          <option value="meeting" ${item.item_type==='meeting'?'selected':''}>🤝 Meeting</option>
+          <option value="checklist" ${item.item_type==='checklist'?'selected':''}>📋 Checklist</option>
+          <option value="issue" ${item.item_type==='issue'?'selected':''}>⚠️ Issue</option>
+          <option value="note" ${item.item_type==='note'?'selected':''}>📝 Note</option>
+          <option value="other" ${item.item_type==='other'?'selected':''}>🔹 Other</option>
         </select>
       </div>
+
       <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
+
+      <div style="display:flex;align-items:center;gap:6px">
+        <strong>${t('board_responsible')||'Responsible'}:</strong>
+        <select id="inlineItemResponsible" class="input" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer;min-width:140px;appearance:auto">
+          <option value="0" data-name="">— ${t('board_none')||'None'} —</option>
+          ${(state.users||[]).map(u => `<option value="${u.id}" data-name="${escHtml(u.display_name||u.username)}" ${item.responsible_id===u.id?'selected':''}>${escHtml(u.display_name||u.username)}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px">
+        <strong>📅 ${t('board_due_date')||'Due date'}:</strong>
+        <input id="inlineItemDueDate" type="date" class="input" value="${escHtml(item.due_date||'')}" style="font-size:var(--fs-sm);padding:3px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer">
+        ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemDueDate').value='';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
+      </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <strong style="font-size:var(--fs-sm)">${t('board_color')||'Color'}:</strong>
       <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" onchange="_inlineSaveBoardItem(${item.id})">
       ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemColor').value='#1a1a2e';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
     </div>
-    <div style="margin-bottom:8px;font-size:var(--fs-sm)">
-      <strong>${t('tags_title')||'Tags'}:</strong>
-      <input id="inlineItemTags" class="input" style="width:calc(100% - 50px);font-size:var(--fs-sm);padding:2px 6px;border:1px solid transparent;background:transparent;border-radius:var(--radius);margin-left:4px" value="${escHtml((item.tags||[]).join(', '))}" placeholder="${t('tags_placeholder')||'comma-separated'}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent';_inlineSaveBoardItem(${item.id})">
+
+    <div style="margin-bottom:10px">
+      <strong style="font-size:var(--fs-sm)">🏷️ ${t('tags_title')||'Tags'}:</strong>
+      <div style="margin-top:4px;position:relative">
+        <input id="inlineItemTags" class="input" style="width:100%;font-size:var(--fs-sm);padding:6px 10px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" value="${escHtml((item.tags||[]).join(', '))}" placeholder="${t('tags_placeholder')||'Type tags separated by commas, e.g. urgent, review, backend'}">
+      </div>
     </div>
+
     <div style="margin-bottom:12px">
-      <strong style="font-size:var(--fs-sm)">${t('board_note')||'Note'}:</strong>
-      <textarea id="inlineItemNote" class="input" style="width:100%;min-height:80px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)" onblur="_inlineSaveBoardItem(${item.id})">${escHtml(item.note||'')}</textarea>
+      <strong style="font-size:var(--fs-sm)">📝 ${t('board_note')||'Note'}:</strong>
+      <textarea id="inlineItemNote" class="input" style="width:100%;min-height:80px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)">${escHtml(item.note||'')}</textarea>
     </div>`;
+
+  // Links section
+  html += `<div style="margin-bottom:12px">
+    <strong style="font-size:var(--fs-sm)">🔗 ${t('board_links')||'Links'}</strong>
+    <div id="boardItemLinks" style="margin-top:4px">`;
+  for (let li = 0; li < (item.links || []).length; li++) {
+    const link = item.links[li];
+    html += `<div class="board-link-row" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:var(--fs-xs)">
+      <a href="${escHtml(link.url)}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(link.label || link.url)}</a>
+      <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;color:var(--danger)" onclick="this.parentElement.remove()">✖</button>
+    </div>`;
+  }
+  html += `</div>
+    <div style="display:flex;gap:4px;margin-top:4px">
+      <input id="newLinkUrl" class="input" style="flex:2;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="https://...">
+      <input id="newLinkLabel" class="input" style="flex:1;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_link_label')||'Label (optional)'}">
+      <button class="btn btn-sm btn-secondary" onclick="_addBoardItemLink()" style="padding:4px 8px">+ Add</button>
+    </div>
+  </div>`;
 
   // Attachments
   html += `<div style="margin-bottom:12px">
@@ -599,8 +664,29 @@ function _openBoardItem(itemId) {
     <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="min-width:32px;height:28px;padding:4px 8px">⬆ Upload</button>
   </form></div></div>`;
 
+  // Comments
+  html += `<div style="margin-bottom:12px">
+    <strong style="font-size:var(--fs-sm)">💬 ${t('board_comments')||'Comments'} (${(item.comments||[]).length})</strong>
+    <div id="boardItemComments" style="max-height:200px;overflow-y:auto;margin-top:4px">`;
+  for (const c of (item.comments || [])) {
+    html += `<div style="padding:6px 8px;margin-bottom:4px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs)">
+      <div style="display:flex;justify-content:space-between">
+        <strong>${escHtml(c.user_name)}</strong>
+        <span style="color:var(--text-dim)">${new Date(c.created_at).toLocaleString()}</span>
+      </div>
+      <div style="margin-top:2px;white-space:pre-wrap">${escHtml(c.text)}</div>
+    </div>`;
+  }
+  html += `</div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <textarea id="newCommentText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);resize:vertical;min-height:36px" placeholder="${t('board_add_comment')||'Write a comment...'}"></textarea>
+      <button class="btn btn-sm btn-primary" onclick="_postBoardItemComment(${item.id})" style="align-self:flex-end;padding:6px 12px">Send</button>
+    </div>
+  </div>`;
+
   // History
-  html += `<div><strong style="font-size:var(--fs-sm)">📜 ${t('board_history')||'History'}</strong>
+  html += `<details style="margin-bottom:8px">
+    <summary style="font-size:var(--fs-sm);cursor:pointer"><strong>📜 ${t('board_history')||'History'}</strong></summary>
     <div style="max-height:200px;overflow-y:auto;margin-top:4px;font-size:var(--fs-xs)">`;
   for (const h of (item.history || []).slice().reverse()) {
     html += `<div style="padding:3px 0;border-bottom:1px solid var(--border)">
@@ -608,36 +694,111 @@ function _openBoardItem(itemId) {
       <strong>${escHtml(h.user_name)}</strong>: ${escHtml(h.action)} ${h.detail ? '— ' + escHtml(h.detail) : ''}
     </div>`;
   }
-  html += `</div></div></div>`;
+  html += `</div></details></div>`;
 
   _boardModal('boardItemModal', html, '720px');
+
   // Setup tag autocomplete on inline tags input
   _loadBoardTags().then(() => {
     const tagInput = document.getElementById('inlineItemTags');
     if (tagInput) _setupTagAutocomplete(tagInput);
   });
+
+  // Auto-save when modal is closed
+  const modalOverlay = document.getElementById('boardItemModal');
+  if (modalOverlay) {
+    const closeBtn = modalOverlay.querySelector('.modal-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => _saveAndCloseBoardItem(itemId), { once: true });
+    }
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) _saveAndCloseBoardItem(itemId);
+    }, { once: true });
+  }
+}
+
+// Add a link row to the edit modal
+function _addBoardItemLink() {
+  const urlEl = document.getElementById('newLinkUrl');
+  const labelEl = document.getElementById('newLinkLabel');
+  const url = (urlEl?.value || '').trim();
+  if (!url) return;
+  const label = (labelEl?.value || '').trim();
+  const container = document.getElementById('boardItemLinks');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'board-link-row';
+  row.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:4px;font-size:var(--fs-xs)';
+  row.innerHTML = `<a href="${escHtml(url)}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label || url)}</a>
+    <button class="btn btn-sm" style="font-size:9px;padding:1px 4px;color:var(--danger)" onclick="this.parentElement.remove()">✖</button>`;
+  row.dataset.url = url;
+  row.dataset.label = label;
+  container.appendChild(row);
+  urlEl.value = '';
+  labelEl.value = '';
+}
+
+// Post a comment on a board item
+async function _postBoardItemComment(itemId) {
+  const textEl = document.getElementById('newCommentText');
+  const text = (textEl?.value || '').trim();
+  if (!text) return;
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/comments', { text });
+    textEl.value = '';
+    // Refresh item and re-open
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _openBoardItem(itemId);
+  } catch (e) { alert(e.message); }
+}
+
+// Save and close board item modal
+async function _saveAndCloseBoardItem(itemId) {
+  await _inlineSaveBoardItemNow(itemId);
+  // Re-render board to reflect changes
+  _renderKanbanBoard();
 }
 
 // ── Inline save for board item (auto-save on blur/change) ──
 let _inlineSaveTimer = null;
 async function _inlineSaveBoardItem(itemId) {
   clearTimeout(_inlineSaveTimer);
-  _inlineSaveTimer = setTimeout(async () => {
-    const subject = (document.getElementById('inlineItemSubject') || {}).value;
-    if (!subject || !subject.trim()) return;
-    const note = (document.getElementById('inlineItemNote') || {}).value || '';
-    const itemType = (document.getElementById('inlineItemType') || {}).value || '';
-    const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
-    const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
-    const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
-    const color = colorVal === '#1a1a2e' ? '' : colorVal;
-    try {
-      await _boardApi('PUT', '/board-items/' + itemId, { subject: subject.trim(), note, item_type: itemType, color, tags });
-      // Refresh items in state
-      const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
-      _boardsState.items = items;
-    } catch (e) { /* silent - inline save */ }
-  }, 400);
+  _inlineSaveTimer = setTimeout(() => _inlineSaveBoardItemNow(itemId), 400);
+}
+
+async function _inlineSaveBoardItemNow(itemId) {
+  clearTimeout(_inlineSaveTimer);
+  const subject = (document.getElementById('inlineItemSubject') || {}).value;
+  if (!subject || !subject.trim()) return;
+  const note = (document.getElementById('inlineItemNote') || {}).value || '';
+  const itemType = (document.getElementById('inlineItemType') || {}).value || '';
+  const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
+  const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
+  const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
+  const color = colorVal === '#1a1a2e' ? '' : colorVal;
+  const dueDate = (document.getElementById('inlineItemDueDate') || {}).value || '';
+
+  // Responsible
+  const respEl = document.getElementById('inlineItemResponsible');
+  const responsibleId = respEl ? parseInt(respEl.value) || 0 : 0;
+  const responsibleName = respEl ? (respEl.selectedOptions[0]?.dataset.name || '') : '';
+
+  // Collect links from DOM
+  const links = [];
+  document.querySelectorAll('#boardItemLinks .board-link-row').forEach(row => {
+    const a = row.querySelector('a');
+    if (a) links.push({ url: row.dataset.url || a.href, label: row.dataset.label || a.textContent });
+  });
+
+  try {
+    await _boardApi('PUT', '/board-items/' + itemId, {
+      subject: subject.trim(), note, item_type: itemType, color, tags,
+      links, due_date: dueDate, responsible_id: responsibleId, responsible_name: responsibleName
+    });
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+  } catch (e) { /* silent - inline save */ }
 }
 
 function _formatSize(bytes) {
