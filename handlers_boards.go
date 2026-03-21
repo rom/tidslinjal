@@ -460,6 +460,8 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		changes = append(changes, "priority")
 		// Auto-set color based on priority
 		switch *req.Priority {
+		case "normal", "":
+			item.Color = "" // default/no color
 		case "low":
 			item.Color = "#3498db" // blue
 		case "high":

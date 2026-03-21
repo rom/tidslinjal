@@ -85,7 +85,7 @@ function _staffToolboxContent(users) {
 
     <!-- Tool References -->
     <div style="background:var(--bg3);border-radius:var(--radius);padding:12px">
-      <h3 style="margin:0 0 8px 0">\u{1F527} ${t('staff_tools_ref')||'Tool References'}</h3>
+      <h3 style="margin:0 0 8px 0">\u{1F4DA} ${t('staff_infomanagement')||'Information Management'}</h3>
       <div style="display:flex;flex-direction:column;gap:6px">
         <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="openDecisionLogModal">\u2696 ${t('decisions_title')||'Decisions'}</button>
         <button class="btn btn-secondary" style="text-align:left;padding:8px 12px;width:100%" data-action="openLogBookModal">\u{1F4D6} ${t('tab_log_book')||'Log Book'}</button>
@@ -139,13 +139,16 @@ function _renderStaffMembers(members) {
     el.innerHTML = `<em style="color:var(--text-muted)">${t('staff_none')||'No entries yet.'}</em>`;
     return;
   }
-  el.innerHTML = members.map(m => `
+  el.innerHTML = members.map(m => {
+    const posLabel = (_staffPositions.find(p => p.value === m.position) || {}).label || m.position;
+    return `
     <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
-      <strong style="min-width:140px">${escHtml(m.position)}</strong>
+      <strong style="min-width:140px">${escHtml(posLabel)}</strong>
       <span style="flex:1">${escHtml(m.user_name || '-')}</span>
       ${m.note ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(m.note)}">\u{1F4DD}</span>` : ''}
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteMember" data-arg="${m.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   _bindActions(el);
 }
 
@@ -225,13 +228,37 @@ async function staffDeleteDuty(id) {
 
 // ── Add member ──────────────────────────────────────────────────────────────
 
+// Standard J-designations and staff positions
+const _staffPositions = [
+  { value: 'chief_of_staff', label: 'Chief of Staff' },
+  { value: 'J1', label: 'J1 \u2013 Personnel' },
+  { value: 'J2', label: 'J2 \u2013 Intelligence' },
+  { value: 'J3', label: 'J3 \u2013 Operations' },
+  { value: 'J4', label: 'J4 \u2013 Logistics' },
+  { value: 'J5', label: 'J5 \u2013 Plans' },
+  { value: 'J6', label: 'J6 \u2013 Communications' },
+  { value: 'J7', label: 'J7 \u2013 Training' },
+  { value: 'J8', label: 'J8 \u2013 Finance' },
+  { value: 'J9', label: 'J9 \u2013 CIMIC' },
+  { value: 'planning', label: 'Planning' },
+  { value: 'documentation', label: 'Documentation' },
+  { value: 'tools_responsible', label: 'Tools Responsible' },
+  { value: 'external_contacts', label: 'External Contacts' },
+];
+
 function staffAddMember() {
   const users = (state.users || []).filter(u => u.active !== false);
   const userOpts = users.map(u => `<option value="${u.id}">${escHtml(u.display_name || u.username)}</option>`).join('');
+  const posOpts = _staffPositions.map(p => `<option value="${p.value}">${escHtml(p.label)}</option>`).join('');
   const formHtml = `
     <div id="staffMemberForm" style="background:var(--bg2);border-radius:var(--radius);padding:10px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:end">
-      <label style="flex:1;min-width:120px">${t('staff_position')||'Position'}
-        <input id="staffMemberPosition" class="input" placeholder="${t('staff_position_placeholder')||'e.g. Planning'}" style="width:100%">
+      <label style="flex:1;min-width:150px">${t('staff_position')||'Position'}
+        <select id="staffMemberPositionSelect" class="input" style="width:100%" data-action="staffPositionChanged" data-event="change">
+          <option value="">-- ${t('staff_select_position')||'Select position'} --</option>
+          ${posOpts}
+          <option value="__custom__">\u270E ${t('staff_custom_position')||'Custom...'}</option>
+        </select>
+        <input id="staffMemberPositionCustom" class="input" placeholder="${t('staff_position_placeholder')||'e.g. Planning'}" style="width:100%;display:none;margin-top:4px">
       </label>
       <label style="flex:1;min-width:120px">${t('staff_person')||'Person'}
         <select id="staffMemberUser" class="input" style="width:100%">
@@ -252,13 +279,24 @@ function staffAddMember() {
   }
 }
 
+function staffPositionChanged() {
+  const sel = document.getElementById('staffMemberPositionSelect');
+  const custom = document.getElementById('staffMemberPositionCustom');
+  if (sel && custom) {
+    custom.style.display = sel.value === '__custom__' ? '' : 'none';
+    if (sel.value === '__custom__') custom.focus();
+  }
+}
+
 function staffCancelMemberForm() {
   const f = document.getElementById('staffMemberForm');
   if (f) f.remove();
 }
 
 async function staffSaveMember() {
-  const position = (document.getElementById('staffMemberPosition') || {}).value || '';
+  const selVal = (document.getElementById('staffMemberPositionSelect') || {}).value || '';
+  const customVal = (document.getElementById('staffMemberPositionCustom') || {}).value || '';
+  const position = selVal === '__custom__' ? customVal : selVal;
   const userId = parseInt((document.getElementById('staffMemberUser') || {}).value) || 0;
   const note = (document.getElementById('staffMemberNote') || {}).value || '';
   if (!position) return;
