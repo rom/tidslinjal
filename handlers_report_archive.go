@@ -55,6 +55,17 @@ func (app *App) handleUploadReportArchive(w http.ResponseWriter, r *http.Request
 	n, _ := io.Copy(dst, file)
 	dst.Close()
 
+	// Parse optional tags (comma-separated)
+	var tags []string
+	if raw := r.FormValue("tags"); raw != "" {
+		for _, t := range strings.Split(raw, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tags = append(tags, t)
+			}
+		}
+	}
+
 	entry := ReportArchiveEntry{
 		Title:          title,
 		Description:    r.FormValue("description"),
@@ -67,6 +78,8 @@ func (app *App) handleUploadReportArchive(w http.ResponseWriter, r *http.Request
 		UploadedBy:     user.ID,
 		UploadedByName: user.DisplayName,
 		UploadedAt:     time.Now(),
+		ReportType:     r.FormValue("report_type"),
+		Tags:           tags,
 	}
 	created, err := app.store.AddReportArchiveEntry(entry)
 	if err != nil {
