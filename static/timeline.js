@@ -142,6 +142,41 @@ function synthDayHeader(date) {
   return dayLabel + ' ' + dayNum;
 }
 
+// ── Exercise info popup ───────────────────────────────────────────────────
+function showExerciseInfoPopup() {
+  const ex = state.exercise;
+  if (!ex) return;
+  const mode = ex.operation_mode || 'exercise';
+  const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+  let html = `<div style="max-width:480px">
+    <h3 style="margin:0 0 12px">${escHtml(ex.label || modeLabel)}</h3>
+    <table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse">`;
+  const row = (k, v) => `<tr><td style="padding:4px 8px 4px 0;font-weight:600;white-space:nowrap;color:var(--text-dim)">${k}</td><td style="padding:4px 0">${escHtml(v||'—')}</td></tr>`;
+  html += row(t('exercise_mode')||'Mode', modeLabel);
+  if (ex.epoch) html += row(t('exercise_start')||'Start', new Date(ex.epoch).toLocaleString());
+  if (ex.endex) html += row(t('exercise_end')||'End', new Date(ex.endex).toLocaleString());
+  if (ex.paused) html += row(t('exercise_status')||'Status', t('exercise_paused')||'Paused');
+  if (ex.artificial_time_enabled && ex.artificial_time) html += row(t('exercise_artificial_time')||'Artificial Time', new Date(ex.artificial_time).toLocaleString());
+  if (ex.day_hours_only) html += row(t('exercise_day_hours')||'Day Hours Only', '✔');
+  html += `</table>
+    <div style="margin-top:12px;text-align:right">
+      <button class="btn btn-secondary btn-sm" data-action="closeModal" data-arg="exerciseInfoModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  // Use the modal helper from utils
+  let overlay = document.getElementById('exerciseInfoModal');
+  if (overlay) overlay.remove();
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="modal-overlay" id="exerciseInfoModal"><div class="modal" style="width:500px;max-width:96vw;padding:20px">' + html + '</div></div>');
+  const el = document.getElementById('exerciseInfoModal');
+  if (el) {
+    void el.offsetHeight;
+    el.classList.add('open');
+    el.addEventListener('click', function(e) { if (e.target === el) closeModal('exerciseInfoModal'); });
+    if (typeof _bindActions === 'function') _bindActions(el);
+  }
+}
+
 function updateSyntheticUI() {
   const btn   = document.getElementById('btnSyntheticTime');
   const badge = document.getElementById('exerciseBadge');
