@@ -210,8 +210,6 @@ document.getElementById('eventRecurring').addEventListener('change', function() 
   document.getElementById('recurrenceEndGroup').style.display = this.checked ? '' : 'none';
 });
 
-document.getElementById('eventAllDay').addEventListener('change', updateEventModalTimeVisibility);
-
 // Auto-adjust end time to start + 1 hour whenever start changes
 document.getElementById('eventStart').addEventListener('change', function() {
   const start = new Date(this.value);
