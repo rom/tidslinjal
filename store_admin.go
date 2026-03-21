@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,6 +21,11 @@ func (s *Store) LogAudit(entry AuditEntry) error {
 	s.nextAuditID++
 	entry.ID = s.nextAuditID
 	entry.Timestamp = time.Now()
+	// Tamper protection: compute hash chain
+	if len(s.audit) > 0 {
+		entry.PrevHash = s.audit[len(s.audit)-1].Hash
+	}
+	entry.Hash = computeAuditHash(entry)
 	s.audit = append(s.audit, entry)
 	// Cap at 10 000 entries (oldest first → drop from front)
 	if len(s.audit) > 10000 {
@@ -27,6 +34,17 @@ func (s *Store) LogAudit(entry AuditEntry) error {
 	snap := append([]AuditEntry(nil), s.audit...)
 	s.mu.Unlock()
 	return s.persist("audit.json", snap)
+}
+
+// computeAuditHash creates a SHA-256 hash of an audit entry's key fields plus PrevHash,
+// forming a tamper-evident hash chain similar to a blockchain.
+func computeAuditHash(e AuditEntry) string {
+	data := fmt.Sprintf("%d|%s|%d|%s|%s|%d|%s|%s|%s",
+		e.ID, e.Timestamp.UTC().Format(time.RFC3339Nano),
+		e.UserID, e.Action, e.EntityType, e.EntityID,
+		e.Summary, e.PrevHash, e.RequestID)
+	h := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(h[:])
 }
 
 func (s *Store) GetAudit(limit int) []AuditEntry {

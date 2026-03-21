@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -47,6 +50,36 @@ func validateCSRF(r *http.Request) bool {
 	}
 	// Fallback: require X-Requested-With header (for API key auth or legacy clients)
 	return r.Header.Get("X-Requested-With") != ""
+}
+
+// requestIDKey is the context key for the HTTP request ID.
+type requestIDKeyType struct{}
+
+var requestIDKey = requestIDKeyType{}
+
+// requestIDMiddleware generates a unique request ID and adds it to the context
+// and the response headers for audit correlation.
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b := make([]byte, 8)
+		rand.Read(b) //nolint
+		reqID := hex.EncodeToString(b)
+		w.Header().Set("X-Request-ID", reqID)
+		ctx := r.Context()
+		ctx = contextWithRequestID(ctx, reqID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func contextWithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, requestIDKey, id)
+}
+
+func getRequestID(r *http.Request) string {
+	if id, ok := r.Context().Value(requestIDKey).(string); ok {
+		return id
+	}
+	return ""
 }
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
@@ -256,6 +289,16 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 		if strings.HasPrefix(authHdr, "Bearer ") {
 			raw := strings.TrimPrefix(authHdr, "Bearer ")
 			if raw != "" {
+				// API key brute-force protection: rate-limit validation attempts per IP
+				if !app.authLimiter.allow("apikey:"+clientIP(r), 20, time.Minute) {
+					ip := clientIP(r)
+					log.Printf("[SECURITY] API key rate limit exceeded from IP %s", ip)
+					app.store.LogAudit(AuditEntry{ //nolint
+						Action: "rate_limited", EntityType: "api_key", Summary: fmt.Sprintf("API key brute-force protection triggered from IP %s", ip),
+					})
+					jsonError(w, "too many API key attempts — try again later", http.StatusTooManyRequests)
+					return
+				}
 				// Check API keys
 				if k := app.store.ValidateAPIKey(raw); k != nil {
 					// V-05/API key fix: apply CSRF check to API-key authenticated requests too
@@ -298,6 +341,10 @@ func (app *App) authenticateAPIKey(r *http.Request) *User {
 	if raw == "" {
 		return nil
 	}
+	// API key brute-force protection
+	if !app.authLimiter.allow("apikey:"+clientIP(r), 20, time.Minute) {
+		return nil
+	}
 	k := app.store.ValidateAPIKey(raw)
 	if k == nil {
 		return nil
@@ -335,16 +382,21 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), payment=()")
-		// CSP: all JS/CSS served from 'self'; inline style="" attributes still
-		// need 'unsafe-inline' for style-src but script-src is locked to 'self'.
+		// Generate CSP nonce for scripts (defence-in-depth)
+		nonceBytes := make([]byte, 16)
+		rand.Read(nonceBytes) //nolint
+		nonce := base64.StdEncoding.EncodeToString(nonceBytes)
+		// CSP: all JS/CSS served from 'self'; nonce allows specific inline scripts if needed.
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
-				"script-src 'self'; "+
+				"script-src 'self' 'nonce-"+nonce+"'; "+
 				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https://*.tile.openstreetmap.org; "+
 				"connect-src 'self' https://nominatim.openstreetmap.org; "+
 				"font-src 'self' data:; "+
 				"frame-ancestors 'none'")
+		// Make nonce available to handlers that render HTML
+		w.Header().Set("X-CSP-Nonce", nonce)
 		next.ServeHTTP(w, r)
 	})
 }

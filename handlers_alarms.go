@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -101,6 +102,19 @@ func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 	_, user := app.getSession(r)
 	if user == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	// Enforce per-user SSE connection limit
+	ss := app.store.GetSecuritySettings()
+	maxConns := ss.MaxSSEConnsPerUser
+	if maxConns <= 0 {
+		maxConns = 5 // default: 5 concurrent SSE connections per user
+	}
+	if app.broker.UserConnectionCount(user.ID) >= maxConns {
+		log.Printf("[SECURITY] SSE connection limit reached for user %q (%d connections, limit %d)", user.Username, app.broker.UserConnectionCount(user.ID), maxConns)
+		app.audit(user.ID, user.DisplayName, "rate_limited", "sse", 0,
+			fmt.Sprintf("SSE connection limit reached for user %q (%d max)", user.Username, maxConns))
+		http.Error(w, "too many SSE connections", http.StatusTooManyRequests)
 		return
 	}
 	flusher, ok := w.(http.Flusher)

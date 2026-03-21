@@ -135,6 +135,8 @@ type User struct {
 	Blocked bool `json:"blocked,omitempty"`
 	// MustChangePassword: forces user to change password on next login (C-03 fix)
 	MustChangePassword bool `json:"must_change_password,omitempty"`
+	// PasswordHistory stores bcrypt hashes of previous passwords to prevent reuse
+	PasswordHistory []string `json:"password_history,omitempty"`
 	// Location: user's physical location (free text, e.g. "Stockholm, Sweden")
 	Location     string `json:"location,omitempty"`
 	Latitude     float64 `json:"latitude,omitempty"`
@@ -526,6 +528,10 @@ type AuditEntry struct {
 	EntityType string    `json:"entity_type"` // event | user | group | layer | lock | alarm
 	EntityID   int64     `json:"entity_id"`
 	Summary    string    `json:"summary"`
+	// Tamper protection: SHA-256 hash chain — each entry includes the hash of the previous entry
+	PrevHash   string    `json:"prev_hash,omitempty"` // SHA-256 hash of the previous entry
+	Hash       string    `json:"hash,omitempty"`      // SHA-256(ID+Timestamp+UserID+Action+EntityType+EntityID+Summary+PrevHash)
+	RequestID  string    `json:"request_id,omitempty"` // HTTP request ID for audit correlation
 }
 
 // TemplateGroup defines a group to create when the template is applied
@@ -933,6 +939,9 @@ type SecuritySettings struct {
 	RequireNumbers        bool `json:"require_numbers,omitempty"`   // at least one 0-9
 	RequireSymbols        bool `json:"require_symbols,omitempty"`   // at least one symbol
 
+	// Password history: prevent reuse of recent passwords
+	PasswordHistoryCount int `json:"password_history_count,omitempty"` // 0 = disabled, e.g. 5 = remember last 5
+
 	// Session management settings
 	SessionTimeEnabled bool `json:"session_time_enabled"`            // enforce max session duration
 	SessionTimeHours   int  `json:"session_time_hours,omitempty"`    // max session lifetime in hours (default 100)
@@ -944,6 +953,19 @@ type SecuritySettings struct {
 	// SSO-only mode: when enabled, password login is disabled for all users
 	// except the built-in admin account. Requires OIDC/SSO to be configured.
 	DisablePasswordLogin bool `json:"disable_password_login"`
+
+	// Upload quotas
+	UploadQuotaDailyMB int `json:"upload_quota_daily_mb,omitempty"` // per-user daily upload limit in MB (0 = unlimited, default 500)
+	UploadQuotaTotalMB int `json:"upload_quota_total_mb,omitempty"` // per-user total upload limit in MB (0 = unlimited, default 5000)
+
+	// SSE connection limit per user
+	MaxSSEConnsPerUser int `json:"max_sse_conns_per_user,omitempty"` // 0 = unlimited, default 5
+
+	// Connector poll interval minimum (seconds)
+	ConnectorPollMinSeconds int `json:"connector_poll_min_seconds,omitempty"` // default 30
+
+	// Max comments per event
+	MaxCommentsPerEvent int `json:"max_comments_per_event,omitempty"` // 0 = unlimited, default 500
 }
 
 // TLSConfig stores TLS certificate and key file paths for persistent server configuration.

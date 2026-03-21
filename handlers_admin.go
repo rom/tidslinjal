@@ -108,12 +108,18 @@ func (app *App) handleAdminReset(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "confirmation required: send {\"confirm\":\"RESET\"}", http.StatusBadRequest)
 		return
 	}
+	// Audit before reset (the audit log will be cleared)
+	app.audit(user.ID, user.DisplayName, "reset", "system", 0,
+		fmt.Sprintf("Admin %q triggered full system reset (keepTemplates=%v) from %s",
+			user.Username, req.KeepTemplates, clientIP(r)))
 	if err := app.store.ResetToEmpty(*user, req.KeepTemplates); err != nil {
 		jsonError(w, "reset failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Invalidate ALL sessions (including the admin's current session) to force re-login
+	app.store.DeleteAllSessions()
 	log.Printf("Admin %q triggered a full system reset (data cleared, admin account preserved, keepTemplates=%v)", user.Username, req.KeepTemplates)
-	jsonOK(w, map[string]string{"status": "reset complete"})
+	jsonOK(w, map[string]string{"status": "reset complete", "message": "All sessions invalidated — please log in again."})
 }
 
 // ── Admin Session Management ───────────────────────────────────────────────────

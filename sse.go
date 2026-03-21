@@ -37,6 +37,13 @@ func NewSSEBroker() *SSEBroker {
 	}
 }
 
+// UserConnectionCount returns the number of active SSE connections for a user.
+func (b *SSEBroker) UserConnectionCount(userID int64) int {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return len(b.byUser[userID])
+}
+
 func (b *SSEBroker) Subscribe(userID int64) *SSEClient {
 	b.mu.Lock()
 	defer b.mu.Unlock()

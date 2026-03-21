@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -31,6 +34,42 @@ type webhookJob struct {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
+// uploadTracker tracks per-user upload bytes for quota enforcement.
+type uploadTracker struct {
+	mu    sync.Mutex
+	daily map[int64]*uploadBucket // userID → today's bytes
+}
+
+type uploadBucket struct {
+	bytes   int64
+	resetAt time.Time
+}
+
+func (ut *uploadTracker) add(userID int64, bytes int64) int64 {
+	ut.mu.Lock()
+	defer ut.mu.Unlock()
+	now := time.Now()
+	b, ok := ut.daily[userID]
+	if !ok || now.After(b.resetAt) {
+		// Reset at next midnight UTC
+		tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+		ut.daily[userID] = &uploadBucket{bytes: bytes, resetAt: tomorrow}
+		return bytes
+	}
+	b.bytes += bytes
+	return b.bytes
+}
+
+func (ut *uploadTracker) todayBytes(userID int64) int64 {
+	ut.mu.Lock()
+	defer ut.mu.Unlock()
+	b, ok := ut.daily[userID]
+	if !ok || time.Now().After(b.resetAt) {
+		return 0
+	}
+	return b.bytes
+}
+
 type App struct {
 	store           *Store
 	broker          *SSEBroker
@@ -48,6 +87,7 @@ type App struct {
 	metrics         *Metrics
 	ldap            *LDAPConnector
 	enabledLangs    []string      // languages available to users (nil = all)
+	uploads         *uploadTracker // per-user upload quota tracking
 	stopCh          chan struct{} // closed to stop background goroutines
 	stopOnce        sync.Once
 }
@@ -210,6 +250,7 @@ func NewApp(dataDir string) (*App, error) {
 		eventBus:    NewEventBus(),
 		connectors:  NewConnectorRegistry(),
 		metrics:     NewMetrics(),
+		uploads:     &uploadTracker{daily: make(map[int64]*uploadBucket)},
 		stopCh:      stopCh,
 	}
 	// Start bounded webhook worker pool — prevents goroutine explosion under load.
@@ -356,6 +397,14 @@ func (app *App) runWebhookWorker() {
 			continue
 		}
 		req.Header.Set("Content-Type", "application/json")
+		// Webhook signature verification: add HMAC-SHA256 signature and timestamp
+		ts := strconv.FormatInt(time.Now().Unix(), 10)
+		signPayload := ts + "." + string(job.body)
+		mac := hmac.New(sha256.New, app.store.GetAdminPasswordHash())
+		mac.Write([]byte(signPayload))
+		sig := hex.EncodeToString(mac.Sum(nil))
+		req.Header.Set("X-Webhook-Timestamp", ts)
+		req.Header.Set("X-Webhook-Signature", "sha256="+sig)
 		resp, err := client.Do(req)
 		if err != nil {
 			logVerbose("webhook: POST %q failed: %v", job.url, err)

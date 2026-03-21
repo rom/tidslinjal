@@ -263,10 +263,28 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request, use
 		}
 	}
 
+	// Password history enforcement: reject reuse of recent passwords
+	policy := app.store.GetSecuritySettings()
+	if policy.PasswordHistoryCount > 0 {
+		for _, oldHash := range fullUser.PasswordHistory {
+			if bcrypt.CompareHashAndPassword([]byte(oldHash), []byte(req.NewPassword)) == nil {
+				jsonError(w, fmt.Sprintf("password was used recently — choose a password not used in the last %d changes", policy.PasswordHistoryCount), http.StatusBadRequest)
+				return
+			}
+		}
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	// Push old hash to password history and trim to configured limit
+	if policy.PasswordHistoryCount > 0 {
+		fullUser.PasswordHistory = append(fullUser.PasswordHistory, fullUser.PasswordHash)
+		if len(fullUser.PasswordHistory) > policy.PasswordHistoryCount {
+			fullUser.PasswordHistory = fullUser.PasswordHistory[len(fullUser.PasswordHistory)-policy.PasswordHistoryCount:]
+		}
 	}
 	fullUser.PasswordHash = string(hash)
 	if err := app.store.UpdateUser(*fullUser); err != nil {
