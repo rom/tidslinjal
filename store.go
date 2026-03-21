@@ -80,6 +80,9 @@ type Store struct {
 	reportIngestConfig   ReportIngestConfig
 	startupText          string
 	geoItems             []map[string]any
+	staffDuties          []StaffDuty
+	staffMembers         []StaffMember
+	areasOfResp          []AreaOfResponsibility
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -120,6 +123,9 @@ type Store struct {
 	nextBoardID              int64
 	nextBoardItemID          int64
 	nextReportArchiveID      int64
+	nextStaffDutyID          int64
+	nextStaffMemberID        int64
+	nextAreaID               int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -241,6 +247,11 @@ func (s *Store) load() error {
 	if v, ok := startupTextData["text"]; ok {
 		s.startupText = v
 	}
+
+	// Staff toolbox data
+	s.loadFile("staff_duties.json", &s.staffDuties)
+	s.loadFile("staff_members.json", &s.staffMembers)
+	s.loadFile("areas_of_responsibility.json", &s.areasOfResp)
 
 	// Load geo items (items placed on the geographical/OSM map)
 	s.loadFile("geo_items.json", &s.geoItems)
@@ -457,6 +468,21 @@ func (s *Store) load() error {
 	for _, x := range s.reportArchive {
 		if x.ID > s.nextReportArchiveID {
 			s.nextReportArchiveID = x.ID
+		}
+	}
+	for _, x := range s.staffDuties {
+		if x.ID > s.nextStaffDutyID {
+			s.nextStaffDutyID = x.ID
+		}
+	}
+	for _, x := range s.staffMembers {
+		if x.ID > s.nextStaffMemberID {
+			s.nextStaffMemberID = x.ID
+		}
+	}
+	for _, x := range s.areasOfResp {
+		if x.ID > s.nextAreaID {
+			s.nextAreaID = x.ID
 		}
 	}
 	// Build O(1) lookup indexes.
