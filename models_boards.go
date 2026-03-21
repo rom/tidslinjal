@@ -49,6 +49,7 @@ type BoardItem struct {
 	History         []BoardHistory    `json:"history,omitempty"`
 	ChecklistID     int64             `json:"checklist_id,omitempty"`  // linked checklist
 	EventID         int64             `json:"event_id,omitempty"`      // linked event/meeting
+	Priority        string            `json:"priority,omitempty"`      // "low", "high", "critical"
 	ShareToken      string            `json:"share_token,omitempty"`   // token for sharable link
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`

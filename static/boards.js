@@ -23,7 +23,7 @@ function _boardModal(id, content, width) {
   let el = document.getElementById(id);
   if (el) el.remove();
   const html = `<div class="modal-overlay" id="${id}">
-    <div class="modal" style="width:${width||'800px'};max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px">
+    <div class="modal" style="width:${width||'800px'};max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px;box-sizing:border-box">
       <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;z-index:10">&#x2715;</button>
       ${content}
     </div>
@@ -222,7 +222,7 @@ function _renderKanbanBoard() {
 
   const boardBg = board.color ? `background:${board.color}22;border:1px solid ${board.color}44;border-radius:var(--radius);padding:12px;` : '';
   const btnStyle = 'min-width:32px;height:28px;padding:4px 8px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;';
-  let html = `<div style="max-width:100%;overflow-x:auto;${boardBg}">
+  let html = `<div style="width:100%;overflow-x:auto;box-sizing:border-box;${boardBg}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-sm btn-secondary" data-action="openBoardsModal" title="${t('board_back')||'Back to boards'}" style="${btnStyle}">← ${t('board_back_short')||'Boards'}</button>
@@ -259,7 +259,7 @@ function _renderKanbanBoard() {
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="${btnStyle}font-size:var(--fs-xs);">100%</button>
       </div>
     </div>
-    <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
+    <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;width:100%;box-sizing:border-box;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
 
   for (const col of board.columns) {
     const collapsed = col.collapsed;
@@ -284,6 +284,7 @@ function _renderKanbanBoard() {
       for (const item of cItems) {
         const bgColor = item.color || 'var(--bg3)';
         const typeIcon = _itemTypeIcons[item.item_type] || '';
+        const priorityBadge = item.priority ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
         // Due date display and urgency
         let dueDateHtml = '';
         if (item.due_date) {
@@ -297,7 +298,7 @@ function _renderKanbanBoard() {
           style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
           data-action="_openBoardItem" data-arg="${item.id}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <strong style="font-size:var(--fs-sm)">${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</strong>
+            <strong style="font-size:var(--fs-sm)">${priorityBadge ? priorityBadge + ' ' : ''}${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</strong>
             <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
           </div>
           ${item.note ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;max-height:40px;overflow:hidden">${escHtml(item.note).substring(0, 100)}</div>` : ''}
@@ -571,10 +572,11 @@ function _openBoardItem(itemId) {
 
   let html = `<div style="max-width:720px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h3 style="margin:0">#${item.id}
-        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:60%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
+      <h3 style="margin:0;flex:1;min-width:0">#${item.id}
+        <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:80%;border-radius:var(--radius)" value="${escHtml(item.subject)}" onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg3)'" onblur="this.style.borderColor='transparent';this.style.background='transparent'">
       </h3>
-      <div style="display:flex;gap:6px;align-items:center;margin-right:32px">
+      <div style="display:flex;gap:6px;align-items:center;margin-right:32px;flex-shrink:0">
+        <button class="btn btn-sm btn-secondary" data-action="_showBoardItemHelp" title="${t('board_item_help')||'Help'}" style="min-width:32px;height:28px;padding:4px 8px">❓</button>
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
         <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger);min-width:32px;height:28px;padding:4px 8px" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete item'}">🗑</button>
@@ -583,22 +585,22 @@ function _openBoardItem(itemId) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:var(--fs-sm);margin-bottom:14px">
       <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
-      <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
+      <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
 
       <div style="display:flex;align-items:center;gap:6px">
         <strong>${t('board_type')||'Type'}:</strong>
         <select id="inlineItemType" class="input" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer;min-width:140px;appearance:auto">
           <option value="" ${!item.item_type?'selected':''}>— ${t('board_select_type')||'Select type'} —</option>
-          <option value="task" ${item.item_type==='task'?'selected':''}>✅ Task</option>
-          <option value="meeting" ${item.item_type==='meeting'?'selected':''}>🤝 Meeting</option>
-          <option value="checklist" ${item.item_type==='checklist'?'selected':''}>📋 Checklist</option>
-          <option value="issue" ${item.item_type==='issue'?'selected':''}>⚠️ Issue</option>
-          <option value="note" ${item.item_type==='note'?'selected':''}>📝 Note</option>
-          <option value="other" ${item.item_type==='other'?'selected':''}>🔹 Other</option>
+          <option value="task" ${item.item_type==='task'?'selected':''}>✅ ${t('board_type_task')||'Task'}</option>
+          <option value="meeting" ${item.item_type==='meeting'?'selected':''}>🤝 ${t('board_type_meeting')||'Meeting'}</option>
+          <option value="checklist" ${item.item_type==='checklist'?'selected':''}>📋 ${t('board_type_checklist')||'Checklist'}</option>
+          <option value="issue" ${item.item_type==='issue'?'selected':''}>⚠️ ${t('board_type_issue')||'Issue'}</option>
+          <option value="note" ${item.item_type==='note'?'selected':''}>📝 ${t('board_type_note')||'Note'}</option>
+          <option value="other" ${item.item_type==='other'?'selected':''}>🔹 ${t('board_type_other')||'Other'}</option>
         </select>
       </div>
 
-      <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
+      <div><strong>${t('board_creator')||'Creator'}:</strong> ${escHtml(item.creator_name)}</div>
 
       <div style="display:flex;align-items:center;gap:6px">
         <strong>${t('board_responsible')||'Responsible'}:</strong>
@@ -609,9 +611,19 @@ function _openBoardItem(itemId) {
       </div>
 
       <div style="display:flex;align-items:center;gap:6px">
-        <strong>📅 ${t('board_due_date')||'Due date'}:</strong>
+        <strong>📅 ${t('board_due_date')||'Due Date'}:</strong>
         <input id="inlineItemDueDate" type="date" class="input" value="${escHtml(item.due_date||'')}" style="font-size:var(--fs-sm);padding:3px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer">
         ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" onclick="document.getElementById('inlineItemDueDate').value='';_inlineSaveBoardItem(${item.id})">✖</button>` : ''}
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px">
+        <strong>${t('board_priority')||'Priority'}:</strong>
+        <select id="inlineItemPriority" class="input" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer;min-width:140px;appearance:auto">
+          <option value="" ${!item.priority?'selected':''}>— ${t('board_none')||'None'} —</option>
+          <option value="low" ${item.priority==='low'?'selected':''} style="color:#3498db">🔵 ${t('board_priority_low')||'Low'}</option>
+          <option value="high" ${item.priority==='high'?'selected':''} style="color:#e67e22">🟠 ${t('board_priority_high')||'High'}</option>
+          <option value="critical" ${item.priority==='critical'?'selected':''} style="color:#e74c3c">🔴 ${t('board_priority_critical')||'Critical'}</option>
+        </select>
       </div>
     </div>
 
@@ -648,7 +660,7 @@ function _openBoardItem(itemId) {
     <div style="display:flex;gap:4px;margin-top:4px">
       <input id="newLinkUrl" class="input" style="flex:2;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="https://...">
       <input id="newLinkLabel" class="input" style="flex:1;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_link_label')||'Label (optional)'}">
-      <button class="btn btn-sm btn-secondary" onclick="_addBoardItemLink()" style="padding:4px 8px">+ Add</button>
+      <button class="btn btn-sm btn-secondary" data-action="_addBoardItemLink" style="padding:4px 8px">+ ${t('board_link_add')||'Add'}</button>
     </div>
   </div>`;
 
@@ -680,7 +692,7 @@ function _openBoardItem(itemId) {
   html += `</div>
     <div style="display:flex;gap:4px;margin-top:6px">
       <textarea id="newCommentText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);resize:vertical;min-height:36px" placeholder="${t('board_add_comment')||'Write a comment...'}"></textarea>
-      <button class="btn btn-sm btn-primary" onclick="_postBoardItemComment(${item.id})" style="align-self:flex-end;padding:6px 12px">Send</button>
+      <button class="btn btn-sm btn-primary" data-action="_postBoardItemComment" data-arg="${item.id}" style="align-self:flex-end;padding:6px 12px">${t('board_comment_send')||'Send'}</button>
     </div>
   </div>`;
 
@@ -694,7 +706,13 @@ function _openBoardItem(itemId) {
       <strong>${escHtml(h.user_name)}</strong>: ${escHtml(h.action)} ${h.detail ? '— ' + escHtml(h.detail) : ''}
     </div>`;
   }
-  html += `</div></details></div>`;
+  html += `</div></details>
+
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn btn-primary" data-action="_saveBoardItemAndClose" data-arg="${item.id}">✔ ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary" data-action="_cancelBoardItem">✖ ${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
 
   _boardModal('boardItemModal', html, '720px');
 
@@ -760,6 +778,39 @@ async function _saveAndCloseBoardItem(itemId) {
   _renderKanbanBoard();
 }
 
+// Save and close via button
+async function _saveBoardItemAndClose(itemId) {
+  await _inlineSaveBoardItemNow(itemId);
+  _closeBoardModal('boardItemModal');
+  _renderKanbanBoard();
+}
+
+// Cancel without saving
+function _cancelBoardItem() {
+  _closeBoardModal('boardItemModal');
+}
+
+// Help dialog for board item editing
+function _showBoardItemHelp() {
+  const helpHtml = `<div style="max-width:500px">
+    <h3>❓ ${t('board_item_help_title')||'How to Edit Items'}</h3>
+    <div style="font-size:var(--fs-sm);line-height:1.6">
+      <p><strong>${t('board_item_help_subject')||'Subject'}:</strong> ${t('board_item_help_subject_desc')||'Click the title field to edit the item name.'}</p>
+      <p><strong>${t('board_item_help_priority')||'Priority'}:</strong> ${t('board_item_help_priority_desc')||'Set priority to Low (blue), High (orange), or Critical (red). The card color changes automatically.'}</p>
+      <p><strong>${t('board_item_help_type')||'Type'}:</strong> ${t('board_item_help_type_desc')||'Choose the item type from the dropdown (Task, Meeting, Issue, etc.).'}</p>
+      <p><strong>${t('board_item_help_responsible')||'Responsible'}:</strong> ${t('board_item_help_responsible_desc')||'Assign a team member who is responsible for this item.'}</p>
+      <p><strong>${t('board_item_help_due')||'Due Date'}:</strong> ${t('board_item_help_due_desc')||'Set a deadline. Overdue items are highlighted in red on the board.'}</p>
+      <p><strong>${t('board_item_help_tags')||'Tags'}:</strong> ${t('board_item_help_tags_desc')||'Add comma-separated tags. Previously used tags are suggested as you type.'}</p>
+      <p><strong>${t('board_item_help_links')||'Links'}:</strong> ${t('board_item_help_links_desc')||'Add URLs with optional labels. Click "+ Add" to add a link.'}</p>
+      <p><strong>${t('board_item_help_save')||'Saving'}:</strong> ${t('board_item_help_save_desc')||'Click Save to save your changes, or Cancel to discard. Closing with X also saves.'}</p>
+    </div>
+    <div style="margin-top:12px;text-align:right">
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardItemHelpModal', helpHtml, '520px');
+}
+
 // ── Inline save for board item (auto-save on blur/change) ──
 let _inlineSaveTimer = null;
 async function _inlineSaveBoardItem(itemId) {
@@ -778,6 +829,7 @@ async function _inlineSaveBoardItemNow(itemId) {
   const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
   const color = colorVal === '#1a1a2e' ? '' : colorVal;
   const dueDate = (document.getElementById('inlineItemDueDate') || {}).value || '';
+  const priority = (document.getElementById('inlineItemPriority') || {}).value || '';
 
   // Responsible
   const respEl = document.getElementById('inlineItemResponsible');
@@ -794,7 +846,8 @@ async function _inlineSaveBoardItemNow(itemId) {
   try {
     await _boardApi('PUT', '/board-items/' + itemId, {
       subject: subject.trim(), note, item_type: itemType, color, tags,
-      links, due_date: dueDate, responsible_id: responsibleId, responsible_name: responsibleName
+      links, due_date: dueDate, responsible_id: responsibleId, responsible_name: responsibleName,
+      priority
     });
     const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
     _boardsState.items = items;
@@ -1275,7 +1328,7 @@ function _setupTagAutocomplete(inputEl) {
 
 // Global function for tag selection from autocomplete dropdown
 window._selectTag = function(el, tag) {
-  const inputEl = document.getElementById('editItemTags');
+  const inputEl = document.getElementById('inlineItemTags') || document.getElementById('editItemTags');
   if (!inputEl) return;
   const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
   parts[parts.length - 1] = tag;
