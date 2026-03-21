@@ -2550,6 +2550,46 @@ func main() {
 		log.Printf("    decisions  : %d", len(decisions))
 		log.Printf("    sessions   : %d (active)", len(sessions))
 		log.Printf("  [DEBUG] All registered API routes will be logged per request")
+
+		// Log configured security limits
+		ss := app.store.GetSecuritySettings()
+		log.Printf("  [DEBUG] Security limits:")
+		log.Printf("    Password policy      : enabled=%v  minLength=%d  uppercase=%v  lowercase=%v  numbers=%v  symbols=%v",
+			ss.PasswordPolicyEnabled, ss.MinLength, ss.RequireUppercase, ss.RequireLowercase, ss.RequireNumbers, ss.RequireSymbols)
+		pwHist := ss.PasswordHistoryCount
+		if pwHist <= 0 { pwHist = 0 }
+		log.Printf("    Password history     : %d (0=disabled)", pwHist)
+		log.Printf("    Session time         : enabled=%v  hours=%d", ss.SessionTimeEnabled, ss.SessionTimeHours)
+		log.Printf("    Idle timeout         : enabled=%v  hours=%d", ss.IdleTimeoutEnabled, ss.IdleTimeoutHours)
+		log.Printf("    Logoff on pw change  : %v", ss.LogoffOnPasswordChange)
+		log.Printf("    Rotate sess on role  : %v", ss.RotateSessionOnRoleChange)
+		log.Printf("    Disable pw login     : %v", ss.DisablePasswordLogin)
+		uploadDaily := ss.UploadQuotaDailyMB
+		if uploadDaily <= 0 { uploadDaily = 500 }
+		uploadTotal := ss.UploadQuotaTotalMB
+		if uploadTotal <= 0 { uploadTotal = 5000 }
+		log.Printf("    Upload quota daily   : %d MB", uploadDaily)
+		log.Printf("    Upload quota total   : %d MB", uploadTotal)
+		maxSSE := ss.MaxSSEConnsPerUser
+		if maxSSE <= 0 { maxSSE = 5 }
+		log.Printf("    Max SSE conns/user   : %d", maxSSE)
+		pollMin := ss.ConnectorPollMinSeconds
+		if pollMin < 30 { pollMin = 30 }
+		log.Printf("    Connector poll min   : %d seconds", pollMin)
+		maxComments := ss.MaxCommentsPerEvent
+		if maxComments <= 0 { maxComments = 500 }
+		log.Printf("    Max comments/event   : %d", maxComments)
+
+		// Rate limits
+		rl := app.store.GetRateLimitSettings()
+		log.Printf("    Login rate limit     : %d/window", rl.LoginLimit)
+		log.Printf("    Registration limit   : %d/window", rl.RegistrationLimit)
+		log.Printf("    Password reset limit : %d/window", rl.PasswordResetLimit)
+		log.Printf("    API key rate limit   : 20/minute (per IP)")
+
+		// Gradual backup
+		gb := app.store.GetGradualBackupSettings()
+		log.Printf("    Gradual backup       : enabled=%v  interval=%d min  max=%d snapshots", gb.Enabled, gb.IntervalMinutes, gb.MaxSnapshots)
 	}
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 

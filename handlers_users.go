@@ -52,8 +52,10 @@ func (app *App) handleCreateUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	validRoles := map[Role]bool{
 		RoleObserver: true, RoleRead: true, RoleReporter: true,
-		RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
-		RoleStaffOfficer: true, RoleStaffOfficerFull: true, RoleAdmin: true,
+		RoleReadWrite: true, RoleTeamLead: true, RoleDeputyTeamLead: true,
+		RoleOpLead: true, RoleDeputyOpLead: true,
+		RoleStaffOfficer: true, RoleStaffAssistant: true, RoleStaffOfficerFull: true,
+		RoleAdmin: true,
 	}
 	if req.Role == "" {
 		req.Role = RoleRead
@@ -166,8 +168,10 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			// V-12 fix: validate role against allowed whitelist (same as handleCreateUser)
 			validRoles := map[Role]bool{
 				RoleObserver: true, RoleRead: true, RoleReporter: true,
-				RoleReadWrite: true, RoleTeamLead: true, RoleOpLead: true,
-				RoleStaffOfficer: true, RoleStaffOfficerFull: true, RoleAdmin: true,
+				RoleReadWrite: true, RoleTeamLead: true, RoleDeputyTeamLead: true,
+				RoleOpLead: true, RoleDeputyOpLead: true,
+				RoleStaffOfficer: true, RoleStaffAssistant: true, RoleStaffOfficerFull: true,
+				RoleAdmin: true,
 			}
 			if !validRoles[req.Role] {
 				jsonError(w, "invalid role", http.StatusBadRequest)
