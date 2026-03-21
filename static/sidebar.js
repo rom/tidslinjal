@@ -1,4 +1,39 @@
 /* ── Sidebar ── */
+
+// ── Sidebar Resize Handle ─────────────────────────────────────────────────
+function setupSidebarResize() {
+  const handle = document.getElementById('sidebarResizeHandle');
+  const sidebar = document.getElementById('sidebar');
+  if (!handle || !sidebar) return;
+
+  let dragging = false, startX = 0, startWidth = 0;
+
+  handle.addEventListener('pointerdown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startWidth = sidebar.getBoundingClientRect().width;
+    handle.setPointerCapture(e.pointerId);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    // Sidebar is on the right, so dragging left increases width
+    const delta = startX - e.clientX;
+    const newWidth = Math.max(180, Math.min(startWidth + delta, window.innerWidth * 0.5));
+    sidebar.style.width = newWidth + 'px';
+  });
+
+  handle.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}
+
 // ── renderSidebar ─────────────────────────────────────────────────────────
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function _bindResSubTabs(el) {
