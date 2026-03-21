@@ -370,6 +370,209 @@ async function generateReport() {
       html += '<p>Failed to load poll data.</p>';
     }
 
+  } else if (type === 'staff_manning') {
+    // Staff manning report
+    try {
+      const members = await apiGet('/api/staff/members') || [];
+      const posLabels = {};
+      if (typeof _staffPositions !== 'undefined') _staffPositions.forEach(p => { posLabels[p.value] = p.label; });
+      html += `<h2>${t('report_staff_manning_title')||'Staff Manning Overview'} (${members.length})</h2>`;
+      if (members.length) {
+        html += `<table><thead><tr><th>#</th><th>${t('staff_position')||'Position'}</th><th>${t('staff_assigned')||'Assigned To'}</th><th>${t('staff_note')||'Note'}</th><th>${t('staff_set_by')||'Set By'}</th><th>${t('report_updated')||'Updated'}</th></tr></thead><tbody>
+        ${members.map((m,i) => `<tr>
+          <td>${i+1}</td>
+          <td><strong>${escHtml(posLabels[m.position] || m.position)}</strong></td>
+          <td>${escHtml(m.user_name || '—')}</td>
+          <td>${escHtml(m.note || '')}</td>
+          <td>${escHtml(m.set_by_name || '')}</td>
+          <td>${m.updated_at ? fmtDateTime(new Date(m.updated_at)) : '—'}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      } else {
+        html += '<p style="color:#888">No staff manning data available.</p>';
+      }
+      const vacant = members.filter(m => !m.user_name && !m.user_id);
+      const filled = members.filter(m => m.user_name || m.user_id);
+      html += `<h2>${t('report_manning_summary')||'Manning Summary'}</h2>
+      <table><thead><tr><th>Status</th><th>Count</th></tr></thead><tbody>
+        <tr><td><strong>${t('report_filled')||'Filled'}</strong></td><td>${filled.length}</td></tr>
+        <tr><td><strong>${t('report_vacant')||'Vacant'}</strong></td><td>${vacant.length}</td></tr>
+        <tr><td><strong>${t('report_total')||'Total'}</strong></td><td>${members.length}</td></tr>
+      </tbody></table>`;
+    } catch(err) {
+      html += '<p>Failed to load staff manning data.</p>';
+    }
+
+  } else if (type === 'staff_duties') {
+    // Staff duty list report
+    try {
+      const duties = await apiGet('/api/staff/duties') || [];
+      html += `<h2>${t('report_staff_duties_title')||'Staff Duty List'} (${duties.length})</h2>`;
+      if (duties.length) {
+        html += `<table><thead><tr><th>#</th><th>${t('staff_role')||'Role'}</th><th>${t('staff_assigned')||'Assigned To'}</th><th>${t('staff_start')||'Start'}</th><th>${t('staff_end')||'End'}</th><th>${t('staff_note')||'Note'}</th><th>${t('staff_set_by')||'Set By'}</th></tr></thead><tbody>
+        ${duties.map((d,i) => `<tr>
+          <td>${i+1}</td>
+          <td><strong>${escHtml(d.role)}</strong></td>
+          <td>${escHtml(d.user_name || '—')}</td>
+          <td>${d.start_time ? fmtDateTime(new Date(d.start_time)) : '—'}</td>
+          <td>${d.end_time ? fmtDateTime(new Date(d.end_time)) : '—'}</td>
+          <td>${escHtml(d.note || '')}</td>
+          <td>${escHtml(d.set_by_name || '')}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      } else {
+        html += '<p style="color:#888">No duty assignments found.</p>';
+      }
+    } catch(err) {
+      html += '<p>Failed to load staff duty data.</p>';
+    }
+
+  } else if (type === 'staff_areas') {
+    // Areas of responsibility report
+    try {
+      const areas = await apiGet('/api/staff/areas') || [];
+      html += `<h2>${t('report_staff_areas_title')||'Areas of Responsibility'} (${areas.length})</h2>`;
+      if (areas.length) {
+        html += `<table><thead><tr><th>#</th><th>${t('staff_area_name')||'Area'}</th><th>${t('staff_area_desc')||'Description'}</th><th>${t('staff_assigned')||'Assigned To'}</th><th>${t('staff_area_created_by')||'Created By'}</th><th>${t('report_updated')||'Updated'}</th></tr></thead><tbody>
+        ${areas.map((a,i) => `<tr>
+          <td>${i+1}</td>
+          <td><strong>${escHtml(a.name)}</strong></td>
+          <td>${escHtml(a.description || '')}</td>
+          <td>${escHtml(a.assigned_name || '—')}</td>
+          <td>${escHtml(a.created_by_name || '')}</td>
+          <td>${a.updated_at ? fmtDateTime(new Date(a.updated_at)) : '—'}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      } else {
+        html += '<p style="color:#888">No areas of responsibility defined.</p>';
+      }
+    } catch(err) {
+      html += '<p>Failed to load areas of responsibility data.</p>';
+    }
+
+  } else if (type === 'board_summary') {
+    // Board summary report
+    try {
+      const boards = await apiGet('/api/boards') || [];
+      html += `<h2>${t('report_board_summary_title')||'Board Summary'} (${boards.length} boards)</h2>`;
+      for (const board of boards) {
+        let items = [];
+        try { items = await apiGet(`/api/boards/${board.id}/items`) || []; } catch(e) {}
+        const cols = board.columns || [];
+        const colMap = {};
+        cols.forEach(c => { colMap[c.id] = c.name; });
+
+        html += `<h2>${escHtml(board.name)} <small style="font-size:11px;color:#888">(${items.length} items)</small></h2>`;
+        if (board.description) html += `<p style="color:#666;font-size:13px">${escHtml(board.description)}</p>`;
+
+        // Items by column
+        const byCol = {};
+        cols.forEach(c => { byCol[c.id] = []; });
+        items.forEach(item => {
+          const cid = item.column_id || (cols.length ? cols[0].id : 'unknown');
+          if (!byCol[cid]) byCol[cid] = [];
+          byCol[cid].push(item);
+        });
+
+        cols.forEach(col => {
+          const citems = byCol[col.id] || [];
+          html += `<h3 style="font-size:14px;margin-top:12px">${escHtml(col.name)} (${citems.length})</h3>`;
+          if (citems.length) {
+            html += `<table><thead><tr><th>${t('board_subject')||'Subject'}</th><th>${t('board_assigned')||'Assigned'}</th><th>${t('board_priority')||'Priority'}</th><th>${t('board_due')||'Due'}</th><th>${t('board_tags')||'Tags'}</th></tr></thead><tbody>
+            ${citems.map(item => `<tr>
+              <td>${escHtml(item.subject)}</td>
+              <td>${escHtml(item.assigned_name || '—')}</td>
+              <td>${item.priority && item.priority !== 'normal' ? escHtml(item.priority) : '—'}</td>
+              <td>${item.due_date ? fmtDateTime(new Date(item.due_date)) : '—'}</td>
+              <td>${(item.tags || []).map(t => escHtml(t)).join(', ') || '—'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+          }
+        });
+
+        // Priority breakdown
+        const byPrio = {};
+        items.forEach(item => { const p = item.priority || 'normal'; byPrio[p] = (byPrio[p]||0) + 1; });
+        html += `<h3 style="font-size:14px;margin-top:12px">${t('report_priority_breakdown')||'Priority Breakdown'}</h3>
+        <table><thead><tr><th>Priority</th><th>Count</th></tr></thead><tbody>
+        ${Object.entries(byPrio).map(([p,c]) => `<tr><td>${escHtml(p)}</td><td>${c}</td></tr>`).join('')}
+        </tbody></table>`;
+      }
+      if (!boards.length) html += '<p style="color:#888">No boards found.</p>';
+    } catch(err) {
+      html += '<p>Failed to load board data.</p>';
+    }
+
+  } else if (type === 'technical_system') {
+    // Technical / system report
+    try {
+      const users = await apiGet('/api/users') || [];
+      const exercise = await apiGet('/api/exercise') || {};
+      const boards = await apiGet('/api/boards') || [];
+      const layers = state.layers || [];
+      let auditEntries = [];
+      try { auditEntries = await apiGet('/api/audit') || []; } catch(e) {}
+      let backupInfo = null;
+      try { backupInfo = await apiGet('/api/admin/gradual-backup'); } catch(e) {}
+
+      html += `<h2>${t('report_technical_title')||'Technical / System Overview'}</h2>`;
+
+      // Exercise info
+      html += `<h3 style="font-size:14px;margin-top:16px">${t('exercise_title')||'Exercise Setup'}</h3>
+      <table><tbody>
+        <tr><td><strong>${t('exercise_name')||'Name'}</strong></td><td>${escHtml(exercise.name || '—')}</td></tr>
+        <tr><td><strong>${t('exercise_start')||'Start'}</strong></td><td>${exercise.start_time ? fmtDateTime(new Date(exercise.start_time)) : '—'}</td></tr>
+        <tr><td><strong>${t('exercise_end')||'End'}</strong></td><td>${exercise.end_time ? fmtDateTime(new Date(exercise.end_time)) : '—'}</td></tr>
+        <tr><td><strong>${t('exercise_timezone')||'Timezone'}</strong></td><td>${escHtml(exercise.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)}</td></tr>
+      </tbody></table>`;
+
+      // Users summary
+      const activeUsers = users.filter(u => !u.blocked);
+      const blockedUsers = users.filter(u => u.blocked);
+      html += `<h3 style="font-size:14px;margin-top:16px">${t('report_users_summary')||'Users'}</h3>
+      <table><tbody>
+        <tr><td><strong>${t('report_total_users')||'Total Users'}</strong></td><td>${users.length}</td></tr>
+        <tr><td><strong>${t('report_active_users')||'Active'}</strong></td><td>${activeUsers.length}</td></tr>
+        <tr><td><strong>${t('report_blocked_users')||'Blocked'}</strong></td><td>${blockedUsers.length}</td></tr>
+      </tbody></table>`;
+
+      // Data counts
+      html += `<h3 style="font-size:14px;margin-top:16px">${t('report_data_overview')||'Data Overview'}</h3>
+      <table><thead><tr><th>Category</th><th>Count</th></tr></thead><tbody>
+        <tr><td>Timeline Events</td><td>${state.events ? state.events.length : 0}</td></tr>
+        <tr><td>Layers</td><td>${layers.length}</td></tr>
+        <tr><td>Boards</td><td>${boards.length}</td></tr>
+        <tr><td>Audit Trail Entries</td><td>${auditEntries.length}</td></tr>
+      </tbody></table>`;
+
+      // Backup info
+      if (backupInfo) {
+        html += `<h3 style="font-size:14px;margin-top:16px">${t('report_backup_status')||'Backup Status'}</h3>
+        <table><tbody>
+          <tr><td><strong>${t('report_backup_enabled')||'Enabled'}</strong></td><td>${backupInfo.enabled ? 'Yes' : 'No'}</td></tr>
+          <tr><td><strong>${t('report_backup_interval')||'Interval'}</strong></td><td>${backupInfo.interval_minutes || '—'} min</td></tr>
+          <tr><td><strong>${t('report_backup_snapshots')||'Snapshots'}</strong></td><td>${(backupInfo.snapshots || []).length}</td></tr>
+        </tbody></table>`;
+      }
+
+      // Recent audit activity (last 20 entries)
+      if (auditEntries.length) {
+        const recent = auditEntries.slice(0, 20);
+        html += `<h3 style="font-size:14px;margin-top:16px">${t('report_recent_audit')||'Recent Audit Activity'} (last ${recent.length})</h3>
+        <table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Type</th><th>Summary</th></tr></thead><tbody>
+        ${recent.map(e => `<tr>
+          <td>${e.timestamp ? fmtDateTime(new Date(e.timestamp)) : '—'}</td>
+          <td>${escHtml(e.user_name || '')}</td>
+          <td>${escHtml(e.action || '')}</td>
+          <td>${escHtml(e.entity_type || '')}</td>
+          <td>${escHtml(e.summary || '')}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+      }
+    } catch(err) {
+      html += '<p>Failed to load system data.</p>';
+    }
+
   } else {
     // timeline snapshot
     html += `<h2>Timeline Snapshot</h2>

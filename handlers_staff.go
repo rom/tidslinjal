@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -51,6 +52,8 @@ func (app *App) handleSetStaffDuty(w http.ResponseWriter, r *http.Request, user 
 		UpdatedAt: now,
 	}
 	app.store.SetStaffDuty(duty)
+	app.audit(user.ID, user.DisplayName, "set", "staff_duty", 0,
+		fmt.Sprintf("Set duty %q → %s", req.Role, req.UserName))
 	jsonOK(w, duty)
 }
 
@@ -61,6 +64,8 @@ func (app *App) handleDeleteStaffDuty(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	app.store.DeleteStaffDuty(id)
+	app.audit(user.ID, user.DisplayName, "deleted", "staff_duty", id,
+		fmt.Sprintf("Deleted staff duty #%d", id))
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -106,6 +111,8 @@ func (app *App) handleSetStaffMember(w http.ResponseWriter, r *http.Request, use
 		UpdatedAt: now,
 	}
 	app.store.SetStaffMember(member)
+	app.audit(user.ID, user.DisplayName, "set", "staff_member", 0,
+		fmt.Sprintf("Set staff position %q → %s", req.Position, req.UserName))
 	jsonOK(w, member)
 }
 
@@ -116,6 +123,8 @@ func (app *App) handleDeleteStaffMember(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	app.store.DeleteStaffMember(id)
+	app.audit(user.ID, user.DisplayName, "deleted", "staff_member", id,
+		fmt.Sprintf("Deleted staff member #%d", id))
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -161,6 +170,8 @@ func (app *App) handleCreateArea(w http.ResponseWriter, r *http.Request, user *U
 		UpdatedAt:     now,
 	}
 	app.store.CreateArea(area)
+	app.audit(user.ID, user.DisplayName, "created", "area_of_responsibility", 0,
+		fmt.Sprintf("Created area %q", req.Name))
 	jsonOK(w, area)
 }
 
@@ -186,6 +197,8 @@ func (app *App) handleUpdateArea(w http.ResponseWriter, r *http.Request, user *U
 		}
 	}
 	app.store.UpdateArea(id, req.Name, req.Description, req.AssignedTo, req.AssignedName)
+	app.audit(user.ID, user.DisplayName, "updated", "area_of_responsibility", id,
+		fmt.Sprintf("Updated area #%d %q", id, req.Name))
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -196,5 +209,7 @@ func (app *App) handleDeleteArea(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	app.store.DeleteArea(id)
+	app.audit(user.ID, user.DisplayName, "deleted", "area_of_responsibility", id,
+		fmt.Sprintf("Deleted area #%d", id))
 	jsonOK(w, map[string]string{"status": "ok"})
 }

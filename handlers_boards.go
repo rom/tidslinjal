@@ -365,6 +365,8 @@ func (app *App) handleCreateBoardItem(w http.ResponseWriter, r *http.Request, us
 		app.notifyBoardMentions(req.Note, user, board, &created)
 	}
 
+	app.audit(user.ID, user.DisplayName, "created", "board_item", created.ID,
+		fmt.Sprintf("Created item %q on board #%d", created.Subject, boardID))
 	app.broadcastBoardChange("board_item_created", boardID)
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
@@ -486,6 +488,10 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+	if len(changes) > 0 {
+		app.audit(user.ID, user.DisplayName, "updated", "board_item", item.ID,
+			fmt.Sprintf("Updated item %q: %s", item.Subject, strings.Join(changes, ", ")))
+	}
 	app.broadcastBoardChange("board_item_updated", item.BoardID)
 	jsonOK(w, item)
 }
@@ -510,6 +516,8 @@ func (app *App) handleDeleteBoardItem(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "deleted", "board_item", id,
+		fmt.Sprintf("Deleted item %q from board #%d", item.Subject, item.BoardID))
 	app.broadcastBoardChange("board_item_deleted", item.BoardID)
 	jsonOK(w, map[string]string{"status": "ok"})
 }
@@ -548,6 +556,8 @@ func (app *App) handleMoveBoardItem(w http.ResponseWriter, r *http.Request, user
 		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
 		Action: "moved", Detail: fmt.Sprintf("Moved from %s to %s", oldCol, req.ColumnID),
 	})
+	app.audit(user.ID, user.DisplayName, "moved", "board_item", id,
+		fmt.Sprintf("Moved item %q from %s to %s", item.Subject, oldCol, req.ColumnID))
 	app.broadcastBoardChange("board_item_moved", item.BoardID)
 	jsonOK(w, map[string]string{"status": "ok"})
 }
@@ -598,6 +608,8 @@ func (app *App) handleAddBoardItemComment(w http.ResponseWriter, r *http.Request
 		jsonError(w, "save failed", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "commented", "board_item", itemID,
+		fmt.Sprintf("Commented on item %q", item.Subject))
 	app.broadcastBoardChange("board_item_updated", item.BoardID)
 	jsonOK(w, item)
 }
@@ -663,6 +675,8 @@ func (app *App) handleUploadBoardItemAttachment(w http.ResponseWriter, r *http.R
 		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
 		Action: "attachment_added", Detail: safeName,
 	})
+	app.audit(user.ID, user.DisplayName, "attachment", "board_item", itemID,
+		fmt.Sprintf("Uploaded attachment %q to item %q", safeName, item.Subject))
 	app.broadcastBoardChange("board_item_updated", item.BoardID)
 	jsonOK(w, att)
 }
@@ -734,6 +748,9 @@ func (app *App) handleExportBoard(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	items := app.store.GetBoardItems(boardID)
+
+	app.audit(user.ID, user.DisplayName, "exported", "board", boardID,
+		fmt.Sprintf("Exported board %q as %s", board.Name, format))
 
 	switch format {
 	case "json":
@@ -981,6 +998,8 @@ func (app *App) handleGenerateBoardItemShareToken(w http.ResponseWriter, r *http
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+	app.audit(user.ID, user.DisplayName, "share", "board_item", id,
+		fmt.Sprintf("Generated share link for item %q", item.Subject))
 	jsonOK(w, map[string]string{"share_token": token})
 }
 
