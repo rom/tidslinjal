@@ -1,6 +1,28 @@
 /* ── Boards (Kanban) UI ─────────────────────────────────────────────────── */
 'use strict';
 
+// Build role <option> elements dynamically (includes custom roles from role editor)
+function _boardRoleOptions(selectedKey) {
+  const builtinRoles = [
+    {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
+    {key:'reporter', label:'Reporter'}, {key:'teammember', label:'Team Member'},
+    {key:'teamlead', label:'Team Lead'}, {key:'deputy_teamlead', label:'Deputy Team Lead'},
+    {key:'oplead', label:'Operations Lead'}, {key:'deputy_oplead', label:'Deputy Operations Lead'},
+    {key:'staffofficer', label:'Staff Officer'}, {key:'staff_assistant', label:'Staff Assistant'},
+    {key:'staffofficer_full', label:'Staff Officer (Full)'}, {key:'admin', label:'Admin'},
+  ];
+  const allRoles = [...builtinRoles];
+  (state.roleConfigs || []).forEach(rc => {
+    if (!allRoles.find(r => r.key === rc.key) && rc.key !== 'admin') {
+      allRoles.push({key: rc.key, label: rc.display_name || rc.key});
+    }
+  });
+  return allRoles.map(r => {
+    const label = (typeof getRoleDisplayName === 'function' ? getRoleDisplayName(r.key) : null) || r.label;
+    return `<option value="${r.key}" ${r.key===selectedKey?'selected':''}>${escHtml(label)}</option>`;
+  }).join('');
+}
+
 // ── State ──
 let _boardsState = {
   boards: [],
@@ -148,18 +170,7 @@ async function _openCreateBoardDialog() {
     <div id="newBoardRoleDiv" style="display:none;margin-bottom:8px">
       <label>${t('board_role')||'Role'}</label>
       <select id="newBoardRole" class="input" style="width:100%">
-        <option value="observer">Observer</option>
-        <option value="read">Read</option>
-        <option value="reporter">Reporter</option>
-        <option value="teammember">Team Member</option>
-        <option value="teamlead">Team Lead</option>
-        <option value="deputy_teamlead">Deputy Team Lead</option>
-        <option value="oplead">Operations Lead</option>
-        <option value="deputy_oplead">Deputy Operations Lead</option>
-        <option value="staffofficer">Staff Officer</option>
-        <option value="staff_assistant">Staff Assistant</option>
-        <option value="staffofficer_full">Staff Officer (Full)</option>
-        <option value="admin">Admin</option>
+        ${_boardRoleOptions('')}
       </select>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -1056,18 +1067,7 @@ async function _openBoardSettings() {
     <div id="settBoardRoleDiv" style="display:${board.visibility==='role'?'':'none'};margin-bottom:8px">
       <label>${t('board_role')||'Role'}</label>
       <select id="settBoardRole" class="input" style="width:100%">
-        <option value="observer" ${board.role_key==='observer'?'selected':''}>Observer</option>
-        <option value="read" ${board.role_key==='read'?'selected':''}>Read</option>
-        <option value="reporter" ${board.role_key==='reporter'?'selected':''}>Reporter</option>
-        <option value="teammember" ${board.role_key==='teammember'?'selected':''}>Team Member</option>
-        <option value="teamlead" ${board.role_key==='teamlead'?'selected':''}>Team Lead</option>
-        <option value="deputy_teamlead" ${board.role_key==='deputy_teamlead'?'selected':''}>Deputy Team Lead</option>
-        <option value="oplead" ${board.role_key==='oplead'?'selected':''}>Operations Lead</option>
-        <option value="deputy_oplead" ${board.role_key==='deputy_oplead'?'selected':''}>Deputy Operations Lead</option>
-        <option value="staffofficer" ${board.role_key==='staffofficer'?'selected':''}>Staff Officer</option>
-        <option value="staff_assistant" ${board.role_key==='staff_assistant'?'selected':''}>Staff Assistant</option>
-        <option value="staffofficer_full" ${board.role_key==='staffofficer_full'?'selected':''}>Staff Officer (Full)</option>
-        <option value="admin" ${board.role_key==='admin'?'selected':''}>Admin</option>
+        ${_boardRoleOptions(board.role_key || '')}
       </select>
     </div>
     <label>${t('board_columns')||'Columns'}</label>

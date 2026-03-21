@@ -426,29 +426,7 @@ window._deleteResourceStar = async function(starId, resType, resId) {
   } catch (e) { showError(e.message); }
 };
 
-document.getElementById('btnSaveUser').addEventListener('click', async () => {
-  const id = document.getElementById('userId').value;
-  const username = document.getElementById('uUsername').value.trim();
-  const password = document.getElementById('uPassword').value;
-  const displayName = document.getElementById('uDisplayName').value.trim();
-  const role = document.getElementById('uRole').value;
-  const canLock = document.getElementById('uCanLock').checked;
-  if (!id && (!username||!password)) { showError('Username and password required', 'Validation'); return; }
-  const email = document.getElementById('uEmail').value.trim();
-  const groupIDs = [...document.querySelectorAll('input[name="uGroup"]:checked')].map(cb => parseInt(cb.value, 10));
-  const natoDesignations = [...document.querySelectorAll('input[name="uNATO"]:checked')].map(cb => cb.value);
-  // Staff Officer role requires at least one J-designation
-  if (role === 'staffofficer_full' && natoDesignations.length === 0) {
-    showError('The Staff Officer role requires at least one J-designation to be assigned.', 'Validation');
-    return;
-  }
-  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs, nato_designations:natoDesignations};
-  if (!id) { payload.username=username; payload.password=password; }
-  if (id&&password) { payload.password=password; }
-  const res = id ? await apiPut(`/api/users/${id}`, payload) : await apiPost('/api/users', payload);
-  if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
-  else { const err = await res.json(); showError(err.error); }
-});
+// btnSaveUser handler is in modal-user.js (single handler to avoid duplicate API calls)
 
 document.getElementById('btnSaveGroup').addEventListener('click', async () => {
   const id = document.getElementById('groupId').value;
