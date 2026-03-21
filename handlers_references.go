@@ -448,7 +448,7 @@ func (app *App) handleReferenceIndex(w http.ResponseWriter, r *http.Request, use
 
 	// Group by category
 	catMap := make(map[string][]IndexEntry)
-	catOrder := []string{"handbook", "sop", "policy", "map", "reference", "checklist", "faq", "objectives", "other"}
+	catOrder := []string{"handbook", "sop", "policy", "map", "reference", "checklist", "faq", "objectives", "presentation_material", "exercise_documents", "other"}
 	for _, rd := range refs {
 		cat := rd.Category
 		if cat == "" {

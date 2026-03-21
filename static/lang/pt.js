@@ -1291,6 +1291,7 @@ manage_resource_types: 'Gerir Tipos',
     questionnaire_builtin_acknowledged: 'Edição confirmada — as alterações criarão uma nova cópia',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Documentos de exercício',
 
     analysis_tab_overview: 'Visão geral',

@@ -1718,6 +1718,7 @@ TRANSLATIONS.en = {
     sq5_q_def_comments: 'Key observations or concerns regarding defence capabilities?',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Exercise Documents',
 
 

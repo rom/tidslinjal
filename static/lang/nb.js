@@ -1577,6 +1577,7 @@ TRANSLATIONS.nb = {
     questionnaire_builtin_acknowledged: 'Redigering godkjent — endringer oppretter en ny kopi',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Øvelsesdokumenter',
 
     analysis_tab_overview: 'Oversikt',

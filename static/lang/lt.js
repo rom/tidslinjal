@@ -1290,6 +1290,7 @@ admin_view: 'Administratoriaus rodinys',
     questionnaire_builtin_acknowledged: 'Redagavimas patvirtintas — pakeitimai sukurs naują kopiją',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Pratybų dokumentai',
 
     analysis_tab_overview: 'Apžvalga',

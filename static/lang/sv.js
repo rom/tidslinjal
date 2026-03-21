@@ -1539,6 +1539,7 @@ TRANSLATIONS.sv = {
     questionnaire_builtin_acknowledged: 'Redigering godkänd — ändringar skapar en ny kopia',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Övningsdokument',
 
 

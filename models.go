@@ -805,6 +805,8 @@ type ExerciseSettings struct {
 	HelpURL     string `json:"help_url,omitempty"`
 	TrainingURL string `json:"training_url,omitempty"`
 	DemoURL     string `json:"demo_url,omitempty"`
+	// Mattermost DM base URL (e.g. https://mm.example.com/team/messages)
+	MattermostDMURL string `json:"mattermost_dm_url,omitempty"`
 }
 
 // MapLocation represents a named geographic position (HQ, base, POI, etc.)

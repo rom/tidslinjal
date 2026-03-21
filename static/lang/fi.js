@@ -1351,6 +1351,7 @@ TRANSLATIONS.fi = {
     questionnaire_builtin_acknowledged: 'Muokkaus hyväksytty — muutokset luovat uuden kopion',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Harjoitusasiakirjat',
 
     analysis_tab_overview: 'Yleiskatsaus',

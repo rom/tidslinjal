@@ -1290,6 +1290,7 @@ admin_view: 'Vista de administrador',
     questionnaire_builtin_acknowledged: 'Edición confirmada — los cambios crearán una nueva copia',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Documentos de ejercicio',
 
     analysis_tab_overview: 'Resumen',

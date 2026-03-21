@@ -1464,6 +1464,7 @@ TRANSLATIONS.is = {
     sq5_q_def_redundancy: 'Are backup systems and redundancy measures in place and tested?',
     sq5_q_def_personnel: 'Is the defence manning level sufficient for current threat level?',
     sq5_q_def_comments: 'Key observations or concerns regarding defence capabilities?',
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Exercise Documents',
     analysis_tab_overview: 'Overview',
     analysis_tab_events: 'Events',

@@ -102,7 +102,7 @@ async function restoreGradualSnapshot(filename) {
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" id="btnConfirmGbRestore">↩ Restore</button>
-      <button class="btn btn-secondary" onclick="closeModal('gbRestoreModal')">Cancel</button>
+      <button class="btn btn-secondary" data-action="closeModal" data-arg="gbRestoreModal">Cancel</button>
     </div>
   </div>`;
   // Use a simple modal approach - inject into DOM

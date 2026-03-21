@@ -1291,6 +1291,7 @@ role_editor_label_nb: '🇳🇴 NB',
     questionnaire_builtin_acknowledged: 'Редагування підтверджено — зміни створять нову копію',
 
     // Reference categories (additions)
+    ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Документи навчань',
 
     analysis_tab_overview: 'Огляд',
