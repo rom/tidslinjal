@@ -387,13 +387,18 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Subject     *string   `json:"subject"`
-		Note        *string   `json:"note"`
-		ItemType    *string   `json:"item_type"`
-		Color       *string   `json:"color"`
-		Tags        *[]string `json:"tags"`
-		ChecklistID *int64    `json:"checklist_id"`
-		EventID     *int64    `json:"event_id"`
+		Subject         *string        `json:"subject"`
+		Note            *string        `json:"note"`
+		ItemType        *string        `json:"item_type"`
+		Color           *string        `json:"color"`
+		Tags            *[]string      `json:"tags"`
+		Links           *[]BoardLink   `json:"links"`
+		DueDate         *string        `json:"due_date"`
+		ResponsibleID   *int64         `json:"responsible_id"`
+		ResponsibleName *string        `json:"responsible_name"`
+		Comments        *[]BoardComment `json:"comments"`
+		ChecklistID     *int64         `json:"checklist_id"`
+		EventID         *int64         `json:"event_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -423,6 +428,31 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 	}
 	if req.Tags != nil {
 		item.Tags = *req.Tags
+	}
+	if req.Links != nil {
+		item.Links = *req.Links
+		changes = append(changes, "links")
+	}
+	if req.DueDate != nil {
+		item.DueDate = *req.DueDate
+		changes = append(changes, "due_date")
+	}
+	if req.ResponsibleID != nil {
+		item.ResponsibleID = *req.ResponsibleID
+		if req.ResponsibleName != nil {
+			item.ResponsibleName = *req.ResponsibleName
+		} else if *req.ResponsibleID > 0 {
+			if u, ok := app.store.GetUserByID(*req.ResponsibleID); ok {
+				item.ResponsibleName = u.DisplayName
+			}
+		} else {
+			item.ResponsibleName = ""
+		}
+		changes = append(changes, "responsible")
+	}
+	if req.Comments != nil {
+		item.Comments = *req.Comments
+		changes = append(changes, "comments")
 	}
 	if req.ChecklistID != nil {
 		item.ChecklistID = *req.ChecklistID
@@ -507,6 +537,54 @@ func (app *App) handleMoveBoardItem(w http.ResponseWriter, r *http.Request, user
 }
 
 // ── Board Item Attachments ──────────────────────────────────────────────────
+
+func (app *App) handleAddBoardItemComment(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 4 {
+		jsonError(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	itemID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid item id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(itemID)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canAccessBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := decode(r, &req); err != nil || strings.TrimSpace(req.Text) == "" {
+		jsonError(w, "text required", http.StatusBadRequest)
+		return
+	}
+	comment := BoardComment{
+		ID:        time.Now().UnixNano(),
+		UserID:    user.ID,
+		UserName:  user.DisplayName,
+		Text:      strings.TrimSpace(req.Text),
+		CreatedAt: time.Now(),
+	}
+	item.Comments = append(item.Comments, comment)
+	item.History = append(item.History, BoardHistory{
+		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
+		Action: "commented", Detail: req.Text,
+	})
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "save failed", http.StatusInternalServerError)
+		return
+	}
+	app.broadcastBoardChange("board_item_updated", item.BoardID)
+	jsonOK(w, item)
+}
 
 func (app *App) handleUploadBoardItemAttachment(w http.ResponseWriter, r *http.Request, user *User) {
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")

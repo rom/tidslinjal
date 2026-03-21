@@ -1805,6 +1805,15 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				}
 				return
 			}
+			// /api/board-items/{id}/comments
+			if len(parts) == 4 && parts[3] == "comments" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleAddBoardItemComment)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
 			// /api/board-items/{id}/attachments
 			if len(parts) == 4 && parts[3] == "attachments" {
 				if r.Method == http.MethodPost {
