@@ -299,6 +299,7 @@ function _renderKanbanBoard() {
   const boardWidth = Math.min(calcWidth, window.innerWidth * 0.95);
   _boardModal('boardsModal', html, boardWidth + 'px');
   _bindKanbanEvents();
+  _setupKanbanDragScroll();
 }
 
 // ── Bind drag/drop and dblclick events for kanban board ──
@@ -326,6 +327,42 @@ function _bindKanbanEvents() {
     const colId = el.dataset.dblclickRename;
     const colName = el.dataset.colName;
     el.addEventListener('dblclick', () => _renameCol(colId, colName));
+  });
+}
+
+// ── Drag-to-scroll on the kanban board container ──
+function _setupKanbanDragScroll() {
+  const modal = document.getElementById('boardsModal');
+  if (!modal) return;
+  // The scrollable wrapper is the first child inside .modal-body
+  const body = modal.querySelector('.modal-body');
+  if (!body) return;
+  const container = body.querySelector('[style*="overflow-x"]') || body.firstElementChild;
+  if (!container) return;
+
+  let dragging = false, startX = 0, startScrollLeft = 0;
+
+  container.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;
+    // Don't interfere with card drag, buttons, inputs, or interactive elements
+    if (e.target.closest('.kanban-card, button, input, select, textarea, a, [data-action]')) return;
+    dragging = true;
+    startX = e.clientX;
+    startScrollLeft = container.scrollLeft;
+    container.style.cursor = 'grabbing';
+    container.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  container.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    container.scrollLeft = startScrollLeft - (e.clientX - startX);
+  });
+
+  container.addEventListener('pointerup', e => {
+    if (!dragging) return;
+    dragging = false;
+    container.style.cursor = '';
   });
 }
 
