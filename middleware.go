@@ -373,6 +373,41 @@ func noDirListing(next http.Handler) http.Handler {
 	})
 }
 
+// ipBlacklistMiddleware blocks requests from blacklisted IP addresses.
+func (app *App) ipBlacklistMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bl := app.store.GetIPBlacklist()
+		if bl.Enabled && len(bl.Entries) > 0 {
+			ip := clientIP(r)
+			parsedIP := net.ParseIP(ip)
+			for _, entry := range bl.Entries {
+				// Check exact IP match
+				if entry.IP == ip {
+					app.store.LogAudit(AuditEntry{
+						Action: "blocked", EntityType: "ip_blacklist",
+						Summary: fmt.Sprintf("SECURITY: Blocked connection from blacklisted IP %s (reason: %s)", ip, entry.Reason),
+					})
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+				// Check CIDR match
+				if strings.Contains(entry.IP, "/") {
+					_, cidr, err := net.ParseCIDR(entry.IP)
+					if err == nil && parsedIP != nil && cidr.Contains(parsedIP) {
+						app.store.LogAudit(AuditEntry{
+							Action: "blocked", EntityType: "ip_blacklist",
+							Summary: fmt.Sprintf("SECURITY: Blocked connection from blacklisted range %s (IP: %s, reason: %s)", entry.IP, ip, entry.Reason),
+						})
+						http.Error(w, "Forbidden", http.StatusForbidden)
+						return
+					}
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // securityHeaders wraps an http.Handler and injects security-related HTTP
 // response headers on every reply. This provides defence-in-depth against
 // clickjacking, MIME-sniffing, and other common web vulnerabilities.

@@ -313,7 +313,9 @@ var backupRestoreAreas = map[string][]string{
 	"other":     {"templates.json", "filter_presets.json", "locks.json",
 		"routing_rules.json", "connectors.json", "auto_report_schedules.json",
 		"questionnaires.json", "tags.json", "notifications.json", "polls.json",
-		"person_ready_checks.json", "attachments.json"},
+		"person_ready_checks.json", "attachments.json",
+		"security.json", "rate_limits.json", "geoblocking.json",
+		"ip_blacklist.json", "encryption.json"},
 }
 
 func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User) {

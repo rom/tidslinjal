@@ -832,6 +832,111 @@ async function saveSecEncryption() {
   }
 }
 
+// ── IP Blacklist ──────────────────────────────────────────────────────────────
+let _ipBlacklistData = { enabled: false, entries: [] };
+
+async function loadIpBlacklist() {
+  try {
+    const data = await apiGet('/api/admin/ip-blacklist');
+    if (data) _ipBlacklistData = data;
+  } catch { /* ignore */ }
+  const enabledEl = document.getElementById('secIpBlEnabled');
+  if (enabledEl) enabledEl.checked = _ipBlacklistData.enabled;
+  renderIpBlacklistEntries();
+}
+
+function renderIpBlacklistEntries() {
+  const el = document.getElementById('secIpBlEntries');
+  if (!el) return;
+  const entries = _ipBlacklistData.entries || [];
+  if (!entries.length) {
+    el.innerHTML = `<p style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px;text-align:center">${t('security_ip_bl_empty')||'No blocked IPs.'}</p>`;
+    return;
+  }
+  el.innerHTML = entries.map((e, i) => `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid var(--border);font-size:var(--fs-xs)">
+    <span style="font-weight:600;font-family:monospace;min-width:140px">${escHtml(e.ip)}</span>
+    <span style="flex:1;color:var(--text-dim)">${escHtml(e.reason||'')}</span>
+    <span style="color:var(--text-dim);font-size:10px;white-space:nowrap">${e.added_by ? escHtml(e.added_by) : ''}${e.added_at ? ' · ' + new Date(e.added_at).toLocaleDateString() : ''}</span>
+    <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#E74C3C;color:#fff" data-action="removeIpBlacklistEntry" data-arg="${i}">×</button>
+  </div>`).join('');
+}
+
+async function addIpBlacklistEntry() {
+  const ip = document.getElementById('secIpBlNewIp')?.value?.trim();
+  if (!ip) { showError(t('security_ip_required')||'IP address is required'); return; }
+  const reason = document.getElementById('secIpBlNewReason')?.value?.trim() || '';
+  const res = await apiPost('/api/admin/ip-blacklist/add', { ip, reason });
+  if (res.ok) {
+    const data = await res.json();
+    _ipBlacklistData = data;
+    renderIpBlacklistEntries();
+    document.getElementById('secIpBlNewIp').value = '';
+    document.getElementById('secIpBlNewReason').value = '';
+    showNotification('success', (t('security_ip_bl_added')||'IP added to blacklist') + ': ' + ip);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to add IP');
+  }
+}
+
+async function removeIpBlacklistEntry(idx) {
+  const index = parseInt(idx, 10);
+  const entry = (_ipBlacklistData.entries || [])[index];
+  if (!entry) return;
+  const res = await apiPost('/api/admin/ip-blacklist/remove', { ip: entry.ip });
+  if (res.ok) {
+    const data = await res.json();
+    _ipBlacklistData = data;
+    renderIpBlacklistEntries();
+    showNotification('success', (t('security_ip_bl_removed')||'IP removed from blacklist') + ': ' + entry.ip);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to remove IP');
+  }
+}
+
+async function saveIpBlacklist() {
+  _ipBlacklistData.enabled = document.getElementById('secIpBlEnabled')?.checked || false;
+  const res = await api('PUT', '/api/admin/ip-blacklist', _ipBlacklistData);
+  if (res.ok) {
+    showNotification('success', t('security_ip_bl_saved')||'IP blacklist settings saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save IP blacklist');
+  }
+}
+
+function exportIpBlacklist() {
+  window.open('/api/admin/ip-blacklist/export', '_blank');
+}
+
+// Import file handler — bound after sidebar renders
+function _setupIpBlImport() {
+  const fileInput = document.getElementById('secIpBlImportFile');
+  if (!fileInput || fileInput._bound) return;
+  fileInput._bound = true;
+  fileInput.addEventListener('change', async function() {
+    const file = this.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const res = await apiPost('/api/admin/ip-blacklist/import?mode=merge', data);
+      if (res.ok) {
+        _ipBlacklistData = await res.json();
+        const enabledEl = document.getElementById('secIpBlEnabled');
+        if (enabledEl) enabledEl.checked = _ipBlacklistData.enabled;
+        renderIpBlacklistEntries();
+        showNotification('success', (t('security_ip_bl_imported')||'IP blacklist imported') + ` (${(_ipBlacklistData.entries||[]).length} entries)`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to import');
+      }
+    } catch (e) { showError('Invalid JSON file: ' + e.message); }
+    this.value = '';
+  });
+}
+
 async function restartBackend() {
   if (!confirm(t('danger_restart_confirm')||'Are you sure you want to restart? This will interrupt all active sessions.')) return;
   const res = await api('POST', '/api/admin/restart-backend', {});

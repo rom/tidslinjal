@@ -814,6 +814,46 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 
+	// IP Blacklist — admin only
+	mux.HandleFunc("/api/admin/ip-blacklist", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireRole(RoleAdmin, app.handleGetIPBlacklist)(w, r)
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleSaveIPBlacklist)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/admin/ip-blacklist/add", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		app.requireRole(RoleAdmin, app.handleAddIPBlacklistEntry)(w, r)
+	})
+	mux.HandleFunc("/api/admin/ip-blacklist/remove", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		app.requireRole(RoleAdmin, app.handleRemoveIPBlacklistEntry)(w, r)
+	})
+	mux.HandleFunc("/api/admin/ip-blacklist/export", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		app.requireRole(RoleAdmin, app.handleExportIPBlacklist)(w, r)
+	})
+	mux.HandleFunc("/api/admin/ip-blacklist/import", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		app.requireRole(RoleAdmin, app.handleImportIPBlacklist)(w, r)
+	})
+
 	// Reports: on-demand download in specific format
 	mux.HandleFunc("/api/reports/download", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -2172,9 +2212,15 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 
 	// Wrap the entire mux with security headers.
 	if app.secureMode {
-		return securityHeadersWithHSTS(handler)
+		handler = securityHeadersWithHSTS(handler)
+	} else {
+		handler = securityHeaders(handler)
 	}
-	return securityHeaders(handler)
+
+	// IP blacklist — outermost layer, blocks before any processing
+	handler = app.ipBlacklistMiddleware(handler)
+
+	return handler
 }
 
 // apiVersionRewrite transparently rewrites /api/v1/* requests to /api/* so that
