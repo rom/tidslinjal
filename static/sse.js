@@ -218,7 +218,8 @@ function _showFlashAlert(data) {
     quick_report: { bg: '#3498DB', border: '#2980B9', icon: '📋' },
   };
   const c = colors[type] || colors.quick_response;
-  if (priority === 'critical') { c.bg = '#C0392B'; c.border = '#922B21'; }
+  const isCritical = priority === 'critical';
+  if (isCritical) { c.bg = '#8B0000'; c.border = '#5C0000'; c.icon = '🚨🔴🚨'; }
 
   const typeLabels = {
     quick_response: t('tl_quick_response') || 'Quick Response needed!',
@@ -226,25 +227,38 @@ function _showFlashAlert(data) {
     quick_report: t('tl_quick_report') || 'Quick Report',
   };
   const typeLabel = typeLabels[type] || type;
+  const modalWidth = isCritical ? 'max-width:620px' : 'max-width:500px';
+  const modalPadding = isCritical ? 'padding:32px 40px' : 'padding:24px 32px';
+  const iconSize = isCritical ? 'font-size:48px;margin-bottom:12px' : 'font-size:32px;margin-bottom:8px';
+  const titleSize = isCritical ? 'font-size:24px;font-weight:900;text-transform:uppercase;letter-spacing:2px' : 'font-size:18px;font-weight:700';
+  const borderWidth = isCritical ? '4px' : '3px';
+  const priorityBadge = isCritical
+    ? `<div style="display:inline-block;background:#fff;color:#8B0000;font-size:11px;font-weight:900;padding:2px 10px;border-radius:4px;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">CRITICAL PRIORITY</div>`
+    : '';
 
   // Create flash overlay
   const overlay = document.createElement('div');
   overlay.className = 'flash-alert-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;animation:flashPulse 0.5s ease-in-out';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,' + (isCritical ? '.7' : '.5') + ');z-index:99999;display:flex;align-items:center;justify-content:center;animation:flashPulse 0.5s ease-in-out';
 
   overlay.innerHTML = `
-    <div style="background:${c.bg};color:#fff;border:3px solid ${c.border};border-radius:12px;padding:24px 32px;max-width:500px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:flashBounce 0.4s ease-out">
-      <div style="font-size:32px;margin-bottom:8px">${c.icon}</div>
-      <div style="font-size:18px;font-weight:700;margin-bottom:8px">${escHtml(typeLabel)}</div>
+    <div style="background:${c.bg};color:#fff;border:${borderWidth} solid ${c.border};border-radius:12px;${modalPadding};${modalWidth};width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:flashBounce 0.4s ease-out">
+      <div style="${iconSize}">${c.icon}</div>
+      ${priorityBadge}
+      <div style="${titleSize};margin-bottom:8px">${escHtml(typeLabel)}</div>
       <div style="font-size:14px;margin-bottom:12px;line-height:1.6">${escHtml(message)}</div>
       <div style="font-size:12px;opacity:.8;margin-bottom:16px">${t('from')||'From'}: <strong>${escHtml(from)}</strong>${role ? ' (' + escHtml(role) + ')' : ''} ${timestamp ? '· ' + timestamp : ''}</div>
-      <button style="background:rgba(255,255,255,.25);color:#fff;border:2px solid rgba(255,255,255,.5);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-dismiss-btn">${t('btn_dismiss')||'Dismiss'}</button>
+      <button style="background:rgba(255,255,255,.25);color:#fff;border:2px solid rgba(255,255,255,.5);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-dismiss-btn">${t('flash_acknowledge')||'Acknowledge'}</button>
     </div>`;
 
   document.body.appendChild(overlay);
 
-  // Play alert sound
-  _playNotifBellSound();
+  // Play different sound based on priority
+  if (isCritical) {
+    playAlarmSound('klaxon');
+  } else {
+    playAlarmSound('alert');
+  }
 
   // Auto-dismiss after 15 seconds
   const timer = setTimeout(() => overlay.remove(), 15000);

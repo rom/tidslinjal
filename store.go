@@ -83,6 +83,7 @@ type Store struct {
 	staffDuties          []StaffDuty
 	staffMembers         []StaffMember
 	areasOfResp          []AreaOfResponsibility
+	resourceIncidents    []ResourceIncident
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -126,6 +127,7 @@ type Store struct {
 	nextStaffDutyID          int64
 	nextStaffMemberID        int64
 	nextAreaID               int64
+	nextResourceIncidentID   int64
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User

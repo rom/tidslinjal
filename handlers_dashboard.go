@@ -191,6 +191,25 @@ func (app *App) handleDashboardData(w http.ResponseWriter, r *http.Request, user
 		}
 	}
 
+	// ── 9. Active resource incidents ────────────────────────────────────────
+	activeIncidents := []map[string]any{}
+	for _, ri := range app.store.GetResourceIncidents() {
+		if ri.Status == "open" || ri.Status == "in_progress" {
+			activeIncidents = append(activeIncidents, map[string]any{
+				"id":            ri.ID,
+				"title":         ri.Title,
+				"resource_type": ri.ResourceType,
+				"incident_type": ri.IncidentType,
+				"severity":      ri.Severity,
+				"status":        ri.Status,
+				"created_at":    ri.CreatedAt,
+			})
+		}
+		if len(activeIncidents) >= 10 {
+			break
+		}
+	}
+
 	jsonOK(w, map[string]any{
 		"urgent_requests":     urgentRequests,
 		"online_users":        onlineUsers,
@@ -200,6 +219,7 @@ func (app *App) handleDashboardData(w http.ResponseWriter, r *http.Request, user
 		"active_ready_checks": activeReadyChecks,
 		"board_summary":       boardSummary,
 		"recent_decisions":    recentDecisions,
+		"active_incidents":    activeIncidents,
 		"stats": map[string]any{
 			"total_users":       len(allUsers),
 			"online_users":      len(onlineUsers),

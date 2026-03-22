@@ -62,10 +62,13 @@ async function _refreshTicker() {
         if (e.type && e.type.startsWith(prefix)) { icon = typeIcons[prefix]; break; }
       }
       var col = severityColors[e.severity] || 'var(--text-dim)';
-      return '<span class="ticker-item">' +
+      var isCrit = e.severity === 'critical';
+      var sumText = escHtml(e.summary || '');
+      if (isCrit) sumText = '<strong style="text-transform:uppercase">' + sumText + '</strong>';
+      return '<span class="ticker-item"' + (isCrit ? ' style="font-weight:700"' : '') + '>' +
         '<span class="ticker-time" style="color:' + col + '">' + timeStr + '</span>' +
         '<span class="ticker-icon">' + icon + '</span>' +
-        '<span>' + escHtml(e.summary || '') + '</span>' +
+        '<span>' + sumText + '</span>' +
         (e.user_name ? '<span style="color:var(--text-dim)">— ' + escHtml(e.user_name) + '</span>' : '') +
         '</span><span class="ticker-sep">|</span>';
     }).join('');

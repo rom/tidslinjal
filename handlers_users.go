@@ -124,6 +124,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		GroupIDs         []int64  `json:"group_ids"`    // nil = no change; [] = remove all; [...] = replace
 		GroupIDsSet      bool     `json:"group_ids_set"` // true if caller passed group_ids field
 		NATODesignations []string `json:"nato_designations"`
+		BuildingID       int64    `json:"building_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -192,6 +193,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		if req.NATODesignations != nil {
 			existing.NATODesignations = req.NATODesignations
 		}
+		existing.BuildingID = req.BuildingID
 		// Update group memberships if admin passed group_ids
 		if req.GroupIDs != nil {
 			// Remove all existing memberships for this user

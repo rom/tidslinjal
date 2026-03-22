@@ -1799,3 +1799,70 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 		"items_per_board":    itemsPerBoard,
 	})
 }
+
+// ── User Location Analytics ──────────────────────────────────────────────────
+
+func (app *App) handleStatsUserLocations(w http.ResponseWriter, r *http.Request, user *User) {
+	users := app.store.GetUsers()
+	rooms := app.store.GetRooms()
+
+	// Build building lookup
+	buildingMap := map[int64]Room{}
+	for _, r := range rooms {
+		if r.Type == "building" {
+			buildingMap[r.ID] = r
+		}
+	}
+
+	// Users by building
+	byBuilding := map[string]int{}
+	userLocations := []map[string]any{}
+	for _, u := range users {
+		loc := u.Location
+		buildingName := ""
+		if u.BuildingID > 0 {
+			if b, ok := buildingMap[u.BuildingID]; ok {
+				buildingName = b.Name
+				if loc == "" {
+					loc = b.Location
+				}
+			}
+		}
+		if buildingName != "" {
+			byBuilding[buildingName]++
+		}
+		if loc != "" || buildingName != "" {
+			userLocations = append(userLocations, map[string]any{
+				"user_id":       u.ID,
+				"username":      u.Username,
+				"display_name":  u.DisplayName,
+				"location":      loc,
+				"building_name": buildingName,
+				"building_id":   u.BuildingID,
+				"login_count":   u.LoginCount,
+				"last_login":    u.LastLoginAt,
+			})
+		}
+	}
+
+	// Logins by location (using last login domain/IP as location proxy)
+	loginsByLocation := map[string]int{}
+	for _, u := range users {
+		key := u.Location
+		if key == "" && u.BuildingID > 0 {
+			if b, ok := buildingMap[u.BuildingID]; ok {
+				key = b.Name
+			}
+		}
+		if key == "" {
+			key = "Unknown"
+		}
+		loginsByLocation[key] += u.LoginCount
+	}
+
+	jsonOK(w, map[string]any{
+		"users_by_building":  byBuilding,
+		"user_locations":     userLocations,
+		"logins_by_location": loginsByLocation,
+	})
+}

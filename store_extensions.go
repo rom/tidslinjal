@@ -443,3 +443,62 @@ func (s *Store) SetGeoItems(items []map[string]any) error {
 	s.mu.Unlock()
 	return s.persist("geo_items.json", items)
 }
+
+// ── Resource Incidents ────────────────────────────────────────────────────────
+
+func (s *Store) GetResourceIncidents() []ResourceIncident {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]ResourceIncident, len(s.resourceIncidents))
+	copy(result, s.resourceIncidents)
+	return result
+}
+
+func (s *Store) GetResourceIncidentsByResource(resourceType string, resourceID int64) []ResourceIncident {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var result []ResourceIncident
+	for _, ri := range s.resourceIncidents {
+		if ri.ResourceType == resourceType && ri.ResourceID == resourceID {
+			result = append(result, ri)
+		}
+	}
+	return result
+}
+
+func (s *Store) SaveResourceIncident(ri ResourceIncident) (ResourceIncident, error) {
+	s.mu.Lock()
+	now := time.Now()
+	if ri.ID == 0 {
+		s.nextResourceIncidentID++
+		ri.ID = s.nextResourceIncidentID
+		ri.CreatedAt = now
+		ri.UpdatedAt = now
+		s.resourceIncidents = append(s.resourceIncidents, ri)
+	} else {
+		ri.UpdatedAt = now
+		for i := range s.resourceIncidents {
+			if s.resourceIncidents[i].ID == ri.ID {
+				s.resourceIncidents[i] = ri
+				break
+			}
+		}
+	}
+	snap := append([]ResourceIncident(nil), s.resourceIncidents...)
+	s.mu.Unlock()
+	return ri, s.persist("resource_incidents.json", snap)
+}
+
+func (s *Store) DeleteResourceIncident(id int64) error {
+	s.mu.Lock()
+	for i := range s.resourceIncidents {
+		if s.resourceIncidents[i].ID == id {
+			s.resourceIncidents = append(s.resourceIncidents[:i], s.resourceIncidents[i+1:]...)
+			snap := append([]ResourceIncident(nil), s.resourceIncidents...)
+			s.mu.Unlock()
+			return s.persist("resource_incidents.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("resource incident %d not found", id)
+}

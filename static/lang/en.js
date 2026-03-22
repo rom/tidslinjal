@@ -1816,6 +1816,16 @@ TRANSLATIONS.en = {
     dashboard_boards: 'Board Summary',
     dashboard_decisions: 'Recent Decisions',
 
+    dashboard_incidents: 'Active Incidents',
+    flash_acknowledge: 'Acknowledge',
+
+    // Resource types
+    resource_capabilities: 'Capabilities',
+    resource_applications: 'Applications',
+    resource_infrastructure: 'Infrastructure',
+    latitude: 'Latitude',
+    longitude: 'Longitude',
+
     // Quick Response Receiver settings
     settings_quick_response_receiver: 'Quick Response Receiver',
     settings_quick_response_receiver_info: 'Configure who receives quick response and decision-needed alerts from the TeamLead Toolbox.',
