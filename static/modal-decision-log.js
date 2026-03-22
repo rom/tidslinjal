@@ -2,7 +2,8 @@
 // ── Decision Log Modal ──────────────────────────────────────────────────────
 let _decisionLogEntries = [];
 let _decisionLogSortNewest = true; // true = newest first (default), false = oldest first
-let _decisionLogFilter = 'all'; // 'all' | 'pending' | 'decided' | 'denied'
+let _decisionLogFilter = 'all'; // 'all' | 'pending' | 'decided' | 'approved_condition' | 'approved_modification' | 'denied'
+let _decisionLogStaffDuties = []; // cached staff duties for acting check
 
 async function openDecisionLogModal() {
   await _loadDecisionLog();
@@ -91,11 +92,13 @@ async function openDecisionLogModal() {
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 0;border-bottom:2px solid var(--accent);flex-wrap:wrap;gap:6px">
             <h3 style="margin:0;font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)">📋 ${t('decision_log_header')||'Decision Log'}</h3>
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
-              <div class="toggle-btn-group" style="font-size:10px">
-                <button class="toggle-btn${_decisionLogFilter==='all'?' active':''}" data-action="_setDecisionFilter" data-arg="all" style="padding:2px 8px;font-size:10px">${t('filter_all')||'All'}</button>
+              <div class="toggle-btn-group" style="font-size:10px;flex-wrap:wrap">
+                <button class="toggle-btn${_decisionLogFilter==='all'?' active':''}" data-action="_setDecisionFilter" data-arg="all" style="padding:2px 8px;font-size:10px">${t('filter_all')||'All'} (${_decisionLogEntries.length})</button>
                 <button class="toggle-btn${_decisionLogFilter==='pending'?' active':''}" data-action="_setDecisionFilter" data-arg="pending" style="padding:2px 8px;font-size:10px">⏳ ${t('decision_filter_pending')||'Pending'} (${_decisionLogEntries.filter(e=>e.status==='requested').length})</button>
-                <button class="toggle-btn${_decisionLogFilter==='decided'?' active':''}" data-action="_setDecisionFilter" data-arg="decided" style="padding:2px 8px;font-size:10px">✓ ${t('decision_filter_decided')||'Decided'}</button>
-                <button class="toggle-btn${_decisionLogFilter==='denied'?' active':''}" data-action="_setDecisionFilter" data-arg="denied" style="padding:2px 8px;font-size:10px">✗ ${t('decision_filter_denied')||'Denied'}</button>
+                <button class="toggle-btn${_decisionLogFilter==='decided'?' active':''}" data-action="_setDecisionFilter" data-arg="decided" style="padding:2px 8px;font-size:10px">✓ ${t('decision_filter_decided')||'Approved'} (${_decisionLogEntries.filter(e=>!e.status||e.status==='approved').length})</button>
+                <button class="toggle-btn${_decisionLogFilter==='approved_condition'?' active':''}" data-action="_setDecisionFilter" data-arg="approved_condition" style="padding:2px 8px;font-size:10px">✓⚠ ${t('decision_filter_approved_condition')||'With Condition'} (${_decisionLogEntries.filter(e=>e.approval_type==='approved_with_condition').length})</button>
+                <button class="toggle-btn${_decisionLogFilter==='approved_modification'?' active':''}" data-action="_setDecisionFilter" data-arg="approved_modification" style="padding:2px 8px;font-size:10px">✓✏ ${t('decision_filter_approved_modification')||'With Modification'} (${_decisionLogEntries.filter(e=>e.approval_type==='approved_with_modification').length})</button>
+                <button class="toggle-btn${_decisionLogFilter==='denied'?' active':''}" data-action="_setDecisionFilter" data-arg="denied" style="padding:2px 8px;font-size:10px">✗ ${t('decision_filter_denied')||'Denied'} (${_decisionLogEntries.filter(e=>e.status==='rejected').length})</button>
               </div>
               <span style="border-left:1px solid var(--border);height:16px;margin:0 2px"></span>
               <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('decision_sort')||'Sort'}:</span>
@@ -174,6 +177,17 @@ function closeDecisionLogModal() {
 
 async function _loadDecisionLog() {
   try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch { _decisionLogEntries = []; }
+  try { _decisionLogStaffDuties = await apiGet('/api/staff/duties') || []; } catch { _decisionLogStaffDuties = []; }
+}
+
+function _canReviewDecisions() {
+  const role = state.user?.role;
+  if (role === 'admin' || role === 'oplead' || role === 'deputy_oplead') return true;
+  // Check if user is acting as OpLead via staff duties
+  const uid = state.user?.id;
+  return _decisionLogStaffDuties.some(d =>
+    d.user_id === uid && (d.role === 'acting_oplead' || d.role === 'acting_deputy_oplead')
+  );
 }
 
 function _setDecisionFilter(filter) {
@@ -208,10 +222,12 @@ async function _shareDecisionLogEntry(id) {
 
 function _renderDecisionLogEntries() {
   if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
-  const canReview = hasRole2(state.user?.role, 'teamlead');
+  const canReview = _canReviewDecisions();
   let filtered = _decisionLogEntries.slice();
   if (_decisionLogFilter === 'pending') filtered = filtered.filter(e => e.status === 'requested');
   else if (_decisionLogFilter === 'decided') filtered = filtered.filter(e => !e.status || e.status === 'approved');
+  else if (_decisionLogFilter === 'approved_condition') filtered = filtered.filter(e => e.approval_type === 'approved_with_condition');
+  else if (_decisionLogFilter === 'approved_modification') filtered = filtered.filter(e => e.approval_type === 'approved_with_modification');
   else if (_decisionLogFilter === 'denied') filtered = filtered.filter(e => e.status === 'rejected');
   if (!filtered.length) return `<p style="color:var(--text-dim)">${t('decision_filter_empty')||'No decisions match this filter.'}</p>`;
   const sorted = _decisionLogSortNewest ? filtered.reverse() : filtered;
@@ -228,15 +244,26 @@ function _renderDecisionLogEntries() {
       const targetInfo = e.requested_of_label ? ` → ${escHtml(e.requested_of_label)}` : '';
       statusBadge = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">PENDING${targetInfo}</span>`;
       if (canReview) {
-        reviewSection = `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment...'}"
-            style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
-          <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
-          <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:11px" data-action="reviewDecision" data-arg="${e.id}" data-status="denied" data-arg-el>✗ ${t('btn_deny')||'Deny'}</button>
+        reviewSection = `<div style="margin-top:6px">
+          <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_comment')||'Comment / condition / modification...'}"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:10px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-approval-type="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
+            <button class="btn btn-sm" style="background:#2ECC71;color:#fff;padding:2px 8px;font-size:10px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-approval-type="approved_with_condition" data-arg-el>✓⚠ ${t('btn_approve_condition')||'Approve w/ Condition'}</button>
+            <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:10px;border:1px dashed #fff" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-approval-type="approved_with_modification" data-arg-el>✓✏ ${t('btn_approve_modification')||'Approve w/ Modification'}</button>
+            <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:10px" data-action="reviewDecision" data-arg="${e.id}" data-status="denied" data-arg-el>✗ ${t('btn_deny')||'Deny'}</button>
+          </div>
         </div>`;
       }
     } else if (e.status === 'approved') {
-      statusBadge = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DECIDED</span>`;
+      const approvalLabels = {
+        approved: t('decision_approved_label')||'APPROVED',
+        approved_with_condition: t('decision_approved_condition_label')||'APPROVED W/ CONDITION',
+        approved_with_modification: t('decision_approved_modification_label')||'APPROVED W/ MODIFICATION',
+      };
+      const approvalLabel = approvalLabels[e.approval_type] || approvalLabels.approved;
+      const approvalBg = e.approval_type === 'approved_with_condition' ? '#2ECC71' : e.approval_type === 'approved_with_modification' ? '#27AE60' : '#27AE60';
+      statusBadge = `<span style="background:${approvalBg};color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">${approvalLabel}</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
     } else if (e.status === 'rejected') {
       statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DENIED</span>`;
@@ -251,7 +278,7 @@ function _renderDecisionLogEntries() {
         coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">👁👁 Co-signed by ${escHtml(e.co_signed_by_name)}${e.co_signed_at ? ' — ' + fmtDateTime(new Date(e.co_signed_at)) : ''}${e.co_sign_comment ? ': ' + escHtml(e.co_sign_comment) : ''}</div>`;
       } else {
         coSignHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:#E67E22">👁👁 Co-sign required (pending)</div>`;
-        if (canReview && e.user_id !== state.user?.id) {
+        if ((canReview || hasRole2(state.user?.role, 'teamlead')) && e.user_id !== state.user?.id) {
           coSignHtml += `<div style="margin-top:4px;display:flex;gap:6px;align-items:center">
             <input type="text" id="dlCoSignComment_${e.id}" placeholder="Co-sign comment"
               style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
@@ -420,6 +447,7 @@ async function requestDecision() {
 async function reviewDecision(el) {
   const id = parseInt(el?.dataset?.arg, 10);
   const status = el?.dataset?.status || 'approved';
+  const approvalType = el?.dataset?.approvalType || 'approved';
   const comment = document.getElementById('dlReviewComment_' + id)?.value?.trim() || '';
   // Deny requires a reason
   if (status === 'denied' && !comment) {
@@ -427,7 +455,13 @@ async function reviewDecision(el) {
     document.getElementById('dlReviewComment_' + id)?.focus();
     return;
   }
-  const res = await api('PUT', `/api/decision-log/${id}/review`, {status, comment});
+  // Conditional/modification approvals should have a comment explaining the condition/modification
+  if ((approvalType === 'approved_with_condition' || approvalType === 'approved_with_modification') && !comment) {
+    showError(t('decision_condition_comment_required')||'Please describe the condition or modification');
+    document.getElementById('dlReviewComment_' + id)?.focus();
+    return;
+  }
+  const res = await api('PUT', `/api/decision-log/${id}/review`, {status, comment, approval_type: approvalType});
   if (res.ok) {
     await _loadDecisionLog();
     const el2 = document.getElementById('dlEntries');

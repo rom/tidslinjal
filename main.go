@@ -885,7 +885,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("POST /api/decision-log", app.requireAuth(app.handleAddDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/request", app.requireAuth(app.handleRequestDecision))
 	mux.HandleFunc("DELETE /api/decision-log/{id}", app.requireRole(RoleAdmin, app.handleDeleteDecisionLogEntry))
-	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireRole(RoleTeamLead, app.handleReviewDecisionLogEntry))
+	mux.HandleFunc("PUT /api/decision-log/{id}/review", app.requireAuth(app.handleReviewDecisionLogEntry))
 	mux.HandleFunc("PUT /api/decision-log/{id}/cosign", app.requireRole(RoleTeamLead, app.handleCoSignDecisionLogEntry))
 	mux.HandleFunc("POST /api/decision-log/{id}/attachment", app.requireRole(RoleTeamLead, app.handleDecisionLogAttachment))
 	mux.HandleFunc("POST /api/decision-log/{id}/share", app.requireRole(RoleTeamLead, app.handleGenerateDecisionLogShareToken))
