@@ -57,6 +57,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		GroupID           int64  `json:"group_id"`
 		Confidential      bool   `json:"confidential"`
 		Status            string `json:"status"`              // "" = decided, "requested" = request for decision
+		ApprovalType      string `json:"approval_type"`       // "approved" | "approved_with_condition" | "approved_with_modification"
 		RequestedOfType   string `json:"requested_of_type"`   // "role" | "group" | "person"
 		RequestedOfValue  string `json:"requested_of_value"`  // role key, group id, or user id
 		RequestedOfLabel  string `json:"requested_of_label"`  // display name
@@ -89,6 +90,18 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	now := time.Now()
+	// Validate approval_type for direct decisions
+	if req.Status == "" && req.ApprovalType != "" {
+		switch req.ApprovalType {
+		case "approved", "approved_with_condition", "approved_with_modification":
+			// valid
+		default:
+			req.ApprovalType = "approved"
+		}
+	}
+	if req.Status == "" && req.ApprovalType == "" {
+		req.ApprovalType = "approved"
+	}
 	entry := DecisionLogEntry{
 		Timestamp:         now,
 		UserID:            user.ID,
@@ -113,6 +126,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
 	} else {
+		entry.ApprovalType = req.ApprovalType
 		entry.DecidedAt = &now
 	}
 	created, err := app.store.AddDecisionLogEntry(entry)
