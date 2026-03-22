@@ -560,6 +560,25 @@ func (app *App) handleRespondPoll(w http.ResponseWriter, r *http.Request, user *
 		})
 	}
 
+	// Check if all target respondents have answered → auto-close
+	allTargetIDs := app.resolvePollTargets(*poll)
+	respondedSet := make(map[int64]bool)
+	for _, r := range poll.Responses {
+		respondedSet[r.UserID] = true
+	}
+	allAnswered := len(allTargetIDs) > 0
+	for _, uid := range allTargetIDs {
+		if !respondedSet[uid] {
+			allAnswered = false
+			break
+		}
+	}
+	if allAnswered && poll.Status == "open" {
+		now := time.Now()
+		poll.Status = "closed"
+		poll.ClosedAt = &now
+	}
+
 	if err := app.store.UpdatePoll(*poll); err != nil {
 		jsonError(w, "failed to update poll", http.StatusInternalServerError)
 		return
@@ -567,15 +586,23 @@ func (app *App) handleRespondPoll(w http.ResponseWriter, r *http.Request, user *
 	jsonOK(w, poll)
 
 	// Audit log
+	auditMsg := fmt.Sprintf("Responded to poll '%s' with %d answers", poll.Title, len(req.Answers))
+	if allAnswered {
+		auditMsg += " (all respondents answered — poll auto-closed)"
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "respond_poll", EntityType: "poll", EntityID: poll.ID,
-		Summary: fmt.Sprintf("Responded to poll '%s' with %d answers", poll.Title, len(req.Answers)),
+		Summary: auditMsg,
 	})
 
 	// Broadcast SSE
+	sseEvent := "poll_update"
+	if allAnswered {
+		sseEvent = "poll_closed"
+	}
 	updatedData, _ := json.Marshal(poll)
-	app.broker.BroadcastAll(SSEMessage{Event: "poll_update", Data: string(updatedData)})
+	app.broker.BroadcastAll(SSEMessage{Event: sseEvent, Data: string(updatedData)})
 }
 
 func (app *App) handleClosePoll(w http.ResponseWriter, r *http.Request, user *User) {
@@ -669,6 +696,35 @@ func (app *App) handlePollReminder(w http.ResponseWriter, r *http.Request, user 
 	})
 
 	jsonOK(w, map[string]interface{}{"status": "ok", "reminded": reminded})
+}
+
+func (app *App) handleDeletePoll(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	poll, ok := app.store.GetPollByID(id)
+	if !ok {
+		jsonError(w, "poll not found", http.StatusNotFound)
+		return
+	}
+	// Only creator or admin can delete
+	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+		jsonError(w, "only the creator or an admin can delete this poll", http.StatusForbidden)
+		return
+	}
+	if err := app.store.DeletePoll(id); err != nil {
+		jsonError(w, "failed to delete poll", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "delete_poll", EntityType: "poll", EntityID: id,
+		Summary: fmt.Sprintf("Deleted poll '%s'", poll.Title),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "poll_deleted", Data: fmt.Sprintf(`{"id":%d}`, id)})
+	jsonOK(w, map[string]string{"status": "ok"})
 }
 
 func (app *App) handleGetPollLog(w http.ResponseWriter, r *http.Request, user *User) {

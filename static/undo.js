@@ -122,6 +122,28 @@ async function performUndo() {
       delete payload.created_at;
       await apiPost('/api/alarms', payload);
       await fetchAlarms();
+    } else if (entry.action === 'delete_board_item') {
+      // Undo deletion by re-creating the item
+      const payload = { ...entry.data };
+      const boardId = payload._boardId;
+      delete payload.id;
+      delete payload._boardId;
+      delete payload.created_at;
+      delete payload.updated_at;
+      await api('POST', `/api/boards/${boardId}/items`, JSON.stringify(payload));
+    } else if (entry.action === 'archive_board_item') {
+      // Undo archive by unarchiving the item
+      await api('PUT', `/api/boards/${entry.data.boardId}/items/${entry.data.itemId}`, JSON.stringify({ archived: false }));
+    } else if (entry.action === 'archive_column_items') {
+      // Undo column archive by unarchiving all items
+      for (const itemId of (entry.data.itemIds || [])) {
+        await api('PUT', `/api/boards/${entry.data.boardId}/items/${itemId}`, JSON.stringify({ archived: false }));
+      }
+    } else if (entry.action === 'delete_poll') {
+      // Cannot restore deleted poll — just notify
+      showNotification('info', 'Poll deletion cannot be undone');
+      updateUndoButton();
+      return;
     }
     await refreshAll();
     showNotification('success', `Undone: ${entry.action.replace(/_/g, ' ')}`);

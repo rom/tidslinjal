@@ -135,7 +135,9 @@ async function _loadPollsterLog(container) {
     el.innerHTML = polls.map(poll => {
       const ts = fmtDateTime(new Date(poll.created_at));
       const closedTs = poll.closed_at ? fmtDateTime(new Date(poll.closed_at)) : '';
-      const statusColor = poll.status === 'open' ? 'var(--accent)' : 'var(--text-dim)';
+      const statusColor = poll.status === 'open' ? 'var(--accent)' : poll.status === 'scheduled' ? '#E67E22' : 'var(--text-dim)';
+      const statusLabel = poll.status === 'scheduled' ? (t('poll_status_scheduled')||'Scheduled') : poll.status;
+      const scheduledTs = poll.status === 'scheduled' && poll.scheduled_at ? fmtDateTime(new Date(poll.scheduled_at)) : '';
       const allResponses = poll.responses || [];
       const respondedUserSet = new Set(allResponses.map(r => r.user_id));
       const totalR = respondedUserSet.size;
@@ -222,15 +224,39 @@ async function _loadPollsterLog(container) {
         }).join('');
       }
 
+      // Resolve receiver display
+      let receiversHtml = '';
+      if (poll.target_type && poll.target_ids && poll.target_ids.length > 0) {
+        let targetLabel = '';
+        if (poll.target_type === 'user') {
+          const names = poll.target_ids.map(idStr => {
+            const u = (state.users||[]).find(u => u.id === parseInt(idStr));
+            return u ? (u.display_name||u.username) : `#${idStr}`;
+          });
+          targetLabel = names.join(', ');
+        } else if (poll.target_type === 'group') {
+          const names = poll.target_ids.map(idStr => {
+            const g = (state.groups||[]).find(g => String(g.id) === String(idStr));
+            return g ? g.name : `Group #${idStr}`;
+          });
+          targetLabel = '👥 ' + names.join(', ');
+        } else if (poll.target_type === 'role') {
+          targetLabel = '🛡 ' + poll.target_ids.map(r => typeof getRoleDisplayName === 'function' ? getRoleDisplayName(r) : r).join(', ');
+        }
+        if (targetLabel) receiversHtml = `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">📨 ${t('poll_receivers')||'Receivers'}: ${escHtml(targetLabel)}</div>`;
+      }
+
       return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>📊 ${escHtml(poll.title)}</strong>
-          <span style="font-size:10px;color:${statusColor}">${poll.status}</span>
+          <span style="font-size:10px;color:${statusColor}">${statusLabel}</span>
         </div>
         <div style="color:var(--text-dim);font-size:var(--fs-xs)">
           📅 ${t('poll_started')||'Started'}: ${ts}
+          ${scheduledTs ? `<br>⏱ ${t('poll_scheduled_for')||'Scheduled for'}: ${scheduledTs}` : ''}
           ${closedTs ? `<br>🔒 ${t('poll_closed')||'Closed'}: ${closedTs}` : ''}
         </div>
+        ${receiversHtml}
         <div style="font-size:var(--fs-xs);margin-top:4px">
           <strong>${t('poll_responses')||'Responses'}: ${totalR}/${totalT}</strong>
         </div>
@@ -241,6 +267,7 @@ async function _loadPollsterLog(container) {
           ${nonRespondents.map(nr => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 5px;margin:1px;background:var(--bg2);border-radius:var(--radius);border:1px solid #E74C3C">${escHtml(nr.name)}</span>`).join(' ')}
         </div>` : ''}
         ${tableHtml || freeTextHtml ? `<div style="margin-top:4px;padding:6px;background:var(--bg3);border-radius:var(--radius)">${tableHtml}${freeTextHtml}</div>` : ''}
+        ${(state.user && (poll.created_by === state.user.id || state.user.role === 'admin')) ? `<div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-sm" style="color:var(--danger);font-size:10px;padding:2px 8px" onclick="deletePoll(${poll.id})">🗑 ${t('btn_delete')||'Delete'}</button></div>` : ''}
       </div>`;
     }).join('');
   } catch (e) {
@@ -433,6 +460,23 @@ async function _loadPollsterLog(container) {
   const printBtn = container.querySelector ? container.querySelector('#pollsterPrint') : document.getElementById('pollsterPrint');
   if (printBtn) {
     printBtn.addEventListener('click', () => { window.print(); });
+  }
+}
+
+async function deletePoll(pollId) {
+  if (!confirm(t('confirm_delete')||'Delete this poll?')) return;
+  try {
+    const res = await api('DELETE', '/api/polls/' + pollId);
+    if (res.ok) {
+      showNotification('success', t('notif_deleted')||'Deleted');
+      pushUndo('delete_poll', { id: pollId });
+      renderSidebar();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to delete poll');
+    }
+  } catch (e) {
+    showError('Failed to delete poll: ' + e.message);
   }
 }
 

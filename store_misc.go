@@ -215,6 +215,20 @@ func (s *Store) UpdatePoll(poll Poll) error {
 	return fmt.Errorf("poll %d not found", poll.ID)
 }
 
+func (s *Store) DeletePoll(id int64) error {
+	s.mu.Lock()
+	for i, p := range s.polls {
+		if p.ID == id {
+			s.polls = append(s.polls[:i], s.polls[i+1:]...)
+			snap := append([]Poll(nil), s.polls...)
+			s.mu.Unlock()
+			return s.persist("polls.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("poll %d not found", id)
+}
+
 // ── Poll Questionnaires ─────────────────────────────────────────────────────
 
 func (s *Store) GetQuestionnaires() []PollQuestionnaire {

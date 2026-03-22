@@ -302,15 +302,19 @@ function _renderKanbanBoard() {
           <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(col.name)} (${cItems.length})</strong>
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_addItemToCol" data-arg="${col.id}" title="${t('board_add_item')||'Add item'}">+</button>
-            ${cItems.length > 0 ? `<button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_archiveColumnItems" data-arg="${col.id}" title="${t('board_archive_col')||'Archive all items in this column'}">📦</button>` : ''}
+            ${board.show_archival !== false && cItems.length > 0 ? `<button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_archiveColumnItems" data-arg="${col.id}" title="${t('board_archive_col')||'Archive all items in this column'}">📦</button>` : ''}
             <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_toggleColCollapse" data-arg="${col.id}" title="${t('board_collapse')||'Collapse'}">−</button>
           </div>
         </div>
         <div class="kanban-items" style="display:flex;flex-direction:column;gap:6px;min-height:40px">`;
 
       for (const item of cItems) {
-        const bgColor = item.color || 'var(--bg3)';
-        const typeIcon = _itemTypeIcons[item.item_type] || '';
+        const showIcons = board.show_icons !== false;
+        const priorityBg = board.priority_background !== false;
+        const bgColor = priorityBg && item.priority && item.priority !== 'normal' && item.priority !== 'low'
+          ? (item.priority === 'critical' ? 'rgba(231,76,60,0.12)' : item.priority === 'high' ? 'rgba(230,126,34,0.12)' : (item.color || 'var(--bg3)'))
+          : (item.color || 'var(--bg3)');
+        const typeIcon = showIcons ? (_itemTypeIcons[item.item_type] || '') : '';
         const priorityBadge = item.priority && item.priority !== 'normal' ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
         // Due date display and urgency
         let dueDateHtml = '';
@@ -984,10 +988,15 @@ async function _doEditBoardItem(itemId) {
 async function _deleteBoardItem(itemId) {
   if (!confirm(t('board_delete_item_confirm')||'Delete this item?')) return;
   try {
+    // Save item data for undo before deleting
+    const item = _boardsState.items.find(i => i.id === itemId);
     await _boardApi('DELETE', '/board-items/' + itemId);
     closeModal('boardItemModal');
     _boardsState.items = _boardsState.items.filter(i => i.id !== itemId);
     _renderKanbanBoard();
+    if (item && typeof pushUndo === 'function') {
+      pushUndo('delete_board_item', { ...item, _boardId: _boardsState.activeBoard?.id });
+    }
   } catch (e) { alert(e.message); }
 }
 
@@ -1073,6 +1082,23 @@ async function _openBoardSettings() {
     <label>${t('board_columns')||'Columns'}</label>
     <div id="settBoardCols">${colsHtml}</div>
     <button class="btn btn-sm btn-secondary" data-action="_addBoardCol" style="margin-top:4px;margin-bottom:12px">+ ${t('board_add_col')||'Add Column'}</button>
+
+    <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px">${t('board_display_options')||'Display Options'}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="settBoardShowIcons" ${board.show_icons !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_show_icons')||'Show icons in subject'}
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="settBoardPriorityBg" ${board.priority_background !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_priority_background')||'Color background by priority (otherwise show colored dot only)'}
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+        <input type="checkbox" id="settBoardShowArchival" ${board.show_archival !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_show_archival')||'Show archival controls on columns'}
+      </label>
+    </div>
+
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" data-action="_saveBoardSettings">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardSettingsModal">✖ ${t('btn_cancel')||'Cancel'}</button>
@@ -1129,6 +1155,9 @@ async function _saveBoardSettings() {
       role_key: document.getElementById('settBoardRole')?.value || '',
       columns: cols,
       color: boardColor === '#1a1a2e' ? '' : boardColor,
+      show_icons: document.getElementById('settBoardShowIcons')?.checked !== false,
+      priority_background: document.getElementById('settBoardPriorityBg')?.checked !== false,
+      show_archival: document.getElementById('settBoardShowArchival')?.checked !== false,
     });
     closeModal('boardSettingsModal');
     await _openBoard(board.id);
@@ -1205,6 +1234,9 @@ async function _archiveBoardItem(itemId) {
     const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
     _boardsState.items = items;
     _renderKanbanBoard();
+    if (typeof pushUndo === 'function') {
+      pushUndo('archive_board_item', { boardId: _boardsState.activeBoard?.id, itemId: itemId });
+    }
   } catch (e) { alert(e.message); }
 }
 
@@ -1225,12 +1257,17 @@ async function _archiveColumnItems(colId) {
   const colName = (board.columns.find(c => String(c.id) === String(colId)) || {}).name || colId;
   if (!confirm((t('board_archive_col_confirm') || 'Archive all %n items in "%s"?').replace('%n', colItems.length).replace('%s', colName))) return;
   try {
+    const archivedIds = [];
     for (const item of colItems) {
       await _boardApi('POST', '/board-items/' + item.id + '/archive', {});
+      archivedIds.push(item.id);
     }
     const items = await _boardApi('GET', '/boards/' + board.id + '/items');
     _boardsState.items = items;
     _renderKanbanBoard();
+    if (typeof pushUndo === 'function') {
+      pushUndo('archive_column_items', { boardId: board.id, itemIds: archivedIds, colName: colName });
+    }
   } catch (e) { alert(e.message); }
 }
 
@@ -1258,39 +1295,28 @@ function _detachBoard() {
     `width=${w},height=${h},resizable=yes,scrollbars=yes`);
   if (!_boardPopout) { alert('Popup blocked. Please allow popups for this site.'); return; }
 
-  // Always use dark theme for detached board window
-  _boardPopout.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>${escHtml(board.name)} — Board</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <style>
-      body { margin:0; padding:16px; font-family:"Segoe UI",system-ui,sans-serif; overflow:auto; }
-      .modal-close { display:none; }
-      .kanban-card { transition: transform 0.1s ease; }
-      .kanban-card:hover { transform: translateY(-1px); }
-      #boardContainer { min-height: 90vh; }
-    </style>
-  </head><body class="dark">
-    <div id="boardContainer">
-      <div style="text-align:center;padding:40px;color:var(--text-dim)">Loading board…</div>
-    </div>
-    <script src="/static/i18n.js"><\/script>
-    <script src="/static/utils.js"><\/script>
-    <script src="/static/api.js"><\/script>
-    <script src="/static/boards.js"><\/script>
-    <script>
-      // Bridge state from opener
-      window.state = window.opener && window.opener.state ? window.opener.state : {};
-      window._detachedBoardMode = true;
-      // Load the board
-      (function() {
-        const boardId = ${board.id};
-        if (typeof _openBoard === 'function') {
-          _openBoard(boardId);
-        }
-      })();
-    <\/script>
-  </body></html>`);
+  const theme = document.body.className || '';
+
+  // Render the kanban board HTML in the main window, then inject into the popout
+  // This avoids CSP and script-loading-order issues
+  const boardHtml = _buildKanbanHtml();
+
+  _boardPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>' + escHtml(board.name) + ' \u2014 Board</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>' +
+    'body{margin:0;padding:16px;font-family:"Segoe UI",system-ui,sans-serif;overflow:auto;background:var(--bg);color:var(--text)}' +
+    '.modal-close{display:none}' +
+    '.kanban-card{transition:transform 0.1s ease}' +
+    '.kanban-card:hover{transform:translateY(-1px)}' +
+    '#boardContainer{min-height:90vh}' +
+    '</style></head><body class="' + escHtml(theme) + '">' +
+    '<div id="boardContainer">' + boardHtml + '</div>' +
+    '</body></html>');
   _boardPopout.document.close();
+
+  // Bind all data-action buttons in the popout back to main window functions
+  _bindBoardPopoutActions();
 
   if (_boardPopoutMonitor) clearInterval(_boardPopoutMonitor);
   _boardPopoutMonitor = setInterval(() => {
@@ -1300,6 +1326,67 @@ function _detachBoard() {
       _boardPopout = null;
     }
   }, 1000);
+}
+
+function _buildKanbanHtml() {
+  const board = _boardsState.activeBoard;
+  const items = _boardsState.items;
+  if (!board) return '';
+
+  const activeItems = items.filter(i => !i.archived);
+  const colItems = {};
+  for (const col of board.columns) colItems[String(col.id)] = [];
+  for (const item of activeItems) {
+    const cid = String(item.column_id);
+    if (!colItems[cid]) colItems[cid] = [];
+    colItems[cid].push(item);
+  }
+  for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
+
+  let html = '<div style="width:100%;overflow-x:auto;box-sizing:border-box">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<h2 style="margin:0">' + escHtml(board.name) + '</h2>' +
+    '</div>' +
+    '<div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;width:100%">';
+
+  for (const col of board.columns) {
+    const cItems = colItems[String(col.id)] || [];
+    const colBg = col.color ? col.color : 'var(--bg2)';
+    html += '<div class="kanban-col" style="flex:1;min-width:220px;max-width:360px;background:' + colBg + ';border:1px solid var(--border);border-radius:var(--radius);padding:10px">' +
+      '<div style="font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span>' + escHtml(col.name) + ' (' + cItems.length + ')</span>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px">';
+    for (const item of cItems) {
+      const priorityColor = item.priority === 'critical' ? '#E74C3C' : item.priority === 'high' ? '#E67E22' : '';
+      const priorityBg = priorityColor ? 'border-left:3px solid ' + priorityColor + ';' : '';
+      html += '<div class="kanban-card" style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);' + priorityBg + '">' +
+        '<div style="font-weight:600;font-size:var(--fs-sm)">' + escHtml(item.subject) + '</div>' +
+        (item.note ? '<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">' + escHtml(item.note.slice(0, 100)) + '</div>' : '') +
+        (item.responsible_name ? '<div style="font-size:10px;color:var(--text-dim);margin-top:4px">\u{1F464} ' + escHtml(item.responsible_name) + '</div>' : '') +
+        '</div>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function _bindBoardPopoutActions() {
+  if (!_boardPopout || _boardPopout.closed) return;
+  const wrap = _boardPopout.document.getElementById('boardContainer');
+  if (!wrap) return;
+  wrap.querySelectorAll('[data-action]').forEach(el => {
+    el.onclick = function() {
+      try {
+        const fn = el.dataset.action;
+        const arg = el.dataset.arg;
+        if (typeof window[fn] === 'function') {
+          arg ? window[fn](arg) : window[fn]();
+        }
+      } catch(e) { console.error(e); }
+    };
+  });
 }
 
 // ── Export ──

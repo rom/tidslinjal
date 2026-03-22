@@ -429,8 +429,6 @@ function detachStaffToolbox() {
     '</style></head><body class="' + escHtml(theme) + '">' +
     '<h2>\u{1F396} ' + escHtml(t('staff_toolbox_title')||'Staff Toolbox') + '</h2>' +
     '<div id="staffDetachedWrap">' + content + '</div>' +
-    '<script src="/static/i18n.js"><\/script>' +
-    '<script src="/static/utils.js"><\/script>' +
     '</body></html>');
   _staffPopout.document.close();
 
@@ -454,8 +452,8 @@ function detachStaffToolbox() {
   }
   rebindPopoutActions();
 
-  // Load data into the popout
-  _loadStaffData();
+  // Load data directly into the popout document
+  _loadStaffDataInto(_staffPopout.document, rebindPopoutActions);
 
   if (_staffPopoutMonitor) clearInterval(_staffPopoutMonitor);
   _staffPopoutMonitor = setInterval(() => {
@@ -465,6 +463,79 @@ function detachStaffToolbox() {
       _staffPopout = null;
     }
   }, 1000);
+}
+
+// Load staff data into a specific document context (for detached windows)
+async function _loadStaffDataInto(targetDoc, rebindFn) {
+  try {
+    const [duties, members, areas] = await Promise.all([
+      apiGet('/api/staff/duties'),
+      apiGet('/api/staff/members'),
+      apiGet('/api/staff/areas')
+    ]);
+    _renderStaffDutiesInto(targetDoc, duties || [], rebindFn);
+    _renderStaffMembersInto(targetDoc, members || [], rebindFn);
+    _renderStaffAreasInto(targetDoc, areas || [], rebindFn);
+  } catch (e) {
+    console.error('Staff data load error (detached):', e);
+  }
+}
+
+function _renderStaffDutiesInto(doc, duties, rebindFn) {
+  const el = doc.getElementById('staffDutyList');
+  if (!el) return;
+  if (duties.length === 0) {
+    el.innerHTML = '<em style="color:var(--text-muted)">' + (t('staff_none')||'No entries yet.') + '</em>';
+    return;
+  }
+  el.innerHTML = duties.map(function(d) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">' +
+      '<strong style="min-width:120px">' + escHtml(d.role) + '</strong>' +
+      '<span style="flex:1">' + escHtml(d.user_name || '-') + '</span>' +
+      (d.start_time ? '<span style="font-size:11px;color:var(--text-muted)">' + escHtml(d.start_time) + ' \u2013 ' + escHtml(d.end_time||'') + '</span>' : '') +
+      (d.note ? '<span style="font-size:11px;color:var(--text-muted)" title="' + escHtml(d.note) + '">\u{1F4DD}</span>' : '') +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteDuty" data-arg="' + d.id + '" title="Delete">\u2715</button>' +
+    '</div>';
+  }).join('');
+  if (rebindFn) rebindFn();
+}
+
+function _renderStaffMembersInto(doc, members, rebindFn) {
+  const el = doc.getElementById('staffMemberList');
+  if (!el) return;
+  if (members.length === 0) {
+    el.innerHTML = '<em style="color:var(--text-muted)">' + (t('staff_none')||'No entries yet.') + '</em>';
+    return;
+  }
+  el.innerHTML = members.map(function(m) {
+    var posLabel = (_staffPositions.find(function(p) { return p.value === m.position; }) || {}).label || m.position;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">' +
+      '<strong style="min-width:140px">' + escHtml(posLabel) + '</strong>' +
+      '<span style="flex:1">' + escHtml(m.user_name || '-') + '</span>' +
+      (m.note ? '<span style="font-size:11px;color:var(--text-muted)" title="' + escHtml(m.note) + '">\u{1F4DD}</span>' : '') +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteMember" data-arg="' + m.id + '" title="Delete">\u2715</button>' +
+    '</div>';
+  }).join('');
+  if (rebindFn) rebindFn();
+}
+
+function _renderStaffAreasInto(doc, areas, rebindFn) {
+  const el = doc.getElementById('staffAreaList');
+  if (!el) return;
+  if (areas.length === 0) {
+    el.innerHTML = '<em style="color:var(--text-muted)">' + (t('staff_none')||'No entries yet.') + '</em>';
+    return;
+  }
+  el.innerHTML = areas.map(function(a) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">' +
+      '<strong style="min-width:140px">' + escHtml(a.name) + '</strong>' +
+      '<span style="flex:1">' + escHtml(a.assigned_name || '-') + '</span>' +
+      (a.description ? '<span style="font-size:11px;color:var(--text-muted)" title="' + escHtml(a.description) + '">\u{1F4C4}</span>' : '') +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditArea" data-arg="' + a.id + '" title="Edit">\u270E</button>' +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteArea" data-arg="' + a.id + '" title="Delete">\u2715</button>' +
+    '</div>';
+  }).join('');
+  if (rebindFn) rebindFn();
 }
 
 // apiPost, apiPut, apiDel are provided by api.js
