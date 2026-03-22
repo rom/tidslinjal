@@ -165,6 +165,7 @@ function connectSSE() {
           try { new Notification('Tidslinjal', { body: `${data.title || data.sequence_number}\n${t('decision_executor')||'Assigned by'}: ${data.assigned_by}`, icon: '/static/favicon.ico' }); } catch {}
         }
       }
+      _refreshDecisionLogIfOpen();
     } catch {}
   });
   // Quick response from TeamLead — show flash notification
@@ -174,12 +175,17 @@ function connectSSE() {
       _showFlashAlert(data);
     } catch {}
   });
-  // Decision escalated — show flash notification
+  // Decision escalated — show flash notification + live-update decision log modal
   es.addEventListener('decision_escalated', e => {
     try {
       const data = JSON.parse(e.data);
       _showFlashAlert(data);
+      _refreshDecisionLogIfOpen();
     } catch {}
+  });
+  // Decision outcome (approved/denied) — live-update decision log modal
+  es.addEventListener('decision_outcome', e => {
+    try { _refreshDecisionLogIfOpen(); } catch {}
   });
   // Quick report received
   es.addEventListener('quick_report', e => {

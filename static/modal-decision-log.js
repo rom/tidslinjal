@@ -5,6 +5,36 @@ let _decisionLogSortNewest = true; // true = newest first (default), false = old
 let _decisionLogFilter = 'all'; // 'all' | 'pending' | 'decided' | 'approved_condition' | 'approved_modification' | 'denied'
 let _decisionLogStaffDuties = []; // cached staff duties for acting check
 
+// Live-refresh the decision log entries if the modal is currently open
+async function _refreshDecisionLogIfOpen() {
+  const modal = document.getElementById('decisionLogModal');
+  if (!modal) return;
+  try {
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+    // Also update filter counts in the header
+    const filterBar = modal.querySelector('.toggle-btn-group');
+    if (filterBar) {
+      const counts = {
+        all: _decisionLogEntries.length,
+        pending: _decisionLogEntries.filter(e => e.status === 'requested').length,
+        decided: _decisionLogEntries.filter(e => !e.status || e.status === 'approved').length,
+        approved_condition: _decisionLogEntries.filter(e => e.approval_type === 'approved_with_condition').length,
+        approved_modification: _decisionLogEntries.filter(e => e.approval_type === 'approved_with_modification').length,
+        denied: _decisionLogEntries.filter(e => e.status === 'rejected').length,
+      };
+      filterBar.querySelectorAll('.toggle-btn').forEach(btn => {
+        const arg = btn.dataset?.arg;
+        if (arg && counts[arg] !== undefined) {
+          const text = btn.textContent.replace(/\(\d+\)/, `(${counts[arg]})`);
+          btn.textContent = text;
+        }
+      });
+    }
+  } catch {}
+}
+
 async function openDecisionLogModal() {
   await _loadDecisionLog();
   const groups = state.groups || [];
@@ -72,7 +102,11 @@ async function openDecisionLogModal() {
               </select>
             </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              ${canWrite ? `<button class="btn btn-primary btn-sm" data-action="addDecisionLogEntry">${t('btn_add_decision')||'Add Decision'}</button>` : ''}
+              ${canWrite ? `
+                <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
+                <button class="btn btn-sm" style="background:#2ECC71;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="approved_with_condition" data-arg-el>✓⚠ ${t('btn_approve_condition')||'Approve w/ Condition'}</button>
+                <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:3px 10px;font-size:11px;border:1px dashed #fff" data-action="addDecisionLogEntry" data-approval-type="approved_with_modification" data-arg-el>✓✏ ${t('btn_approve_modification')||'Approve w/ Modification'}</button>
+              ` : ''}
               <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
@@ -337,9 +371,17 @@ function _renderDecisionLogEntries() {
   }).join('');
 }
 
-async function addDecisionLogEntry() {
+async function addDecisionLogEntry(el) {
+  const approvalType = el?.dataset?.approvalType || 'approved';
   const text = document.getElementById('dlNewDecision')?.value?.trim();
   if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
+  const reason = document.getElementById('dlReason')?.value?.trim() || '';
+  // Condition/modification requires a reason describing it
+  if ((approvalType === 'approved_with_condition' || approvalType === 'approved_with_modification') && !reason) {
+    showError(t('decision_condition_comment_required')||'Please describe the condition or modification');
+    document.getElementById('dlReason')?.focus();
+    return;
+  }
   const logType = document.getElementById('dlLogType')?.value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
   const confidential = document.getElementById('dlConfidential')?.checked || false;
@@ -348,13 +390,13 @@ async function addDecisionLogEntry() {
   const executorValueEl = document.getElementById('dlExecutorValue');
   const executorValue = executorType ? (executorValueEl?.value || '') : '';
   const executorLabel = executorType ? (executorValueEl?.selectedOptions?.[0]?.textContent || executorValue) : '';
-  const reason = document.getElementById('dlReason')?.value?.trim() || '';
   const coSignRequired = document.getElementById('dlCoSignRequired')?.checked || false;
   const coSignTargetId = coSignRequired ? (document.getElementById('dlCoSignTarget')?.value || '') : '';
   const coSignTargetUser = coSignTargetId ? (state.users||[]).find(u => u.id === parseInt(coSignTargetId, 10)) : null;
   const coSignTargetName = coSignTargetUser ? (coSignTargetUser.display_name || coSignTargetUser.username) : '';
   const deadline = document.getElementById('dlDeadline')?.value || '';
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
+    approval_type: approvalType,
     executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
     reason, co_sign_required: coSignRequired, deadline,
     co_sign_target_id: coSignTargetId ? parseInt(coSignTargetId, 10) : null,
