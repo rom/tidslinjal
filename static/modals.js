@@ -1729,52 +1729,62 @@ async function openPersonReadyCheckPopup() {
   const createBtn = modal.querySelector('#btnCreatePRC');
   if (createBtn) {
     createBtn.addEventListener('click', async () => {
-      const activeMode = modal.querySelector('[data-prc-mode].active')?.dataset?.prcMode || 'individual';
-      let selected = [];
-      if (activeMode === 'individual') {
-        selected = [...modal.querySelectorAll('.prc-user-cb:checked')].map(cb => parseInt(cb.value, 10));
-      } else if (activeMode === 'group') {
-        const groupIds = [...modal.querySelectorAll('.prc-group-cb:checked')].map(cb => parseInt(cb.value, 10));
-        // Resolve group members to user IDs
-        const allUsers = state.users || [];
-        for (const gid of groupIds) {
-          try {
-            const members = await apiGet(`/api/groups/${gid}/members`);
-            if (members) members.forEach(m => { if (m.user_id && m.user_id !== state.user.id && !selected.includes(m.user_id)) selected.push(m.user_id); });
-          } catch {}
+      try {
+        const activeMode = modal.querySelector('[data-prc-mode].active')?.dataset?.prcMode || 'individual';
+        let selected = [];
+        if (activeMode === 'individual') {
+          const checkedCbs = [...modal.querySelectorAll('.prc-user-cb:checked')];
+          selected = checkedCbs.map(cb => {
+            const id = Number(cb.value);
+            return isNaN(id) ? null : id;
+          }).filter(id => id !== null && id > 0);
+        } else if (activeMode === 'group') {
+          const groupIds = [...modal.querySelectorAll('.prc-group-cb:checked')].map(cb => parseInt(cb.value, 10));
+          for (const gid of groupIds) {
+            try {
+              const members = await apiGet(`/api/groups/${gid}/members`);
+              if (members) members.forEach(m => { if (m.user_id && m.user_id !== state.user.id && !selected.includes(m.user_id)) selected.push(m.user_id); });
+            } catch {}
+          }
+        } else if (activeMode === 'role') {
+          const roles = [...modal.querySelectorAll('.prc-role-cb:checked')].map(cb => cb.value);
+          (state.users || []).forEach(u => {
+            if (roles.includes(u.role) && u.id !== state.user.id && !selected.includes(u.id)) selected.push(u.id);
+          });
         }
-      } else if (activeMode === 'role') {
-        const roles = [...modal.querySelectorAll('.prc-role-cb:checked')].map(cb => cb.value);
-        (state.users || []).forEach(u => {
-          if (roles.includes(u.role) && u.id !== state.user.id && !selected.includes(u.id)) selected.push(u.id);
-        });
-      }
-      if (selected.length === 0) { showError(t('prc_no_participants')||'Select at least one participant'); return; }
-      const isTimed = modal.querySelector('#prcTimedCheck')?.checked || false;
-      const timedAt = isTimed ? modal.querySelector('#prcTimedDateTime')?.value : null;
-      if (isTimed && !timedAt) { showError(t('prc_timed_required')||'Please select a date and time for the timed check'); return; }
-      const messageText = modal.querySelector('#prcMessageText')?.value?.trim() || '';
-      const body = { participant_ids: selected };
-      if (messageText) body.message = messageText;
-      if (isTimed && timedAt) {
-        body.scheduled_at = new Date(timedAt).toISOString();
-      }
-      // Include tags if any selected
-      if (_prcTagInput) {
-        const tags = _prcTagInput.getSelectedTags();
-        if (tags.length > 0) body.tags = tags;
-      }
-      const res = await apiPost('/api/person-ready-check', body);
-      if (res.ok) {
-        if (isTimed) {
-          showNotification('success', t('prc_timed_scheduled')||'Timed ready check scheduled');
+        if (selected.length === 0) { showError(t('prc_no_participants')||'Select at least one participant'); return; }
+        const isTimed = modal.querySelector('#prcTimedCheck')?.checked || false;
+        const timedAt = isTimed ? modal.querySelector('#prcTimedDateTime')?.value : null;
+        if (isTimed && !timedAt) { showError(t('prc_timed_required')||'Please select a date and time for the timed check'); return; }
+        const messageText = modal.querySelector('#prcMessageText')?.value?.trim() || '';
+        const body = { participant_ids: selected };
+        if (messageText) body.message = messageText;
+        if (isTimed && timedAt) {
+          body.scheduled_at = new Date(timedAt).toISOString();
+        }
+        // Include tags if any selected
+        if (_prcTagInput) {
+          const tags = _prcTagInput.getSelectedTags();
+          if (tags.length > 0) body.tags = tags;
+        }
+        const res = await apiPost('/api/person-ready-check', body);
+        if (res.ok) {
+          const created = await res.json().catch(() => null);
+          const pCount = created && created.participants ? created.participants.length : selected.length;
+          const names = created && created.participants ? created.participants.map(p => p.user_name || ('User #' + p.user_id)).join(', ') : '';
+          if (isTimed) {
+            showNotification('success', (t('prc_timed_scheduled')||'Timed ready check scheduled') + ` (${pCount} ${t('participants')||'participants'})`);
+          } else {
+            showNotification('success', (t('prc_sent')||'Ready check request sent') + ` → ${names || pCount + ' ' + (t('participants')||'participants')}`);
+          }
+          _loadPersonReadyChecks(modal);
         } else {
-          showNotification('success', t('prc_sent')||'Ready check request sent');
+          const err = await res.json().catch(() => ({}));
+          showError(err.error || 'Failed to create ready check');
         }
-        _loadPersonReadyChecks(modal);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        showError(err.error || 'Failed to create ready check');
+      } catch (e) {
+        console.error('PRC creation error:', e);
+        showError('Failed to create ready check: ' + (e.message || String(e)));
       }
     });
   }

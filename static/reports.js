@@ -344,6 +344,26 @@ async function generateReport() {
           const totalT = (poll.target_ids || []).length || '?';
           html += `<h2>📊 ${escHtml(poll.title)} <small style="font-size:11px;color:#888">(${poll.status} — ${ts})</small></h2>`;
           html += `<p>Responses: ${totalR}/${totalT}</p>`;
+          // Show recipients
+          if (poll.target_type && poll.target_ids && poll.target_ids.length > 0) {
+            let recipientDesc = '';
+            if (poll.target_type === 'user') {
+              const names = poll.target_ids.map(idStr => {
+                const u = (state.users||[]).find(u => u.id === parseInt(idStr));
+                return u ? (u.display_name||u.username) : '#' + idStr;
+              });
+              recipientDesc = names.join(', ');
+            } else if (poll.target_type === 'group') {
+              const names = poll.target_ids.map(idStr => {
+                const g = (state.groups||[]).find(g => String(g.id) === String(idStr));
+                return g ? g.name : 'Group #' + idStr;
+              });
+              recipientDesc = 'Groups: ' + names.join(', ');
+            } else if (poll.target_type === 'role') {
+              recipientDesc = 'Roles: ' + poll.target_ids.join(', ');
+            }
+            if (recipientDesc) html += `<p style="font-size:12px;color:#666">Recipients: ${escHtml(recipientDesc)}</p>`;
+          }
           if ((poll.questions || []).length && (poll.responses || []).length) {
             html += '<table><thead><tr><th>Question</th><th>Type</th><th>Summary</th></tr></thead><tbody>';
             (poll.questions || []).forEach((q, qi) => {
@@ -622,6 +642,12 @@ async function generateReport() {
     _downloadBlob(dlContent, dlMime, dlFilename);
   } else {
     _downloadBlob(html, 'text/html;charset=utf-8', dlFilename);
+    // Also open HTML report in a new browser window for immediate viewing
+    const previewWin = window.open('', '_blank');
+    if (previewWin) {
+      previewWin.document.write(html);
+      previewWin.document.close();
+    }
   }
 
   // Archive to infomanagement → local reports

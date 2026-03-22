@@ -135,6 +135,7 @@ func (s *Store) GetPreferences(userID int64) UserPreferences {
 			return p
 		}
 	}
+	trueVal := true
 	return UserPreferences{
 		UserID:       userID,
 		Theme:        "light",
@@ -144,6 +145,11 @@ func (s *Store) GetPreferences(userID int64) UserPreferences {
 		DayEndHour:   24,
 		HiddenTypes:  []string{},
 		ActiveLayers: []int64{},
+		ConfirmDragMove: &trueVal,
+		RedLineEnabled:  true,
+		SynthLabel:       true,
+		ShowClockFlags:   &trueVal,
+		ShowWeekNumbers:  true,
 	}
 }
 

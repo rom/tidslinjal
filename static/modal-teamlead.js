@@ -6,9 +6,12 @@ async function openTeamLeadToolbox() {
   const html = `
     <div class="modal-overlay" id="teamleadToolboxModal">
       <div class="modal" style="max-width:650px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
-        <div class="modal-header">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
           <h2>🧰 ${t('teamlead_toolbox_title')||'TeamLead Toolbox'}</h2>
-          <button class="modal-close" data-action="closeTeamLeadToolbox">✕</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 8px" data-action="detachTeamLeadToolbox" title="${t('btn_detach')||'Detach to window'}">⧉ ${t('btn_detach')||'Detach'}</button>
+            <button class="modal-close" data-action="closeTeamLeadToolbox">✕</button>
+          </div>
         </div>
         <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
 
@@ -244,5 +247,178 @@ async function sendQuickReport() {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to send report');
   }
+}
+
+// ── Detach TeamLead Toolbox ────────────────────────────────────────────────
+let _teamleadPopout = null;
+let _teamleadPopoutMonitor = null;
+
+function detachTeamLeadToolbox() {
+  closeTeamLeadToolbox();
+
+  if (_teamleadPopout && !_teamleadPopout.closed) {
+    _teamleadPopout.focus();
+    return;
+  }
+
+  const groups = state.groups || [];
+  const myGroups = groups;
+  const theme = document.body.className || '';
+  const w = Math.min(window.screen.availWidth, 680);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+
+  _teamleadPopout = window.open('', 'tidslinjal-teamlead',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (!_teamleadPopout) return;
+
+  // Build the same content as the modal body
+  const content = _teamleadToolboxContent(myGroups);
+
+  _teamleadPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal \u2014 TeamLead Toolbox</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>' +
+    'body{margin:0;padding:16px;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif}' +
+    'h2{margin:0 0 12px 0}' +
+    '</style></head><body class="' + escHtml(theme) + '">' +
+    '<h2>\u{1F9F0} ' + escHtml(t('teamlead_toolbox_title')||'TeamLead Toolbox') + '</h2>' +
+    '<div id="teamleadDetachedWrap">' + content + '</div>' +
+    '</body></html>');
+  _teamleadPopout.document.close();
+
+  // Bind actions in the popout to opener (main window) functions
+  function rebindPopoutActions() {
+    if (!_teamleadPopout || _teamleadPopout.closed) return;
+    const wrap = _teamleadPopout.document.getElementById('teamleadDetachedWrap');
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-action]').forEach(el => {
+      el.onclick = function() {
+        try {
+          window.focus();
+          const fn = el.dataset.action;
+          const arg = el.dataset.arg;
+          if (typeof window[fn] === 'function') {
+            arg ? window[fn](arg) : window[fn]();
+          }
+        } catch(e) { console.error(e); }
+      };
+    });
+  }
+  rebindPopoutActions();
+
+  if (_teamleadPopoutMonitor) clearInterval(_teamleadPopoutMonitor);
+  _teamleadPopoutMonitor = setInterval(() => {
+    if (!_teamleadPopout || _teamleadPopout.closed) {
+      clearInterval(_teamleadPopoutMonitor);
+      _teamleadPopoutMonitor = null;
+      _teamleadPopout = null;
+    }
+  }, 1000);
+}
+
+// Helper to extract toolbox content for reuse in detached window
+function _teamleadToolboxContent(myGroups) {
+  return `
+          <!-- Quick Response to OpLead -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px;color:#E74C3C">\u{1F6A8} ${t('tl_quick_response')||'Quick Response needed!'}</div>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_quick_response_desc')||'Send an urgent message directly to Operations Lead'}</p>
+            <textarea id="tlQuickMsg" rows="2" placeholder="${t('tl_quick_response_placeholder')||'Describe the urgent situation...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="tlQuickPriority" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="high">${t('priority_high')||'High'}</option>
+                <option value="critical">${t('priority_critical')||'Critical'}</option>
+              </select>
+              <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="sendQuickResponse">\u{1F6A8} ${t('btn_send')||'Send'}</button>
+            </div>
+          </div>
+
+          <!-- Quick Report -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px;color:var(--accent)">\u{1F4CB} ${t('tl_quick_report')||'Quick Report'}</div>
+            <input type="text" id="tlReportSubject" placeholder="${t('tl_report_subject')||'Report subject'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlReportBody" rows="3" placeholder="${t('tl_report_body')||'Report details...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="tlReportCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="situation">${t('tl_report_cat_situation')||'Situation'}</option>
+                <option value="incident">${t('tl_report_cat_incident')||'Incident'}</option>
+                <option value="resource">${t('tl_report_cat_resource')||'Resource'}</option>
+                <option value="progress">${t('tl_report_cat_progress')||'Progress'}</option>
+                <option value="other">${t('tl_report_cat_other')||'Other'}</option>
+              </select>
+              <select id="tlReportPriority" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="normal">${t('priority_normal')||'Normal'}</option>
+                <option value="high">${t('priority_high')||'High'}</option>
+                <option value="critical">${t('priority_critical')||'Critical'}</option>
+              </select>
+              <span style="flex:1"></span>
+              <button class="btn btn-sm btn-primary" data-action="sendQuickReport">\u{1F4CB} ${t('btn_send_report')||'Send Report'}</button>
+            </div>
+          </div>
+
+          <!-- TeamLead Decisions -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">\u2696 ${t('tl_decisions')||'TeamLead Decisions'}</div>
+            <input type="text" id="tlDecisionTitle" placeholder="${t('decision_title_placeholder')||'Decision title'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlDecisionText" rows="2" placeholder="${t('tl_decision_placeholder')||'Enter your decision...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <input type="text" id="tlDecisionReason" placeholder="${t('decision_reason_label')||'Reason for decision'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
+            </div>
+          </div>
+
+          <!-- Escalate Decision -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">\u2B06 ${t('tl_escalate_decision')||'Decision needed \u2014 Escalate to OpLead'}</div>
+            <input type="text" id="tlEscalateTitle" placeholder="${t('tl_escalate_title_placeholder')||'Decision title'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <textarea id="tlEscalateText" rows="2" placeholder="${t('tl_escalate_placeholder')||'Describe what needs to be decided...'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+            <input type="text" id="tlEscalateReason" placeholder="${t('tl_escalate_reason')||'Background / reason for escalation'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="tlEscalateUrgency" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="normal">${t('urgency_normal')||'Normal'}</option>
+                <option value="urgent">${t('urgency_urgent')||'Urgent'}</option>
+                <option value="critical">${t('urgency_critical')||'Critical'}</option>
+              </select>
+              <button class="btn btn-sm" style="background:#E67E22;color:#fff" data-action="escalateDecision">\u2B06 ${t('btn_escalate')||'Escalate'}</button>
+            </div>
+          </div>
+
+          <!-- Team Ready Check -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">\u2705 ${t('tl_team_ready_check')||'Team Ready Check'}</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="tlReadyCheckGroup" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:150px">
+                ${myGroups.map(g => '<option value="' + g.id + '">' + escHtml(g.name) + '</option>').join('')}
+              </select>
+              <input type="text" id="tlReadyCheckMsg" placeholder="${t('tl_ready_check_msg')||'Optional message'}"
+                style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+              <button class="btn btn-sm btn-primary" data-action="sendTeamReadyCheck">\u2705 ${t('btn_send')||'Send'}</button>
+            </div>
+          </div>
+
+          <!-- Team Poll -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">\u{1F4CA} ${t('tl_team_poll')||'Team Poll'}</div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+              <select id="tlPollGroup" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:150px">
+                ${myGroups.map(g => '<option value="' + g.id + '">' + escHtml(g.name) + '</option>').join('')}
+              </select>
+            </div>
+            <input type="text" id="tlPollQuestion" placeholder="${t('tl_poll_question')||'Question'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
+            <input type="text" id="tlPollOptions" placeholder="${t('tl_poll_options_placeholder')||'Options (comma-separated, e.g.: Yes, No, Maybe)'}"
+              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-sm btn-primary" data-action="sendTeamPoll">\u{1F4CA} ${t('btn_send_poll')||'Send Poll'}</button>
+            </div>
+          </div>`;
 }
 

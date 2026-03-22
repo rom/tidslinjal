@@ -1588,9 +1588,12 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 	mux.HandleFunc("/api/polls/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			app.requireAuth(app.handleGetPoll)(w, r)
-		} else {
+		case http.MethodDelete:
+			app.requireAuth(app.handleDeletePoll)(w, r)
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})

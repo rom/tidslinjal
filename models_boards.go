@@ -13,10 +13,13 @@ type Board struct {
 	GroupID     int64       `json:"group_id,omitempty"`
 	RoleKey     string      `json:"role_key,omitempty"`
 	Columns     []BoardCol  `json:"columns"`
-	Color       string      `json:"color,omitempty"`       // board background/accent color
-	ShareToken  string      `json:"share_token,omitempty"` // token for sharable link
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	Color              string    `json:"color,omitempty"`                // board background/accent color
+	ShareToken         string    `json:"share_token,omitempty"`          // token for sharable link
+	ShowIcons          *bool     `json:"show_icons,omitempty"`           // show icons in subject (default true)
+	PriorityBackground *bool     `json:"priority_background,omitempty"` // color bg by priority (default true)
+	ShowArchival       *bool     `json:"show_archival,omitempty"`        // show archival controls (default true)
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 // BoardCol is a column in the kanban board
