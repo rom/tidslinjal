@@ -1682,6 +1682,7 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 	openItems := 0
 	inProgressItems := 0
 	closedItems := 0
+	archivedItems := 0
 
 	// Count items by column name (convention: Open, In Progress, Closed)
 	colNameMap := map[string]string{}
@@ -1691,7 +1692,23 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Priority counts
+	priorityNormal := 0
+	priorityLow := 0
+	priorityHigh := 0
+	priorityCritical := 0
+
+	// Type counts
+	typeCounts := map[string]int{}
+
+	// Responsible tracking
+	responsibleSet := map[string]bool{}
+
 	for _, item := range allItems {
+		if item.Archived {
+			archivedItems++
+			continue
+		}
 		colName := colNameMap[item.ColumnID]
 		switch {
 		case strings.Contains(colName, "closed") || strings.Contains(colName, "done") || strings.Contains(colName, "complete"):
@@ -1700,6 +1717,30 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 			inProgressItems++
 		default:
 			openItems++
+		}
+
+		// Priority
+		switch item.Priority {
+		case "low":
+			priorityLow++
+		case "high":
+			priorityHigh++
+		case "critical":
+			priorityCritical++
+		default:
+			priorityNormal++
+		}
+
+		// Type
+		tp := item.ItemType
+		if tp == "" {
+			tp = "untyped"
+		}
+		typeCounts[tp]++
+
+		// Responsible
+		if item.ResponsibleName != "" {
+			responsibleSet[item.ResponsibleName] = true
 		}
 	}
 
@@ -1730,13 +1771,31 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 	}
 	sort.Slice(itemsPerBoard, func(i, j int) bool { return itemsPerBoard[i].Count > itemsPerBoard[j].Count })
 
+	// Type breakdown
+	type typeCount struct {
+		Type  string `json:"type"`
+		Count int    `json:"count"`
+	}
+	byType := []typeCount{}
+	for tp, cnt := range typeCounts {
+		byType = append(byType, typeCount{tp, cnt})
+	}
+	sort.Slice(byType, func(i, j int) bool { return byType[i].Count > byType[j].Count })
+
 	jsonOK(w, map[string]any{
-		"total_boards":     totalBoards,
-		"total_items":      totalItems,
-		"open_items":       openItems,
-		"in_progress_items": inProgressItems,
-		"closed_items":     closedItems,
-		"by_owner":         owners,
-		"items_per_board":  itemsPerBoard,
+		"total_boards":       totalBoards,
+		"total_items":        totalItems,
+		"open_items":         openItems,
+		"in_progress_items":  inProgressItems,
+		"closed_items":       closedItems,
+		"archived_items":     archivedItems,
+		"priority_normal":    priorityNormal,
+		"priority_low":       priorityLow,
+		"priority_high":      priorityHigh,
+		"priority_critical":  priorityCritical,
+		"by_type":            byType,
+		"total_responsible":  len(responsibleSet),
+		"by_owner":           owners,
+		"items_per_board":    itemsPerBoard,
 	})
 }

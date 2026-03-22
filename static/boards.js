@@ -95,12 +95,12 @@ function _renderBoardListModal() {
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm btn-primary" data-action="_openCreateBoardDialog">+ ${t('board_new')||'New Board'}</button>
         <div style="position:relative;display:inline-block" id="boardListImpExpDropdown">
-          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardListImpExpMenu">⬆⬇ ${t('board_import_export')||'Import/Export'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_toggleBoardListImpExpMenu">⬆⬇ ${t('board_import_export')||'Import / Export'}</button>
           <div id="boardListImpExpMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:160px;margin-top:4px">
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="json">⬆ Import JSON</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="csv">⬆ Import CSV</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="json">⬆ ${t('board_import_json')||'Import JSON'}</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_importBoardAs" data-arg="csv">⬆ ${t('board_import_csv')||'Import CSV'}</button>
             <hr style="margin:2px 0;border:0;border-top:1px solid var(--border)">
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportAllBoardsJson">⬇ Export All (JSON)</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_exportAllBoardsJson">⬇ ${t('board_export_all')||'Export All (JSON)'}</button>
           </div>
         </div>
       </div>
@@ -113,34 +113,36 @@ function _renderBoardListModal() {
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
       const cardBg = b.color ? `background:${b.color}22;border:1px solid ${b.color}44;` : 'background:var(--bg2);border:1px solid var(--border);';
+      const itemCount = b.item_count != null ? b.item_count : 0;
       html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg};position:relative" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(b.name)}</strong>
           <div style="display:flex;align-items:center;gap:4px">
             <span title="${b.visibility}">${vis}</span>
-            <button class="btn btn-sm" style="font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_editBoardFromList" data-arg="${b.id}" data-stop-prop title="Edit board settings">✏️</button>
-            <button class="btn btn-sm" style="color:var(--danger);font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_removeBoardFromList" data-arg="${b.id}" data-stop-prop title="${t('board_delete')||'Remove board'}">🗑</button>
+            <button class="btn btn-sm" style="font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_editBoardFromList" data-arg="${b.id}" data-stop-prop title="${t('board_edit_board')||'Edit Board'}">✏️</button>
           </div>
         </div>
         ${b.color ? `<div style="height:3px;background:${b.color};border-radius:2px;margin-top:6px"></div>` : ''}
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${escHtml(b.description||'')}</div>
-        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${b.columns ? b.columns.length : 3} columns · by ${escHtml(b.owner_name||'')}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${itemCount} ${t('board_items_count')||'items'} · ${b.columns ? b.columns.length : 3} ${t('board_columns')||'columns'} · ${escHtml(b.owner_name||'')}</div>
       </div>`;
     }
     html += `</div>`;
   }
 
-  // Templates section
-  html += `<div style="margin-top:24px"><h3>📋 ${t('board_templates')||'Templates'}</h3>
+  // Templates section (collapsed by default)
+  const tmplCount = (window._boardTemplates || []).length;
+  html += `<details style="margin-top:24px">
+    <summary style="cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px"><h3 style="display:inline;margin:0">📋 ${t('board_templates')||'Templates'}</h3> <span style="font-size:var(--fs-xs);color:var(--text-dim)">(${tmplCount})</span></summary>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">`;
   for (const tmpl of (window._boardTemplates || [])) {
     html += `<div class="card" style="padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer" data-action="_createFromTemplate" data-arg="${tmpl.id}">
       <strong style="font-size:var(--fs-sm)">${escHtml(tmpl.name)}</strong>
       <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(tmpl.description||'')}</div>
-      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${tmpl.columns.length} columns</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${tmpl.columns.length} ${t('board_columns')||'columns'}</div>
     </div>`;
   }
-  html += `</div></div></div>`;
+  html += `</div></details></div>`;
 
   _boardModal('boardsModal', html, '960px');
 }
@@ -185,45 +187,45 @@ async function _editBoardFromList(boardId) {
   }
 
   let html = `<div style="max-width:540px">
-    <h3 style="margin-bottom:12px">✏️ Edit Board</h3>
+    <h3 style="margin-bottom:12px">✏️ ${t('board_edit_board')||'Edit Board'}</h3>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Board Name</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_name')||'Board Name'}</label>
         <input id="editBoardName" class="input" style="width:100%" value="${escHtml(board.name)}">
       </div>
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Board Color</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_color')||'Board Color'}</label>
         <div style="display:flex;align-items:center;gap:6px">
           <input id="editBoardColor" type="color" value="${board.color||'#1a1a2e'}" style="width:48px;height:28px;cursor:pointer;border:none;padding:0">
-          ${board.color ? `<button class="btn btn-sm btn-secondary" style="font-size:var(--fs-xs);padding:1px 6px" id="editBoardColorClear">✖ Clear</button>` : ''}
+          ${board.color ? `<button class="btn btn-sm btn-secondary" style="font-size:var(--fs-xs);padding:1px 6px" id="editBoardColorClear">✖ ${t('board_color_clear')||'Clear'}</button>` : ''}
         </div>
       </div>
     </div>
 
     <div style="margin-bottom:12px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Description</label>
-      <input id="editBoardDesc" class="input" style="width:100%" value="${escHtml(board.description||'')}" placeholder="Optional description">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_description')||'Description'}</label>
+      <input id="editBoardDesc" class="input" style="width:100%" value="${escHtml(board.description||'')}" placeholder="${t('board_desc_placeholder')||'Optional description'}">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Visibility</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_visibility')||'Visibility'}</label>
         <select id="editBoardVis" class="input" style="width:100%">
-          <option value="private" ${board.visibility==='private'?'selected':''}>🔒 Private</option>
-          <option value="group" ${board.visibility==='group'?'selected':''}>👥 Group</option>
-          <option value="role" ${board.visibility==='role'?'selected':''}>🎭 Role</option>
-          <option value="global" ${board.visibility==='global'?'selected':''}>🌐 Global</option>
+          <option value="private" ${board.visibility==='private'?'selected':''}>🔒 ${t('board_vis_private')||'Private'}</option>
+          <option value="group" ${board.visibility==='group'?'selected':''}>👥 ${t('board_vis_group')||'Group'}</option>
+          <option value="role" ${board.visibility==='role'?'selected':''}>🎭 ${t('board_vis_role')||'Role'}</option>
+          <option value="global" ${board.visibility==='global'?'selected':''}>🌐 ${t('board_vis_global')||'Global'}</option>
         </select>
       </div>
       <div id="editBoardGroupDiv" style="display:${board.visibility==='group'?'':'none'}">
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Group</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_group')||'Group'}</label>
         <select id="editBoardGroup" class="input" style="width:100%">
           ${groups.map(g => `<option value="${g.id}" ${g.id===board.group_id?'selected':''}>${escHtml(g.name)}</option>`).join('')}
         </select>
       </div>
       <div id="editBoardRoleDiv" style="display:${board.visibility==='role'?'':'none'}">
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Role</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_role')||'Role'}</label>
         <select id="editBoardRole" class="input" style="width:100%">
           ${_boardRoleOptions(board.role_key || '')}
         </select>
@@ -231,30 +233,33 @@ async function _editBoardFromList(boardId) {
     </div>
 
     <div style="margin-bottom:12px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Columns</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_columns')||'Columns'}</label>
       <div id="editBoardCols">${colsHtml}</div>
-      <button class="btn btn-sm btn-secondary" data-action="_addEditBoardCol" style="margin-top:4px">+ Add Column</button>
+      <button class="btn btn-sm btn-secondary" data-action="_addEditBoardCol" style="margin-top:4px">+ ${t('board_add_col')||'Add Column'}</button>
     </div>
 
     <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">Display Options</div>
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">${t('board_display_options')||'Display Options'}</div>
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="editBoardShowIcons" ${board.show_icons !== false ? 'checked' : ''} style="accent-color:var(--accent)">
-        Show type icons on cards
+        ${t('board_show_icons')||'Show type icons on cards'}
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="editBoardPriorityBg" ${board.priority_background !== false ? 'checked' : ''} style="accent-color:var(--accent)">
-        Color card background by priority
+        ${t('board_priority_background')||'Color card background by priority'}
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
         <input type="checkbox" id="editBoardShowArchival" ${board.show_archival !== false ? 'checked' : ''} style="accent-color:var(--accent)">
-        Show archive controls on column headers
+        ${t('board_show_archival')||'Show archive controls on column headers'}
       </label>
     </div>
 
-    <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px">
-      <button class="btn btn-primary" data-action="_saveEditBoardFromList" data-arg="${board.id}">Save Changes</button>
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="editBoardListModal">Cancel</button>
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-sm" style="color:var(--danger);background:none;border:1px solid var(--danger);opacity:0.7;font-size:var(--fs-xs)" data-action="_removeBoardFromList" data-arg="${board.id}">🗑 ${t('board_delete')||'Delete Board'}</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" data-action="_saveEditBoardFromList" data-arg="${board.id}">${t('btn_save')||'Save'}</button>
+        <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="editBoardListModal">${t('btn_cancel')||'Cancel'}</button>
+      </div>
     </div>
   </div>`;
 
@@ -1085,11 +1090,11 @@ function _openBoardItem(itemId) {
     <strong style="font-size:var(--fs-sm)">📎 ${t('board_attachments')||'Attachments'} (${(item.attachments||[]).length})</strong>
     <div style="margin-top:4px">`;
   for (const att of (item.attachments || [])) {
-    html += `<div style="font-size:var(--fs-xs);margin-bottom:2px"><a href="/api/board-items/${item.id}/attachments/${att.id}" target="_blank">${escHtml(att.filename)}</a> (${_formatSize(att.size)})</div>`;
+    html += `<div style="font-size:var(--fs-xs);margin-bottom:2px"><a href="/api/board-items/${item.id}/attachments/${encodeURIComponent(att.stored_name || att.id)}" target="_blank">${escHtml(att.filename)}</a> (${_formatSize(att.size)})</div>`;
   }
   html += `<form id="boardAttUploadForm" style="margin-top:6px;display:flex;align-items:center;gap:6px">
     <input type="file" id="boardAttFile" style="font-size:var(--fs-xs)">
-    <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="min-width:32px;height:28px;padding:4px 8px">⬆ Upload</button>
+    <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="min-width:32px;height:28px;padding:4px 8px">⬆ ${t('btn_upload')||'Upload'}</button>
   </form></div></div>`;
 
   // History
