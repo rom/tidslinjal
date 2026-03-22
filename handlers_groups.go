@@ -194,6 +194,15 @@ func (app *App) handleAddGroupMember(w http.ResponseWriter, r *http.Request, use
 	if req.Role == "" {
 		req.Role = "member"
 	}
+	// V-36 fix: verify group and user exist before adding membership
+	if _, ok := app.store.GetGroupByID(groupID); !ok {
+		jsonError(w, "group not found", http.StatusNotFound)
+		return
+	}
+	if _, ok := app.store.GetUserByID(req.UserID); !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
 	if err := app.store.AddGroupMember(GroupMembership{GroupID: groupID, UserID: req.UserID, Role: req.Role}); err != nil {
 		jsonError(w, "failed to add member", http.StatusInternalServerError)
 		return
@@ -208,8 +217,21 @@ func (app *App) handleRemoveGroupMember(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	groupID, _ := strconv.ParseInt(parts[2], 10, 64)
-	userID, _ := strconv.ParseInt(parts[4], 10, 64)
+	groupID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+	userID, err := strconv.ParseInt(parts[4], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+	// V-37 fix: verify group exists before removing member
+	if _, ok := app.store.GetGroupByID(groupID); !ok {
+		jsonError(w, "group not found", http.StatusNotFound)
+		return
+	}
 	app.store.RemoveGroupMember(groupID, userID) //nolint
 	jsonOK(w, map[string]string{"status": "removed"})
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1086,7 +1087,7 @@ func (app *App) handleGetBoardByShareToken(w http.ResponseWriter, r *http.Reques
 	}
 	boards := app.store.GetBoards()
 	for _, b := range boards {
-		if b.ShareToken != "" && b.ShareToken == token {
+		if b.ShareToken != "" && subtle.ConstantTimeCompare([]byte(b.ShareToken), []byte(token)) == 1 {
 			// Share token grants access if the user is authenticated
 			items := app.store.GetBoardItems(b.ID)
 			if items == nil {
@@ -1142,7 +1143,7 @@ func (app *App) handleGetBoardItemByShareToken(w http.ResponseWriter, r *http.Re
 	for _, b := range boards {
 		items := app.store.GetBoardItems(b.ID)
 		for _, item := range items {
-			if item.ShareToken != "" && item.ShareToken == token {
+			if item.ShareToken != "" && subtle.ConstantTimeCompare([]byte(item.ShareToken), []byte(token)) == 1 {
 				// Share token grants access if user is authenticated
 				colName := ""
 				for _, c := range b.Columns {

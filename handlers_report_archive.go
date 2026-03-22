@@ -174,6 +174,11 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "unauthorized — provide a valid API key via Authorization: Bearer <key>", http.StatusUnauthorized)
 		return
 	}
+	// V-33 fix: require at least RoleReadWrite for creating report entries
+	if user.Role == RoleRead {
+		jsonError(w, "insufficient permissions — API key requires read-write role or higher", http.StatusForbidden)
+		return
+	}
 
 	ct := r.Header.Get("Content-Type")
 	dir := filepath.Join(app.store.DataDir(), "report_archive")

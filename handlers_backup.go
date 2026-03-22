@@ -427,6 +427,11 @@ func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User
 // ── WebCal Subscription ───────────────────────────────────────────────────────
 
 func (app *App) handleWebCal(w http.ResponseWriter, r *http.Request) {
+	// V-35 fix: rate-limit WebCal token brute-force attempts
+	if !app.authLimiter.allow("webcal:"+clientIP(r), 10, time.Minute) {
+		http.Error(w, "too many requests", http.StatusTooManyRequests)
+		return
+	}
 	// /webcal/:token.ics
 	token := strings.TrimPrefix(r.URL.Path, "/webcal/")
 	token = strings.TrimSuffix(token, ".ics")
