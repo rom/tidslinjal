@@ -78,6 +78,16 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   html += '</tbody></table>';
   el.innerHTML = html;
 
+  // Row highlighting on click
+  el.querySelectorAll('.ttm-table tbody tr').forEach(tr => {
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => {
+      el.querySelectorAll('.ttm-table tbody tr').forEach(r => r.style.outline = '');
+      tr.style.outline = '2px solid var(--accent)';
+      tr.style.outlineOffset = '-1px';
+    });
+  });
+
   // ── Current time line in task-time matrix ──
   const p = state.preferences || {};
   if (p.red_line_enabled !== false) {
@@ -156,16 +166,20 @@ async function openTaskTimeMatrix() {
     if (fromEl && !fromEl.value) fromEl.value = new Date(sorted[0].start_time).toISOString().slice(0,10);
     if (toEl && !toEl.value) toEl.value = new Date(sorted[sorted.length-1].end_time || sorted[sorted.length-1].start_time).toISOString().slice(0,10);
   }
-  _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
   openModal('taskTimeMatrixModal');
-  // Bind date apply
-  document.getElementById('ttmApplyDates')?.addEventListener('click', () => {
-    _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
-  });
-  // Bind detach
-  document.getElementById('ttmDetach')?.addEventListener('click', _detachTaskTimeMatrix);
-  // Bind print
-  document.getElementById('ttmPrint')?.addEventListener('click', _printTaskTimeMatrix);
+  _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
+  // Bind date apply (remove old listeners first to avoid duplicates)
+  const applyBtn = document.getElementById('ttmApplyDates');
+  if (applyBtn && !applyBtn._ttmBound) {
+    applyBtn._ttmBound = true;
+    applyBtn.addEventListener('click', () => {
+      _renderTaskTimeMatrixTable(document.getElementById('ttmDateFrom')?.value, document.getElementById('ttmDateTo')?.value);
+    });
+  }
+  const detachBtn = document.getElementById('ttmDetach');
+  if (detachBtn && !detachBtn._ttmBound) { detachBtn._ttmBound = true; detachBtn.addEventListener('click', _detachTaskTimeMatrix); }
+  const printBtn = document.getElementById('ttmPrint');
+  if (printBtn && !printBtn._ttmBound) { printBtn._ttmBound = true; printBtn.addEventListener('click', _printTaskTimeMatrix); }
 }
 
 function _detachTaskTimeMatrix() {
