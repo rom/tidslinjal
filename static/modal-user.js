@@ -76,6 +76,7 @@ async function openUserModal(user) {
             : `<button class="btn btn-danger btn-sm" id="btnBlockUser" title="${t('user_block_desc')||'Prevent this user from logging in'}">🚫 ${t('user_block')||'Block'}</button>`
           }
           <button class="btn btn-secondary btn-sm" id="btnLoginHistory" title="${t('user_login_history_desc')||'View recent login activity for this user'}">📋 ${t('user_login_history')||'Login History'}</button>
+          ${state.user && (state.user.role === 'admin' || hasRole2(state.user.role, 'admin')) && user.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" id="btnAdminChangePassword" title="${t('admin_change_password')||'Change Password'}">🔑 ${t('admin_change_password')||'Change Password'}</button>` : ''}
         </div>
         <div id="uLoginHistoryPanel" style="display:none;margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px"></div>
       `;
@@ -120,6 +121,12 @@ async function openUserModal(user) {
             }).join('');
           }
         } catch { panel.innerHTML = `<em style="color:var(--red)">Error loading login history.</em>`; }
+      });
+      // Admin change password button
+      const btnAdminPwd = document.getElementById('btnAdminChangePassword');
+      if (btnAdminPwd) btnAdminPwd.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _openAdminPasswordModal(user);
       });
     } else {
       uUserInfo.style.display = 'none';
@@ -367,5 +374,62 @@ async function deleteUser(id) {
   const res = await apiDel(`/api/users/${id}`);
   if (res.ok) { closeModal('userModal'); renderSidebar(); showNotification('success', t('notif_saved')); }
   else { showError('Failed to delete user'); }
+}
+
+// ── Admin password change modal ──
+function _openAdminPasswordModal(user) {
+  const existingModal = document.getElementById('adminPwdModal');
+  if (existingModal) existingModal.remove();
+
+  const html = `<div class="modal-overlay open" id="adminPwdModal" style="z-index:10002">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <h2>🔑 ${t('admin_change_password')||'Change Password'}</h2>
+        <button class="modal-close" data-action="_closeAdminPwdModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px;font-size:var(--fs-sm);color:var(--text-dim)">${(t('admin_change_password_confirm')||'Set new password for user "%s"?').replace('%s', escHtml(user.display_name || user.username))}</p>
+        <div class="form-group" style="margin-bottom:10px">
+          <label>${t('admin_new_password')||'New password'}</label>
+          <input type="password" id="adminNewPwd" style="width:100%" placeholder="${t('admin_new_password')||'New password'}">
+        </div>
+        <div class="form-group">
+          <label>${t('admin_confirm_password')||'Confirm password'}</label>
+          <input type="password" id="adminConfirmPwd" style="width:100%" placeholder="${t('admin_confirm_password')||'Confirm password'}">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="_closeAdminPwdModal">${t('btn_cancel')||'Cancel'}</button>
+        <button class="btn btn-primary" id="btnAdminPwdSave">${t('btn_save')||'Save'}</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('adminPwdModal');
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  if (typeof _bindActions === 'function') _bindActions(modal);
+
+  document.getElementById('btnAdminPwdSave').addEventListener('click', async () => {
+    const newPwd = document.getElementById('adminNewPwd').value;
+    const confirmPwd = document.getElementById('adminConfirmPwd').value;
+    if (!newPwd) { showError(t('admin_new_password')||'New password required'); return; }
+    if (newPwd !== confirmPwd) { showError(t('admin_passwords_mismatch')||'Passwords do not match'); return; }
+    try {
+      const res = await apiPut(`/api/users/${user.id}`, { password: newPwd });
+      if (res.ok) {
+        document.getElementById('adminPwdModal')?.remove();
+        showNotification('success', t('admin_password_changed')||'Password changed successfully');
+      } else {
+        const err = await res.json();
+        showError(err.error || 'Failed to change password');
+      }
+    } catch (e) { showError(e.message || 'Failed to change password'); }
+  });
+
+  document.getElementById('adminNewPwd').focus();
+}
+
+function _closeAdminPwdModal() {
+  document.getElementById('adminPwdModal')?.remove();
 }
 

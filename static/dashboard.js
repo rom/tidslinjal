@@ -26,6 +26,15 @@ function _saveDashboardConfig(config) {
   try { localStorage.setItem('dashboard_config', JSON.stringify(config)); } catch { /* ignore */ }
 }
 
+function _closeDashboard() {
+  if (_dashboardRefreshTimer) clearInterval(_dashboardRefreshTimer);
+  document.getElementById('dashboardModal')?.remove();
+}
+
+function _closeDashConfig() {
+  document.getElementById('dashConfigModal')?.remove();
+}
+
 async function openDashboard() {
   const config = _getDashboardConfig();
 
@@ -47,8 +56,8 @@ async function openDashboard() {
   overlay.className = 'modal-overlay open';
   overlay.id = 'dashboardModal';
   overlay.innerHTML = `<div class="modal" style="max-width:920px;width:95vw;max-height:90vh;overflow-y:auto">
-    <div class="modal-header"><h2>📊 Dashboard</h2>
-      <button class="modal-close" onclick="document.getElementById('dashboardModal')?.remove()">✕</button>
+    <div class="modal-header"><h2>📊 ${t('dashboard_title')||'Situational Overview'}</h2>
+      <button class="modal-close" data-action="_closeDashboard">✕</button>
     </div>
     <div class="modal-body" style="padding:12px">
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:12px">
@@ -60,6 +69,7 @@ async function openDashboard() {
   </div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  if (typeof _bindActions === 'function') _bindActions(overlay);
 
   // Fetch data and render
   await _dashboardRefresh();
@@ -264,7 +274,7 @@ function _dashboardConfigure() {
   html += `</div>
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px">
       <button class="btn btn-primary" data-action="_dashboardSaveConfig">Save</button>
-      <button class="btn btn-secondary" onclick="document.getElementById('dashConfigModal')?.remove()">Cancel</button>
+      <button class="btn btn-secondary" data-action="_closeDashConfig">Cancel</button>
     </div>
   </div>`;
 
@@ -275,6 +285,7 @@ function _dashboardConfigure() {
   overlay.innerHTML = `<div class="modal" style="max-width:500px">${html}</div>`;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  if (typeof _bindActions === 'function') _bindActions(overlay);
 }
 
 function _dashboardSaveConfig() {

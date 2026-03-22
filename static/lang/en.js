@@ -1799,6 +1799,17 @@ TRANSLATIONS.en = {
     docs_user_manual: 'User Manual',
     docs_reference: 'Reference Handbook',
 
+    // Dashboard
+    dashboard_title: 'Situational Overview',
+
+    // Admin user management
+    admin_change_password: 'Change Password',
+    admin_change_password_confirm: 'Set new password for user "%s"?',
+    admin_password_changed: 'Password changed successfully',
+    admin_new_password: 'New password',
+    admin_confirm_password: 'Confirm password',
+    admin_passwords_mismatch: 'Passwords do not match',
+
     // Leadership dashboard
     ld_overall_confidence: 'Overall Confidence',
     ld_completion: 'Completion',

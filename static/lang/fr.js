@@ -1594,6 +1594,17 @@ TRANSLATIONS.fr = {
     digest_webhook_url: 'URL du webhook',
     digest_webhook_type: 'Type de webhook',
 
+    // Dashboard
+    dashboard_title: 'Vue d\'ensemble de la situation',
+
+    // Admin user management
+    admin_change_password: 'Changer le mot de passe',
+    admin_change_password_confirm: 'Définir un nouveau mot de passe pour l\'utilisateur « %s » ?',
+    admin_password_changed: 'Mot de passe modifié avec succès',
+    admin_new_password: 'Nouveau mot de passe',
+    admin_confirm_password: 'Confirmer le mot de passe',
+    admin_passwords_mismatch: 'Les mots de passe ne correspondent pas',
+
     // Leadership dashboard
     ld_tempo: 'Tempo',
     ld_last_1h: 'Dernière 1h',

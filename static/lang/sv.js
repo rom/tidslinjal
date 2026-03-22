@@ -1618,6 +1618,17 @@ TRANSLATIONS.sv = {
     docs_user_manual: 'Användarhandbok',
     docs_reference: 'Referenshandbok',
 
+    // Dashboard
+    dashboard_title: 'Situationsöversikt',
+
+    // Admin user management
+    admin_change_password: 'Ändra lösenord',
+    admin_change_password_confirm: 'Ange nytt lösenord för användare "%s"?',
+    admin_password_changed: 'Lösenordet har ändrats',
+    admin_new_password: 'Nytt lösenord',
+    admin_confirm_password: 'Bekräfta lösenord',
+    admin_passwords_mismatch: 'Lösenorden matchar inte',
+
     // Leadership dashboard (Swedish)
     ld_overall_confidence: 'Övergripande konfidens',
     ld_completion: 'Färdigställande',

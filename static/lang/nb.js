@@ -1786,6 +1786,17 @@ TRANSLATIONS.nb = {
     tags_no_tags: 'Ingen tagger ennå',
     tags_delete_confirm: 'Slette denne taggen?',
 
+    // Dashboard
+    dashboard_title: 'Situasjonsoversikt',
+
+    // Admin user management
+    admin_change_password: 'Endre passord',
+    admin_change_password_confirm: 'Sett nytt passord for bruker «%s»?',
+    admin_password_changed: 'Passordet er endret',
+    admin_new_password: 'Nytt passord',
+    admin_confirm_password: 'Bekreft passord',
+    admin_passwords_mismatch: 'Passordene stemmer ikke overens',
+
     // Leadership dashboard
     ld_overall_confidence: 'Samlet tillit',
     ld_completion: 'Fullføring',

@@ -1411,6 +1411,17 @@ TRANSLATIONS.da = {
     tags_no_tags: 'Ingen tags endnu',
     tags_delete_confirm: 'Slet dette tag?',
 
+    // Dashboard
+    dashboard_title: 'Situationsoversigt',
+
+    // Admin user management
+    admin_change_password: 'Skift adgangskode',
+    admin_change_password_confirm: 'Angiv ny adgangskode for bruger "%s"?',
+    admin_password_changed: 'Adgangskoden er ændret',
+    admin_new_password: 'Ny adgangskode',
+    admin_confirm_password: 'Bekræft adgangskode',
+    admin_passwords_mismatch: 'Adgangskoderne stemmer ikke overens',
+
     // Leadership dashboard
     ld_overall_confidence: 'Samlet tillid',
     ld_completion: 'Fuldførelse',

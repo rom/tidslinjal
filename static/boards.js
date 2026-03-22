@@ -519,6 +519,8 @@ function _renderKanbanBoard() {
         <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
         <button class="btn btn-sm btn-secondary" style="color:var(--danger);${btnStyle}" data-action="_deleteBoardConfirm" title="${t('board_delete')||'Delete board'}">🗑</button>
         <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
+        <button class="btn btn-sm btn-secondary" data-action="_boardUndo" title="${t('btn_undo')||'Undo'}" style="${btnStyle}" id="boardUndoBtn" ${state.undoStack.length===0?'disabled':''}>↩ ${t('btn_undo')||'Undo'}</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomOut" title="${t('board_zoom_out')||'Zoom out'}" style="${btnStyle}">−</button>
         <span id="boardZoomLevel" style="font-size:var(--fs-xs);min-width:36px;text-align:center">${Math.round(_boardsState.zoom * 100)}%</span>
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomIn" title="${t('board_zoom_in')||'Zoom in'}" style="${btnStyle}">+</button>
@@ -1976,6 +1978,17 @@ async function _archiveColumnItems(colId) {
 // ── Print ──
 function _printBoard() {
   window.print();
+}
+
+// ── Undo action from board view ──
+async function _boardUndo() {
+  if (typeof performUndo === 'function') {
+    await performUndo();
+    // Refresh board view after undo
+    if (_boardsState.activeBoard) {
+      await _openBoard(_boardsState.activeBoard.id);
+    }
+  }
 }
 
 // ── Detach board into a new window ──
