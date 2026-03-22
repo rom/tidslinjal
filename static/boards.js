@@ -350,36 +350,32 @@ function _renderKanbanBoard() {
       html += `</div></div>`;
     }
   }
-  html += `</div>`;
-
-  // Archived items section
+  // Archived column to the right (inline with other columns)
   if (archivedItems.length > 0) {
-    html += `<details style="margin-top:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);padding:8px 12px">
-      <summary style="cursor:pointer;font-size:var(--fs-sm);font-weight:600;color:var(--text-dim)">📦 ${t('board_archived')||'Archived'} (${archivedItems.length})</summary>
-      <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">`;
+    html += `<div class="kanban-col" style="min-width:180px;max-width:220px;flex-shrink:0;background:var(--bg2);border:1px dashed var(--border);border-radius:var(--radius);padding:10px;opacity:0.8">
+      <div style="font-weight:700;margin-bottom:8px;color:var(--text-dim)">📦 ${t('board_archived')||'Archived'} (${archivedItems.length})</div>
+      <div style="display:flex;flex-direction:column;gap:4px;max-height:500px;overflow-y:auto">`;
     for (const item of archivedItems) {
-      const typeIcon = _itemTypeIcons[item.item_type] || '';
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg3);border-radius:var(--radius);font-size:var(--fs-xs)">
-        <div style="flex:1;min-width:0">
-          <span>${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</span>
-          <span style="color:var(--text-dim);margin-left:8px">#${item.id}</span>
-          ${item.responsible_name ? `<span style="color:var(--text-dim);margin-left:8px">— ${escHtml(item.responsible_name)}</span>` : ''}
-        </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="btn btn-sm" style="font-size:10px;padding:1px 6px" data-action="_unarchiveBoardItem" data-arg="${item.id}" title="${t('board_unarchive')||'Unarchive'}">↩</button>
-          <button class="btn btn-sm" style="font-size:10px;padding:1px 6px;color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete'}">🗑</button>
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:var(--bg3);border-radius:var(--radius);font-size:10px">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.subject)}">${escHtml(item.subject)}</span>
+        <div style="display:flex;gap:2px;flex-shrink:0;margin-left:4px">
+          <button class="btn btn-sm" style="font-size:9px;padding:0 4px" data-action="_unarchiveBoardItem" data-arg="${item.id}" title="${t('board_unarchive')||'Restore'}">↩</button>
+          <button class="btn btn-sm" style="font-size:9px;padding:0 4px;color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete'}">🗑</button>
         </div>
       </div>`;
     }
-    html += `</div></details>`;
+    html += `</div></div>`;
   }
 
-  html += `</div>`;
+  html += `</div>`; // close kanban-columns
+
+  html += `</div>`; // close outer wrapper
 
   // Adjust width to number of columns: ~280px per column + padding, capped at 95vw
   const visibleCols = board.columns.filter(c => !c.collapsed).length;
   const collapsedCols = board.columns.length - visibleCols;
-  const calcWidth = visibleCols * 300 + collapsedCols * 60 + 80;
+  const archiveColWidth = archivedItems.length > 0 ? 220 : 0;
+  const calcWidth = visibleCols * 300 + collapsedCols * 60 + archiveColWidth + 80;
   const boardWidth = Math.min(calcWidth, window.innerWidth * 0.95);
   _boardModal('boardsModal', html, boardWidth + 'px');
   _bindKanbanEvents();
@@ -609,17 +605,21 @@ async function _renameCol(colId, oldName) {
 
 // ── Add item to column ──
 async function _addItemToCol(colId) {
-  const subject = prompt(t('board_item_subject')||'Subject:');
-  if (!subject) return;
   const board = _boardsState.activeBoard;
   const colItems = _boardsState.items.filter(i => String(i.column_id) === String(colId));
   const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
   try {
     const created = await _boardApi('POST', '/boards/' + board.id + '/items', {
-      column_id: colId, subject, sort_order: sortOrder
+      column_id: colId, subject: t('board_new_item')||'New item', sort_order: sortOrder
     });
     _boardsState.items.push(created);
     _renderKanbanBoard();
+    // Open the newly created item for editing and focus the subject field
+    _openBoardItem(created.id);
+    setTimeout(() => {
+      const subjectEl = document.getElementById('inlineItemSubject');
+      if (subjectEl) { subjectEl.select(); subjectEl.focus(); }
+    }, 100);
   } catch (e) { alert(e.message); }
 }
 
@@ -646,6 +646,7 @@ function _openBoardItem(itemId) {
         <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:80%;border-radius:var(--radius)" value="${escHtml(item.subject)}">
       </h3>
       <div style="display:flex;gap:6px;align-items:center;margin-right:32px;flex-shrink:0">
+        <button class="btn btn-sm btn-secondary" data-action="_archiveBoardItem" data-arg="${item.id}" title="${t('board_archive')||'Archive'}" style="min-width:32px;height:28px;padding:4px 8px">📦</button>
         <button class="btn btn-sm btn-secondary" data-action="_showBoardItemHelp" title="${t('board_item_help')||'Help'}" style="min-width:32px;height:28px;padding:4px 8px">❓</button>
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
         <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
@@ -715,6 +716,44 @@ function _openBoardItem(itemId) {
       <textarea id="inlineItemNote" class="input" style="width:100%;min-height:80px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)">${escHtml(item.note||'')}</textarea>
     </div>`;
 
+  // Activities section (user-entered timestamped log)
+  html += `<div style="margin-bottom:12px">
+    <strong style="font-size:var(--fs-sm)">📋 ${t('board_activities')||'Activities'}</strong>
+    <div id="boardItemActivities" style="max-height:180px;overflow-y:auto;margin-top:4px">`;
+  for (const a of (item.activities || []).slice().reverse()) {
+    html += `<div style="padding:4px 8px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs);border-left:3px solid var(--accent)">
+      <span style="color:var(--text-dim)">${new Date(a.created_at).toLocaleString()}</span>
+      <strong style="margin-left:4px">${escHtml(a.user_name)}</strong>:
+      <span>${escHtml(a.text)}</span>
+    </div>`;
+  }
+  html += `</div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <input id="newActivityText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_add_activity')||'Log an activity...'}">
+      <button class="btn btn-sm btn-primary" data-action="_addBoardItemActivity" data-arg="${item.id}" style="padding:6px 12px">+ ${t('board_activity_add')||'Add'}</button>
+    </div>
+  </div>`;
+
+  // Comments (moved before links)
+  html += `<div style="margin-bottom:12px">
+    <strong style="font-size:var(--fs-sm)">💬 ${t('board_comments')||'Comments'} (${(item.comments||[]).length})</strong>
+    <div id="boardItemComments" style="max-height:200px;overflow-y:auto;margin-top:4px">`;
+  for (const c of (item.comments || [])) {
+    html += `<div style="padding:6px 8px;margin-bottom:4px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs)">
+      <div style="display:flex;justify-content:space-between">
+        <strong>${escHtml(c.user_name)}</strong>
+        <span style="color:var(--text-dim)">${new Date(c.created_at).toLocaleString()}</span>
+      </div>
+      <div style="margin-top:2px;white-space:pre-wrap">${escHtml(c.text)}</div>
+    </div>`;
+  }
+  html += `</div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <textarea id="newCommentText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);resize:vertical;min-height:36px" placeholder="${t('board_add_comment')||'Write a comment...'}"></textarea>
+      <button class="btn btn-sm btn-primary" data-action="_postBoardItemComment" data-arg="${item.id}" style="align-self:flex-end;padding:6px 12px">${t('board_comment_send')||'Send'}</button>
+    </div>
+  </div>`;
+
   // Links section
   html += `<div style="margin-bottom:12px">
     <strong style="font-size:var(--fs-sm)">🔗 ${t('board_links')||'Links'}</strong>
@@ -746,26 +785,6 @@ function _openBoardItem(itemId) {
     <button type="button" class="btn btn-sm btn-secondary" data-action="_uploadBoardAttachment" data-arg="${item.id}" style="min-width:32px;height:28px;padding:4px 8px">⬆ Upload</button>
   </form></div></div>`;
 
-  // Comments
-  html += `<div style="margin-bottom:12px">
-    <strong style="font-size:var(--fs-sm)">💬 ${t('board_comments')||'Comments'} (${(item.comments||[]).length})</strong>
-    <div id="boardItemComments" style="max-height:200px;overflow-y:auto;margin-top:4px">`;
-  for (const c of (item.comments || [])) {
-    html += `<div style="padding:6px 8px;margin-bottom:4px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs)">
-      <div style="display:flex;justify-content:space-between">
-        <strong>${escHtml(c.user_name)}</strong>
-        <span style="color:var(--text-dim)">${new Date(c.created_at).toLocaleString()}</span>
-      </div>
-      <div style="margin-top:2px;white-space:pre-wrap">${escHtml(c.text)}</div>
-    </div>`;
-  }
-  html += `</div>
-    <div style="display:flex;gap:4px;margin-top:6px">
-      <textarea id="newCommentText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);resize:vertical;min-height:36px" placeholder="${t('board_add_comment')||'Write a comment...'}"></textarea>
-      <button class="btn btn-sm btn-primary" data-action="_postBoardItemComment" data-arg="${item.id}" style="align-self:flex-end;padding:6px 12px">${t('board_comment_send')||'Send'}</button>
-    </div>
-  </div>`;
-
   // History
   html += `<details style="margin-bottom:8px">
     <summary style="font-size:var(--fs-sm);cursor:pointer"><strong>📜 ${t('board_history')||'History'}</strong></summary>
@@ -779,7 +798,6 @@ function _openBoardItem(itemId) {
   html += `</div></details>
 
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:12px">
-      <button class="btn btn-sm" style="margin-right:auto;color:var(--text-dim)" data-action="_archiveBoardItem" data-arg="${item.id}">📦 ${t('board_archive')||'Archive'}</button>
       <button class="btn btn-primary" data-action="_saveBoardItemAndClose" data-arg="${item.id}">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary" data-action="_cancelBoardItem">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
@@ -850,6 +868,29 @@ function _addBoardItemLink() {
 }
 
 // Post a comment on a board item
+async function _addBoardItemActivity(itemId) {
+  const textEl = document.getElementById('newActivityText');
+  const text = (textEl?.value || '').trim();
+  if (!text) return;
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+  const activities = (item.activities || []).slice();
+  const u = state.user || {};
+  activities.push({
+    text,
+    user_id: u.id || 0,
+    user_name: u.display_name || u.username || '',
+    created_at: new Date().toISOString()
+  });
+  try {
+    await _boardApi('PUT', '/board-items/' + itemId, { activities });
+    textEl.value = '';
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _openBoardItem(itemId);
+  } catch (e) { alert(e.message); }
+}
+
 async function _postBoardItemComment(itemId) {
   const textEl = document.getElementById('newCommentText');
   const text = (textEl?.value || '').trim();
