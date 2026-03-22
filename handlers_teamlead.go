@@ -139,13 +139,31 @@ func (app *App) handleTeamLeadEscalateDecision(w http.ResponseWriter, r *http.Re
 		Summary: fmt.Sprintf("Decision escalated to OpLead: %s (%s)", req.Title, req.Urgency),
 	})
 	payload, _ := json.Marshal(map[string]any{
+		"type":            "escalate_decision",
 		"decision_id":     created.ID,
 		"sequence_number": created.SequenceNumber,
 		"title":           req.Title,
+		"decision":        req.Decision,
 		"urgency":         req.Urgency,
 		"from_user":       user.DisplayName,
+		"from_role":       string(user.Role),
+		"message":         req.Decision,
+		"priority":        req.Urgency,
+		"timestamp":       time.Now().Format(time.RFC3339),
 	})
-	app.broker.BroadcastAll(SSEMessage{Event: "decision_escalated", Data: string(payload)})
+	// Send specifically to OpLead, Deputy OpLead, Admin, and anyone acting as OpLead
+	sseMsg := SSEMessage{Event: "decision_escalated", Data: string(payload)}
+	for _, u := range app.store.GetUsers() {
+		if u.ID != user.ID && (u.Role == RoleOpLead || u.Role == RoleDeputyOpLead || u.Role == RoleAdmin) {
+			app.broker.SendToUser(u.ID, sseMsg)
+		}
+	}
+	// Also send to anyone acting as OpLead via staff duties
+	for _, d := range app.store.GetStaffDuties() {
+		if (d.Role == "acting_oplead" || d.Role == "acting_deputy_oplead") && d.UserID != user.ID {
+			app.broker.SendToUser(d.UserID, sseMsg)
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)

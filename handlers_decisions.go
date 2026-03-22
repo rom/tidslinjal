@@ -203,9 +203,27 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+
+	// Authorization: only admin, oplead, deputy_oplead, or someone acting as oplead on duty
+	canReview := user.Role == RoleAdmin || user.Role == RoleOpLead || user.Role == RoleDeputyOpLead
+	if !canReview {
+		// Check if user is set as acting oplead via staff duties
+		for _, d := range app.store.GetStaffDuties() {
+			if d.UserID == user.ID && (d.Role == "acting_oplead" || d.Role == "acting_deputy_oplead") {
+				canReview = true
+				break
+			}
+		}
+	}
+	if !canReview {
+		jsonError(w, "only admin, Operations Lead, Deputy Operations Lead, or acting OpLead can review decisions", http.StatusForbidden)
+		return
+	}
+
 	var req struct {
-		Status  string `json:"status"`  // "approved" or "rejected"
-		Comment string `json:"comment"`
+		Status       string `json:"status"`        // "approved" or "rejected"
+		Comment      string `json:"comment"`
+		ApprovalType string `json:"approval_type"`  // "approved" | "approved_with_condition" | "approved_with_modification"
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -223,6 +241,13 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	if req.Status == "rejected" && strings.TrimSpace(req.Comment) == "" {
 		jsonError(w, "a reason is required when denying a decision", http.StatusBadRequest)
 		return
+	}
+	// Validate approval type
+	if req.Status == "approved" && req.ApprovalType == "" {
+		req.ApprovalType = "approved"
+	}
+	if req.Status == "approved" && req.ApprovalType != "approved" && req.ApprovalType != "approved_with_condition" && req.ApprovalType != "approved_with_modification" {
+		req.ApprovalType = "approved"
 	}
 	entries := app.store.GetDecisionLog()
 	var found *DecisionLogEntry
@@ -246,6 +271,7 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	found.ReviewedAt = &now
 	found.ReviewComment = req.Comment
 	if req.Status == "approved" {
+		found.ApprovalType = req.ApprovalType
 		found.DecidedAt = &now
 	}
 	if err := app.store.UpdateDecisionLogEntry(*found); err != nil {

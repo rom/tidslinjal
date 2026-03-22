@@ -880,6 +880,7 @@ type DecisionLogEntry struct {
 	ReviewedByName    string     `json:"reviewed_by_name,omitempty"`
 	ReviewedAt        *time.Time `json:"reviewed_at,omitempty"`
 	ReviewComment     string     `json:"review_comment,omitempty"`
+	ApprovalType      string     `json:"approval_type,omitempty"`       // "approved" | "approved_with_condition" | "approved_with_modification"
 	DecidedAt         *time.Time `json:"decided_at,omitempty"`          // when decision was actually made/approved
 	// Reason / background for the decision
 	Reason            string     `json:"reason,omitempty"`
