@@ -1502,6 +1502,17 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     dol_completion: 'Ukończenie ZKO',
     event_distribution: 'Rozkład zdarzeń',
 
+    // Dashboard
+    dashboard_title: 'Przegląd sytuacji',
+
+    // Admin user management
+    admin_change_password: 'Zmień hasło',
+    admin_change_password_confirm: 'Ustawić nowe hasło dla użytkownika „%s"?',
+    admin_password_changed: 'Hasło zostało zmienione',
+    admin_new_password: 'Nowe hasło',
+    admin_confirm_password: 'Potwierdź hasło',
+    admin_passwords_mismatch: 'Hasła nie są zgodne',
+
     // Leadership dashboard
     ld_overall_confidence: 'Ogólna pewność',
     ld_completion: 'Ukończenie',

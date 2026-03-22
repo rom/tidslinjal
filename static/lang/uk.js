@@ -1500,6 +1500,17 @@ role_editor_label_nb: '🇳🇴 NB',
     dol_completion: 'Виконання ЗКО',
     event_distribution: 'Розподіл подій',
 
+    // Dashboard
+    dashboard_title: 'Огляд ситуації',
+
+    // Admin user management
+    admin_change_password: 'Змінити пароль',
+    admin_change_password_confirm: 'Встановити новий пароль для користувача «%s»?',
+    admin_password_changed: 'Пароль успішно змінено',
+    admin_new_password: 'Новий пароль',
+    admin_confirm_password: 'Підтвердити пароль',
+    admin_passwords_mismatch: 'Паролі не збігаються',
+
     // Leadership dashboard
     ld_overall_confidence: 'Загальна впевненість',
     ld_completion: 'Виконання',

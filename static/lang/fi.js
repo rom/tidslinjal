@@ -1560,6 +1560,17 @@ TRANSLATIONS.fi = {
     tags_no_tags: 'Ei vielä tageja',
     tags_delete_confirm: 'Poistetaanko tämä tagi?',
 
+    // Dashboard
+    dashboard_title: 'Tilannekatsaus',
+
+    // Admin user management
+    admin_change_password: 'Vaihda salasana',
+    admin_change_password_confirm: 'Aseta uusi salasana käyttäjälle "%s"?',
+    admin_password_changed: 'Salasana vaihdettu onnistuneesti',
+    admin_new_password: 'Uusi salasana',
+    admin_confirm_password: 'Vahvista salasana',
+    admin_passwords_mismatch: 'Salasanat eivät täsmää',
+
     // Leadership dashboard
     ld_overall_confidence: 'Kokonaisluottamus',
     ld_completion: 'Valmistuminen',
