@@ -1139,9 +1139,6 @@ function _openBoardItem(itemId) {
   </div>`;
 
   _boardModal('boardItemModal', html, '720px');
-  // Ensure @mention dropdowns are not clipped by modal overflow
-  const itemModalDiv = document.querySelector('#boardItemModal .modal');
-  if (itemModalDiv) itemModalDiv.style.overflow = 'visible';
 
   // Bind events for elements that used to have inline handlers (CSP compliance)
   const subjectEl = document.getElementById('inlineItemSubject');
@@ -2204,18 +2201,24 @@ async function _shareBoardLink() {
 async function _shareBoardItemLink(itemId) {
   try {
     const res = await _boardApi('POST', '/board-items/' + itemId + '/share');
-    const url = window.location.origin + '/#board-item-share=' + res.share_token;
-    await navigator.clipboard.writeText(url).catch(() => {});
+    const externalUrl = window.location.origin + '/#board-item-share=' + res.share_token;
+    const boardId = _boardsState.activeBoard?.id || '';
+    const internalUrl = window.location.origin + '/#open-board-item=' + boardId + ':' + itemId;
+    await navigator.clipboard.writeText(internalUrl).catch(() => {});
     _boardModal('boardItemShareModal', `<div style="max-width:500px">
       <h3>🔗 ${t('board_share_item')||'Share Item Link'}</h3>
-      <p style="font-size:var(--fs-sm);color:var(--text-dim)">${t('board_share_item_desc')||'Anyone with an account and access to this board can use this link to view the item.'}</p>
-      <input id="boardItemShareUrl" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(url)}" readonly>
+      <p style="font-size:var(--fs-sm);color:var(--text-dim);font-weight:600;margin-bottom:4px">${t('board_internal_link')||'Internal link (within Tidslinjal)'}:</p>
+      <input id="boardItemInternalUrl" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(internalUrl)}" readonly>
+      <p style="font-size:var(--fs-sm);color:var(--text-dim);font-weight:600;margin-bottom:4px">${t('board_external_link')||'External share link'}:</p>
+      <input id="boardItemShareUrl" class="input" style="width:100%;margin-bottom:8px" value="${escHtml(externalUrl)}" readonly>
       <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('board_share_access_note')||'Access is checked: the user must be authenticated and have visibility rights to this board.'}</p>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" data-action="_copyShareUrl" data-arg="boardItemShareUrl">📋 ${t('btn_copy')||'Copy to clipboard'}</button>
+        <button class="btn btn-primary btn-sm" data-action="_copyShareUrl" data-arg="boardItemInternalUrl">📋 ${t('btn_copy_internal')||'Copy internal link'}</button>
+        <button class="btn btn-secondary btn-sm" data-action="_copyShareUrl" data-arg="boardItemShareUrl">📋 ${t('btn_copy_external')||'Copy external link'}</button>
         <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardItemShareModal">✖ ${t('btn_close')||'Close'}</button>
       </div>
-    </div>`, '520px');
+    </div>`, '560px');
+    _bindShareInput('boardItemInternalUrl');
     _bindShareInput('boardItemShareUrl');
   } catch (e) { alert(e.message); }
 }
@@ -2364,149 +2367,124 @@ window._selectTag = function(el, tag) {
 };
 
 // ── @Mention Autocomplete for board textareas and inputs ──
-let _boardMentionDropdown = null;
-let _boardMentionStart = -1;
-let _boardMentionTextarea = null;
-let _boardMentionClosing = false; // flag to prevent blur race condition
-
+// ── @mention autocomplete — uses same pattern as tag autocomplete ──
 function _setupBoardMentionAutocomplete(el) {
-  if (!el || el._boardMentionBound) return;
-  el._boardMentionBound = true;
-  el.addEventListener('input', () => _onBoardMentionInput(el));
-  el.addEventListener('keydown', (e) => _onBoardMentionKey(e, el));
-  // Use focusout with relatedTarget check to avoid race condition with clicks
-  el.addEventListener('blur', () => {
-    setTimeout(() => {
-      // Only close if focus didn't move to the dropdown
-      if (_boardMentionDropdown && !_boardMentionDropdown.contains(document.activeElement)) {
-        _closeBoardMentionDropdown();
-      }
-    }, 250);
-  });
-}
+  if (!el || el._mentionAcSetup) return;
+  el._mentionAcSetup = true;
+  let acDiv = null;
+  let mentionStart = -1;
+  let matches = [];
 
-async function _onBoardMentionInput(ta) {
-  const val = ta.value;
-  const pos = ta.selectionStart;
-  let start = pos - 1;
-  while (start >= 0 && /\w/.test(val[start])) start--;
-  if (start < 0 || val[start] !== '@') { _closeBoardMentionDropdown(); return; }
-  _boardMentionStart = start;
-  _boardMentionTextarea = ta;
-  const query = val.slice(start + 1, pos).toLowerCase();
-  // Ensure users are loaded
-  if (!state.users || !state.users.length) {
-    try {
-      const users = await (typeof apiGet === 'function' ? apiGet('/api/users') : _boardApi('GET', '/users'));
-      if (users && users.length) state.users = users;
-    } catch { /* ignore */ }
+  function getMentionContext() {
+    const val = el.value;
+    const pos = el.selectionStart;
+    // Walk backwards from cursor to find @
+    let i = pos - 1;
+    while (i >= 0 && /[\w.]/.test(val[i])) i--;
+    if (i < 0 || val[i] !== '@') return null;
+    // @ must be at start or preceded by whitespace/punctuation
+    if (i > 0 && /\w/.test(val[i - 1])) return null;
+    return { start: i, query: val.slice(i + 1, pos).toLowerCase() };
   }
-  const users = (state.users || []).filter(u =>
-    (u.username && u.username.toLowerCase().includes(query)) ||
-    (u.display_name && u.display_name.toLowerCase().includes(query))
-  ).slice(0, 8);
-  if (!users.length) { _closeBoardMentionDropdown(); return; }
-  _showBoardMentionDropdown(ta, users);
-}
 
-function _onBoardMentionKey(e, ta) {
-  if (!_boardMentionDropdown) return;
-  const items = _boardMentionDropdown.querySelectorAll('.mention-item');
-  const active = _boardMentionDropdown.querySelector('.mention-item.active');
-  let idx = Array.from(items).indexOf(active);
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    _updateBoardMentionActive(items, Math.min(idx + 1, items.length - 1));
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    _updateBoardMentionActive(items, Math.max(idx - 1, 0));
-  } else if (e.key === 'Enter' || e.key === 'Tab') {
-    // Always select the active item (first item is active by default)
-    const target = active || items[0];
-    if (target) {
-      e.preventDefault();
-      e.stopPropagation();
-      const username = target.dataset.username;
-      if (username) _insertBoardMention(username);
+  async function showSuggestions() {
+    const ctx = getMentionContext();
+    if (!ctx) { hideSuggestions(); return; }
+    mentionStart = ctx.start;
+    // Ensure users are loaded
+    if (!state.users || !state.users.length) {
+      try {
+        const users = await apiGet('/api/users');
+        if (users && users.length) state.users = users;
+      } catch { /* ignore */ }
     }
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    _closeBoardMentionDropdown();
-  }
-}
-
-function _updateBoardMentionActive(items, idx) {
-  items.forEach((it, i) => it.classList.toggle('active', i === idx));
-  const el = items[idx]; if (el) el.scrollIntoView({block:'nearest'});
-}
-
-function _showBoardMentionDropdown(ta, users) {
-  _closeBoardMentionDropdown();
-  const rect = ta.getBoundingClientRect();
-  const dd = document.createElement('div');
-  dd.id = 'boardMentionDropdown';
-  _boardMentionDropdown = dd;
-  // Position above input if near bottom of viewport, else below
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const placeAbove = spaceBelow < 220 && rect.top > 220;
-  Object.assign(dd.style, {
-    position: 'fixed', zIndex: '99999', background: 'var(--bg2)',
-    border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-    boxShadow: '0 4px 16px rgba(0,0,0,.4)', minWidth: '220px', maxHeight: '200px',
-    overflowY: 'auto',
-    left: Math.min(rect.left, window.innerWidth - 240) + 'px',
-    top: placeAbove ? '' : (rect.bottom + 2) + 'px',
-    bottom: placeAbove ? (window.innerHeight - rect.top + 2) + 'px' : ''
-  });
-  users.forEach((u, i) => {
-    const item = document.createElement('div');
-    item.className = 'mention-item' + (i === 0 ? ' active' : '');
-    item.dataset.username = u.username;
-    item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center;user-select:none';
-    item.innerHTML = `<span style="font-weight:600;color:var(--accent)">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
-    item.addEventListener('mouseover', () => {
-      dd.querySelectorAll('.mention-item').forEach(x => x.classList.remove('active'));
-      item.classList.add('active');
+    matches = (state.users || []).filter(u =>
+      (u.username && u.username.toLowerCase().includes(ctx.query)) ||
+      (u.display_name && u.display_name.toLowerCase().includes(ctx.query))
+    ).slice(0, 8);
+    if (!matches.length) { hideSuggestions(); return; }
+    if (!acDiv) {
+      acDiv = document.createElement('div');
+      acDiv.style.cssText = 'position:absolute;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);max-height:200px;overflow-y:auto;min-width:220px;width:' + el.offsetWidth + 'px;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+      el.parentNode.style.position = 'relative';
+      el.parentNode.appendChild(acDiv);
+    }
+    acDiv.innerHTML = matches.map((u, idx) =>
+      `<div class="mention-ac-item${idx===0?' active':''}" style="padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center" data-username="${escHtml(u.username)}"><span style="font-weight:600;color:var(--accent)">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span></div>`
+    ).join('');
+    acDiv.querySelectorAll('.mention-ac-item').forEach(function(item) {
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        doInsert(item.dataset.username);
+        hideSuggestions();
+      });
+      item.addEventListener('mouseover', function() {
+        acDiv.querySelectorAll('.mention-ac-item').forEach(x => x.classList.remove('active'));
+        item.classList.add('active');
+      });
     });
-    // Use mousedown with preventDefault to stop blur, then insert
-    item.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // prevents blur on the textarea/input
-      e.stopPropagation();
-      _insertBoardMention(u.username);
-    });
-    dd.appendChild(item);
-  });
-  // Add hover highlight style
-  const style = document.createElement('style');
-  style.textContent = '#boardMentionDropdown .mention-item:hover,#boardMentionDropdown .mention-item.active{background:var(--bg3)}';
-  dd.appendChild(style);
-  // Append to document.body for reliable z-index above all modals
-  document.body.appendChild(dd);
-}
-
-function _closeBoardMentionDropdown() {
-  if (_boardMentionDropdown) {
-    _boardMentionDropdown.remove();
-    _boardMentionDropdown = null;
   }
-  _boardMentionStart = -1;
-}
 
-function _insertBoardMention(username) {
-  const ta = _boardMentionTextarea;
-  if (!ta) return;
-  const startPos = _boardMentionStart;
-  if (startPos < 0) return;
-  const pos = ta.selectionStart;
-  const val = ta.value;
-  const before = val.slice(0, startPos);
-  const after = val.slice(pos);
-  const insert = '@' + username + ' ';
-  ta.value = before + insert + after;
-  const newPos = before.length + insert.length;
-  ta.setSelectionRange(newPos, newPos);
-  ta.focus();
-  _closeBoardMentionDropdown();
+  function hideSuggestions() {
+    if (acDiv) { acDiv.remove(); acDiv = null; }
+    matches = [];
+    mentionStart = -1;
+  }
+
+  function selectActive() {
+    if (!acDiv) return false;
+    const active = acDiv.querySelector('.mention-ac-item.active');
+    if (active) {
+      doInsert(active.dataset.username);
+      hideSuggestions();
+      return true;
+    }
+    if (matches.length === 1) {
+      doInsert(matches[0].username);
+      hideSuggestions();
+      return true;
+    }
+    return false;
+  }
+
+  function doInsert(username) {
+    const pos = el.selectionStart;
+    const val = el.value;
+    const before = val.slice(0, mentionStart);
+    const after = val.slice(pos);
+    const insert = '@' + username + ' ';
+    el.value = before + insert + after;
+    const newPos = before.length + insert.length;
+    el.setSelectionRange(newPos, newPos);
+    el.focus();
+  }
+
+  // Same event pattern as tag autocomplete
+  el.addEventListener('input', showSuggestions);
+  el.addEventListener('keyup', function(e) {
+    // Also trigger on keyup as fallback for some keyboard layouts
+    if (e.key === '@' || e.key === 'Backspace' || e.key === 'Delete') showSuggestions();
+  });
+  el.addEventListener('blur', () => setTimeout(hideSuggestions, 200));
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { hideSuggestions(); return; }
+    if (!acDiv) return;
+    const items = acDiv.querySelectorAll('.mention-ac-item');
+    const active = acDiv.querySelector('.mention-ac-item.active');
+    let idx = Array.from(items).indexOf(active);
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); items.forEach((it,i) => it.classList.toggle('active', i===idx)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); items.forEach((it,i) => it.classList.toggle('active', i===idx)); }
+    else if (e.key === 'Tab' || e.key === 'Enter') {
+      if (selectActive()) { e.preventDefault(); e.stopPropagation(); }
+    }
+  });
+  // Add styles once
+  if (!document.getElementById('mentionAcStyles')) {
+    const s = document.createElement('style');
+    s.id = 'mentionAcStyles';
+    s.textContent = '.mention-ac-item:hover,.mention-ac-item.active{background:var(--bg3)}';
+    document.head.appendChild(s);
+  }
 }
 
 // ── Handle Share Link on Page Load ──
@@ -2534,6 +2512,40 @@ function _handleBoardShareLinks() {
         });
       });
     }).catch(e => alert(e.message));
+  } else if (hash.startsWith('#open-board-item=')) {
+    // Internal cross-reference: #open-board-item=boardId:itemId
+    const ref = hash.substring('#open-board-item='.length);
+    window.location.hash = '';
+    const [boardIdStr, itemIdStr] = ref.split(':');
+    const boardId = parseInt(boardIdStr, 10);
+    const itemId = parseInt(itemIdStr, 10);
+    if (boardId && itemId) {
+      _boardApi('GET', '/boards/' + boardId).then(board => {
+        _boardApi('GET', '/boards/' + boardId + '/items').then(items => {
+          _boardsState.activeBoard = board;
+          _boardsState.items = items;
+          if (typeof openBoardsModal === 'function') openBoardsModal();
+          setTimeout(() => {
+            _renderKanbanBoard();
+            setTimeout(() => _openBoardItem(itemId), 300);
+          }, 300);
+        });
+      }).catch(e => { if (typeof showError === 'function') showError(e.message); });
+    }
+  } else if (hash.startsWith('#open-board=')) {
+    // Internal cross-reference: #open-board=boardId
+    const boardId = parseInt(hash.substring('#open-board='.length), 10);
+    window.location.hash = '';
+    if (boardId) {
+      _boardApi('GET', '/boards/' + boardId).then(board => {
+        _boardApi('GET', '/boards/' + boardId + '/items').then(items => {
+          _boardsState.activeBoard = board;
+          _boardsState.items = items;
+          if (typeof openBoardsModal === 'function') openBoardsModal();
+          setTimeout(() => _renderKanbanBoard(), 300);
+        });
+      }).catch(e => { if (typeof showError === 'function') showError(e.message); });
+    }
   }
 }
 
@@ -2543,6 +2555,8 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(_handleBoardShareLinks, 500);
 }
+// Listen for hash changes to handle cross-reference links in-app
+window.addEventListener('hashchange', _handleBoardShareLinks);
 
 // ── SSE listener ──
 if (typeof window._boardSSESetup === 'undefined') {

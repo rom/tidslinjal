@@ -106,8 +106,9 @@ async function openDecisionLogModal() {
                 <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
                 <button class="btn btn-sm" style="background:#2ECC71;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="approved_with_condition" data-arg-el>✓⚠ ${t('btn_approve_condition')||'Approve w/ Condition'}</button>
                 <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:3px 10px;font-size:11px;border:1px dashed #fff" data-action="addDecisionLogEntry" data-approval-type="approved_with_modification" data-arg-el>✓✏ ${t('btn_approve_modification')||'Approve w/ Modification'}</button>
+                <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="denied" data-arg-el>✗ ${t('btn_deny')||'Deny'}</button>
               ` : ''}
-              <button class="btn btn-secondary btn-sm" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
+              <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px" data-action="requestDecision">${t('btn_request_decision')||'Request Decision'}</button>
             </div>
             <div id="dlRequestTarget" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
               <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">${t('request_decision_to')||'Request decision from'}:</div>
@@ -245,12 +246,9 @@ function _toggleDecisionSort() {
 
 async function _shareDecisionLogEntry(id) {
   try {
-    const res = await apiPost('/api/decision-log/' + id + '/share', {});
-    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Failed'); }
-    const data = await res.json();
-    const url = window.location.origin + '/#decision-share=' + data.share_token;
-    await navigator.clipboard.writeText(url).catch(() => {});
-    showNotification('success', t('link_copied') || 'Share link copied to clipboard');
+    const internalUrl = window.location.origin + '/#open-decision=' + id;
+    await navigator.clipboard.writeText(internalUrl).catch(() => {});
+    showNotification('success', t('link_copied') || 'Link copied to clipboard');
   } catch (e) { showError(e.message); }
 }
 
@@ -345,7 +343,7 @@ function _renderDecisionLogEntries() {
     const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
     const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
     const borderStyle = e.deadline && e.deadline < todayStr && e.status === 'requested' ? 'border-left:3px solid var(--danger,#E74C3C);' : '';
-    return `<div style="padding:8px;border-bottom:1px solid var(--border);${borderStyle}">
+    return `<div data-decision-id="${e.id}" style="padding:8px;border-bottom:1px solid var(--border);${borderStyle}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${escHtml(e.sequence_number||'')}</span>
@@ -373,9 +371,16 @@ function _renderDecisionLogEntries() {
 
 async function addDecisionLogEntry(el) {
   const approvalType = el?.dataset?.approvalType || 'approved';
+  const isDeny = approvalType === 'denied';
   const text = document.getElementById('dlNewDecision')?.value?.trim();
   if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
   const reason = document.getElementById('dlReason')?.value?.trim() || '';
+  // Deny requires a reason
+  if (isDeny && !reason) {
+    showError(t('deny_reason_required')||'A reason is required when denying a decision');
+    document.getElementById('dlReason')?.focus();
+    return;
+  }
   // Condition/modification requires a reason describing it
   if ((approvalType === 'approved_with_condition' || approvalType === 'approved_with_modification') && !reason) {
     showError(t('decision_condition_comment_required')||'Please describe the condition or modification');
@@ -396,7 +401,8 @@ async function addDecisionLogEntry(el) {
   const coSignTargetName = coSignTargetUser ? (coSignTargetUser.display_name || coSignTargetUser.username) : '';
   const deadline = document.getElementById('dlDeadline')?.value || '';
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
-    approval_type: approvalType,
+    status: isDeny ? 'rejected' : '',
+    approval_type: isDeny ? '' : approvalType,
     executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
     reason, co_sign_required: coSignRequired, deadline,
     co_sign_target_id: coSignTargetId ? parseInt(coSignTargetId, 10) : null,
@@ -419,7 +425,7 @@ async function addDecisionLogEntry(el) {
     _bindActions(el);
     const inp = document.getElementById('dlNewDecision');
     if (inp) inp.value = '';
-    showNotification('success', t('decision_added')||'Decision recorded');
+    showNotification('success', isDeny ? (t('decision_denied')||'Decision denied') : (t('decision_added')||'Decision recorded'));
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to add decision');
@@ -530,7 +536,7 @@ async function coSignDecision(id) {
   }
 }
 
-// ── Handle Decision Share Link on Page Load ──
+// ── Handle Decision Share/Internal Link on Page Load ──
 function _handleDecisionShareLinks() {
   const hash = window.location.hash;
   if (hash.startsWith('#decision-share=')) {
@@ -542,12 +548,28 @@ function _handleDecisionShareLinks() {
       if (!res.ok) throw new Error('Access denied or invalid link');
       return res.json();
     }).then(entry => {
-      // Open the decision log modal, which loads all entries
       openDecisionLogModal();
     }).catch(e => {
       if (typeof showError === 'function') showError(e.message);
       else alert(e.message);
     });
+  } else if (hash.startsWith('#open-decision=')) {
+    // Internal cross-reference: #open-decision=<id>
+    const id = parseInt(hash.substring('#open-decision='.length), 10);
+    window.location.hash = '';
+    if (id && typeof openDecisionLogModal === 'function') {
+      openDecisionLogModal();
+      // After modal opens and entries load, scroll to the entry
+      setTimeout(() => {
+        const entry = document.querySelector(`[data-decision-id="${id}"]`);
+        if (entry) {
+          entry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          entry.style.outline = '2px solid var(--accent)';
+          entry.style.outlineOffset = '2px';
+          setTimeout(() => { entry.style.outline = ''; entry.style.outlineOffset = ''; }, 3000);
+        }
+      }, 800);
+    }
   }
 }
 if (document.readyState === 'loading') {
@@ -555,6 +577,8 @@ if (document.readyState === 'loading') {
 } else {
   setTimeout(_handleDecisionShareLinks, 1000);
 }
+// Listen for hash changes to handle cross-reference links in-app
+window.addEventListener('hashchange', _handleDecisionShareLinks);
 
 // ── Decision Log Window (detached) ───────────────────────────────────────────
 function openDetachedDecisionLog() {

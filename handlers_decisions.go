@@ -80,8 +80,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		req.LogType = "general"
 	}
 	// Validate status
-	if req.Status != "" && req.Status != "requested" {
-		jsonError(w, "status must be empty or 'requested'", http.StatusBadRequest)
+	if req.Status != "" && req.Status != "requested" && req.Status != "rejected" {
+		jsonError(w, "status must be empty, 'requested', or 'rejected'", http.StatusBadRequest)
 		return
 	}
 	// Check capability – admin always allowed
@@ -125,6 +125,15 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 	}
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
+	} else if req.Status == "rejected" {
+		entry.ReviewedBy = user.ID
+		entry.ReviewedByName = user.DisplayName
+		if entry.ReviewedByName == "" {
+			entry.ReviewedByName = user.Username
+		}
+		entry.ReviewedAt = &now
+		entry.DecidedAt = &now
+		entry.ReviewComment = req.Reason
 	} else {
 		entry.ApprovalType = req.ApprovalType
 		entry.DecidedAt = &now
