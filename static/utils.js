@@ -157,7 +157,8 @@ function getSlotHeight() {
     case 'day':     h = parseInt(s.getPropertyValue('--slot-h-day'))     || 80; break;
     default:        h = 40;
   }
-  return Math.max(6, Math.round(h * (state.zoomFactor || 1.0)));
+  const spacing = (state.preferences && state.preferences.view_spacing) || 1;
+  return Math.max(6, Math.round(h * (state.zoomFactor || 1.0) * spacing));
 }
 function getStartHourOffset() {
   return 0; // Always from midnight — full day is always rendered

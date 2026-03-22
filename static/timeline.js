@@ -246,7 +246,14 @@ function renderTimeline() {
     const isWeekend = isWeekendDay(day);
     const useSync   = synthActive();
     const showDayName = state.preferences.show_day_name !== false;
-    const dayName   = showDayName ? (useSync ? synthDayHeader(day) : localDayName(day)) : '';
+    const showDaysToEpoch = state.preferences.show_days_to_epoch !== false;
+    let dayName = '';
+    if (useSync && showDaysToEpoch) {
+      dayName = synthDayHeader(day);
+      if (showDayName) dayName += ' (' + localDayName(day) + ')';
+    } else if (showDayName) {
+      dayName = localDayName(day);
+    }
     const dayDate   = useSync
       ? `<small style="font-size:.75em;opacity:.65">${localShortDate(day)}</small>`
       : localShortDate(day);
@@ -303,10 +310,11 @@ function renderTimeline() {
         const slotTime = new Date(days[0]);
         slotTime.setHours(0, slotMin, 0, 0);
         const hoursOn = synthElapsedHours(synthEpoch.getTime(), slotTime.getTime());
+        const synthColor = (state.preferences || {}).red_line_color || '#E74C3C';
         if (hoursOn >= 0) {
-          synthSpan = `<span class="synth-inline">H+${hoursOn}</span>`;
+          synthSpan = `<span class="synth-inline" style="color:${synthColor}">H+${hoursOn}</span>`;
         } else {
-          synthSpan = `<span class="synth-inline" style="color:var(--text-dim)">H${hoursOn}</span>`;
+          synthSpan = `<span class="synth-inline" style="color:${synthColor};opacity:0.5">H${hoursOn}</span>`;
         }
       }
     }

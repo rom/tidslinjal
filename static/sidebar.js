@@ -2915,6 +2915,13 @@ Fields: file, subject, sender, type, tags</pre>
           <span title="${t('settings_show_day_name_info')||'Display the weekday name (e.g. Monday, Tuesday) in timeline column headers.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
+          <input type="checkbox" id="prefShowDaysToEpoch" ${p.show_days_to_epoch!==false?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_days_to_epoch"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_days_to_epoch')||'Days to epoch (Day N)'}
+          <span title="${t('settings_show_days_to_epoch_info')||'Show the day count relative to exercise epoch (Day -2, Day 0, Day 1, etc.) in the timeline header when synthetic time is active.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
           <input type="checkbox" id="prefShowWelcomeMessage" ${p.show_welcome_message!==false?'checked':''}
             data-action="setPref" data-event="change" data-pref-checked="show_welcome_message"
             style="width:14px;height:14px;accent-color:var(--accent)">

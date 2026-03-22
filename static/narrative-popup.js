@@ -125,11 +125,15 @@ function applyI18n() {
 }
 
 // Set default date range (last 24h)
+function fmtLocalDatetime(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
 function initDateRange() {
   const now = new Date();
   const from = new Date(now.getTime() - 24*60*60*1000);
-  document.getElementById('nrFrom').value = from.toISOString().slice(0,16);
-  document.getElementById('nrTo').value = now.toISOString().slice(0,16);
+  document.getElementById('nrFrom').value = fmtLocalDatetime(from);
+  document.getElementById('nrTo').value = fmtLocalDatetime(now);
 }
 
 async function loadEntries() {
@@ -166,7 +170,8 @@ function render(entries) {
     return newestFirst ? (tb - ta) : (ta - tb);
   });
   el.innerHTML = sorted.map(e => {
-    const timeStr = new Date(e.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    const _d = new Date(e.timestamp);
+    const timeStr = _d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + ' ' + _d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
     const severityColor = severityColors[e.severity] || 'var(--text-dim)';
     let icon = '•';
     for (const [prefix, ic] of Object.entries(typeIcons)) {
@@ -227,7 +232,7 @@ setInterval(function() {
 
 // SSE: listen for relevant events and re-fetch
 try {
-  var _nrSSE = new EventSource('/api/events');
+  var _nrSSE = new EventSource('/api/notifications/stream');
   _nrSSE.onmessage = function(ev) {
     try {
       var data = JSON.parse(ev.data);

@@ -1968,7 +1968,7 @@ async function openPollModal(opts) {
   ];
 
   modal.innerHTML = `
-    <div class="modal" style="max-width:950px;width:90vw">
+    <div class="modal" style="max-width:1200px;width:95vw">
       <div class="modal-header">
         <h3>📊 ${t('poll_title')||'Poll / Multipoll'}</h3>
         <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
@@ -2207,7 +2207,16 @@ async function openPollModal(opts) {
         const isPollTimed = modal.querySelector('#pollTimedCheck')?.checked || false;
         const pollTimedVal = isPollTimed ? modal.querySelector('#pollTimedDateTime')?.value : null;
         if (isPollTimed && pollTimedVal) {
-          payload.scheduled_at = new Date(pollTimedVal).toISOString();
+          const scheduledDate = new Date(pollTimedVal);
+          if (isNaN(scheduledDate.getTime()) || scheduledDate.getFullYear() < 2000) {
+            showError(t('poll_invalid_schedule_date')||'Invalid scheduled date. Please use a valid future date.');
+            return;
+          }
+          if (scheduledDate <= new Date()) {
+            showError(t('poll_schedule_past')||'Scheduled date must be in the future.');
+            return;
+          }
+          payload.scheduled_at = scheduledDate.toISOString();
         }
         // Reminder
         const reminderMins = parseInt(modal.querySelector('#pollReminderMins')?.value || '0', 10);
@@ -2230,6 +2239,14 @@ async function openPollModal(opts) {
           throw new Error(errMsg);
         }
         showNotification('success',t('poll_created')||'Poll created successfully');
+        // Collapse create pane and clear fields after successful creation
+        const createBody = modal.querySelector('#pollCreateBody');
+        const createToggle = modal.querySelector('#pollCreateToggle');
+        if (createBody) createBody.style.display = 'none';
+        if (createToggle) createToggle.textContent = '▶';
+        modal.querySelector('#pollTitleInput').value = '';
+        const qList = modal.querySelector('#pollQuestionList');
+        if (qList) qList.innerHTML = '';
         _loadPolls(modal);
       } catch (e) { showError(e.message); }
     });
