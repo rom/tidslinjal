@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -645,7 +646,7 @@ func (app *App) handleGetDecisionLogByShareToken(w http.ResponseWriter, r *http.
 	}
 	entries := app.store.GetDecisionLog()
 	for _, e := range entries {
-		if e.ShareToken != "" && e.ShareToken == token {
+		if e.ShareToken != "" && subtle.ConstantTimeCompare([]byte(e.ShareToken), []byte(token)) == 1 {
 			// Check access: confidential entries require capability
 			if e.Confidential && !app.userHasCapability(user, "confidential_read") && user.Role != RoleAdmin {
 				jsonError(w, "forbidden", http.StatusForbidden)

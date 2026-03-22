@@ -98,6 +98,11 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 	if safeFilename == "." || safeFilename == "/" {
 		safeFilename = "upload"
 	}
+	// V-31 fix: reject dangerous file types (e.g. .exe, .js, .html, .sh)
+	if isDangerousFilename(safeFilename) {
+		jsonError(w, "file type not allowed", http.StatusBadRequest)
+		return
+	}
 	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeFilename)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
 	dst, err := os.Create(destPath)

@@ -176,10 +176,8 @@ type UserPublic struct {
 	LoginCount        int        `json:"login_count"`
 	LastFailedLoginAt *time.Time `json:"last_failed_login_at,omitempty"`
 	LastFailedLoginIP string     `json:"last_failed_login_ip,omitempty"`
-	// Previous login tracking
-	PrevLoginAt     *time.Time `json:"prev_login_at,omitempty"`
-	PrevLoginIP     string     `json:"prev_login_ip,omitempty"`
-	PrevLoginDomain string     `json:"prev_login_domain,omitempty"`
+	// Previous login tracking (IP/Domain omitted from public view — V-34 fix)
+	PrevLoginAt *time.Time `json:"prev_login_at,omitempty"`
 	IsOIDC            bool       `json:"is_oidc,omitempty"`
 	Blocked           bool       `json:"blocked,omitempty"`
 	MustChangePassword bool      `json:"must_change_password,omitempty"`
@@ -217,9 +215,8 @@ func (u *User) Public() UserPublic {
 		LoginCount:        u.LoginCount,
 		LastFailedLoginAt: u.LastFailedLoginAt,
 		// V-26 fix: LastFailedLoginIP omitted from public view to prevent IP leakage
-		PrevLoginAt:       u.PrevLoginAt,
-		PrevLoginIP:       u.PrevLoginIP,
-		PrevLoginDomain:   u.PrevLoginDomain,
+		// V-34 fix: PrevLoginIP and PrevLoginDomain omitted from public view
+		PrevLoginAt: u.PrevLoginAt,
 		IsOIDC:            u.IsOIDC,
 		Blocked:          u.Blocked,
 		MustChangePassword: u.MustChangePassword,
