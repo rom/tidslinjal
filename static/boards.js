@@ -40,6 +40,28 @@ function _closeBoardModal(id) {
   if (el) el.remove();
 }
 
+// ── Translate well-known column names ──
+// Board columns are user-defined, but default/template column names can be translated
+function _tColName(name) {
+  const key = {
+    'open': 'board_col_open',
+    'in progress': 'board_col_in_progress',
+    'closed': 'board_col_closed',
+    'done': 'board_col_closed',
+    'archived': 'board_col_archived',
+    'reported': 'board_col_reported',
+    'triaging': 'board_col_triaging',
+    'resolved': 'board_col_resolved',
+    'planned': 'board_col_planned',
+    'preparing': 'board_col_preparing',
+    'completed': 'board_col_completed',
+    'requested': 'board_col_requested',
+    'approved': 'board_col_approved',
+    'deployed': 'board_col_deployed',
+  }[name.toLowerCase()];
+  return key ? (t(key) || name) : name;
+}
+
 // ── Modal helper (creates dynamic overlay modals) ──
 function _boardModal(id, content, width) {
   let el = document.getElementById(id);
@@ -506,7 +528,7 @@ function _renderKanbanBoard() {
     <div class="kanban-col-tabs" style="display:none">
       ${board.columns.map((col, i) => {
         const cnt = (colItems[String(col.id)] || []).length;
-        return `<button class="kanban-col-tab${i===0?' active':''}" data-col-tab="${col.id}">${escHtml(col.name)} (${cnt})</button>`;
+        return `<button class="kanban-col-tab${i===0?' active':''}" data-col-tab="${col.id}">${escHtml(_tColName(col.name))} (${cnt})</button>`;
       }).join('')}
       ${archivedItems.length > 0 ? `<button class="kanban-col-tab" data-col-tab="_archived">📦 (${archivedItems.length})</button>` : ''}
     </div>
@@ -517,14 +539,14 @@ function _renderKanbanBoard() {
     const cItems = colItems[String(col.id)] || [];
     if (collapsed) {
       html += `<div class="kanban-col kanban-col-collapsed" style="min-width:40px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:pointer;writing-mode:vertical-rl;text-orientation:mixed" data-action="_toggleColCollapse" data-arg="${col.id}">
-        <strong>${escHtml(col.name)} (${cItems.length})</strong>
+        <strong>${escHtml(_tColName(col.name))} (${cItems.length})</strong>
       </div>`;
     } else {
       const colBg = col.color ? col.color : 'var(--bg2)';
       const colBorder = col.color ? `border:1px solid ${col.color};` : 'border:1px solid var(--border);';
       html += `<div class="kanban-col" data-col="${col.id}" data-drop-col="${col.id}" style="min-width:240px;max-width:320px;flex:1;background:${colBg};${colBorder}border-radius:var(--radius);padding:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(col.name)} (${cItems.length})</strong>
+          <strong style="cursor:pointer" data-dblclick-rename="${col.id}" data-col-name="${escHtml(col.name)}">${escHtml(_tColName(col.name))} (${cItems.length})</strong>
           <div style="display:flex;gap:4px">
             <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_addItemToCol" data-arg="${col.id}" title="${t('board_add_item')||'Add item'}">+</button>
             ${board.show_archival !== false && cItems.length > 0 ? `<button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_archiveColumnItems" data-arg="${col.id}" title="${t('board_archive_col')||'Archive all items in this column'}">📦</button>` : ''}
@@ -935,7 +957,7 @@ function _openBoardItem(itemId) {
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:var(--fs-sm);margin-bottom:14px">
-      <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(colName)}</div>
+      <div><strong>${t('board_column')||'Column'}:</strong> ${escHtml(_tColName(colName))}</div>
       <div><strong>${t('board_created')||'Created'}:</strong> ${new Date(item.created_at).toLocaleString()}</div>
 
       <div style="display:flex;align-items:center;gap:6px">
@@ -1391,26 +1413,26 @@ function _cancelBoardItem() {
 // Help dialog for board item editing
 function _showBoardItemHelp() {
   const helpHtml = `<div style="max-width:540px">
-    <h3 style="margin-bottom:10px">Item Editor — Quick Reference</h3>
+    <h3 style="margin-bottom:10px">${t('board_item_help_title')||'How to Edit Items'}</h3>
     <div style="font-size:var(--fs-sm);line-height:1.6">
-      <p><strong>Subject:</strong> Click the title field at the top to edit the item name. This is what appears on the card.</p>
-      <p><strong>Type:</strong> Categorize the item as Task, Meeting, Checklist, Issue, Note, or Other. An icon appears on the card to help identify it visually.</p>
-      <p><strong>Responsible:</strong> Assign who is responsible for this item. Defaults to the person who created it. The name is shown on the card.</p>
-      <p><strong>Priority:</strong> Set Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically to indicate urgency.</p>
-      <p><strong>Due Date:</strong> Set a deadline. Cards show the date — overdue items turn red, items due within 2 days show orange.</p>
-      <p><strong>Tags:</strong> Type a tag and press <strong>comma</strong> or <strong>Enter</strong> to create it. Tags appear as colored chips. Click the × to remove. Previously used tags are suggested as you type.</p>
-      <p><strong>Notes:</strong> Free-text area for detailed information. Supports @mentions.</p>
-      <p><strong>Activity Log:</strong> Record timestamped actions. Each entry shows who did what and when. Great for tracking progress. Supports @mentions.</p>
-      <p><strong>Comments:</strong> Discussion thread on the item. Saved immediately when you click Send.</p>
-      <p><strong>Related Items:</strong> Link to other items on the same board. Relationships go both ways — linking A to B also links B to A.</p>
-      <p><strong>Links:</strong> Attach external URLs with optional labels.</p>
-      <p><strong>Attachments:</strong> Upload and download files attached to this item.</p>
-      <p><strong>@Mentions:</strong> Type <strong>@</strong> followed by a name in notes, comments, or activities. Use arrow keys and Enter/Tab to select, or click a name from the dropdown.</p>
-      <p><strong>Saving:</strong> Click <strong>Save</strong> to save all changes, or <strong>Cancel</strong> to discard. Comments and activities are saved immediately when submitted.</p>
-      <p><strong>Archive:</strong> Use the 📦 button to archive this item. It moves to the Archived column and can be restored later.</p>
+      <p><strong>${t('board_item_subject')||'Subject'}:</strong> ${t('board_help_subject_text')||'Click the title field at the top to edit the item name. This is what appears on the card.'}</p>
+      <p><strong>${t('board_type')||'Type'}:</strong> ${t('board_help_type_text')||'Categorize the item as Task, Meeting, Checklist, Issue, Note, or Other. An icon appears on the card to help identify it visually.'}</p>
+      <p><strong>${t('board_responsible')||'Responsible'}:</strong> ${t('board_help_responsible_text')||'Assign who is responsible for this item. Defaults to the person who created it. The name is shown on the card.'}</p>
+      <p><strong>${t('board_priority')||'Priority'}:</strong> ${t('board_help_priority_text')||'Set Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically to indicate urgency.'}</p>
+      <p><strong>${t('board_due_date')||'Due Date'}:</strong> ${t('board_help_due_text')||'Set a deadline. Cards show the date — overdue items turn red, items due within 2 days show orange.'}</p>
+      <p><strong>${t('board_help_tags_label')||'Tags'}:</strong> ${t('board_help_tags_text')||'Type a tag and press comma or Enter to create it. Tags appear as colored chips. Click the × to remove. Previously used tags are suggested as you type.'}</p>
+      <p><strong>${t('board_note')||'Note'}:</strong> ${t('board_help_notes_text')||'Free-text area for detailed information. Supports @mentions.'}</p>
+      <p><strong>${t('board_activities_title')||'Activity Log'}:</strong> ${t('board_help_activity_text')||'Record timestamped actions. Each entry shows who did what and when. Great for tracking progress. Supports @mentions.'}</p>
+      <p><strong>${t('board_comments')||'Comments'}:</strong> ${t('board_help_comments_text')||'Discussion thread on the item. Saved immediately when you click Send.'}</p>
+      <p><strong>${t('board_related_items')||'Related Items'}:</strong> ${t('board_help_related_text')||'Link to other items on the same board. Relationships go both ways — linking A to B also links B to A.'}</p>
+      <p><strong>${t('board_links')||'Links'}:</strong> ${t('board_help_links_text')||'Attach external URLs with optional labels.'}</p>
+      <p><strong>${t('board_attachments')||'Attachments'}:</strong> ${t('board_help_attachments_text')||'Upload and download files attached to this item.'}</p>
+      <p><strong>${t('board_help_mentions_label')||'@Mentions'}:</strong> ${t('board_help_mentions_text')||'Type @ followed by a name in notes, comments, or activities. Use arrow keys and Enter/Tab to select, or click a name from the dropdown.'}</p>
+      <p><strong>${t('board_help_saving_label')||'Saving'}:</strong> ${t('board_help_saving_text')||'Click Save to save all changes, or Cancel to discard. Comments and activities are saved immediately when submitted.'}</p>
+      <p><strong>${t('board_archive')||'Archive'}:</strong> ${t('board_help_archive_text')||'Use the 📦 button to archive this item. It moves to the Archived column and can be restored later.'}</p>
     </div>
     <div style="margin-top:12px;text-align:right;border-top:1px solid var(--border);padding-top:8px">
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">Close</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">${t('btn_close')||'Close'}</button>
     </div>
   </div>`;
   _boardModal('boardItemHelpModal', helpHtml, '560px');
@@ -1419,66 +1441,47 @@ function _showBoardItemHelp() {
 // Help dialog for the board view
 function _showBoardHelp() {
   const helpHtml = `<div style="max-width:640px">
-    <h3 style="margin-bottom:12px">Kanban Board — User Guide</h3>
+    <h3 style="margin-bottom:12px">${t('board_guide_title')||'Kanban Board — User Guide'}</h3>
     <div style="font-size:var(--fs-sm);line-height:1.7">
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Getting Started</h4>
-      <p>Boards are Kanban-style task trackers for organizing work. Each board has columns that represent stages in your workflow (e.g. To Do, In Progress, Done). Cards in these columns represent individual tasks or items.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_getting_started')||'Getting Started'}</h4>
+      <p>${t('board_guide_getting_started_text')||'Boards are Kanban-style task trackers for organizing work. Each board has columns that represent stages in your workflow (e.g. To Do, In Progress, Done). Cards in these columns represent individual tasks or items.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Working with Columns</h4>
-      <p><strong>Rename:</strong> Double-click any column header to rename it.</p>
-      <p><strong>Collapse:</strong> Click the <strong>−</strong> button to collapse a column and save space. Click the collapsed column to expand it again.</p>
-      <p><strong>Add/remove columns:</strong> Open Board Settings (⚙) to add, remove, or reorder columns.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_columns')||'Working with Columns'}</h4>
+      <p>${t('board_guide_columns_text')||'<strong>Rename:</strong> Double-click any column header to rename it.<br><strong>Collapse:</strong> Click the <strong>−</strong> button to collapse a column and save space. Click the collapsed column to expand it again.<br><strong>Add/remove columns:</strong> Open Board Settings (⚙) to add, remove, or reorder columns.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Creating and Editing Items</h4>
-      <p><strong>New item:</strong> Click <strong>+</strong> at the top of any column. An empty item opens immediately — just start typing the subject.</p>
-      <p><strong>Edit item:</strong> Click any card to open the detail editor where you can set:</p>
-      <ul style="margin:4px 0 8px 16px;padding:0">
-        <li><strong>Subject</strong> — the title displayed on the card</li>
-        <li><strong>Type</strong> — Task, Meeting, Checklist, Issue, Note, or Other (defaults to Task)</li>
-        <li><strong>Responsible</strong> — the person assigned to this item (defaults to the creator)</li>
-        <li><strong>Priority</strong> — Normal, Low (blue), High (orange), or Critical (red). Card color changes to match.</li>
-        <li><strong>Due Date</strong> — overdue items are highlighted in red on the board</li>
-        <li><strong>Tags</strong> — type a tag and press <strong>comma</strong> or <strong>Enter</strong> to create a chip. Click × to remove. Autocomplete suggests previously used tags.</li>
-        <li><strong>Notes</strong> — free-text notes with @mention support</li>
-      </ul>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_items')||'Creating and Editing Items'}</h4>
+      <p>${t('board_guide_items_text')||'Click <strong>+</strong> at the top of any column to create a new item. Click any card to open the detail editor where you can set subject, type, responsible, priority, due date, tags, and notes.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Activity Log</h4>
-      <p>Record what was done on an item. Each entry is automatically timestamped with your name. Use <strong>@username</strong> to mention team members. This creates an audit trail of actions taken.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_activities_title')||'Activity Log'}</h4>
+      <p>${t('board_guide_activity_text')||'Record what was done on an item. Each entry is automatically timestamped with your name. Use <strong>@username</strong> to mention team members. This creates an audit trail of actions taken.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Comments</h4>
-      <p>Add discussion comments to items. Comments are displayed chronologically and can also use @mentions.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_comments')||'Comments'}</h4>
+      <p>${t('board_guide_comments_text')||'Add discussion comments to items. Comments are displayed chronologically and can also use @mentions.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Related Items</h4>
-      <p>Link items that are related to each other. Relationships are bidirectional — linking item A to item B also links B back to A. Useful for tracking dependencies or grouping related tasks.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_related_items')||'Related Items'}</h4>
+      <p>${t('board_guide_related_text')||'Link items that are related to each other. Relationships are bidirectional — linking item A to item B also links B back to A. Useful for tracking dependencies or grouping related tasks.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">@Mentions</h4>
-      <p>In Notes, Comments, and Activities, type <strong>@</strong> followed by a username. A dropdown appears — use arrow keys and <strong>Enter</strong> or <strong>Tab</strong> to select, or click a name directly.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_mentions')||'@Mentions'}</h4>
+      <p>${t('board_guide_mentions_text')||'In Notes, Comments, and Activities, type <strong>@</strong> followed by a username. A dropdown appears — use arrow keys and <strong>Enter</strong> or <strong>Tab</strong> to select, or click a name directly.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Drag and Drop</h4>
-      <p>Drag cards between columns to move them through the workflow. You can also reorder cards within the same column by dragging up or down. Hold and drag the board background to scroll horizontally.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_dragdrop')||'Drag and Drop'}</h4>
+      <p>${t('board_guide_dragdrop_text')||'Drag cards between columns to move them through the workflow. You can also reorder cards within the same column by dragging up or down. Hold and drag the board background to scroll horizontally.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Archiving</h4>
-      <p>Click <strong>📦 Archive</strong> on an item to archive it, or use the 📦 button on a column header to archive all items in that column. Archived items appear in a separate column on the right and can be restored or permanently deleted.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_archiving')||'Archiving'}</h4>
+      <p>${t('board_guide_archiving_text')||'Click 📦 Archive on an item to archive it, or use the 📦 button on a column header to archive all items in that column. Archived items appear in a separate column on the right and can be restored or permanently deleted.'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Toolbar</h4>
-      <ul style="margin:4px 0 8px 16px;padding:0">
-        <li><strong>🔗 Share</strong> — generate a shareable link (recipients need authentication and board access)</li>
-        <li><strong>⧉ Detach</strong> — open the board in a separate browser window</li>
-        <li><strong>🖨 Print</strong> — print the current board view</li>
-        <li><strong>⬇ Export</strong> — export as JSON, CSV, SVG, or PDF</li>
-        <li><strong>⬆ Import</strong> — import boards from JSON or CSV files</li>
-        <li><strong>Zoom +/−</strong> — scale the board view (25%–200%)</li>
-      </ul>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_guide_toolbar')||'Toolbar'}</h4>
+      <p>${t('board_guide_toolbar_text')||'<strong>🔗 Share</strong> — generate a shareable link. <strong>⧉ Detach</strong> — open in a separate window. <strong>🖨 Print</strong> — print the board. <strong>⬇ Export</strong> — export as JSON, CSV, SVG, or PDF. <strong>⬆ Import</strong> — import from JSON or CSV. <strong>Zoom +/−</strong> — scale the view (25%–200%).'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Visibility and Access</h4>
-      <p>Boards can be Private (only you), Group (shared with a group), Role-based (shared with a role), or Global (visible to everyone). Set visibility in Board Settings (⚙).</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_visibility')||'Visibility'}</h4>
+      <p>${t('board_guide_visibility_text')||'Boards can be Private (only you), Group (shared with a group), Role-based (shared with a role), or Global (visible to everyone). Set visibility in Board Settings (⚙).'}</p>
 
-      <h4 style="margin:14px 0 6px;color:var(--accent)">Saving</h4>
-      <p>Click <strong>Save</strong> to save changes and close the item editor. Click <strong>Cancel</strong> to discard unsaved changes. Comments and activities are saved immediately when you submit them.</p>
+      <h4 style="margin:14px 0 6px;color:var(--accent)">${t('board_help_saving_label')||'Saving'}</h4>
+      <p>${t('board_guide_saving_text')||'Click Save to save changes and close the item editor. Click Cancel to discard unsaved changes. Comments and activities are saved immediately when you submit them.'}</p>
     </div>
     <div style="margin-top:14px;text-align:right;border-top:1px solid var(--border);padding-top:10px">
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardHelpModal">Close</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardHelpModal">${t('btn_close')||'Close'}</button>
     </div>
   </div>`;
   _boardModal('boardHelpModal', helpHtml, '660px');
