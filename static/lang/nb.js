@@ -1788,6 +1788,13 @@ TRANSLATIONS.nb = {
 
     // Dashboard
     dashboard_title: 'Situasjonsoversikt',
+    dashboard_clock: 'Klokke',
+    dashboard_boards: 'Tavleoversikt',
+    dashboard_decisions: 'Siste beslutninger',
+    settings_quick_response_receiver: 'Mottaker av hurtigsvar',
+    settings_quick_response_receiver_desc: 'Velg hvilke roller og grupper som skal motta blitsvarsler ved hurtigsvar eller eskalering.',
+    settings_qr_roles: 'Roller',
+    settings_qr_groups: 'Grupper',
 
     // Admin user management
     admin_change_password: 'Endre passord',

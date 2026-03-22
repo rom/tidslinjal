@@ -167,6 +167,27 @@ function connectSSE() {
       }
     } catch {}
   });
+  // Quick response from TeamLead — show flash notification
+  es.addEventListener('teamlead_quick_response', e => {
+    try {
+      const data = JSON.parse(e.data);
+      _showFlashAlert(data);
+    } catch {}
+  });
+  // Decision escalated — show flash notification
+  es.addEventListener('decision_escalated', e => {
+    try {
+      const data = JSON.parse(e.data);
+      _showFlashAlert(data);
+    } catch {}
+  });
+  // Quick report received
+  es.addEventListener('quick_report', e => {
+    try {
+      const data = JSON.parse(e.data);
+      _showFlashAlert(data);
+    } catch {}
+  });
   es.onopen = () => { _sseReconnectAttempts = 0; };
   es.onerror = () => {
     if (_sseConnection === es) {
@@ -179,5 +200,74 @@ function connectSSE() {
     _sseReconnectAttempts++;
     setTimeout(connectSSE, baseDelay + jitter);
   };
+}
+
+// ── Flash Alert for quick response / escalation / quick report ──
+function _showFlashAlert(data) {
+  const type = data.type || 'notification';
+  const priority = data.priority || 'high';
+  const from = data.from_user || '';
+  const role = data.from_role || '';
+  const message = data.message || data.title || data.subject || '';
+  const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) : '';
+
+  // Color based on type/priority
+  const colors = {
+    quick_response: { bg: '#E74C3C', border: '#C0392B', icon: '🚨' },
+    escalate_decision: { bg: '#E67E22', border: '#D35400', icon: '⬆' },
+    quick_report: { bg: '#3498DB', border: '#2980B9', icon: '📋' },
+  };
+  const c = colors[type] || colors.quick_response;
+  if (priority === 'critical') { c.bg = '#C0392B'; c.border = '#922B21'; }
+
+  const typeLabels = {
+    quick_response: t('tl_quick_response') || 'Quick Response needed!',
+    escalate_decision: t('tl_escalate_decision') || 'Decision needed — Escalated',
+    quick_report: t('tl_quick_report') || 'Quick Report',
+  };
+  const typeLabel = typeLabels[type] || type;
+
+  // Create flash overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'flash-alert-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;animation:flashPulse 0.5s ease-in-out';
+
+  overlay.innerHTML = `
+    <div style="background:${c.bg};color:#fff;border:3px solid ${c.border};border-radius:12px;padding:24px 32px;max-width:500px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:flashBounce 0.4s ease-out">
+      <div style="font-size:32px;margin-bottom:8px">${c.icon}</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px">${escHtml(typeLabel)}</div>
+      <div style="font-size:14px;margin-bottom:12px;line-height:1.6">${escHtml(message)}</div>
+      <div style="font-size:12px;opacity:.8;margin-bottom:16px">${t('from')||'From'}: <strong>${escHtml(from)}</strong>${role ? ' (' + escHtml(role) + ')' : ''} ${timestamp ? '· ' + timestamp : ''}</div>
+      <button style="background:rgba(255,255,255,.25);color:#fff;border:2px solid rgba(255,255,255,.5);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-dismiss-btn">${t('btn_dismiss')||'Dismiss'}</button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  // Play alert sound
+  _playNotifBellSound();
+
+  // Auto-dismiss after 15 seconds
+  const timer = setTimeout(() => overlay.remove(), 15000);
+  overlay.querySelector('.flash-dismiss-btn').addEventListener('click', () => {
+    clearTimeout(timer);
+    overlay.remove();
+  });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) { clearTimeout(timer); overlay.remove(); }
+  });
+
+  // Browser notification
+  if (Notification.permission === 'granted') {
+    try { new Notification('Tidslinjal — ' + typeLabel, { body: message + (from ? '\n' + (t('from')||'From') + ': ' + from : ''), icon: '/static/favicon.ico' }); } catch {}
+  }
+
+  // Add CSS animation if not present
+  if (!document.getElementById('flashAlertStyles')) {
+    const style = document.createElement('style');
+    style.id = 'flashAlertStyles';
+    style.textContent = `@keyframes flashPulse { 0% { opacity:0 } 100% { opacity:1 } }
+      @keyframes flashBounce { 0% { transform:scale(.8);opacity:0 } 50% { transform:scale(1.05) } 100% { transform:scale(1);opacity:1 } }`;
+    document.head.appendChild(style);
+  }
 }
 

@@ -3556,6 +3556,20 @@ async function setTickerCount(value) {
   await savePreferences();
 }
 
+async function _saveQRRoles() {
+  const roles = [...document.querySelectorAll('.prefQRRole:checked')].map(cb => cb.value);
+  state.preferences.quick_response_roles = roles;
+  await savePreferences();
+  renderSidebar();
+}
+
+async function _saveQRGroups() {
+  const groups = [...document.querySelectorAll('.prefQRGroup:checked')].map(cb => parseInt(cb.value, 10));
+  state.preferences.quick_response_groups = groups;
+  await savePreferences();
+  renderSidebar();
+}
+
 async function setTooltipDelay(value) {
   state.preferences.tooltip_delay = parseInt(value, 10) || 0;
   document.documentElement.style.setProperty('--tooltip-delay', state.preferences.tooltip_delay + 'ms');

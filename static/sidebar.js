@@ -2962,6 +2962,47 @@ Fields: file, subject, sender, type, tags</pre>
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🚨 ${t('settings_quick_response_receiver')||'Quick Response Receiver'} <span title="${t('settings_quick_response_receiver_info')||'Configure who receives quick response and decision-needed alerts from the TeamLead Toolbox.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_quick_response_receiver_desc')||'Choose which roles and groups should receive flash alerts when a quick response or escalation is sent.'}</p>
+        <div style="margin-bottom:6px">
+          <label style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim)">${t('settings_qr_roles')||'Roles'}:</label>
+          <div id="prefQRRoles" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${(() => {
+              const currentRoles = (p.quick_response_roles || []);
+              const builtinRoles = [
+                {key:'observer', label:'Observer'}, {key:'read', label:'Read'},
+                {key:'reporter', label:'Reporter'}, {key:'teammember', label:'Team Member'},
+                {key:'teamlead', label:'Team Lead'}, {key:'deputy_teamlead', label:'Deputy Team Lead'},
+                {key:'oplead', label:'Operations Lead'}, {key:'deputy_oplead', label:'Deputy Operations Lead'},
+                {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staff_assistant', label:'Staff Assistant'},
+                {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
+              ];
+              const allRoles = [...builtinRoles];
+              (state.roleConfigs || []).forEach(rc => {
+                if (!allRoles.find(r => r.key === rc.key)) allRoles.push({key: rc.key, label: rc.display_name || rc.key});
+              });
+              return allRoles.map(r => {
+                const active = currentRoles.includes(r.key);
+                return '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;font-size:var(--fs-xs);white-space:nowrap;' + (active ? 'background:var(--accent-muted,rgba(0,120,255,.12));border-color:var(--accent)' : '') + '">' +
+                  '<input type="checkbox" class="prefQRRole" value="' + escHtml(r.key) + '" ' + (active ? 'checked' : '') + ' data-action="_saveQRRoles" data-event="change" style="accent-color:var(--accent);width:12px;height:12px">' +
+                  (getRoleDisplayName(r.key) || r.label) + '</label>';
+              }).join('');
+            })()}
+          </div>
+        </div>
+        <div>
+          <label style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim)">${t('settings_qr_groups')||'Groups'}:</label>
+          <div id="prefQRGroups" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${(state.groups||[]).map(g => {
+              const active = (p.quick_response_groups || []).includes(g.id);
+              return '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;font-size:var(--fs-xs);white-space:nowrap;' + (active ? 'background:var(--accent-muted,rgba(0,120,255,.12));border-color:var(--accent)' : '') + '">' +
+                '<input type="checkbox" class="prefQRGroup" value="' + g.id + '" ' + (active ? 'checked' : '') + ' data-action="_saveQRGroups" data-event="change" style="accent-color:var(--accent);width:12px;height:12px">' +
+                escHtml(g.name) + '</label>';
+            }).join('') || '<span style="font-size:var(--fs-xs);color:var(--text-dim)">No groups</span>'}
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'} <span title="${t('settings_view_spacing_info')||'Adjust the vertical spacing between rows on the timeline.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Vertical spacing multiplier for timeline rows.'}</p>
         <div class="toggle-btn-group">

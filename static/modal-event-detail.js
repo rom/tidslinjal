@@ -398,19 +398,27 @@ function renderCommentContent(text) {
 let _mentionDropdown = null;
 let _mentionStart = -1;
 let _mentionCursorPos = -1; // Save cursor position for click handling
+let _mentionTextarea = null; // Track which textarea is active
 
 function _attachMentionAutocomplete(textarea) {
   if (!textarea || textarea._mentionBound) return;
   textarea._mentionBound = true;
 
-  textarea.addEventListener('input', _onMentionInput);
+  textarea.addEventListener('input', function() { _onMentionInput(this); });
   textarea.addEventListener('keydown', _onMentionKey);
-  textarea.addEventListener('blur', () => { setTimeout(_closeMentionDropdown, 150); });
+  textarea.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (_mentionDropdown && !_mentionDropdown.contains(document.activeElement)) {
+        _closeMentionDropdown();
+      }
+    }, 200);
+  });
 }
 
-function _onMentionInput() {
-  const ta = document.getElementById('commentText');
+function _onMentionInput(ta) {
+  if (!ta) ta = _mentionTextarea || document.getElementById('commentText');
   if (!ta) return;
+  _mentionTextarea = ta;
   const val = ta.value;
   const pos = ta.selectionStart;
   // Find the @ that begins the current word
@@ -440,8 +448,13 @@ function _onMentionKey(e) {
     e.preventDefault();
     _updateMentionActive(items, Math.max(idx - 1, 0));
   } else if (e.key === 'Enter' || e.key === 'Tab') {
-    if (active) { e.preventDefault(); active.click(); }
-    else if (items.length === 1) { e.preventDefault(); items[0].click(); }
+    const target = active || items[0];
+    if (target) {
+      e.preventDefault();
+      e.stopPropagation();
+      const username = target.dataset.username;
+      if (username) _insertMention(username);
+    }
   } else if (e.key === 'Escape') {
     e.preventDefault(); _closeMentionDropdown();
   }
@@ -467,12 +480,17 @@ function _showMentionDropdown(ta, users, query) {
   users.forEach((u, i) => {
     const item = document.createElement('div');
     item.className = 'mention-item' + (i === 0 ? ' active' : '');
-    item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
-    item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
+    item.dataset.username = u.username;
+    item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center;user-select:none';
+    item.innerHTML = `<span style="font-weight:600;color:var(--accent)">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
     item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
-    item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertMention(u.username); });
+    item.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); _insertMention(u.username); });
     dd.appendChild(item);
   });
+  // Add hover highlight style
+  const style = document.createElement('style');
+  style.textContent = '#mentionDropdown .mention-item:hover,#mentionDropdown .mention-item.active{background:var(--bg3)}';
+  dd.appendChild(style);
   document.body.appendChild(dd);
 }
 
@@ -482,7 +500,7 @@ function _closeMentionDropdown() {
 }
 
 function _insertMention(username) {
-  const ta = document.getElementById('commentText');
+  const ta = _mentionTextarea || document.getElementById('commentText');
   if (!ta || _mentionStart < 0) return;
   const pos = _mentionCursorPos >= 0 ? _mentionCursorPos : ta.selectionStart;
   const val = ta.value;

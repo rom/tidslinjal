@@ -1504,6 +1504,13 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
 
     // Dashboard
     dashboard_title: 'Przegląd sytuacji',
+    dashboard_clock: 'Zegar',
+    dashboard_boards: 'Podsumowanie tablic',
+    dashboard_decisions: 'Ostatnie decyzje',
+    settings_quick_response_receiver: 'Odbiorca szybkiej odpowiedzi',
+    settings_quick_response_receiver_desc: 'Wybierz które role i grupy mają otrzymywać alerty flash przy szybkiej odpowiedzi lub eskalacji.',
+    settings_qr_roles: 'Role',
+    settings_qr_groups: 'Grupy',
 
     // Admin user management
     admin_change_password: 'Zmień hasło',

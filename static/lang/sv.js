@@ -1620,6 +1620,13 @@ TRANSLATIONS.sv = {
 
     // Dashboard
     dashboard_title: 'Situationsöversikt',
+    dashboard_clock: 'Klocka',
+    dashboard_boards: 'Anslagstavlor',
+    dashboard_decisions: 'Senaste beslut',
+    settings_quick_response_receiver: 'Mottagare av snabbsvar',
+    settings_quick_response_receiver_desc: 'Välj vilka roller och grupper som ska ta emot blinkaviseringar vid snabbsvar eller eskalering.',
+    settings_qr_roles: 'Roller',
+    settings_qr_groups: 'Grupper',
 
     // Admin user management
     admin_change_password: 'Ändra lösenord',
