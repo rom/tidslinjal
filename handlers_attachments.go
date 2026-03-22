@@ -74,6 +74,7 @@ func (app *App) handleUploadAttachment(w http.ResponseWriter, r *http.Request, u
 	}
 	todayMB := app.uploads.todayBytes(user.ID) / (1 << 20)
 	if todayMB >= int64(dailyLimitMB) {
+		logDebug("limits: upload quota exceeded for user %q (%d/%d MB/day)", user.Username, todayMB, dailyLimitMB)
 		log.Printf("[SECURITY] Upload quota exceeded for user %q (used %d MB, limit %d MB/day)", user.Username, todayMB, dailyLimitMB)
 		app.audit(user.ID, user.DisplayName, "quota_exceeded", "upload", 0,
 			fmt.Sprintf("User %q exceeded daily upload quota (%d MB used, limit %d MB)", user.Username, todayMB, dailyLimitMB))

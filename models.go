@@ -3,7 +3,7 @@ package main
 import "time"
 
 // AppVersion is the current application version
-const AppVersion = "8.0.0"
+const AppVersion = "8.1.0"
 
 
 // AppGitHub is the project repository URL

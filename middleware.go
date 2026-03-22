@@ -292,6 +292,7 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 				// API key brute-force protection: rate-limit validation attempts per IP
 				if !app.authLimiter.allow("apikey:"+clientIP(r), 20, time.Minute) {
 					ip := clientIP(r)
+					logDebug("limits: API key rate limit hit for IP %s", ip)
 					log.Printf("[SECURITY] API key rate limit exceeded from IP %s", ip)
 					app.store.LogAudit(AuditEntry{ //nolint
 						Action: "rate_limited", EntityType: "api_key", Summary: fmt.Sprintf("API key brute-force protection triggered from IP %s", ip),
@@ -383,6 +384,7 @@ func (app *App) ipBlacklistMiddleware(next http.Handler) http.Handler {
 			for _, entry := range bl.Entries {
 				// Check exact IP match
 				if entry.IP == ip {
+					logDebug("IP %s has been blocked — blacklisted IP %s", ip, entry.IP)
 					app.store.LogAudit(AuditEntry{
 						Action: "blocked", EntityType: "ip_blacklist",
 						Summary: fmt.Sprintf("SECURITY: Blocked connection from blacklisted IP %s (reason: %s)", ip, entry.Reason),
@@ -394,6 +396,7 @@ func (app *App) ipBlacklistMiddleware(next http.Handler) http.Handler {
 				if strings.Contains(entry.IP, "/") {
 					_, cidr, err := net.ParseCIDR(entry.IP)
 					if err == nil && parsedIP != nil && cidr.Contains(parsedIP) {
+						logDebug("IP %s has been blocked — blacklisted IP %s (CIDR match %s)", ip, ip, entry.IP)
 						app.store.LogAudit(AuditEntry{
 							Action: "blocked", EntityType: "ip_blacklist",
 							Summary: fmt.Sprintf("SECURITY: Blocked connection from blacklisted range %s (IP: %s, reason: %s)", entry.IP, ip, entry.Reason),
