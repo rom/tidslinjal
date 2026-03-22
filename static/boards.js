@@ -116,11 +116,13 @@ function _renderBoardListModal() {
       html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg};position:relative" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <strong>${escHtml(b.name)}</strong>
-          <div style="display:flex;align-items:center;gap:6px">
+          <div style="display:flex;align-items:center;gap:4px">
             <span title="${b.visibility}">${vis}</span>
+            <button class="btn btn-sm" style="font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_editBoardFromList" data-arg="${b.id}" data-stop-prop title="Edit board settings">✏️</button>
             <button class="btn btn-sm" style="color:var(--danger);font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_removeBoardFromList" data-arg="${b.id}" data-stop-prop title="${t('board_delete')||'Remove board'}">🗑</button>
           </div>
         </div>
+        ${b.color ? `<div style="height:3px;background:${b.color};border-radius:2px;margin-top:6px"></div>` : ''}
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">${escHtml(b.description||'')}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:8px">${b.columns ? b.columns.length : 3} columns · by ${escHtml(b.owner_name||'')}</div>
       </div>`;
@@ -141,6 +143,216 @@ function _renderBoardListModal() {
   html += `</div></div></div>`;
 
   _boardModal('boardsModal', html, '960px');
+}
+
+// ── Edit Board from list view ──
+async function _editBoardFromList(boardId) {
+  // Use cached data if available (for column add/remove/move), otherwise fetch
+  let board;
+  if (window._editBoardListData && window._editBoardListData.id === boardId) {
+    board = window._editBoardListData;
+  } else {
+    try {
+      board = await _boardApi('GET', '/boards/' + boardId);
+    } catch (e) { alert('Failed to load board: ' + e.message); return; }
+  }
+
+  let groups = state.groups || [];
+  try { groups = await apiGet('/api/groups?all=true') || groups; } catch {}
+
+  const colColorPresets = [
+    {label:'None',value:''},
+    {label:'🟠 Orange',value:'rgba(230,126,34,0.15)'},
+    {label:'🟡 Yellow',value:'rgba(241,196,15,0.15)'},
+    {label:'🟢 Green',value:'rgba(39,174,96,0.15)'},
+    {label:'🔵 Blue',value:'rgba(52,152,219,0.15)'},
+    {label:'🔴 Red',value:'rgba(231,76,60,0.15)'},
+    {label:'🟣 Purple',value:'rgba(155,89,182,0.15)'}
+  ];
+
+  let colsHtml = '';
+  for (let i = 0; i < (board.columns || []).length; i++) {
+    const col = board.columns[i];
+    colsHtml += `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+      <input class="input editBoardCol" data-idx="${i}" value="${escHtml(col.name)}" style="flex:1">
+      <select class="input editBoardColColor" data-idx="${i}" style="width:100px;font-size:var(--fs-xs)">
+        ${colColorPresets.map(p => `<option value="${p.value}" ${col.color===p.value?'selected':''}>${p.label}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm" data-action="_moveEditBoardCol" data-args="[${i},-1]" ${i===0?'disabled':''}>↑</button>
+      <button class="btn btn-sm" data-action="_moveEditBoardCol" data-args="[${i},1]" ${i===(board.columns||[]).length-1?'disabled':''}>↓</button>
+      <button class="btn btn-sm" style="color:var(--danger)" data-action="_removeEditBoardCol" data-arg="${i}">✖</button>
+    </div>`;
+  }
+
+  let html = `<div style="max-width:540px">
+    <h3 style="margin-bottom:12px">✏️ Edit Board</h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Board Name</label>
+        <input id="editBoardName" class="input" style="width:100%" value="${escHtml(board.name)}">
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Board Color</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input id="editBoardColor" type="color" value="${board.color||'#1a1a2e'}" style="width:48px;height:28px;cursor:pointer;border:none;padding:0">
+          ${board.color ? `<button class="btn btn-sm btn-secondary" style="font-size:var(--fs-xs);padding:1px 6px" id="editBoardColorClear">✖ Clear</button>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Description</label>
+      <input id="editBoardDesc" class="input" style="width:100%" value="${escHtml(board.description||'')}" placeholder="Optional description">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Visibility</label>
+        <select id="editBoardVis" class="input" style="width:100%">
+          <option value="private" ${board.visibility==='private'?'selected':''}>🔒 Private</option>
+          <option value="group" ${board.visibility==='group'?'selected':''}>👥 Group</option>
+          <option value="role" ${board.visibility==='role'?'selected':''}>🎭 Role</option>
+          <option value="global" ${board.visibility==='global'?'selected':''}>🌐 Global</option>
+        </select>
+      </div>
+      <div id="editBoardGroupDiv" style="display:${board.visibility==='group'?'':'none'}">
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Group</label>
+        <select id="editBoardGroup" class="input" style="width:100%">
+          ${groups.map(g => `<option value="${g.id}" ${g.id===board.group_id?'selected':''}>${escHtml(g.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="editBoardRoleDiv" style="display:${board.visibility==='role'?'':'none'}">
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Role</label>
+        <select id="editBoardRole" class="input" style="width:100%">
+          ${_boardRoleOptions(board.role_key || '')}
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">Columns</label>
+      <div id="editBoardCols">${colsHtml}</div>
+      <button class="btn btn-sm btn-secondary" data-action="_addEditBoardCol" style="margin-top:4px">+ Add Column</button>
+    </div>
+
+    <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">Display Options</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="editBoardShowIcons" ${board.show_icons !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        Show type icons on cards
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="editBoardPriorityBg" ${board.priority_background !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        Color card background by priority
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+        <input type="checkbox" id="editBoardShowArchival" ${board.show_archival !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        Show archive controls on column headers
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-primary" data-action="_saveEditBoardFromList" data-arg="${board.id}">Save Changes</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="editBoardListModal">Cancel</button>
+    </div>
+  </div>`;
+
+  _boardModal('editBoardListModal', html, '560px');
+
+  // Store board data for save
+  window._editBoardListData = board;
+
+  // Wire visibility toggle
+  const visSel = document.getElementById('editBoardVis');
+  if (visSel) {
+    visSel.addEventListener('change', function() {
+      const v = visSel.value;
+      const gd = document.getElementById('editBoardGroupDiv');
+      const rd = document.getElementById('editBoardRoleDiv');
+      if (gd) gd.style.display = v === 'group' ? '' : 'none';
+      if (rd) rd.style.display = v === 'role' ? '' : 'none';
+    });
+  }
+  // Wire color clear
+  const clearBtn = document.getElementById('editBoardColorClear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function() {
+      const colorEl = document.getElementById('editBoardColor');
+      if (colorEl) colorEl.value = '#1a1a2e';
+      clearBtn.remove();
+    });
+  }
+}
+
+// Column management helpers for edit-from-list modal
+function _addEditBoardCol() {
+  const board = window._editBoardListData;
+  if (!board) return;
+  const id = 'col_' + Date.now();
+  board.columns.push({ id, name: 'New Column', collapsed: false, color: '' });
+  _editBoardFromList(board.id);
+}
+
+function _removeEditBoardCol(idx) {
+  const board = window._editBoardListData;
+  if (!board || board.columns.length <= 1) return;
+  // Sync names/colors from DOM before removing
+  _syncEditBoardColsFromDOM(board);
+  board.columns.splice(parseInt(idx), 1);
+  _editBoardFromList(board.id);
+}
+
+function _moveEditBoardCol(args) {
+  const board = window._editBoardListData;
+  if (!board) return;
+  const [idx, dir] = args;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= board.columns.length) return;
+  _syncEditBoardColsFromDOM(board);
+  const tmp = board.columns[idx];
+  board.columns[idx] = board.columns[newIdx];
+  board.columns[newIdx] = tmp;
+  _editBoardFromList(board.id);
+}
+
+function _syncEditBoardColsFromDOM(board) {
+  document.querySelectorAll('.editBoardCol').forEach(inp => {
+    const i = parseInt(inp.dataset.idx);
+    if (board.columns[i]) board.columns[i].name = inp.value.trim() || board.columns[i].name;
+  });
+  document.querySelectorAll('.editBoardColColor').forEach(sel => {
+    const i = parseInt(sel.dataset.idx);
+    if (board.columns[i]) board.columns[i].color = sel.value;
+  });
+}
+
+async function _saveEditBoardFromList(boardId) {
+  const board = window._editBoardListData;
+  if (!board) return;
+  // Sync latest column names/colors from DOM
+  _syncEditBoardColsFromDOM(board);
+  const boardColor = document.getElementById('editBoardColor')?.value || '';
+  try {
+    await _boardApi('PUT', '/boards/' + boardId, {
+      name: document.getElementById('editBoardName')?.value?.trim() || board.name,
+      description: document.getElementById('editBoardDesc')?.value?.trim() || '',
+      visibility: document.getElementById('editBoardVis')?.value || board.visibility,
+      group_id: parseInt(document.getElementById('editBoardGroup')?.value) || 0,
+      role_key: document.getElementById('editBoardRole')?.value || '',
+      columns: board.columns,
+      color: boardColor === '#1a1a2e' ? '' : boardColor,
+      show_icons: document.getElementById('editBoardShowIcons')?.checked !== false,
+      priority_background: document.getElementById('editBoardPriorityBg')?.checked !== false,
+      show_archival: document.getElementById('editBoardShowArchival')?.checked !== false,
+    });
+    _closeBoardModal('editBoardListModal');
+    // Refresh the board list
+    const boards = await _boardApi('GET', '/boards').catch(() => []);
+    _boardsState.boards = boards;
+    _renderBoardListModal();
+    if (typeof showNotification === 'function') showNotification('success', 'Board settings saved');
+  } catch (e) { alert('Failed to save: ' + e.message); }
 }
 
 // ── Create Board Dialog ──
