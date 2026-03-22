@@ -54,6 +54,7 @@ type BoardItem struct {
 	EventID         int64             `json:"event_id,omitempty"`      // linked event/meeting
 	Priority        string            `json:"priority,omitempty"`      // "low", "high", "critical"
 	Activities      []BoardActivity   `json:"activities,omitempty"`    // timestamped activity log entries
+	RelatedItemIDs  []int64           `json:"related_item_ids,omitempty"` // IDs of related board items
 	Archived        bool              `json:"archived,omitempty"`      // archived items are hidden from board view
 	ShareToken      string            `json:"share_token,omitempty"`   // token for sharable link
 	CreatedAt       time.Time         `json:"created_at"`

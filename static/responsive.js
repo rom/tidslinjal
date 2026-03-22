@@ -574,7 +574,16 @@ function applyPhoneDefaults() {
     const landingView = state.preferences?.default_landing_view;
     if (!landingView || landingView === 'grid') {
       // On phone, list view is more useful by default
-      // But respect user's explicit preference
+      if (typeof toggleListView === 'function' && !_listViewActive) {
+        setTimeout(() => toggleListView(), 80);
+      }
+      // Highlight the list button in mobile nav
+      const mobileNav = document.getElementById('mobileNav');
+      if (mobileNav) {
+        mobileNav.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+        const listBtn = mobileNav.querySelector('[data-mobile-tab="list"]');
+        if (listBtn) listBtn.classList.add('active');
+      }
     }
   }
 }

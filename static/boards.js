@@ -256,6 +256,7 @@ function _renderKanbanBoard() {
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-right:28px">
+        <button class="btn btn-sm btn-secondary" data-action="_showBoardHelp" title="${t('board_help')||'Help'}" style="${btnStyle}">❓</button>
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardLink" title="${t('board_share')||'Share link'}" style="${btnStyle}">🔗</button>
         <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}" style="${btnStyle}">⚙</button>
         <button class="btn btn-sm btn-secondary" data-action="_detachBoard" title="${t('board_detach')||'Detach window'}" style="${btnStyle}">⧉</button>
@@ -284,6 +285,13 @@ function _renderKanbanBoard() {
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomIn" title="${t('board_zoom_in')||'Zoom in'}" style="${btnStyle}">+</button>
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="${btnStyle}font-size:var(--fs-xs);">100%</button>
       </div>
+    </div>
+    <div class="kanban-col-tabs" style="display:none">
+      ${board.columns.map((col, i) => {
+        const cnt = (colItems[String(col.id)] || []).length;
+        return `<button class="kanban-col-tab${i===0?' active':''}" data-col-tab="${col.id}">${escHtml(col.name)} (${cnt})</button>`;
+      }).join('')}
+      ${archivedItems.length > 0 ? `<button class="kanban-col-tab" data-col-tab="_archived">📦 (${archivedItems.length})</button>` : ''}
     </div>
     <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;width:100%;box-sizing:border-box;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
 
@@ -343,6 +351,7 @@ function _renderKanbanBoard() {
               ${item.comments && item.comments.length ? `<span title="${item.comments.length} comment(s)">💬${item.comments.length}</span>` : ''}
               ${item.checklist_id ? '<span title="Linked checklist">📋</span>' : ''}
               ${item.event_id ? '<span title="Linked event">📅</span>' : ''}
+              ${item.related_item_ids && item.related_item_ids.length ? `<span title="${item.related_item_ids.length} related item(s)">🔗${item.related_item_ids.length}</span>` : ''}
             </div>
           </div>
         </div>`;
@@ -434,6 +443,59 @@ function _bindKanbanEvents() {
     const colId = el.dataset.dblclickRename;
     const colName = el.dataset.colName;
     el.addEventListener('dblclick', () => _renameCol(colId, colName));
+  });
+
+  // Mobile column tab navigation
+  _setupMobileKanbanTabs(modal);
+}
+
+function _setupMobileKanbanTabs(modal) {
+  const isMobile = window.innerWidth <= 768;
+  const tabBar = modal.querySelector('.kanban-col-tabs');
+  if (!tabBar) return;
+  // Show tab bar only on mobile
+  tabBar.style.display = isMobile ? 'flex' : 'none';
+  if (!isMobile) return;
+
+  const kanbanCols = modal.querySelector('.kanban-columns');
+  if (!kanbanCols) return;
+
+  tabBar.querySelectorAll('.kanban-col-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabBar.querySelectorAll('.kanban-col-tab').forEach(t2 => t2.classList.remove('active'));
+      tab.classList.add('active');
+      const colId = tab.dataset.colTab;
+      let target;
+      if (colId === '_archived') {
+        // Last column is the archive
+        const cols = kanbanCols.querySelectorAll('.kanban-col');
+        target = cols[cols.length - 1];
+      } else {
+        target = kanbanCols.querySelector('[data-col="' + colId + '"]');
+      }
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  });
+
+  // Highlight active tab on scroll
+  let scrollTimer;
+  kanbanCols.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const cols = kanbanCols.querySelectorAll('.kanban-col:not(.kanban-col-collapsed)');
+      const center = kanbanCols.scrollLeft + kanbanCols.clientWidth / 2;
+      let closest = null, closestDist = Infinity;
+      cols.forEach(c => {
+        const dist = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center);
+        if (dist < closestDist) { closestDist = dist; closest = c; }
+      });
+      if (closest) {
+        const activeColId = closest.dataset.col || '_archived';
+        tabBar.querySelectorAll('.kanban-col-tab').forEach(t2 => {
+          t2.classList.toggle('active', t2.dataset.colTab === activeColId);
+        });
+      }
+    }, 100);
   });
 }
 
@@ -610,7 +672,7 @@ async function _addItemToCol(colId) {
   const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
   try {
     const created = await _boardApi('POST', '/boards/' + board.id + '/items', {
-      column_id: colId, subject: t('board_new_item')||'New item', sort_order: sortOrder
+      column_id: colId, subject: '', sort_order: sortOrder
     });
     _boardsState.items.push(created);
     _renderKanbanBoard();
@@ -618,7 +680,7 @@ async function _addItemToCol(colId) {
     _openBoardItem(created.id);
     setTimeout(() => {
       const subjectEl = document.getElementById('inlineItemSubject');
-      if (subjectEl) { subjectEl.select(); subjectEl.focus(); }
+      if (subjectEl) { subjectEl.value = ''; subjectEl.focus(); subjectEl.style.borderColor='var(--accent)'; subjectEl.style.background='var(--bg3)'; }
     }, 100);
   } catch (e) { alert(e.message); }
 }
@@ -706,8 +768,11 @@ function _openBoardItem(itemId) {
 
     <div style="margin-bottom:10px">
       <strong style="font-size:var(--fs-sm)">🏷️ ${t('tags_title')||'Tags'}:</strong>
-      <div style="margin-top:4px;position:relative">
-        <input id="inlineItemTags" class="input" style="width:100%;font-size:var(--fs-sm);padding:6px 10px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" value="${escHtml((item.tags||[]).join(', '))}" placeholder="${t('tags_placeholder')||'Type tags separated by commas, e.g. urgent, review, backend'}">
+      <div id="inlineItemTagChips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;margin-bottom:4px">
+        ${(item.tags||[]).map(tag => `<span class="board-tag-chip" data-tag="${escHtml(tag)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:${typeof _tagColor==='function'?_tagColor(tag):'var(--accent)'};cursor:default">${escHtml(tag)}<span class="board-tag-remove" style="cursor:pointer;font-weight:bold;margin-left:2px">×</span></span>`).join('')}
+      </div>
+      <div style="position:relative">
+        <input id="inlineItemTags" class="input" style="width:100%;font-size:var(--fs-sm);padding:6px 10px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" value="" placeholder="${t('tags_placeholder')||'Type a tag and press comma to add...'}">
       </div>
     </div>
 
@@ -718,7 +783,8 @@ function _openBoardItem(itemId) {
 
   // Activities section (user-entered timestamped log)
   html += `<div style="margin-bottom:12px">
-    <strong style="font-size:var(--fs-sm)">📋 ${t('board_activities')||'Activities'}</strong>
+    <strong style="font-size:var(--fs-sm)">📋 ${t('board_activities_title')||'Activity Log'}</strong>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin:2px 0 6px">${t('board_activities_desc')||'Record actions taken on this item. Each entry is timestamped with your name.'}</p>
     <div id="boardItemActivities" style="max-height:180px;overflow-y:auto;margin-top:4px">`;
   for (const a of (item.activities || []).slice().reverse()) {
     html += `<div style="padding:4px 8px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);font-size:var(--fs-xs);border-left:3px solid var(--accent)">
@@ -729,8 +795,8 @@ function _openBoardItem(itemId) {
   }
   html += `</div>
     <div style="display:flex;gap:4px;margin-top:6px">
-      <input id="newActivityText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_add_activity')||'Log an activity...'}">
-      <button class="btn btn-sm btn-primary" data-action="_addBoardItemActivity" data-arg="${item.id}" style="padding:6px 12px">+ ${t('board_activity_add')||'Add'}</button>
+      <input id="newActivityText" class="input" style="flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_activity_placeholder')||'What did you do? (use @name to mention people)'}">
+      <button class="btn btn-sm btn-primary" data-action="_addBoardItemActivity" data-arg="${item.id}" style="padding:6px 12px">${t('board_activity_log')||'Log Activity'}</button>
     </div>
   </div>`;
 
@@ -770,6 +836,34 @@ function _openBoardItem(itemId) {
       <input id="newLinkUrl" class="input" style="flex:2;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="https://...">
       <input id="newLinkLabel" class="input" style="flex:1;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" placeholder="${t('board_link_label')||'Label (optional)'}">
       <button class="btn btn-sm btn-secondary" data-action="_addBoardItemLink" style="padding:4px 8px">+ ${t('board_link_add')||'Add'}</button>
+    </div>
+  </div>`;
+
+  // Related Items
+  const relatedIds = item.related_item_ids || [];
+  const allItems = _boardsState.items || [];
+  html += `<div style="margin-bottom:12px">
+    <strong style="font-size:var(--fs-sm)">🔗 ${t('board_related_items')||'Related Items'} (${relatedIds.length})</strong>
+    <div id="boardRelatedItems" style="margin-top:4px">`;
+  for (const rid of relatedIds) {
+    const rel = allItems.find(i => i.id === rid);
+    if (rel) {
+      const relIcon = _itemTypeIcons[rel.item_type] || '🔹';
+      html += `<div class="board-related-row" data-related-id="${rid}" style="display:flex;gap:6px;align-items:center;margin-bottom:3px;font-size:var(--fs-xs);padding:3px 6px;background:var(--bg2);border-radius:var(--radius);cursor:pointer">
+        <span>${relIcon}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-action="_openBoardItem" data-arg="${rid}">#${rid} ${escHtml(rel.subject)}</span>
+        <span style="color:var(--text-dim)">${escHtml((rel.column_id && _boardsState.activeBoard.columns.find(c=>c.id===rel.column_id)||{}).name||'')}</span>
+        <button class="btn btn-sm board-related-remove" style="font-size:9px;padding:0 4px;color:var(--danger)" title="${t('board_remove')||'Remove'}">✖</button>
+      </div>`;
+    }
+  }
+  html += `</div>
+    <div style="display:flex;gap:4px;margin-top:4px">
+      <select id="newRelatedItem" class="input" style="flex:1;font-size:var(--fs-xs);padding:4px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)">
+        <option value="">— ${t('board_select_related')||'Select an item to link'} —</option>
+        ${allItems.filter(i => i.id !== item.id && !relatedIds.includes(i.id) && !i.archived).map(i => `<option value="${i.id}">${(_itemTypeIcons[i.item_type]||'')} #${i.id} ${escHtml(i.subject)}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm btn-secondary" data-action="_addRelatedItem" data-arg="${item.id}" style="padding:4px 8px">+ ${t('board_link_add')||'Add'}</button>
     </div>
   </div>`;
 
@@ -820,17 +914,82 @@ function _openBoardItem(itemId) {
     btn.addEventListener('click', function() { btn.parentElement.remove(); });
   });
 
+  // Bind related item remove buttons
+  document.querySelectorAll('#boardRelatedItems .board-related-remove').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const row = btn.closest('.board-related-row');
+      const relId = parseInt(row?.dataset.relatedId);
+      if (relId) _removeRelatedItem(itemId, relId);
+    });
+  });
+
+  // ── Tag chip behavior (comma creates chip, × removes) ──
+  const tagInput = document.getElementById('inlineItemTags');
+  const tagChipsEl = document.getElementById('inlineItemTagChips');
+  if (tagInput && tagChipsEl) {
+    // Bind remove on existing chips
+    tagChipsEl.querySelectorAll('.board-tag-remove').forEach(function(x) {
+      x.addEventListener('click', function() { x.parentElement.remove(); });
+    });
+    // Comma or Enter creates a new chip
+    tagInput.addEventListener('keydown', function(e) {
+      if (e.key === ',' || e.key === 'Enter') {
+        e.preventDefault();
+        const val = tagInput.value.replace(/,/g, '').trim();
+        if (!val) return;
+        // Don't add duplicates
+        const existing = Array.from(tagChipsEl.querySelectorAll('.board-tag-chip')).map(c => c.dataset.tag.toLowerCase());
+        if (existing.includes(val.toLowerCase())) { tagInput.value = ''; return; }
+        const chip = document.createElement('span');
+        chip.className = 'board-tag-chip';
+        chip.dataset.tag = val;
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:' + (typeof _tagColor === 'function' ? _tagColor(val) : 'var(--accent)') + ';cursor:default';
+        chip.textContent = val;
+        const x = document.createElement('span');
+        x.className = 'board-tag-remove';
+        x.style.cssText = 'cursor:pointer;font-weight:bold;margin-left:2px';
+        x.textContent = '×';
+        x.addEventListener('click', function() { chip.remove(); });
+        chip.appendChild(x);
+        tagChipsEl.appendChild(chip);
+        tagInput.value = '';
+      }
+    });
+    // Also add on blur
+    tagInput.addEventListener('blur', function() {
+      const val = tagInput.value.replace(/,/g, '').trim();
+      if (!val) return;
+      const existing = Array.from(tagChipsEl.querySelectorAll('.board-tag-chip')).map(c => c.dataset.tag.toLowerCase());
+      if (existing.includes(val.toLowerCase())) { tagInput.value = ''; return; }
+      const chip = document.createElement('span');
+      chip.className = 'board-tag-chip';
+      chip.dataset.tag = val;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:' + (typeof _tagColor === 'function' ? _tagColor(val) : 'var(--accent)') + ';cursor:default';
+      chip.textContent = val;
+      const x = document.createElement('span');
+      x.className = 'board-tag-remove';
+      x.style.cssText = 'cursor:pointer;font-weight:bold;margin-left:2px';
+      x.textContent = '×';
+      x.addEventListener('click', function() { chip.remove(); });
+      chip.appendChild(x);
+      tagChipsEl.appendChild(chip);
+      tagInput.value = '';
+    });
+  }
+
   // Setup tag autocomplete on inline tags input
   _loadBoardTags().then(() => {
-    const tagInput = document.getElementById('inlineItemTags');
     if (tagInput) _setupTagAutocomplete(tagInput);
   });
 
-  // Setup @mention autocomplete on note and comment textareas
+  // Setup @mention autocomplete on note, comment, and activity inputs
   const noteTA = document.getElementById('inlineItemNote');
   if (noteTA) _setupBoardMentionAutocomplete(noteTA);
   const commentTA = document.getElementById('newCommentText');
   if (commentTA) _setupBoardMentionAutocomplete(commentTA);
+  const activityInput = document.getElementById('newActivityText');
+  if (activityInput) _setupBoardMentionAutocomplete(activityInput);
 
   // Auto-save when modal is closed
   const modalOverlay = document.getElementById('boardItemModal');
@@ -891,6 +1050,51 @@ async function _addBoardItemActivity(itemId) {
   } catch (e) { alert(e.message); }
 }
 
+// ── Related items management ──
+async function _addRelatedItem(itemId) {
+  const sel = document.getElementById('newRelatedItem');
+  const relId = parseInt(sel?.value);
+  if (!relId) return;
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+  const ids = (item.related_item_ids || []).slice();
+  if (ids.includes(relId)) return;
+  ids.push(relId);
+  try {
+    await _boardApi('PUT', '/board-items/' + itemId, { related_item_ids: ids });
+    // Also add reverse link on the related item
+    const relItem = _boardsState.items.find(i => i.id === relId);
+    if (relItem) {
+      const reverseIds = (relItem.related_item_ids || []).slice();
+      if (!reverseIds.includes(itemId)) {
+        reverseIds.push(itemId);
+        await _boardApi('PUT', '/board-items/' + relId, { related_item_ids: reverseIds });
+      }
+    }
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _openBoardItem(itemId);
+  } catch (e) { alert(e.message); }
+}
+
+async function _removeRelatedItem(itemId, relId) {
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+  const ids = (item.related_item_ids || []).filter(id => id !== relId);
+  try {
+    await _boardApi('PUT', '/board-items/' + itemId, { related_item_ids: ids });
+    // Also remove reverse link
+    const relItem = _boardsState.items.find(i => i.id === relId);
+    if (relItem) {
+      const reverseIds = (relItem.related_item_ids || []).filter(id => id !== itemId);
+      await _boardApi('PUT', '/board-items/' + relId, { related_item_ids: reverseIds });
+    }
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _openBoardItem(itemId);
+  } catch (e) { alert(e.message); }
+}
+
 async function _postBoardItemComment(itemId) {
   const textEl = document.getElementById('newCommentText');
   const text = (textEl?.value || '').trim();
@@ -930,8 +1134,11 @@ async function _saveBoardItemExplicit(itemId) {
   const note = (document.getElementById('inlineItemNote') || {}).value || '';
   const itemType = (document.getElementById('inlineItemType') || {}).value || '';
   const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
-  const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
-  const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
+  // Collect tags from chips + any pending input text
+  const tags = [];
+  document.querySelectorAll('#inlineItemTagChips .board-tag-chip').forEach(c => { if (c.dataset.tag) tags.push(c.dataset.tag); });
+  const pendingTag = (document.getElementById('inlineItemTags') || {}).value.replace(/,/g, '').trim();
+  if (pendingTag && !tags.includes(pendingTag)) tags.push(pendingTag);
   const color = colorVal === '#1a1a2e' ? '' : colorVal;
   const dueDate = (document.getElementById('inlineItemDueDate') || {}).value || '';
   const priority = (document.getElementById('inlineItemPriority') || {}).value || '';
@@ -943,10 +1150,16 @@ async function _saveBoardItemExplicit(itemId) {
     const a = row.querySelector('a');
     if (a) links.push({ url: row.dataset.url || a.href, label: row.dataset.label || a.textContent });
   });
+  // Collect related item IDs from DOM
+  const related_item_ids = [];
+  document.querySelectorAll('#boardRelatedItems .board-related-row').forEach(row => {
+    const rid = parseInt(row.dataset.relatedId);
+    if (rid) related_item_ids.push(rid);
+  });
   await _boardApi('PUT', '/board-items/' + itemId, {
     subject: subject.trim(), note, item_type: itemType, color, tags,
     links, due_date: dueDate, responsible_id: responsibleId, responsible_name: responsibleName,
-    priority
+    priority, related_item_ids
   });
   const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
   _boardsState.items = items;
@@ -965,17 +1178,41 @@ function _showBoardItemHelp() {
       <p><strong>${t('board_item_help_subject')||'Subject'}:</strong> ${t('board_item_help_subject_desc')||'Click the title field to edit the item name.'}</p>
       <p><strong>${t('board_item_help_priority')||'Priority'}:</strong> ${t('board_item_help_priority_desc')||'Set priority: Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically.'}</p>
       <p><strong>${t('board_item_help_type')||'Type'}:</strong> ${t('board_item_help_type_desc')||'Choose the item type from the dropdown (Task, Meeting, Issue, etc.).'}</p>
-      <p><strong>${t('board_item_help_responsible')||'Responsible'}:</strong> ${t('board_item_help_responsible_desc')||'Assign a team member who is responsible for this item.'}</p>
+      <p><strong>${t('board_item_help_responsible')||'Responsible'}:</strong> ${t('board_item_help_responsible_desc')||'Assign a team member who is responsible for this item. The creator is assigned by default.'}</p>
       <p><strong>${t('board_item_help_due')||'Due Date'}:</strong> ${t('board_item_help_due_desc')||'Set a deadline. Overdue items are highlighted in red on the board.'}</p>
-      <p><strong>${t('board_item_help_tags')||'Tags'}:</strong> ${t('board_item_help_tags_desc')||'Add comma-separated tags. Previously used tags are suggested as you type.'}</p>
+      <p><strong>${t('board_item_help_tags')||'Tags'}:</strong> ${t('board_item_help_tags_desc')||'Type a tag and press comma or Enter to add it as a chip. Click × on a chip to remove it. Previously used tags are suggested as you type.'}</p>
+      <p><strong>${t('board_item_help_activities')||'Activity Log'}:</strong> ${t('board_item_help_activities_desc')||'Record actions taken on this item. Each entry is automatically timestamped with your name. Use @name to mention people.'}</p>
+      <p><strong>${t('board_item_help_related')||'Related Items'}:</strong> ${t('board_item_help_related_desc')||'Link this item to other items on the same board. Relations are bidirectional — linking A to B also links B to A.'}</p>
+      <p><strong>${t('board_item_help_mentions')||'@Mentions'}:</strong> ${t('board_item_help_mentions_desc')||'Type @ followed by a name in notes, comments, or activities to mention a team member. A dropdown will appear — click a name to insert it.'}</p>
       <p><strong>${t('board_item_help_links')||'Links'}:</strong> ${t('board_item_help_links_desc')||'Add URLs with optional labels. Click "+ Add" to add a link.'}</p>
-      <p><strong>${t('board_item_help_save')||'Saving'}:</strong> ${t('board_item_help_save_desc')||'Click Save to save your changes, or Cancel to discard. Closing with X also saves.'}</p>
+      <p><strong>${t('board_item_help_save')||'Saving'}:</strong> ${t('board_item_help_save_desc')||'Click Save to save your changes, or Cancel to discard.'}</p>
     </div>
     <div style="margin-top:12px;text-align:right">
       <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">${t('btn_close')||'Close'}</button>
     </div>
   </div>`;
   _boardModal('boardItemHelpModal', helpHtml, '520px');
+}
+
+// Help dialog for the board view
+function _showBoardHelp() {
+  const helpHtml = `<div style="max-width:560px">
+    <h3>❓ ${t('board_help_title')||'How to Use Boards'}</h3>
+    <div style="font-size:var(--fs-sm);line-height:1.6">
+      <p><strong>${t('board_help_columns')||'Columns'}:</strong> ${t('board_help_columns_desc')||'Columns represent workflow stages. Double-click a column header to rename it. Use the − button to collapse a column.'}</p>
+      <p><strong>${t('board_help_add_item')||'Adding Items'}:</strong> ${t('board_help_add_item_desc')||'Click the + button at the top of a column to create a new item. The item opens immediately so you can fill in the subject.'}</p>
+      <p><strong>${t('board_help_drag')||'Drag & Drop'}:</strong> ${t('board_help_drag_desc')||'Drag cards between columns to move them through the workflow. Cards can also be reordered within a column.'}</p>
+      <p><strong>${t('board_help_edit')||'Editing Items'}:</strong> ${t('board_help_edit_desc')||'Click any card to open its detail view. You can edit subject, notes, priority, tags, add activities, comments, links, and more.'}</p>
+      <p><strong>${t('board_help_archive')||'Archiving'}:</strong> ${t('board_help_archive_desc')||'Use the 📦 button to archive items (or all items in a column). Archived items appear in a separate column on the right.'}</p>
+      <p><strong>${t('board_help_zoom')||'Zoom'}:</strong> ${t('board_help_zoom_desc')||'Use the + and − buttons to zoom in/out. Click 100% to reset.'}</p>
+      <p><strong>${t('board_help_share')||'Sharing'}:</strong> ${t('board_help_share_desc')||'Use 🔗 to generate a shareable link. Use ⧉ to open the board in a detached window.'}</p>
+      <p><strong>${t('board_help_export')||'Export/Import'}:</strong> ${t('board_help_export_desc')||'Export the board as JSON, CSV, SVG, or PDF. Import boards from JSON or CSV files.'}</p>
+    </div>
+    <div style="margin-top:12px;text-align:right">
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardHelpModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardHelpModal', helpHtml, '580px');
 }
 
 // ── Inline save for board item (auto-save on blur/change) ──
@@ -992,8 +1229,11 @@ async function _inlineSaveBoardItemNow(itemId) {
   const note = (document.getElementById('inlineItemNote') || {}).value || '';
   const itemType = (document.getElementById('inlineItemType') || {}).value || '';
   const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
-  const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
-  const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
+  // Collect tags from chips + any pending input text
+  const tags = [];
+  document.querySelectorAll('#inlineItemTagChips .board-tag-chip').forEach(c => { if (c.dataset.tag) tags.push(c.dataset.tag); });
+  const pendingTag = (document.getElementById('inlineItemTags') || {}).value.replace(/,/g, '').trim();
+  if (pendingTag && !tags.includes(pendingTag)) tags.push(pendingTag);
   const color = colorVal === '#1a1a2e' ? '' : colorVal;
   const dueDate = (document.getElementById('inlineItemDueDate') || {}).value || '';
   const priority = (document.getElementById('inlineItemPriority') || {}).value || '';
@@ -1684,20 +1924,40 @@ function _setupTagAutocomplete(inputEl) {
 }
 
 function _doSelectTag(inputEl, tag) {
-  const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
-  parts[parts.length - 1] = tag;
-  inputEl.value = parts.join(', ') + ', ';
-  inputEl.focus();
+  // Add tag as a chip
+  const chipsEl = document.getElementById('inlineItemTagChips');
+  if (chipsEl) {
+    const existing = Array.from(chipsEl.querySelectorAll('.board-tag-chip')).map(c => c.dataset.tag.toLowerCase());
+    if (!existing.includes(tag.toLowerCase())) {
+      const chip = document.createElement('span');
+      chip.className = 'board-tag-chip';
+      chip.dataset.tag = tag;
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:' + (typeof _tagColor === 'function' ? _tagColor(tag) : 'var(--accent)') + ';cursor:default';
+      chip.textContent = tag;
+      const x = document.createElement('span');
+      x.className = 'board-tag-remove';
+      x.style.cssText = 'cursor:pointer;font-weight:bold;margin-left:2px';
+      x.textContent = '×';
+      x.addEventListener('click', function() { chip.remove(); });
+      chip.appendChild(x);
+      chipsEl.appendChild(chip);
+    }
+    inputEl.value = '';
+    inputEl.focus();
+  } else {
+    // Fallback to old behavior
+    const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
+    parts[parts.length - 1] = tag;
+    inputEl.value = parts.join(', ') + ', ';
+    inputEl.focus();
+  }
 }
 
 // Global function for tag selection from autocomplete dropdown
 window._selectTag = function(el, tag) {
   const inputEl = document.getElementById('inlineItemTags') || document.getElementById('editItemTags');
   if (!inputEl) return;
-  const parts = inputEl.value.split(',').map(s => s.trim()).filter(Boolean);
-  parts[parts.length - 1] = tag;
-  inputEl.value = parts.join(', ') + ', ';
-  inputEl.focus();
+  _doSelectTag(inputEl, tag);
 };
 
 // ── @Mention Autocomplete for board textareas ──
