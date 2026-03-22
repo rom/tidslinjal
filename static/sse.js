@@ -183,9 +183,24 @@ function connectSSE() {
       _refreshDecisionLogIfOpen();
     } catch {}
   });
-  // Decision outcome (approved/denied) — live-update decision log modal
+  // Decision outcome (approved/denied) — live-update decision log modal + teamlead toolbox
   es.addEventListener('decision_outcome', e => {
-    try { _refreshDecisionLogIfOpen(); } catch {}
+    try {
+      const data = JSON.parse(e.data);
+      _refreshDecisionLogIfOpen();
+      // If I am the original requester, refresh my escalated decisions panel
+      if (data.requester_id === state.user?.id) {
+        if (typeof _refreshTlEscalationsIfOpen === 'function') _refreshTlEscalationsIfOpen();
+        // Show a notification about the outcome
+        const outcomeText = data.outcome === 'approved'
+          ? (data.approval_type === 'approved_with_condition' ? (t('decision_approved_condition_label')||'Approved with condition')
+            : data.approval_type === 'approved_with_modification' ? (t('decision_approved_modification_label')||'Approved with modification')
+            : (t('decision_approved_label')||'Approved'))
+          : (t('decision_filter_denied')||'Denied');
+        const msg = `${t('tl_decision_outcome_received')||'Decision outcome'}: ${data.title || data.sequence_number} — ${outcomeText} (${data.decided_by})`;
+        showNotification(data.outcome === 'approved' ? 'success' : 'error', msg);
+      }
+    } catch {}
   });
   // Quick report received
   es.addEventListener('quick_report', e => {

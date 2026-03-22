@@ -1,5 +1,68 @@
 /* ── TeamLead Toolbox Modal ── */
 // ── TeamLead Toolbox Modal ──────────────────────────────────────────────────
+let _tlEscalatedDecisions = [];
+
+async function _loadTlEscalatedDecisions() {
+  try {
+    const all = await apiGet('/api/decision-log') || [];
+    _tlEscalatedDecisions = all.filter(e =>
+      e.user_id === state.user?.id && e.requested_of_value === 'oplead' && e.status
+    );
+  } catch { _tlEscalatedDecisions = []; }
+}
+
+function _renderTlEscalatedDecisions() {
+  if (!_tlEscalatedDecisions.length) return `<p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('tl_no_escalations')||'No escalated decisions yet.'}</p>`;
+  return _tlEscalatedDecisions.map(e => {
+    const ts = e.requested_at ? fmtDateTime(new Date(e.requested_at)) : fmtDateTime(new Date(e.timestamp));
+    let statusHtml = '';
+    if (e.status === 'requested') {
+      statusHtml = `<span style="background:#E67E22;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700">⏳ ${t('decision_filter_pending')||'PENDING'}</span>`;
+    } else if (e.status === 'approved') {
+      const labels = { approved: 'APPROVED', approved_with_condition: 'APPROVED W/ CONDITION', approved_with_modification: 'APPROVED W/ MODIFICATION' };
+      const label = labels[e.approval_type] || 'APPROVED';
+      statusHtml = `<span style="background:#27AE60;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700">✓ ${label}</span>`;
+    } else if (e.status === 'rejected') {
+      statusHtml = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700">✗ ${t('decision_filter_denied')||'DENIED'}</span>`;
+    }
+    let reviewHtml = '';
+    if (e.reviewed_by_name) {
+      const reviewTs = e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : '';
+      const commentHtml = e.review_comment ? `<div style="margin-top:3px;font-size:var(--fs-xs);color:var(--text);padding:4px 8px;background:var(--bg);border-left:3px solid ${e.status==='rejected'?'var(--danger,#E74C3C)':'var(--accent)'};border-radius:2px">${escHtml(e.review_comment)}</div>` : '';
+      reviewHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">
+        ${e.status === 'rejected' ? '✗' : '✓'} ${escHtml(e.reviewed_by_name)}${reviewTs}
+      </div>${commentHtml}`;
+    }
+    return `<div style="padding:8px;margin-bottom:6px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid ${e.status==='requested'?'#E67E22':e.status==='approved'?'#27AE60':'#E74C3C'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+        <span style="font-size:var(--fs-xs);font-weight:700">${escHtml(e.sequence_number || '')} ${escHtml(e.title || '')}</span>
+        ${statusHtml}
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${ts}</div>
+      <div style="font-size:var(--fs-sm);margin-top:4px">${escHtml(e.decision)}</div>
+      ${e.reason ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);font-style:italic;margin-top:3px;border-left:3px solid var(--border);padding-left:8px">${escHtml(e.reason)}</div>` : ''}
+      ${reviewHtml}
+    </div>`;
+  }).join('');
+}
+
+// Live-refresh escalated decisions panel if teamlead toolbox is open (modal or detached)
+async function _refreshTlEscalationsIfOpen() {
+  const modal = document.getElementById('teamleadToolboxModal');
+  const popout = (typeof _teamleadPopout !== 'undefined' && _teamleadPopout && !_teamleadPopout.closed) ? _teamleadPopout : null;
+  if (!modal && !popout) return;
+  await _loadTlEscalatedDecisions();
+  const html = _renderTlEscalatedDecisions();
+  if (modal) {
+    const panel = document.getElementById('tlEscalatedDecisionsPanel');
+    if (panel) panel.innerHTML = html;
+  }
+  if (popout) {
+    const panel = popout.document.getElementById('tlEscalatedDecisionsPanel');
+    if (panel) panel.innerHTML = html;
+  }
+}
+
 async function openTeamLeadToolbox() {
   const groups = state.groups || [];
   const myGroups = groups; // TeamLead can see all groups they manage
@@ -105,6 +168,14 @@ async function openTeamLeadToolbox() {
             </div>
           </div>
 
+          <!-- Escalated Decisions Status -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">📋 ${t('tl_my_escalations')||'My Escalated Decisions'}</div>
+            <div id="tlEscalatedDecisionsPanel" style="max-height:250px;overflow-y:auto">
+              <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
+            </div>
+          </div>
+
           <!-- Team Ready Check -->
           <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
             <div style="font-weight:700;margin-bottom:8px">✅ ${t('tl_team_ready_check')||'Team Ready Check'}</div>
@@ -156,6 +227,11 @@ async function openTeamLeadToolbox() {
   void modal.offsetHeight;
   modal.classList.add('open');
   _bindActions(modal);
+  // Load escalated decisions asynchronously
+  _loadTlEscalatedDecisions().then(() => {
+    const panel = document.getElementById('tlEscalatedDecisionsPanel');
+    if (panel) panel.innerHTML = _renderTlEscalatedDecisions();
+  });
 }
 
 function closeTeamLeadToolbox() {
@@ -225,6 +301,8 @@ async function escalateDecision() {
     document.getElementById('tlEscalateTitle').value = '';
     document.getElementById('tlEscalateText').value = '';
     document.getElementById('tlEscalateReason').value = '';
+    // Refresh the escalations panel immediately
+    _refreshTlEscalationsIfOpen();
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to escalate');
@@ -338,6 +416,14 @@ function detachTeamLeadToolbox() {
   }
   rebindPopoutActions();
 
+  // Load escalated decisions in detached window
+  _loadTlEscalatedDecisions().then(() => {
+    if (_teamleadPopout && !_teamleadPopout.closed) {
+      const panel = _teamleadPopout.document.getElementById('tlEscalatedDecisionsPanel');
+      if (panel) panel.innerHTML = _renderTlEscalatedDecisions();
+    }
+  });
+
   if (_teamleadPopoutMonitor) clearInterval(_teamleadPopoutMonitor);
   _teamleadPopoutMonitor = setInterval(() => {
     if (!_teamleadPopout || _teamleadPopout.closed) {
@@ -421,6 +507,14 @@ function _teamleadToolboxContent(myGroups) {
                 <option value="critical">${t('urgency_critical')||'Critical'}</option>
               </select>
               <button class="btn btn-sm" style="background:#E67E22;color:#fff" data-action="escalateDecision">\u2B06 ${t('btn_escalate')||'Escalate'}</button>
+            </div>
+          </div>
+
+          <!-- Escalated Decisions Status (detached) -->
+          <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
+            <div style="font-weight:700;margin-bottom:8px">\uD83D\uDCCB ${t('tl_my_escalations')||'My Escalated Decisions'}</div>
+            <div id="tlEscalatedDecisionsPanel" style="max-height:250px;overflow-y:auto">
+              <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
             </div>
           </div>
 
