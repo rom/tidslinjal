@@ -708,6 +708,7 @@ function _openBoardItem(itemId) {
         <input id="inlineItemSubject" class="input" style="font-size:inherit;font-weight:bold;border:1px solid transparent;background:transparent;padding:2px 6px;width:80%;border-radius:var(--radius)" value="${escHtml(item.subject)}">
       </h3>
       <div style="display:flex;gap:6px;align-items:center;margin-right:32px;flex-shrink:0">
+        <button class="btn btn-sm btn-secondary" data-action="_showMoveToBoardDialog" data-arg="${item.id}" title="Move to another board" style="min-width:32px;height:28px;padding:4px 8px">↗️</button>
         <button class="btn btn-sm btn-secondary" data-action="_archiveBoardItem" data-arg="${item.id}" title="${t('board_archive')||'Archive'}" style="min-width:32px;height:28px;padding:4px 8px">📦</button>
         <button class="btn btn-sm btn-secondary" data-action="_showBoardItemHelp" title="${t('board_item_help')||'Help'}" style="min-width:32px;height:28px;padding:4px 8px">❓</button>
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardItemLink" data-arg="${item.id}" title="${t('board_share_item')||'Share link'}" style="min-width:32px;height:28px;padding:4px 8px">🔗</button>
@@ -1593,6 +1594,122 @@ function _boardZoomReset() {
 }
 
 // ── Archive ──
+// ── Move item to another board ──
+async function _showMoveToBoardDialog(itemId) {
+  const item = _boardsState.items.find(i => i.id === itemId);
+  if (!item) return;
+
+  // Fetch all boards the user can access
+  let boards;
+  try {
+    boards = await _boardApi('GET', '/boards');
+  } catch (e) { alert('Failed to load boards: ' + e.message); return; }
+
+  // Filter out the current board
+  const currentBoardId = _boardsState.activeBoard?.id;
+  const otherBoards = boards.filter(b => b.id !== currentBoardId);
+  if (!otherBoards.length) {
+    alert('No other boards available to move this item to.');
+    return;
+  }
+
+  // Check for related items on the same board
+  const relatedIds = (item.related_item_ids || []).filter(rid => {
+    const rel = _boardsState.items.find(i => i.id === rid);
+    return rel && !rel.archived;
+  });
+  const hasRelated = relatedIds.length > 0;
+
+  let html = `<div style="max-width:440px">
+    <h3 style="margin-bottom:10px">Move Item to Another Board</h3>
+    <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:10px">
+      Moving <strong>#${item.id} ${escHtml(item.subject)}</strong> from <strong>${escHtml(_boardsState.activeBoard?.name || '')}</strong>
+    </p>
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-sm);font-weight:600;display:block;margin-bottom:4px">Target Board:</label>
+      <select id="moveToBoardSelect" class="input" style="width:100%;padding:6px 8px;font-size:var(--fs-sm);border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)">
+        ${otherBoards.map(b => `<option value="${b.id}" data-cols='${JSON.stringify(b.columns||[])}'>${escHtml(b.name)}${b.description ? ' — ' + escHtml(b.description.substring(0, 40)) : ''}</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-sm);font-weight:600;display:block;margin-bottom:4px">Target Column:</label>
+      <select id="moveToColSelect" class="input" style="width:100%;padding:6px 8px;font-size:var(--fs-sm);border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)"></select>
+    </div>`;
+
+  if (hasRelated) {
+    const relatedNames = relatedIds.map(rid => {
+      const rel = _boardsState.items.find(i => i.id === rid);
+      return rel ? `#${rid} ${escHtml(rel.subject)}` : `#${rid}`;
+    });
+    html += `<div style="margin-bottom:10px;padding:10px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent)">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+        <input type="checkbox" id="moveRelatedCheck" checked style="width:16px;height:16px;accent-color:var(--accent);margin-top:2px">
+        <div>
+          <strong>Also move ${relatedIds.length} related item(s)?</strong>
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">
+            ${relatedNames.join('<br>')}
+          </div>
+        </div>
+      </label>
+    </div>`;
+  }
+
+  html += `<div style="display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:10px;margin-top:12px">
+      <button class="btn btn-primary" data-action="_executeMoveToBoard" data-arg="${itemId}">Move</button>
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="moveToBoardModal">Cancel</button>
+    </div>
+  </div>`;
+
+  _boardModal('moveToBoardModal', html, '460px');
+
+  // Populate columns when board selection changes
+  const boardSel = document.getElementById('moveToBoardSelect');
+  const colSel = document.getElementById('moveToColSelect');
+  function updateColumns() {
+    const opt = boardSel.selectedOptions[0];
+    if (!opt) return;
+    let cols = [];
+    try { cols = JSON.parse(opt.dataset.cols || '[]'); } catch {}
+    colSel.innerHTML = cols.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+  }
+  if (boardSel) {
+    boardSel.addEventListener('change', updateColumns);
+    updateColumns();
+  }
+}
+
+async function _executeMoveToBoard(itemId) {
+  const boardSel = document.getElementById('moveToBoardSelect');
+  const colSel = document.getElementById('moveToColSelect');
+  const relatedCheck = document.getElementById('moveRelatedCheck');
+  if (!boardSel || !colSel) return;
+
+  const targetBoardId = parseInt(boardSel.value);
+  const targetColId = colSel.value;
+  const moveRelated = relatedCheck ? relatedCheck.checked : false;
+
+  if (!targetBoardId) return;
+
+  try {
+    const result = await _boardApi('POST', '/board-items/' + itemId + '/move-to-board', {
+      target_board_id: targetBoardId,
+      target_column_id: targetColId,
+      move_related: moveRelated
+    });
+    const movedCount = (result.moved || []).length;
+    _closeBoardModal('moveToBoardModal');
+    _closeBoardModal('boardItemModal');
+    // Refresh current board
+    const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+    _boardsState.items = items;
+    _renderKanbanBoard();
+    const boardName = boardSel.selectedOptions[0]?.textContent?.split(' — ')[0] || 'target board';
+    if (typeof showNotification === 'function') {
+      showNotification('success', `Moved ${movedCount} item(s) to ${boardName}`);
+    }
+  } catch (e) { alert('Failed to move: ' + e.message); }
+}
+
 async function _archiveBoardItem(itemId) {
   try {
     await _boardApi('POST', '/board-items/' + itemId + '/archive', {});

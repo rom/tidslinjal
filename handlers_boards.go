@@ -597,6 +597,87 @@ func (app *App) handleMoveBoardItem(w http.ResponseWriter, r *http.Request, user
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// handleMoveBoardItemToBoard moves an item (and optionally its related items) to a different board.
+func (app *App) handleMoveBoardItemToBoard(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	srcBoard := app.store.GetBoardByID(item.BoardID)
+	if srcBoard == nil || !app.canEditBoard(srcBoard, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		TargetBoardID  int64   `json:"target_board_id"`
+		TargetColumnID string  `json:"target_column_id"`
+		MoveRelated    bool    `json:"move_related"` // also move related items
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.TargetBoardID == 0 {
+		jsonError(w, "target_board_id is required", http.StatusBadRequest)
+		return
+	}
+	targetBoard := app.store.GetBoardByID(req.TargetBoardID)
+	if targetBoard == nil {
+		jsonError(w, "target board not found", http.StatusNotFound)
+		return
+	}
+	if !app.canEditBoard(targetBoard, user) {
+		jsonError(w, "no access to target board", http.StatusForbidden)
+		return
+	}
+	// Default to first column of target board
+	colID := req.TargetColumnID
+	if colID == "" && len(targetBoard.Columns) > 0 {
+		colID = targetBoard.Columns[0].ID
+	}
+
+	// Collect items to move
+	itemsToMove := []int64{id}
+	if req.MoveRelated && len(item.RelatedItemIDs) > 0 {
+		for _, relID := range item.RelatedItemIDs {
+			rel := app.store.GetBoardItemByID(relID)
+			if rel != nil && rel.BoardID == item.BoardID {
+				itemsToMove = append(itemsToMove, relID)
+			}
+		}
+	}
+
+	srcBoardID := item.BoardID
+	movedItems := []map[string]any{}
+	for _, mid := range itemsToMove {
+		if err := app.store.MoveBoardItemToBoard(mid, req.TargetBoardID, colID); err != nil {
+			continue
+		}
+		movedItem := app.store.GetBoardItemByID(mid)
+		subj := ""
+		if movedItem != nil {
+			subj = movedItem.Subject
+		}
+		_ = app.store.AddBoardItemHistory(mid, BoardHistory{
+			Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
+			Action: "moved", Detail: fmt.Sprintf("Moved from board #%d to board #%d (%s)", srcBoardID, req.TargetBoardID, targetBoard.Name),
+		})
+		movedItems = append(movedItems, map[string]any{"id": mid, "subject": subj})
+	}
+
+	app.audit(user.ID, user.DisplayName, "moved_to_board", "board_item", id,
+		fmt.Sprintf("Moved %d item(s) from board %q to board %q", len(movedItems), srcBoard.Name, targetBoard.Name))
+	app.broadcastBoardChange("board_item_moved", srcBoardID)
+	app.broadcastBoardChange("board_item_moved", req.TargetBoardID)
+	jsonOK(w, map[string]any{"status": "ok", "moved": movedItems})
+}
+
 // ── Board Item Attachments ──────────────────────────────────────────────────
 
 func (app *App) handleAddBoardItemComment(w http.ResponseWriter, r *http.Request, user *User) {

@@ -145,6 +145,24 @@ func (s *Store) DeleteBoardItem(id int64) error {
 	return fmt.Errorf("board item %d not found", id)
 }
 
+// MoveBoardItemToBoard moves an item to a different board, placing it in the given column.
+func (s *Store) MoveBoardItemToBoard(itemID, targetBoardID int64, targetColumnID string) error {
+	s.mu.Lock()
+	for i, x := range s.boardItems {
+		if x.ID == itemID {
+			s.boardItems[i].BoardID = targetBoardID
+			s.boardItems[i].ColumnID = targetColumnID
+			s.boardItems[i].SortOrder = 9999 // will be at the end
+			s.boardItems[i].UpdatedAt = time.Now()
+			snap := append([]BoardItem(nil), s.boardItems...)
+			s.mu.Unlock()
+			return s.persist("board_items.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("board item %d not found", itemID)
+}
+
 // MoveBoardItem moves an item to a column at the given sort position, shifting other items.
 func (s *Store) MoveBoardItem(itemID int64, columnID string, sortOrder int) error {
 	s.mu.Lock()
