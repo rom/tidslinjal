@@ -285,6 +285,13 @@ function _renderKanbanBoard() {
         <button class="btn btn-sm btn-secondary" data-action="_boardZoomReset" title="${t('board_zoom_reset')||'Reset zoom'}" style="${btnStyle}font-size:var(--fs-xs);">100%</button>
       </div>
     </div>
+    <div class="kanban-col-tabs" style="display:none">
+      ${board.columns.map((col, i) => {
+        const cnt = (colItems[String(col.id)] || []).length;
+        return `<button class="kanban-col-tab${i===0?' active':''}" data-col-tab="${col.id}">${escHtml(col.name)} (${cnt})</button>`;
+      }).join('')}
+      ${archivedItems.length > 0 ? `<button class="kanban-col-tab" data-col-tab="_archived">📦 (${archivedItems.length})</button>` : ''}
+    </div>
     <div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;width:100%;box-sizing:border-box;transform:scale(${_boardsState.zoom});transform-origin:top left;${_boardsState.zoom !== 1 ? 'width:' + (100 / _boardsState.zoom) + '%;' : ''}">`;
 
   for (const col of board.columns) {
@@ -434,6 +441,59 @@ function _bindKanbanEvents() {
     const colId = el.dataset.dblclickRename;
     const colName = el.dataset.colName;
     el.addEventListener('dblclick', () => _renameCol(colId, colName));
+  });
+
+  // Mobile column tab navigation
+  _setupMobileKanbanTabs(modal);
+}
+
+function _setupMobileKanbanTabs(modal) {
+  const isMobile = window.innerWidth <= 768;
+  const tabBar = modal.querySelector('.kanban-col-tabs');
+  if (!tabBar) return;
+  // Show tab bar only on mobile
+  tabBar.style.display = isMobile ? 'flex' : 'none';
+  if (!isMobile) return;
+
+  const kanbanCols = modal.querySelector('.kanban-columns');
+  if (!kanbanCols) return;
+
+  tabBar.querySelectorAll('.kanban-col-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabBar.querySelectorAll('.kanban-col-tab').forEach(t2 => t2.classList.remove('active'));
+      tab.classList.add('active');
+      const colId = tab.dataset.colTab;
+      let target;
+      if (colId === '_archived') {
+        // Last column is the archive
+        const cols = kanbanCols.querySelectorAll('.kanban-col');
+        target = cols[cols.length - 1];
+      } else {
+        target = kanbanCols.querySelector('[data-col="' + colId + '"]');
+      }
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  });
+
+  // Highlight active tab on scroll
+  let scrollTimer;
+  kanbanCols.addEventListener('scroll', () => {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const cols = kanbanCols.querySelectorAll('.kanban-col:not(.kanban-col-collapsed)');
+      const center = kanbanCols.scrollLeft + kanbanCols.clientWidth / 2;
+      let closest = null, closestDist = Infinity;
+      cols.forEach(c => {
+        const dist = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center);
+        if (dist < closestDist) { closestDist = dist; closest = c; }
+      });
+      if (closest) {
+        const activeColId = closest.dataset.col || '_archived';
+        tabBar.querySelectorAll('.kanban-col-tab').forEach(t2 => {
+          t2.classList.toggle('active', t2.dataset.colTab === activeColId);
+        });
+      }
+    }, 100);
   });
 }
 
@@ -610,7 +670,7 @@ async function _addItemToCol(colId) {
   const sortOrder = colItems.length > 0 ? Math.max(...colItems.map(i => i.sort_order)) + 1 : 0;
   try {
     const created = await _boardApi('POST', '/boards/' + board.id + '/items', {
-      column_id: colId, subject: t('board_new_item')||'New item', sort_order: sortOrder
+      column_id: colId, subject: '', sort_order: sortOrder
     });
     _boardsState.items.push(created);
     _renderKanbanBoard();
@@ -618,7 +678,7 @@ async function _addItemToCol(colId) {
     _openBoardItem(created.id);
     setTimeout(() => {
       const subjectEl = document.getElementById('inlineItemSubject');
-      if (subjectEl) { subjectEl.select(); subjectEl.focus(); }
+      if (subjectEl) { subjectEl.value = ''; subjectEl.focus(); subjectEl.style.borderColor='var(--accent)'; subjectEl.style.background='var(--bg3)'; }
     }, 100);
   } catch (e) { alert(e.message); }
 }

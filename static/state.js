@@ -33,7 +33,7 @@ window.state = {
     synth_label:     false,
     // v6.1.0
     time_format:         '24h',
-    high_contrast:       false,
+    high_contrast:       true,
     color_blind_mode:    'off',
     default_landing_view:'grid',
     auto_follow_now:     false,
