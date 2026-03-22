@@ -1366,6 +1366,8 @@ async function _renderBoardsAnalysisTab(container) {
       ${card(t('analysis_boards_closed')||'Closed', data.closed_items || 0, t('analysis_boards_items_label')||'issues')}
       ${card(t('analysis_boards_archived')||'Archived', data.archived_items || 0, t('analysis_boards_items_label')||'issues')}
       ${card(t('analysis_boards_total_responsible')||'Total Responsible', data.total_responsible || 0)}
+      ${card(t('analysis_boards_overdue')||'Overdue', data.overdue_items || 0, t('analysis_boards_items_label')||'issues')}
+      ${card(t('analysis_boards_due_soon')||'Due Soon (48h)', data.due_soon_items || 0, t('analysis_boards_items_label')||'issues')}
     </div>`;
 
   // Donut charts row: by state, by priority, by type
@@ -1390,6 +1392,30 @@ async function _renderBoardsAnalysisTab(container) {
   </div>`;
 
   html += `</div>`;
+
+  // Issues by responsible bar chart
+  if (data.by_responsible && data.by_responsible.length > 0) {
+    html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_by_responsible')||'Issues by Responsible'}</h4>
+      <canvas id="anlBoardResponsibleChart" width="600" height="${Math.max(180, data.by_responsible.length * 28)}"></canvas>
+    </div>`;
+  }
+
+  // Issues by tag bar chart
+  if (data.by_tag && data.by_tag.length > 0) {
+    html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_by_tag')||'Issues by Tag'}</h4>
+      <canvas id="anlBoardTagChart" width="600" height="${Math.max(180, data.by_tag.length * 28)}"></canvas>
+    </div>`;
+  }
+
+  // Items created trend (last 30 days line chart)
+  if (data.created_trend && data.created_trend.length > 1) {
+    html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_created_trend')||'Items Created (Last 30 Days)'}</h4>
+      <canvas id="anlBoardCreatedTrend" width="600" height="220"></canvas>
+    </div>`;
+  }
 
   // Boards by owner
   if (data.by_owner && data.by_owner.length > 0) {
@@ -1462,6 +1488,41 @@ async function _renderBoardsAnalysisTab(container) {
       const typeData = (data.by_type||[]).map(t => t.count);
       const typeColors = ['#27ae60','#2980b9','#8e44ad','#e74c3c','#f39c12','#1abc9c','#95a5a6'];
       drawPieChart('anlBoardTypeChart', typeLabels, typeData, typeColors);
+
+      // Responsible bar chart
+      if (data.by_responsible && data.by_responsible.length > 0 && typeof drawBarChart === 'function') {
+        const respLabels = data.by_responsible.map(r => r.name);
+        const respData = data.by_responsible.map(r => r.count);
+        const respColors = ['#3498db','#e67e22','#27ae60','#e74c3c','#9b59b6','#1abc9c','#f39c12','#2c3e50'];
+        drawBarChart('anlBoardResponsibleChart', respLabels, respData, {
+          horizontal: true,
+          barColors: respColors,
+          showValues: true
+        });
+      }
+
+      // Tag bar chart
+      if (data.by_tag && data.by_tag.length > 0 && typeof drawBarChart === 'function') {
+        const tagLabels = data.by_tag.map(t => t.name);
+        const tagData = data.by_tag.map(t => t.count);
+        const tagColors = ['#9b59b6','#e67e22','#1abc9c','#e74c3c','#3498db','#27ae60','#f39c12','#2c3e50'];
+        drawBarChart('anlBoardTagChart', tagLabels, tagData, {
+          horizontal: true,
+          barColors: tagColors,
+          showValues: true
+        });
+      }
+
+      // Created trend line chart
+      if (data.created_trend && data.created_trend.length > 1 && typeof drawLineChart === 'function') {
+        const trendLabels = data.created_trend.map(d => d.date.slice(5)); // MM-DD format
+        const trendData = data.created_trend.map(d => d.count);
+        drawLineChart('anlBoardCreatedTrend', trendLabels, [{
+          label: t('analysis_boards_items_created')||'Items Created',
+          data: trendData,
+          color: '#3498db'
+        }]);
+      }
     }
   }, 50);
 }

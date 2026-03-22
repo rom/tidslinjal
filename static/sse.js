@@ -269,7 +269,10 @@ function _showFlashAlert(data) {
       <div style="${titleSize};margin-bottom:8px">${escHtml(typeLabel)}</div>
       <div style="font-size:14px;margin-bottom:12px;line-height:1.6">${escHtml(message)}</div>
       <div style="font-size:12px;opacity:.8;margin-bottom:16px">${t('from')||'From'}: <strong>${escHtml(from)}</strong>${role ? ' (' + escHtml(role) + ')' : ''} ${timestamp ? '· ' + timestamp : ''}</div>
-      <button style="background:rgba(255,255,255,.25);color:#fff;border:2px solid rgba(255,255,255,.5);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-dismiss-btn">${t('flash_acknowledge')||'Acknowledge'}</button>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        ${type === 'escalate_decision' ? `<button style="background:rgba(255,255,255,.9);color:#333;border:2px solid rgba(255,255,255,.8);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-decision-tool-btn">📋 ${t('decision_tool')||'Decision Tool'}</button>` : ''}
+        <button style="background:rgba(255,255,255,.25);color:#fff;border:2px solid rgba(255,255,255,.5);padding:8px 24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600" class="flash-dismiss-btn">${t('flash_acknowledge')||'Acknowledge'}</button>
+      </div>
     </div>`;
 
   document.body.appendChild(overlay);
@@ -287,6 +290,14 @@ function _showFlashAlert(data) {
     clearTimeout(timer);
     overlay.remove();
   });
+  const decisionToolBtn = overlay.querySelector('.flash-decision-tool-btn');
+  if (decisionToolBtn) {
+    decisionToolBtn.addEventListener('click', () => {
+      clearTimeout(timer);
+      overlay.remove();
+      if (typeof openDecisionLogModal === 'function') openDecisionLogModal();
+    });
+  }
   overlay.addEventListener('click', e => {
     if (e.target === overlay) { clearTimeout(timer); overlay.remove(); }
   });

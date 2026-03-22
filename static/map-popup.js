@@ -425,17 +425,24 @@ function geocodeSync(location) {
   // Try to parse "lat,lng" format
   const parts = location.split(',').map(s => parseFloat(s.trim()));
   if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return parts;
-  // Try country lookup
   const lower = location.toLowerCase().trim();
-  if (COUNTRY_CAPITALS[lower]) return COUNTRY_CAPITALS[lower];
-  // Try city lookup (e.g. "Stockholm, Sweden" → match "stockholm")
-  const cityParts = lower.split(',').map(s => s.trim());
-  for (const part of cityParts) {
-    if (MAJOR_CITIES[part]) return MAJOR_CITIES[part];
-    if (COUNTRY_CAPITALS[part]) return COUNTRY_CAPITALS[part];
-  }
-  // Try full string as city name
+  // Try full string as city name first (e.g. "gothenburg")
   if (MAJOR_CITIES[lower]) return MAJOR_CITIES[lower];
+  // Try comma-separated parts: prioritize city matches over country matches
+  // e.g. "Gothenburg, Sweden" → match Gothenburg city, not Sweden capital
+  const cityParts = lower.split(',').map(s => s.trim());
+  if (cityParts.length > 1) {
+    // First pass: look for city match in any part
+    for (const part of cityParts) {
+      if (MAJOR_CITIES[part]) return MAJOR_CITIES[part];
+    }
+    // Second pass: fall back to country match
+    for (const part of cityParts) {
+      if (COUNTRY_CAPITALS[part]) return COUNTRY_CAPITALS[part];
+    }
+  }
+  // Single-word fallback: try country lookup
+  if (COUNTRY_CAPITALS[lower]) return COUNTRY_CAPITALS[lower];
   return null;
 }
 

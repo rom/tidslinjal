@@ -56,11 +56,14 @@ function render() {
       const targetInfo = e.requested_of_label ? ' → ' + escHtml(e.requested_of_label) : '';
       statusBadge = '<span class="badge badge-requested">PENDING' + targetInfo + '</span>';
       if (canReview) {
-        reviewSection = '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
-          '<input type="text" data-review-id="' + e.id + '" placeholder="' + escHtml(t('review_comment')) + '" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px">' +
-          '<button class="btn-primary" data-approve="' + e.id + '" style="padding:2px 8px;font-size:11px">✓ ' + escHtml(t('btn_approve')) + '</button>' +
-          '<button class="btn-danger" data-reject="' + e.id + '" style="padding:2px 8px;font-size:11px">✗ ' + escHtml(t('btn_reject')) + '</button>' +
-          '</div>';
+        reviewSection = '<div style="margin-top:6px">' +
+          '<input type="text" data-review-id="' + e.id + '" placeholder="' + escHtml(t('review_comment') || 'Comment / condition / modification...') + '" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 8px;font-size:11px;margin-bottom:6px">' +
+          '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+          '<button class="btn-primary" data-approve="' + e.id + '" data-approval-type="approved" style="padding:2px 8px;font-size:11px">✓ ' + escHtml(t('btn_approve') || 'Approve') + '</button>' +
+          '<button class="btn-primary" data-approve="' + e.id + '" data-approval-type="approved_with_condition" style="padding:2px 8px;font-size:11px;background:#2ECC71">✓⚠ ' + escHtml(t('btn_approve_condition') || 'Approve w/ Condition') + '</button>' +
+          '<button class="btn-primary" data-approve="' + e.id + '" data-approval-type="approved_with_modification" style="padding:2px 8px;font-size:11px;border:1px dashed #fff">✓✏ ' + escHtml(t('btn_approve_modification') || 'Approve w/ Modification') + '</button>' +
+          '<button class="btn-danger" data-reject="' + e.id + '" style="padding:2px 8px;font-size:11px">✗ ' + escHtml(t('btn_deny') || 'Deny') + '</button>' +
+          '</div></div>';
       }
     } else if (e.status === 'approved') {
       statusBadge = '<span class="badge badge-approved">DECIDED</span>';
@@ -103,8 +106,13 @@ function bindEntryActions() {
   document.querySelectorAll('[data-approve]').forEach(btn => {
     btn.onclick = async () => {
       const id = btn.dataset.approve;
+      const approvalType = btn.dataset.approvalType || 'approved';
       const comment = document.querySelector('[data-review-id="' + id + '"]')?.value || '';
-      await api('PUT', '/api/decision-log/' + id + '/review', { status: 'approved', comment });
+      if ((approvalType === 'approved_with_condition' || approvalType === 'approved_with_modification') && !comment) {
+        alert(t('decision_condition_comment_required') || 'Please describe the condition or modification');
+        return;
+      }
+      await api('PUT', '/api/decision-log/' + id + '/review', { status: 'approved', comment, approval_type: approvalType });
       loadEntries();
     };
   });
@@ -112,6 +120,10 @@ function bindEntryActions() {
     btn.onclick = async () => {
       const id = btn.dataset.reject;
       const comment = document.querySelector('[data-review-id="' + id + '"]')?.value || '';
+      if (!comment) {
+        alert(t('deny_reason_required') || 'A reason is required when denying a decision');
+        return;
+      }
       await api('PUT', '/api/decision-log/' + id + '/review', { status: 'rejected', comment });
       loadEntries();
     };

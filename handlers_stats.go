@@ -1701,8 +1701,22 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 	// Type counts
 	typeCounts := map[string]int{}
 
+	// Tag counts
+	tagCounts := map[string]int{}
+
+	// Due date tracking
+	overdueItems := 0
+	dueSoonItems := 0
+	today := time.Now().Format("2006-01-02")
+	soonDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
+
+	// Items created per day (last 30 days)
+	createdPerDay := map[string]int{}
+	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+
 	// Responsible tracking
 	responsibleSet := map[string]bool{}
+	responsibleCounts := map[string]int{}
 
 	for _, item := range allItems {
 		if item.Archived {
@@ -1741,6 +1755,29 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 		// Responsible
 		if item.ResponsibleName != "" {
 			responsibleSet[item.ResponsibleName] = true
+			responsibleCounts[item.ResponsibleName]++
+		}
+
+		// Tags
+		for _, tag := range item.Tags {
+			if tag != "" {
+				tagCounts[tag]++
+			}
+		}
+
+		// Due date tracking
+		if item.DueDate != "" {
+			if item.DueDate < today {
+				overdueItems++
+			} else if item.DueDate <= soonDate {
+				dueSoonItems++
+			}
+		}
+
+		// Created per day (last 30 days)
+		if item.CreatedAt.After(thirtyDaysAgo) {
+			day := item.CreatedAt.Format("2006-01-02")
+			createdPerDay[day]++
 		}
 	}
 
@@ -1782,6 +1819,31 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 	}
 	sort.Slice(byType, func(i, j int) bool { return byType[i].Count > byType[j].Count })
 
+	// Items by responsible
+	byResponsible := []ownerCount{}
+	for name, cnt := range responsibleCounts {
+		byResponsible = append(byResponsible, ownerCount{name, cnt})
+	}
+	sort.Slice(byResponsible, func(i, j int) bool { return byResponsible[i].Count > byResponsible[j].Count })
+
+	// Tags breakdown
+	byTag := []ownerCount{}
+	for tag, cnt := range tagCounts {
+		byTag = append(byTag, ownerCount{tag, cnt})
+	}
+	sort.Slice(byTag, func(i, j int) bool { return byTag[i].Count > byTag[j].Count })
+
+	// Created per day (sorted by date)
+	type dayCount struct {
+		Date  string `json:"date"`
+		Count int    `json:"count"`
+	}
+	createdTrend := []dayCount{}
+	for d, cnt := range createdPerDay {
+		createdTrend = append(createdTrend, dayCount{d, cnt})
+	}
+	sort.Slice(createdTrend, func(i, j int) bool { return createdTrend[i].Date < createdTrend[j].Date })
+
 	jsonOK(w, map[string]any{
 		"total_boards":       totalBoards,
 		"total_items":        totalItems,
@@ -1797,6 +1859,11 @@ func (app *App) handleStatsBoardAnalytics(w http.ResponseWriter, r *http.Request
 		"total_responsible":  len(responsibleSet),
 		"by_owner":           owners,
 		"items_per_board":    itemsPerBoard,
+		"by_responsible":     byResponsible,
+		"by_tag":             byTag,
+		"overdue_items":      overdueItems,
+		"due_soon_items":     dueSoonItems,
+		"created_trend":      createdTrend,
 	})
 }
 
