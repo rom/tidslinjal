@@ -1502,6 +1502,13 @@ role_editor_label_nb: '🇳🇴 NB',
 
     // Dashboard
     dashboard_title: 'Огляд ситуації',
+    dashboard_clock: 'Годинник',
+    dashboard_boards: 'Зведення дошок',
+    dashboard_decisions: 'Останні рішення',
+    settings_quick_response_receiver: 'Отримувач швидкої відповіді',
+    settings_quick_response_receiver_desc: 'Оберіть які ролі та групи мають отримувати спалах-сповіщення при швидкій відповіді або ескалації.',
+    settings_qr_roles: 'Ролі',
+    settings_qr_groups: 'Групи',
 
     // Admin user management
     admin_change_password: 'Змінити пароль',

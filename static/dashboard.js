@@ -3,16 +3,20 @@
 
 // Default widget configuration
 const _dashboardDefaults = [
-  { id: 'urgent_requests', title: 'Urgent Requests from TeamLeads', enabled: true, order: 0 },
-  { id: 'online_users',    title: 'Currently Logged In Users',      enabled: true, order: 1 },
-  { id: 'recent_audit',    title: 'Recent Audit Events',            enabled: true, order: 2, config: { count: 5 } },
-  { id: 'integrations',    title: 'Active Integrations',            enabled: true, order: 3 },
-  { id: 'ongoing',         title: 'Ongoing Activities',             enabled: true, order: 4 },
-  { id: 'summary',         title: 'System Summary',                 enabled: true, order: 5 },
+  { id: 'clock',            title: 'Clock',                          enabled: true, order: 0 },
+  { id: 'urgent_requests',  title: 'Urgent Requests from TeamLeads', enabled: true, order: 1 },
+  { id: 'online_users',     title: 'Currently Logged In Users',      enabled: true, order: 2 },
+  { id: 'recent_audit',     title: 'Recent Audit Events',            enabled: true, order: 3, config: { count: 5 } },
+  { id: 'ongoing',          title: 'Ongoing Activities',             enabled: true, order: 4 },
+  { id: 'summary',          title: 'System Summary',                 enabled: true, order: 5 },
+  { id: 'board_summary',    title: 'Board Summary',                  enabled: true, order: 6 },
+  { id: 'recent_decisions', title: 'Recent Decisions',               enabled: true, order: 7 },
+  { id: 'integrations',     title: 'Active Integrations',            enabled: false, order: 8 },
 ];
 
 let _dashboardData = null;
 let _dashboardRefreshTimer = null;
+let _dashboardClockTimer = null;
 
 function _getDashboardConfig() {
   try {
@@ -28,6 +32,7 @@ function _saveDashboardConfig(config) {
 
 function _closeDashboard() {
   if (_dashboardRefreshTimer) clearInterval(_dashboardRefreshTimer);
+  if (_dashboardClockTimer) clearInterval(_dashboardClockTimer);
   document.getElementById('dashboardModal')?.remove();
 }
 
@@ -82,7 +87,10 @@ async function openDashboard() {
       return;
     }
     _dashboardRefresh();
-  }, 30000);
+  }, 10000);
+
+  // Live clock update every second
+  _dashboardClockTimer = setInterval(_updateDashboardClock, 1000);
 }
 
 async function _dashboardRefresh() {
@@ -122,6 +130,15 @@ function _renderDashboardWidgets() {
         break;
       case 'summary':
         html += _renderSummary(d.stats || {});
+        break;
+      case 'clock':
+        html += _renderDashboardClock();
+        break;
+      case 'board_summary':
+        html += _renderBoardSummary(d.board_summary || {});
+        break;
+      case 'recent_decisions':
+        html += _renderRecentDecisions(d.recent_decisions || []);
         break;
       default:
         html += `<div style="color:var(--text-dim)">Unknown widget: ${escHtml(widget.id)}</div>`;
@@ -253,6 +270,63 @@ function _renderSummary(stats) {
       <div style="font-size:var(--fs-xs);color:var(--text-dim)">Open Polls</div>
     </div>
   </div>`;
+  return h;
+}
+
+function _renderDashboardClock() {
+  const now = new Date();
+  const localTime = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const utcTime = now.toUTCString().slice(17, 25);
+  const dateStr = now.toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  let h = `<div style="text-align:center;padding:8px 0">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--accent)">🕐 ${t('dashboard_clock')||'Clock'}</div>
+    <div id="dashClockLocal" style="font-size:32px;font-weight:700;font-family:monospace;color:var(--text-bright);letter-spacing:2px">${localTime}</div>
+    <div id="dashClockDate" style="font-size:var(--fs-sm);color:var(--text-dim);margin-top:2px">${dateStr}</div>
+    <div id="dashClockUTC" style="font-size:var(--fs-sm);font-family:monospace;color:var(--text-dim);margin-top:4px">UTC: ${utcTime}</div>
+  </div>`;
+  return h;
+}
+
+function _updateDashboardClock() {
+  const localEl = document.getElementById('dashClockLocal');
+  const utcEl = document.getElementById('dashClockUTC');
+  const dateEl = document.getElementById('dashClockDate');
+  if (!localEl) return;
+  const now = new Date();
+  localEl.textContent = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  if (utcEl) utcEl.textContent = 'UTC: ' + now.toUTCString().slice(17, 25);
+  if (dateEl) dateEl.textContent = now.toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+
+function _renderBoardSummary(summary) {
+  let h = `<div style="font-weight:700;margin-bottom:8px;color:var(--accent)">📌 ${t('dashboard_boards')||'Board Summary'}</div>`;
+  const boards = summary.boards || [];
+  if (!boards.length) {
+    h += '<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0">No boards available</div>';
+    return h;
+  }
+  for (const b of boards.slice(0, 5)) {
+    h += `<div style="font-size:var(--fs-xs);padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center">
+      <strong>${escHtml(b.name)}</strong>
+      <span style="color:var(--text-dim)">${b.item_count||0} items${b.overdue_count ? ` · <span style="color:var(--danger)">${b.overdue_count} overdue</span>` : ''}</span>
+    </div>`;
+  }
+  return h;
+}
+
+function _renderRecentDecisions(decisions) {
+  let h = `<div style="font-weight:700;margin-bottom:8px;color:var(--accent)">⚖ ${t('dashboard_decisions')||'Recent Decisions'}</div>`;
+  if (!decisions.length) {
+    h += '<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0">No recent decisions</div>';
+    return h;
+  }
+  for (const d of decisions.slice(0, 5)) {
+    const time = d.created_at ? new Date(d.created_at).toLocaleString() : '';
+    h += `<div style="font-size:var(--fs-xs);padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent)">
+      <div style="display:flex;justify-content:space-between"><strong>${escHtml(d.title || d.sequence_number || '')}</strong><span style="color:var(--text-dim)">${time}</span></div>
+      ${d.decision ? `<div style="color:var(--text-dim);margin-top:2px">${escHtml(d.decision).substring(0, 100)}</div>` : ''}
+    </div>`;
+  }
   return h;
 }
 

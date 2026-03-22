@@ -147,6 +147,50 @@ func (app *App) handleDashboardData(w http.ResponseWriter, r *http.Request, user
 		}
 	}
 
+	// ── 7. Board summary ────────────────────────────────────────────────────
+	boardSummary := map[string]any{"boards": []map[string]any{}}
+	boards := app.store.GetBoards()
+	boardList := []map[string]any{}
+	todayStr := now.Format("2006-01-02")
+	for _, b := range boards {
+		if !app.canAccessBoard(&b, user) {
+			continue
+		}
+		items := app.store.GetBoardItems(b.ID)
+		overdueCount := 0
+		for _, it := range items {
+			if !it.Archived && it.DueDate != "" && it.DueDate < todayStr {
+				overdueCount++
+			}
+		}
+		boardList = append(boardList, map[string]any{
+			"id":            b.ID,
+			"name":          b.Name,
+			"item_count":    len(items),
+			"overdue_count": overdueCount,
+		})
+		if len(boardList) >= 5 {
+			break
+		}
+	}
+	boardSummary["boards"] = boardList
+
+	// ── 8. Recent decisions ─────────────────────────────────────────────────
+	recentDecisions := []map[string]any{}
+	for _, d := range app.store.GetDecisionLog() {
+		recentDecisions = append(recentDecisions, map[string]any{
+			"id":              d.ID,
+			"sequence_number": d.SequenceNumber,
+			"title":           d.Title,
+			"decision":        d.Decision,
+			"status":          d.Status,
+			"created_at":      d.Timestamp,
+		})
+		if len(recentDecisions) >= 5 {
+			break
+		}
+	}
+
 	jsonOK(w, map[string]any{
 		"urgent_requests":     urgentRequests,
 		"online_users":        onlineUsers,
@@ -154,6 +198,8 @@ func (app *App) handleDashboardData(w http.ResponseWriter, r *http.Request, user
 		"active_integrations": integrations,
 		"open_polls":          openPolls,
 		"active_ready_checks": activeReadyChecks,
+		"board_summary":       boardSummary,
+		"recent_decisions":    recentDecisions,
 		"stats": map[string]any{
 			"total_users":       len(allUsers),
 			"online_users":      len(onlineUsers),

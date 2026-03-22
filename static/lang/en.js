@@ -1801,6 +1801,16 @@ TRANSLATIONS.en = {
 
     // Dashboard
     dashboard_title: 'Situational Overview',
+    dashboard_clock: 'Clock',
+    dashboard_boards: 'Board Summary',
+    dashboard_decisions: 'Recent Decisions',
+
+    // Quick Response Receiver settings
+    settings_quick_response_receiver: 'Quick Response Receiver',
+    settings_quick_response_receiver_info: 'Configure who receives quick response and decision-needed alerts from the TeamLead Toolbox.',
+    settings_quick_response_receiver_desc: 'Choose which roles and groups should receive flash alerts when a quick response or escalation is sent.',
+    settings_qr_roles: 'Roles',
+    settings_qr_groups: 'Groups',
 
     // Admin user management
     admin_change_password: 'Change Password',

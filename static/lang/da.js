@@ -1413,6 +1413,13 @@ TRANSLATIONS.da = {
 
     // Dashboard
     dashboard_title: 'Situationsoversigt',
+    dashboard_clock: 'Ur',
+    dashboard_boards: 'Tavleoversigt',
+    dashboard_decisions: 'Seneste beslutninger',
+    settings_quick_response_receiver: 'Modtager af hurtigsvar',
+    settings_quick_response_receiver_desc: 'Vælg hvilke roller og grupper der skal modtage flashadvarsler ved hurtigsvar eller eskalering.',
+    settings_qr_roles: 'Roller',
+    settings_qr_groups: 'Grupper',
 
     // Admin user management
     admin_change_password: 'Skift adgangskode',

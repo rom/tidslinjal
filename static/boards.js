@@ -1000,27 +1000,26 @@ function _openBoardItem(itemId) {
           <option value="critical" ${item.priority==='critical'?'selected':''} style="color:#e74c3c">🔴 ${t('board_priority_critical')||'Critical'}</option>
         </select>
       </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <strong>${t('board_color')||'Color'}:</strong>
+        <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" data-board-item-id="${item.id}">
+        ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemColor" data-arg="${item.id}">✖</button>` : ''}
+      </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <strong style="font-size:var(--fs-sm)">${t('board_color')||'Color'}:</strong>
-      <input id="inlineItemColor" type="color" value="${item.color||'#1a1a2e'}" style="width:32px;height:22px;cursor:pointer;border:none;padding:0" data-board-item-id="${item.id}">
-      ${item.color ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemColor" data-arg="${item.id}">✖</button>` : ''}
-    </div>
-
-    <div style="margin-bottom:10px">
-      <strong style="font-size:var(--fs-sm)">🏷️ ${t('tags_title')||'Tags'}:</strong>
-      <div id="inlineItemTagChips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <strong style="font-size:var(--fs-sm);white-space:nowrap">🏷️ ${t('tags_title')||'Tags'}:</strong>
+      <div id="inlineItemTagChips" style="display:flex;flex-wrap:wrap;gap:4px">
         ${(item.tags||[]).map(tag => `<span class="board-tag-chip" data-tag="${escHtml(tag)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:var(--fs-xs);color:#fff;background:${typeof _tagColor==='function'?_tagColor(tag):'var(--accent)'};cursor:default">${escHtml(tag)}<span class="board-tag-remove" style="cursor:pointer;font-weight:bold;margin-left:2px">×</span></span>`).join('')}
       </div>
-      <div style="position:relative">
+      <div style="position:relative;flex:1;min-width:150px">
         <input id="inlineItemTags" class="input" style="width:100%;font-size:var(--fs-sm);padding:6px 10px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius)" value="" placeholder="${t('tags_placeholder')||'Type a tag and press comma to add...'}">
       </div>
     </div>
 
     <div style="margin-bottom:12px">
       <strong style="font-size:var(--fs-sm)">📝 ${t('board_note')||'Note'}:</strong>
-      <textarea id="inlineItemNote" class="input" style="width:100%;min-height:80px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)">${escHtml(item.note||'')}</textarea>
+      <textarea id="inlineItemNote" class="input" style="width:100%;min-height:160px;margin-top:4px;padding:8px;border-radius:var(--radius);font-size:var(--fs-sm);resize:vertical;border:1px solid var(--border);background:var(--bg3)">${escHtml(item.note||'')}</textarea>
     </div>`;
 
   // Activities section (user-entered timestamped log)

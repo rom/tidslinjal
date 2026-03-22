@@ -1596,6 +1596,13 @@ TRANSLATIONS.fr = {
 
     // Dashboard
     dashboard_title: 'Vue d\'ensemble de la situation',
+    dashboard_clock: 'Horloge',
+    dashboard_boards: 'Résumé des tableaux',
+    dashboard_decisions: 'Décisions récentes',
+    settings_quick_response_receiver: 'Récepteur de réponse rapide',
+    settings_quick_response_receiver_desc: 'Choisissez quels rôles et groupes doivent recevoir les alertes flash lors d\'une réponse rapide ou d\'une escalade.',
+    settings_qr_roles: 'Rôles',
+    settings_qr_groups: 'Groupes',
 
     // Admin user management
     admin_change_password: 'Changer le mot de passe',

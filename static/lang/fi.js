@@ -1562,6 +1562,13 @@ TRANSLATIONS.fi = {
 
     // Dashboard
     dashboard_title: 'Tilannekatsaus',
+    dashboard_clock: 'Kello',
+    dashboard_boards: 'Tauluyhteenveto',
+    dashboard_decisions: 'Viimeisimmät päätökset',
+    settings_quick_response_receiver: 'Pikavastauksen vastaanottaja',
+    settings_quick_response_receiver_desc: 'Valitse mitkä roolit ja ryhmät saavat hälytyksiä pikavastauksista tai eskalaatioista.',
+    settings_qr_roles: 'Roolit',
+    settings_qr_groups: 'Ryhmät',
 
     // Admin user management
     admin_change_password: 'Vaihda salasana',
