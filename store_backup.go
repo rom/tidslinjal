@@ -87,7 +87,7 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 		"routing_rules.json", "connectors.json",
 		"questionnaires.json", "checklist_templates.json", "checklist_instances.json",
 		"tags.json", "notifications.json", "polls.json",
-		"person_ready_checks.json",
+		"person_ready_checks.json", "api_keys.json",
 	}
 	for _, fn := range files {
 		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))

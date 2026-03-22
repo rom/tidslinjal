@@ -208,13 +208,16 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	var req struct {
-		Name        *string     `json:"name"`
-		Description *string     `json:"description"`
-		Visibility  *string     `json:"visibility"`
-		GroupID     *int64      `json:"group_id"`
-		RoleKey     *string     `json:"role_key"`
-		Columns     *[]BoardCol `json:"columns"`
-		Color       *string     `json:"color"`
+		Name               *string     `json:"name"`
+		Description        *string     `json:"description"`
+		Visibility         *string     `json:"visibility"`
+		GroupID            *int64      `json:"group_id"`
+		RoleKey            *string     `json:"role_key"`
+		Columns            *[]BoardCol `json:"columns"`
+		Color              *string     `json:"color"`
+		ShowIcons          *bool       `json:"show_icons"`
+		PriorityBackground *bool       `json:"priority_background"`
+		ShowArchival       *bool       `json:"show_archival"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -240,6 +243,15 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 	}
 	if req.Color != nil {
 		board.Color = *req.Color
+	}
+	if req.ShowIcons != nil {
+		board.ShowIcons = req.ShowIcons
+	}
+	if req.PriorityBackground != nil {
+		board.PriorityBackground = req.PriorityBackground
+	}
+	if req.ShowArchival != nil {
+		board.ShowArchival = req.ShowArchival
 	}
 	if err := app.store.UpdateBoard(*board); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)

@@ -307,7 +307,7 @@ var backupRestoreAreas = map[string][]string{
 	"boards":    {"boards.json", "board_items.json"},
 	"resources": {"map_resources.json", "map_locations.json", "references.json",
 		"rooms.json", "custom_resource_types.json"},
-	"users":     {"groups.json", "memberships.json", "preferences.json", "roles.json"},
+	"users":     {"groups.json", "memberships.json", "preferences.json", "roles.json", "api_keys.json"},
 	"logs":      {"decision_log.json", "event_log.json", "log_book.json", "audit.json"},
 	"checklists": {"checklist_templates.json", "checklist_instances.json"},
 	"other":     {"templates.json", "filter_presets.json", "locks.json",

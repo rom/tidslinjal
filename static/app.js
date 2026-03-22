@@ -506,6 +506,22 @@ function _showWelcomeBanner(startupText) {
       <p style="font-size:var(--fs-sm);color:var(--text);margin-bottom:16px;line-height:1.6">${t('welcome_text')}</p>
       ${loginInfoSection}
       ${startupSection}
+      ${(() => {
+        // Show integration status on startup for admin
+        const st = (state.user && state.user.role === 'admin') ? (state._integrationStatus || null) : null;
+        if (!st) return '';
+        const dot = (ok) => '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (ok ? '#22c55e' : '#6b7280') + ';margin-right:4px"></span>';
+        const sso = st.sso || {}, tls_c = st.tls || {}, sys = st.syslog || {}, smtp = st.smtp || {}, mm = st.mattermost || {}, ak = st.api_keys || {};
+        return '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px;background:var(--bg2);text-align:left;font-size:var(--fs-xs);line-height:1.8">' +
+          '<div style="font-weight:600;margin-bottom:4px;color:var(--accent)">🔌 Active Integrations</div>' +
+          dot(sso.active) + 'SSO/OIDC: ' + (sso.active ? 'Active' : sso.enabled ? 'Configured' : 'Off') + '<br>' +
+          dot(tls_c.configured) + 'TLS: ' + (tls_c.configured ? 'Configured' : 'Off') + '<br>' +
+          dot(sys.enabled) + 'Syslog: ' + (sys.enabled ? 'Enabled' : 'Off') + '<br>' +
+          dot(smtp.enabled) + 'SMTP/Mail: ' + (smtp.enabled ? 'Enabled' : 'Off') + '<br>' +
+          dot((mm.mattermost_users||0)>0) + 'Mattermost: ' + ((mm.webhook_users||0)>0 ? (mm.webhook_users + ' webhook user(s)') : 'None') + '<br>' +
+          dot((ak.count||0)>0) + 'API Keys: ' + (ak.count||0) + ' active<br>' +
+        '</div>';
+      })()}
       ${urlLinks.length ? `<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:16px">${urlLinks.join('')}</div>` : ''}
       <label style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:16px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
         <input type="checkbox" id="welcomeShowOnLogin" checked style="accent-color:var(--accent)">

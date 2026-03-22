@@ -919,7 +919,8 @@ async function _loadAPIKeys() {
 async function createAPIKey() {
   const name = document.getElementById('newAPIKeyName')?.value?.trim();
   if (!name) { showError('Key name is required'); return; }
-  const res = await apiPost('/api/apikeys', {name, description: ''});
+  const comment = document.getElementById('newAPIKeyComment')?.value?.trim() || '';
+  const res = await apiPost('/api/apikeys', {name, description: comment});
   if (res.ok) {
     const key = await res.json();
     // Show the key in a modal with a copyable field
@@ -945,6 +946,8 @@ async function createAPIKey() {
     document.body.appendChild(keyModal);
     _bindActions(keyModal);
     document.getElementById('newAPIKeyName').value = '';
+    const commentEl = document.getElementById('newAPIKeyComment');
+    if (commentEl) commentEl.value = '';
     await _loadAPIKeys();
   } else {
     const err = await res.json().catch(() => ({}));
@@ -1975,7 +1978,7 @@ async function openPollModal(opts) {
           ${t('poll_desc')||'Poll specific users, groups, or roles with standard or custom questions. All replies are collected and reported.'}
         </p>
         ${isCreator ? `
-        <div id="pollCreatePane" style="border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2));overflow:hidden">
+        <div id="pollCreatePane" style="border:1px solid var(--accent);border-radius:var(--radius);margin-bottom:12px;background:color-mix(in srgb, var(--accent) 5%, var(--bg2))">
           <div id="pollCreateHeader" style="padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
             <h4 style="font-size:var(--fs-sm);margin:0">${t('poll_create')||'Create New Poll'}</h4>
             <span id="pollCreateToggle" style="font-size:12px;color:var(--text-dim)">${hideCreatePane ? '▶' : '▼'}</span>

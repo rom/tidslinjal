@@ -28,11 +28,11 @@ async function openNarrativeModal() {
         <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
             <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
-              ${t('from')||'From'}: <input type="datetime-local" id="narrativeFrom" value="${from.toISOString().slice(0,16)}"
+              ${t('from')||'From'}: <input type="datetime-local" id="narrativeFrom" value="${fmtDateInput(from)}"
                 style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
             </label>
             <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
-              ${t('to')||'To'}: <input type="datetime-local" id="narrativeTo" value="${now.toISOString().slice(0,16)}"
+              ${t('to')||'To'}: <input type="datetime-local" id="narrativeTo" value="${fmtDateInput(now)}"
                 style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
             </label>
             <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
@@ -93,8 +93,9 @@ function _renderNarrativeEntries(entries) {
     return _narrativeSortNewestFirst ? (tb - ta) : (ta - tb);
   });
   return sorted.map(e => {
-    const ts = fmtDateTime(new Date(e.timestamp));
-    const timeStr = new Date(e.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    const d = new Date(e.timestamp);
+    const timeStr = d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    const dateStr = d.toLocaleDateString('en-GB', {day:'2-digit',month:'short'});
     const severityColors = {info:'var(--text-dim)', warning:'#E67E22', critical:'#E74C3C'};
     const severityColor = severityColors[e.severity] || 'var(--text-dim)';
     const typeIcons = {
@@ -108,7 +109,7 @@ function _renderNarrativeEntries(entries) {
       if (e.type.startsWith(prefix)) { icon = ic; break; }
     }
     return `<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start">
-      <span style="color:${severityColor};font-weight:700;min-width:42px">${timeStr}</span>
+      <span style="color:${severityColor};font-weight:700;min-width:80px;white-space:nowrap">${dateStr} ${timeStr}</span>
       <span style="font-size:14px">${icon}</span>
       <div style="flex:1">
         <span style="color:var(--text)">${escHtml(e.summary)}</span>
@@ -130,6 +131,9 @@ async function refreshNarrative() {
   const fromEl = document.getElementById('narrativeFrom');
   const toEl = document.getElementById('narrativeTo');
   const catEl = document.getElementById('narrativeCategory');
+  const sortEl = document.getElementById('narrativeSortOrder');
+  // Sync sort order from dropdown in case it was changed
+  if (sortEl) _narrativeSortNewestFirst = sortEl.value === 'newest';
   let from = fromEl ? new Date(fromEl.value).toISOString() : new Date(Date.now()-24*60*60*1000).toISOString();
   let to = toEl ? new Date(toEl.value).toISOString() : new Date().toISOString();
   const category = catEl ? catEl.value : 'all';
