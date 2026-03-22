@@ -1910,12 +1910,16 @@ function renderSidebar() {
           Keys are shown only once after creation — store them securely.
         </p>
         <div id="apiKeyList" style="margin-bottom:8px">Loading…</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" id="newAPIKeyName" placeholder="Key name / description"
-            title="Give the key a descriptive name so you can identify which system uses it (e.g. 'Monitoring Script', 'CI Pipeline')."
-            style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-          <button class="btn btn-primary btn-sm" data-action="createAPIKey"
-            title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="newAPIKeyName" placeholder="Key name"
+              title="Give the key a descriptive name so you can identify which system uses it (e.g. 'Monitoring Script', 'CI Pipeline')."
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <button class="btn btn-primary btn-sm" data-action="createAPIKey"
+              title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
+          </div>
+          <input type="text" id="newAPIKeyComment" placeholder="Comment (optional) — e.g. what system uses this key"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
         </div>
       </div>
 
@@ -2108,9 +2112,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
-          ${(isTeamLead || isAdminOrOplead) ? toolBtn('📊', t('btn_task_time_matrix')||'Task-Time Matrix', 'openTaskTimeMatrix()') : ''}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
-          ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
           ${canReport ? toolBtn('📄', t('btn_report')||'Report', 'openReportModal()') : ''}

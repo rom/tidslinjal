@@ -1297,9 +1297,9 @@ function _detachBoard() {
 
   const theme = document.body.className || '';
 
-  // Render the kanban board HTML in the main window, then inject into the popout
-  // This avoids CSP and script-loading-order issues
-  const boardHtml = _buildKanbanHtml();
+  // Get the full rendered kanban HTML from the existing modal
+  const boardsModal = document.getElementById('boardsModal');
+  const existingHtml = boardsModal ? boardsModal.querySelector('.modal').innerHTML : '';
 
   _boardPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">' +
     '<title>' + escHtml(board.name) + ' \u2014 Board</title>' +
@@ -1307,11 +1307,11 @@ function _detachBoard() {
     '<style>' +
     'body{margin:0;padding:16px;font-family:"Segoe UI",system-ui,sans-serif;overflow:auto;background:var(--bg);color:var(--text)}' +
     '.modal-close{display:none}' +
-    '.kanban-card{transition:transform 0.1s ease}' +
-    '.kanban-card:hover{transform:translateY(-1px)}' +
+    '.kanban-card{transition:transform 0.1s ease;cursor:pointer}' +
+    '.kanban-card:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.2)}' +
     '#boardContainer{min-height:90vh}' +
     '</style></head><body class="' + escHtml(theme) + '">' +
-    '<div id="boardContainer">' + boardHtml + '</div>' +
+    '<div id="boardContainer">' + existingHtml + '</div>' +
     '</body></html>');
   _boardPopout.document.close();
 
@@ -1328,63 +1328,29 @@ function _detachBoard() {
   }, 1000);
 }
 
-function _buildKanbanHtml() {
-  const board = _boardsState.activeBoard;
-  const items = _boardsState.items;
-  if (!board) return '';
-
-  const activeItems = items.filter(i => !i.archived);
-  const colItems = {};
-  for (const col of board.columns) colItems[String(col.id)] = [];
-  for (const item of activeItems) {
-    const cid = String(item.column_id);
-    if (!colItems[cid]) colItems[cid] = [];
-    colItems[cid].push(item);
-  }
-  for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
-
-  let html = '<div style="width:100%;overflow-x:auto;box-sizing:border-box">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<h2 style="margin:0">' + escHtml(board.name) + '</h2>' +
-    '</div>' +
-    '<div class="kanban-columns" style="display:flex;gap:12px;min-height:400px;align-items:flex-start;width:100%">';
-
-  for (const col of board.columns) {
-    const cItems = colItems[String(col.id)] || [];
-    const colBg = col.color ? col.color : 'var(--bg2)';
-    html += '<div class="kanban-col" style="flex:1;min-width:220px;max-width:360px;background:' + colBg + ';border:1px solid var(--border);border-radius:var(--radius);padding:10px">' +
-      '<div style="font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">' +
-      '<span>' + escHtml(col.name) + ' (' + cItems.length + ')</span>' +
-      '</div>' +
-      '<div style="display:flex;flex-direction:column;gap:6px">';
-    for (const item of cItems) {
-      const priorityColor = item.priority === 'critical' ? '#E74C3C' : item.priority === 'high' ? '#E67E22' : '';
-      const priorityBg = priorityColor ? 'border-left:3px solid ' + priorityColor + ';' : '';
-      html += '<div class="kanban-card" style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);' + priorityBg + '">' +
-        '<div style="font-weight:600;font-size:var(--fs-sm)">' + escHtml(item.subject) + '</div>' +
-        (item.note ? '<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">' + escHtml(item.note.slice(0, 100)) + '</div>' : '') +
-        (item.responsible_name ? '<div style="font-size:10px;color:var(--text-dim);margin-top:4px">\u{1F464} ' + escHtml(item.responsible_name) + '</div>' : '') +
-        '</div>';
-    }
-    html += '</div></div>';
-  }
-  html += '</div></div>';
-  return html;
-}
-
 function _bindBoardPopoutActions() {
   if (!_boardPopout || _boardPopout.closed) return;
   const wrap = _boardPopout.document.getElementById('boardContainer');
   if (!wrap) return;
   wrap.querySelectorAll('[data-action]').forEach(el => {
-    el.onclick = function() {
+    el.onclick = function(e) {
       try {
+        if (el.hasAttribute('data-stop-prop')) e.stopPropagation();
         const fn = el.dataset.action;
-        const arg = el.dataset.arg;
+        const rawArg = el.dataset.arg;
+        const rawArgs = el.dataset.args;
         if (typeof window[fn] === 'function') {
-          arg ? window[fn](arg) : window[fn]();
+          if (rawArgs) {
+            window[fn](...JSON.parse(rawArgs));
+          } else if (rawArg !== undefined && rawArg !== null) {
+            let arg = rawArg;
+            if (/^\d+$/.test(arg)) arg = parseInt(arg, 10);
+            window[fn](arg);
+          } else {
+            window[fn]();
+          }
         }
-      } catch(e) { console.error(e); }
+      } catch(e2) { console.error(e2); }
     };
   });
 }

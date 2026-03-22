@@ -7,6 +7,15 @@
 
 // ── Error display ───────────────────────────────────────────────────────────
 function showError(msg, title) {
+  // If a detached popout window is active, show error there via alert
+  const popouts = [
+    typeof _boardPopout !== 'undefined' ? _boardPopout : null,
+    typeof _staffPopout !== 'undefined' ? _staffPopout : null,
+    typeof _teamleadPopout !== 'undefined' ? _teamleadPopout : null,
+  ].filter(p => p && !p.closed);
+  for (const p of popouts) {
+    try { if (p.document && p.document.hasFocus()) { p.alert((title ? title + ': ' : '') + msg); return; } } catch {}
+  }
   const modal = document.getElementById('errorModal');
   if (!modal) { alert(msg); return; }
   document.getElementById('errorModalTitle').textContent = title || 'Error';
