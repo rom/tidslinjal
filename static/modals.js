@@ -197,6 +197,8 @@ function applyPreferences() {
   if (typeof _broadcastSync === 'function') {
     _broadcastSync({ type: 'theme', theme: state.preferences.theme || 'dark' });
   }
+  // Update narrative ticker visibility
+  if (typeof initTicker === 'function') initTicker();
 }
 
 // Wire up inline alarm checkbox toggle
@@ -3531,6 +3533,12 @@ async function setViewSpacing(value) {
   await savePreferences();
   renderSidebar();
   renderTimeline();
+}
+
+async function setTickerCount(value) {
+  state.preferences.ticker_count = parseInt(value, 10) || 10;
+  applyPreferences();
+  await savePreferences();
 }
 
 async function setTooltipDelay(value) {

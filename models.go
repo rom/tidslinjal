@@ -313,6 +313,8 @@ type UserPreferences struct {
 	CountryCodeFormat  string   `json:"country_code_format,omitempty"` // alpha2 | alpha3 — ISO 3166-1 abbreviation format (default: alpha2)
 	TacticalFontEnabled bool   `json:"tactical_font_enabled,omitempty"` // enable tactical task graphics font
 	TacticalFontFamily  string `json:"tactical_font_family,omitempty"`  // CSS font-family name for tactical font
+	TickerEnabled       bool   `json:"ticker_enabled,omitempty"`        // show narrative ticker bar at bottom
+	TickerCount         int    `json:"ticker_count,omitempty"`          // number of narrative entries in ticker (default 10)
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click

@@ -492,6 +492,11 @@
   <div id="layerPopoverList"></div>
 </div>
 
+<!-- Narrative Ticker -->
+<div id="narrativeTicker" style="display:none;position:fixed;bottom:0;left:0;right:0;height:28px;background:var(--bg2);border-top:1px solid var(--border);z-index:90;overflow:hidden;font-size:11px;font-family:'Cascadia Code','Fira Code','Consolas',monospace">
+  <div id="narrativeTickerTrack" style="display:flex;gap:32px;align-items:center;height:100%;white-space:nowrap;padding-left:100%;animation:tickerScroll 60s linear infinite"></div>
+</div>
+
 <!-- Notifications -->
 <div id="notification-area"></div>
 
@@ -2952,6 +2957,7 @@
 <script src="/static/modal-teamlead.js"></script>
 <script src="/static/modal-staff.js"></script>
 <script src="/static/modal-narrative.js"></script>
+<script src="/static/ticker.js"></script>
 <script src="/static/modal-critical-line.js"></script>
 <script src="/static/modal-dependencies.js"></script>
 <script src="/static/modal-map.js"></script>
