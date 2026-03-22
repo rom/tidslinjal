@@ -930,6 +930,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/stats/decision-analytics", app.requireAuth(app.handleStatsDecisionAnalytics))
 	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireAuth(app.handleStatsSlipHistogram))
 	mux.HandleFunc("GET /api/stats/op-tempo", app.requireAuth(app.handleStatsOpTempo))
+	mux.HandleFunc("GET /api/dashboard", app.requireAuth(app.handleDashboardData))
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 	mux.HandleFunc("GET /api/stats/personnel-performance", app.requireAuth(app.handleStatsPersonnelPerformance))
 	mux.HandleFunc("GET /api/stats/usage", app.requireAuth(app.handleStatsUsage))

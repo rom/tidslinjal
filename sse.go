@@ -138,6 +138,19 @@ func (b *SSEBroker) BroadcastFiltered(senderID int64, msg SSEMessage, canSee fun
 	}
 }
 
+// ConnectedUserIDs returns the set of user IDs that currently have SSE connections.
+func (b *SSEBroker) ConnectedUserIDs() []int64 {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	ids := make([]int64, 0, len(b.byUser))
+	for uid := range b.byUser {
+		if len(b.byUser[uid]) > 0 {
+			ids = append(ids, uid)
+		}
+	}
+	return ids
+}
+
 // SendToUser sends an SSE message to all clients for a specific user — O(1) via byUser index.
 func (b *SSEBroker) SendToUser(userID int64, msg SSEMessage) {
 	b.mu.RLock()

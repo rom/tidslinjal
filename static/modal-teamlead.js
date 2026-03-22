@@ -18,15 +18,29 @@ async function openTeamLeadToolbox() {
           <!-- Quick Response to OpLead -->
           <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
             <div style="font-weight:700;margin-bottom:8px;color:#E74C3C">🚨 ${t('tl_quick_response')||'Quick Response needed!'}</div>
-            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_quick_response_desc')||'Send an urgent message directly to Operations Lead'}</p>
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('tl_quick_response_desc')||'Send an urgent message to leadership. Choose who should receive it.'}</p>
             <textarea id="tlQuickMsg" rows="2" placeholder="${t('tl_quick_response_placeholder')||'Describe the urgent situation...'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
-            <div style="display:flex;gap:6px;align-items:center">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <select id="tlQuickTarget" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="oplead">${t('tl_target_oplead')||'Operations Lead'}</option>
+                <option value="oplead_deputy">${t('tl_target_oplead_deputy')||'OpLead + Deputy OpLeads'}</option>
+                <option value="custom">${t('tl_target_custom')||'Custom recipients...'}</option>
+              </select>
               <select id="tlQuickPriority" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
                 <option value="high">${t('priority_high')||'High'}</option>
                 <option value="critical">${t('priority_critical')||'Critical'}</option>
               </select>
               <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="sendQuickResponse">🚨 ${t('btn_send')||'Send'}</button>
+            </div>
+            <div id="tlQuickCustomRecipients" style="display:none;margin-top:8px">
+              <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('tl_select_recipients')||'Select recipients:'}</p>
+              <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:4px;background:var(--bg)">
+                ${(state.users||[]).map(u => `<label style="display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:var(--fs-xs);cursor:pointer">
+                  <input type="checkbox" class="tlCustomRecipient" value="${u.id}" style="width:14px;height:14px;accent-color:var(--accent)">
+                  ${escHtml(u.display_name||u.username)} <span style="color:var(--text-dim)">(${escHtml(String(u.role||''))})</span>
+                </label>`).join('')}
+              </div>
             </div>
           </div>
 
@@ -149,13 +163,32 @@ function closeTeamLeadToolbox() {
   if (el) el.remove();
 }
 
+// Show/hide custom recipients when target changes
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.id === 'tlQuickTarget') {
+    const custom = document.getElementById('tlQuickCustomRecipients');
+    if (custom) custom.style.display = e.target.value === 'custom' ? '' : 'none';
+  }
+});
+
 async function sendQuickResponse() {
   const msg = document.getElementById('tlQuickMsg')?.value?.trim();
   if (!msg) { showError(t('message_required')||'Message is required'); return; }
   const priority = document.getElementById('tlQuickPriority')?.value || 'high';
-  const res = await apiPost('/api/teamlead/quick-response', {message: msg, priority});
+  const target = document.getElementById('tlQuickTarget')?.value || 'oplead';
+  const body = { message: msg, priority, target };
+  if (target === 'custom') {
+    const customIds = [];
+    document.querySelectorAll('.tlCustomRecipient:checked').forEach(cb => {
+      customIds.push(parseInt(cb.value));
+    });
+    if (customIds.length === 0) { showError(t('tl_select_at_least_one')||'Select at least one recipient'); return; }
+    body.custom_ids = customIds;
+  }
+  const targetLabels = { oplead: 'Operations Lead', oplead_deputy: 'OpLead + Deputies', custom: 'selected recipients' };
+  const res = await apiPost('/api/teamlead/quick-response', body);
   if (res.ok) {
-    showNotification('success', t('tl_quick_response_sent')||'Quick response sent to Operations Lead');
+    showNotification('success', (t('tl_quick_response_sent_to')||'Quick response sent to') + ' ' + (targetLabels[target] || target));
     document.getElementById('tlQuickMsg').value = '';
   } else {
     const err = await res.json().catch(() => ({}));
