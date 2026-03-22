@@ -308,14 +308,23 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 			outcomeLabel = "denied"
 		}
 		payload, _ := json.Marshal(map[string]any{
-			"decision_id":     found.ID,
-			"sequence_number": found.SequenceNumber,
-			"title":           found.Title,
-			"outcome":         outcomeLabel,
+			"decision_id":      found.ID,
+			"sequence_number":  found.SequenceNumber,
+			"title":            found.Title,
+			"decision":         found.Decision,
+			"outcome":          outcomeLabel,
+			"approval_type":    found.ApprovalType,
 			"decided_by":      user.DisplayName,
+			"decided_by_id":   user.ID,
 			"comment":         req.Comment,
+			"reason":          found.Reason,
 			"requester_id":    found.UserID,
+			"reviewed_at":     found.ReviewedAt,
+			"status":          found.Status,
 		})
+		// Send targeted notification to the original requester
+		app.broker.SendToUser(found.UserID, SSEMessage{Event: "decision_outcome", Data: string(payload)})
+		// Also broadcast to all for decision log refresh
 		app.broker.BroadcastAll(SSEMessage{Event: "decision_outcome", Data: string(payload)})
 	}
 	jsonOK(w, found)
