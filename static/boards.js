@@ -1139,6 +1139,9 @@ function _openBoardItem(itemId) {
   </div>`;
 
   _boardModal('boardItemModal', html, '720px');
+  // Ensure @mention dropdowns are not clipped by modal overflow
+  const itemModalDiv = document.querySelector('#boardItemModal .modal');
+  if (itemModalDiv) itemModalDiv.style.overflow = 'visible';
 
   // Bind events for elements that used to have inline handlers (CSP compliance)
   const subjectEl = document.getElementById('inlineItemSubject');

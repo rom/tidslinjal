@@ -604,7 +604,7 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 // ── Decision Log Share Token ────────────────────────────────────────────────
 
 func (app *App) handleGenerateDecisionLogShareToken(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return

@@ -1,6 +1,7 @@
 /* ── TeamLead Toolbox Modal ── */
 // ── TeamLead Toolbox Modal ──────────────────────────────────────────────────
 let _tlEscalatedDecisions = [];
+let _tlEscalationSortNewest = true; // default: newest first
 
 async function _loadTlEscalatedDecisions() {
   try {
@@ -8,6 +9,12 @@ async function _loadTlEscalatedDecisions() {
     _tlEscalatedDecisions = all.filter(e =>
       e.user_id === state.user?.id && e.requested_of_value === 'oplead' && e.status
     );
+    // Sort by requested_at or timestamp
+    _tlEscalatedDecisions.sort((a, b) => {
+      const ta = new Date(a.requested_at || a.timestamp).getTime();
+      const tb = new Date(b.requested_at || b.timestamp).getTime();
+      return _tlEscalationSortNewest ? (tb - ta) : (ta - tb);
+    });
   } catch { _tlEscalatedDecisions = []; }
 }
 
@@ -170,7 +177,10 @@ async function openTeamLeadToolbox() {
 
           <!-- Escalated Decisions Status -->
           <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">📋 ${t('tl_my_escalations')||'My Escalated Decisions'}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-weight:700">📋 ${t('tl_my_escalations')||'My Escalated Decisions'}</span>
+              <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:1px 6px" data-action="toggleTlEscalationSort">${t('sort')||'Sort'}: ${_tlEscalationSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first')}</button>
+            </div>
             <div id="tlEscalatedDecisionsPanel" style="max-height:250px;overflow-y:auto">
               <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
             </div>
@@ -269,6 +279,20 @@ async function sendQuickResponse() {
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to send');
+  }
+}
+
+function toggleTlEscalationSort() {
+  _tlEscalationSortNewest = !_tlEscalationSortNewest;
+  _refreshTlEscalationsIfOpen();
+  // Update sort button text in both modal and detached window
+  document.querySelectorAll('[data-action="toggleTlEscalationSort"]').forEach(btn => {
+    btn.textContent = (t('sort')||'Sort') + ': ' + (_tlEscalationSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first'));
+  });
+  if (typeof _teamleadPopout !== 'undefined' && _teamleadPopout && !_teamleadPopout.closed) {
+    _teamleadPopout.document.querySelectorAll('[data-action="toggleTlEscalationSort"]').forEach(btn => {
+      btn.textContent = (t('sort')||'Sort') + ': ' + (_tlEscalationSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first'));
+    });
   }
 }
 
@@ -512,7 +536,10 @@ function _teamleadToolboxContent(myGroups) {
 
           <!-- Escalated Decisions Status (detached) -->
           <div style="margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:var(--radius)">
-            <div style="font-weight:700;margin-bottom:8px">\uD83D\uDCCB ${t('tl_my_escalations')||'My Escalated Decisions'}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-weight:700">\uD83D\uDCCB ${t('tl_my_escalations')||'My Escalated Decisions'}</span>
+              <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:1px 6px" data-action="toggleTlEscalationSort">${t('sort')||'Sort'}: ${_tlEscalationSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first')}</button>
+            </div>
             <div id="tlEscalatedDecisionsPanel" style="max-height:250px;overflow-y:auto">
               <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
             </div>

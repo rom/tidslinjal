@@ -2658,6 +2658,17 @@ function openRoomModal(argJson) {
         </div>
         <input type="hidden" id="rmIcon" value="${escHtml(currentIcon)}">
 
+        ${isEdit ? `<label class="form-label" style="margin-top:12px">${t('rm_assigned_users')||'Assigned Users'}</label>
+        <div id="rmAssignedUsers" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:4px;background:var(--bg3);margin-bottom:4px">
+          ${(state.users||[]).map(u => {
+            const checked = u.building_id === data.id;
+            return '<label style="display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:var(--fs-xs);cursor:pointer">' +
+              '<input type="checkbox" class="rmUserCheck" value="' + u.id + '"' + (checked ? ' checked' : '') + ' style="width:14px;height:14px;accent-color:var(--accent)">' +
+              escHtml(u.display_name || u.username) + '</label>';
+          }).join('')}
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin:0 0 8px">${t('rm_assigned_users_hint')||'Select users assigned to this building/resource'}</p>
+        ` : ''}
         <label class="form-label" style="margin-top:12px">${t('rm_image')||'Photo / Image'}</label>
         ${hasImage ? `<div id="rmCurrentImage" style="margin-bottom:6px">
           <img src="/api/rooms/${data.id}/image" alt="Resource image" style="max-width:100%;max-height:150px;border-radius:var(--radius);border:1px solid var(--border)">
@@ -2720,6 +2731,22 @@ function openRoomModal(argJson) {
       const fd = new FormData();
       fd.append('image', imgFile);
       await api('POST', `/api/rooms/${roomId}/image`, fd);
+    }
+
+    // Update user building assignments
+    if (isEdit && roomId) {
+      const checkedIds = new Set();
+      modal.querySelectorAll('.rmUserCheck:checked').forEach(cb => checkedIds.add(parseInt(cb.value)));
+      const allUsers = state.users || [];
+      for (const u of allUsers) {
+        const wasAssigned = u.building_id === data.id;
+        const nowAssigned = checkedIds.has(u.id);
+        if (nowAssigned && !wasAssigned) {
+          await apiPut('/api/users/' + u.id, { building_id: roomId });
+        } else if (!nowAssigned && wasAssigned) {
+          await apiPut('/api/users/' + u.id, { building_id: 0 });
+        }
+      }
     }
 
     showNotification('success', `${label} ${t('saved')||'saved'}`);
