@@ -2,6 +2,8 @@
 // ── TeamLead Toolbox Modal ──────────────────────────────────────────────────
 let _tlEscalatedDecisions = [];
 let _tlEscalationSortNewest = true; // default: newest first
+let _tlOwnDecisions = [];
+let _tlOwnDecisionsSortNewest = true;
 
 async function _loadTlEscalatedDecisions() {
   try {
@@ -51,6 +53,64 @@ function _renderTlEscalatedDecisions() {
       ${reviewHtml}
     </div>`;
   }).join('');
+}
+
+async function _loadTlOwnDecisions() {
+  try {
+    const all = await apiGet('/api/decision-log') || [];
+    _tlOwnDecisions = all.filter(e =>
+      e.user_id === state.user?.id && !e.status
+    );
+    _tlOwnDecisions.sort((a, b) => {
+      const ta = new Date(a.timestamp).getTime();
+      const tb = new Date(b.timestamp).getTime();
+      return _tlOwnDecisionsSortNewest ? (tb - ta) : (ta - tb);
+    });
+  } catch { _tlOwnDecisions = []; }
+}
+
+function _renderTlOwnDecisions() {
+  if (!_tlOwnDecisions.length) return `<p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('tl_no_decisions')||'No decisions recorded yet.'}</p>`;
+  return _tlOwnDecisions.map(e => {
+    const ts = fmtDateTime(new Date(e.timestamp));
+    return `<div style="padding:8px;margin-bottom:6px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+        <span style="font-size:var(--fs-xs);font-weight:700">${escHtml(e.sequence_number || '')} ${escHtml(e.title || '')}</span>
+        <span style="font-size:10px;color:var(--text-dim)">${ts}</span>
+      </div>
+      <div style="font-size:var(--fs-sm);margin-top:4px">${escHtml(e.decision)}</div>
+      ${e.reason ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);font-style:italic;margin-top:3px;border-left:3px solid var(--border);padding-left:8px">${escHtml(e.reason)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function _refreshTlOwnDecisionsIfOpen() {
+  const modal = document.getElementById('teamleadToolboxModal');
+  const popout = (typeof _teamleadPopout !== 'undefined' && _teamleadPopout && !_teamleadPopout.closed) ? _teamleadPopout : null;
+  if (!modal && !popout) return;
+  await _loadTlOwnDecisions();
+  const html = _renderTlOwnDecisions();
+  if (modal) {
+    const panel = document.getElementById('tlOwnDecisionsPanel');
+    if (panel) panel.innerHTML = html;
+  }
+  if (popout) {
+    const panel = popout.document.getElementById('tlOwnDecisionsPanel');
+    if (panel) panel.innerHTML = html;
+  }
+}
+
+function toggleTlOwnDecisionSort() {
+  _tlOwnDecisionsSortNewest = !_tlOwnDecisionsSortNewest;
+  _refreshTlOwnDecisionsIfOpen();
+  document.querySelectorAll('[data-action="toggleTlOwnDecisionSort"]').forEach(btn => {
+    btn.textContent = (t('sort')||'Sort') + ': ' + (_tlOwnDecisionsSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first'));
+  });
+  if (typeof _teamleadPopout !== 'undefined' && _teamleadPopout && !_teamleadPopout.closed) {
+    _teamleadPopout.document.querySelectorAll('[data-action="toggleTlOwnDecisionSort"]').forEach(btn => {
+      btn.textContent = (t('sort')||'Sort') + ': ' + (_tlOwnDecisionsSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first'));
+    });
+  }
 }
 
 // Live-refresh escalated decisions panel if teamlead toolbox is open (modal or detached)
@@ -153,6 +213,15 @@ async function openTeamLeadToolbox() {
             <div style="display:flex;justify-content:flex-end">
               <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
             </div>
+            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-weight:600;font-size:var(--fs-xs)">${t('tl_my_decisions')||'My Decisions'}</span>
+                <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:1px 6px" data-action="toggleTlOwnDecisionSort">${t('sort')||'Sort'}: ${_tlOwnDecisionsSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first')}</button>
+              </div>
+              <div id="tlOwnDecisionsPanel" style="max-height:200px;overflow-y:auto">
+                <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
+              </div>
+            </div>
           </div>
 
           <!-- Escalate Decision -->
@@ -242,6 +311,11 @@ async function openTeamLeadToolbox() {
     const panel = document.getElementById('tlEscalatedDecisionsPanel');
     if (panel) panel.innerHTML = _renderTlEscalatedDecisions();
   });
+  // Load own decisions
+  _loadTlOwnDecisions().then(() => {
+    const panel = document.getElementById('tlOwnDecisionsPanel');
+    if (panel) panel.innerHTML = _renderTlOwnDecisions();
+  });
 }
 
 function closeTeamLeadToolbox() {
@@ -307,6 +381,7 @@ async function addTeamLeadDecision() {
     document.getElementById('tlDecisionTitle').value = '';
     document.getElementById('tlDecisionText').value = '';
     document.getElementById('tlDecisionReason').value = '';
+    _refreshTlOwnDecisionsIfOpen();
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to add decision');
@@ -447,6 +522,13 @@ function detachTeamLeadToolbox() {
       if (panel) panel.innerHTML = _renderTlEscalatedDecisions();
     }
   });
+  // Load own decisions in detached window
+  _loadTlOwnDecisions().then(() => {
+    if (_teamleadPopout && !_teamleadPopout.closed) {
+      const panel = _teamleadPopout.document.getElementById('tlOwnDecisionsPanel');
+      if (panel) panel.innerHTML = _renderTlOwnDecisions();
+    }
+  });
 
   if (_teamleadPopoutMonitor) clearInterval(_teamleadPopoutMonitor);
   _teamleadPopoutMonitor = setInterval(() => {
@@ -512,6 +594,15 @@ function _teamleadToolboxContent(myGroups) {
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
             <div style="display:flex;justify-content:flex-end">
               <button class="btn btn-primary btn-sm" data-action="addTeamLeadDecision">${t('btn_add_decision')||'Add Decision'}</button>
+            </div>
+            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-weight:600;font-size:var(--fs-xs)">${t('tl_my_decisions')||'My Decisions'}</span>
+                <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:1px 6px" data-action="toggleTlOwnDecisionSort">${t('sort')||'Sort'}: ${_tlOwnDecisionsSortNewest ? (t('newest_first')||'Newest first') : (t('oldest_first')||'Oldest first')}</button>
+              </div>
+              <div id="tlOwnDecisionsPanel" style="max-height:200px;overflow-y:auto">
+                <p style="font-size:var(--fs-xs);color:var(--text-dim)">${t('loading')||'Loading...'}</p>
+              </div>
             </div>
           </div>
 

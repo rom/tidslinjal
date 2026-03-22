@@ -80,6 +80,7 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 	}
 	existing := app.store.GetCommentsByEvent(eventID)
 	if len(existing) >= maxComments {
+		logDebug("limits: comment limit reached on event %d (%d/%d) by user %q", eventID, len(existing), maxComments, user.Username)
 		app.audit(user.ID, user.DisplayName, "rate_limited", "comment", eventID,
 			fmt.Sprintf("Comment limit reached on event %d (%d max) by user %q", eventID, maxComments, user.Username))
 		jsonError(w, fmt.Sprintf("comment limit reached (%d per event)", maxComments), http.StatusTooManyRequests)

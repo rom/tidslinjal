@@ -15,6 +15,7 @@ import (
 
 func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !app.authLimiter.allow(clientIP(r), 10, time.Minute) {
+		logDebug("limits: login rate limit hit for IP %s", clientIP(r))
 		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -394,6 +395,7 @@ func (app *App) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		logDebug("limits: registration rate limit hit for IP %s", clientIP(r))
 		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -729,6 +731,7 @@ func (app *App) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		logDebug("limits: forgot-password rate limit hit for IP %s", clientIP(r))
 		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}
@@ -809,6 +812,7 @@ func (app *App) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	// V-24 fix: rate-limit password reset attempts
 	if !app.authLimiter.allow(clientIP(r), 5, time.Minute) {
+		logDebug("limits: password-reset rate limit hit for IP %s", clientIP(r))
 		jsonError(w, "too many requests — try again later", http.StatusTooManyRequests)
 		return
 	}

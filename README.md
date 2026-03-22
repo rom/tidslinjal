@@ -728,6 +728,11 @@ data/
 ├── mail.json             # SMTP mail configuration
 ├── apikeys.json          # API bearer tokens
 ├── filter_presets.json   # Per-user saved filter presets
+├── security.json         # Password policy & session management
+├── rate_limits.json      # Per-IP rate limiting thresholds
+├── geoblocking.json      # Country-based access control
+├── ip_blacklist.json     # IP deny list (addresses & CIDR ranges)
+├── encryption.json       # Backup encryption settings
 └── attachments/          # Uploaded files
 ```
 
@@ -808,6 +813,11 @@ All endpoints (except `/api/version` and `/api/auth/login`) require an authentic
 | `GET/POST` | `/api/filter-presets` | Any | List / save filter presets |
 | `DELETE` | `/api/filter-presets/:id` | Owner | Delete filter preset |
 | `GET/POST` | `/api/editing-locks` | Any | Active collaborative editing locks |
+| `GET/PUT` | `/api/admin/ip-blacklist` | Admin | IP blacklist settings |
+| `POST` | `/api/admin/ip-blacklist/add` | Admin | Add IP to blacklist |
+| `POST` | `/api/admin/ip-blacklist/remove` | Admin | Remove IP from blacklist |
+| `GET` | `/api/admin/ip-blacklist/export` | Admin | Download blacklist JSON |
+| `POST` | `/api/admin/ip-blacklist/import` | Admin | Import blacklist JSON |
 | `GET` | `/api/backup` | Admin | Download data ZIP |
 | `POST` | `/api/restore` | Admin | Restore from ZIP |
 | `POST` | `/api/references/bulk` | RW+ | Bulk upload references |
@@ -917,6 +927,15 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v8.1.0 — IP Blacklist, Debug Diagnostics & TeamLead Decisions
+
+- **IP blacklist / deny list** — block specific IP addresses or CIDR ranges from connecting; managed in the Security admin panel with enable/disable toggle, add/remove entries, reason tracking, and who-added-when attribution; blocked IPs receive 403 Forbidden; audit logging for all blocked connections
+- **IP blacklist import/export** — download the blacklist as JSON; upload a JSON file to merge or replace entries; supports sharing deny lists between instances
+- **IP blacklist in backups** — `ip_blacklist.json` included in snapshots and backup/restore alongside other security configuration files (`security.json`, `rate_limits.json`, `geoblocking.json`, `encryption.json`)
+- **Debug logging for limits** — when `--debug` is enabled, all rate limit and quota enforcement events emit `[DEBUG] limits:` messages: login, registration, forgot-password, password-reset, API key brute-force, SSE connection limit, upload quota, and comment-per-event limit
+- **Debug logging for IP blacklist** — when `--debug` is enabled, blocked connections emit `[DEBUG] IP <addr> has been blocked — blacklisted IP <entry>` with CIDR match details
+- **TeamLead decisions in toolbox** — the TeamLead Toolbox now displays a "My Decisions" panel below the decision form, showing the teamlead's own recorded decisions with title, text, reason, sequence number, and timestamp; sortable newest/oldest first; live-refreshes after adding a decision; works in both modal and detached window
 
 ### v8.0.0 — Clocks, Checklists & List View Enhancements
 

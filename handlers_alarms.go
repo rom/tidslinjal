@@ -111,6 +111,7 @@ func (app *App) handleSSE(w http.ResponseWriter, r *http.Request) {
 		maxConns = 5 // default: 5 concurrent SSE connections per user
 	}
 	if app.broker.UserConnectionCount(user.ID) >= maxConns {
+		logDebug("limits: SSE connection limit hit for user %q (%d/%d)", user.Username, app.broker.UserConnectionCount(user.ID), maxConns)
 		log.Printf("[SECURITY] SSE connection limit reached for user %q (%d connections, limit %d)", user.Username, app.broker.UserConnectionCount(user.ID), maxConns)
 		app.audit(user.ID, user.DisplayName, "rate_limited", "sse", 0,
 			fmt.Sprintf("SSE connection limit reached for user %q (%d max)", user.Username, maxConns))
