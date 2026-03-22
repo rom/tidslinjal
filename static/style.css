@@ -654,6 +654,15 @@ textarea { resize: vertical; min-height: 70px; }
 }
 @keyframes notif-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
+/* Narrative ticker */
+@keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+#narrativeTicker .ticker-item { display:inline-flex; align-items:center; gap:6px; padding:0 16px; color:var(--text); }
+#narrativeTicker .ticker-time { color:var(--accent); font-weight:600; }
+#narrativeTicker .ticker-icon { font-size:13px; }
+#narrativeTicker .ticker-sep { color:var(--border); font-size:16px; }
+body.ticker-active #notification-area { bottom: 48px; }
+body.ticker-active .mobile-nav { bottom: 28px; }
+
 /* Today marker — prominent pill badge instead of small dot */
 .today-marker {
   display: inline-block; padding: 1px 6px; border-radius: 8px;

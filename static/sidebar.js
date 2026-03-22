@@ -2946,6 +2946,21 @@ Fields: file, subject, sender, type, tags</pre>
         </div>` : ''}
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_ticker')||'Narrative Ticker'} <span title="${t('settings_ticker_info')||'Show a scrolling ticker bar at the bottom of the screen with the latest narrative entries (events, decisions, audit).'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" id="prefTickerEnabled" ${p.ticker_enabled?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="ticker_enabled"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_ticker_enable')||'Show narrative ticker'}
+        </label>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:var(--fs-sm)">
+          <label style="color:var(--text-dim)">${t('settings_ticker_count')||'Number of entries'}:</label>
+          <input type="number" id="prefTickerCount" min="3" max="50" value="${p.ticker_count||10}"
+            style="width:60px;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)"
+            data-action="setTickerCount" data-event="change" data-arg-value>
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_view_spacing')||'Vertical Spacing'} <span title="${t('settings_view_spacing_info')||'Adjust the vertical spacing between rows on the timeline.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_view_spacing_desc')||'Vertical spacing multiplier for timeline rows.'}</p>
         <div class="toggle-btn-group">
