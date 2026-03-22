@@ -61,14 +61,19 @@ func (app *App) canEditBoard(board *Board, user *User) bool {
 
 func (app *App) handleGetBoards(w http.ResponseWriter, r *http.Request, user *User) {
 	boards := app.store.GetBoards()
-	var visible []Board
+	type boardWithCount struct {
+		Board
+		ItemCount int `json:"item_count"`
+	}
+	var visible []boardWithCount
 	for _, b := range boards {
 		if app.canAccessBoard(&b, user) {
-			visible = append(visible, b)
+			items := app.store.GetBoardItems(b.ID)
+			visible = append(visible, boardWithCount{Board: b, ItemCount: len(items)})
 		}
 	}
 	if visible == nil {
-		visible = []Board{}
+		visible = []boardWithCount{}
 	}
 	jsonOK(w, visible)
 }
@@ -808,11 +813,7 @@ func (app *App) handleDownloadBoardItemAttachment(w http.ResponseWriter, r *http
 		jsonError(w, "invalid item id", http.StatusBadRequest)
 		return
 	}
-	attID, err := strconv.ParseInt(parts[4], 10, 64)
-	if err != nil {
-		jsonError(w, "invalid attachment id", http.StatusBadRequest)
-		return
-	}
+	attID, _ := strconv.ParseInt(parts[4], 10, 64)
 	item := app.store.GetBoardItemByID(itemID)
 	if item == nil {
 		jsonError(w, "item not found", http.StatusNotFound)
@@ -824,10 +825,21 @@ func (app *App) handleDownloadBoardItemAttachment(w http.ResponseWriter, r *http
 		return
 	}
 	var att *BoardAttachment
+	attIDStr := parts[4]
 	for _, a := range item.Attachments {
 		if a.ID == attID {
 			att = &a
 			break
+		}
+	}
+	// Fallback: JavaScript may lose precision on large int64 IDs (> 2^53).
+	// Try matching by stored_name prefix (the nanosecond part) or filename.
+	if att == nil {
+		for _, a := range item.Attachments {
+			if a.StoredName == attIDStr || strings.HasPrefix(a.StoredName, attIDStr+"_") || a.Filename == attIDStr {
+				att = &a
+				break
+			}
 		}
 	}
 	if att == nil {

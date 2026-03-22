@@ -1358,17 +1358,42 @@ async function _renderBoardsAnalysisTab(container) {
   </div>`;
 
   let html = `<h3 style="margin-bottom:12px">${t('analysis_boards_title')||'Board Statistics'}</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px">
       ${card(t('analysis_boards_total')||'Total Boards', data.total_boards || 0)}
       ${card(t('analysis_boards_items')||'Total Issues', data.total_items || 0)}
       ${card(t('analysis_boards_open')||'Open', data.open_items || 0, t('analysis_boards_items_label')||'issues')}
       ${card(t('analysis_boards_in_progress')||'In Progress', data.in_progress_items || 0, t('analysis_boards_items_label')||'issues')}
       ${card(t('analysis_boards_closed')||'Closed', data.closed_items || 0, t('analysis_boards_items_label')||'issues')}
+      ${card(t('analysis_boards_archived')||'Archived', data.archived_items || 0, t('analysis_boards_items_label')||'issues')}
+      ${card(t('analysis_boards_total_responsible')||'Total Responsible', data.total_responsible || 0)}
     </div>`;
+
+  // Donut charts row: by state, by priority, by type
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:20px">`;
+
+  // Issues by state donut
+  html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+    <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_by_state')||'Issues by State'}</h4>
+    <canvas id="anlBoardStateChart" width="280" height="200"></canvas>
+  </div>`;
+
+  // Issues by priority donut
+  html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+    <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_by_priority')||'Issues by Priority'}</h4>
+    <canvas id="anlBoardPriorityChart" width="280" height="200"></canvas>
+  </div>`;
+
+  // Issues by type donut
+  html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+    <h4 style="margin:0 0 8px;font-size:var(--fs-sm)">${t('analysis_boards_by_type')||'Issues by Type'}</h4>
+    <canvas id="anlBoardTypeChart" width="280" height="200"></canvas>
+  </div>`;
+
+  html += `</div>`;
 
   // Boards by owner
   if (data.by_owner && data.by_owner.length > 0) {
-    html += `<h4 style="margin-bottom:8px">${t('analysis_boards_by_owner')||'Most Boards by Owner'}</h4>
+    html += `<h4 style="margin-bottom:8px">${t('analysis_boards_by_owner')||'Boards by Owner'}</h4>
       <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">
         <thead><tr style="background:var(--bg3)">
           <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">#</th>
@@ -1403,5 +1428,41 @@ async function _renderBoardsAnalysisTab(container) {
   }
 
   container.innerHTML = html;
+
+  // Draw donut charts after DOM is rendered
+  setTimeout(() => {
+    // State donut
+    if (typeof drawPieChart === 'function') {
+      const stateLabels = [
+        t('analysis_boards_open')||'Open',
+        t('analysis_boards_in_progress')||'In Progress',
+        t('analysis_boards_closed')||'Closed',
+        t('analysis_boards_archived')||'Archived'
+      ];
+      const stateData = [data.open_items||0, data.in_progress_items||0, data.closed_items||0, data.archived_items||0];
+      const stateColors = ['#3498db', '#f39c12', '#27ae60', '#95a5a6'];
+      drawPieChart('anlBoardStateChart', stateLabels, stateData, stateColors);
+
+      // Priority donut
+      const priLabels = [
+        t('analysis_boards_priority_normal')||'Normal',
+        t('analysis_boards_priority_low')||'Low',
+        t('analysis_boards_priority_high')||'High',
+        t('analysis_boards_priority_critical')||'Critical'
+      ];
+      const priData = [data.priority_normal||0, data.priority_low||0, data.priority_high||0, data.priority_critical||0];
+      const priColors = ['#7f8c8d', '#3498db', '#e67e22', '#e74c3c'];
+      drawPieChart('anlBoardPriorityChart', priLabels, priData, priColors);
+
+      // Type donut
+      const typeLabels = (data.by_type||[]).map(t => {
+        const icons = {task:'✅',meeting:'🤝',checklist:'📋',issue:'⚠️',note:'📝',other:'🔹',untyped:'—'};
+        return (icons[t.type]||'') + ' ' + (t.type === 'untyped' ? 'Untyped' : t.type.charAt(0).toUpperCase() + t.type.slice(1));
+      });
+      const typeData = (data.by_type||[]).map(t => t.count);
+      const typeColors = ['#27ae60','#2980b9','#8e44ad','#e74c3c','#f39c12','#1abc9c','#95a5a6'];
+      drawPieChart('anlBoardTypeChart', typeLabels, typeData, typeColors);
+    }
+  }, 50);
 }
 
