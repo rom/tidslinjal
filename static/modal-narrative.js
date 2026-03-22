@@ -82,11 +82,31 @@ async function openNarrativeModal() {
   if (sortEl) sortEl.addEventListener('change', () => { _narrativeSortNewestFirst = sortEl.value === 'newest'; refreshNarrative(); });
   // Autoscroll to bottom on open
   _narrativeScrollToTop();
-  // Start auto-refresh (every 15s)
+  // Start auto-refresh (every 10s)
+  if (_narrativeAutoRefreshTimer) clearInterval(_narrativeAutoRefreshTimer);
   _narrativeAutoRefreshTimer = setInterval(() => {
     if (document.getElementById('narrativeModal')) refreshNarrative();
-    else clearInterval(_narrativeAutoRefreshTimer);
-  }, 15000);
+    else { clearInterval(_narrativeAutoRefreshTimer); _narrativeAutoRefreshTimer = null; }
+  }, 10000);
+
+  // Also listen for SSE events to trigger immediate refresh
+  if (typeof _sseConnection !== 'undefined' && _sseConnection) {
+    const _nrSSEHandler = () => {
+      if (document.getElementById('narrativeModal')) refreshNarrative();
+    };
+    ['event_change', 'decision_new', 'decision_update', 'poll_new', 'poll_update'].forEach(evName => {
+      _sseConnection.addEventListener(evName, _nrSSEHandler);
+    });
+    // Clean up SSE listeners when modal closes
+    const _origClose = closeNarrativeModal;
+    closeNarrativeModal = function() {
+      ['event_change', 'decision_new', 'decision_update', 'poll_new', 'poll_update'].forEach(evName => {
+        _sseConnection.removeEventListener(evName, _nrSSEHandler);
+      });
+      closeNarrativeModal = _origClose;
+      _origClose();
+    };
+  }
 }
 
 function _renderNarrativeEntries(entries) {

@@ -230,23 +230,16 @@ setInterval(function() {
   }
 }, 3000);
 
-// SSE: listen for relevant events and re-fetch
+// SSE: listen for relevant named events and re-fetch narrative
 try {
   var _nrSSE = new EventSource('/api/notifications/stream');
-  _nrSSE.onmessage = function(ev) {
-    try {
-      var data = JSON.parse(ev.data);
-      if (data.type && (
-        data.type.startsWith('event_') ||
-        data.type.startsWith('decision_') ||
-        data.type.startsWith('audit_') ||
-        data.type === 'narrative_update' ||
-        data.type === 'refresh'
-      )) {
-        loadEntries();
-      }
-    } catch(e) {}
-  };
+  // The SSE server sends named events (event_change, decision_new, etc.)
+  // Listen on the specific event names that affect the narrative
+  var _nrSSERefresh = function() { loadEntries(); };
+  ['event_change', 'decision_new', 'decision_update', 'poll_new', 'poll_update', 'poll_closed',
+   'prc_new_check', 'prc_update', 'board_item_updated', 'refresh'].forEach(function(evName) {
+    _nrSSE.addEventListener(evName, _nrSSERefresh);
+  });
   _nrSSE.onerror = function() {
     // EventSource will auto-reconnect
   };

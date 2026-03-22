@@ -410,10 +410,11 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		DueDate         *string        `json:"due_date"`
 		ResponsibleID   *int64         `json:"responsible_id"`
 		ResponsibleName *string        `json:"responsible_name"`
-		Comments        *[]BoardComment `json:"comments"`
-		Priority        *string        `json:"priority"`
-		ChecklistID     *int64         `json:"checklist_id"`
-		EventID         *int64         `json:"event_id"`
+		Comments        *[]BoardComment  `json:"comments"`
+		Priority        *string         `json:"priority"`
+		Activities      *[]BoardActivity `json:"activities"`
+		ChecklistID     *int64          `json:"checklist_id"`
+		EventID         *int64          `json:"event_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -468,6 +469,10 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 	if req.Comments != nil {
 		item.Comments = *req.Comments
 		changes = append(changes, "comments")
+	}
+	if req.Activities != nil {
+		item.Activities = *req.Activities
+		changes = append(changes, "activities")
 	}
 	if req.Priority != nil {
 		item.Priority = *req.Priority
