@@ -2497,6 +2497,7 @@ async function _loadPolls(modal) {
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
           ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger poll-close-btn" data-poll-id="${poll.id}">${t('poll_close')||'Close Poll'}</button>` : ''}
           ${isCreator && isOpen ? `<button class="btn btn-sm btn-secondary poll-remind-btn" data-poll-id="${poll.id}">${t('poll_send_reminder')||'Send Reminder'}</button>` : ''}
+          ${isCreator || state.user?.role === 'admin' ? `<button class="btn btn-sm btn-secondary poll-delete-btn" data-poll-id="${poll.id}" style="color:var(--danger)">${t('poll_delete')||'Delete Poll'}</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -2563,6 +2564,20 @@ async function _loadPolls(modal) {
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
           const data = await res.json().catch(()=>({}));
           showNotification('success', (t('poll_reminder_sent')||'Reminder sent') + (data.reminded != null ? ` (${data.reminded})` : ''));
+        } catch (e) { showError(e.message); }
+      });
+    });
+
+    // Bind delete poll
+    wrap.querySelectorAll('.poll-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pollId = parseInt(btn.dataset.pollId);
+        if (!confirm(t('poll_delete_confirm')||'Are you sure you want to delete this poll? This cannot be undone.')) return;
+        try {
+          const res = await api('DELETE', `/api/polls/${pollId}`);
+          if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+          showNotification('success', t('poll_deleted_success')||'Poll deleted');
+          _loadPolls(modal);
         } catch (e) { showError(e.message); }
       });
     });

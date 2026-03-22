@@ -326,22 +326,20 @@ func (app *App) handleCreateBoardItem(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		ColumnID    string   `json:"column_id"`
-		Subject     string   `json:"subject"`
-		Note        string   `json:"note"`
-		ItemType    string   `json:"item_type"`
-		Color       string   `json:"color"`
-		Tags        []string `json:"tags"`
-		ChecklistID int64    `json:"checklist_id"`
-		EventID     int64    `json:"event_id"`
-		SortOrder   int      `json:"sort_order"`
+		ColumnID        string   `json:"column_id"`
+		Subject         string   `json:"subject"`
+		Note            string   `json:"note"`
+		ItemType        string   `json:"item_type"`
+		Color           string   `json:"color"`
+		Tags            []string `json:"tags"`
+		ChecklistID     int64    `json:"checklist_id"`
+		EventID         int64    `json:"event_id"`
+		SortOrder       int      `json:"sort_order"`
+		ResponsibleID   int64    `json:"responsible_id"`
+		ResponsibleName string   `json:"responsible_name"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
-		return
-	}
-	if req.Subject == "" {
-		jsonError(w, "subject is required", http.StatusBadRequest)
 		return
 	}
 	colID := req.ColumnID
@@ -349,19 +347,34 @@ func (app *App) handleCreateBoardItem(w http.ResponseWriter, r *http.Request, us
 		colID = board.Columns[0].ID
 	}
 
+	// Default responsible to creator if not specified
+	respID := req.ResponsibleID
+	respName := req.ResponsibleName
+	if respID == 0 {
+		respID = user.ID
+		respName = user.DisplayName
+	}
+	// Default item type to task if not specified
+	itemType := req.ItemType
+	if itemType == "" {
+		itemType = "task"
+	}
+
 	item := BoardItem{
-		BoardID:     boardID,
-		ColumnID:    colID,
-		SortOrder:   req.SortOrder,
-		Subject:     req.Subject,
-		Note:        req.Note,
-		ItemType:    req.ItemType,
-		Color:       req.Color,
-		Tags:        req.Tags,
-		CreatorID:   user.ID,
-		CreatorName: user.DisplayName,
-		ChecklistID: req.ChecklistID,
-		EventID:     req.EventID,
+		BoardID:         boardID,
+		ColumnID:        colID,
+		SortOrder:       req.SortOrder,
+		Subject:         req.Subject,
+		Note:            req.Note,
+		ItemType:        itemType,
+		Color:           req.Color,
+		Tags:            req.Tags,
+		CreatorID:       user.ID,
+		CreatorName:     user.DisplayName,
+		ResponsibleID:   respID,
+		ResponsibleName: respName,
+		ChecklistID:     req.ChecklistID,
+		EventID:         req.EventID,
 		History: []BoardHistory{
 			{Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName, Action: "created", Detail: "Item created"},
 		},
@@ -415,6 +428,7 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 		Activities      *[]BoardActivity `json:"activities"`
 		ChecklistID     *int64          `json:"checklist_id"`
 		EventID         *int64          `json:"event_id"`
+		RelatedItemIDs  *[]int64        `json:"related_item_ids"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -494,6 +508,10 @@ func (app *App) handleUpdateBoardItem(w http.ResponseWriter, r *http.Request, us
 	}
 	if req.EventID != nil {
 		item.EventID = *req.EventID
+	}
+	if req.RelatedItemIDs != nil {
+		item.RelatedItemIDs = *req.RelatedItemIDs
+		changes = append(changes, "related_items")
 	}
 	if len(changes) > 0 {
 		item.History = append(item.History, BoardHistory{
