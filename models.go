@@ -868,6 +868,8 @@ type DecisionLogEntry struct {
 	CoSignComment     string     `json:"co_sign_comment,omitempty"`
 	// Sharable link token
 	ShareToken        string               `json:"share_token,omitempty"`
+	// Deadline for decision
+	Deadline          string               `json:"deadline,omitempty"` // ISO date string YYYY-MM-DD, optional
 	// File attachments
 	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
 }

@@ -2,6 +2,7 @@
 // ── Decision Log Modal ──────────────────────────────────────────────────────
 let _decisionLogEntries = [];
 let _decisionLogSortNewest = true; // true = newest first (default), false = oldest first
+let _decisionLogFilter = 'all'; // 'all' | 'pending' | 'decided' | 'denied'
 
 async function openDecisionLogModal() {
   await _loadDecisionLog();
@@ -53,6 +54,10 @@ async function openDecisionLogModal() {
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
                 📎 <input type="file" id="dlAttachFile" style="max-width:140px;font-size:10px" multiple>
               </label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim)">
+                📅 ${t('decision_deadline')||'Deadline'}:
+                <input type="date" id="dlDeadline" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+              </label>
             </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('decision_executor')||'Executor'}:</span>
@@ -83,9 +88,16 @@ async function openDecisionLogModal() {
               </div>
             </div>
           </div>` : ''}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 0;border-bottom:2px solid var(--accent)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 0;border-bottom:2px solid var(--accent);flex-wrap:wrap;gap:6px">
             <h3 style="margin:0;font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)">📋 ${t('decision_log_header')||'Decision Log'}</h3>
-            <div style="display:flex;align-items:center;gap:6px">
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+              <div class="toggle-btn-group" style="font-size:10px">
+                <button class="toggle-btn${_decisionLogFilter==='all'?' active':''}" data-action="_setDecisionFilter" data-arg="all" style="padding:2px 8px;font-size:10px">${t('filter_all')||'All'}</button>
+                <button class="toggle-btn${_decisionLogFilter==='pending'?' active':''}" data-action="_setDecisionFilter" data-arg="pending" style="padding:2px 8px;font-size:10px">⏳ ${t('decision_filter_pending')||'Pending'} (${_decisionLogEntries.filter(e=>e.status==='requested').length})</button>
+                <button class="toggle-btn${_decisionLogFilter==='decided'?' active':''}" data-action="_setDecisionFilter" data-arg="decided" style="padding:2px 8px;font-size:10px">✓ ${t('decision_filter_decided')||'Decided'}</button>
+                <button class="toggle-btn${_decisionLogFilter==='denied'?' active':''}" data-action="_setDecisionFilter" data-arg="denied" style="padding:2px 8px;font-size:10px">✗ ${t('decision_filter_denied')||'Denied'}</button>
+              </div>
+              <span style="border-left:1px solid var(--border);height:16px;margin:0 2px"></span>
               <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('decision_sort')||'Sort'}:</span>
               <button class="btn btn-sm" id="dlSortToggle" style="font-size:10px;padding:2px 8px" data-action="_toggleDecisionSort">↓ ${t('decision_sort_newest')||'Newest first'}</button>
             </div>
@@ -164,6 +176,13 @@ async function _loadDecisionLog() {
   try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch { _decisionLogEntries = []; }
 }
 
+function _setDecisionFilter(filter) {
+  _decisionLogFilter = filter;
+  // Re-render the whole modal body to update filter tabs and entries
+  closeDecisionLogModal();
+  openDecisionLogModal();
+}
+
 function _toggleDecisionSort() {
   _decisionLogSortNewest = !_decisionLogSortNewest;
   const btn = document.getElementById('dlSortToggle');
@@ -190,7 +209,13 @@ async function _shareDecisionLogEntry(id) {
 function _renderDecisionLogEntries() {
   if (!_decisionLogEntries.length) return `<p style="color:var(--text-dim)">${t('decision_log_empty')||'No decisions recorded yet.'}</p>`;
   const canReview = hasRole2(state.user?.role, 'teamlead');
-  const sorted = _decisionLogSortNewest ? _decisionLogEntries.slice().reverse() : _decisionLogEntries.slice();
+  let filtered = _decisionLogEntries.slice();
+  if (_decisionLogFilter === 'pending') filtered = filtered.filter(e => e.status === 'requested');
+  else if (_decisionLogFilter === 'decided') filtered = filtered.filter(e => !e.status || e.status === 'approved');
+  else if (_decisionLogFilter === 'denied') filtered = filtered.filter(e => e.status === 'rejected');
+  if (!filtered.length) return `<p style="color:var(--text-dim)">${t('decision_filter_empty')||'No decisions match this filter.'}</p>`;
+  const sorted = _decisionLogSortNewest ? filtered.reverse() : filtered;
+  const todayStr = new Date().toISOString().slice(0, 10);
   return sorted.map(e => {
     const ts = fmtDateTime(new Date(e.timestamp));
     const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
@@ -235,15 +260,37 @@ function _renderDecisionLogEntries() {
         }
       }
     }
+    // Deadline display
+    let deadlineHtml = '';
+    if (e.deadline) {
+      const isOverdue = e.deadline < todayStr && (e.status === 'requested');
+      const isDueSoon = !isOverdue && e.deadline <= new Date(Date.now() + 2*86400000).toISOString().slice(0,10) && (e.status === 'requested');
+      const deadlineColor = isOverdue ? 'var(--danger,#E74C3C)' : isDueSoon ? '#E67E22' : 'var(--text-dim)';
+      const deadlineIcon = isOverdue ? '🔴' : isDueSoon ? '🟠' : '📅';
+      deadlineHtml = `<span style="font-size:var(--fs-xs);color:${deadlineColor};margin-left:6px;font-weight:${isOverdue?'700':'400'}">${deadlineIcon} ${t('decision_deadline')||'Deadline'}: ${e.deadline}${isOverdue ? ' (' + (t('decision_overdue')||'OVERDUE') + ')' : ''}</span>`;
+    }
+    // Lifecycle tracking for pending decisions
+    let lifecycleHtml = '';
+    if (e.status === 'requested') {
+      const requestedDate = e.requested_at ? fmtDateTime(new Date(e.requested_at)) : '';
+      const elapsed = e.requested_at ? Math.floor((Date.now() - new Date(e.requested_at).getTime()) / 3600000) : 0;
+      const elapsedLabel = elapsed >= 24 ? Math.floor(elapsed/24) + 'd ' + (elapsed%24) + 'h' : elapsed + 'h';
+      lifecycleHtml = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim);display:flex;gap:12px;flex-wrap:wrap">
+        <span>📥 ${t('decision_requested_at')||'Requested'}: ${requestedDate}</span>
+        <span>⏱ ${t('decision_elapsed')||'Elapsed'}: ${elapsedLabel}</span>
+        ${e.requested_of_label ? '<span>👤 ' + (t('decision_requested_of')||'Requested of') + ': ' + escHtml(e.requested_of_label) + '</span>' : ''}
+      </div>`;
+    }
     const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
     const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
-    return `<div style="padding:8px;border-bottom:1px solid var(--border)">
+    const borderStyle = e.deadline && e.deadline < todayStr && e.status === 'requested' ? 'border-left:3px solid var(--danger,#E74C3C);' : '';
+    return `<div style="padding:8px;border-bottom:1px solid var(--border);${borderStyle}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${escHtml(e.sequence_number||'')}</span>
           <span style="font-weight:600;margin-left:4px">${escHtml(e.display_name || e.user_name)}</span>
           <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
-          ${statusBadge}${execHtml}
+          ${statusBadge}${deadlineHtml}${execHtml}
         </div>
         <div style="display:flex;gap:4px">
           ${canReview ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_shareDecisionLogEntry" data-arg="${e.id}" title="${t('board_share')||'Share link'}">🔗</button>` : ''}
@@ -253,6 +300,7 @@ function _renderDecisionLogEntries() {
       ${titleHtml}
       <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
       ${reasonHtml}
+      ${lifecycleHtml}
       ${(e.attachments && e.attachments.length) ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${e.attachments.map(a =>
         `<a href="/api/decision-log/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none" title="${escHtml(a.filename)}">📎 ${escHtml(a.filename)}</a>`
       ).join('')}</div>` : ''}
@@ -278,9 +326,10 @@ async function addDecisionLogEntry() {
   const coSignTargetId = coSignRequired ? (document.getElementById('dlCoSignTarget')?.value || '') : '';
   const coSignTargetUser = coSignTargetId ? (state.users||[]).find(u => u.id === parseInt(coSignTargetId, 10)) : null;
   const coSignTargetName = coSignTargetUser ? (coSignTargetUser.display_name || coSignTargetUser.username) : '';
+  const deadline = document.getElementById('dlDeadline')?.value || '';
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
     executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
-    reason, co_sign_required: coSignRequired,
+    reason, co_sign_required: coSignRequired, deadline,
     co_sign_target_id: coSignTargetId ? parseInt(coSignTargetId, 10) : null,
     co_sign_target_name: coSignTargetName});
   if (res.ok) {
@@ -337,9 +386,11 @@ async function requestDecision() {
   const targetLabel = targetType ? (targetValueEl?.selectedOptions?.[0]?.textContent || targetValue) : '';
   const title = document.getElementById('dlTitle')?.value?.trim() || '';
   const reason = document.getElementById('dlReason')?.value?.trim() || '';
+  const deadline = document.getElementById('dlDeadline')?.value || '';
   const res = await apiPost('/api/decision-log/request', {
     title, decision: text, log_type: logType, group_id: groupId, confidential, reason,
-    requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel
+    requested_of_type: targetType, requested_of_value: targetValue, requested_of_label: targetLabel,
+    deadline
   });
   if (res.ok) {
     const created = await res.json().catch(() => null);
