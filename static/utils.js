@@ -20,6 +20,8 @@ function showError(msg, title) {
   if (!modal) { alert(msg); return; }
   document.getElementById('errorModalTitle').textContent = title || 'Error';
   document.getElementById('errorModalMsg').textContent  = msg;
+  // Move error modal to end of body so it stacks above dynamically created modals
+  document.body.appendChild(modal);
   openModal('errorModal');
 }
 

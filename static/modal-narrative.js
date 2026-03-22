@@ -14,6 +14,10 @@ async function openNarrativeModal() {
     entries = await apiGet(`/api/narrative?from=${from.toISOString()}&to=${now.toISOString()}&limit=200`) || [];
   } catch(e) { console.warn('Narrative fetch error', e); }
 
+  const tzAbbr = new Date().toLocaleTimeString('en-GB', {timeZoneName:'short'}).split(' ').pop() || '';
+  const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  const tzLabel = tzAbbr + (tzName ? ' (' + tzName + ')' : '');
+
   const html = `
     <div class="modal-overlay" id="narrativeModal">
       <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column">
@@ -35,6 +39,7 @@ async function openNarrativeModal() {
               ${t('to')||'To'}: <input type="datetime-local" id="narrativeTo" value="${fmtDateInput(now)}"
                 style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">
             </label>
+            <span style="font-size:10px;color:var(--text-dim)">${escHtml(tzLabel)}</span>
             <label style="font-size:var(--fs-xs);display:flex;align-items:center;gap:4px">
               ${t('narrative_detail_level')||'Detail level'}:
               <select id="narrativeCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-xs)">

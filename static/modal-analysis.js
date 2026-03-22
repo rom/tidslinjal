@@ -1250,6 +1250,8 @@ async function _renderPollsAnalysisTab(container) {
     ${sub ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${sub}</div>` : ''}
   </div>`;
 
+  const fmtMins = (m) => m < 1 ? (m * 60).toFixed(0) + 's' : m < 60 ? m.toFixed(1) + ' min' : (m / 60).toFixed(1) + 'h';
+
   let html = `<h3 style="margin-bottom:12px">${t('analysis_polls_title')||'Poll Statistics'}</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px">
       ${card(t('analysis_polls_total')||'Total Polls', data.total || 0)}
@@ -1257,8 +1259,60 @@ async function _renderPollsAnalysisTab(container) {
       ${card(t('analysis_polls_closed')||'Closed', data.closed || 0)}
       ${card(t('analysis_polls_responses')||'Total Responses', data.total_responses || 0)}
       ${card(t('analysis_polls_questions')||'Total Questions', data.total_questions || 0)}
-      ${card(t('analysis_polls_avg_response')||'Avg Response Time', (data.avg_response_time_mins || 0).toFixed(1) + ' min')}
+      ${card(t('analysis_polls_avg_response')||'Mean Response Time', fmtMins(data.avg_response_time_mins || 0))}
+      ${card('Median Response Time', fmtMins(data.median_response_time_mins || 0))}
     </div>`;
+
+  // Fastest / slowest single response
+  const fs = data.fastest_single || {};
+  const ss = data.slowest_single || {};
+  if (fs.name || ss.name) {
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">`;
+    if (fs.name) html += `<div style="background:#27ae6015;border:1px solid #27ae6040;border-radius:var(--radius);padding:10px">
+      <div style="font-size:var(--fs-xs);color:#27ae60;font-weight:600">⚡ Fastest Single Response</div>
+      <div style="font-size:var(--fs-sm);margin-top:4px"><strong>${escHtml(fs.name)}</strong> — ${fmtMins(fs.mins || 0)}</div></div>`;
+    if (ss.name) html += `<div style="background:#e74c3c15;border:1px solid #e74c3c40;border-radius:var(--radius);padding:10px">
+      <div style="font-size:var(--fs-xs);color:#e74c3c;font-weight:600">🐢 Slowest Single Response</div>
+      <div style="font-size:var(--fs-sm);margin-top:4px"><strong>${escHtml(ss.name)}</strong> — ${fmtMins(ss.mins || 0)}</div></div>`;
+    html += `</div>`;
+  }
+
+  // Questionnaire usage
+  if (data.questionnaire_usage && data.questionnaire_usage.length > 0) {
+    html += `<h4 style="margin-bottom:8px">📋 Questionnaire Usage</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">`;
+    data.questionnaire_usage.forEach(q => {
+      html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:var(--fs-sm)">
+        <strong>${escHtml(q.name)}</strong> <span style="color:var(--text-dim)">×${q.count}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Per-user response time stats
+  if (data.user_response_stats && data.user_response_stats.length > 0) {
+    html += `<h4 style="margin-bottom:8px">⏱ Response Time by Recipient</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm);margin-bottom:16px">
+        <thead><tr style="background:var(--bg3)">
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">#</th>
+          <th style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)">Recipient</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">Avg</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">Fastest</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">Slowest</th>
+          <th style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border)">Polls</th>
+        </tr></thead><tbody>`;
+    data.user_response_stats.forEach((u, i) => {
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 10px">${i + 1}</td>
+        <td style="padding:4px 10px">${escHtml(u.name)}</td>
+        <td style="padding:4px 10px;text-align:right">${fmtMins(u.avg_mins)}</td>
+        <td style="padding:4px 10px;text-align:right;color:#27ae60">${fmtMins(u.min_mins)}</td>
+        <td style="padding:4px 10px;text-align:right;color:#e74c3c">${fmtMins(u.max_mins)}</td>
+        <td style="padding:4px 10px;text-align:right">${u.count}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
 
   // Question type distribution
   if (data.question_type_distribution && Object.keys(data.question_type_distribution).length > 0) {
