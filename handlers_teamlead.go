@@ -12,8 +12,10 @@ import (
 
 func (app *App) handleTeamLeadQuickResponse(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Message  string `json:"message"`
-		Priority string `json:"priority"` // normal, high, critical
+		Message   string  `json:"message"`
+		Priority  string  `json:"priority"`  // normal, high, critical
+		Target    string  `json:"target"`    // "oplead", "oplead_deputy", "custom"
+		CustomIDs []int64 `json:"custom_ids"` // user IDs when target is "custom"
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -26,20 +28,58 @@ func (app *App) handleTeamLeadQuickResponse(w http.ResponseWriter, r *http.Reque
 	if req.Priority == "" {
 		req.Priority = "high"
 	}
-	// Send SSE notification to all OpLead+ users
+	if req.Target == "" {
+		req.Target = "oplead"
+	}
+
 	payload, _ := json.Marshal(map[string]any{
 		"type":      "quick_response",
 		"message":   req.Message,
 		"priority":  req.Priority,
 		"from_user": user.DisplayName,
 		"from_role": string(user.Role),
+		"target":    req.Target,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
-	app.broker.BroadcastAll(SSEMessage{Event: "teamlead_quick_response", Data: string(payload)})
+	msg := SSEMessage{Event: "teamlead_quick_response", Data: string(payload)}
+
+	// Route to target recipients
+	targetLabel := "Operations Lead"
+	switch req.Target {
+	case "oplead":
+		// Send only to OpLead+ roles
+		for _, u := range app.store.GetUsers() {
+			if u.ID != user.ID && hasRole(u.Role, RoleOpLead) {
+				app.broker.SendToUser(u.ID, msg)
+			}
+		}
+	case "oplead_deputy":
+		// Send to OpLead+ and Deputy OpLead roles
+		targetLabel = "Operations Lead + Deputies"
+		for _, u := range app.store.GetUsers() {
+			if u.ID != user.ID && (hasRole(u.Role, RoleOpLead) || u.Role == RoleDeputyOpLead) {
+				app.broker.SendToUser(u.ID, msg)
+			}
+		}
+	case "custom":
+		// Send to specific users
+		targetLabel = "Custom recipients"
+		for _, uid := range req.CustomIDs {
+			if uid != user.ID {
+				app.broker.SendToUser(uid, msg)
+			}
+		}
+	default:
+		// Fallback: broadcast to all
+		app.broker.BroadcastAll(msg)
+	}
+	// Also send confirmation back to sender
+	app.broker.SendToUser(user.ID, SSEMessage{Event: "teamlead_quick_response_sent", Data: string(payload)})
+
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
 		Action: "quick_response", EntityType: "teamlead_toolbox",
-		Summary: fmt.Sprintf("Quick response to OpLead: %s (priority: %s)", req.Message, req.Priority),
+		Summary: fmt.Sprintf("Quick response to %s: %s (priority: %s)", targetLabel, req.Message, req.Priority),
 	})
 	jsonOK(w, map[string]string{"status": "sent"})
 }

@@ -663,6 +663,11 @@ textarea { resize: vertical; min-height: 70px; }
 body.ticker-active #notification-area { bottom: 48px; }
 body.ticker-active .mobile-nav { bottom: 28px; }
 
+/* Dashboard widget responsive */
+@media (max-width: 768px) {
+  #dashboardWidgets { grid-template-columns: 1fr !important; }
+}
+
 /* Today marker — prominent pill badge instead of small dot */
 .today-marker {
   display: inline-block; padding: 1px 6px; border-radius: 8px;

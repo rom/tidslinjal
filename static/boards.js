@@ -1172,47 +1172,98 @@ function _cancelBoardItem() {
 
 // Help dialog for board item editing
 function _showBoardItemHelp() {
-  const helpHtml = `<div style="max-width:500px">
-    <h3>❓ ${t('board_item_help_title')||'How to Edit Items'}</h3>
+  const helpHtml = `<div style="max-width:540px">
+    <h3 style="margin-bottom:10px">Item Editor — Quick Reference</h3>
     <div style="font-size:var(--fs-sm);line-height:1.6">
-      <p><strong>${t('board_item_help_subject')||'Subject'}:</strong> ${t('board_item_help_subject_desc')||'Click the title field to edit the item name.'}</p>
-      <p><strong>${t('board_item_help_priority')||'Priority'}:</strong> ${t('board_item_help_priority_desc')||'Set priority: Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically.'}</p>
-      <p><strong>${t('board_item_help_type')||'Type'}:</strong> ${t('board_item_help_type_desc')||'Choose the item type from the dropdown (Task, Meeting, Issue, etc.).'}</p>
-      <p><strong>${t('board_item_help_responsible')||'Responsible'}:</strong> ${t('board_item_help_responsible_desc')||'Assign a team member who is responsible for this item. The creator is assigned by default.'}</p>
-      <p><strong>${t('board_item_help_due')||'Due Date'}:</strong> ${t('board_item_help_due_desc')||'Set a deadline. Overdue items are highlighted in red on the board.'}</p>
-      <p><strong>${t('board_item_help_tags')||'Tags'}:</strong> ${t('board_item_help_tags_desc')||'Type a tag and press comma or Enter to add it as a chip. Click × on a chip to remove it. Previously used tags are suggested as you type.'}</p>
-      <p><strong>${t('board_item_help_activities')||'Activity Log'}:</strong> ${t('board_item_help_activities_desc')||'Record actions taken on this item. Each entry is automatically timestamped with your name. Use @name to mention people.'}</p>
-      <p><strong>${t('board_item_help_related')||'Related Items'}:</strong> ${t('board_item_help_related_desc')||'Link this item to other items on the same board. Relations are bidirectional — linking A to B also links B to A.'}</p>
-      <p><strong>${t('board_item_help_mentions')||'@Mentions'}:</strong> ${t('board_item_help_mentions_desc')||'Type @ followed by a name in notes, comments, or activities to mention a team member. A dropdown will appear — click a name to insert it.'}</p>
-      <p><strong>${t('board_item_help_links')||'Links'}:</strong> ${t('board_item_help_links_desc')||'Add URLs with optional labels. Click "+ Add" to add a link.'}</p>
-      <p><strong>${t('board_item_help_save')||'Saving'}:</strong> ${t('board_item_help_save_desc')||'Click Save to save your changes, or Cancel to discard.'}</p>
+      <p><strong>Subject:</strong> Click the title field at the top to edit the item name. This is what appears on the card.</p>
+      <p><strong>Type:</strong> Categorize the item as Task, Meeting, Checklist, Issue, Note, or Other. An icon appears on the card to help identify it visually.</p>
+      <p><strong>Responsible:</strong> Assign who is responsible for this item. Defaults to the person who created it. The name is shown on the card.</p>
+      <p><strong>Priority:</strong> Set Normal (default), Low (blue), High (orange), or Critical (red). The card color changes automatically to indicate urgency.</p>
+      <p><strong>Due Date:</strong> Set a deadline. Cards show the date — overdue items turn red, items due within 2 days show orange.</p>
+      <p><strong>Tags:</strong> Type a tag and press <strong>comma</strong> or <strong>Enter</strong> to create it. Tags appear as colored chips. Click the × to remove. Previously used tags are suggested as you type.</p>
+      <p><strong>Notes:</strong> Free-text area for detailed information. Supports @mentions.</p>
+      <p><strong>Activity Log:</strong> Record timestamped actions. Each entry shows who did what and when. Great for tracking progress. Supports @mentions.</p>
+      <p><strong>Comments:</strong> Discussion thread on the item. Saved immediately when you click Send.</p>
+      <p><strong>Related Items:</strong> Link to other items on the same board. Relationships go both ways — linking A to B also links B to A.</p>
+      <p><strong>Links:</strong> Attach external URLs with optional labels.</p>
+      <p><strong>Attachments:</strong> Upload and download files attached to this item.</p>
+      <p><strong>@Mentions:</strong> Type <strong>@</strong> followed by a name in notes, comments, or activities. Use arrow keys and Enter/Tab to select, or click a name from the dropdown.</p>
+      <p><strong>Saving:</strong> Click <strong>Save</strong> to save all changes, or <strong>Cancel</strong> to discard. Comments and activities are saved immediately when submitted.</p>
+      <p><strong>Archive:</strong> Use the 📦 button to archive this item. It moves to the Archived column and can be restored later.</p>
     </div>
-    <div style="margin-top:12px;text-align:right">
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">${t('btn_close')||'Close'}</button>
+    <div style="margin-top:12px;text-align:right;border-top:1px solid var(--border);padding-top:8px">
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardItemHelpModal">Close</button>
     </div>
   </div>`;
-  _boardModal('boardItemHelpModal', helpHtml, '520px');
+  _boardModal('boardItemHelpModal', helpHtml, '560px');
 }
 
 // Help dialog for the board view
 function _showBoardHelp() {
-  const helpHtml = `<div style="max-width:560px">
-    <h3>❓ ${t('board_help_title')||'How to Use Boards'}</h3>
-    <div style="font-size:var(--fs-sm);line-height:1.6">
-      <p><strong>${t('board_help_columns')||'Columns'}:</strong> ${t('board_help_columns_desc')||'Columns represent workflow stages. Double-click a column header to rename it. Use the − button to collapse a column.'}</p>
-      <p><strong>${t('board_help_add_item')||'Adding Items'}:</strong> ${t('board_help_add_item_desc')||'Click the + button at the top of a column to create a new item. The item opens immediately so you can fill in the subject.'}</p>
-      <p><strong>${t('board_help_drag')||'Drag & Drop'}:</strong> ${t('board_help_drag_desc')||'Drag cards between columns to move them through the workflow. Cards can also be reordered within a column.'}</p>
-      <p><strong>${t('board_help_edit')||'Editing Items'}:</strong> ${t('board_help_edit_desc')||'Click any card to open its detail view. You can edit subject, notes, priority, tags, add activities, comments, links, and more.'}</p>
-      <p><strong>${t('board_help_archive')||'Archiving'}:</strong> ${t('board_help_archive_desc')||'Use the 📦 button to archive items (or all items in a column). Archived items appear in a separate column on the right.'}</p>
-      <p><strong>${t('board_help_zoom')||'Zoom'}:</strong> ${t('board_help_zoom_desc')||'Use the + and − buttons to zoom in/out. Click 100% to reset.'}</p>
-      <p><strong>${t('board_help_share')||'Sharing'}:</strong> ${t('board_help_share_desc')||'Use 🔗 to generate a shareable link. Use ⧉ to open the board in a detached window.'}</p>
-      <p><strong>${t('board_help_export')||'Export/Import'}:</strong> ${t('board_help_export_desc')||'Export the board as JSON, CSV, SVG, or PDF. Import boards from JSON or CSV files.'}</p>
+  const helpHtml = `<div style="max-width:640px">
+    <h3 style="margin-bottom:12px">Kanban Board — User Guide</h3>
+    <div style="font-size:var(--fs-sm);line-height:1.7">
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Getting Started</h4>
+      <p>Boards are Kanban-style task trackers for organizing work. Each board has columns that represent stages in your workflow (e.g. To Do, In Progress, Done). Cards in these columns represent individual tasks or items.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Working with Columns</h4>
+      <p><strong>Rename:</strong> Double-click any column header to rename it.</p>
+      <p><strong>Collapse:</strong> Click the <strong>−</strong> button to collapse a column and save space. Click the collapsed column to expand it again.</p>
+      <p><strong>Add/remove columns:</strong> Open Board Settings (⚙) to add, remove, or reorder columns.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Creating and Editing Items</h4>
+      <p><strong>New item:</strong> Click <strong>+</strong> at the top of any column. An empty item opens immediately — just start typing the subject.</p>
+      <p><strong>Edit item:</strong> Click any card to open the detail editor where you can set:</p>
+      <ul style="margin:4px 0 8px 16px;padding:0">
+        <li><strong>Subject</strong> — the title displayed on the card</li>
+        <li><strong>Type</strong> — Task, Meeting, Checklist, Issue, Note, or Other (defaults to Task)</li>
+        <li><strong>Responsible</strong> — the person assigned to this item (defaults to the creator)</li>
+        <li><strong>Priority</strong> — Normal, Low (blue), High (orange), or Critical (red). Card color changes to match.</li>
+        <li><strong>Due Date</strong> — overdue items are highlighted in red on the board</li>
+        <li><strong>Tags</strong> — type a tag and press <strong>comma</strong> or <strong>Enter</strong> to create a chip. Click × to remove. Autocomplete suggests previously used tags.</li>
+        <li><strong>Notes</strong> — free-text notes with @mention support</li>
+      </ul>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Activity Log</h4>
+      <p>Record what was done on an item. Each entry is automatically timestamped with your name. Use <strong>@username</strong> to mention team members. This creates an audit trail of actions taken.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Comments</h4>
+      <p>Add discussion comments to items. Comments are displayed chronologically and can also use @mentions.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Related Items</h4>
+      <p>Link items that are related to each other. Relationships are bidirectional — linking item A to item B also links B back to A. Useful for tracking dependencies or grouping related tasks.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">@Mentions</h4>
+      <p>In Notes, Comments, and Activities, type <strong>@</strong> followed by a username. A dropdown appears — use arrow keys and <strong>Enter</strong> or <strong>Tab</strong> to select, or click a name directly.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Drag and Drop</h4>
+      <p>Drag cards between columns to move them through the workflow. You can also reorder cards within the same column by dragging up or down. Hold and drag the board background to scroll horizontally.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Archiving</h4>
+      <p>Click <strong>📦 Archive</strong> on an item to archive it, or use the 📦 button on a column header to archive all items in that column. Archived items appear in a separate column on the right and can be restored or permanently deleted.</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Toolbar</h4>
+      <ul style="margin:4px 0 8px 16px;padding:0">
+        <li><strong>🔗 Share</strong> — generate a shareable link (recipients need authentication and board access)</li>
+        <li><strong>⧉ Detach</strong> — open the board in a separate browser window</li>
+        <li><strong>🖨 Print</strong> — print the current board view</li>
+        <li><strong>⬇ Export</strong> — export as JSON, CSV, SVG, or PDF</li>
+        <li><strong>⬆ Import</strong> — import boards from JSON or CSV files</li>
+        <li><strong>Zoom +/−</strong> — scale the board view (25%–200%)</li>
+      </ul>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Visibility and Access</h4>
+      <p>Boards can be Private (only you), Group (shared with a group), Role-based (shared with a role), or Global (visible to everyone). Set visibility in Board Settings (⚙).</p>
+
+      <h4 style="margin:14px 0 6px;color:var(--accent)">Saving</h4>
+      <p>Click <strong>Save</strong> to save changes and close the item editor. Click <strong>Cancel</strong> to discard unsaved changes. Comments and activities are saved immediately when you submit them.</p>
     </div>
-    <div style="margin-top:12px;text-align:right">
-      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardHelpModal">${t('btn_close')||'Close'}</button>
+    <div style="margin-top:14px;text-align:right;border-top:1px solid var(--border);padding-top:10px">
+      <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardHelpModal">Close</button>
     </div>
   </div>`;
-  _boardModal('boardHelpModal', helpHtml, '580px');
+  _boardModal('boardHelpModal', helpHtml, '660px');
 }
 
 // ── Inline save for board item (auto-save on blur/change) ──
@@ -1960,17 +2011,26 @@ window._selectTag = function(el, tag) {
   _doSelectTag(inputEl, tag);
 };
 
-// ── @Mention Autocomplete for board textareas ──
+// ── @Mention Autocomplete for board textareas and inputs ──
 let _boardMentionDropdown = null;
 let _boardMentionStart = -1;
 let _boardMentionTextarea = null;
+let _boardMentionClosing = false; // flag to prevent blur race condition
 
-function _setupBoardMentionAutocomplete(textarea) {
-  if (!textarea || textarea._boardMentionBound) return;
-  textarea._boardMentionBound = true;
-  textarea.addEventListener('input', () => _onBoardMentionInput(textarea));
-  textarea.addEventListener('keydown', (e) => _onBoardMentionKey(e, textarea));
-  textarea.addEventListener('blur', () => { setTimeout(_closeBoardMentionDropdown, 150); });
+function _setupBoardMentionAutocomplete(el) {
+  if (!el || el._boardMentionBound) return;
+  el._boardMentionBound = true;
+  el.addEventListener('input', () => _onBoardMentionInput(el));
+  el.addEventListener('keydown', (e) => _onBoardMentionKey(e, el));
+  // Use focusout with relatedTarget check to avoid race condition with clicks
+  el.addEventListener('blur', () => {
+    setTimeout(() => {
+      // Only close if focus didn't move to the dropdown
+      if (_boardMentionDropdown && !_boardMentionDropdown.contains(document.activeElement)) {
+        _closeBoardMentionDropdown();
+      }
+    }, 250);
+  });
 }
 
 async function _onBoardMentionInput(ta) {
@@ -1982,7 +2042,7 @@ async function _onBoardMentionInput(ta) {
   _boardMentionStart = start;
   _boardMentionTextarea = ta;
   const query = val.slice(start + 1, pos).toLowerCase();
-  // Ensure users are loaded (may be empty on first access)
+  // Ensure users are loaded
   if (!state.users || !state.users.length) {
     try {
       const users = await (typeof apiGet === 'function' ? apiGet('/api/users') : _boardApi('GET', '/users'));
@@ -2002,17 +2062,25 @@ function _onBoardMentionKey(e, ta) {
   const items = _boardMentionDropdown.querySelectorAll('.mention-item');
   const active = _boardMentionDropdown.querySelector('.mention-item.active');
   let idx = Array.from(items).indexOf(active);
-  if (e.key === 'ArrowDown') { e.preventDefault(); _updateBoardMentionActive(items, Math.min(idx + 1, items.length - 1)); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); _updateBoardMentionActive(items, Math.max(idx - 1, 0)); }
-  else if (e.key === 'Enter' || e.key === 'Tab') {
-    const target = active || (items.length === 1 ? items[0] : null);
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _updateBoardMentionActive(items, Math.min(idx + 1, items.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _updateBoardMentionActive(items, Math.max(idx - 1, 0));
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    // Always select the active item (first item is active by default)
+    const target = active || items[0];
     if (target) {
       e.preventDefault();
+      e.stopPropagation();
       const username = target.dataset.username;
       if (username) _insertBoardMention(username);
     }
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    _closeBoardMentionDropdown();
   }
-  else if (e.key === 'Escape') { e.preventDefault(); _closeBoardMentionDropdown(); }
 }
 
 function _updateBoardMentionActive(items, idx) {
@@ -2026,39 +2094,60 @@ function _showBoardMentionDropdown(ta, users) {
   const dd = document.createElement('div');
   dd.id = 'boardMentionDropdown';
   _boardMentionDropdown = dd;
+  // Position above input if near bottom of viewport, else below
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const placeAbove = spaceBelow < 220 && rect.top > 220;
   Object.assign(dd.style, {
-    position: 'fixed', zIndex: '10000', background: 'var(--bg2)',
+    position: 'fixed', zIndex: '99999', background: 'var(--bg2)',
     border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-    boxShadow: '0 4px 12px rgba(0,0,0,.3)', minWidth: '180px', maxHeight: '200px',
-    overflowY: 'auto', left: rect.left + 'px', top: (rect.bottom + 2) + 'px'
+    boxShadow: '0 4px 16px rgba(0,0,0,.4)', minWidth: '220px', maxHeight: '200px',
+    overflowY: 'auto',
+    left: Math.min(rect.left, window.innerWidth - 240) + 'px',
+    top: placeAbove ? '' : (rect.bottom + 2) + 'px',
+    bottom: placeAbove ? (window.innerHeight - rect.top + 2) + 'px' : ''
   });
   users.forEach((u, i) => {
     const item = document.createElement('div');
     item.className = 'mention-item' + (i === 0 ? ' active' : '');
     item.dataset.username = u.username;
-    item.style.cssText = 'padding:6px 12px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center';
-    item.innerHTML = `<span style="font-weight:600">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
-    item.addEventListener('mouseover', () => { dd.querySelectorAll('.mention-item').forEach(x=>x.classList.remove('active')); item.classList.add('active'); });
-    item.addEventListener('mousedown', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
-    item.addEventListener('click', (e) => { e.preventDefault(); _insertBoardMention(u.username); });
+    item.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:var(--fs-sm);display:flex;gap:8px;align-items:center;user-select:none';
+    item.innerHTML = `<span style="font-weight:600;color:var(--accent)">@${escHtml(u.username)}</span><span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(u.display_name||'')}</span>`;
+    item.addEventListener('mouseover', () => {
+      dd.querySelectorAll('.mention-item').forEach(x => x.classList.remove('active'));
+      item.classList.add('active');
+    });
+    // Use mousedown with preventDefault to stop blur, then insert
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // prevents blur on the textarea/input
+      e.stopPropagation();
+      _insertBoardMention(u.username);
+    });
     dd.appendChild(item);
   });
-  // Append inside the board modal to avoid z-index/pointer-event issues with overlays
-  const modal = ta.closest('.modal-overlay') || ta.closest('.modal') || document.body;
-  modal.appendChild(dd);
+  // Add hover highlight style
+  const style = document.createElement('style');
+  style.textContent = '#boardMentionDropdown .mention-item:hover,#boardMentionDropdown .mention-item.active{background:var(--bg3)}';
+  dd.appendChild(style);
+  // Append to document.body for reliable z-index above all modals
+  document.body.appendChild(dd);
 }
 
 function _closeBoardMentionDropdown() {
-  if (_boardMentionDropdown) { _boardMentionDropdown.remove(); _boardMentionDropdown = null; }
+  if (_boardMentionDropdown) {
+    _boardMentionDropdown.remove();
+    _boardMentionDropdown = null;
+  }
   _boardMentionStart = -1;
 }
 
 function _insertBoardMention(username) {
   const ta = _boardMentionTextarea;
-  if (!ta || _boardMentionStart < 0) return;
+  if (!ta) return;
+  const startPos = _boardMentionStart;
+  if (startPos < 0) return;
   const pos = ta.selectionStart;
   const val = ta.value;
-  const before = val.slice(0, _boardMentionStart);
+  const before = val.slice(0, startPos);
   const after = val.slice(pos);
   const insert = '@' + username + ' ';
   ta.value = before + insert + after;
