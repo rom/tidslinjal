@@ -65,6 +65,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorLabel     string `json:"executor_label"`
 		Reason            string `json:"reason"`
 		CoSignRequired    bool   `json:"co_sign_required"`
+		Deadline          string `json:"deadline"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -107,6 +108,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorLabel:     req.ExecutorLabel,
 		Reason:            req.Reason,
 		CoSignRequired:    req.CoSignRequired,
+		Deadline:          req.Deadline,
 	}
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
@@ -476,6 +478,7 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 		RequestedOfType  string `json:"requested_of_type"`
 		RequestedOfValue string `json:"requested_of_value"`
 		RequestedOfLabel string `json:"requested_of_label"`
+		Deadline         string `json:"deadline"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -505,6 +508,7 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 		RequestedOfValue: req.RequestedOfValue,
 		RequestedOfLabel: req.RequestedOfLabel,
 		Reason:           req.Reason,
+		Deadline:         req.Deadline,
 	}
 	created, err := app.store.AddDecisionLogEntry(entry)
 	if err != nil {
