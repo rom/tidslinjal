@@ -305,6 +305,8 @@ function renderTimeline() {
         const hoursOn = synthElapsedHours(synthEpoch.getTime(), slotTime.getTime());
         if (hoursOn >= 0) {
           synthSpan = `<span class="synth-inline">H+${hoursOn}</span>`;
+        } else {
+          synthSpan = `<span class="synth-inline" style="color:var(--text-dim)">H${hoursOn}</span>`;
         }
       }
     }

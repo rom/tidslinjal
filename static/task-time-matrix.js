@@ -3,7 +3,7 @@
 function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   const el = document.getElementById('taskTimeMatrixContent');
   if (!el) return;
-  const events = (state.events || []).filter(ev => ev.start_time && ev.title);
+  const events = (window._ttmEvents || state.events || []).filter(ev => ev.start_time && ev.title);
   if (!events.length) {
     el.innerHTML = `<p style="color:var(--text-dim)">${t('ttm_no_events')||'No events to display in the matrix.'}</p>`;
     return;
@@ -136,8 +136,19 @@ function _renderTaskTimeMatrixTable(dateFrom, dateTo) {
   }
 }
 
-function openTaskTimeMatrix() {
-  const events = (state.events || []).filter(ev => ev.start_time && ev.title);
+async function openTaskTimeMatrix() {
+  // Fetch events for a wider range (all events, not just the current timeline view)
+  let allEvents = state.events || [];
+  try {
+    const farFrom = new Date(Date.now() - 30*24*60*60*1000).toISOString(); // 30 days ago
+    const farTo = new Date(Date.now() + 30*24*60*60*1000).toISOString(); // 30 days ahead
+    allEvents = await apiGet(`/api/events?from=${farFrom}&to=${farTo}`) || allEvents;
+  } catch(e) { console.warn('TTM fetch error:', e); }
+
+  // Store in a temporary for the renderer
+  window._ttmEvents = allEvents.filter(ev => ev.start_time && ev.title);
+
+  const events = window._ttmEvents;
   if (events.length) {
     const sorted = events.slice().sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
     const fromEl = document.getElementById('ttmDateFrom');

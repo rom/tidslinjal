@@ -873,9 +873,42 @@ async function _saveAndCloseBoardItem(itemId) {
 
 // Save and close via button
 async function _saveBoardItemAndClose(itemId) {
-  await _inlineSaveBoardItemNow(itemId);
-  _closeBoardModal('boardItemModal');
-  _renderKanbanBoard();
+  try {
+    await _saveBoardItemExplicit(itemId);
+    _closeBoardModal('boardItemModal');
+    _renderKanbanBoard();
+  } catch (e) {
+    showError('Failed to save item: ' + e.message);
+  }
+}
+
+// Explicit save (throws on error, unlike inline which is silent)
+async function _saveBoardItemExplicit(itemId) {
+  const subject = (document.getElementById('inlineItemSubject') || {}).value;
+  if (!subject || !subject.trim()) throw new Error('Subject is required');
+  const note = (document.getElementById('inlineItemNote') || {}).value || '';
+  const itemType = (document.getElementById('inlineItemType') || {}).value || '';
+  const colorVal = (document.getElementById('inlineItemColor') || {}).value || '';
+  const tagsVal = (document.getElementById('inlineItemTags') || {}).value || '';
+  const tags = tagsVal.split(',').map(s => s.trim()).filter(Boolean);
+  const color = colorVal === '#1a1a2e' ? '' : colorVal;
+  const dueDate = (document.getElementById('inlineItemDueDate') || {}).value || '';
+  const priority = (document.getElementById('inlineItemPriority') || {}).value || '';
+  const respEl = document.getElementById('inlineItemResponsible');
+  const responsibleId = respEl ? parseInt(respEl.value) || 0 : 0;
+  const responsibleName = respEl ? (respEl.selectedOptions[0]?.dataset.name || '') : '';
+  const links = [];
+  document.querySelectorAll('#boardItemLinks .board-link-row').forEach(row => {
+    const a = row.querySelector('a');
+    if (a) links.push({ url: row.dataset.url || a.href, label: row.dataset.label || a.textContent });
+  });
+  await _boardApi('PUT', '/board-items/' + itemId, {
+    subject: subject.trim(), note, item_type: itemType, color, tags,
+    links, due_date: dueDate, responsible_id: responsibleId, responsible_name: responsibleName,
+    priority
+  });
+  const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
+  _boardsState.items = items;
 }
 
 // Cancel without saving

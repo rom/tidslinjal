@@ -1537,15 +1537,134 @@ func (app *App) handleStatsPollAnalytics(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
+	// Questionnaire usage: count how many polls used each questionnaire set of questions
+	// (approximate by matching question count and first question text)
+	type questionnaireUsage struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	qUsage := map[string]int{}
+	builtIn := BuiltInQuestionnaires()
+	custom := app.store.GetQuestionnaires()
+	allQuestionnaires := append(builtIn, custom...)
+	for _, p := range polls {
+		matched := false
+		for _, q := range allQuestionnaires {
+			if len(q.Questions) > 0 && len(p.Questions) > 0 && len(q.Questions) == len(p.Questions) {
+				if q.Questions[0].Text == p.Questions[0].Text {
+					qUsage[q.Name]++
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched {
+			qUsage["Custom / Ad-hoc"]++
+		}
+	}
+	quUsageList := []questionnaireUsage{}
+	for name, count := range qUsage {
+		quUsageList = append(quUsageList, questionnaireUsage{name, count})
+	}
+	sort.Slice(quUsageList, func(i, j int) bool { return quUsageList[i].Count > quUsageList[j].Count })
+
+	// Per-user response time stats (fastest/slowest individual per poll and overall)
+	type userResponseStat struct {
+		Name     string  `json:"name"`
+		AvgMins  float64 `json:"avg_mins"`
+		MinMins  float64 `json:"min_mins"`
+		MaxMins  float64 `json:"max_mins"`
+		Count    int     `json:"count"`
+	}
+	userTimesMap := map[string][]float64{}
+	fastestSingleName := ""
+	fastestSingleMins := 0.0
+	slowestSingleName := ""
+	slowestSingleMins := 0.0
+	for _, p := range polls {
+		if p.CreatedAt.IsZero() {
+			continue
+		}
+		for _, resp := range p.Responses {
+			if resp.AnsweredAt.IsZero() {
+				continue
+			}
+			dur := resp.AnsweredAt.Sub(p.CreatedAt).Minutes()
+			if dur < 0 {
+				continue
+			}
+			name := resp.UserName
+			if name == "" {
+				name = fmt.Sprintf("User #%d", resp.UserID)
+			}
+			userTimesMap[name] = append(userTimesMap[name], dur)
+			// Track single fastest/slowest
+			if fastestSingleName == "" || dur < fastestSingleMins {
+				fastestSingleName = name
+				fastestSingleMins = dur
+			}
+			if slowestSingleName == "" || dur > slowestSingleMins {
+				slowestSingleName = name
+				slowestSingleMins = dur
+			}
+		}
+	}
+	userStats := []userResponseStat{}
+	for name, times := range userTimesMap {
+		if len(times) == 0 {
+			continue
+		}
+		sum := 0.0
+		minV := times[0]
+		maxV := times[0]
+		for _, t := range times {
+			sum += t
+			if t < minV {
+				minV = t
+			}
+			if t > maxV {
+				maxV = t
+			}
+		}
+		userStats = append(userStats, userResponseStat{
+			Name:    name,
+			AvgMins: math.Round(sum/float64(len(times))*100) / 100,
+			MinMins: math.Round(minV*100) / 100,
+			MaxMins: math.Round(maxV*100) / 100,
+			Count:   len(times),
+		})
+	}
+	sort.Slice(userStats, func(i, j int) bool { return userStats[i].AvgMins < userStats[j].AvgMins })
+
+	// Median response time
+	medianResponseTime := 0.0
+	if len(responseTimesMinutes) > 0 {
+		sorted := make([]float64, len(responseTimesMinutes))
+		copy(sorted, responseTimesMinutes)
+		sort.Float64s(sorted)
+		mid := len(sorted) / 2
+		if len(sorted)%2 == 0 {
+			medianResponseTime = (sorted[mid-1] + sorted[mid]) / 2
+		} else {
+			medianResponseTime = sorted[mid]
+		}
+		medianResponseTime = math.Round(medianResponseTime*100) / 100
+	}
+
 	jsonOK(w, map[string]any{
-		"total":                   total,
-		"open":                    open,
-		"closed":                  closed,
-		"total_responses":         totalResponses,
-		"total_questions":         totalQuestions,
-		"avg_response_time_mins":  avgResponseTime,
-		"by_creator":              creators,
+		"total":                      total,
+		"open":                       open,
+		"closed":                     closed,
+		"total_responses":            totalResponses,
+		"total_questions":            totalQuestions,
+		"avg_response_time_mins":     avgResponseTime,
+		"median_response_time_mins":  medianResponseTime,
+		"by_creator":                 creators,
 		"question_type_distribution": questionTypes,
+		"questionnaire_usage":        quUsageList,
+		"user_response_stats":        userStats,
+		"fastest_single":             map[string]any{"name": fastestSingleName, "mins": math.Round(fastestSingleMins*100) / 100},
+		"slowest_single":             map[string]any{"name": slowestSingleName, "mins": math.Round(slowestSingleMins*100) / 100},
 	})
 }
 
