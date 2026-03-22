@@ -334,6 +334,22 @@ func (s *Store) SaveSSOToggle(enabled bool) error {
 	return s.persist("oidc.json", snap)
 }
 
+// ── IP Blacklist ──────────────────────────────────────────────────────────────
+
+func (s *Store) GetIPBlacklist() IPBlacklistSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ipBlacklist
+}
+
+func (s *Store) SaveIPBlacklist(settings IPBlacklistSettings) error {
+	s.mu.Lock()
+	s.ipBlacklist = settings
+	snap := s.ipBlacklist
+	s.mu.Unlock()
+	return s.persist("ip_blacklist.json", snap)
+}
+
 // ── Export All Settings ───────────────────────────────────────────────────────
 
 func (s *Store) GetAllSettings() map[string]interface{} {
@@ -349,7 +365,8 @@ func (s *Store) GetAllSettings() map[string]interface{} {
 		"tls":          s.tlsConfig,
 		"rate_limits":  s.rateLimitSettings,
 		"geoblocking":  s.geoblockingSettings,
-		"encryption":   s.encryptionSettings,
-		"day_labels":   s.dayLabels,
+		"encryption":    s.encryptionSettings,
+		"ip_blacklist":  s.ipBlacklist,
+		"day_labels":    s.dayLabels,
 	}
 }

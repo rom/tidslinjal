@@ -68,6 +68,7 @@ type Store struct {
 	rateLimitSettings    RateLimitSettings
 	geoblockingSettings  GeoblockingSettings
 	encryptionSettings   EncryptionSettings
+	ipBlacklist          IPBlacklistSettings
 	resourceNotes        []ResourceNote
 	resourceStars        []ResourceStar
 	questionnaires       []PollQuestionnaire
@@ -234,6 +235,7 @@ func (s *Store) load() error {
 	s.loadFile("rate_limits.json", &s.rateLimitSettings)
 	s.loadFile("geoblocking.json", &s.geoblockingSettings)
 	s.loadFile("encryption.json", &s.encryptionSettings)
+	s.loadFile("ip_blacklist.json", &s.ipBlacklist)
 	s.loadFile("questionnaires.json", &s.questionnaires)
 	s.loadFile("checklist_templates.json", &s.checklistTemplates)
 	s.loadFile("checklist_instances.json", &s.checklistInstances)

@@ -2264,6 +2264,37 @@ Fields: file, subject, sender, type, tags</pre>
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title">🚫 ${t('security_ip_blacklist')||'IP Blacklist / Deny List'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
+          ${t('security_ip_blacklist_desc')||'Block specific IP addresses or CIDR ranges from connecting to this server. Blocked IPs receive a 403 Forbidden response.'}
+        </p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" id="secIpBlEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('security_ip_bl_enabled')||'Enable IP blacklist'}
+        </label>
+        <div style="margin-bottom:6px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input type="text" id="secIpBlNewIp" placeholder="${t('security_ip_bl_placeholder')||'IP address or CIDR (e.g. 192.168.1.1 or 10.0.0.0/8)'}"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
+            <input type="text" id="secIpBlNewReason" placeholder="${t('security_ip_bl_reason')||'Reason (optional)'}"
+              style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
+            <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="addIpBlacklistEntry">+ ${t('btn_add')||'Add'}</button>
+          </div>
+          <div id="secIpBlEntries" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px;text-align:center">${t('loading')||'Loading...'}</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn btn-secondary btn-sm" data-action="saveIpBlacklist">${t('security_ip_bl_save')||'Save'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="exportIpBlacklist">📥 ${t('security_ip_bl_export')||'Export JSON'}</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+            📤 ${t('security_ip_bl_import')||'Import JSON'}
+            <input type="file" id="secIpBlImportFile" accept=".json" style="display:none">
+          </label>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">🔑 ${t('security_password_policy')||'Password Policy'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
           <input type="checkbox" id="secPolicyEnabled" style="width:14px;height:14px;accent-color:var(--accent)">
@@ -2474,6 +2505,9 @@ Fields: file, subject, sender, type, tags</pre>
       const cb = document.getElementById('secEncryptionEnabled');
       if (cb) cb.checked = enc.enabled !== false;
     }).catch(() => {});
+    // Load IP blacklist settings
+    if (typeof loadIpBlacklist === 'function') loadIpBlacklist();
+    if (typeof _setupIpBlImport === 'function') setTimeout(_setupIpBlImport, 100);
     // Init enrollment UI (moved from settings)
     setTimeout(_initEnrollmentUI, 0);
     setTimeout(_initSecuritySettingsUI, 0);

@@ -1005,6 +1005,20 @@ type TLSConfig struct {
 	KeyFile  string `json:"key_file,omitempty"`  // path to PEM private key file
 }
 
+// IPBlacklistEntry represents a single IP address or CIDR range on the deny list.
+type IPBlacklistEntry struct {
+	IP        string `json:"ip"`                  // IP address or CIDR (e.g. "192.168.1.1" or "10.0.0.0/8")
+	Reason    string `json:"reason,omitempty"`     // why this IP was blocked
+	AddedBy   string `json:"added_by,omitempty"`   // who added it
+	AddedAt   string `json:"added_at,omitempty"`   // ISO timestamp
+}
+
+// IPBlacklistSettings stores the IP deny list configuration.
+type IPBlacklistSettings struct {
+	Enabled bool               `json:"enabled"`
+	Entries []IPBlacklistEntry `json:"entries"`
+}
+
 // EventVersion records a historical snapshot of an event at a point in time
 type EventVersion struct {
 	ID        int64     `json:"id"`
