@@ -11,7 +11,8 @@ const _dashboardDefaults = [
   { id: 'summary',          title: 'System Summary',                 enabled: true, order: 5 },
   { id: 'board_summary',    title: 'Board Summary',                  enabled: true, order: 6 },
   { id: 'recent_decisions', title: 'Recent Decisions',               enabled: true, order: 7 },
-  { id: 'integrations',     title: 'Active Integrations',            enabled: false, order: 8 },
+  { id: 'incidents',         title: 'Active Incidents',               enabled: true, order: 8 },
+  { id: 'integrations',     title: 'Active Integrations',            enabled: false, order: 9 },
 ];
 
 let _dashboardData = null;
@@ -21,7 +22,16 @@ let _dashboardClockTimer = null;
 function _getDashboardConfig() {
   try {
     const saved = localStorage.getItem('dashboard_config');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const cfg = JSON.parse(saved);
+      // Merge in any new default widgets missing from saved config
+      for (const dw of _dashboardDefaults) {
+        if (!cfg.find(w => w.id === dw.id)) {
+          cfg.push({...dw});
+        }
+      }
+      return cfg;
+    }
   } catch { /* ignore */ }
   return _dashboardDefaults.map(w => ({...w}));
 }
@@ -139,6 +149,9 @@ function _renderDashboardWidgets() {
         break;
       case 'recent_decisions':
         html += _renderRecentDecisions(d.recent_decisions || []);
+        break;
+      case 'incidents':
+        html += _renderActiveIncidents(d.active_incidents || []);
         break;
       default:
         html += `<div style="color:var(--text-dim)">Unknown widget: ${escHtml(widget.id)}</div>`;
@@ -309,6 +322,25 @@ function _renderBoardSummary(summary) {
     h += `<div style="font-size:var(--fs-xs);padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);display:flex;justify-content:space-between;align-items:center">
       <strong>${escHtml(b.name)}</strong>
       <span style="color:var(--text-dim)">${b.item_count||0} items${b.overdue_count ? ` · <span style="color:var(--danger)">${b.overdue_count} overdue</span>` : ''}</span>
+    </div>`;
+  }
+  return h;
+}
+
+function _renderActiveIncidents(incidents) {
+  let h = `<div style="font-weight:700;margin-bottom:8px;color:#E74C3C">⚠ ${t('dashboard_incidents')||'Active Incidents'}</div>`;
+  if (!incidents.length) {
+    h += '<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0">No active incidents</div>';
+    return h;
+  }
+  const sevColor = {critical:'#E74C3C', high:'#E67E22', medium:'#F39C12', low:'var(--text-dim)'};
+  const sevIcon = {critical:'🔴', high:'🟠', medium:'🟡', low:'🔵'};
+  for (const i of incidents.slice(0, 8)) {
+    const color = sevColor[i.severity] || 'var(--text-dim)';
+    const icon = sevIcon[i.severity] || '⚪';
+    h += `<div style="font-size:var(--fs-xs);padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid ${color};display:flex;justify-content:space-between;align-items:center">
+      <span>${icon} <strong>${escHtml(i.title)}</strong> <span style="color:var(--text-dim)">[${escHtml(i.incident_type)}]</span></span>
+      <span style="font-size:9px;color:${color};font-weight:700;text-transform:uppercase">${escHtml(i.severity)}</span>
     </div>`;
   }
   return h;

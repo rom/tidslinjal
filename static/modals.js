@@ -2639,6 +2639,16 @@ function openRoomModal(argJson) {
         </select>` : ''}
         <label class="form-label" style="margin-top:8px">${t('location')||'Location'}</label>
         <input class="form-input" id="rmLoc" value="${escHtml(data.location||'')}">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1">
+            <label class="form-label">${t('latitude')||'Latitude'}</label>
+            <input class="form-input" id="rmLat" type="number" step="any" min="-90" max="90" placeholder="e.g. 59.33" value="${data.latitude != null ? data.latitude : ''}">
+          </div>
+          <div style="flex:1">
+            <label class="form-label">${t('longitude')||'Longitude'}</label>
+            <input class="form-input" id="rmLng" type="number" step="any" min="-180" max="180" placeholder="e.g. 18.07" value="${data.longitude != null ? data.longitude : ''}">
+          </div>
+        </div>
         ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">${t('capacity')||'Capacity'}</label>
         <input class="form-input" id="rmCap" type="number" value="${data.capacity||0}">` : ''}
 
@@ -2684,6 +2694,8 @@ function openRoomModal(argJson) {
       sub_type: modal.querySelector('#rmSubType')?.value || '',
       description: (modal.querySelector('#rmDesc')?.value || '').trim(),
       location: (modal.querySelector('#rmLoc')?.value || '').trim(),
+      latitude: modal.querySelector('#rmLat')?.value ? parseFloat(modal.querySelector('#rmLat').value) : null,
+      longitude: modal.querySelector('#rmLng')?.value ? parseFloat(modal.querySelector('#rmLng').value) : null,
       capacity: parseInt(modal.querySelector('#rmCap')?.value) || 0,
       icon: modal.querySelector('#rmIcon')?.value || '',
       enabled: true,

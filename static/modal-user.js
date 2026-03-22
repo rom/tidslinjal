@@ -134,6 +134,16 @@ async function openUserModal(user) {
     }
   }
 
+  // Populate building selector
+  const buildingSel = document.getElementById('uBuildingId');
+  if (buildingSel) {
+    apiGet('/api/rooms').then(rooms => {
+      const buildings = (rooms || []).filter(r => r.type === 'building');
+      buildingSel.innerHTML = '<option value="0">— ' + (t('none')||'None') + ' —</option>' +
+        buildings.map(b => `<option value="${b.id}" ${user && user.building_id === b.id ? 'selected' : ''}>${escHtml(b.name)}</option>`).join('');
+    });
+  }
+
   // Populate group picker
   const picker = document.getElementById('uGroupPicker');
   if (picker && state.groups.length > 0) {
@@ -361,7 +371,8 @@ document.getElementById('btnSaveUser').addEventListener('click', async () => {
     showError('The Staff Officer role requires at least one J-designation to be assigned.', 'Validation');
     return;
   }
-  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs, nato_designations:natoDesignations};
+  const buildingId = parseInt(document.getElementById('uBuildingId')?.value) || 0;
+  const payload = {display_name:displayName, email, role, can_lock:canLock, group_ids:groupIDs, nato_designations:natoDesignations, building_id:buildingId};
   if (!id) { payload.username=username; payload.password=password; }
   if (id&&password) { payload.password=password; }
   const res = id ? await apiPut(`/api/users/${id}`, payload) : await apiPost('/api/users', payload);

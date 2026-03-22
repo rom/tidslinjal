@@ -1078,6 +1078,9 @@ function renderSidebar() {
       ${subBtn('datacenters', t('resource_data_centers')||'Data Centers', '🖥')}
       ${subBtn('work_areas', t('resource_work_areas')||'Work Areas', '💼')}
       ${subBtn('alliance_partners', t('resource_alliance_partners')||'Alliance Partners', '🤝')}
+      ${subBtn('capabilities', t('resource_capabilities')||'Capabilities', '🎯')}
+      ${subBtn('applications', t('resource_applications')||'Applications', '📱')}
+      ${subBtn('infrastructure', t('resource_infrastructure')||'Infrastructure', '🏗')}
       ${customTypes.map(ct => subBtn('custom_'+ct.key, ct.label, ct.icon||'📦')).join('')}
       ${subBtn('resource_list', t('resource_list')||'Resource List', '📋')}
       ${subBtn('resource_plan', t('resource_plan')||'Resource Plan', '📅')}
@@ -1150,9 +1153,9 @@ function renderSidebar() {
       _bindResSubTabs(el);
       _bindActions(el);
     } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'work_areas' || resSubTab === 'alliance_partners' || resSubTab.startsWith('custom_')) {
-      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', work_areas:'work_area', alliance_partners:'alliance_partner'};
-      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', work_areas:t('resource_work_areas')||'Work Areas', alliance_partners:t('resource_alliance_partners')||'Alliance Partners'};
-      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', work_areas:'💼', alliance_partners:'🤝'};
+      const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', work_areas:'work_area', alliance_partners:'alliance_partner', capabilities:'capability', applications:'application', infrastructure:'infrastructure'};
+      const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', work_areas:t('resource_work_areas')||'Work Areas', alliance_partners:t('resource_alliance_partners')||'Alliance Partners', capabilities:t('resource_capabilities')||'Capabilities', applications:t('resource_applications')||'Applications', infrastructure:t('resource_infrastructure')||'Infrastructure'};
+      const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', work_areas:'💼', alliance_partners:'🤝', capabilities:'🎯', applications:'📱', infrastructure:'🏗'};
       let roomType, sectionLabel, sectionIcon;
       if (resSubTab.startsWith('custom_')) {
         const customKey = resSubTab.replace('custom_', '');

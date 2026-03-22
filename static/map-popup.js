@@ -358,6 +358,10 @@ async function loadResourceLayers() {
     Object.values(layerMap).forEach(l => l.clearLayers());
     // Resolve coordinates and spread co-located resources
     const geoRooms = (rooms || []).map(r => {
+      // Use exact lat/lng if available, otherwise fall back to geocoding location text
+      if (r.latitude != null && r.longitude != null) {
+        return { ...r, _coords: [r.latitude, r.longitude] };
+      }
       if (!r.location) return null;
       const coords = geocodeSync(r.location);
       if (!coords) return null;

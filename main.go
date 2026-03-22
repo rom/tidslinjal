@@ -919,6 +919,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/stats/events/type", app.requireAuth(app.handleStatsEventsType))
 	mux.HandleFunc("GET /api/stats/events/heatmap", app.requireAuth(app.handleStatsEventsHeatmap))
 	mux.HandleFunc("GET /api/stats/users/workload", app.requireAuth(app.handleStatsUsersWorkload))
+	mux.HandleFunc("GET /api/stats/users/locations", app.requireRole(RoleTeamLead, app.handleStatsUserLocations))
 	mux.HandleFunc("GET /api/stats/decisions", app.requireAuth(app.handleStatsDecisions))
 	mux.HandleFunc("GET /api/stats/events/slip", app.requireAuth(app.handleStatsSlipHistogram))
 	mux.HandleFunc("GET /api/stats/events/tempo", app.requireAuth(app.handleStatsOpTempo))
@@ -1886,6 +1887,30 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		case http.MethodDelete:
 			app.requireAuth(app.handleDeleteBoardItem)(w, r)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// ── Resource Incidents ──
+	mux.HandleFunc("/api/resource-incidents", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleListResourceIncidents)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleSaveResourceIncident)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/resource-incidents/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/status") {
+			app.requireRole(RoleTeamLead, app.handleUpdateResourceIncidentStatus)(w, r)
+		} else if r.Method == http.MethodDelete {
+			app.requireRole(RoleAdmin, app.handleDeleteResourceIncident)(w, r)
+		} else if r.Method == http.MethodPut {
+			app.requireRole(RoleTeamLead, app.handleSaveResourceIncident)(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})

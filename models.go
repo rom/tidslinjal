@@ -141,6 +141,7 @@ type User struct {
 	Location     string `json:"location,omitempty"`
 	Latitude     float64 `json:"latitude,omitempty"`
 	Longitude    float64 `json:"longitude,omitempty"`
+	BuildingID   int64   `json:"building_id,omitempty"` // link to a building/room resource
 	Availability string `json:"availability,omitempty"` // free | busy | dnd | away
 	// OIDC-synced profile fields
 	FullName string `json:"full_name,omitempty"` // full name from IDP (given_name + family_name or name)
@@ -740,6 +741,8 @@ type Room struct {
 	Type        string    `json:"type"`       // room | building | computer_service | data_center | vehicle | equipment | <custom>
 	SubType     string    `json:"sub_type,omitempty"` // meeting_room | video_room | aula | studio | server_room | depot | ...
 	Location    string    `json:"location,omitempty"`
+	Latitude    *float64  `json:"latitude,omitempty"`
+	Longitude   *float64  `json:"longitude,omitempty"`
 	Capacity    int       `json:"capacity,omitempty"`
 	Description string    `json:"description,omitempty"`
 	Equipment   []string  `json:"equipment,omitempty"` // projector, whiteboard, etc.
@@ -755,6 +758,26 @@ type CustomResourceType struct {
 	Key   string `json:"key"`   // machine-readable key, e.g. "vehicle"
 	Label string `json:"label"` // display name, e.g. "Vehicles"
 	Icon  string `json:"icon"`  // emoji icon for the tab button
+}
+
+// ResourceIncident represents an incident, impact, or issue affecting a resource
+type ResourceIncident struct {
+	ID              int64     `json:"id"`
+	ResourceType    string    `json:"resource_type"`           // building | computer_service | data_center | capability | application | infrastructure
+	ResourceID      int64     `json:"resource_id"`             // references Room.ID
+	Title           string    `json:"title"`
+	Description     string    `json:"description,omitempty"`
+	IncidentType    string    `json:"incident_type"`           // incident | impact | task
+	Severity        string    `json:"severity"`                // low | medium | high | critical
+	Status          string    `json:"status"`                  // open | in_progress | resolved | closed
+	DecisionID      int64     `json:"decision_id,omitempty"`   // link to decision log entry
+	CreatedByID     int64     `json:"created_by_id"`
+	CreatedByName   string    `json:"created_by_name"`
+	AssignedToID    int64     `json:"assigned_to_id,omitempty"`
+	AssignedToName  string    `json:"assigned_to_name,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	ResolvedAt      *time.Time `json:"resolved_at,omitempty"`
 }
 
 // RoomBooking represents a reservation of a room/resource for a time period
