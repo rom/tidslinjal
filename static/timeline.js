@@ -9,6 +9,10 @@
 function navigate(dir) {
   state.startDate = addDays(state.startDate, dir * getRangeDays());
   refreshAll();
+  if (typeof a11yAnnounce === 'function') {
+    const d = state.startDate;
+    a11yAnnounce((dir > 0 ? 'Navigated forward' : 'Navigated backward') + ' to ' + d.toLocaleDateString());
+  }
 }
 function navJump(days) {
   const menu = document.getElementById('navJumpMenu');
@@ -727,6 +731,9 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         const block = document.createElement('div');
         block.className = 'event-block';
         block.dataset.evId = ev.id;
+        block.setAttribute('role', 'button');
+        block.setAttribute('tabindex', '0');
+        block.setAttribute('aria-label', `${escHtml(ev.title)} — ${ev.status || 'planned'}, ${fmtTime(evStart)}${ev.end_time ? ' to ' + fmtTime(evEnd) : ''}`);
         const _rawColor = ev.color || (evTypeDef ? evTypeDef.color : '#4A90D9');
         const evColor = typeof cbSafeColor === 'function' ? cbSafeColor(_rawColor) : _rawColor;
         // Sanitize color values to prevent CSS injection
@@ -762,6 +769,13 @@ function _renderEventBlocksInner(days, slotH, incremental) {
             showEventDetail(ev);
           }
         };
+        // Keyboard activation: Enter or Space opens event detail
+        block.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            block.click();
+          }
+        });
         container.appendChild(block);
         // Track for incremental updates
         _renderedBlockMap.set(blockKey, { fingerprint: _eventBlockFingerprint(ev), element: block });

@@ -1829,6 +1829,83 @@ body.light-mode { --danger: #c0392b; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* ── Accessibility: Enhanced focus indicators ───────────────────────────── */
+body.a11y-focus :focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px rgba(74,144,217,.25) !important;
+}
+body.a11y-focus .event-block:focus-visible {
+  outline: 3px solid #fff !important;
+  outline-offset: 1px !important;
+  z-index: 10 !important;
+}
+body.a11y-focus .modal-close:focus-visible,
+body.a11y-focus .btn:focus-visible,
+body.a11y-focus .sidebar-tab:focus-visible {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+body.light-mode.a11y-focus :focus-visible {
+  outline-color: #0056b3 !important;
+  box-shadow: 0 0 0 6px rgba(0,86,179,.2) !important;
+}
+
+/* ── Accessibility: Reduced motion (user preference override) ───────────── */
+body.a11y-reduced-motion *,
+body.a11y-reduced-motion *::before,
+body.a11y-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+body.a11y-reduced-motion .modal-overlay .modal { transform: none !important; }
+body.a11y-reduced-motion .event-block:hover { transform: none !important; }
+
+/* ── Accessibility: Skip link ───────────────────────────────────────────── */
+.a11y-skip-link {
+  position: fixed; top: -100px; left: 16px; z-index: 10000;
+  background: var(--accent); color: #fff; padding: 10px 20px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  font-size: var(--fs-base); font-weight: 600;
+  text-decoration: none; transition: top .15s;
+}
+.a11y-skip-link:focus {
+  top: 0;
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+body:not(.a11y-skip-links) .a11y-skip-link { display: none; }
+
+/* ── Accessibility: Large click targets ─────────────────────────────────── */
+body.a11y-large-targets .btn,
+body.a11y-large-targets .toolbar-btn,
+body.a11y-large-targets .sidebar-tab,
+body.a11y-large-targets .modal-close,
+body.a11y-large-targets .toggle-btn {
+  min-height: 44px !important;
+  min-width: 44px !important;
+  padding: 8px 12px !important;
+}
+body.a11y-large-targets .tl-cell { min-height: 44px !important; }
+body.a11y-large-targets .kanban-card { min-height: 44px !important; padding: 12px !important; }
+
+/* ── Accessibility: Font scaling ────────────────────────────────────────── */
+body.a11y-font-125 { font-size: 125% !important; }
+body.a11y-font-125 :root { --fs-base: 16px; --fs-md: 15px; --fs-sm: 14px; --fs-xs: 12px; --fs-lg: 19px; }
+body.a11y-font-150 { font-size: 150% !important; }
+body.a11y-font-150 :root { --fs-base: 20px; --fs-md: 18px; --fs-sm: 16px; --fs-xs: 14px; --fs-lg: 22px; }
+
+/* ── Accessibility: Screen reader only text ─────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ── Accessibility: ARIA live region for announcements ──────────────────── */
+#a11y-announcer { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
 /* Tablet landscape: ensure good use of horizontal space */
 @media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
   #sidebar.visible { width: 320px; }

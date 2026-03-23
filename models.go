@@ -320,6 +320,13 @@ type UserPreferences struct {
 	TacticalFontFamily  string `json:"tactical_font_family,omitempty"`  // CSS font-family name for tactical font
 	TickerEnabled       bool   `json:"ticker_enabled,omitempty"`        // show narrative ticker bar at bottom
 	TickerCount         int    `json:"ticker_count,omitempty"`          // number of narrative entries in ticker (default 10)
+	// Accessibility settings (configurable per user)
+	A11yFocusIndicators  bool   `json:"a11y_focus_indicators,omitempty"`  // enhanced keyboard focus indicators
+	A11yReducedMotion    bool   `json:"a11y_reduced_motion,omitempty"`    // reduce animations (override OS setting)
+	A11yScreenReader     bool   `json:"a11y_screen_reader,omitempty"`     // enable ARIA live regions and announcements
+	A11yLargeClickTarget bool   `json:"a11y_large_click_targets,omitempty"` // enlarge click/touch targets (44px minimum)
+	A11yFontScaling      string `json:"a11y_font_scaling,omitempty"`      // 100 | 125 | 150 — percentage text scaling
+	A11ySkipLinks        bool   `json:"a11y_skip_links,omitempty"`        // show skip-to-content navigation links
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click

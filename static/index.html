@@ -10,10 +10,15 @@
   <link rel="stylesheet" href="/static/vendor/leaflet.css">
 </head>
 <body>
+<!-- Skip links for keyboard navigation (hidden until focused) -->
+<a href="#timeline-container" class="a11y-skip-link">Skip to timeline</a>
+<a href="#sidebar" class="a11y-skip-link" style="left:200px">Skip to sidebar</a>
+<!-- Live region for screen reader announcements -->
+<div id="a11y-announcer" aria-live="polite" aria-atomic="true" role="status"></div>
 <div id="app">
 
   <!-- ── Header ────────────────────────────────────────────────────────────── -->
-  <header id="header">
+  <header id="header" role="banner">
     <div class="logo">Tids<span>linjal</span></div>
 
     <div class="header-controls">
@@ -176,11 +181,11 @@
   </header>
 
   <!-- ── Main content ───────────────────────────────────────────────────────── -->
-  <div id="main">
+  <main id="main" role="main">
 
     <!-- Timeline -->
-    <div id="timeline-container">
-      <div id="timeline"></div>
+    <div id="timeline-container" role="region" aria-label="Timeline grid">
+      <div id="timeline" role="grid" aria-label="Event timeline"></div>
       <div id="current-time-line" style="display:none"></div>
       <div id="calNavPrev" class="cal-nav-arrow cal-nav-left" title="Previous period">‹</div>
       <div id="calNavNext" class="cal-nav-arrow cal-nav-right" title="Next period">›</div>
@@ -231,7 +236,7 @@
     <div id="sidebarResizeHandle" class="sidebar-resize-handle"></div>
 
     <!-- Sidebar -->
-    <aside id="sidebar">
+    <aside id="sidebar" aria-label="Settings and tools">
       <div class="sidebar-tabs" id="sidebarTabs">
         <button class="sidebar-tab active" data-tab="legend" data-i18n="tab_legend">Legend</button>
         <button class="sidebar-tab" data-tab="tools" data-i18n="tab_tools">Tools</button>
@@ -249,7 +254,7 @@
       <div class="sidebar-content" id="sidebarContent"></div>
     </aside>
 
-  </div>
+  </main>
 </div>
 
 <!-- Navigation jump dropdown -->
