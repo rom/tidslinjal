@@ -203,6 +203,95 @@ function updateUILabels() {
   // Member modal
   setElText('lbl-member-close', t('btn_close'));
 
+  // Context menu
+  setElText('ctxEdit', '✏️ ' + t('ctx_edit'));
+  setElText('ctxDuplicate', '⧉ ' + t('ctx_duplicate'));
+  setElText('ctxAlarm', '🔔 ' + t('ctx_alarm'));
+  setElText('ctxMove', '📅 ' + t('ctx_move'));
+  setElText('ctxDelete', '🗑 ' + t('ctx_delete'));
+  setElText('ctxStatusPlanned', t('ctx_set_planned'));
+  setElText('ctxStatusActive', t('ctx_set_active'));
+  setElText('ctxStatusCompleted', t('ctx_set_completed'));
+  setElText('ctxStatusCancelled', t('ctx_set_cancelled'));
+  // Slot context menu
+  const slotCtx = document.getElementById('slotContextMenu');
+  if (slotCtx) {
+    const items = slotCtx.querySelectorAll('.context-menu-item');
+    if (items[0]) items[0].textContent = t('ctx_add_event_here');
+    if (items[1]) items[1].textContent = t('ctx_lock_this_slot');
+  }
+
+  // Mobile nav
+  setElText('mnTimeline', '📅' + t('mobile_timeline'));
+  setElText('mnList', '📋' + t('mobile_list'));
+  setElText('mnLegend', '🏷️' + t('mobile_legend'));
+  setElText('mnLayers', '📂' + t('mobile_layers'));
+  setElText('mnSettings', '⚙️' + t('mobile_settings'));
+  setElText('mnMenu', '☰' + t('mobile_more'));
+
+  // Filter panel
+  const filterPanel = document.getElementById('filterPanel');
+  if (filterPanel) {
+    const filterLabels = filterPanel.querySelectorAll('.filter-section-title');
+    // These are set via IDs below instead
+  }
+  setElText('filterStatusLabel', t('filter_by_status'));
+  setElText('filterResponsibleLabel', t('filter_by_responsible'));
+  setElText('filterLayerLabel', t('filter_by_layer'));
+  setElText('btnApplyFilter', t('filter_apply'));
+  setElText('btnSaveFilterPreset', t('filter_preset_save'));
+  const presetInput = document.getElementById('filterPresetName');
+  if (presetInput) presetInput.placeholder = t('filter_preset_name_ph');
+
+  // Templates modal
+  setElText('btnSaveTemplate', '💾 ' + t('tmpl_save_current'));
+  setElText('btnImportTemplate', '📂 ' + t('tmpl_load_file'));
+  setElText('btnExportTemplates', '⬇ ' + t('tmpl_save_file'));
+
+  // Recurring event modals
+  setElText('recurEditThis', t('recur_edit_this'));
+  setElText('recurEditFuture', t('recur_edit_future'));
+  setElText('recurEditAll', t('recur_edit_all'));
+  setElText('recurDelThis', t('recur_delete_this'));
+  setElText('recurDelFuture', t('recur_delete_future'));
+  setElText('recurDelAll', t('recur_delete_all'));
+
+  // Alarm modal extras
+  setElText('lbl-alarm-title', t('alarm_title'));
+  setElText('lbl-alarm-event', t('alarm_event'));
+  setElText('lbl-alarm-time', t('alarm_time'));
+  setElText('lbl-alarm-remind', t('alarm_remind'));
+  setElText('lbl-alarm-sound', t('alarm_sound'));
+  setElText('lbl-alarm-webhook', t('alarm_webhook'));
+  const alarmLead = document.getElementById('alarmLeadTime');
+  if (alarmLead) {
+    const alarmMap = {'0':'alarm_at_time','5':'alarm_5min','10':'alarm_10min','15':'alarm_15min','30':'alarm_30min','60':'alarm_1hr'};
+    [...alarmLead.options].forEach(opt => { const k = alarmMap[opt.value]; if (k) opt.text = t(k); });
+  }
+  const alarmSound = document.getElementById('alarmSound');
+  if (alarmSound) {
+    const sndMap = {klaxon:'🔊 '+t('alarm_sound_klaxon'),alert:'🔔 '+t('alarm_sound_alert'),siren:'🚨 '+t('alarm_sound_siren'),chime:'🎵 '+t('alarm_sound_chime'),beep:'📢 '+t('alarm_sound_beep'),none:'🔇 '+t('alarm_sound_silent')};
+    [...alarmSound.options].forEach(opt => { if (sndMap[opt.value]) opt.text = sndMap[opt.value]; });
+  }
+
+  // Lock modal extras
+  setElText('lbl-lock-title', t('lock_title'));
+  setElText('lbl-existing-locks', t('lock_active_locks'));
+  setElText('lbl-add-lock', t('lock_add_new'));
+  setElText('lbl-lock-start', t('lock_start') + ' *');
+  setElText('lbl-lock-end', t('lock_end') + ' *');
+  setElText('lbl-lock-scope', t('lock_scope'));
+  setElText('lbl-lock-layer', t('lock_layer'));
+  setElText('lbl-lock-reason', t('lock_reason'));
+  const lockScope = document.getElementById('lockScope');
+  if (lockScope) {
+    const scopeMap = {all:'lock_scope_all',master:'lock_scope_master',layer:'lock_scope_layer'};
+    [...lockScope.options].forEach(opt => { const k = scopeMap[opt.value]; if (k) opt.text = t(k); });
+  }
+
+  // Error modal
+  setElText('errorModalTitle', t('error_title'));
+
   // Translate any element with data-i18n attribute
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
