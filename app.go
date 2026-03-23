@@ -177,7 +177,11 @@ func (app *App) broadcastUserChange(senderID int64, action string, userID int64)
 		"action":  action,
 		"user_id": userID,
 	}
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		logError("broadcastUserChange: marshal error: %v", err)
+		return
+	}
 	app.broker.BroadcastAll(SSEMessage{Event: "user_change", Data: string(data)})
 }
 
@@ -188,7 +192,11 @@ func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
 		"action": action,
 		"event":  ev,
 	}
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		logError("broadcastEventChange: marshal error: %v", err)
+		return
+	}
 	msg := SSEMessage{Event: "event_change", Data: string(data)}
 
 	// If event is on master timeline (no layer), broadcast to everyone
@@ -223,11 +231,16 @@ func (app *App) fireWebhooks(action string, ev *Event) {
 			"updated_by":  ev.CreatedByName,
 		}
 		var body []byte
+		var mErr error
 		if p.WebhookType == "mattermost" || p.WebhookType == "slack" {
 			text := fmt.Sprintf("[%s] **%s** — %s (%s)", action, ev.Title, ev.Status, ev.EventType)
-			body, _ = json.Marshal(map[string]string{"text": text})
+			body, mErr = json.Marshal(map[string]string{"text": text})
 		} else {
-			body, _ = json.Marshal(payload)
+			body, mErr = json.Marshal(payload)
+		}
+		if mErr != nil {
+			logError("fireWebhooks: marshal error for user %d: %v", p.UserID, mErr)
+			continue
 		}
 		app.enqueueWebhook(p.WebhookType, p.WebhookURL, body)
 	}
@@ -320,6 +333,10 @@ func (app *App) Stop() {
 		app.eventBus.Stop()
 		close(app.webhookCh)
 		app.webhookWG.Wait() // drain in-flight webhook deliveries
+		// Flush any pending writes to disk
+		if err := app.store.FlushAll(); err != nil {
+			log.Printf("Warning: error flushing store on shutdown: %v", err)
+		}
 	})
 }
 

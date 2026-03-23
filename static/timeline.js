@@ -1257,6 +1257,51 @@ function setupKeyboardShortcuts() {
         state.zoomFactor = Math.max(0.2, state.zoomFactor - 0.25);
         renderTimeline();
         break;
+      // ── Additional shortcuts ──
+      case 'f':
+        // Freeze/resume synthetic time
+        if (typeof toggleSyntheticTime === 'function') toggleSyntheticTime();
+        else { const btn = document.getElementById('btnSyntheticTime'); if (btn) btn.click(); }
+        break;
+      case 'l':
+        // Toggle list view
+        if (typeof toggleListView === 'function') toggleListView();
+        break;
+      case 'b':
+        // Open boards
+        if (typeof openBoardsModal === 'function') openBoardsModal();
+        break;
+      case 's':
+        // Toggle sidebar
+        { const btn = document.getElementById('btnSidebar'); if (btn) btn.click(); }
+        break;
+      case 'r':
+        // Open reports
+        if (typeof openReportModal === 'function') openReportModal();
+        break;
+      case 'd':
+        // Open decision log
+        if (typeof openDecisionLogModal === 'function') openDecisionLogModal();
+        break;
+      case 'a':
+        // Open analysis
+        if (typeof openAnalysisModal === 'function') openAnalysisModal();
+        break;
+      case 'p':
+        // Open profile
+        if (typeof openProfileModal === 'function') openProfileModal();
+        break;
+      case 'g':
+        // Go to date (prompt)
+        { const d = prompt(t('go_to_date')||'Go to date (YYYY-MM-DD):');
+          if (d) goToDate(d); }
+        break;
+      case '/':
+        // Focus search
+        e.preventDefault();
+        { const el = document.getElementById('searchInput') || document.getElementById('listSearch');
+          if (el) el.focus(); }
+        break;
     }
   });
 }

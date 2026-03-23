@@ -1,7 +1,12 @@
 .PHONY: build test lint lint-go lint-js vet e2e clean test-perf test-fuzz test-all
 
+VERSION ?= $(shell grep 'var AppVersion' models.go | head -1 | sed 's/.*"\(.*\)"/\1/')
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS := -X main.AppVersion=$(VERSION) -X main.BuildCommit=$(COMMIT) -X main.BuildTime=$(BUILD_TIME)
+
 build:
-	go build -o tidslinjal ./...
+	go build -ldflags "$(LDFLAGS)" -o tidslinjal ./...
 
 test:
 	go test -short ./...

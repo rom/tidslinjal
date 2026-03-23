@@ -2470,13 +2470,16 @@ func main() {
 	// ── Startup summary ──────────────────────────────────────────────────────
 	hn, _ := os.Hostname()
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Printf("  Tidslinjal v%s", AppVersion)
+	log.Printf("  Tidslinjal v%s (commit %s)", AppVersion, BuildCommit)
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Runtime / system info
 	log.Printf("  Hostname   : %s", hn)
 	log.Printf("  PID        : %d", os.Getpid())
 	log.Printf("  Go version : %s", runtime.Version())
+	if BuildTime != "" {
+		log.Printf("  Built at   : %s", BuildTime)
+	}
 	log.Printf("  OS/Arch    : %s/%s", runtime.GOOS, runtime.GOARCH)
 	log.Printf("  CPUs       : %d", runtime.NumCPU())
 	log.Printf("  Started at : %s", time.Now().Format(time.RFC3339))
@@ -2709,18 +2712,28 @@ func main() {
 	go func() {
 		sig := <-shutdownCh
 		log.Printf("Received %v — initiating graceful shutdown...", sig)
+		shutdownStart := time.Now()
 
 		// Give in-flight requests up to 30 seconds to finish
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
+		// Disconnect SSE clients first so they can reconnect to another instance
+		connCount := len(app.broker.ConnectedUserIDs())
+		if connCount > 0 {
+			log.Printf("Closing %d SSE client connection(s)...", connCount)
+		}
+
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("HTTP server shutdown error: %v", err)
+		} else {
+			log.Printf("HTTP server stopped (took %s)", time.Since(shutdownStart).Truncate(time.Millisecond))
 		}
 
 		// Stop background goroutines and drain webhook queue
+		log.Printf("Draining background workers...")
 		app.Stop()
-		log.Printf("Graceful shutdown complete.")
+		log.Printf("Graceful shutdown complete (total %s)", time.Since(shutdownStart).Truncate(time.Millisecond))
 	}()
 
 	if useTLS {

@@ -1048,7 +1048,22 @@ func (app *App) notifyBoardMentions(text string, sender *User, board *Board, ite
 
 func (app *App) broadcastBoardChange(action string, boardID int64) {
 	data := fmt.Sprintf(`{"action":"%s","board_id":%d}`, action, boardID)
-	app.broker.BroadcastAll(SSEMessage{Event: "board_change", Data: data})
+	msg := SSEMessage{Event: "board_change", Data: data}
+
+	// Only notify users who have access to this board
+	board := app.store.GetBoardByID(boardID)
+	if board == nil {
+		// Board deleted — broadcast to everyone so clients can clean up
+		app.broker.BroadcastAll(msg)
+		return
+	}
+	app.broker.BroadcastFiltered(0, msg, func(userID int64) bool {
+		u, ok := app.store.GetUserByID(userID)
+		if !ok {
+			return false
+		}
+		return app.canAccessBoard(board, u)
+	})
 }
 
 // ── Share Token Endpoints ───────────────────────────────────────────────────

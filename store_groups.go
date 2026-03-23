@@ -248,7 +248,55 @@ func (s *Store) DeleteLayer(id int64) error {
 		s.mu.Unlock()
 		return fmt.Errorf("layer not found")
 	}
-	snap := append([]Layer(nil), s.layers...)
+
+	// Cascade: move events on this layer to the master timeline (nil layer)
+	eventsChanged := false
+	for i := range s.events {
+		if s.events[i].LayerID != nil && *s.events[i].LayerID == id {
+			s.events[i].LayerID = nil
+			eventsChanged = true
+		}
+	}
+
+	// Cascade: remove layer from user preferences' hidden_layers and active_layers
+	for i := range s.preferences {
+		p := &s.preferences[i]
+		filtered := p.HiddenLayers[:0]
+		for _, lid := range p.HiddenLayers {
+			if lid != id {
+				filtered = append(filtered, lid)
+			}
+		}
+		p.HiddenLayers = filtered
+
+		filteredActive := p.ActiveLayers[:0]
+		for _, lid := range p.ActiveLayers {
+			if lid != id {
+				filteredActive = append(filteredActive, lid)
+			}
+		}
+		p.ActiveLayers = filteredActive
+	}
+
+	snapLayers := append([]Layer(nil), s.layers...)
+	var snapEvents []Event
+	if eventsChanged {
+		snapEvents = append([]Event(nil), s.events...)
+	}
+	snapPrefs := append([]UserPreferences(nil), s.preferences...)
 	s.mu.Unlock()
-	return s.persist("layers.json", snap)
+
+	var firstErr error
+	if err := s.persist("layers.json", snapLayers); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if eventsChanged {
+		if err := s.persist("events.json", snapEvents); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if err := s.persist("preferences.json", snapPrefs); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return firstErr
 }
