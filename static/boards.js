@@ -270,10 +270,18 @@ async function _editBoardFromList(boardId) {
         <input type="checkbox" id="editBoardPriorityBg" ${board.priority_background !== false ? 'checked' : ''} style="accent-color:var(--accent)">
         ${t('board_priority_background')||'Color card background by priority'}
       </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="editBoardShowArchival" ${board.show_archival !== false ? 'checked' : ''} style="accent-color:var(--accent)">
         ${t('board_show_archival')||'Show archive controls on column headers'}
       </label>
+      <div style="margin-top:6px">
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_sort_mode')||'Item Sort Order'}</label>
+        <select id="editBoardSortMode" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="normal" ${(!board.sort_mode||board.sort_mode==='normal')?'selected':''}>📋 ${t('board_sort_normal')||'Normal (order added)'}</option>
+          <option value="priority" ${board.sort_mode==='priority'?'selected':''}>⚡ ${t('board_sort_priority')||'Priority order'}</option>
+          <option value="due_date" ${board.sort_mode==='due_date'?'selected':''}>📅 ${t('board_sort_due_date')||'Shortest due date'}</option>
+        </select>
+      </div>
     </div>
 
     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px">
@@ -372,6 +380,7 @@ async function _saveEditBoardFromList(boardId) {
       show_icons: document.getElementById('editBoardShowIcons')?.checked !== false,
       priority_background: document.getElementById('editBoardPriorityBg')?.checked !== false,
       show_archival: document.getElementById('editBoardShowArchival')?.checked !== false,
+      sort_mode: document.getElementById('editBoardSortMode')?.value || 'normal',
     });
     _closeBoardModal('editBoardListModal');
     // Refresh the board list
@@ -482,8 +491,32 @@ function _renderKanbanBoard() {
     if (!colItems[cid]) colItems[cid] = [];
     colItems[cid].push(item);
   }
-  // Sort by sort_order
-  for (const k of Object.keys(colItems)) colItems[k].sort((a, b) => a.sort_order - b.sort_order);
+  // Sort items based on board sort_mode setting
+  const _priorityRank = { critical: 0, high: 1, normal: 2, '': 2, low: 3 };
+  const sortMode = board.sort_mode || 'normal';
+  for (const k of Object.keys(colItems)) {
+    if (sortMode === 'priority') {
+      colItems[k].sort((a, b) => {
+        const pa = _priorityRank[a.priority || ''] ?? 2;
+        const pb = _priorityRank[b.priority || ''] ?? 2;
+        if (pa !== pb) return pa - pb;
+        return a.sort_order - b.sort_order;
+      });
+    } else if (sortMode === 'due_date') {
+      colItems[k].sort((a, b) => {
+        // Items with due dates come first, sorted by earliest due date
+        if (a.due_date && !b.due_date) return -1;
+        if (!a.due_date && b.due_date) return 1;
+        if (a.due_date && b.due_date) {
+          if (a.due_date < b.due_date) return -1;
+          if (a.due_date > b.due_date) return 1;
+        }
+        return a.sort_order - b.sort_order;
+      });
+    } else {
+      colItems[k].sort((a, b) => a.sort_order - b.sort_order);
+    }
+  }
 
   const boardBg = board.color ? `background:${board.color}22;border:1px solid ${board.color}44;border-radius:var(--radius);padding:12px;` : '';
   const btnStyle = 'min-width:32px;height:28px;padding:4px 8px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;';
@@ -1680,10 +1713,18 @@ async function _openBoardSettings() {
         <input type="checkbox" id="settBoardPriorityBg" ${board.priority_background !== false ? 'checked' : ''} style="accent-color:var(--accent)">
         ${t('board_priority_background')||'Color background by priority (otherwise show colored dot only)'}
       </label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="settBoardShowArchival" ${board.show_archival !== false ? 'checked' : ''} style="accent-color:var(--accent)">
         ${t('board_show_archival')||'Show archival controls on columns'}
       </label>
+      <div style="margin-top:6px">
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_sort_mode')||'Item Sort Order'}</label>
+        <select id="settBoardSortMode" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="normal" ${(!board.sort_mode||board.sort_mode==='normal')?'selected':''}>📋 ${t('board_sort_normal')||'Normal (order added)'}</option>
+          <option value="priority" ${board.sort_mode==='priority'?'selected':''}>⚡ ${t('board_sort_priority')||'Priority order'}</option>
+          <option value="due_date" ${board.sort_mode==='due_date'?'selected':''}>📅 ${t('board_sort_due_date')||'Shortest due date'}</option>
+        </select>
+      </div>
     </div>
 
     <div style="display:flex;gap:8px">
@@ -1745,6 +1786,7 @@ async function _saveBoardSettings() {
       show_icons: document.getElementById('settBoardShowIcons')?.checked !== false,
       priority_background: document.getElementById('settBoardPriorityBg')?.checked !== false,
       show_archival: document.getElementById('settBoardShowArchival')?.checked !== false,
+      sort_mode: document.getElementById('settBoardSortMode')?.value || 'normal',
     });
     closeModal('boardSettingsModal');
     await _openBoard(board.id);
