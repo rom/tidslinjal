@@ -492,30 +492,8 @@ function _renderKanbanBoard() {
     colItems[cid].push(item);
   }
   // Sort items based on board sort_mode setting
-  const _priorityRank = { critical: 0, high: 1, normal: 2, '': 2, low: 3 };
-  const sortMode = board.sort_mode || 'normal';
   for (const k of Object.keys(colItems)) {
-    if (sortMode === 'priority') {
-      colItems[k].sort((a, b) => {
-        const pa = _priorityRank[a.priority || ''] ?? 2;
-        const pb = _priorityRank[b.priority || ''] ?? 2;
-        if (pa !== pb) return pa - pb;
-        return a.sort_order - b.sort_order;
-      });
-    } else if (sortMode === 'due_date') {
-      colItems[k].sort((a, b) => {
-        // Items with due dates come first, sorted by earliest due date
-        if (a.due_date && !b.due_date) return -1;
-        if (!a.due_date && b.due_date) return 1;
-        if (a.due_date && b.due_date) {
-          if (a.due_date < b.due_date) return -1;
-          if (a.due_date > b.due_date) return 1;
-        }
-        return a.sort_order - b.sort_order;
-      });
-    } else {
-      colItems[k].sort((a, b) => a.sort_order - b.sort_order);
-    }
+    colItems[k] = _sortColItems(colItems[k], board);
   }
 
   const boardBg = board.color ? `background:${board.color}22;border:1px solid ${board.color}44;border-radius:var(--radius);padding:12px;` : '';
@@ -591,44 +569,7 @@ function _renderKanbanBoard() {
         <div class="kanban-items" style="display:flex;flex-direction:column;gap:6px;min-height:40px">`;
 
       for (const item of cItems) {
-        const showIcons = board.show_icons !== false;
-        const priorityBg = board.priority_background !== false;
-        const bgColor = priorityBg && item.priority && item.priority !== 'normal' && item.priority !== 'low'
-          ? (item.priority === 'critical' ? 'rgba(231,76,60,0.12)' : item.priority === 'high' ? 'rgba(230,126,34,0.12)' : (item.color || 'var(--bg3)'))
-          : (item.color || 'var(--bg3)');
-        const typeIcon = showIcons ? (_itemTypeIcons[item.item_type] || '') : '';
-        const priorityBadge = item.priority && item.priority !== 'normal' ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
-        // Due date display and urgency
-        let dueDateHtml = '';
-        if (item.due_date) {
-          const due = new Date(item.due_date + 'T23:59:59');
-          const now = new Date();
-          const daysLeft = Math.ceil((due - now) / 86400000);
-          const dueColor = daysLeft < 0 ? 'var(--danger)' : daysLeft <= 2 ? '#e67e22' : 'var(--text-dim)';
-          dueDateHtml = `<span title="${t('board_due_date')||'Due'}: ${item.due_date}" style="color:${dueColor};font-weight:${daysLeft<=0?'bold':'normal'}">📅 ${item.due_date.slice(5)}</span>`;
-        }
-        html += `<div class="kanban-card" draggable="true" data-item-id="${item.id}" data-drag-item="${item.id}"
-          style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
-          data-action="_openBoardItem" data-arg="${item.id}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <strong style="font-size:var(--fs-sm)">${priorityBadge ? priorityBadge + ' ' : ''}${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</strong>
-            <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
-          </div>
-          ${item.note ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;max-height:40px;overflow:hidden">${escHtml(item.note).substring(0, 100)}</div>` : ''}
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:var(--fs-xs)">
-            <span style="color:var(--text-dim)">${item.responsible_name ? escHtml(item.responsible_name) : escHtml(item.creator_name||'')}</span>
-            <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-              ${item.tags ? item.tags.map(tag => `<span style="background:var(--accent);color:#fff;padding:0 4px;border-radius:3px;font-size:9px">${escHtml(tag)}</span>`).join('') : ''}
-              ${dueDateHtml}
-              ${item.attachments && item.attachments.length ? `<span title="${item.attachments.length} attachment(s)">📎${item.attachments.length}</span>` : ''}
-              ${item.links && item.links.length ? `<span title="${item.links.length} link(s)">🔗${item.links.length}</span>` : ''}
-              ${item.comments && item.comments.length ? `<span title="${item.comments.length} comment(s)">💬${item.comments.length}</span>` : ''}
-              ${item.checklist_id ? '<span title="Linked checklist">📋</span>' : ''}
-              ${item.event_id ? '<span title="Linked event">📅</span>' : ''}
-              ${item.related_item_ids && item.related_item_ids.length ? `<span title="${item.related_item_ids.length} related item(s)">🔗${item.related_item_ids.length}</span>` : ''}
-            </div>
-          </div>
-        </div>`;
+        html += _renderCardHtml(item, board);
       }
       html += `</div></div>`;
     }
@@ -689,6 +630,287 @@ function _renderKanbanBoard() {
         }
       }
     }).observe(boardModalEl);
+  }
+}
+
+// ── Generate HTML for a single kanban card ──
+function _renderCardHtml(item, board) {
+  const showIcons = board.show_icons !== false;
+  const priorityBg = board.priority_background !== false;
+  const bgColor = priorityBg && item.priority && item.priority !== 'normal' && item.priority !== 'low'
+    ? (item.priority === 'critical' ? 'rgba(231,76,60,0.12)' : item.priority === 'high' ? 'rgba(230,126,34,0.12)' : (item.color || 'var(--bg3)'))
+    : (item.color || 'var(--bg3)');
+  const typeIcon = showIcons ? (_itemTypeIcons[item.item_type] || '') : '';
+  const priorityBadge = item.priority && item.priority !== 'normal' ? ({low:'🔵',high:'🟠',critical:'🔴'}[item.priority]||'') : '';
+  let dueDateHtml = '';
+  if (item.due_date) {
+    const due = new Date(item.due_date + 'T23:59:59');
+    const now = new Date();
+    const daysLeft = Math.ceil((due - now) / 86400000);
+    const dueColor = daysLeft < 0 ? 'var(--danger)' : daysLeft <= 2 ? '#e67e22' : 'var(--text-dim)';
+    dueDateHtml = `<span title="${t('board_due_date')||'Due'}: ${item.due_date}" style="color:${dueColor};font-weight:${daysLeft<=0?'bold':'normal'}">📅 ${item.due_date.slice(5)}</span>`;
+  }
+  return `<div class="kanban-card" draggable="true" data-item-id="${item.id}" data-drag-item="${item.id}"
+    style="background:${bgColor};border:1px solid var(--border);border-radius:var(--radius);padding:8px;cursor:grab;position:relative"
+    data-action="_openBoardItem" data-arg="${item.id}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <strong style="font-size:var(--fs-sm)">${priorityBadge ? priorityBadge + ' ' : ''}${typeIcon ? typeIcon + ' ' : ''}${escHtml(item.subject)}</strong>
+      <span style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">#${item.id}</span>
+    </div>
+    ${item.note ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;max-height:40px;overflow:hidden">${escHtml(item.note).substring(0, 100)}</div>` : ''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:var(--fs-xs)">
+      <span style="color:var(--text-dim)">${item.responsible_name ? escHtml(item.responsible_name) : escHtml(item.creator_name||'')}</span>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        ${item.tags ? item.tags.map(tag => `<span style="background:var(--accent);color:#fff;padding:0 4px;border-radius:3px;font-size:9px">${escHtml(tag)}</span>`).join('') : ''}
+        ${dueDateHtml}
+        ${item.attachments && item.attachments.length ? `<span title="${item.attachments.length} attachment(s)">📎${item.attachments.length}</span>` : ''}
+        ${item.links && item.links.length ? `<span title="${item.links.length} link(s)">🔗${item.links.length}</span>` : ''}
+        ${item.comments && item.comments.length ? `<span title="${item.comments.length} comment(s)">💬${item.comments.length}</span>` : ''}
+        ${item.checklist_id ? '<span title="Linked checklist">📋</span>' : ''}
+        ${item.event_id ? '<span title="Linked event">📅</span>' : ''}
+        ${item.related_item_ids && item.related_item_ids.length ? `<span title="${item.related_item_ids.length} related item(s)">🔗${item.related_item_ids.length}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Sort items for a column based on board sort_mode ──
+function _sortColItems(items, board) {
+  const sortMode = board.sort_mode || 'normal';
+  const _priorityRank = { critical: 0, high: 1, normal: 2, '': 2, low: 3 };
+  const sorted = [...items];
+  if (sortMode === 'priority') {
+    sorted.sort((a, b) => {
+      const pa = _priorityRank[a.priority || ''] ?? 2;
+      const pb = _priorityRank[b.priority || ''] ?? 2;
+      if (pa !== pb) return pa - pb;
+      return a.sort_order - b.sort_order;
+    });
+  } else if (sortMode === 'due_date') {
+    sorted.sort((a, b) => {
+      if (a.due_date && !b.due_date) return -1;
+      if (!a.due_date && b.due_date) return 1;
+      if (a.due_date && b.due_date) {
+        if (a.due_date < b.due_date) return -1;
+        if (a.due_date > b.due_date) return 1;
+      }
+      return a.sort_order - b.sort_order;
+    });
+  } else {
+    sorted.sort((a, b) => a.sort_order - b.sort_order);
+  }
+  return sorted;
+}
+
+// ── Incremental DOM patching for kanban board ──
+// Updates cards in-place without destroying the entire DOM tree.
+// Preserves scroll positions, focus, and event listeners on the modal shell.
+function _patchKanbanBoard() {
+  const board = _boardsState.activeBoard;
+  const items = _boardsState.items;
+  if (!board) return;
+
+  const modal = document.getElementById('boardsModal');
+  if (!modal) { _renderKanbanBoard(); return; }
+
+  const kanbanCols = modal.querySelector('.kanban-columns');
+  if (!kanbanCols) { _renderKanbanBoard(); return; }
+
+  // Save scroll positions
+  const scrollLeft = kanbanCols.parentElement ? kanbanCols.parentElement.scrollLeft : 0;
+  const colScrollTops = {};
+  kanbanCols.querySelectorAll('.kanban-col .kanban-items').forEach(el => {
+    const colId = el.parentElement.dataset.col;
+    if (colId) colScrollTops[colId] = el.scrollTop;
+  });
+
+  const activeItems = items.filter(i => !i.archived);
+  const archivedItems = items.filter(i => i.archived);
+
+  // Build column-to-items map
+  const colItems = {};
+  for (const col of board.columns) colItems[String(col.id)] = [];
+  for (const item of activeItems) {
+    const cid = String(item.column_id);
+    if (!colItems[cid]) colItems[cid] = [];
+    colItems[cid].push(item);
+  }
+  for (const k of Object.keys(colItems)) {
+    colItems[k] = _sortColItems(colItems[k], board);
+  }
+
+  // Patch each column's items
+  for (const col of board.columns) {
+    if (col.collapsed) continue;
+    const colEl = kanbanCols.querySelector(`[data-col="${col.id}"]`);
+    if (!colEl) { _renderKanbanBoard(); return; }
+
+    const itemsContainer = colEl.querySelector('.kanban-items');
+    if (!itemsContainer) continue;
+
+    const cItems = colItems[String(col.id)] || [];
+    const desiredIds = cItems.map(i => i.id);
+
+    // Get current card IDs in DOM order
+    const currentCards = [...itemsContainer.querySelectorAll(':scope > .kanban-card')];
+    const currentIds = currentCards.map(c => parseInt(c.dataset.itemId));
+
+    // Quick check: if order and IDs match, just update content of changed cards
+    const idsMatch = desiredIds.length === currentIds.length && desiredIds.every((id, idx) => id === currentIds[idx]);
+
+    if (idsMatch) {
+      // Only update cards whose content changed
+      for (let i = 0; i < cItems.length; i++) {
+        const newHtml = _renderCardHtml(cItems[i], board);
+        const card = currentCards[i];
+        // Compare by checking key attributes instead of full HTML (cheaper)
+        if (_cardNeedsUpdate(card, cItems[i], board)) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = newHtml;
+          const newCard = tmp.firstElementChild;
+          itemsContainer.replaceChild(newCard, card);
+          // Re-bind drag events for replaced card
+          _bindCardDragEvents(newCard);
+        }
+      }
+    } else {
+      // Items changed (added/removed/reordered) — rebuild this column's items
+      const fragment = document.createDocumentFragment();
+      for (const item of cItems) {
+        // Reuse existing card DOM if present and unchanged
+        const existingCard = itemsContainer.querySelector(`[data-item-id="${item.id}"]`);
+        if (existingCard && !_cardNeedsUpdate(existingCard, item, board)) {
+          fragment.appendChild(existingCard);
+        } else {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = _renderCardHtml(item, board);
+          const newCard = tmp.firstElementChild;
+          _bindCardDragEvents(newCard);
+          fragment.appendChild(newCard);
+        }
+      }
+      // Clear and re-append (only touches this column, not entire board)
+      itemsContainer.textContent = '';
+      itemsContainer.appendChild(fragment);
+    }
+
+    // Update column header count
+    const headerStrong = colEl.querySelector('[data-dblclick-rename]');
+    if (headerStrong) {
+      const expected = `${escHtml(_tColName(col.name))} (${cItems.length})`;
+      if (headerStrong.innerHTML !== expected) headerStrong.innerHTML = expected;
+    }
+  }
+
+  // Update undo button state
+  const undoBtn = modal.querySelector('#boardUndoBtn');
+  if (undoBtn) undoBtn.disabled = state.undoStack.length === 0;
+
+  // Update zoom display
+  const zoomEl = modal.querySelector('#boardZoomLevel');
+  if (zoomEl) zoomEl.textContent = Math.round(_boardsState.zoom * 100) + '%';
+
+  // Update mobile column tabs counts
+  modal.querySelectorAll('.kanban-col-tab').forEach(tab => {
+    const colId = tab.dataset.colTab;
+    if (colId === '_archived') {
+      if (archivedItems.length > 0) {
+        tab.textContent = `📦 (${archivedItems.length})`;
+        tab.style.display = '';
+      } else {
+        tab.style.display = 'none';
+      }
+    } else {
+      const cnt = (colItems[colId] || []).length;
+      const colObj = board.columns.find(c => String(c.id) === colId);
+      if (colObj) tab.textContent = `${escHtml(_tColName(colObj.name))} (${cnt})`;
+    }
+  });
+
+  // Patch archived column
+  _patchArchivedColumn(kanbanCols, archivedItems);
+
+  // Restore scroll positions
+  if (kanbanCols.parentElement) kanbanCols.parentElement.scrollLeft = scrollLeft;
+  kanbanCols.querySelectorAll('.kanban-col .kanban-items').forEach(el => {
+    const colId = el.parentElement.dataset.col;
+    if (colId && colScrollTops[colId] !== undefined) el.scrollTop = colScrollTops[colId];
+  });
+}
+
+// Check if a card DOM element needs updating by comparing key data attributes
+function _cardNeedsUpdate(cardEl, item, board) {
+  // Compare essential visible fields via a lightweight fingerprint
+  const showIcons = board.show_icons !== false;
+  const priorityBg = board.priority_background !== false;
+  const fp = [
+    item.subject, item.note || '', item.priority || '', item.color || '',
+    item.due_date || '', item.responsible_name || item.creator_name || '',
+    item.item_type || '', (item.tags || []).join(','),
+    (item.attachments || []).length, (item.links || []).length,
+    (item.comments || []).length, item.checklist_id || 0, item.event_id || 0,
+    (item.related_item_ids || []).length, showIcons, priorityBg
+  ].join('|');
+
+  const prevFp = cardEl.dataset._fp;
+  if (prevFp === fp) return false;
+  // Store fingerprint for future comparisons
+  cardEl.dataset._fp = fp;
+  return true;
+}
+
+// Bind drag events to a single card element
+function _bindCardDragEvents(card) {
+  const itemId = parseInt(card.dataset.dragItem || card.dataset.itemId);
+  card.addEventListener('dragstart', e => _kanbanDragStart(e, itemId));
+  card.addEventListener('dragend', e => _kanbanDragEnd(e));
+}
+
+// Patch the archived items column incrementally
+function _patchArchivedColumn(kanbanCols, archivedItems) {
+  const existingArchive = kanbanCols.querySelector('.kanban-col:last-child');
+  const isArchiveCol = existingArchive && existingArchive.style.borderStyle === 'dashed';
+
+  if (archivedItems.length === 0) {
+    // Remove archive column if it exists
+    if (isArchiveCol) existingArchive.remove();
+    return;
+  }
+
+  if (!isArchiveCol) {
+    // Need to add archive column — fall back to full render for structural change
+    _renderKanbanBoard();
+    return;
+  }
+
+  // Update archive column header count
+  const header = existingArchive.querySelector('div[style*="font-weight"]');
+  if (header) header.innerHTML = `📦 ${t('board_archived')||'Archived'} (${archivedItems.length})`;
+
+  // Update archived items list
+  const listContainer = existingArchive.querySelector('div[style*="flex-direction"]');
+  if (!listContainer) return;
+
+  const currentArchiveIds = new Set();
+  listContainer.querySelectorAll('[data-action="_unarchiveBoardItem"]').forEach(btn => {
+    currentArchiveIds.add(parseInt(btn.dataset.arg));
+  });
+  const desiredArchiveIds = new Set(archivedItems.map(i => i.id));
+
+  // Only rebuild if items changed
+  if (currentArchiveIds.size !== desiredArchiveIds.size || ![...currentArchiveIds].every(id => desiredArchiveIds.has(id))) {
+    let archiveHtml = '';
+    for (const item of archivedItems) {
+      archiveHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:var(--bg3);border-radius:var(--radius);font-size:10px">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(item.subject)}">${escHtml(item.subject)}</span>
+        <div style="display:flex;gap:2px;flex-shrink:0;margin-left:4px">
+          <button class="btn btn-sm" style="font-size:9px;padding:0 4px" data-action="_unarchiveBoardItem" data-arg="${item.id}" title="${t('board_unarchive')||'Restore'}">↩</button>
+          <button class="btn btn-sm" style="font-size:9px;padding:0 4px;color:var(--danger)" data-action="_deleteBoardItem" data-arg="${item.id}" title="${t('board_delete_item')||'Delete'}">🗑</button>
+        </div>
+      </div>`;
+    }
+    listContainer.innerHTML = archiveHtml;
+    if (typeof _bindActions === 'function') _bindActions(listContainer);
   }
 }
 
@@ -911,7 +1133,7 @@ async function _kanbanDrop(e, colId) {
     // Reassign sort_order values
     withoutDragged.forEach((item, idx) => { if (item) item.sort_order = idx; });
 
-    _renderKanbanBoard();
+    _patchKanbanBoard();
   } catch (e2) { alert(e2.message); }
 }
 
@@ -949,7 +1171,7 @@ async function _addItemToCol(colId) {
       column_id: colId, subject: '', sort_order: sortOrder
     });
     _boardsState.items.push(created);
-    _renderKanbanBoard();
+    _patchKanbanBoard();
     // Open the newly created item for editing and focus the subject field
     _openBoardItem(created.id);
     setTimeout(() => {
@@ -1386,8 +1608,8 @@ async function _postBoardItemComment(itemId) {
 // Save and close board item modal
 async function _saveAndCloseBoardItem(itemId) {
   await _inlineSaveBoardItemNow(itemId);
-  // Re-render board to reflect changes
-  _renderKanbanBoard();
+  // Incrementally update board to reflect changes
+  _patchKanbanBoard();
 }
 
 // Save and close via button
@@ -1395,7 +1617,7 @@ async function _saveBoardItemAndClose(itemId) {
   try {
     await _saveBoardItemExplicit(itemId);
     _closeBoardModal('boardItemModal');
-    _renderKanbanBoard();
+    _patchKanbanBoard();
   } catch (e) {
     showError('Failed to save item: ' + e.message);
   }
@@ -1613,7 +1835,7 @@ async function _deleteBoardItem(itemId) {
     await _boardApi('DELETE', '/board-items/' + itemId);
     closeModal('boardItemModal');
     _boardsState.items = _boardsState.items.filter(i => i.id !== itemId);
-    _renderKanbanBoard();
+    _patchKanbanBoard();
     if (item && typeof pushUndo === 'function') {
       pushUndo('delete_board_item', { ...item, _boardId: _boardsState.activeBoard?.id });
     }
@@ -1843,17 +2065,28 @@ async function _removeBoardFromList(boardId) {
 }
 
 // ── Zoom ──
+function _applyBoardZoom() {
+  const modal = document.getElementById('boardsModal');
+  if (!modal) return;
+  const kanbanCols = modal.querySelector('.kanban-columns');
+  if (!kanbanCols) return;
+  const zoom = _boardsState.zoom;
+  kanbanCols.style.transform = `scale(${zoom})`;
+  kanbanCols.style.width = zoom !== 1 ? (100 / zoom) + '%' : '';
+  const zoomEl = modal.querySelector('#boardZoomLevel');
+  if (zoomEl) zoomEl.textContent = Math.round(zoom * 100) + '%';
+}
 function _boardZoomIn() {
   _boardsState.zoom = Math.min(2.0, _boardsState.zoom + 0.1);
-  _renderKanbanBoard();
+  _applyBoardZoom();
 }
 function _boardZoomOut() {
   _boardsState.zoom = Math.max(0.4, _boardsState.zoom - 0.1);
-  _renderKanbanBoard();
+  _applyBoardZoom();
 }
 function _boardZoomReset() {
   _boardsState.zoom = 1.0;
-  _renderKanbanBoard();
+  _applyBoardZoom();
 }
 
 // ── Archive ──
@@ -1965,7 +2198,7 @@ async function _executeMoveToBoard(itemId) {
     // Refresh current board
     const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
     _boardsState.items = items;
-    _renderKanbanBoard();
+    _patchKanbanBoard();
     const boardName = boardSel.selectedOptions[0]?.textContent?.split(' — ')[0] || 'target board';
     if (typeof showNotification === 'function') {
       showNotification('success', `Moved ${movedCount} item(s) to ${boardName}`);
@@ -1978,7 +2211,7 @@ async function _archiveBoardItem(itemId) {
     await _boardApi('POST', '/board-items/' + itemId + '/archive', {});
     const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
     _boardsState.items = items;
-    _renderKanbanBoard();
+    _patchKanbanBoard();
     if (typeof pushUndo === 'function') {
       pushUndo('archive_board_item', { boardId: _boardsState.activeBoard?.id, itemId: itemId });
     }
@@ -1990,7 +2223,7 @@ async function _unarchiveBoardItem(itemId) {
     await _boardApi('POST', '/board-items/' + itemId + '/unarchive', {});
     const items = await _boardApi('GET', '/boards/' + _boardsState.activeBoard.id + '/items');
     _boardsState.items = items;
-    _renderKanbanBoard();
+    _patchKanbanBoard();
   } catch (e) { alert(e.message); }
 }
 
@@ -2009,7 +2242,7 @@ async function _archiveColumnItems(colId) {
     }
     const items = await _boardApi('GET', '/boards/' + board.id + '/items');
     _boardsState.items = items;
-    _renderKanbanBoard();
+    _patchKanbanBoard();
     if (typeof pushUndo === 'function') {
       pushUndo('archive_column_items', { boardId: board.id, itemIds: archivedIds, colName: colName });
     }
@@ -2614,7 +2847,7 @@ if (typeof window._boardSSESetup === 'undefined') {
         ]);
         _boardsState.activeBoard = board;
         _boardsState.items = items;
-        _renderKanbanBoard();
+        _patchKanbanBoard();
       }
     } catch { /* ignore */ }
   });
