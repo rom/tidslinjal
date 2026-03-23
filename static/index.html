@@ -2932,6 +2932,7 @@
   <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none" id="btnClearSelection">✕ Clear</button>
 </div>
 
+<!-- Core scripts (required for initial render) -->
 <script src="/static/iso3166.js"></script>
 <script src="/static/i18n.js"></script>
 <script src="/static/lang/en.js"></script>
@@ -2941,55 +2942,56 @@
 <script src="/static/undo.js"></script>
 <script src="/static/multi-select.js"></script>
 <script src="/static/timeline.js"></script>
-<script src="/static/charts.js"></script>
-<script src="/static/alarm-sound.js"></script>
 <script src="/static/modals.js"></script>
-<script src="/static/collaborative-editing.js"></script>
 <script src="/static/modal-event.js"></script>
 <script src="/static/modal-event-detail.js"></script>
-<script src="/static/modal-event-type.js"></script>
-<script src="/static/modal-alarm.js"></script>
-<script src="/static/modal-lock.js"></script>
-<script src="/static/modal-user.js"></script>
-<script src="/static/modal-group.js"></script>
-<script src="/static/modal-layer.js"></script>
-<script src="/static/modal-phase.js"></script>
-<script src="/static/modal-day-label.js"></script>
-<script src="/static/modal-profile.js"></script>
-<script src="/static/modal-templates.js"></script>
-<script src="/static/modal-help.js"></script>
-<script src="/static/modal-decision-log.js"></script>
-<script src="/static/modal-analysis.js"></script>
-<script src="/static/modal-teamlead.js"></script>
-<script src="/static/modal-staff.js"></script>
-<script src="/static/modal-narrative.js"></script>
-<script src="/static/ticker.js"></script>
-<script src="/static/dashboard.js"></script>
-<script src="/static/modal-critical-line.js"></script>
-<script src="/static/modal-dependencies.js"></script>
-<script src="/static/modal-map.js"></script>
-<script src="/static/modal-backup.js"></script>
 <script src="/static/sidebar.js"></script>
 <script src="/static/sidebar-settings.js"></script>
-<script src="/static/ui-labels.js"></script>
-<script src="/static/references-tab.js"></script>
-<script src="/static/export-import.js"></script>
-<script src="/static/reports.js"></script>
-<script src="/static/notifications.js"></script>
-<script src="/static/role-editor.js"></script>
 <script src="/static/filters.js"></script>
 <script src="/static/sse.js"></script>
-<script src="/static/context-menu.js"></script>
-<script src="/static/bulk-actions.js"></script>
-<script src="/static/audit-log.js"></script>
-<script src="/static/offline.js"></script>
-<script src="/static/detach-windows.js"></script>
-<script src="/static/task-time-matrix.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/responsive.js"></script>
-<script src="/static/boards.js"></script>
 <script src="/static/bindings.js"></script>
+<!-- Deferred scripts (loaded after initial render, order preserved) -->
+<script defer src="/static/charts.js"></script>
+<script defer src="/static/alarm-sound.js"></script>
+<script defer src="/static/collaborative-editing.js"></script>
+<script defer src="/static/modal-event-type.js"></script>
+<script defer src="/static/modal-alarm.js"></script>
+<script defer src="/static/modal-lock.js"></script>
+<script defer src="/static/modal-user.js"></script>
+<script defer src="/static/modal-group.js"></script>
+<script defer src="/static/modal-layer.js"></script>
+<script defer src="/static/modal-phase.js"></script>
+<script defer src="/static/modal-day-label.js"></script>
+<script defer src="/static/modal-profile.js"></script>
+<script defer src="/static/modal-templates.js"></script>
+<script defer src="/static/modal-help.js"></script>
+<script defer src="/static/modal-decision-log.js"></script>
+<script defer src="/static/modal-analysis.js"></script>
+<script defer src="/static/modal-teamlead.js"></script>
+<script defer src="/static/modal-staff.js"></script>
+<script defer src="/static/modal-narrative.js"></script>
+<script defer src="/static/ticker.js"></script>
+<script defer src="/static/dashboard.js"></script>
+<script defer src="/static/modal-critical-line.js"></script>
+<script defer src="/static/modal-dependencies.js"></script>
+<script defer src="/static/modal-map.js"></script>
+<script defer src="/static/modal-backup.js"></script>
+<script defer src="/static/ui-labels.js"></script>
+<script defer src="/static/references-tab.js"></script>
+<script defer src="/static/export-import.js"></script>
+<script defer src="/static/reports.js"></script>
+<script defer src="/static/notifications.js"></script>
+<script defer src="/static/role-editor.js"></script>
+<script defer src="/static/context-menu.js"></script>
+<script defer src="/static/bulk-actions.js"></script>
+<script defer src="/static/audit-log.js"></script>
+<script defer src="/static/offline.js"></script>
+<script defer src="/static/detach-windows.js"></script>
+<script defer src="/static/task-time-matrix.js"></script>
+<script defer src="/static/boards.js"></script>
 <!-- Leaflet.js for map integration (lazy loaded from local vendor copy) -->
-<script src="/static/leaflet-loader.js"></script>
+<script defer src="/static/leaflet-loader.js"></script>
 </body>
 </html>

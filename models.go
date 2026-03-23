@@ -2,8 +2,15 @@ package main
 
 import "time"
 
-// AppVersion is the current application version
-const AppVersion = "8.1.0"
+// AppVersion is the current application version.
+// Override at build time: go build -ldflags "-X main.AppVersion=1.2.3 -X main.BuildCommit=abc123 -X main.BuildTime=2024-01-01T00:00:00Z"
+var AppVersion = "8.1.0"
+
+// BuildCommit is the git commit hash, set at build time via ldflags.
+var BuildCommit = "dev"
+
+// BuildTime is the build timestamp, set at build time via ldflags.
+var BuildTime = ""
 
 
 // AppGitHub is the project repository URL

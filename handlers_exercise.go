@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -67,6 +68,9 @@ func handleVersion(w http.ResponseWriter, r *http.Request) {
 	uptime := time.Since(serverStartTime).Truncate(time.Second).String()
 	resp := map[string]any{
 		"version":    AppVersion,
+		"commit":     BuildCommit,
+		"build_time": BuildTime,
+		"go_version": runtime.Version(),
 		"github":     AppGitHub,
 		"uptime":     uptime,
 		"started_at": serverStartTime.Format(time.RFC3339),

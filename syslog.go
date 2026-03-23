@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -48,6 +50,24 @@ func init() {
 	}
 }
 
+func logInfo(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	log.Print("[INFO] " + msg)
+	syslogSend(6, msg) // info severity
+}
+
+func logWarn(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	log.Print("[WARN] " + msg)
+	syslogSend(4, msg) // warning severity
+}
+
+func logError(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	log.Print("[ERROR] " + msg)
+	syslogSend(3, msg) // error severity
+}
+
 func logVerbose(format string, args ...any) {
 	if verbose {
 		fmt.Printf("[VERBOSE] "+format+"\n", args...)
@@ -59,6 +79,18 @@ func logDebug(format string, args ...any) {
 		fmt.Printf("[DEBUG] "+format+"\n", args...)
 	}
 	syslogSend(7, fmt.Sprintf(format, args...)) // debug severity
+}
+
+// logRequestError logs an error with request context (request ID, user, method, path).
+func logRequestError(r *http.Request, format string, args ...any) {
+	reqID := getRequestID(r)
+	user := getUserFromContext(r)
+	username := ""
+	if user != nil {
+		username = user.Username
+	}
+	msg := fmt.Sprintf(format, args...)
+	logError("req=%s user=%s %s %s: %s", reqID, username, r.Method, r.URL.Path, msg)
 }
 
 // setSyslogWriter replaces the active syslog writer (or disables it if cfg.Enabled is false).

@@ -532,6 +532,31 @@ func (s *Store) persist(filename string, v interface{}) error {
 	return s.saveFile(filename, v)
 }
 
+// FlushAll persists all critical in-memory data to disk.
+// Called during graceful shutdown to ensure no data loss.
+func (s *Store) FlushAll() error {
+	s.mu.RLock()
+	snapUsers := append([]User(nil), s.users...)
+	snapEvents := append([]Event(nil), s.events...)
+	snapSessions := append([]Session(nil), s.sessions...)
+	s.mu.RUnlock()
+
+	var firstErr error
+	for _, item := range []struct {
+		name string
+		data interface{}
+	}{
+		{"users.json", snapUsers},
+		{"events.json", snapEvents},
+		{"sessions.json", snapSessions},
+	} {
+		if err := s.persist(item.name, item.data); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("flush %s: %w", item.name, err)
+		}
+	}
+	return firstErr
+}
+
 // DataDir returns the path to the data directory.
 func (s *Store) DataDir() string {
 	return s.dataDir

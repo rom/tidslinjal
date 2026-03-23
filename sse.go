@@ -163,3 +163,21 @@ func (b *SSEBroker) SendToUser(userID int64, msg SSEMessage) {
 		}
 	}
 }
+
+// BroadcastToUsers sends an SSE message to a specific set of user IDs — useful for
+// board-scoped or group-scoped notifications instead of broadcasting to everyone.
+func (b *SSEBroker) BroadcastToUsers(userIDs []int64, senderID int64, msg SSEMessage) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for _, uid := range userIDs {
+		if uid == senderID {
+			continue
+		}
+		for _, c := range b.byUser[uid] {
+			select {
+			case c.broadcast <- msg:
+			default:
+			}
+		}
+	}
+}

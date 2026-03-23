@@ -120,9 +120,55 @@ func (s *Store) DeleteUser(id int64) error {
 		s.mu.Unlock()
 		return fmt.Errorf("user not found")
 	}
-	snap := append([]User(nil), s.users...)
+
+	// Cascade: remove sessions for this user
+	sessions := s.sessions[:0]
+	for _, sess := range s.sessions {
+		if sess.UserID != id {
+			sessions = append(sessions, sess)
+		}
+	}
+	s.sessions = sessions
+
+	// Cascade: remove preferences for this user
+	prefs := s.preferences[:0]
+	for _, p := range s.preferences {
+		if p.UserID != id {
+			prefs = append(prefs, p)
+		}
+	}
+	s.preferences = prefs
+
+	// Cascade: remove group memberships for this user
+	memberships := s.memberships[:0]
+	for _, m := range s.memberships {
+		if m.UserID != id {
+			memberships = append(memberships, m)
+		}
+	}
+	s.memberships = memberships
+
+	snapUsers := append([]User(nil), s.users...)
+	snapSessions := append([]Session(nil), s.sessions...)
+	snapPrefs := append([]UserPreferences(nil), s.preferences...)
+	snapMemberships := append([]GroupMembership(nil), s.memberships...)
 	s.mu.Unlock()
-	return s.persist("users.json", snap)
+
+	// Persist all affected files
+	var firstErr error
+	if err := s.persist("users.json", snapUsers); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if err := s.persist("sessions.json", snapSessions); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if err := s.persist("preferences.json", snapPrefs); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if err := s.persist("memberships.json", snapMemberships); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return firstErr
 }
 
 // ── Preferences ───────────────────────────────────────────────────────────────

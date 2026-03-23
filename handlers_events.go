@@ -82,10 +82,21 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "only operations leads and admins may create master-timeline events", http.StatusForbidden)
 		return
 	}
-	// Check layer write permission
+	// Check layer write permission and existence
 	if e.LayerID != nil {
+		if _, ok := app.store.GetLayerByID(*e.LayerID); !ok {
+			jsonError(w, "layer not found", http.StatusBadRequest)
+			return
+		}
 		if !app.canWriteLayer(*e.LayerID, user) {
 			jsonError(w, "no write permission on this layer", http.StatusForbidden)
+			return
+		}
+	}
+	// Validate responsible user exists (if specified)
+	if e.ResponsibleID != nil && *e.ResponsibleID != 0 {
+		if _, ok := app.store.GetUserByID(*e.ResponsibleID); !ok {
+			jsonError(w, "responsible user not found", http.StatusBadRequest)
 			return
 		}
 	}

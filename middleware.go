@@ -82,6 +82,24 @@ func getRequestID(r *http.Request) string {
 	return ""
 }
 
+// userContextKey is the context key for the authenticated user.
+type userContextKeyType struct{}
+
+var userContextKey = userContextKeyType{}
+
+// contextWithUser stores the authenticated user in the request context.
+func contextWithUser(ctx context.Context, u *User) context.Context {
+	return context.WithValue(ctx, userContextKey, u)
+}
+
+// getUserFromContext retrieves the authenticated user from the request context.
+func getUserFromContext(r *http.Request) *User {
+	if u, ok := r.Context().Value(userContextKey).(*User); ok {
+		return u
+	}
+	return nil
+}
+
 // ── Middleware ─────────────────────────────────────────────────────────────────
 
 func (app *App) getSession(r *http.Request) (*Session, *User) {
@@ -122,7 +140,9 @@ func (app *App) requireAuth(next func(http.ResponseWriter, *http.Request, *User)
 				return
 			}
 		}
-		next(w, r, user)
+		// Propagate user into request context for downstream use
+		ctx := contextWithUser(r.Context(), user)
+		next(w, r.WithContext(ctx), user)
 	}
 }
 
