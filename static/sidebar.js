@@ -2276,8 +2276,12 @@ Fields: file, subject, sender, type, tags</pre>
           <div style="display:flex;gap:6px;margin-bottom:6px">
             <input type="text" id="secIpBlNewIp" placeholder="${t('security_ip_bl_placeholder')||'IP address or CIDR (e.g. 192.168.1.1 or 10.0.0.0/8)'}"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
-            <input type="text" id="secIpBlNewReason" placeholder="${t('security_ip_bl_reason')||'Reason (optional)'}"
+            <select id="secIpBlNewReason"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
+              <option value="Attacking and scanning" selected>${t('security_ip_bl_reason_attacking')||'Attacking and scanning'}</option>
+              <option value="Misbehaving">${t('security_ip_bl_reason_misbehaving')||'Misbehaving'}</option>
+              <option value="Other">${t('security_ip_bl_reason_other')||'Other'}</option>
+            </select>
             <button class="btn btn-sm" style="background:#E74C3C;color:#fff" data-action="addIpBlacklistEntry">+ ${t('btn_add')||'Add'}</button>
           </div>
           <div id="secIpBlEntries" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">

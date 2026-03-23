@@ -18,6 +18,7 @@ type Board struct {
 	ShowIcons          *bool     `json:"show_icons,omitempty"`           // show icons in subject (default true)
 	PriorityBackground *bool     `json:"priority_background,omitempty"` // color bg by priority (default true)
 	ShowArchival       *bool     `json:"show_archival,omitempty"`        // show archival controls (default true)
+	SortMode           string    `json:"sort_mode,omitempty"`            // "normal", "priority", "due_date" (default "normal")
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }

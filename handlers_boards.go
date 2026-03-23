@@ -224,6 +224,7 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 		ShowIcons          *bool       `json:"show_icons"`
 		PriorityBackground *bool       `json:"priority_background"`
 		ShowArchival       *bool       `json:"show_archival"`
+		SortMode           *string     `json:"sort_mode"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -258,6 +259,9 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 	}
 	if req.ShowArchival != nil {
 		board.ShowArchival = req.ShowArchival
+	}
+	if req.SortMode != nil {
+		board.SortMode = *req.SortMode
 	}
 	if err := app.store.UpdateBoard(*board); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)
