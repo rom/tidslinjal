@@ -92,9 +92,11 @@ async function refreshAll() {
     try {
       await Promise.all([fetchEvents(), fetchLocks(), fetchAlarms(), fetchLayers(), fetchExercise(), fetchPhases(), fetchDayLabels()]);
       if (typeof _listViewActive !== 'undefined' && _listViewActive) {
-        renderListView();
+        if (typeof patchListView === 'function') patchListView();
+        else renderListView();
       } else {
-        renderTimeline();
+        if (typeof patchTimeline === 'function') patchTimeline();
+        else renderTimeline();
       }
       // Preserve sidebar filter state (audit log, logbook, etc.) across refreshes
       // triggered by SSE events — only re-render if the current tab benefits from it.

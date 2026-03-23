@@ -722,6 +722,11 @@ function renderListView() {
 
   if (countEl) countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
 
+  // Update fingerprints for incremental comparison
+  if (typeof _listRowFingerprints !== 'undefined') {
+    _listRowFingerprints = new Map(events.map(ev => [ev.id, _listEventFingerprint(ev)]));
+  }
+
   const statusColors = {
     planned:'var(--text-dim)', active:'var(--accent)', completed:'var(--green)',
     verified:'var(--green)', cancelled:'var(--red)', submitted:'var(--yellow)',
@@ -938,4 +943,115 @@ function renderListView() {
       });
     });
   }
+}
+
+// ── Incremental list view update ──────────────────────────────────────────
+// Tracks rendered rows and only replaces those whose data changed.
+let _listRowFingerprints = new Map(); // evId -> fingerprint
+
+function _listEventFingerprint(ev) {
+  return [
+    ev.id, ev.title, ev.status || '', ev.event_type || '',
+    ev.start_time, ev.end_time || '', ev.color || '',
+    ev.responsible_id || 0, ev.responsible_name || '',
+    ev.created_by_name || '', ev.contact_url || '',
+    ev.layer_id || 0, ev.updated_at || ''
+  ].join('|');
+}
+
+function patchListView() {
+  if (!_listViewActive) return;
+  const tbody = document.getElementById('list-view-tbody');
+  if (!tbody) return;
+
+  // Re-apply the same filtering and sorting as renderListView
+  const search     = (document.getElementById('listSearch')?.value || '').toLowerCase();
+  const statusFil  = document.getElementById('listStatusFilter')?.value || '';
+  const typeFil    = document.getElementById('listTypeFilter')?.value || '';
+  const dateFrom   = document.getElementById('listDateFrom')?.value || '';
+  const dateTo     = document.getElementById('listDateTo')?.value || '';
+  const respFil    = document.getElementById('listResponsibleFilter')?.value || '';
+
+  const hl = state.preferences.hidden_layers || [];
+  let events = (state.events || []).filter(ev => {
+    if (isTypeHidden(ev.event_type)) return false;
+    if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
+    if (statusFil && ev.status !== statusFil) return false;
+    if (typeFil   && ev.event_type !== typeFil) return false;
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (new Date(ev.start_time) < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo + 'T23:59:59');
+      if (new Date(ev.start_time) > to) return false;
+    }
+    if (respFil) {
+      const effRespId = ev.responsible_id || ev.created_by || null;
+      if (String(effRespId) !== respFil) return false;
+    }
+    if (search) {
+      const hay = (ev.title + ' ' + (ev.description||'') + ' ' + (ev.responsible_name||'')).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  if (_listSortKey === '_custom') {
+    const customOrder = state.preferences.list_custom_order || [];
+    events.sort((a, b) => {
+      const ia = customOrder.indexOf(a.id);
+      const ib = customOrder.indexOf(b.id);
+      if (ia === -1 && ib === -1) return 0;
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  } else {
+    events.sort((a, b) => {
+      let va = a[_listSortKey] || '';
+      let vb = b[_listSortKey] || '';
+      if (_listSortKey === 'start_time' || _listSortKey === 'end_time') { va = new Date(va || 0); vb = new Date(vb || 0); }
+      if (typeof va === 'string' && typeof vb === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (va < vb) return _listSortAsc ? -1 : 1;
+      if (va > vb) return _listSortAsc ?  1 : -1;
+      return 0;
+    });
+  }
+
+  // Build desired ID list and fingerprints
+  const desiredIds = events.map(ev => ev.id);
+  const desiredFps = new Map(events.map(ev => [ev.id, _listEventFingerprint(ev)]));
+
+  // Get current rows
+  const currentRows = [...tbody.querySelectorAll('tr[data-ev-row]')];
+  const currentIds = currentRows.map(r => parseInt(r.dataset.evRow, 10));
+
+  // Quick check: if IDs and order match, only update changed rows in-place
+  const idsMatch = desiredIds.length === currentIds.length &&
+    desiredIds.every((id, i) => id === currentIds[i]);
+
+  if (idsMatch) {
+    let anyChanged = false;
+    for (let i = 0; i < desiredIds.length; i++) {
+      const evId = desiredIds[i];
+      const newFp = desiredFps.get(evId);
+      if (_listRowFingerprints.get(evId) !== newFp) {
+        anyChanged = true;
+        break;
+      }
+    }
+    if (!anyChanged) {
+      // Update count and return — nothing to change
+      const countEl = document.getElementById('listCount');
+      if (countEl) countEl.textContent = `${events.length} event${events.length !== 1 ? 's' : ''}`;
+      return;
+    }
+  }
+
+  // Events changed (order, additions, removals, or content) — do full renderListView
+  // to preserve the complex row rendering logic (dropdowns, red line, drag handlers)
+  _listRowFingerprints = desiredFps;
+  renderListView();
 }

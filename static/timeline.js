@@ -376,10 +376,72 @@ function renderTimeline() {
 
   renderEventBlocks(days, slotH);
   updateCurrentTimeLine(days, slotH);
+  _lastGridIdentity = _gridIdentity();
+}
+
+// ── Incremental timeline update ──────────────────────────────────────────────
+// Updates event blocks and current time line without rebuilding the grid.
+// Use this for data-only refreshes (SSE, periodic) where navigation/resolution
+// hasn't changed.
+// Track last grid identity to detect when incremental update is safe.
+let _lastGridIdentity = '';
+
+function _gridIdentity() {
+  const days = getDays();
+  const res = state.resolution || '';
+  const zf = (state.zoomFactor || 1.0).toFixed(3);
+  const start = days.length ? days[0].toISOString().slice(0,10) : '';
+  const end = days.length ? days[days.length-1].toISOString().slice(0,10) : '';
+  return `${start}_${end}_${res}_${zf}_${days.length}`;
+}
+
+function patchTimeline() {
+  const gid = _gridIdentity();
+  if (gid !== _lastGridIdentity || !_lastRenderDays) {
+    // Grid structure changed — full re-render required
+    renderTimeline();
+    return;
+  }
+  const days = _lastRenderDays;
+  const slotH = _lastRenderSlotH;
+  patchEventBlocks();
+  updateCurrentTimeLine(days, slotH);
 }
 
 // ── Event block rendering ───────────────────────────────────────────────────
+
+// Track rendered event blocks for incremental updates
+let _renderedBlockMap = new Map(); // evId -> { fingerprint, element }
+let _lastRenderDays = null;
+let _lastRenderSlotH = 0;
+
 function renderEventBlocks(days, slotH) {
+  // Full rebuild: clear tracking and render fresh
+  _renderedBlockMap = new Map();
+  _lastRenderDays = days;
+  _lastRenderSlotH = slotH;
+  _renderEventBlocksInner(days, slotH, false);
+}
+
+// Incremental update: reuse existing blocks when possible
+function patchEventBlocks() {
+  if (!_lastRenderDays) return;
+  _renderEventBlocksInner(_lastRenderDays, _lastRenderSlotH, true);
+}
+
+function _eventBlockFingerprint(ev) {
+  return [
+    ev.id, ev.title, ev.status || '', ev.color || '', ev.event_type || '',
+    ev.start_time, ev.end_time || '', ev.layer_id || 0,
+    ev.is_recurring ? 1 : 0, ev.attachment_count || 0,
+    ev.comment_count || 0, ev.all_day ? 1 : 0,
+    ev.created_by_name || '', ev.responsible_name || '',
+    ev.updated_at || '', ev.recurrence_pattern || '',
+    ev.recurrence_end || '', (ev.recurrence_excl || []).join(',')
+  ].join('|');
+}
+
+function _renderEventBlocksInner(days, slotH, incremental) {
   const container  = document.getElementById('timeline');
   const headerH    = 44;
   const slotMin    = getSlotMinutes();
@@ -402,7 +464,14 @@ function renderEventBlocks(days, slotH) {
       return cell ? { left: cell.offsetLeft, width: cell.offsetWidth } : null;
     });
 
-    container.querySelectorAll('.event-block,.lock-overlay,.lock-label').forEach(el => el.remove());
+    // In incremental mode, only remove phases/locks (rebuilt cheaply);
+    // event blocks are diffed below.
+    if (incremental) {
+      container.querySelectorAll('.lock-overlay,.lock-label').forEach(el => el.remove());
+    } else {
+      container.querySelectorAll('.event-block,.lock-overlay,.lock-label').forEach(el => el.remove());
+      _renderedBlockMap = new Map();
+    }
 
     // ── Exercise Phase overlays ─────────────────────────────────────────────
     container.querySelectorAll('.phase-overlay,.phase-label').forEach(el => el.remove());
@@ -540,6 +609,9 @@ function renderEventBlocks(days, slotH) {
       });
     });
 
+    // Collect all desired block keys for incremental cleanup
+    const _desiredBlockKeys = incremental ? new Set() : null;
+
     days.forEach((day, di) => {
       if (!dayMeta[di]) return;
       const items = evsByDay[di];
@@ -583,6 +655,32 @@ function renderEventBlocks(days, slotH) {
 
         const { ev, evStart, evEnd, topPx, heightPx } = item;
 
+        // Unique key for this block placement (event can span multiple days)
+        const blockKey = ev.id + '_d' + di;
+
+        // In incremental mode, check if block can be reused
+        if (incremental) {
+          _desiredBlockKeys.add(blockKey);
+          const existing = _renderedBlockMap.get(blockKey);
+          const fp = _eventBlockFingerprint(ev);
+          if (existing && existing.fingerprint === fp) {
+            // Content unchanged — just update position (column widths may differ)
+            const el = existing.element;
+            if (el.parentNode) {
+              el.style.top = topPx + 'px';
+              el.style.left = blockL + 'px';
+              el.style.width = blockW + 'px';
+              el.style.height = heightPx + 'px';
+              // Update time/creator visibility based on new height
+              const timeEl = el.querySelector('.ev-time');
+              if (timeEl) timeEl.style.display = heightPx > 28 ? '' : 'none';
+              const creatorEl = el.querySelector('.ev-creator');
+              if (creatorEl) creatorEl.style.display = heightPx > 44 ? '' : 'none';
+              return;
+            }
+          }
+        }
+
         let borderL = 'rgba(255,255,255,.3)';
         if (ev.layer_id) {
           const layer = _layerMap.get(ev.layer_id);
@@ -619,6 +717,12 @@ function renderEventBlocks(days, slotH) {
           : '';
         const typeIcon = typeIconChar
           ? `<span class="ev-icon ev-type-icon" title="${escHtml(ev.event_type)}">${typeIconChar}</span>` : '';
+
+        // Remove old block if being replaced in incremental mode
+        if (incremental) {
+          const old = _renderedBlockMap.get(blockKey);
+          if (old && old.element.parentNode) old.element.remove();
+        }
 
         const block = document.createElement('div');
         block.className = 'event-block';
@@ -659,8 +763,20 @@ function renderEventBlocks(days, slotH) {
           }
         };
         container.appendChild(block);
+        // Track for incremental updates
+        _renderedBlockMap.set(blockKey, { fingerprint: _eventBlockFingerprint(ev), element: block });
       });
     });
+
+    // In incremental mode, remove blocks that are no longer needed
+    if (incremental && _desiredBlockKeys) {
+      for (const [key, entry] of _renderedBlockMap) {
+        if (!_desiredBlockKeys.has(key)) {
+          if (entry.element.parentNode) entry.element.remove();
+          _renderedBlockMap.delete(key);
+        }
+      }
+    }
 
     // ── Lock overlays ─────────────────────────────────────────────────────
     state.locks.forEach(lk => {
