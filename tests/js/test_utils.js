@@ -649,6 +649,167 @@ test('past slot is not current', () => {
   expect(isCurrentSlot(start, end)).toBeFalsy();
 });
 
+// ── userHasCapability ────────────────────────────────────────────────────────
+function userHasCapability(cap) {
+  if (!state || !state.user) return false;
+  if (state.user.role === 'admin') return true;
+  const caps = (state.user.capabilities || []);
+  return caps.includes(cap);
+}
+
+console.log('\nuserHasCapability');
+test('no state.user returns false', () => {
+  const saved = state.user;
+  delete state.user;
+  expect(userHasCapability('edit')).toBeFalsy();
+  state.user = saved;
+});
+test('admin role always true regardless of cap', () => {
+  state.user = { role: 'admin', capabilities: [] };
+  expect(userHasCapability('anything')).toBeTruthy();
+  expect(userHasCapability('nonexistent')).toBeTruthy();
+});
+test('user with matching capability returns true', () => {
+  state.user = { role: 'editor', capabilities: ['edit', 'view'] };
+  expect(userHasCapability('edit')).toBeTruthy();
+});
+test('user without matching capability returns false', () => {
+  state.user = { role: 'editor', capabilities: ['view'] };
+  expect(userHasCapability('edit')).toBeFalsy();
+});
+test('empty capabilities array returns false', () => {
+  state.user = { role: 'editor', capabilities: [] };
+  expect(userHasCapability('edit')).toBeFalsy();
+});
+
+// ── stripHTMLTags ────────────────────────────────────────────────────────────
+function stripHTMLTags(s) {
+  if (!s) return '';
+  return String(s).replace(/<[^>]*>/g, '');
+}
+
+console.log('\nstripHTMLTags');
+test('empty string returns empty', () => expect(stripHTMLTags('')).toBe(''));
+test('null returns empty', () => expect(stripHTMLTags(null)).toBe(''));
+test('undefined returns empty', () => expect(stripHTMLTags(undefined)).toBe(''));
+test('no tags returns unchanged', () => expect(stripHTMLTags('hello world')).toBe('hello world'));
+test('simple tag removed', () => expect(stripHTMLTags('<b>bold</b>')).toBe('bold'));
+test('nested tags removed', () => expect(stripHTMLTags('<div><span>text</span></div>')).toBe('text'));
+test('self-closing tags removed', () => expect(stripHTMLTags('before<br/>after')).toBe('beforeafter'));
+test('attributes stripped', () => expect(stripHTMLTags('<a href="x">text</a>')).toBe('text'));
+test('script tag content preserved (only tags removed)', () => expect(stripHTMLTags('<script>alert(1)</script>')).toBe('alert(1)'));
+test('multiple tags in sequence', () => expect(stripHTMLTags('<p>one</p><p>two</p><p>three</p>')).toBe('onetwothree'));
+test('mixed text and tags', () => expect(stripHTMLTags('Hello <b>world</b>!')).toBe('Hello world!'));
+test('tag with multiple attributes', () => expect(stripHTMLTags('<div class="a" id="b">content</div>')).toBe('content'));
+
+// ── localDayName ─────────────────────────────────────────────────────────────
+function localDayName(d) {
+  const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  return names[d.getDay()];
+}
+
+console.log('\nlocalDayName');
+test('Sunday', () => expect(localDayName(new Date('2024-01-07'))).toBe('Sun'));
+test('Monday', () => expect(localDayName(new Date('2024-01-08'))).toBe('Mon'));
+test('Tuesday', () => expect(localDayName(new Date('2024-01-09'))).toBe('Tue'));
+test('Wednesday', () => expect(localDayName(new Date('2024-01-10'))).toBe('Wed'));
+test('Thursday', () => expect(localDayName(new Date('2024-01-11'))).toBe('Thu'));
+test('Friday', () => expect(localDayName(new Date('2024-01-12'))).toBe('Fri'));
+test('Saturday', () => expect(localDayName(new Date('2024-01-13'))).toBe('Sat'));
+
+// ── isWeekendDay ─────────────────────────────────────────────────────────────
+function isWeekendDay(d) {
+  const dow = d.getDay();
+  return dow === 0 || dow === 6;
+}
+
+console.log('\nisWeekendDay');
+test('Saturday is weekend', () => expect(isWeekendDay(new Date('2024-01-13'))).toBeTruthy());
+test('Sunday is weekend', () => expect(isWeekendDay(new Date('2024-01-07'))).toBeTruthy());
+test('Monday is not weekend', () => expect(isWeekendDay(new Date('2024-01-08'))).toBeFalsy());
+test('Tuesday is not weekend', () => expect(isWeekendDay(new Date('2024-01-09'))).toBeFalsy());
+test('Wednesday is not weekend', () => expect(isWeekendDay(new Date('2024-01-10'))).toBeFalsy());
+test('Thursday is not weekend', () => expect(isWeekendDay(new Date('2024-01-11'))).toBeFalsy());
+test('Friday is not weekend', () => expect(isWeekendDay(new Date('2024-01-12'))).toBeFalsy());
+
+// ── synthElapsedHours ────────────────────────────────────────────────────────
+function synthElapsedHours(epochMs, nowMs) {
+  return Math.floor((nowMs - epochMs) / 3600000);
+}
+
+console.log('\nsynthElapsedHours');
+test('0 hours elapsed', () => expect(synthElapsedHours(1000, 1000)).toBe(0));
+test('1 hour elapsed', () => expect(synthElapsedHours(0, 3600000)).toBe(1));
+test('negative hours (before epoch)', () => expect(synthElapsedHours(7200000, 0)).toBe(-2));
+test('24 hours = 24', () => expect(synthElapsedHours(0, 24 * 3600000)).toBe(24));
+test('fractional hours floor to lower', () => expect(synthElapsedHours(0, 5400000)).toBe(1));
+test('just under 1 hour = 0', () => expect(synthElapsedHours(0, 3599999)).toBe(0));
+test('48 hours', () => expect(synthElapsedHours(0, 48 * 3600000)).toBe(48));
+
+// ── localShortDate ───────────────────────────────────────────────────────────
+function localShortDate(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`;
+}
+
+console.log('\nlocalShortDate');
+test('mid-month date', () => expect(localShortDate(new Date(2024, 5, 15))).toBe('15/06'));
+test('single-digit day padded', () => expect(localShortDate(new Date(2024, 0, 5))).toBe('05/01'));
+test('single-digit month padded', () => expect(localShortDate(new Date(2024, 2, 1))).toBe('01/03'));
+test('Dec 31', () => expect(localShortDate(new Date(2024, 11, 31))).toBe('31/12'));
+test('Jan 1', () => expect(localShortDate(new Date(2024, 0, 1))).toBe('01/01'));
+test('double-digit month', () => expect(localShortDate(new Date(2024, 10, 22))).toBe('22/11'));
+
+// ── _listWeekLabel ───────────────────────────────────────────────────────────
+function _listWeekLabel(d) {
+  const _d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  _d.setUTCDate(_d.getUTCDate() + 4 - (_d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(_d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((_d - yearStart) / 86400000 + 1) / 7);
+  return ` (W${weekNo})`;
+}
+
+console.log('\n_listWeekLabel');
+test('Jan 1 2024 (Monday) → W1', () => expect(_listWeekLabel(new Date(2024, 0, 1))).toBe(' (W1)'));
+test('Mid-year Jun 15 2024 → W24', () => expect(_listWeekLabel(new Date(2024, 5, 15))).toBe(' (W24)'));
+test('End of year Dec 30 2024 → W1 (next year ISO week)', () => expect(_listWeekLabel(new Date(2024, 11, 30))).toBe(' (W1)'));
+test('Mar 1 2024 → W9', () => expect(_listWeekLabel(new Date(2024, 2, 1))).toBe(' (W9)'));
+
+// ── Edge cases for existing functions ────────────────────────────────────────
+
+console.log('\naddDays — edge cases');
+test('addDays 365 days from Jan 1 2024 (leap year)', () => {
+  const d = new Date('2024-01-01');
+  const r = addDays(d, 365);
+  expect(r.getMonth()).toBe(11); // December
+  expect(r.getDate()).toBe(31);
+  expect(r.getFullYear()).toBe(2024);
+});
+
+console.log('\naddMonths — edge cases');
+test('negative months wrapping year: Mar 2024 - 5 months = Oct 2023', () => {
+  const d = new Date(2024, 2, 15); // Mar 15 2024
+  const r = addMonths(d, -5);
+  expect(r.getFullYear()).toBe(2023);
+  expect(r.getMonth()).toBe(9); // October
+  expect(r.getDate()).toBe(15);
+});
+test('negative months within same year: Jun - 2 = Apr', () => {
+  const d = new Date(2024, 5, 10); // Jun 10
+  const r = addMonths(d, -2);
+  expect(r.getMonth()).toBe(3); // April
+});
+
+console.log('\ndaysInMonth — edge cases');
+test('September has 30 days', () => expect(daysInMonth(new Date('2024-09-01'))).toBe(30));
+test('July has 31 days', () => expect(daysInMonth(new Date('2024-07-01'))).toBe(31));
+
+console.log('\nfmtFileSize — edge cases');
+test('very large: 1 GB', () => expect(fmtFileSize(1024 * 1024 * 1024)).toBe('1024.0 MB'));
+
+console.log('\nhasRole2Full — edge cases');
+test('deputy_oplead >= readwrite', () => expect(hasRole2Full('deputy_oplead', 'readwrite')).toBeTruthy());
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(60)}`);
