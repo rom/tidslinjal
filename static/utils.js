@@ -231,7 +231,7 @@ function openModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.add('open');
-  el.setAttribute('aria-hidden', 'false');
+  el.removeAttribute('inert');
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
   // Focus first focusable element inside the modal
@@ -248,7 +248,7 @@ function closeModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.remove('open');
-  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('inert', '');
   a11yAnnounce('Dialog closed');
 }
 

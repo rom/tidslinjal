@@ -83,8 +83,8 @@ test.describe('Modal accessibility', () => {
       const ariaModal = await modal.getAttribute('aria-modal');
       expect(ariaModal).toBe('true');
 
-      const ariaHidden = await modal.getAttribute('aria-hidden');
-      expect(ariaHidden).toBe('false');
+      const inert = await modal.getAttribute('inert');
+      expect(inert).toBeNull();
 
       // Close modal for cleanup
       await page.evaluate(() => {

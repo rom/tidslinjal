@@ -75,8 +75,8 @@ function _boardModal(id, content, width) {
   document.body.insertAdjacentHTML('beforeend', html);
   const modalEl = document.getElementById(id);
   void modalEl.offsetHeight;
-  modalEl.classList.add('open');
   if (typeof _bindActions === 'function') _bindActions(modalEl);
+  openModal(id);
 }
 
 // ── API helpers ──
