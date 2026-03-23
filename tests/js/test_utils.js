@@ -436,6 +436,219 @@ test('end of year', () => {
   expect(toICSDate(d)).toBe('20241231T235959Z');
 });
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── New test groups: functions not previously covered ────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── escAttr ──────────────────────────────────────────────────────────────────
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+console.log('\nescAttr');
+test('empty returns empty', () => expect(escAttr('')).toBe(''));
+test('null returns empty', () => expect(escAttr(null)).toBe(''));
+test('ampersand escaped', () => expect(escAttr('a & b')).toBe('a &amp; b'));
+test('single quote escaped', () => expect(escAttr("it's")).toBe("it&#39;s"));
+test('angle brackets escaped', () => expect(escAttr('<div>')).toBe('&lt;div&gt;'));
+test('double quote NOT escaped (different from escHtml)', () => expect(escAttr('"hi"')).toBe('"hi"'));
+test('combined special chars', () => expect(escAttr("<b class='x'>a & b</b>")).toBe("&lt;b class=&#39;x&#39;&gt;a &amp; b&lt;/b&gt;"));
+test('plain text unchanged', () => expect(escAttr('hello world')).toBe('hello world'));
+
+// ── fmtDTG (Date-Time Group format) ─────────────────────────────────────────
+function fmtDTG(d) {
+  if (!d) return '';
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const pad = n => String(n).padStart(2,'0');
+  const dd = pad(d.getUTCDate());
+  const hh = pad(d.getUTCHours());
+  const mm = pad(d.getUTCMinutes());
+  const mon = months[d.getUTCMonth()];
+  const yy = String(d.getUTCFullYear()).slice(-2);
+  return `${dd}${hh}${mm}Z${mon}${yy}`;
+}
+
+console.log('\nfmtDTG');
+test('null returns empty', () => expect(fmtDTG(null)).toBe(''));
+test('formats UTC date correctly', () => {
+  const d = new Date('2024-06-15T14:30:00Z');
+  expect(fmtDTG(d)).toBe('151430ZJUN24');
+});
+test('midnight UTC', () => {
+  const d = new Date('2024-01-01T00:00:00Z');
+  expect(fmtDTG(d)).toBe('010000ZJAN24');
+});
+test('end of year', () => {
+  const d = new Date('2024-12-31T23:59:00Z');
+  expect(fmtDTG(d)).toBe('312359ZDEC24');
+});
+test('single digit day and hour padded', () => {
+  const d = new Date('2024-03-05T09:07:00Z');
+  expect(fmtDTG(d)).toBe('050907ZMAR24');
+});
+test('February date', () => {
+  const d = new Date('2025-02-28T18:45:00Z');
+  expect(fmtDTG(d)).toBe('281845ZFEB25');
+});
+
+// ── _fmt24or12 (time formatting) ────────────────────────────────────────────
+function _fmt24or12_24h(h, m) {
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function _fmt24or12_12h(h, m) {
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+console.log('\n_fmt24or12 (24h mode)');
+test('midnight 00:00', () => expect(_fmt24or12_24h(0, 0)).toBe('00:00'));
+test('noon 12:00', () => expect(_fmt24or12_24h(12, 0)).toBe('12:00'));
+test('afternoon 14:30', () => expect(_fmt24or12_24h(14, 30)).toBe('14:30'));
+test('single digit hour padded', () => expect(_fmt24or12_24h(9, 5)).toBe('09:05'));
+test('23:59', () => expect(_fmt24or12_24h(23, 59)).toBe('23:59'));
+
+console.log('\n_fmt24or12 (12h mode)');
+test('midnight → 12:00 AM', () => expect(_fmt24or12_12h(0, 0)).toBe('12:00 AM'));
+test('1am → 1:00 AM', () => expect(_fmt24or12_12h(1, 0)).toBe('1:00 AM'));
+test('noon → 12:00 PM', () => expect(_fmt24or12_12h(12, 0)).toBe('12:00 PM'));
+test('1pm → 1:00 PM', () => expect(_fmt24or12_12h(13, 0)).toBe('1:00 PM'));
+test('11:30pm → 11:30 PM', () => expect(_fmt24or12_12h(23, 30)).toBe('11:30 PM'));
+test('11:59am → 11:59 AM', () => expect(_fmt24or12_12h(11, 59)).toBe('11:59 AM'));
+
+// ── getRangeDays (requires state mock) ──────────────────────────────────────
+const state = { range: 'week', startDate: new Date('2024-06-01'), exercise: null, resolution: 'hour', preferences: { day_start_hour: 8, day_end_hour: 18 } };
+function getRangeDays() {
+  switch (state.range) {
+    case 'day':     return 1;
+    case '2days':   return 2;
+    case '3days':   return 3;
+    case '4days':   return 4;
+    case '5days':   return 5;
+    case 'week':    return 7;
+    case '2weeks':  return 14;
+    case '3weeks':  return 21;
+    case 'month':   return daysInMonth(state.startDate);
+    case '2months': return daysInMonth(state.startDate) + daysInMonth(addMonths(state.startDate,1));
+    default:        return 7;
+  }
+}
+
+console.log('\ngetRangeDays');
+test('day → 1', () => { state.range = 'day'; expect(getRangeDays()).toBe(1); });
+test('3days → 3', () => { state.range = '3days'; expect(getRangeDays()).toBe(3); });
+test('week → 7', () => { state.range = 'week'; expect(getRangeDays()).toBe(7); });
+test('2weeks → 14', () => { state.range = '2weeks'; expect(getRangeDays()).toBe(14); });
+test('month for June → 30', () => { state.range = 'month'; state.startDate = new Date('2024-06-01'); expect(getRangeDays()).toBe(30); });
+test('month for Feb 2024 (leap) → 29', () => { state.range = 'month'; state.startDate = new Date('2024-02-01'); expect(getRangeDays()).toBe(29); });
+test('unknown range → 7 (default)', () => { state.range = 'custom'; expect(getRangeDays()).toBe(7); });
+state.range = 'week'; // reset
+
+// ── getSlotMinutes ──────────────────────────────────────────────────────────
+function getSlotMinutes() {
+  switch (state.resolution) {
+    case 'ten':     return 10;
+    case 'quarter': return 15;
+    case 'hour':    return 60;
+    case 'day':     return 1440;
+    default:        return 60;
+  }
+}
+
+console.log('\ngetSlotMinutes');
+test('ten → 10', () => { state.resolution = 'ten'; expect(getSlotMinutes()).toBe(10); });
+test('quarter → 15', () => { state.resolution = 'quarter'; expect(getSlotMinutes()).toBe(15); });
+test('hour → 60', () => { state.resolution = 'hour'; expect(getSlotMinutes()).toBe(60); });
+test('day → 1440', () => { state.resolution = 'day'; expect(getSlotMinutes()).toBe(1440); });
+test('unknown → 60 (default)', () => { state.resolution = 'xyz'; expect(getSlotMinutes()).toBe(60); });
+state.resolution = 'hour'; // reset
+
+// ── isOutOfHours ────────────────────────────────────────────────────────────
+function isOutOfHours(slotIdx) {
+  if (state.resolution === 'day') return false;
+  const min     = slotIdx * getSlotMinutes();
+  const startH  = (state.preferences.day_start_hour || 0) * 60;
+  const endH    = (state.preferences.day_end_hour   || 24) * 60;
+  return min < startH || min >= endH;
+}
+
+console.log('\nisOutOfHours');
+test('day resolution always false', () => { state.resolution = 'day'; expect(isOutOfHours(0)).toBeFalsy(); state.resolution = 'hour'; });
+test('slot at 7:00 (idx 7) before 8:00 start → OOH', () => expect(isOutOfHours(7)).toBeTruthy());
+test('slot at 8:00 (idx 8) at start → in hours', () => expect(isOutOfHours(8)).toBeFalsy());
+test('slot at 12:00 (idx 12) → in hours', () => expect(isOutOfHours(12)).toBeFalsy());
+test('slot at 17:00 (idx 17) → in hours', () => expect(isOutOfHours(17)).toBeFalsy());
+test('slot at 18:00 (idx 18) at end → OOH', () => expect(isOutOfHours(18)).toBeTruthy());
+test('slot at 23:00 (idx 23) → OOH', () => expect(isOutOfHours(23)).toBeTruthy());
+
+// ── hasRole2 expanded (with full role hierarchy from actual utils.js) ────────
+function hasRole2Full(userRole, required) {
+  const order = {read:0, reporter:1, readwrite:2, teammember:2, teamlead:3, deputy_teamlead:3, oplead:4, deputy_oplead:4, staffofficer:4, staff_assistant:4, staffofficer_full:4, admin:5};
+  return (order[userRole]||0) >= (order[required]||0);
+}
+
+console.log('\nhasRole2 — full hierarchy');
+test('teammember == readwrite', () => expect(hasRole2Full('teammember', 'readwrite')).toBeTruthy());
+test('readwrite == teammember', () => expect(hasRole2Full('readwrite', 'teammember')).toBeTruthy());
+test('deputy_teamlead == teamlead', () => expect(hasRole2Full('deputy_teamlead', 'teamlead')).toBeTruthy());
+test('deputy_oplead == oplead', () => expect(hasRole2Full('deputy_oplead', 'oplead')).toBeTruthy());
+test('staffofficer == oplead', () => expect(hasRole2Full('staffofficer', 'oplead')).toBeTruthy());
+test('staff_assistant == oplead', () => expect(hasRole2Full('staff_assistant', 'oplead')).toBeTruthy());
+test('staffofficer_full == oplead', () => expect(hasRole2Full('staffofficer_full', 'oplead')).toBeTruthy());
+test('staffofficer < admin', () => expect(hasRole2Full('staffofficer', 'admin')).toBeFalsy());
+test('teammember < teamlead', () => expect(hasRole2Full('teammember', 'teamlead')).toBeFalsy());
+test('admin > all roles', () => {
+  for (const r of ['read','reporter','readwrite','teammember','teamlead','oplead','staffofficer','admin']) {
+    expect(hasRole2Full('admin', r)).toBeTruthy();
+  }
+});
+
+// ── getSlotsPerDay ──────────────────────────────────────────────────────────
+function getSlotsPerDay() {
+  return 1440 / getSlotMinutes();
+}
+
+console.log('\ngetSlotsPerDay');
+test('10 min → 144 slots', () => { state.resolution = 'ten'; expect(getSlotsPerDay()).toBe(144); state.resolution = 'hour'; });
+test('15 min → 96 slots', () => { state.resolution = 'quarter'; expect(getSlotsPerDay()).toBe(96); state.resolution = 'hour'; });
+test('60 min → 24 slots', () => { state.resolution = 'hour'; expect(getSlotsPerDay()).toBe(24); });
+test('day → 1 slot', () => { state.resolution = 'day'; expect(getSlotsPerDay()).toBe(1); state.resolution = 'hour'; });
+
+// ── _applyTimeSep ──────────────────────────────────────────────────────────
+console.log('\n_applyTimeSep (time separator)');
+test('dot separator replaces colons', () => {
+  const orig = state.preferences;
+  state.preferences = { ...orig, time_separator: 'dot' };
+  function _getTimeSeparator() { return (state.preferences.time_separator === 'dot') ? '.' : ':'; }
+  function _applyTimeSep(str) { if (_getTimeSeparator() === '.') return str.replace(/:/g, '.'); return str; }
+  expect(_applyTimeSep('14:30')).toBe('14.30');
+  expect(_applyTimeSep('08:05:00')).toBe('08.05.00');
+  state.preferences = orig;
+});
+test('colon separator leaves unchanged', () => {
+  function _getTimeSeparator2() { return (state.preferences.time_separator === 'dot') ? '.' : ':'; }
+  function _applyTimeSep2(str) { if (_getTimeSeparator2() === '.') return str.replace(/:/g, '.'); return str; }
+  expect(_applyTimeSep2('14:30')).toBe('14:30');
+});
+
+// ── isCurrentSlot ──────────────────────────────────────────────────────────
+console.log('\nisCurrentSlot');
+test('current time falls within slot', () => {
+  const now = new Date();
+  const start = new Date(now.getTime() - 60000);
+  const end = new Date(now.getTime() + 60000);
+  function isCurrentSlot(s, e) { const n = new Date(); return n >= s && n < e; }
+  expect(isCurrentSlot(start, end)).toBeTruthy();
+});
+test('past slot is not current', () => {
+  const now = new Date();
+  const start = new Date(now.getTime() - 120000);
+  const end = new Date(now.getTime() - 60000);
+  function isCurrentSlot(s, e) { const n = new Date(); return n >= s && n < e; }
+  expect(isCurrentSlot(start, end)).toBeFalsy();
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${'─'.repeat(60)}`);
