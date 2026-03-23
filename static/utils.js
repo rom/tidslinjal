@@ -227,8 +227,60 @@ function setElText(id, text) {
 }
 
 // ── Modal helpers ───────────────────────────────────────────────────────────
-function openModal(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); }
-function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); }
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  // Focus first focusable element inside the modal
+  requestAnimationFrame(() => {
+    const modal = el.querySelector('.modal');
+    if (!modal) return;
+    const focusable = modal.querySelector('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable) focusable.focus();
+  });
+  // Announce modal to screen readers
+  a11yAnnounce('Dialog opened');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  a11yAnnounce('Dialog closed');
+}
+
+// Focus trap: keep Tab within open modals
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab') return;
+  const openOverlays = [...document.querySelectorAll('.modal-overlay.open')];
+  if (!openOverlays.length) return;
+  const topModal = openOverlays[openOverlays.length - 1].querySelector('.modal');
+  if (!topModal) return;
+  const focusable = topModal.querySelectorAll('button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+});
+
+// ── Accessibility announcer ────────────────────────────────────────────────
+function a11yAnnounce(message) {
+  const el = document.getElementById('a11y-announcer');
+  if (!el) return;
+  // Only announce if screen reader mode is enabled
+  if (!(state && state.preferences && state.preferences.a11y_screen_reader)) return;
+  el.textContent = '';
+  requestAnimationFrame(() => { el.textContent = message; });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.modal-overlay').forEach(overlay => {

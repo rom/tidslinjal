@@ -2792,6 +2792,48 @@ Fields: file, subject, sender, type, tags</pre>
         </div>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">♿ ${t('settings_accessibility')||'Accessibility'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('settings_a11y_desc')||'Configure accessibility features for keyboard navigation, screen readers, and visual preferences.'}</p>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" ${p.a11y_focus_indicators?'checked':''} data-action="setPref" data-event="change" data-pref-checked="a11y_focus_indicators"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('a11y_focus_indicators')||'Enhanced keyboard focus indicators'}
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" ${p.a11y_reduced_motion?'checked':''} data-action="setPref" data-event="change" data-pref-checked="a11y_reduced_motion"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('a11y_reduced_motion')||'Reduce animations and motion'}
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" ${p.a11y_screen_reader?'checked':''} data-action="setPref" data-event="change" data-pref-checked="a11y_screen_reader"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('a11y_screen_reader')||'Screen reader announcements'}
+          <span title="${t('a11y_screen_reader_info')||'Enables ARIA live region announcements for navigation, modal changes, and status updates.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+          <input type="checkbox" ${p.a11y_skip_links?'checked':''} data-action="setPref" data-event="change" data-pref-checked="a11y_skip_links"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('a11y_skip_links')||'Show skip navigation links'}
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+          <input type="checkbox" ${p.a11y_large_click_targets?'checked':''} data-action="setPref" data-event="change" data-pref-checked="a11y_large_click_targets"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('a11y_large_targets')||'Large click/touch targets (44px)'}
+        </label>
+
+        <div style="margin-bottom:4px;font-size:var(--fs-sm);color:var(--text-dim)">${t('a11y_font_scaling')||'Text scaling'}</div>
+        <div class="toggle-btn-group" style="margin-bottom:8px">
+          <button class="toggle-btn${(p.a11y_font_scaling||'100')==='100'?' active':''}" data-action="setPref" data-args='["a11y_font_scaling","100"]'>100%</button>
+          <button class="toggle-btn${p.a11y_font_scaling==='125'?' active':''}" data-action="setPref" data-args='["a11y_font_scaling","125"]'>125%</button>
+          <button class="toggle-btn${p.a11y_font_scaling==='150'?' active':''}" data-action="setPref" data-args='["a11y_font_scaling","150"]'>150%</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_high_contrast')||'High Contrast'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_high_contrast_desc')}</p>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">

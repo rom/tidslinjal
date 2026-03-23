@@ -191,6 +191,15 @@ function applyPreferences() {
     link.href = 'https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined|Material+Icons+Round';
     document.head.appendChild(link);
   }
+  // ── Accessibility preferences ──
+  const ap = state.preferences;
+  if (ap.a11y_focus_indicators) body.classList.add('a11y-focus');
+  if (ap.a11y_reduced_motion) body.classList.add('a11y-reduced-motion');
+  if (ap.a11y_large_click_targets) body.classList.add('a11y-large-targets');
+  if (ap.a11y_skip_links) body.classList.add('a11y-skip-links');
+  const fontScale = ap.a11y_font_scaling || '100';
+  if (fontScale === '125') body.classList.add('a11y-font-125');
+  if (fontScale === '150') body.classList.add('a11y-font-150');
   // Apply tactical font
   if (typeof _applyTacticalFont === 'function') _applyTacticalFont();
   // Broadcast theme to detached windows
