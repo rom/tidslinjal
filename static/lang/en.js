@@ -2662,4 +2662,12 @@ TRANSLATIONS.en = {
     kt_col_left: 'Move column left',
     kt_col_right: 'Move column right',
     kt_col_order: 'Column Order',
+    kt_mgmt_label: 'Management of line item',
+    kt_help: 'Help',
+    kt_help_title: 'Key Terrain Board \u2014 Help',
+    kt_help_what: 'What is a Key Terrain Board?',
+    kt_help_columns: 'Columns',
+    kt_help_features: 'Features',
+    kt_help_access: 'Access Control',
+    kt_detach: 'Detach to window',
   };
