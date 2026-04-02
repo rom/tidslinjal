@@ -260,6 +260,7 @@ type KeyTerrainEntry struct {
 	ResponsibleID   int64            `json:"responsible_id,omitempty"`
 	ResponsibleName string           `json:"responsible_name,omitempty"`
 	Actions         string           `json:"actions"`                     // what is being done
+	Rounds          int              `json:"rounds,omitempty"`            // number of battle rhythm rounds on the board
 	Ghosted         bool             `json:"ghosted,omitempty"`           // visually dimmed / inactive
 	Archived        bool             `json:"archived,omitempty"`          // hidden from normal view
 	FinishedAt      *time.Time       `json:"finished_at,omitempty"`       // when the entry was marked finished

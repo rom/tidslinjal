@@ -121,6 +121,7 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		ResponsibleID *int64  `json:"responsible_id"`
 		Responsible   *string `json:"responsible"`
 		Actions       *string `json:"actions"`
+		Rounds        *int    `json:"rounds"`
 		Ghosted       *bool   `json:"ghosted"`
 		Archived      *bool   `json:"archived"`
 		Finished      *bool   `json:"finished"`
@@ -165,6 +166,10 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	if req.Actions != nil && *req.Actions != entry.Actions {
 		addHist("actions", entry.Actions, *req.Actions)
 		entry.Actions = *req.Actions
+	}
+	if req.Rounds != nil && *req.Rounds != entry.Rounds {
+		addHist("rounds", fmt.Sprintf("%d", entry.Rounds), fmt.Sprintf("%d", *req.Rounds))
+		entry.Rounds = *req.Rounds
 	}
 
 	// Handle ghost/archive/finish
