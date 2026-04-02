@@ -10,6 +10,7 @@ let _ktState = {
   filter: {},             // active filters
   settings: {},           // persisted settings from server
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
+  columnOrder: ['priority','function','status','trend','threat','external','responsible','actions'], // reorderable
 };
 
 const _ktStatusOptions = [
@@ -142,10 +143,23 @@ function _renderKeyTerrainBoard() {
 
   // Sort using settings
   const sorted = _ktSortEntries(filtered);
-  const totalCols = 8 + (showTs ? 3 : 0) + (canWrite ? 1 : 0);
+  const cols = _ktState.columnOrder;
+  const totalCols = cols.length + (showTs ? 3 : 0) + (canWrite ? 1 : 0);
 
-  let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  // Column definitions
+  const colDef = {
+    priority:    { icon: '\u26A1', label: t('kt_priority')||'Pri', align: 'left', extra: 'white-space:nowrap' },
+    function:    { icon: '\u{1F3AF}', label: t('kt_function')||'Function', align: 'left', extra: 'min-width:140px' },
+    status:      { icon: '\u{1F4CA}', label: t('kt_status')||'Status', align: 'center', extra: '' },
+    trend:       { icon: '\u{1F4C8}', label: t('kt_trend')||'Trend', align: 'center', extra: '' },
+    threat:      { icon: '\u2694\uFE0F', label: t('kt_threat')||'Threat', align: 'left', extra: 'min-width:120px' },
+    external:    { icon: '\u{1F517}', label: t('kt_external')||'External', align: 'left', extra: 'min-width:120px' },
+    responsible: { icon: '\u{1F464}', label: t('kt_responsible')||'Responsible', align: 'left', extra: 'min-width:100px' },
+    actions:     { icon: '\u{1F527}', label: t('kt_actions')||'Actions', align: 'left', extra: 'min-width:140px' },
+  };
+
+  let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto" id="ktBoardContent">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px" class="kt-no-print">
       <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
@@ -153,25 +167,32 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions'}</button>` : ''}
+        ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenColumnOrder">\u2B80 ${t('kt_col_order')||'Columns'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
+        <button class="btn btn-sm btn-secondary" data-action="_ktPrint">\u{1F5A8} ${t('kt_print')||'Print'}</button>
+        <div style="position:relative;display:inline-block" id="ktExportDropdown">
+          <button class="btn btn-sm btn-secondary" data-action="_ktToggleExportMenu">\u2B07 ${t('kt_export')||'Export'}</button>
+          <div id="ktExportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:100px;margin-top:4px">
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="json">JSON</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="csv">CSV</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="xml">XML</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="pdf">PDF</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="svg">SVG</button>
+            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="jpeg">JPEG</button>
+          </div>
+        </div>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
       </div>
     </div>
 
+    <h2 class="kt-print-only" style="display:none;margin-bottom:8px">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
     <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('kt_desc')||'Cyber key terrain overview \u2014 tracks critical functions, their status, threats, and response actions.'}</p>
 
     <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)" id="ktBoardTable">
         <thead>
           <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
-            ${_ktSortTh('priority', '\u26A1 '+(t('kt_priority')||'Pri'), 'left', 'white-space:nowrap')}
-            ${_ktSortTh('function', '\u{1F3AF} '+(t('kt_function')||'Function'), 'left', 'min-width:140px')}
-            ${_ktSortTh('status', '\u{1F4CA} '+(t('kt_status')||'Status'), 'center', '')}
-            ${_ktSortTh('trend', '\u{1F4C8} '+(t('kt_trend')||'Trend'), 'center', '')}
-            ${_ktSortTh('threat', '\u2694\uFE0F '+(t('kt_threat')||'Threat'), 'left', 'min-width:120px')}
-            ${_ktSortTh('external', '\u{1F517} '+(t('kt_external')||'External'), 'left', 'min-width:120px')}
-            ${_ktSortTh('responsible', '\u{1F464} '+(t('kt_responsible')||'Responsible'), 'left', 'min-width:100px')}
-            ${_ktSortTh('actions', '\u{1F527} '+(t('kt_actions')||'Actions'), 'left', 'min-width:140px')}
+            ${cols.map(c => { const d = colDef[c]; return _ktSortTh(c, d.icon+' '+d.label, d.align, d.extra); }).join('')}
             ${showTs ? `
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F4C5} ${t('kt_added')||'Added'}</th>
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
@@ -208,19 +229,20 @@ function _renderKeyTerrainBoard() {
       }
     }
 
+    // Cell renderers per column
+    const cellHtml = {
+      priority: `<td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>`,
+      function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>`,
+      status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${sIcon} ${statusOpt.label}</span></td>`,
+      trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
+      threat: `<td style="padding:8px">${escHtml(e.threat || '\u2014')}</td>`,
+      external: `<td style="padding:8px">${escHtml(e.external || '\u2014')}</td>`,
+      responsible: `<td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
+      actions: `<td style="padding:8px">${escHtml(e.actions || '\u2014')}</td>`,
+    };
+
     html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'">
-      <td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>
-      <td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>
-      <td style="padding:8px;text-align:center">
-        <span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${sIcon} ${statusOpt.label}</span>
-      </td>
-      <td style="padding:8px;text-align:center">
-        <span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span>
-      </td>
-      <td style="padding:8px">${escHtml(e.threat || '\u2014')}</td>
-      <td style="padding:8px">${escHtml(e.external || '\u2014')}</td>
-      <td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
-      <td style="padding:8px">${escHtml(e.actions || '\u2014')}</td>
+      ${cols.map(c => cellHtml[c]).join('')}
       ${showTs ? `
       <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>
       <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>
@@ -563,6 +585,168 @@ async function _ktSaveSettings() {
     _renderKeyTerrainBoard();
     if (typeof showNotification === 'function') showNotification('success', t('kt_settings_saved')||'Settings saved');
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Column Reorder ──
+function _ktOpenColumnOrder() {
+  const cols = _ktState.columnOrder;
+  const colLabels = {
+    priority: '\u26A1 ' + (t('kt_priority')||'Priority'),
+    function: '\u{1F3AF} ' + (t('kt_function')||'Function'),
+    status: '\u{1F4CA} ' + (t('kt_status')||'Status'),
+    trend: '\u{1F4C8} ' + (t('kt_trend')||'Trend'),
+    threat: '\u2694\uFE0F ' + (t('kt_threat')||'Threat'),
+    external: '\u{1F517} ' + (t('kt_external')||'External'),
+    responsible: '\u{1F464} ' + (t('kt_responsible')||'Responsible'),
+    actions: '\u{1F527} ' + (t('kt_actions')||'Actions'),
+  };
+  let html = `<div style="max-width:400px">
+    <h3>\u2B80 ${t('kt_col_order')||'Column Order'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">Drag or use arrows to reorder columns.</p>
+    <div id="ktColOrderList">`;
+  cols.forEach((c, i) => {
+    html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
+      <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktMoveCol" data-args='[${i},-1]' ${i===0?'disabled':''}>\u25C0</button>
+      <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktMoveCol" data-args='[${i},1]' ${i===cols.length-1?'disabled':''}>\u25B6</button>
+      <span style="flex:1;font-size:var(--fs-xs)">${colLabels[c] || c}</span>
+    </div>`;
+  });
+  html += `</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktColOrderModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktColOrderModal', html, '420px');
+}
+function _ktMoveCol(args) {
+  const [idx, dir] = args;
+  const cols = _ktState.columnOrder;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= cols.length) return;
+  const tmp = cols[idx];
+  cols[idx] = cols[newIdx];
+  cols[newIdx] = tmp;
+  _ktOpenColumnOrder(); // re-render dialog
+  _renderKeyTerrainBoard(); // re-render table behind
+}
+
+// ── Print ──
+function _ktPrint() {
+  const table = document.getElementById('ktBoardTable');
+  if (!table) return;
+  const w = window.open('', '_blank', 'width=1100,height=800');
+  w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>
+    <style>body{font-family:system-ui,sans-serif;padding:20px;font-size:12px}
+    table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border:1px solid #ccc;text-align:left}
+    th{background:#eee;font-weight:700}tr:nth-child(even){background:#f9f9f9}
+    h2{margin-bottom:8px}p{color:#666;margin-bottom:12px;font-size:11px}
+    @media print{button{display:none!important}}</style></head><body>`);
+  w.document.write(`<h2>\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>`);
+  w.document.write(`<p>${t('kt_desc')||'Cyber key terrain overview'} \u2014 ${new Date().toLocaleString()}</p>`);
+  w.document.write(table.outerHTML);
+  w.document.write(`<br><button onclick="window.print()">Print</button></body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
+}
+
+// ── Export ──
+function _ktToggleExportMenu() {
+  const menu = document.getElementById('ktExportMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none';
+}
+function _ktExport(format) {
+  const menu = document.getElementById('ktExportMenu');
+  if (menu) menu.style.display = 'none';
+  const entries = _ktState.entries.filter(e => !e.archived);
+  const sorted = _ktSortEntries(entries);
+  const cols = _ktState.columnOrder;
+
+  if (format === 'json') {
+    const data = JSON.stringify(sorted, null, 2);
+    _ktDownload(data, 'key-terrain.json', 'application/json');
+  } else if (format === 'csv') {
+    const headers = cols.map(c => c).join(',');
+    const rows = sorted.map(e => cols.map(c => {
+      let v = _ktCellText(e, c);
+      return '"' + v.replace(/"/g, '""') + '"';
+    }).join(','));
+    _ktDownload(headers + '\n' + rows.join('\n'), 'key-terrain.csv', 'text/csv');
+  } else if (format === 'xml') {
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<key_terrain>\n';
+    for (const e of sorted) {
+      xml += '  <entry>\n';
+      cols.forEach(c => { xml += `    <${c}>${_ktXmlEsc(_ktCellText(e, c))}</${c}>\n`; });
+      xml += '  </entry>\n';
+    }
+    xml += '</key_terrain>';
+    _ktDownload(xml, 'key-terrain.xml', 'application/xml');
+  } else if (format === 'pdf' || format === 'svg' || format === 'jpeg') {
+    _ktExportImage(format);
+  }
+}
+function _ktCellText(e, col) {
+  switch (col) {
+    case 'priority': return String(e.priority || '');
+    case 'function': return e.function || '';
+    case 'status': return e.status || '';
+    case 'trend': return e.trend || '';
+    case 'threat': return e.threat || '';
+    case 'external': return e.external || '';
+    case 'responsible': return e.responsible_name || '';
+    case 'actions': return e.actions || '';
+    default: return '';
+  }
+}
+function _ktXmlEsc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _ktDownload(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function _ktExportImage(format) {
+  // Build an HTML table, render to a new window for printing/saving
+  const entries = _ktState.entries.filter(e => !e.archived);
+  const sorted = _ktSortEntries(entries);
+  const cols = _ktState.columnOrder;
+  const colLabels = { priority:'Priority', function:'Function', status:'Status', trend:'Trend', threat:'Threat', external:'External', responsible:'Responsible', actions:'Actions' };
+
+  let tableHtml = '<table style="width:100%;border-collapse:collapse;font-family:system-ui,sans-serif;font-size:12px"><thead><tr>';
+  cols.forEach(c => { tableHtml += `<th style="padding:6px 8px;border:1px solid #ccc;background:#eee">${colLabels[c]||c}</th>`; });
+  tableHtml += '</tr></thead><tbody>';
+  for (const e of sorted) {
+    tableHtml += '<tr>';
+    cols.forEach(c => { tableHtml += `<td style="padding:6px 8px;border:1px solid #ccc">${_ktXmlEsc(_ktCellText(e, c))}</td>`; });
+    tableHtml += '</tr>';
+  }
+  tableHtml += '</tbody></table>';
+
+  if (format === 'svg') {
+    // Wrap as SVG foreignObject
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="${60 + sorted.length * 32}">
+      <foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="padding:10px">
+        <h3 style="font-family:system-ui;margin:0 0 8px">\u{1F3D4}\uFE0F Key Terrain Board</h3>
+        ${tableHtml}</div></foreignObject></svg>`;
+    _ktDownload(svg, 'key-terrain.svg', 'image/svg+xml');
+  } else {
+    // PDF / JPEG: open in new window for browser print-to-PDF or screenshot
+    const w = window.open('', '_blank', 'width=1100,height=800');
+    w.document.write(`<!DOCTYPE html><html><head><title>Key Terrain Board</title>
+      <style>body{font-family:system-ui,sans-serif;padding:20px;font-size:12px;background:#fff}
+      table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border:1px solid #ccc;text-align:left}
+      th{background:#eee;font-weight:700}</style></head><body>`);
+    w.document.write(`<h2>\u{1F3D4}\uFE0F Key Terrain Board</h2><p style="color:#666;font-size:11px">${new Date().toLocaleString()}</p>`);
+    w.document.write(tableHtml);
+    if (format === 'pdf') {
+      w.document.write('<p style="margin-top:12px;font-size:10px;color:#999">Use your browser\'s "Save as PDF" option in the print dialog.</p>');
+    } else {
+      w.document.write('<p style="margin-top:12px;font-size:10px;color:#999">Right-click the page and choose "Save image" or take a screenshot.</p>');
+    }
+    w.document.close();
+    if (format === 'pdf') setTimeout(() => w.print(), 300);
+  }
 }
 
 // ── Sortable column header helper ──
