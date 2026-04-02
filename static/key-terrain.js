@@ -6,7 +6,9 @@ let _ktState = {
   access: { can_write: false },
   editingId: null,
   showTimestamps: false,  // collapsed by default
+  showArchived: false,    // show archived entries
   filter: {},             // active filters
+  settings: {},           // persisted settings from server
 };
 
 const _ktStatusOptions = [
@@ -34,12 +36,14 @@ async function _ktApi(method, path, body) {
 
 async function openKeyTerrainBoard() {
   try {
-    const [entries, access] = await Promise.all([
+    const [entries, access, settings] = await Promise.all([
       _ktApi('GET', '/key-terrain'),
       _ktApi('GET', '/key-terrain/access'),
+      _ktApi('GET', '/key-terrain/settings').catch(() => ({})),
     ]);
     _ktState.entries = entries;
     _ktState.access = access;
+    _ktState.settings = settings || {};
   } catch (e) {
     _ktState.entries = [];
     _ktState.access = { can_write: false };
@@ -47,15 +51,59 @@ async function openKeyTerrainBoard() {
   _renderKeyTerrainBoard();
 }
 
+// ── Settings helpers ──
+function _ktGetStatusIcon(value) {
+  const override = (_ktState.settings.status_icons || {})[value];
+  if (override) return override;
+  const opt = _ktStatusOptions.find(s => s.value === value);
+  return opt ? opt.icon : '\u26AA';
+}
+function _ktGetTrendIcon(value) {
+  const override = (_ktState.settings.trend_icons || {})[value];
+  if (override) return override;
+  const opt = _ktTrendOptions.find(tr => tr.value === value);
+  return opt ? opt.icon : '\u27A1\uFE0F';
+}
+function _ktGetPriorityColor(pri) {
+  const colors = _ktState.settings.priority_colors || {};
+  return colors[String(pri)] || '';
+}
+function _ktGhostStyle() {
+  return _ktState.settings.ghost_style || 'grey';
+}
+function _ktSortEntries(entries) {
+  const sortBy = _ktState.settings.sort_by || 'priority';
+  const sorted = [...entries];
+  switch (sortBy) {
+    case 'function': return sorted.sort((a, b) => (a.function || '').localeCompare(b.function || ''));
+    case 'status': {
+      const order = { working: 0, degraded: 1, down: 2, unknown: 3 };
+      return sorted.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+    }
+    case 'trend': {
+      const order = { worsening: 0, stable: 1, improving: 2 };
+      return sorted.sort((a, b) => (order[a.trend] ?? 9) - (order[b.trend] ?? 9));
+    }
+    case 'responsible': return sorted.sort((a, b) => (a.responsible_name || '').localeCompare(b.responsible_name || ''));
+    case 'entry_order': return sorted.sort((a, b) => a.id - b.id);
+    default: return sorted.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  }
+}
+
 function _renderKeyTerrainBoard() {
-  const entries = _ktState.entries;
+  const allEntries = _ktState.entries;
   const canWrite = _ktState.access.can_write;
   const showTs = _ktState.showTimestamps;
+  const ghostStyle = _ktGhostStyle();
   const f = _ktState.filter || {};
   const hasFilter = Object.values(f).some(v => v);
 
-  // Filter entries
-  let filtered = [...entries];
+  // Separate active vs archived; hide ghosted if ghost_style === 'remove'
+  const activeEntries = allEntries.filter(e => !e.archived && !(e.ghosted && ghostStyle === 'remove'));
+  const archivedEntries = allEntries.filter(e => e.archived);
+
+  // Filter active entries
+  let filtered = [...activeEntries];
   if (hasFilter) {
     const q = (v) => (v || '').toLowerCase();
     filtered = filtered.filter(e => {
@@ -70,17 +118,18 @@ function _renderKeyTerrainBoard() {
     });
   }
 
-  // Sort by priority
-  const sorted = filtered.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  // Sort using settings
+  const sorted = _ktSortEntries(filtered);
   const totalCols = 8 + (showTs ? 3 : 0) + (canWrite ? 1 : 0);
 
   let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps" title="${t('kt_timestamps')||'Toggle timestamp columns'}">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
+        ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
       </div>
     </div>
@@ -104,7 +153,7 @@ function _renderKeyTerrainBoard() {
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u2705 ${t('kt_finished')||'Finished'}</th>
             ` : ''}
-            ${canWrite ? `<th style="padding:8px;width:80px"></th>` : ''}
+            ${canWrite ? `<th style="padding:8px;width:110px"></th>` : ''}
           </tr>
         </thead>
         <tbody>`;
@@ -113,21 +162,36 @@ function _renderKeyTerrainBoard() {
     html += `<tr><td colspan="${totalCols}" style="padding:20px;text-align:center;color:var(--text-dim)">${hasFilter ? (t('kt_no_match')||'No entries match the current filter.') : (t('kt_empty')||'No key terrain entries. Add one to get started.')}</td></tr>`;
   }
 
+  const fmtDate = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleDateString(undefined, {year:'2-digit',month:'short',day:'numeric'}); } catch { return '\u2014'; } };
+  const fmtDateTime = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '\u2014'; } };
+
   for (const e of sorted) {
     const statusOpt = _ktStatusOptions.find(s => s.value === e.status) || _ktStatusOptions[3];
     const trendOpt = _ktTrendOptions.find(tr => tr.value === e.trend) || _ktTrendOptions[1];
-    const rowBg = statusOpt.color;
-    const fmtDate = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleDateString(undefined, {year:'2-digit',month:'short',day:'numeric'}); } catch { return '\u2014'; } };
-    const fmtDateTime = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '\u2014'; } };
+    const sIcon = _ktGetStatusIcon(e.status);
+    const trIcon = _ktGetTrendIcon(e.trend);
+    const priColor = _ktGetPriorityColor(e.priority);
 
-    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'">
-      <td style="padding:8px;text-align:center;font-weight:700;font-size:14px">${e.priority || '\u2014'}</td>
-      <td style="padding:8px;font-weight:600">${escHtml(e.function)}</td>
+    // Ghosting styles
+    let rowBg = statusOpt.color;
+    let rowStyle = '';
+    if (e.ghosted) {
+      if (ghostStyle === 'grey') {
+        rowBg = 'rgba(150,150,150,0.08)';
+        rowStyle = 'opacity:0.5;';
+      } else if (ghostStyle === 'strikethrough') {
+        rowStyle = 'text-decoration:line-through;opacity:0.6;';
+      }
+    }
+
+    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'">
+      <td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>
+      <td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>
       <td style="padding:8px;text-align:center">
-        <span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${statusOpt.icon} ${statusOpt.label}</span>
+        <span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${sIcon} ${statusOpt.label}</span>
       </td>
       <td style="padding:8px;text-align:center">
-        <span title="${trendOpt.label}">${trendOpt.icon} ${trendOpt.label}</span>
+        <span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span>
       </td>
       <td style="padding:8px">${escHtml(e.threat || '\u2014')}</td>
       <td style="padding:8px">${escHtml(e.external || '\u2014')}</td>
@@ -139,20 +203,46 @@ function _renderKeyTerrainBoard() {
       <td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
       ` : ''}
       ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap">
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="Edit">\u270F\uFE0F</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="History">\u{1F4DC}</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="Delete">\u{1F5D1}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="${t('kt_edit')||'Edit'}">\u270F\uFE0F</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="${t('kt_history')||'History'}">\u{1F4DC}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktArchiveEntry" data-arg="${e.id}" title="${t('kt_archive')||'Archive'}">\u{1F4E6}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
       </td>` : ''}
     </tr>`;
   }
 
-  html += `</tbody></table></div>
+  html += `</tbody></table></div>`;
 
+  // ── Archived entries section ──
+  if (archivedEntries.length > 0) {
+    html += `<details style="margin-top:16px" ${_ktState.showArchived ? 'open' : ''}>
+      <summary style="cursor:pointer;font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:8px">\u{1F4E6} ${t('kt_archived')||'Archived'} (${archivedEntries.length})</summary>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs);opacity:0.7">
+          <tbody>`;
+    for (const e of archivedEntries) {
+      const statusOpt = _ktStatusOptions.find(s => s.value === e.status) || _ktStatusOptions[3];
+      html += `<tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
+        <td style="padding:6px 8px;text-align:center;font-weight:700">${e.priority || '\u2014'}</td>
+        <td style="padding:6px 8px">${escHtml(e.function)}</td>
+        <td style="padding:6px 8px;text-align:center">${_ktGetStatusIcon(e.status)} ${statusOpt.label}</td>
+        <td style="padding:6px 8px">${escHtml(e.responsible_name || '\u2014')}</td>
+        ${canWrite ? `<td style="padding:6px 8px;text-align:center;white-space:nowrap">
+          <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktUnarchiveEntry" data-arg="${e.id}" title="${t('kt_unarchive')||'Restore'}">\u21A9</button>
+          <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
+        </td>` : ''}
+      </tr>`;
+    }
+    html += `</tbody></table></div></details>`;
+  }
+
+  html += `
     <div style="margin-top:16px;font-size:var(--fs-xs);color:var(--text-dim)">
       <strong>${t('kt_legend')||'Legend'}:</strong>
-      ${_ktStatusOptions.map(s => `${s.icon} ${s.label}`).join(' \u00B7 ')} &nbsp;|&nbsp;
-      ${_ktTrendOptions.map(tr => `${tr.icon} ${tr.label}`).join(' \u00B7 ')}
-      ${hasFilter ? ` &nbsp;|&nbsp; <em>${t('kt_filter_active')||'Filter active'} (${sorted.length}/${entries.length})</em>` : ''}
+      ${_ktStatusOptions.map(s => `${_ktGetStatusIcon(s.value)} ${s.label}`).join(' \u00B7 ')} &nbsp;|&nbsp;
+      ${_ktTrendOptions.map(tr => `${_ktGetTrendIcon(tr.value)} ${tr.label}`).join(' \u00B7 ')}
+      ${hasFilter ? ` &nbsp;|&nbsp; <em>${t('kt_filter_active')||'Filter active'} (${sorted.length}/${activeEntries.length})</em>` : ''}
     </div>
   </div>`;
 
@@ -315,6 +405,137 @@ async function _ktDeleteEntry(entryId) {
     await _ktApi('DELETE', '/key-terrain/' + entryId);
     await openKeyTerrainBoard();
     if (typeof showNotification === 'function') showNotification('success', t('kt_deleted')||'Entry deleted');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Ghost / Archive / Unarchive ──
+async function _ktToggleGhost(entryId) {
+  const entry = _ktState.entries.find(e => e.id === parseInt(entryId));
+  if (!entry) return;
+  try {
+    await _ktApi('PUT', '/key-terrain/' + entryId, { ghosted: !entry.ghosted });
+    await openKeyTerrainBoard();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _ktArchiveEntry(entryId) {
+  try {
+    await _ktApi('PUT', '/key-terrain/' + entryId, { archived: true });
+    await openKeyTerrainBoard();
+    if (typeof showNotification === 'function') showNotification('success', t('kt_archived_msg')||'Entry archived');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _ktUnarchiveEntry(entryId) {
+  try {
+    await _ktApi('PUT', '/key-terrain/' + entryId, { archived: false });
+    await openKeyTerrainBoard();
+    if (typeof showNotification === 'function') showNotification('success', t('kt_unarchived_msg')||'Entry restored');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Settings Panel ──
+function _ktOpenSettings() {
+  const s = _ktState.settings || {};
+  const pc = s.priority_colors || {};
+  const si = s.status_icons || {};
+  const ti = s.trend_icons || {};
+  const sortBy = s.sort_by || 'priority';
+  const gs = s.ghost_style || 'grey';
+
+  let html = `<div style="max-width:540px">
+    <h3>\u2699 ${t('kt_settings')||'Key Terrain Settings'}</h3>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3A8} ${t('kt_priority_colors')||'Priority Color Coding'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_priority_colors_desc')||'Assign a color to each priority level (shown on the priority number).'}</p>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+        ${[1,2,3,4,5].map(n => `<div style="text-align:center">
+          <div style="font-weight:700;font-size:12px;margin-bottom:2px">${n}</div>
+          <input type="color" id="ktSettPriColor${n}" value="${pc[String(n)] || '#888888'}" style="width:36px;height:24px;cursor:pointer;border:none;padding:0">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F4CA} ${t('kt_status_icons')||'Status Icons'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${_ktStatusOptions.map(st => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:var(--fs-xs);min-width:60px">${st.label}:</span>
+          <input id="ktSettStatusIcon_${st.value}" class="input" style="width:50px;font-size:14px;text-align:center;padding:2px" value="${escHtml(si[st.value] || st.icon)}" maxlength="4">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F4C8} ${t('kt_trend_icons')||'Trend Icons'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        ${_ktTrendOptions.map(tr => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:var(--fs-xs);min-width:70px">${tr.label}:</span>
+          <input id="ktSettTrendIcon_${tr.value}" class="input" style="width:50px;font-size:14px;text-align:center;padding:2px" value="${escHtml(ti[tr.value] || tr.icon)}" maxlength="4">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F522} ${t('kt_sort_order')||'Sort Order'}</div>
+      <select id="ktSettSortBy" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="priority" ${sortBy==='priority'?'selected':''}>\u26A1 Priority</option>
+        <option value="entry_order" ${sortBy==='entry_order'?'selected':''}>\u{1F4CB} Entry order (added)</option>
+        <option value="function" ${sortBy==='function'?'selected':''}>\u{1F3AF} Function (A\u2013Z)</option>
+        <option value="status" ${sortBy==='status'?'selected':''}>\u{1F4CA} Status</option>
+        <option value="trend" ${sortBy==='trend'?'selected':''}>\u{1F4C8} Trend</option>
+        <option value="responsible" ${sortBy==='responsible'?'selected':''}>\u{1F464} Responsible (A\u2013Z)</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F47B} ${t('kt_ghost_options')||'Ghosting Style'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_ghost_desc')||'How ghosted entries appear in the table.'}</p>
+      <select id="ktSettGhostStyle" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="grey" ${gs==='grey'?'selected':''}>\u{1F9CA} ${t('kt_ghost_grey')||'Grey out (reduced opacity + grey background)'}</option>
+        <option value="strikethrough" ${gs==='strikethrough'?'selected':''}>\u{1F5D9} ${t('kt_ghost_strike')||'Strikethrough text'}</option>
+        <option value="remove" ${gs==='remove'?'selected':''}>\u274C ${t('kt_ghost_remove')||'Hide from view completely'}</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_ktSaveSettings">\u2714 ${t('btn_save')||'Save'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktSettingsModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktSettingsModal', html, '560px');
+}
+
+async function _ktSaveSettings() {
+  const pc = {};
+  for (let n = 1; n <= 5; n++) {
+    const v = document.getElementById('ktSettPriColor' + n)?.value;
+    if (v && v !== '#888888') pc[String(n)] = v;
+  }
+  const si = {};
+  _ktStatusOptions.forEach(st => {
+    const v = document.getElementById('ktSettStatusIcon_' + st.value)?.value?.trim();
+    if (v && v !== st.icon) si[st.value] = v;
+  });
+  const ti = {};
+  _ktTrendOptions.forEach(tr => {
+    const v = document.getElementById('ktSettTrendIcon_' + tr.value)?.value?.trim();
+    if (v && v !== tr.icon) ti[tr.value] = v;
+  });
+  const settings = {
+    priority_colors: pc,
+    status_icons: si,
+    trend_icons: ti,
+    sort_by: document.getElementById('ktSettSortBy')?.value || 'priority',
+    ghost_style: document.getElementById('ktSettGhostStyle')?.value || 'grey',
+  };
+  try {
+    await _ktApi('PUT', '/key-terrain/settings', settings);
+    _ktState.settings = settings;
+    if (typeof _closeBoardModal === 'function') _closeBoardModal('ktSettingsModal');
+    _renderKeyTerrainBoard();
+    if (typeof showNotification === 'function') showNotification('success', t('kt_settings_saved')||'Settings saved');
   } catch (e) { alert('Error: ' + e.message); }
 }
 
