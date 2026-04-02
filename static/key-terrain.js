@@ -5,12 +5,12 @@ let _ktState = {
   entries: [],
   access: { can_write: false },
   editingId: null,
-  showTimestamps: false,  // collapsed by default
   showArchived: false,    // show archived entries
   filter: {},             // active filters
   settings: {},           // persisted settings from server
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
-  columnOrder: ['priority','function','status','trend','threat','external','responsible','actions'], // reorderable
+  columnOrder: ['priority','function','status','trend','threat','external','responsible','actions','created_at','updated_at','finished_at','rounds'],
+  hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true }, // hidden by default
 };
 
 const _ktStatusOptions = [
@@ -116,7 +116,7 @@ function _ktSortByColumn(col) {
 function _renderKeyTerrainBoard() {
   const allEntries = _ktState.entries;
   const canWrite = _ktState.access.can_write;
-  const showTs = _ktState.showTimestamps;
+  const hidden = _ktState.hiddenColumns || {};
   const ghostStyle = _ktGhostStyle();
   const f = _ktState.filter || {};
   const hasFilter = Object.values(f).some(v => v);
@@ -143,8 +143,9 @@ function _renderKeyTerrainBoard() {
 
   // Sort using settings
   const sorted = _ktSortEntries(filtered);
-  const cols = _ktState.columnOrder;
-  const totalCols = cols.length + (showTs ? 3 : 0) + (canWrite ? 1 : 0);
+  const cols = _ktState.columnOrder.filter(c => !hidden[c]);
+  const hasHidden = Object.values(hidden).some(v => v);
+  const totalCols = cols.length + (canWrite ? 1 : 0);
 
   // Column definitions
   const colDef = {
@@ -156,6 +157,10 @@ function _renderKeyTerrainBoard() {
     external:    { icon: '\u{1F517}', label: t('kt_external')||'External', align: 'left', extra: 'min-width:120px' },
     responsible: { icon: '\u{1F464}', label: t('kt_responsible')||'Responsible', align: 'left', extra: 'min-width:100px' },
     actions:     { icon: '\u{1F527}', label: t('kt_actions')||'Actions', align: 'left', extra: 'min-width:140px' },
+    created_at:  { icon: '\u{1F4C5}', label: t('kt_created')||'Created', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    updated_at:  { icon: '\u{1F504}', label: t('kt_updated')||'Updated', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    finished_at: { icon: '\u2705', label: t('kt_finished')||'Finished', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    rounds:      { icon: '\u{1F504}', label: t('kt_rounds')||'# Rounds', align: 'center', extra: 'white-space:nowrap' },
   };
 
   let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto" id="ktBoardContent">
@@ -164,7 +169,7 @@ function _renderKeyTerrainBoard() {
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
+        <button class="btn btn-sm ${hasHidden ? 'btn-secondary' : 'btn-secondary'}" data-action="_ktOpenColumnVisibility">\u{1F441} ${t('kt_columns_vis')||'Columns'}${hasHidden ? ' ('+Object.values(hidden).filter(v=>v).length+' hidden)' : ''}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenColumnOrder">\u2B80 ${t('kt_col_order')||'Columns'}</button>` : ''}
@@ -195,11 +200,6 @@ function _renderKeyTerrainBoard() {
         <thead>
           <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
             ${cols.map(c => { const d = colDef[c]; return _ktSortTh(c, d.icon+' '+d.label, d.align, d.extra); }).join('')}
-            ${showTs ? `
-            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F4C5} ${t('kt_added')||'Added'}</th>
-            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
-            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u2705 ${t('kt_finished')||'Finished'}</th>
-            ` : ''}
             ${canWrite ? `<th style="padding:8px;width:140px;font-size:10px;color:var(--text-dim);font-weight:normal;text-align:center">${t('kt_mgmt_label')||'Management of line item'}</th>` : ''}
           </tr>
         </thead>
@@ -241,15 +241,14 @@ function _renderKeyTerrainBoard() {
       external: `<td style="padding:8px">${e.external ? _ktRenderRich(e.external) : '\u2014'}</td>`,
       responsible: `<td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
       actions: `<td style="padding:8px">${e.actions ? _ktRenderRich(e.actions) : '\u2014'}</td>`,
+      created_at: `<td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>`,
+      updated_at: `<td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>`,
+      finished_at: `<td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
+      rounds: `<td style="padding:8px;text-align:center;font-weight:600">${e.rounds || 0}</td>`,
     };
 
     html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}${canWrite?';cursor:pointer':''}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'" ${canWrite ? `data-action="_ktEditEntry" data-arg="${e.id}"` : ''}>
       ${cols.map(c => cellHtml[c]).join('')}
-      ${showTs ? `
-      <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>
-      <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>
-      <td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
-      ` : ''}
       ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap" data-stop-prop>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},-1]' data-stop-prop title="${t('kt_move_up')||'Move up'}">\u25B2</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},1]' data-stop-prop title="${t('kt_move_down')||'Move down'}">\u25BC</button>
@@ -328,9 +327,9 @@ async function _ktEditEntry(entryId) {
       <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'What matters / critical function'}">
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">📊 ${t('kt_status')||'Status'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
         <select id="ktStatus" class="input" style="width:100%;font-size:var(--fs-xs)">
           ${_ktStatusOptions.map(s => `<option value="${s.value}" ${entry.status===s.value?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
         </select>
@@ -344,6 +343,10 @@ async function _ktEditEntry(entryId) {
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">⚡ ${t('kt_priority')||'Priority'}</label>
         <input id="ktPriority" type="number" class="input" style="width:100%" value="${entry.priority || ''}" min="1" placeholder="1">
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F504} ${t('kt_rounds')||'# Rounds'}</label>
+        <input id="ktRounds" type="number" class="input" style="width:100%" value="${entry.rounds || 0}" min="0" placeholder="0">
       </div>
     </div>
 
@@ -422,6 +425,7 @@ async function _ktSaveEntry(entryId) {
     threat: _ktGetRichValue('ktThreat'),
     external: _ktGetRichValue('ktExternal'),
     priority: parseInt(document.getElementById('ktPriority')?.value) || 0,
+    rounds: parseInt(document.getElementById('ktRounds')?.value) || 0,
     actions: _ktGetRichValue('ktActions'),
   };
 
@@ -601,6 +605,10 @@ function _ktOpenColumnOrder() {
     external: '\u{1F517} ' + (t('kt_external')||'External'),
     responsible: '\u{1F464} ' + (t('kt_responsible')||'Responsible'),
     actions: '\u{1F527} ' + (t('kt_actions')||'Actions'),
+    created_at: '\u{1F4C5} ' + (t('kt_created')||'Created'),
+    updated_at: '\u{1F504} ' + (t('kt_updated')||'Updated'),
+    finished_at: '\u2705 ' + (t('kt_finished')||'Finished'),
+    rounds: '\u{1F504} ' + (t('kt_rounds')||'# Rounds'),
   };
   let html = `<div style="max-width:400px">
     <h3>\u2B80 ${t('kt_col_order')||'Column Order'}</h3>
@@ -692,10 +700,14 @@ function _ktCellText(e, col) {
     case 'function': return e.function || '';
     case 'status': return e.status || '';
     case 'trend': return e.trend || '';
-    case 'threat': return e.threat || '';
-    case 'external': return e.external || '';
+    case 'threat': return (e.threat || '').replace(/<[^>]*>/g, '');
+    case 'external': return (e.external || '').replace(/<[^>]*>/g, '');
     case 'responsible': return e.responsible_name || '';
-    case 'actions': return e.actions || '';
+    case 'actions': return (e.actions || '').replace(/<[^>]*>/g, '');
+    case 'created_at': return e.created_at ? new Date(e.created_at).toLocaleDateString() : '';
+    case 'updated_at': return e.updated_at ? new Date(e.updated_at).toLocaleString() : '';
+    case 'finished_at': return e.finished_at ? new Date(e.finished_at).toLocaleDateString() : '';
+    case 'rounds': return String(e.rounds || 0);
     default: return '';
   }
 }
@@ -920,9 +932,45 @@ async function _ktViewSnapshot(snapId) {
   _boardModal('ktSnapshotViewModal', html, '940px');
 }
 
-// ── Toggle timestamp columns ──
-function _ktToggleTimestamps() {
-  _ktState.showTimestamps = !_ktState.showTimestamps;
+// ── Column Visibility (hide/unhide) ──
+function _ktOpenColumnVisibility() {
+  const allCols = _ktState.columnOrder;
+  const hidden = _ktState.hiddenColumns || {};
+  const colLabels = {
+    priority: '\u26A1 Priority', function: '\u{1F3AF} Function', status: '\u{1F4CA} Status',
+    trend: '\u{1F4C8} Trend', threat: '\u2694\uFE0F Threat', external: '\u{1F517} External',
+    responsible: '\u{1F464} Responsible', actions: '\u{1F527} Actions',
+    created_at: '\u{1F4C5} Created', updated_at: '\u{1F504} Updated',
+    finished_at: '\u2705 Finished', rounds: '\u{1F504} # Rounds',
+  };
+  let html = `<div style="max-width:400px">
+    <h3>\u{1F441} ${t('kt_columns_vis')||'Show / Hide Columns'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('kt_columns_vis_desc')||'Toggle which columns are visible in the table.'}</p>
+    <div style="display:flex;flex-direction:column;gap:4px">`;
+  for (const c of allCols) {
+    const isHidden = !!hidden[c];
+    html += `<label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);cursor:pointer;padding:4px 6px;background:var(--bg3);border-radius:var(--radius)">
+      <input type="checkbox" ${!isHidden ? 'checked' : ''} data-col="${c}" class="ktVisCheck" style="accent-color:var(--accent)">
+      ${colLabels[c] || c}
+    </label>`;
+  }
+  html += `</div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_ktApplyColumnVisibility">\u2714 ${t('kt_apply')||'Apply'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktColVisModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktColVisModal', html, '400px');
+}
+
+function _ktApplyColumnVisibility() {
+  const checks = document.querySelectorAll('.ktVisCheck');
+  const hidden = {};
+  checks.forEach(chk => {
+    if (!chk.checked) hidden[chk.dataset.col] = true;
+  });
+  _ktState.hiddenColumns = hidden;
+  if (typeof _closeBoardModal === 'function') _closeBoardModal('ktColVisModal');
   _renderKeyTerrainBoard();
 }
 

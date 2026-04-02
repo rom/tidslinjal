@@ -2670,4 +2670,9 @@ TRANSLATIONS.en = {
     kt_help_features: 'Features',
     kt_help_access: 'Access Control',
     kt_detach: 'Detach to window',
+    kt_created: 'Created',
+    kt_rounds: '# Rounds',
+    kt_columns_vis: 'Show / Hide Columns',
+    kt_columns_vis_desc: 'Toggle which columns are visible in the table.',
+    kt_apply: 'Apply',
   };
