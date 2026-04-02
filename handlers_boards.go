@@ -225,6 +225,9 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 		PriorityBackground *bool       `json:"priority_background"`
 		ShowArchival       *bool       `json:"show_archival"`
 		SortMode           *string     `json:"sort_mode"`
+		HighlightMe        *bool       `json:"highlight_me"`
+		HighlightStyle     *string     `json:"highlight_style"`
+		MyBoardsOnTop      *bool       `json:"my_boards_on_top"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -262,6 +265,15 @@ func (app *App) handleUpdateBoard(w http.ResponseWriter, r *http.Request, user *
 	}
 	if req.SortMode != nil {
 		board.SortMode = *req.SortMode
+	}
+	if req.HighlightMe != nil {
+		board.HighlightMe = req.HighlightMe
+	}
+	if req.HighlightStyle != nil {
+		board.HighlightStyle = *req.HighlightStyle
+	}
+	if req.MyBoardsOnTop != nil {
+		board.MyBoardsOnTop = req.MyBoardsOnTop
 	}
 	if err := app.store.UpdateBoard(*board); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)

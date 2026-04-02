@@ -2115,6 +2115,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📊', t('dashboard_title')||'Dashboard', 'openDashboard()')}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
+          ${toolBtn('🏔️', t('kt_title')||'Key Terrain Board', 'openKeyTerrainBoard()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
