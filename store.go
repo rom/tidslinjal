@@ -77,6 +77,7 @@ type Store struct {
 	tags                 []Tag
 	boards               []Board
 	boardItems           []BoardItem
+	keyTerrainEntries    []KeyTerrainEntry
 	reportArchive        []ReportArchiveEntry
 	reportIngestConfig   ReportIngestConfig
 	startupText          string
@@ -124,6 +125,7 @@ type Store struct {
 	nextTagID                int64
 	nextBoardID              int64
 	nextBoardItemID          int64
+	nextKeyTerrainID         int64
 	nextReportArchiveID      int64
 	nextStaffDutyID          int64
 	nextStaffMemberID        int64
@@ -242,6 +244,7 @@ func (s *Store) load() error {
 	s.loadFile("tags.json", &s.tags)
 	s.loadFile("boards.json", &s.boards)
 	s.loadFile("board_items.json", &s.boardItems)
+	s.loadFile("key_terrain.json", &s.keyTerrainEntries)
 	s.loadFile("report_archive.json", &s.reportArchive)
 	s.loadFile("report_ingest_config.json", &s.reportIngestConfig)
 
@@ -467,6 +470,11 @@ func (s *Store) load() error {
 	for _, x := range s.boardItems {
 		if x.ID > s.nextBoardItemID {
 			s.nextBoardItemID = x.ID
+		}
+	}
+	for _, x := range s.keyTerrainEntries {
+		if x.ID > s.nextKeyTerrainID {
+			s.nextKeyTerrainID = x.ID
 		}
 	}
 	for _, x := range s.reportArchive {

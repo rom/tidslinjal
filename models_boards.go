@@ -19,6 +19,9 @@ type Board struct {
 	PriorityBackground *bool     `json:"priority_background,omitempty"` // color bg by priority (default true)
 	ShowArchival       *bool     `json:"show_archival,omitempty"`        // show archival controls (default true)
 	SortMode           string    `json:"sort_mode,omitempty"`            // "normal", "priority", "due_date" (default "normal")
+	HighlightMe        *bool     `json:"highlight_me,omitempty"`         // highlight boards user is responsible for (default true)
+	HighlightStyle     string    `json:"highlight_style,omitempty"`      // "border", "color", "icon" (default "border")
+	MyBoardsOnTop      *bool     `json:"my_boards_on_top,omitempty"`     // sort my boards to top (default true)
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -241,4 +244,33 @@ func BuiltInBoardTemplateItems() map[int64][]BoardItem {
 			{Subject: "Tent package (20-person)", ColumnID: "delivered", SortOrder: 0, ItemType: "task", Note: "Delivered and assembled at site B.", CreatedAt: now, UpdatedAt: now},
 		},
 	}
+}
+
+// ── Key Terrain Board ───────────────────────────────────────────────────────
+
+// KeyTerrainEntry represents a single row in the Key Terrain Board
+type KeyTerrainEntry struct {
+	ID              int64            `json:"id"`
+	Function        string           `json:"function"`                    // what matters / cyber key terrain
+	Status          string           `json:"status"`                      // working, degraded, down, unknown
+	Trend           string           `json:"trend"`                       // improving, stable, worsening
+	Threat          string           `json:"threat"`                      // hostile pressure description
+	External        string           `json:"external"`                    // external dependencies / peer effects
+	Priority        int              `json:"priority"`                    // explicit ranking (1 = highest)
+	ResponsibleID   int64            `json:"responsible_id,omitempty"`
+	ResponsibleName string           `json:"responsible_name,omitempty"`
+	Actions         string           `json:"actions"`                     // what is being done
+	History         []KeyTerrainHist `json:"history,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+}
+
+// KeyTerrainHist tracks changes to a key terrain entry
+type KeyTerrainHist struct {
+	Timestamp time.Time `json:"timestamp"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Field     string    `json:"field"`
+	OldValue  string    `json:"old_value"`
+	NewValue  string    `json:"new_value"`
 }

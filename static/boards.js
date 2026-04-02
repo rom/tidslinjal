@@ -31,6 +31,8 @@ let _boardsState = {
   dragItem: null,
   dragOverCol: null,
   zoom: 1.0,
+  filter: {},      // active filters: {responsible, type, priority, column, dueSoon2, dueSoon5, hasHistory}
+  searchQuery: '', // active search text
 };
 
 // ── Close board modal helper ──
@@ -110,7 +112,20 @@ async function openBoardsModal() {
 }
 
 function _renderBoardListModal() {
-  const boards = _boardsState.boards;
+  let boards = _boardsState.boards;
+  const currentUserId = state.user?.id || 0;
+  const currentUserName = state.user?.display_name || state.user?.username || '';
+
+  // ── My Boards On Top: sort boards where user is owner first (default: enabled) ──
+  const myOnTop = boards.length > 0 && boards[0]?.my_boards_on_top !== false;
+  if (myOnTop) {
+    boards = [...boards].sort((a, b) => {
+      const aIsMine = a.owner_id === currentUserId ? 0 : 1;
+      const bIsMine = b.owner_id === currentUserId ? 0 : 1;
+      return aIsMine - bIsMine;
+    });
+  }
+
   let html = `<div style="max-width:900px;margin:0 auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h2 style="margin:0">📌 ${t('board_title')||'Boards'}</h2>
@@ -131,14 +146,36 @@ function _renderBoardListModal() {
   if (boards.length === 0) {
     html += `<p style="color:var(--text-dim)">${t('board_empty')||'No boards yet. Create one or use a template.'}</p>`;
   } else {
+    // ── Filter & Search bar ──
+    html += `<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-sm btn-secondary" data-action="_openBoardFilterPanel" title="${t('board_filter')||'Filter'}">🔍 ${t('board_filter')||'Filter'}</button>
+      <button class="btn btn-sm btn-secondary" data-action="_openBoardSearchPanel" title="${t('board_search')||'Search'}">🔎 ${t('board_search')||'Search'}</button>
+    </div>`;
+
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">`;
     for (const b of boards) {
       const vis = { private: '🔒', group: '👥', role: '🎭', global: '🌐' }[b.visibility] || '';
-      const cardBg = b.color ? `background:${b.color}22;border:1px solid ${b.color}44;` : 'background:var(--bg2);border:1px solid var(--border);';
+      // ── Highlight Me: highlight boards user owns (default: enabled) ──
+      const highlightMe = b.highlight_me !== false;
+      const highlightStyle = b.highlight_style || 'border';
+      const isMine = b.owner_id === currentUserId;
+      let cardBg = b.color ? `background:${b.color}22;border:1px solid ${b.color}44;` : 'background:var(--bg2);border:1px solid var(--border);';
+      let highlightIcon = '';
+      if (isMine && highlightMe) {
+        if (highlightStyle === 'border') {
+          cardBg = b.color
+            ? `background:${b.color}22;border:3px solid ${b.color};box-shadow:0 0 8px ${b.color}44;`
+            : `background:var(--bg2);border:3px solid var(--accent);box-shadow:0 0 8px var(--accent);`;
+        } else if (highlightStyle === 'color') {
+          cardBg = `background:var(--accent-light, rgba(52,152,219,0.15));border:1px solid var(--accent);`;
+        } else if (highlightStyle === 'icon') {
+          highlightIcon = '⭐ ';
+        }
+      }
       const itemCount = b.item_count != null ? b.item_count : 0;
       html += `<div class="card" style="cursor:pointer;padding:14px;border-radius:var(--radius);${cardBg};position:relative" data-action="_openBoard" data-arg="${b.id}">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>${escHtml(b.name)}</strong>
+          <strong>${highlightIcon}${escHtml(b.name)}</strong>
           <div style="display:flex;align-items:center;gap:4px">
             <span title="${b.visibility}">${vis}</span>
             <button class="btn btn-sm" style="font-size:12px;padding:2px 5px;background:none;border:none;opacity:0.6" data-action="_editBoardFromList" data-arg="${b.id}" data-stop-prop title="${t('board_edit_board')||'Edit Board'}">✏️</button>
@@ -284,6 +321,26 @@ async function _editBoardFromList(boardId) {
       </div>
     </div>
 
+    <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">${t('board_personal_options')||'Personal Options'}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="editBoardHighlightMe" ${board.highlight_me !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_highlight_me')||'Highlight boards I am responsible for'}
+      </label>
+      <div id="editBoardHighlightStyleDiv" style="margin-left:22px;margin-bottom:6px;${board.highlight_me === false ? 'display:none' : ''}">
+        <label style="font-size:var(--fs-xs);display:block;margin-bottom:3px">${t('board_highlight_style')||'Highlight style:'}</label>
+        <select id="editBoardHighlightStyle" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="border" ${(!board.highlight_style||board.highlight_style==='border')?'selected':''}>🔲 ${t('board_highlight_border')||'Thick border'}</option>
+          <option value="color" ${board.highlight_style==='color'?'selected':''}>🎨 ${t('board_highlight_color')||'Personal color'}</option>
+          <option value="icon" ${board.highlight_style==='icon'?'selected':''}>⭐ ${t('board_highlight_icon')||'Special icon'}</option>
+        </select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="editBoardMyOnTop" ${board.my_boards_on_top !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_my_on_top')||'My boards always on top'}
+      </label>
+    </div>
+
     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px">
       <button class="btn btn-sm" style="color:var(--danger);background:none;border:1px solid var(--danger);opacity:0.7;font-size:var(--fs-xs)" data-action="_removeBoardFromList" data-arg="${board.id}">🗑 ${t('board_delete')||'Delete Board'}</button>
       <div style="display:flex;gap:8px">
@@ -316,6 +373,14 @@ async function _editBoardFromList(boardId) {
       const colorEl = document.getElementById('editBoardColor');
       if (colorEl) colorEl.value = '#1a1a2e';
       clearBtn.remove();
+    });
+  }
+  // Wire highlight checkbox
+  const hlCheck = document.getElementById('editBoardHighlightMe');
+  if (hlCheck) {
+    hlCheck.addEventListener('change', () => {
+      const div = document.getElementById('editBoardHighlightStyleDiv');
+      if (div) div.style.display = hlCheck.checked ? '' : 'none';
     });
   }
 }
@@ -381,6 +446,9 @@ async function _saveEditBoardFromList(boardId) {
       priority_background: document.getElementById('editBoardPriorityBg')?.checked !== false,
       show_archival: document.getElementById('editBoardShowArchival')?.checked !== false,
       sort_mode: document.getElementById('editBoardSortMode')?.value || 'normal',
+      highlight_me: document.getElementById('editBoardHighlightMe')?.checked !== false,
+      highlight_style: document.getElementById('editBoardHighlightStyle')?.value || 'border',
+      my_boards_on_top: document.getElementById('editBoardMyOnTop')?.checked !== false,
     });
     _closeBoardModal('editBoardListModal');
     // Refresh the board list
@@ -483,7 +551,9 @@ function _renderKanbanBoard() {
   if (!board) return;
 
   const archivedItems = items.filter(i => i.archived);
-  const activeItems = items.filter(i => !i.archived);
+  let activeItems = items.filter(i => !i.archived);
+  // Apply active filters
+  activeItems = _filterBoardItems(activeItems);
   const colItems = {};
   for (const col of board.columns) colItems[String(col.id)] = [];
   for (const item of activeItems) {
@@ -496,6 +566,9 @@ function _renderKanbanBoard() {
     colItems[k] = _sortColItems(colItems[k], board);
   }
 
+  // Filter active indicator
+  const hasActiveFilter = Object.values(_boardsState.filter || {}).some(v => v);
+
   const boardBg = board.color ? `background:${board.color}22;border:1px solid ${board.color}44;border-radius:var(--radius);padding:12px;` : '';
   const btnStyle = 'min-width:32px;height:28px;padding:4px 8px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;';
   let html = `<div style="width:100%;overflow-x:auto;box-sizing:border-box;${boardBg}">
@@ -506,6 +579,9 @@ function _renderKanbanBoard() {
         <h2 style="margin:0">${escHtml(board.name)}</h2>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-right:28px">
+        <button class="btn btn-sm ${hasActiveFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_openBoardFilterPanel" title="${t('board_filter')||'Filter'}" style="${btnStyle}">🔍${hasActiveFilter ? '✓' : ''}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openBoardSearchPanel" title="${t('board_search')||'Search'}" style="${btnStyle}">🔎</button>
+        <span style="border-left:1px solid var(--border);height:20px;margin:0 2px"></span>
         <button class="btn btn-sm btn-secondary" data-action="_showBoardHelp" title="${t('board_help')||'Help'}" style="${btnStyle}">❓</button>
         <button class="btn btn-sm btn-secondary" data-action="_shareBoardLink" title="${t('board_share')||'Share link'}" style="${btnStyle}">🔗</button>
         <button class="btn btn-sm btn-secondary" data-action="_openBoardSettings" title="${t('board_settings')||'Settings'}" style="${btnStyle}">⚙</button>
@@ -1949,12 +2025,40 @@ async function _openBoardSettings() {
       </div>
     </div>
 
+    <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px">${t('board_personal_options')||'Personal Options'}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="settBoardHighlightMe" ${board.highlight_me !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_highlight_me')||'Highlight boards I am responsible for'}
+      </label>
+      <div id="settBoardHighlightStyleDiv" style="margin-left:22px;margin-bottom:6px;${board.highlight_me === false ? 'display:none' : ''}">
+        <label style="font-size:var(--fs-xs);display:block;margin-bottom:3px">${t('board_highlight_style')||'Highlight style:'}</label>
+        <select id="settBoardHighlightStyle" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="border" ${(!board.highlight_style||board.highlight_style==='border')?'selected':''}>🔲 ${t('board_highlight_border')||'Thick border'}</option>
+          <option value="color" ${board.highlight_style==='color'?'selected':''}>🎨 ${t('board_highlight_color')||'Personal color'}</option>
+          <option value="icon" ${board.highlight_style==='icon'?'selected':''}>⭐ ${t('board_highlight_icon')||'Special icon'}</option>
+        </select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="settBoardMyOnTop" ${board.my_boards_on_top !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('board_my_on_top')||'My boards always on top'}
+      </label>
+    </div>
+
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" data-action="_saveBoardSettings">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary" data-action="_closeBoardModal" data-arg="boardSettingsModal">✖ ${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
   _boardModal('boardSettingsModal', html, '540px');
+  // Wire highlight checkbox to show/hide style selector
+  const hlCheck = document.getElementById('settBoardHighlightMe');
+  if (hlCheck) {
+    hlCheck.addEventListener('change', () => {
+      const div = document.getElementById('settBoardHighlightStyleDiv');
+      if (div) div.style.display = hlCheck.checked ? '' : 'none';
+    });
+  }
 }
 
 function _toggleSettVisFields() {
@@ -2009,6 +2113,9 @@ async function _saveBoardSettings() {
       priority_background: document.getElementById('settBoardPriorityBg')?.checked !== false,
       show_archival: document.getElementById('settBoardShowArchival')?.checked !== false,
       sort_mode: document.getElementById('settBoardSortMode')?.value || 'normal',
+      highlight_me: document.getElementById('settBoardHighlightMe')?.checked !== false,
+      highlight_style: document.getElementById('settBoardHighlightStyle')?.value || 'border',
+      my_boards_on_top: document.getElementById('settBoardMyOnTop')?.checked !== false,
     });
     closeModal('boardSettingsModal');
     await _openBoard(board.id);
@@ -2851,4 +2958,432 @@ if (typeof window._boardSSESetup === 'undefined') {
       }
     } catch { /* ignore */ }
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Board Filter Panel ──────────────────────────────────────────────────────
+// Filters board items by: responsible, type, priority, column, due-dates, history
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _openBoardFilterPanel() {
+  const board = _boardsState.activeBoard;
+  if (!board) {
+    // Filter from list view — open filter for board list items
+    _openBoardListFilterPanel();
+    return;
+  }
+  const items = _boardsState.items || [];
+  const f = _boardsState.filter || {};
+
+  // Collect unique values for filters
+  const responsibles = [...new Set(items.map(i => i.responsible_name || i.creator_name).filter(Boolean))].sort();
+  const types = [...new Set(items.map(i => i.item_type).filter(Boolean))].sort();
+  const priorities = ['low', 'high', 'critical'];
+  const columns = (board.columns || []).map(c => ({ id: c.id, name: c.name }));
+
+  let html = `<div style="max-width:500px">
+    <h3>🔍 ${t('board_filter')||'Filter Board Items'}</h3>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_responsible')||'Responsible'}</label>
+      <select id="boardFilterResponsible" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="">— ${t('board_filter_all')||'All'} —</option>
+        ${responsibles.map(r => `<option value="${escHtml(r)}" ${f.responsible===r?'selected':''}>${escHtml(r)}</option>`).join('')}
+      </select>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_type')||'Type'}</label>
+      <select id="boardFilterType" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="">— ${t('board_filter_all')||'All'} —</option>
+        ${types.map(ty => `<option value="${ty}" ${f.type===ty?'selected':''}>${ty}</option>`).join('')}
+      </select>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_priority')||'Priority'}</label>
+      <select id="boardFilterPriority" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="">— ${t('board_filter_all')||'All'} —</option>
+        ${priorities.map(p => `<option value="${p}" ${f.priority===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_column')||'Column'}</label>
+      <select id="boardFilterColumn" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="">— ${t('board_filter_all')||'All'} —</option>
+        ${columns.map(c => `<option value="${c.id}" ${f.column===c.id?'selected':''}>${escHtml(_tColName(c.name))}</option>`).join('')}
+      </select>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:6px">${t('board_filter_due')||'Due Date'}</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="boardFilterDue2" ${f.dueSoon2?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_due_2days')||'Due within 2 days'}
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="boardFilterDue5" ${f.dueSoon5?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_due_5days')||'Due within 5 days'}
+      </label>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+        <input type="checkbox" id="boardFilterHistory" ${f.hasHistory?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_has_history')||'Has history / activity'}
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_applyBoardFilter">✔ ${t('board_filter_apply')||'Apply Filter'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_clearBoardFilter">✖ ${t('board_filter_clear')||'Clear'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardFilterModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardFilterModal', html, '480px');
+}
+
+function _applyBoardFilter() {
+  _boardsState.filter = {
+    responsible: document.getElementById('boardFilterResponsible')?.value || '',
+    type: document.getElementById('boardFilterType')?.value || '',
+    priority: document.getElementById('boardFilterPriority')?.value || '',
+    column: document.getElementById('boardFilterColumn')?.value || '',
+    dueSoon2: document.getElementById('boardFilterDue2')?.checked || false,
+    dueSoon5: document.getElementById('boardFilterDue5')?.checked || false,
+    hasHistory: document.getElementById('boardFilterHistory')?.checked || false,
+  };
+  _closeBoardModal('boardFilterModal');
+  if (_boardsState.activeBoard) {
+    _renderKanbanBoard();
+  }
+}
+
+function _clearBoardFilter() {
+  _boardsState.filter = {};
+  _closeBoardModal('boardFilterModal');
+  if (_boardsState.activeBoard) {
+    _renderKanbanBoard();
+  }
+}
+
+// Apply filter to items
+function _filterBoardItems(items) {
+  const f = _boardsState.filter || {};
+  const hasFilter = f.responsible || f.type || f.priority || f.column || f.dueSoon2 || f.dueSoon5 || f.hasHistory;
+  if (!hasFilter) return items;
+
+  const now = new Date();
+  return items.filter(item => {
+    if (f.responsible && (item.responsible_name || item.creator_name || '') !== f.responsible) return false;
+    if (f.type && item.item_type !== f.type) return false;
+    if (f.priority && (item.priority || '') !== f.priority) return false;
+    if (f.column && item.column_id !== f.column) return false;
+    if (f.dueSoon2 && item.due_date) {
+      const due = new Date(item.due_date + 'T23:59:59');
+      const daysLeft = (due - now) / 86400000;
+      if (daysLeft > 2) return false;
+    } else if (f.dueSoon2 && !item.due_date) return false;
+    if (f.dueSoon5 && item.due_date) {
+      const due = new Date(item.due_date + 'T23:59:59');
+      const daysLeft = (due - now) / 86400000;
+      if (daysLeft > 5) return false;
+    } else if (f.dueSoon5 && !item.due_date) return false;
+    if (f.hasHistory && (!item.history || item.history.length === 0) && (!item.activities || item.activities.length === 0)) return false;
+    return true;
+  });
+}
+
+// ── Board List Filter Panel (for board list view) ──
+function _openBoardListFilterPanel() {
+  // Aggregate all items across all boards for filter values
+  const allBoards = _boardsState.boards || [];
+  const f = _boardsState.filter || {};
+
+  let html = `<div style="max-width:500px">
+    <h3>🔍 ${t('board_filter')||'Filter Boards'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('board_filter_list_desc')||'Filter boards by their items\' properties. Boards with no matching items will be hidden.'}</p>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_responsible')||'Responsible (board owner)'}</label>
+      <input id="boardListFilterResponsible" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('board_filter_responsible_ph')||'Owner name...'}" value="${escHtml(f.responsible||'')}">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_type')||'Type'}</label>
+        <select id="boardListFilterType" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="">— ${t('board_filter_all')||'All'} —</option>
+          <option value="task" ${f.type==='task'?'selected':''}>Task</option>
+          <option value="meeting" ${f.type==='meeting'?'selected':''}>Meeting</option>
+          <option value="issue" ${f.type==='issue'?'selected':''}>Issue</option>
+          <option value="note" ${f.type==='note'?'selected':''}>Note</option>
+          <option value="checklist" ${f.type==='checklist'?'selected':''}>Checklist</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_priority')||'Priority'}</label>
+        <select id="boardListFilterPriority" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="">— ${t('board_filter_all')||'All'} —</option>
+          <option value="low" ${f.priority==='low'?'selected':''}>Low</option>
+          <option value="high" ${f.priority==='high'?'selected':''}>High</option>
+          <option value="critical" ${f.priority==='critical'?'selected':''}>Critical</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_column')||'Column'}</label>
+      <input id="boardListFilterColumn" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('board_filter_column_ph')||'Column name...'}" value="${escHtml(f.column||'')}">
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="boardListFilterDue2" ${f.dueSoon2?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_due_2days')||'Has items due within 2 days'}
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" id="boardListFilterDue5" ${f.dueSoon5?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_due_5days')||'Has items due within 5 days'}
+      </label>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+        <input type="checkbox" id="boardListFilterHistory" ${f.hasHistory?'checked':''} style="accent-color:var(--accent)">
+        ${t('board_filter_has_history')||'Has recent history'}
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_applyBoardListFilter">✔ ${t('board_filter_apply')||'Apply'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_clearBoardListFilter">✖ ${t('board_filter_clear')||'Clear'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardFilterModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardFilterModal', html, '480px');
+}
+
+async function _applyBoardListFilter() {
+  _boardsState.filter = {
+    responsible: document.getElementById('boardListFilterResponsible')?.value?.trim() || '',
+    type: document.getElementById('boardListFilterType')?.value || '',
+    priority: document.getElementById('boardListFilterPriority')?.value || '',
+    column: document.getElementById('boardListFilterColumn')?.value?.trim() || '',
+    dueSoon2: document.getElementById('boardListFilterDue2')?.checked || false,
+    dueSoon5: document.getElementById('boardListFilterDue5')?.checked || false,
+    hasHistory: document.getElementById('boardListFilterHistory')?.checked || false,
+  };
+  _closeBoardModal('boardFilterModal');
+
+  // Now filter the boards list by fetching items for each board and checking
+  const f = _boardsState.filter;
+  const hasFilter = f.responsible || f.type || f.priority || f.column || f.dueSoon2 || f.dueSoon5 || f.hasHistory;
+  if (!hasFilter) {
+    _renderBoardListModal();
+    return;
+  }
+
+  // Fetch all items for all boards to filter
+  const filteredBoards = [];
+  const now = new Date();
+  for (const b of _boardsState.boards) {
+    // Check owner name filter
+    if (f.responsible && !(b.owner_name || '').toLowerCase().includes(f.responsible.toLowerCase())) {
+      // Also need to check items' responsible
+      try {
+        const items = await _boardApi('GET', '/boards/' + b.id + '/items');
+        const matched = items.some(item => {
+          if (f.responsible && !(item.responsible_name || '').toLowerCase().includes(f.responsible.toLowerCase())) return false;
+          return _matchItemFilter(item, f, now);
+        });
+        if (matched) filteredBoards.push(b);
+      } catch { /* skip */ }
+      continue;
+    }
+    if (f.type || f.priority || f.column || f.dueSoon2 || f.dueSoon5 || f.hasHistory) {
+      try {
+        const items = await _boardApi('GET', '/boards/' + b.id + '/items');
+        const matched = items.some(item => _matchItemFilter(item, f, now));
+        if (matched) filteredBoards.push(b);
+      } catch { /* skip */ }
+    } else {
+      filteredBoards.push(b);
+    }
+  }
+  const origBoards = _boardsState.boards;
+  _boardsState.boards = filteredBoards;
+  _renderBoardListModal();
+  _boardsState.boards = origBoards; // restore after render
+}
+
+function _matchItemFilter(item, f, now) {
+  if (f.type && item.item_type !== f.type) return false;
+  if (f.priority && (item.priority || '') !== f.priority) return false;
+  if (f.column && !item.column_id.toLowerCase().includes(f.column.toLowerCase())) return false;
+  if (f.dueSoon2) {
+    if (!item.due_date) return false;
+    const due = new Date(item.due_date + 'T23:59:59');
+    if ((due - now) / 86400000 > 2) return false;
+  }
+  if (f.dueSoon5) {
+    if (!item.due_date) return false;
+    const due = new Date(item.due_date + 'T23:59:59');
+    if ((due - now) / 86400000 > 5) return false;
+  }
+  if (f.hasHistory && (!item.history || item.history.length === 0)) return false;
+  return true;
+}
+
+function _clearBoardListFilter() {
+  _boardsState.filter = {};
+  _closeBoardModal('boardFilterModal');
+  _renderBoardListModal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Board Search Panel ──────────────────────────────────────────────────────
+// Search across: notes, activity logs, comments, responsible, type, priority,
+// due dates, tags, links, attachments, history
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _openBoardSearchPanel() {
+  const q = _boardsState.searchQuery || '';
+  let html = `<div style="max-width:560px">
+    <h3>🔎 ${t('board_search')||'Search Board Items'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('board_search_desc')||'Search across all board items: notes, activity logs, comments, responsible, type, priority, due dates, tags, links, attachments, and history.'}</p>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="boardSearchInput" class="input" style="flex:1;font-size:var(--fs-sm)" placeholder="${t('board_search_placeholder')||'Search...'}" value="${escHtml(q)}" autofocus>
+      <button class="btn btn-primary btn-sm" data-action="_doBoardSearch">🔎 ${t('board_search_go')||'Search'}</button>
+    </div>
+
+    <div id="boardSearchResults" style="max-height:400px;overflow-y:auto;font-size:var(--fs-xs)"></div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_clearBoardSearch">✖ ${t('board_search_clear')||'Clear'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardSearchModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('boardSearchModal', html, '560px');
+
+  // Wire enter key
+  const inp = document.getElementById('boardSearchInput');
+  if (inp) {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') _doBoardSearch(); });
+    inp.focus();
+  }
+}
+
+async function _doBoardSearch() {
+  const q = (document.getElementById('boardSearchInput')?.value || '').trim().toLowerCase();
+  _boardsState.searchQuery = q;
+  const resultsDiv = document.getElementById('boardSearchResults');
+  if (!resultsDiv) return;
+  if (!q) { resultsDiv.innerHTML = `<p style="color:var(--text-dim)">${t('board_search_enter')||'Enter a search term.'}</p>`; return; }
+
+  resultsDiv.innerHTML = `<p style="color:var(--text-dim)">Searching...</p>`;
+
+  const results = [];
+  const boards = _boardsState.boards || [];
+
+  for (const board of boards) {
+    try {
+      const items = await _boardApi('GET', '/boards/' + board.id + '/items');
+      for (const item of items) {
+        const matches = _searchBoardItem(item, q);
+        if (matches.length > 0) {
+          results.push({ board, item, matches });
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  if (results.length === 0) {
+    resultsDiv.innerHTML = `<p style="color:var(--text-dim)">${t('board_search_no_results')||'No results found.'}</p>`;
+    return;
+  }
+
+  let html = `<div style="font-weight:600;margin-bottom:8px">${results.length} ${t('board_search_results')||'result(s) found'}</div>`;
+  for (const r of results) {
+    const matchText = r.matches.map(m => `<span style="background:var(--accent);color:#fff;padding:0 3px;border-radius:2px;font-size:9px;margin-right:2px">${escHtml(m)}</span>`).join('');
+    html += `<div style="padding:8px;margin-bottom:6px;background:var(--bg3);border-radius:var(--radius);cursor:pointer;border:1px solid var(--border)" data-action="_searchResultOpenItem" data-args='[${r.board.id},${r.item.id}]'>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>${escHtml(r.item.subject)}</strong>
+        <span style="font-size:9px;color:var(--text-dim)">${escHtml(r.board.name)}</span>
+      </div>
+      <div style="margin-top:4px">${matchText}</div>
+      ${r.item.responsible_name ? `<div style="margin-top:2px;color:var(--text-dim)">👤 ${escHtml(r.item.responsible_name)}</div>` : ''}
+    </div>`;
+  }
+  resultsDiv.innerHTML = html;
+  if (typeof _bindActions === 'function') _bindActions(resultsDiv);
+}
+
+function _searchBoardItem(item, q) {
+  const matches = [];
+  // Notes
+  if (item.note && item.note.toLowerCase().includes(q)) matches.push('note');
+  // Subject
+  if (item.subject && item.subject.toLowerCase().includes(q)) matches.push('subject');
+  // Activity logs
+  if (item.activities) {
+    for (const a of item.activities) {
+      if (a.text && a.text.toLowerCase().includes(q)) { matches.push('activity'); break; }
+    }
+  }
+  // Comments
+  if (item.comments) {
+    for (const c of item.comments) {
+      if (c.text && c.text.toLowerCase().includes(q)) { matches.push('comment'); break; }
+      if (c.user_name && c.user_name.toLowerCase().includes(q)) { matches.push('comment-user'); break; }
+    }
+  }
+  // Responsible
+  if (item.responsible_name && item.responsible_name.toLowerCase().includes(q)) matches.push('responsible');
+  if (item.creator_name && item.creator_name.toLowerCase().includes(q)) matches.push('creator');
+  // Type
+  if (item.item_type && item.item_type.toLowerCase().includes(q)) matches.push('type');
+  // Priority
+  if (item.priority && item.priority.toLowerCase().includes(q)) matches.push('priority');
+  // Due date
+  if (item.due_date && item.due_date.includes(q)) matches.push('due-date');
+  // Tags
+  if (item.tags) {
+    for (const tag of item.tags) {
+      if (tag.toLowerCase().includes(q)) { matches.push('tag:' + tag); break; }
+    }
+  }
+  // Links
+  if (item.links) {
+    for (const link of item.links) {
+      if ((link.url && link.url.toLowerCase().includes(q)) || (link.label && link.label.toLowerCase().includes(q))) { matches.push('link'); break; }
+    }
+  }
+  // Attachments
+  if (item.attachments) {
+    for (const att of item.attachments) {
+      if (att.filename && att.filename.toLowerCase().includes(q)) { matches.push('attachment'); break; }
+    }
+  }
+  // History
+  if (item.history) {
+    for (const h of item.history) {
+      if ((h.detail && h.detail.toLowerCase().includes(q)) || (h.action && h.action.toLowerCase().includes(q)) || (h.user_name && h.user_name.toLowerCase().includes(q))) { matches.push('history'); break; }
+    }
+  }
+  return matches;
+}
+
+async function _searchResultOpenItem(args) {
+  const [boardId, itemId] = args;
+  _closeBoardModal('boardSearchModal');
+  await _openBoard(boardId);
+  _openBoardItem(itemId);
+}
+
+function _clearBoardSearch() {
+  _boardsState.searchQuery = '';
+  _closeBoardModal('boardSearchModal');
 }
