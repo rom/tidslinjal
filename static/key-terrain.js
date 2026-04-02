@@ -163,7 +163,7 @@ function _renderKeyTerrainBoard() {
     rounds:      { icon: '\u{1F504}', label: t('kt_rounds')||'# Rounds', align: 'center', extra: 'white-space:nowrap' },
   };
 
-  let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto" id="ktBoardContent">
+  let html = `<div style="max-width:98vw;margin:0 auto" id="ktBoardContent">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px" class="kt-no-print">
       <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -200,7 +200,7 @@ function _renderKeyTerrainBoard() {
         <thead>
           <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
             ${cols.map(c => { const d = colDef[c]; return _ktSortTh(c, d.icon+' '+d.label, d.align, d.extra); }).join('')}
-            ${canWrite ? `<th style="padding:8px;width:140px;font-size:10px;color:var(--text-dim);font-weight:normal;text-align:center">${t('kt_mgmt_label')||'Management of line item'}</th>` : ''}
+            ${canWrite ? `<th style="padding:8px;width:160px;text-align:center">\u2699 ${t('kt_mgmt_label')||'Management of item'}</th>` : ''}
           </tr>
         </thead>
         <tbody>`;
@@ -254,6 +254,7 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},1]' data-stop-prop title="${t('kt_move_down')||'Move down'}">\u25BC</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_edit')||'Edit'}">\u270F\uFE0F</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" data-stop-prop title="${t('kt_history')||'History'}">\u{1F4DC}</button>
+        <button class="btn btn-sm${e.finished_at ? '' : ' btn-secondary'}" style="font-size:10px;padding:1px 5px;${e.finished_at ? 'color:var(--success,#27ae60)' : ''}" data-action="_ktHandleEntry" data-arg="${e.id}" data-stop-prop title="${e.finished_at ? (t('kt_unhandle')||'Mark as unhandled') : (t('kt_handle')||'Mark as handled')}">${e.finished_at ? '\u2705' : '\u2611'}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" data-stop-prop title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktArchiveEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_archive')||'Archive'}">\u{1F4E6}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
@@ -296,11 +297,11 @@ function _renderKeyTerrainBoard() {
   </div>`;
 
   if (typeof _boardModal === 'function') {
-    _boardModal('keyTerrainModal', html, (showTs ? '1400' : '1100') + 'px');
+    _boardModal('keyTerrainModal', html, '96vw');
   } else {
     let el = document.getElementById('keyTerrainModal');
     if (el) el.remove();
-    document.body.insertAdjacentHTML('beforeend', `<div class="modal-overlay" id="keyTerrainModal"><div class="modal" style="width:${showTs?1400:1100}px;max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both">${html}</div></div>`);
+    document.body.insertAdjacentHTML('beforeend', `<div class="modal-overlay" id="keyTerrainModal"><div class="modal" style="width:96vw;max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both">${html}</div></div>`);
     if (typeof openModal === 'function') openModal('keyTerrainModal');
     if (typeof _bindActions === 'function') _bindActions(document.getElementById('keyTerrainModal'));
   }
@@ -351,25 +352,28 @@ async function _ktEditEntry(entryId) {
     </div>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">⚔️ ${t('kt_threat')||'Threat'}</label>
-      ${_ktRichField('ktThreat', entry.threat || '', t('kt_threat_ph')||'Current hostile pressure', '50px')}
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u2694\uFE0F ${t('kt_threat')||'Threat'} <span style="color:var(--accent);font-weight:normal">*</span></label>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${t('kt_threat_example')||'e.g. "APT group targeting DNS infrastructure", "DDoS on external gateway", "Insider threat to SCADA"'}</div>
+      ${_ktRichField('ktThreat', entry.threat || '', t('kt_threat_ph')||'Describe current hostile pressure on this function', '50px')}
     </div>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">🔗 ${t('kt_external')||'External Dependencies'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F517} ${t('kt_external')||'External Dependencies'}</label>
       ${_ktRichField('ktExternal', entry.external || '', t('kt_external_ph')||'External dependencies and peer effects', '50px')}
     </div>
 
     <div style="margin-bottom:10px;position:relative">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">👤 ${t('kt_responsible')||'Responsible'}</label>
-      <input id="ktResponsible" class="input" style="width:100%" value="${escHtml(entry.responsible_name || '')}" placeholder="${t('kt_responsible_ph')||'@name or display name'}" autocomplete="off">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F464} ${t('kt_responsible')||'Responsible'} <span style="color:var(--accent);font-weight:normal">*</span></label>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${t('kt_responsible_example')||'e.g. "@john.doe", "J6 Cyber Ops", "CISO", "Network Defense Team"'}</div>
+      <input id="ktResponsible" class="input" style="width:100%" value="${escHtml(entry.responsible_name || '')}" placeholder="${t('kt_responsible_ph')||'@name, role, or team'}" autocomplete="off">
       <input id="ktResponsibleId" type="hidden" value="${entry.responsible_id || 0}">
       <div id="ktResponsibleDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);max-height:160px;overflow-y:auto"></div>
     </div>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">🔧 ${t('kt_actions')||'Actions'}</label>
-      ${_ktRichField('ktActions', entry.actions || '', t('kt_actions_ph')||'What is being done to achieve effects', '60px')}
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F527} ${t('kt_actions')||'Actions'} <span style="color:var(--accent);font-weight:normal">*</span></label>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${t('kt_actions_example')||'e.g. "Deploying additional IDS sensors", "Patching CVE-2025-1234", "Rerouting traffic via backup link"'}</div>
+      ${_ktRichField('ktActions', entry.actions || '', t('kt_actions_ph')||'Describe what is being done to achieve effects', '60px')}
     </div>
 
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -412,6 +416,64 @@ async function _ktEditEntry(entryId) {
       setTimeout(() => { respDropdown.style.display = 'none'; }, 200);
     });
   }
+
+  // Wire autocomplete from previous entries for rich text fields
+  _ktWireFieldAutocomplete('ktThreat', 'threat');
+  _ktWireFieldAutocomplete('ktActions', 'actions');
+}
+
+// ── Field autocomplete from previous entries ──
+function _ktCollectPreviousValues(field) {
+  const values = new Set();
+  for (const e of _ktState.entries) {
+    const raw = (e[field] || '').replace(/<[^>]*>/g, '').trim();
+    if (raw) {
+      // Split on sentences / commas to get individual terms
+      raw.split(/[,;\.\n]+/).forEach(part => {
+        const t = part.trim();
+        if (t.length > 2) values.add(t);
+      });
+    }
+  }
+  return [...values];
+}
+
+function _ktWireFieldAutocomplete(elemId, field) {
+  const el = document.getElementById(elemId);
+  if (!el) return;
+  const previousValues = _ktCollectPreviousValues(field);
+  if (previousValues.length === 0) return;
+
+  // Create dropdown
+  let dropdown = document.createElement('div');
+  dropdown.style.cssText = 'display:none;position:absolute;left:0;right:0;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);max-height:130px;overflow-y:auto;font-size:var(--fs-xs)';
+  el.parentElement.style.position = 'relative';
+  el.parentElement.appendChild(dropdown);
+
+  el.addEventListener('input', () => {
+    const text = (el.innerText || el.textContent || '').trim();
+    // Get the last word being typed
+    const words = text.split(/\s+/);
+    const lastWord = (words[words.length - 1] || '').toLowerCase();
+    if (lastWord.length < 2) { dropdown.style.display = 'none'; return; }
+    const matches = previousValues.filter(v => v.toLowerCase().includes(lastWord)).slice(0, 8);
+    if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matches.map(m =>
+      `<div style="padding:5px 10px;cursor:pointer;border-bottom:1px solid var(--border)" data-val="${escHtml(m)}">${escHtml(m)}</div>`
+    ).join('');
+    dropdown.style.display = '';
+    dropdown.style.top = el.offsetHeight + 'px';
+    dropdown.querySelectorAll('[data-val]').forEach(item => {
+      item.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        // Replace the last word with the selected suggestion
+        el.focus();
+        document.execCommand('insertText', false, item.dataset.val.slice(lastWord.length) + ' ');
+        dropdown.style.display = 'none';
+      });
+    });
+  });
+  el.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 200); });
 }
 
 async function _ktSaveEntry(entryId) {
@@ -463,6 +525,16 @@ async function _ktDeleteEntry(entryId) {
 }
 
 // ── Ghost / Archive / Unarchive ──
+async function _ktHandleEntry(entryId) {
+  const entry = _ktState.entries.find(e => e.id === parseInt(entryId));
+  if (!entry) return;
+  try {
+    await _ktApi('PUT', '/key-terrain/' + entryId, { finished: !entry.finished_at });
+    await openKeyTerrainBoard();
+    if (typeof showNotification === 'function') showNotification('success', entry.finished_at ? (t('kt_unhandled_msg')||'Marked as unhandled') : (t('kt_handled_msg')||'Marked as handled'));
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
 async function _ktToggleGhost(entryId) {
   const entry = _ktState.entries.find(e => e.id === parseInt(entryId));
   if (!entry) return;
