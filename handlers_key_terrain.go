@@ -78,7 +78,6 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		}
 	} else if req.Responsible != "" {
 		entry.ResponsibleName = req.Responsible
-		// Try to resolve @name
 		resolved := app.resolveResponsibleName(req.Responsible)
 		if resolved != nil {
 			entry.ResponsibleID = resolved.ID
@@ -122,6 +121,9 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		ResponsibleID *int64  `json:"responsible_id"`
 		Responsible   *string `json:"responsible"`
 		Actions       *string `json:"actions"`
+		Ghosted       *bool   `json:"ghosted"`
+		Archived      *bool   `json:"archived"`
+		Finished      *bool   `json:"finished"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -163,6 +165,33 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	if req.Actions != nil && *req.Actions != entry.Actions {
 		addHist("actions", entry.Actions, *req.Actions)
 		entry.Actions = *req.Actions
+	}
+
+	// Handle ghost/archive/finish
+	if req.Ghosted != nil && *req.Ghosted != entry.Ghosted {
+		if *req.Ghosted {
+			addHist("ghosted", "false", "true")
+		} else {
+			addHist("ghosted", "true", "false")
+		}
+		entry.Ghosted = *req.Ghosted
+	}
+	if req.Archived != nil && *req.Archived != entry.Archived {
+		if *req.Archived {
+			addHist("archived", "false", "true")
+		} else {
+			addHist("archived", "true", "false")
+		}
+		entry.Archived = *req.Archived
+	}
+	if req.Finished != nil {
+		if *req.Finished && entry.FinishedAt == nil {
+			entry.FinishedAt = &now
+			addHist("finished", "", now.Format(time.RFC3339))
+		} else if !*req.Finished && entry.FinishedAt != nil {
+			addHist("finished", entry.FinishedAt.Format(time.RFC3339), "")
+			entry.FinishedAt = nil
+		}
 	}
 
 	// Handle responsible assignment
@@ -221,6 +250,97 @@ func (app *App) handleDeleteKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// ── Key Terrain Settings ──────────────────────────────────────────────────
+
+func (app *App) handleGetKeyTerrainSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	settings := app.store.GetKeyTerrainSettings()
+	jsonOK(w, settings)
+}
+
+func (app *App) handleSaveKeyTerrainSettings(w http.ResponseWriter, r *http.Request, user *User) {
+	if !canWriteKeyTerrain(user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var settings KeyTerrainSettings
+	if err := decode(r, &settings); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.SaveKeyTerrainSettings(settings); err != nil {
+		jsonError(w, "save failed", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.Username, "update", "key_terrain_settings", 0, "Updated key terrain settings")
+	jsonOK(w, settings)
+}
+
+// ── Key Terrain Snapshots (version control) ───────────────────────────────
+
+func (app *App) handleGetKeyTerrainSnapshots(w http.ResponseWriter, r *http.Request, user *User) {
+	snapshots := app.store.GetKeyTerrainSnapshots()
+	// Return summary without full entries to keep response light
+	type snapshotSummary struct {
+		ID         int64     `json:"id"`
+		Timestamp  time.Time `json:"timestamp"`
+		UserName   string    `json:"user_name"`
+		Label      string    `json:"label,omitempty"`
+		EntryCount int       `json:"entry_count"`
+	}
+	summaries := make([]snapshotSummary, len(snapshots))
+	for i, s := range snapshots {
+		summaries[i] = snapshotSummary{
+			ID:         s.ID,
+			Timestamp:  s.Timestamp,
+			UserName:   s.UserName,
+			Label:      s.Label,
+			EntryCount: len(s.Entries),
+		}
+	}
+	jsonOK(w, summaries)
+}
+
+func (app *App) handleGetKeyTerrainSnapshot(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	snap := app.store.GetKeyTerrainSnapshotByID(id)
+	if snap == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, snap)
+}
+
+func (app *App) handleCreateKeyTerrainSnapshot(w http.ResponseWriter, r *http.Request, user *User) {
+	if !canWriteKeyTerrain(user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Label string `json:"label"`
+	}
+	_ = decode(r, &req)
+
+	snap := KeyTerrainSnapshot{
+		UserID:   user.ID,
+		UserName: user.DisplayName,
+		Label:    req.Label,
+	}
+	created, err := app.store.CreateKeyTerrainSnapshot(snap)
+	if err != nil {
+		jsonError(w, "failed to create snapshot", http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.Username, "create", "key_terrain_snapshot", created.ID, fmt.Sprintf("Created key terrain snapshot %q", created.Label))
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, created)
+}
+
+// ── User helpers ──────────────────────────────────────────────────────────
+
 // resolveResponsibleName tries to find a user by @name pattern from the user list
 func (app *App) resolveResponsibleName(name string) *User {
 	clean := strings.TrimPrefix(strings.TrimSpace(name), "@")
@@ -229,13 +349,11 @@ func (app *App) resolveResponsibleName(name string) *User {
 	}
 	lower := strings.ToLower(clean)
 	users := app.store.GetUsers()
-	// Exact display name match
 	for _, u := range users {
 		if strings.ToLower(u.DisplayName) == lower || strings.ToLower(u.Username) == lower {
 			return &u
 		}
 	}
-	// Prefix match
 	for _, u := range users {
 		if strings.HasPrefix(strings.ToLower(u.DisplayName), lower) || strings.HasPrefix(strings.ToLower(u.Username), lower) {
 			return &u
@@ -244,7 +362,6 @@ func (app *App) resolveResponsibleName(name string) *User {
 	return nil
 }
 
-// handleSearchUsers returns matching users for autocomplete
 func (app *App) handleSearchUsersForKeyTerrain(w http.ResponseWriter, r *http.Request, user *User) {
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	q = strings.TrimPrefix(q, "@")
@@ -273,7 +390,6 @@ func (app *App) handleSearchUsersForKeyTerrain(w http.ResponseWriter, r *http.Re
 	jsonOK(w, results)
 }
 
-// handleGetKeyTerrainAccess returns the current user's access level
 func (app *App) handleGetKeyTerrainAccess(w http.ResponseWriter, r *http.Request, user *User) {
 	jsonOK(w, map[string]any{
 		"can_write": canWriteKeyTerrain(user),

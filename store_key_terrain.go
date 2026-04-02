@@ -67,3 +67,55 @@ func (s *Store) DeleteKeyTerrainEntry(id int64) error {
 	s.mu.Unlock()
 	return fmt.Errorf("key terrain entry %d not found", id)
 }
+
+// ── Key Terrain Settings ──────────────────────────────────────────────────
+
+func (s *Store) GetKeyTerrainSettings() KeyTerrainSettings {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.keyTerrainSettings
+}
+
+func (s *Store) SaveKeyTerrainSettings(settings KeyTerrainSettings) error {
+	s.mu.Lock()
+	s.keyTerrainSettings = settings
+	cp := s.keyTerrainSettings
+	s.mu.Unlock()
+	return s.persist("key_terrain_settings.json", cp)
+}
+
+// ── Key Terrain Snapshots (version control) ───────────────────────────────
+
+func (s *Store) GetKeyTerrainSnapshots() []KeyTerrainSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]KeyTerrainSnapshot, len(s.keyTerrainSnapshots))
+	copy(out, s.keyTerrainSnapshots)
+	return out
+}
+
+func (s *Store) CreateKeyTerrainSnapshot(snap KeyTerrainSnapshot) (KeyTerrainSnapshot, error) {
+	s.mu.Lock()
+	s.nextKTSnapshotID++
+	snap.ID = s.nextKTSnapshotID
+	snap.Timestamp = time.Now()
+	// Deep-copy current entries into snapshot
+	snap.Entries = make([]KeyTerrainEntry, len(s.keyTerrainEntries))
+	copy(snap.Entries, s.keyTerrainEntries)
+	s.keyTerrainSnapshots = append(s.keyTerrainSnapshots, snap)
+	snapAll := append([]KeyTerrainSnapshot(nil), s.keyTerrainSnapshots...)
+	s.mu.Unlock()
+	return snap, s.persist("key_terrain_snapshots.json", snapAll)
+}
+
+func (s *Store) GetKeyTerrainSnapshotByID(id int64) *KeyTerrainSnapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, snap := range s.keyTerrainSnapshots {
+		if snap.ID == id {
+			cp := snap
+			return &cp
+		}
+	}
+	return nil
+}

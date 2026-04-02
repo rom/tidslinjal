@@ -260,6 +260,9 @@ type KeyTerrainEntry struct {
 	ResponsibleID   int64            `json:"responsible_id,omitempty"`
 	ResponsibleName string           `json:"responsible_name,omitempty"`
 	Actions         string           `json:"actions"`                     // what is being done
+	Ghosted         bool             `json:"ghosted,omitempty"`           // visually dimmed / inactive
+	Archived        bool             `json:"archived,omitempty"`          // hidden from normal view
+	FinishedAt      *time.Time       `json:"finished_at,omitempty"`       // when the entry was marked finished
 	History         []KeyTerrainHist `json:"history,omitempty"`
 	CreatedAt       time.Time        `json:"created_at"`
 	UpdatedAt       time.Time        `json:"updated_at"`
@@ -273,4 +276,28 @@ type KeyTerrainHist struct {
 	Field     string    `json:"field"`
 	OldValue  string    `json:"old_value"`
 	NewValue  string    `json:"new_value"`
+}
+
+// KeyTerrainSettings holds board-level display configuration
+type KeyTerrainSettings struct {
+	// Priority color coding
+	PriorityColors map[string]string `json:"priority_colors,omitempty"` // e.g. {"1":"#e74c3c","2":"#e67e22","3":"#f1c40f"}
+	// Status icons override
+	StatusIcons map[string]string `json:"status_icons,omitempty"` // e.g. {"working":"✅","degraded":"⚠️"}
+	// Trend icons override
+	TrendIcons map[string]string `json:"trend_icons,omitempty"` // e.g. {"improving":"⬆️","stable":"➡️"}
+	// Sort order
+	SortBy string `json:"sort_by,omitempty"` // "priority","function","status","trend","responsible","entry_order"
+	// Ghosting style
+	GhostStyle string `json:"ghost_style,omitempty"` // "grey","strikethrough","remove"
+}
+
+// KeyTerrainSnapshot is a point-in-time copy of the board for version control
+type KeyTerrainSnapshot struct {
+	ID        int64              `json:"id"`
+	Timestamp time.Time          `json:"timestamp"`
+	UserID    int64              `json:"user_id"`
+	UserName  string             `json:"user_name"`
+	Label     string             `json:"label,omitempty"`
+	Entries   []KeyTerrainEntry  `json:"entries"`
 }

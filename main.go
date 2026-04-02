@@ -1948,6 +1948,33 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("/api/key-terrain/users", func(w http.ResponseWriter, r *http.Request) {
 		app.requireAuth(app.handleSearchUsersForKeyTerrain)(w, r)
 	})
+	mux.HandleFunc("/api/key-terrain/settings", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetKeyTerrainSettings)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleSaveKeyTerrainSettings)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/key-terrain/snapshots", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetKeyTerrainSnapshots)(w, r)
+		case http.MethodPost:
+			app.requireAuth(app.handleCreateKeyTerrainSnapshot)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/key-terrain/snapshots/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			app.requireAuth(app.handleGetKeyTerrainSnapshot)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/api/key-terrain/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPut:
