@@ -9,6 +9,7 @@ let _ktState = {
   showArchived: false,    // show archived entries
   filter: {},             // active filters
   settings: {},           // persisted settings from server
+  columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
 };
 
 const _ktStatusOptions = [
@@ -72,22 +73,43 @@ function _ktGhostStyle() {
   return _ktState.settings.ghost_style || 'grey';
 }
 function _ktSortEntries(entries) {
-  const sortBy = _ktState.settings.sort_by || 'priority';
+  // Column sort (from clicking headers) takes precedence over settings sort
+  const cs = _ktState.columnSort;
+  const sortBy = cs ? cs.col : (_ktState.settings.sort_by || 'priority');
+  const dir = cs ? (cs.dir === 'desc' ? -1 : 1) : 1;
   const sorted = [...entries];
-  switch (sortBy) {
-    case 'function': return sorted.sort((a, b) => (a.function || '').localeCompare(b.function || ''));
-    case 'status': {
-      const order = { working: 0, degraded: 1, down: 2, unknown: 3 };
-      return sorted.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+  const cmp = (a, b) => {
+    switch (sortBy) {
+      case 'function': return (a.function || '').localeCompare(b.function || '');
+      case 'status': {
+        const order = { working: 0, degraded: 1, down: 2, unknown: 3 };
+        return (order[a.status] ?? 9) - (order[b.status] ?? 9);
+      }
+      case 'trend': {
+        const order = { worsening: 0, stable: 1, improving: 2 };
+        return (order[a.trend] ?? 9) - (order[b.trend] ?? 9);
+      }
+      case 'threat': return (a.threat || '').localeCompare(b.threat || '');
+      case 'external': return (a.external || '').localeCompare(b.external || '');
+      case 'responsible': return (a.responsible_name || '').localeCompare(b.responsible_name || '');
+      case 'actions': return (a.actions || '').localeCompare(b.actions || '');
+      case 'entry_order': return a.id - b.id;
+      default: return (a.priority || 999) - (b.priority || 999);
     }
-    case 'trend': {
-      const order = { worsening: 0, stable: 1, improving: 2 };
-      return sorted.sort((a, b) => (order[a.trend] ?? 9) - (order[b.trend] ?? 9));
-    }
-    case 'responsible': return sorted.sort((a, b) => (a.responsible_name || '').localeCompare(b.responsible_name || ''));
-    case 'entry_order': return sorted.sort((a, b) => a.id - b.id);
-    default: return sorted.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  };
+  sorted.sort((a, b) => cmp(a, b) * dir);
+  return sorted;
+}
+function _ktSortByColumn(col) {
+  const cs = _ktState.columnSort;
+  if (cs && cs.col === col) {
+    // Toggle direction, or clear on third click
+    if (cs.dir === 'asc') _ktState.columnSort = { col, dir: 'desc' };
+    else _ktState.columnSort = null; // clear
+  } else {
+    _ktState.columnSort = { col, dir: 'asc' };
   }
+  _renderKeyTerrainBoard();
 }
 
 function _renderKeyTerrainBoard() {
@@ -129,6 +151,8 @@ function _renderKeyTerrainBoard() {
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History'}</button>
+        ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
       </div>
@@ -140,20 +164,20 @@ function _renderKeyTerrainBoard() {
       <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
         <thead>
           <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
-            <th style="padding:8px;text-align:left;white-space:nowrap">\u26A1 ${t('kt_priority')||'Pri'}</th>
-            <th style="padding:8px;text-align:left;min-width:140px">\u{1F3AF} ${t('kt_function')||'Function'}</th>
-            <th style="padding:8px;text-align:center">\u{1F4CA} ${t('kt_status')||'Status'}</th>
-            <th style="padding:8px;text-align:center">\u{1F4C8} ${t('kt_trend')||'Trend'}</th>
-            <th style="padding:8px;text-align:left;min-width:120px">\u2694\uFE0F ${t('kt_threat')||'Threat'}</th>
-            <th style="padding:8px;text-align:left;min-width:120px">\u{1F517} ${t('kt_external')||'External'}</th>
-            <th style="padding:8px;text-align:left;min-width:100px">\u{1F464} ${t('kt_responsible')||'Responsible'}</th>
-            <th style="padding:8px;text-align:left;min-width:140px">\u{1F527} ${t('kt_actions')||'Actions'}</th>
+            ${_ktSortTh('priority', '\u26A1 '+(t('kt_priority')||'Pri'), 'left', 'white-space:nowrap')}
+            ${_ktSortTh('function', '\u{1F3AF} '+(t('kt_function')||'Function'), 'left', 'min-width:140px')}
+            ${_ktSortTh('status', '\u{1F4CA} '+(t('kt_status')||'Status'), 'center', '')}
+            ${_ktSortTh('trend', '\u{1F4C8} '+(t('kt_trend')||'Trend'), 'center', '')}
+            ${_ktSortTh('threat', '\u2694\uFE0F '+(t('kt_threat')||'Threat'), 'left', 'min-width:120px')}
+            ${_ktSortTh('external', '\u{1F517} '+(t('kt_external')||'External'), 'left', 'min-width:120px')}
+            ${_ktSortTh('responsible', '\u{1F464} '+(t('kt_responsible')||'Responsible'), 'left', 'min-width:100px')}
+            ${_ktSortTh('actions', '\u{1F527} '+(t('kt_actions')||'Actions'), 'left', 'min-width:140px')}
             ${showTs ? `
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F4C5} ${t('kt_added')||'Added'}</th>
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u2705 ${t('kt_finished')||'Finished'}</th>
             ` : ''}
-            ${canWrite ? `<th style="padding:8px;width:110px"></th>` : ''}
+            ${canWrite ? `<th style="padding:8px;width:140px"></th>` : ''}
           </tr>
         </thead>
         <tbody>`;
@@ -203,6 +227,8 @@ function _renderKeyTerrainBoard() {
       <td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
       ` : ''}
       ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap">
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},-1]' title="${t('kt_move_up')||'Move up'}">\u25B2</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},1]' title="${t('kt_move_down')||'Move down'}">\u25BC</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="${t('kt_edit')||'Edit'}">\u270F\uFE0F</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="${t('kt_history')||'History'}">\u{1F4DC}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
@@ -537,6 +563,175 @@ async function _ktSaveSettings() {
     _renderKeyTerrainBoard();
     if (typeof showNotification === 'function') showNotification('success', t('kt_settings_saved')||'Settings saved');
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Sortable column header helper ──
+function _ktSortTh(col, label, align, extra) {
+  const cs = _ktState.columnSort;
+  const arrow = cs && cs.col === col ? (cs.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+  return `<th style="padding:8px;text-align:${align};cursor:pointer;user-select:none;${extra}" data-action="_ktSortByColumn" data-arg="${col}">${label}${arrow}</th>`;
+}
+
+// ── Move row up/down ──
+async function _ktMoveEntry(args) {
+  const [id, direction] = args;
+  const active = _ktState.entries.filter(e => !e.archived);
+  const sorted = _ktSortEntries(active);
+  const idx = sorted.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= sorted.length) return;
+  // Swap priorities to swap positions
+  const myPri = sorted[idx].priority || idx + 1;
+  const otherPri = sorted[newIdx].priority || newIdx + 1;
+  try {
+    await Promise.all([
+      _ktApi('PUT', '/key-terrain/' + sorted[idx].id, { priority: otherPri }),
+      _ktApi('PUT', '/key-terrain/' + sorted[newIdx].id, { priority: myPri }),
+    ]);
+    await openKeyTerrainBoard();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Board-level History Log ──
+function _ktOpenHistoryLog() {
+  // Aggregate all history from all entries, sorted newest first
+  const all = [];
+  for (const e of _ktState.entries) {
+    if (e.history) {
+      for (const h of e.history) {
+        all.push({ ...h, entryFunction: e.function, entryId: e.id });
+      }
+    }
+  }
+  all.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  let html = `<div style="max-width:600px">
+    <h3>\u{1F4DC} ${t('kt_history_log')||'Key Terrain History Log'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('kt_history_log_desc')||'All changes across every entry, sorted by time.'}</p>`;
+
+  if (all.length === 0) {
+    html += `<p style="color:var(--text-dim)">${t('kt_no_history')||'No history yet.'}</p>`;
+  } else {
+    html += `<div style="max-height:450px;overflow-y:auto">`;
+    for (const h of all) {
+      const ts = new Date(h.timestamp).toLocaleString();
+      html += `<div style="padding:8px;border-bottom:1px solid var(--border);font-size:var(--fs-xs)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600">${escHtml(h.entryFunction)}</span>
+          <span style="color:var(--text-dim);font-size:10px">${ts}</span>
+        </div>
+        <div style="margin-top:2px">
+          <span style="color:var(--text-dim)">${escHtml(h.user_name)}</span> changed <strong>${escHtml(h.field)}</strong>${h.old_value ? `: <span style="text-decoration:line-through;color:var(--danger)">${escHtml(h.old_value)}</span> \u2192 ` : ': '}${escHtml(h.new_value)}
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `<div style="margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktHistLogModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktHistLogModal', html, '620px');
+}
+
+// ── Version Control (Snapshots) ──
+async function _ktOpenVersions() {
+  let snapshots = [];
+  try { snapshots = await _ktApi('GET', '/key-terrain/snapshots'); } catch {}
+
+  let html = `<div style="max-width:600px">
+    <h3>\u{1F4CB} ${t('kt_versions')||'Key Terrain Versions'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('kt_versions_desc')||'Save snapshots of the board to track how it looked at different points in time.'}</p>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input id="ktSnapshotLabel" class="input" style="flex:1;font-size:var(--fs-xs)" placeholder="${t('kt_snapshot_label')||'Optional label (e.g. "Before exercise")'}">
+      <button class="btn btn-primary btn-sm" data-action="_ktCreateSnapshot">\u{1F4F8} ${t('kt_snapshot_save')||'Save Snapshot'}</button>
+    </div>`;
+
+  if (snapshots.length === 0) {
+    html += `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('kt_no_versions')||'No snapshots saved yet.'}</p>`;
+  } else {
+    html += `<div style="max-height:350px;overflow-y:auto">`;
+    for (const s of [...snapshots].reverse()) {
+      const ts = new Date(s.timestamp).toLocaleString();
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border);font-size:var(--fs-xs)">
+        <div>
+          <div style="font-weight:600">${s.label ? escHtml(s.label) : `Snapshot #${s.id}`}</div>
+          <div style="color:var(--text-dim)">${ts} \u00B7 ${escHtml(s.user_name)} \u00B7 ${s.entry_count} entries</div>
+        </div>
+        <button class="btn btn-sm btn-secondary" style="font-size:10px" data-action="_ktViewSnapshot" data-arg="${s.id}">\u{1F441} ${t('kt_view')||'View'}</button>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `<div style="margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktVersionsModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktVersionsModal', html, '620px');
+}
+
+async function _ktCreateSnapshot() {
+  const label = document.getElementById('ktSnapshotLabel')?.value?.trim() || '';
+  try {
+    await _ktApi('POST', '/key-terrain/snapshots', { label });
+    if (typeof showNotification === 'function') showNotification('success', t('kt_snapshot_created')||'Snapshot saved');
+    await _ktOpenVersions(); // refresh list
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _ktViewSnapshot(snapId) {
+  let snap;
+  try { snap = await _ktApi('GET', '/key-terrain/snapshots/' + snapId); } catch (e) { alert('Error: ' + e.message); return; }
+
+  const entries = snap.entries || [];
+  const ts = new Date(snap.timestamp).toLocaleString();
+  const sorted = [...entries].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+
+  let html = `<div style="max-width:900px">
+    <h3>\u{1F441} ${snap.label ? escHtml(snap.label) : 'Snapshot #' + snap.id}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${ts} \u00B7 ${escHtml(snap.user_name)} \u00B7 ${entries.length} entries</p>
+
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
+        <thead>
+          <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
+            <th style="padding:6px 8px;text-align:left">Pri</th>
+            <th style="padding:6px 8px;text-align:left">Function</th>
+            <th style="padding:6px 8px;text-align:center">Status</th>
+            <th style="padding:6px 8px;text-align:center">Trend</th>
+            <th style="padding:6px 8px;text-align:left">Threat</th>
+            <th style="padding:6px 8px;text-align:left">External</th>
+            <th style="padding:6px 8px;text-align:left">Responsible</th>
+            <th style="padding:6px 8px;text-align:left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+  for (const e of sorted) {
+    const statusOpt = _ktStatusOptions.find(s => s.value === e.status) || _ktStatusOptions[3];
+    const trendOpt = _ktTrendOptions.find(tr => tr.value === e.trend) || _ktTrendOptions[1];
+    html += `<tr style="background:${statusOpt.color};border-bottom:1px solid var(--border)${e.ghosted ? ';opacity:0.5' : ''}${e.archived ? ';text-decoration:line-through' : ''}">
+      <td style="padding:6px 8px;font-weight:700;text-align:center">${e.priority || '\u2014'}</td>
+      <td style="padding:6px 8px;font-weight:600">${escHtml(e.function)}</td>
+      <td style="padding:6px 8px;text-align:center">${statusOpt.icon} ${statusOpt.label}</td>
+      <td style="padding:6px 8px;text-align:center">${trendOpt.icon} ${trendOpt.label}</td>
+      <td style="padding:6px 8px">${escHtml(e.threat || '\u2014')}</td>
+      <td style="padding:6px 8px">${escHtml(e.external || '\u2014')}</td>
+      <td style="padding:6px 8px">${escHtml(e.responsible_name || '\u2014')}</td>
+      <td style="padding:6px 8px">${escHtml(e.actions || '\u2014')}</td>
+    </tr>`;
+  }
+
+  html += `</tbody></table></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktSnapshotViewModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktSnapshotViewModal', html, '940px');
 }
 
 // ── Toggle timestamp columns ──
