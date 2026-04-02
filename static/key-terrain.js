@@ -427,64 +427,6 @@ async function _ktEditEntry(entryId) {
       setTimeout(() => { respDropdown.style.display = 'none'; }, 200);
     });
   }
-
-  // Wire autocomplete from previous entries for rich text fields
-  _ktWireFieldAutocomplete('ktThreat', 'threat');
-  _ktWireFieldAutocomplete('ktActions', 'actions');
-}
-
-// ── Field autocomplete from previous entries ──
-function _ktCollectPreviousValues(field) {
-  const values = new Set();
-  for (const e of _ktState.entries) {
-    const raw = (e[field] || '').replace(/<[^>]*>/g, '').trim();
-    if (raw) {
-      // Split on sentences / commas to get individual terms
-      raw.split(/[,;\.\n]+/).forEach(part => {
-        const t = part.trim();
-        if (t.length > 2) values.add(t);
-      });
-    }
-  }
-  return [...values];
-}
-
-function _ktWireFieldAutocomplete(elemId, field) {
-  const el = document.getElementById(elemId);
-  if (!el) return;
-  const previousValues = _ktCollectPreviousValues(field);
-  if (previousValues.length === 0) return;
-
-  // Create dropdown
-  let dropdown = document.createElement('div');
-  dropdown.style.cssText = 'display:none;position:absolute;left:0;right:0;z-index:200;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);max-height:130px;overflow-y:auto;font-size:var(--fs-xs)';
-  el.parentElement.style.position = 'relative';
-  el.parentElement.appendChild(dropdown);
-
-  el.addEventListener('input', () => {
-    const text = (el.innerText || el.textContent || '').trim();
-    // Get the last word being typed
-    const words = text.split(/\s+/);
-    const lastWord = (words[words.length - 1] || '').toLowerCase();
-    if (lastWord.length < 2) { dropdown.style.display = 'none'; return; }
-    const matches = previousValues.filter(v => v.toLowerCase().includes(lastWord)).slice(0, 8);
-    if (matches.length === 0) { dropdown.style.display = 'none'; return; }
-    dropdown.innerHTML = matches.map(m =>
-      `<div style="padding:5px 10px;cursor:pointer;border-bottom:1px solid var(--border)" data-val="${escHtml(m)}">${escHtml(m)}</div>`
-    ).join('');
-    dropdown.style.display = '';
-    dropdown.style.top = el.offsetHeight + 'px';
-    dropdown.querySelectorAll('[data-val]').forEach(item => {
-      item.addEventListener('mousedown', (ev) => {
-        ev.preventDefault();
-        // Replace the last word with the selected suggestion
-        el.focus();
-        document.execCommand('insertText', false, item.dataset.val.slice(lastWord.length) + ' ');
-        dropdown.style.display = 'none';
-      });
-    });
-  });
-  el.addEventListener('blur', () => { setTimeout(() => { dropdown.style.display = 'none'; }, 200); });
 }
 
 async function _ktSaveEntry(entryId) {
