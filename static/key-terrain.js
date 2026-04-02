@@ -26,6 +26,16 @@ const _ktTrendOptions = [
   { value: 'worsening', label: 'Worsening', icon: '📉' },
 ];
 
+// Prevent keyboard events inside a modal from leaking to the parent app
+function _ktTrapModalKeys(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  const stop = (e) => e.stopPropagation();
+  el.addEventListener('keydown', stop);
+  el.addEventListener('keyup', stop);
+  el.addEventListener('keypress', stop);
+}
+
 async function _ktApi(method, path, body) {
   const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   const opts = { method, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' } };
@@ -383,6 +393,7 @@ async function _ktEditEntry(entryId) {
   </div>`;
 
   _boardModal('ktEditModal', html, '560px');
+  _ktTrapModalKeys('ktEditModal');
 
   // Wire autocomplete for responsible
   const respInput = document.getElementById('ktResponsible');
@@ -631,6 +642,7 @@ function _ktOpenSettings() {
     </div>
   </div>`;
   _boardModal('ktSettingsModal', html, '560px');
+  _ktTrapModalKeys('ktSettingsModal');
 }
 
 async function _ktSaveSettings() {
@@ -942,6 +954,7 @@ async function _ktOpenVersions() {
     </div>
   </div>`;
   _boardModal('ktVersionsModal', html, '620px');
+  _ktTrapModalKeys('ktVersionsModal');
 }
 
 async function _ktCreateSnapshot() {
@@ -1101,6 +1114,7 @@ function _ktOpenFilter() {
     </div>
   </div>`;
   _boardModal('ktFilterModal', html, '500px');
+  _ktTrapModalKeys('ktFilterModal');
 }
 
 function _ktApplyFilter() {
