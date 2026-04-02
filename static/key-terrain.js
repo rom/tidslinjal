@@ -5,6 +5,8 @@ let _ktState = {
   entries: [],
   access: { can_write: false },
   editingId: null,
+  showTimestamps: false,  // collapsed by default
+  filter: {},             // active filters
 };
 
 const _ktStatusOptions = [
@@ -48,49 +50,78 @@ async function openKeyTerrainBoard() {
 function _renderKeyTerrainBoard() {
   const entries = _ktState.entries;
   const canWrite = _ktState.access.can_write;
+  const showTs = _ktState.showTimestamps;
+  const f = _ktState.filter || {};
+  const hasFilter = Object.values(f).some(v => v);
+
+  // Filter entries
+  let filtered = [...entries];
+  if (hasFilter) {
+    const q = (v) => (v || '').toLowerCase();
+    filtered = filtered.filter(e => {
+      if (f.function && !q(e.function).includes(q(f.function))) return false;
+      if (f.priority && e.priority !== parseInt(f.priority)) return false;
+      if (f.status && e.status !== f.status) return false;
+      if (f.trend && e.trend !== f.trend) return false;
+      if (f.threat && !q(e.threat).includes(q(f.threat))) return false;
+      if (f.responsible && !q(e.responsible_name).includes(q(f.responsible))) return false;
+      if (f.actions && !q(e.actions).includes(q(f.actions))) return false;
+      return true;
+    });
+  }
 
   // Sort by priority
-  const sorted = [...entries].sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  const sorted = filtered.sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  const totalCols = 8 + (showTs ? 3 : 0) + (canWrite ? 1 : 0);
 
-  let html = `<div style="max-width:1100px;margin:0 auto">
+  let html = `<div style="max-width:${showTs ? '1400' : '1100'}px;margin:0 auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0">🏔️ ${t('kt_title')||'Key Terrain Board'}</h2>
+      <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
       <div style="display:flex;gap:8px;align-items:center">
-        ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">🔒 ${t('kt_read_only')||'Read Only'}</span>` : ''}
+        ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
+        <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktToggleTimestamps" title="${t('kt_timestamps')||'Toggle timestamp columns'}">\u{1F552} ${showTs ? t('kt_hide_ts')||'Hide Dates' : t('kt_show_ts')||'Show Dates'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
       </div>
     </div>
 
-    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('kt_desc')||'Cyber key terrain overview — tracks critical functions, their status, threats, and response actions.'}</p>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('kt_desc')||'Cyber key terrain overview \u2014 tracks critical functions, their status, threats, and response actions.'}</p>
 
     <div style="overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">
         <thead>
           <tr style="background:var(--bg3);border-bottom:2px solid var(--border)">
-            <th style="padding:8px;text-align:left;white-space:nowrap">⚡ ${t('kt_priority')||'Pri'}</th>
-            <th style="padding:8px;text-align:left;min-width:140px">🎯 ${t('kt_function')||'Function'}</th>
-            <th style="padding:8px;text-align:center">📊 ${t('kt_status')||'Status'}</th>
-            <th style="padding:8px;text-align:center">📈 ${t('kt_trend')||'Trend'}</th>
-            <th style="padding:8px;text-align:left;min-width:120px">⚔️ ${t('kt_threat')||'Threat'}</th>
-            <th style="padding:8px;text-align:left;min-width:120px">🔗 ${t('kt_external')||'External'}</th>
-            <th style="padding:8px;text-align:left;min-width:100px">👤 ${t('kt_responsible')||'Responsible'}</th>
-            <th style="padding:8px;text-align:left;min-width:140px">🔧 ${t('kt_actions')||'Actions'}</th>
-            ${canWrite ? `<th style="padding:8px;width:60px"></th>` : ''}
+            <th style="padding:8px;text-align:left;white-space:nowrap">\u26A1 ${t('kt_priority')||'Pri'}</th>
+            <th style="padding:8px;text-align:left;min-width:140px">\u{1F3AF} ${t('kt_function')||'Function'}</th>
+            <th style="padding:8px;text-align:center">\u{1F4CA} ${t('kt_status')||'Status'}</th>
+            <th style="padding:8px;text-align:center">\u{1F4C8} ${t('kt_trend')||'Trend'}</th>
+            <th style="padding:8px;text-align:left;min-width:120px">\u2694\uFE0F ${t('kt_threat')||'Threat'}</th>
+            <th style="padding:8px;text-align:left;min-width:120px">\u{1F517} ${t('kt_external')||'External'}</th>
+            <th style="padding:8px;text-align:left;min-width:100px">\u{1F464} ${t('kt_responsible')||'Responsible'}</th>
+            <th style="padding:8px;text-align:left;min-width:140px">\u{1F527} ${t('kt_actions')||'Actions'}</th>
+            ${showTs ? `
+            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F4C5} ${t('kt_added')||'Added'}</th>
+            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
+            <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u2705 ${t('kt_finished')||'Finished'}</th>
+            ` : ''}
+            ${canWrite ? `<th style="padding:8px;width:80px"></th>` : ''}
           </tr>
         </thead>
         <tbody>`;
 
   if (sorted.length === 0) {
-    html += `<tr><td colspan="${canWrite ? 9 : 8}" style="padding:20px;text-align:center;color:var(--text-dim)">${t('kt_empty')||'No key terrain entries. Add one to get started.'}</td></tr>`;
+    html += `<tr><td colspan="${totalCols}" style="padding:20px;text-align:center;color:var(--text-dim)">${hasFilter ? (t('kt_no_match')||'No entries match the current filter.') : (t('kt_empty')||'No key terrain entries. Add one to get started.')}</td></tr>`;
   }
 
   for (const e of sorted) {
     const statusOpt = _ktStatusOptions.find(s => s.value === e.status) || _ktStatusOptions[3];
     const trendOpt = _ktTrendOptions.find(tr => tr.value === e.trend) || _ktTrendOptions[1];
     const rowBg = statusOpt.color;
+    const fmtDate = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleDateString(undefined, {year:'2-digit',month:'short',day:'numeric'}); } catch { return '\u2014'; } };
+    const fmtDateTime = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '\u2014'; } };
 
     html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'">
-      <td style="padding:8px;text-align:center;font-weight:700;font-size:14px">${e.priority || '—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:700;font-size:14px">${e.priority || '\u2014'}</td>
       <td style="padding:8px;font-weight:600">${escHtml(e.function)}</td>
       <td style="padding:8px;text-align:center">
         <span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${statusOpt.icon} ${statusOpt.label}</span>
@@ -98,14 +129,19 @@ function _renderKeyTerrainBoard() {
       <td style="padding:8px;text-align:center">
         <span title="${trendOpt.label}">${trendOpt.icon} ${trendOpt.label}</span>
       </td>
-      <td style="padding:8px">${escHtml(e.threat || '—')}</td>
-      <td style="padding:8px">${escHtml(e.external || '—')}</td>
-      <td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">—</span>'}</td>
-      <td style="padding:8px">${escHtml(e.actions || '—')}</td>
+      <td style="padding:8px">${escHtml(e.threat || '\u2014')}</td>
+      <td style="padding:8px">${escHtml(e.external || '\u2014')}</td>
+      <td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
+      <td style="padding:8px">${escHtml(e.actions || '\u2014')}</td>
+      ${showTs ? `
+      <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>
+      <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>
+      <td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
+      ` : ''}
       ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap">
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="Edit">✏️</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="History">📜</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="Delete">🗑</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="Edit">\u270F\uFE0F</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="History">\u{1F4DC}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="Delete">\u{1F5D1}</button>
       </td>` : ''}
     </tr>`;
   }
@@ -114,19 +150,18 @@ function _renderKeyTerrainBoard() {
 
     <div style="margin-top:16px;font-size:var(--fs-xs);color:var(--text-dim)">
       <strong>${t('kt_legend')||'Legend'}:</strong>
-      ${_ktStatusOptions.map(s => `${s.icon} ${s.label}`).join(' · ')} &nbsp;|&nbsp;
-      ${_ktTrendOptions.map(tr => `${tr.icon} ${tr.label}`).join(' · ')}
+      ${_ktStatusOptions.map(s => `${s.icon} ${s.label}`).join(' \u00B7 ')} &nbsp;|&nbsp;
+      ${_ktTrendOptions.map(tr => `${tr.icon} ${tr.label}`).join(' \u00B7 ')}
+      ${hasFilter ? ` &nbsp;|&nbsp; <em>${t('kt_filter_active')||'Filter active'} (${sorted.length}/${entries.length})</em>` : ''}
     </div>
   </div>`;
 
-  // Use boards modal infrastructure
   if (typeof _boardModal === 'function') {
-    _boardModal('keyTerrainModal', html, '1100px');
+    _boardModal('keyTerrainModal', html, (showTs ? '1400' : '1100') + 'px');
   } else {
-    // Fallback
     let el = document.getElementById('keyTerrainModal');
     if (el) el.remove();
-    document.body.insertAdjacentHTML('beforeend', `<div class="modal-overlay" id="keyTerrainModal"><div class="modal" style="width:1100px;max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both">${html}</div></div>`);
+    document.body.insertAdjacentHTML('beforeend', `<div class="modal-overlay" id="keyTerrainModal"><div class="modal" style="width:${showTs?1400:1100}px;max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both">${html}</div></div>`);
     if (typeof openModal === 'function') openModal('keyTerrainModal');
     if (typeof _bindActions === 'function') _bindActions(document.getElementById('keyTerrainModal'));
   }
@@ -281,6 +316,89 @@ async function _ktDeleteEntry(entryId) {
     await openKeyTerrainBoard();
     if (typeof showNotification === 'function') showNotification('success', t('kt_deleted')||'Entry deleted');
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Toggle timestamp columns ──
+function _ktToggleTimestamps() {
+  _ktState.showTimestamps = !_ktState.showTimestamps;
+  _renderKeyTerrainBoard();
+}
+
+// ── Filter Panel ──
+function _ktOpenFilter() {
+  const f = _ktState.filter || {};
+  let html = `<div style="max-width:500px">
+    <h3>\u{1F50D} ${t('kt_filter')||'Filter Key Terrain'}</h3>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Function'}</label>
+      <input id="ktFilterFunction" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.function||'')}">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${t('kt_priority')||'Priority'}</label>
+        <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="1">
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
+        <select id="ktFilterStatus" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
+          ${_ktStatusOptions.map(s => `<option value="${s.value}" ${f.status===s.value?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4C8} ${t('kt_trend')||'Trend'}</label>
+        <select id="ktFilterTrend" class="input" style="width:100%;font-size:var(--fs-xs)">
+          <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
+          ${_ktTrendOptions.map(tr => `<option value="${tr.value}" ${f.trend===tr.value?'selected':''}>${tr.icon} ${tr.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u2694\uFE0F ${t('kt_threat')||'Threat'}</label>
+      <input id="ktFilterThreat" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.threat||'')}">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F464} ${t('kt_responsible')||'Responsible'}</label>
+        <input id="ktFilterResponsible" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.responsible||'')}">
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F527} ${t('kt_actions')||'Actions'}</label>
+        <input id="ktFilterActions" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.actions||'')}">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="_ktApplyFilter">\u2714 ${t('kt_filter_apply')||'Apply'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_ktClearFilter">\u2716 ${t('kt_filter_clear')||'Clear'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktFilterModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktFilterModal', html, '500px');
+}
+
+function _ktApplyFilter() {
+  _ktState.filter = {
+    function: document.getElementById('ktFilterFunction')?.value?.trim() || '',
+    priority: document.getElementById('ktFilterPriority')?.value?.trim() || '',
+    status: document.getElementById('ktFilterStatus')?.value || '',
+    trend: document.getElementById('ktFilterTrend')?.value || '',
+    threat: document.getElementById('ktFilterThreat')?.value?.trim() || '',
+    responsible: document.getElementById('ktFilterResponsible')?.value?.trim() || '',
+    actions: document.getElementById('ktFilterActions')?.value?.trim() || '',
+  };
+  if (typeof _closeBoardModal === 'function') _closeBoardModal('ktFilterModal');
+  _renderKeyTerrainBoard();
+}
+
+function _ktClearFilter() {
+  _ktState.filter = {};
+  if (typeof _closeBoardModal === 'function') _closeBoardModal('ktFilterModal');
+  _renderKeyTerrainBoard();
 }
 
 function _ktShowHistory(entryId) {

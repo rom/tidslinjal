@@ -78,6 +78,8 @@ type Store struct {
 	boards               []Board
 	boardItems           []BoardItem
 	keyTerrainEntries    []KeyTerrainEntry
+	keyTerrainSettings   KeyTerrainSettings
+	keyTerrainSnapshots  []KeyTerrainSnapshot
 	reportArchive        []ReportArchiveEntry
 	reportIngestConfig   ReportIngestConfig
 	startupText          string
@@ -126,6 +128,7 @@ type Store struct {
 	nextBoardID              int64
 	nextBoardItemID          int64
 	nextKeyTerrainID         int64
+	nextKTSnapshotID         int64
 	nextReportArchiveID      int64
 	nextStaffDutyID          int64
 	nextStaffMemberID        int64
@@ -245,6 +248,8 @@ func (s *Store) load() error {
 	s.loadFile("boards.json", &s.boards)
 	s.loadFile("board_items.json", &s.boardItems)
 	s.loadFile("key_terrain.json", &s.keyTerrainEntries)
+	s.loadFile("key_terrain_settings.json", &s.keyTerrainSettings)
+	s.loadFile("key_terrain_snapshots.json", &s.keyTerrainSnapshots)
 	s.loadFile("report_archive.json", &s.reportArchive)
 	s.loadFile("report_ingest_config.json", &s.reportIngestConfig)
 
@@ -475,6 +480,11 @@ func (s *Store) load() error {
 	for _, x := range s.keyTerrainEntries {
 		if x.ID > s.nextKeyTerrainID {
 			s.nextKeyTerrainID = x.ID
+		}
+	}
+	for _, x := range s.keyTerrainSnapshots {
+		if x.ID > s.nextKTSnapshotID {
+			s.nextKTSnapshotID = x.ID
 		}
 	}
 	for _, x := range s.reportArchive {
