@@ -182,6 +182,8 @@ function _renderKeyTerrainBoard() {
           </div>
         </div>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
+        <button class="btn btn-sm btn-secondary" data-action="_ktShowHelp" title="${t('kt_help')||'Help'}">\u2753</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktDetach" title="${t('kt_detach')||'Detach to window'}">\u29C9</button>
       </div>
     </div>
 
@@ -198,7 +200,7 @@ function _renderKeyTerrainBoard() {
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u{1F504} ${t('kt_updated')||'Updated'}</th>
             <th style="padding:8px;text-align:center;white-space:nowrap;background:var(--bg2)">\u2705 ${t('kt_finished')||'Finished'}</th>
             ` : ''}
-            ${canWrite ? `<th style="padding:8px;width:140px"></th>` : ''}
+            ${canWrite ? `<th style="padding:8px;width:140px;font-size:10px;color:var(--text-dim);font-weight:normal;text-align:center">${t('kt_mgmt_label')||'Management of line item'}</th>` : ''}
           </tr>
         </thead>
         <tbody>`;
@@ -235,27 +237,27 @@ function _renderKeyTerrainBoard() {
       function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>`,
       status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${sIcon} ${statusOpt.label}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
-      threat: `<td style="padding:8px">${escHtml(e.threat || '\u2014')}</td>`,
-      external: `<td style="padding:8px">${escHtml(e.external || '\u2014')}</td>`,
+      threat: `<td style="padding:8px">${e.threat ? _ktRenderRich(e.threat) : '\u2014'}</td>`,
+      external: `<td style="padding:8px">${e.external ? _ktRenderRich(e.external) : '\u2014'}</td>`,
       responsible: `<td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
-      actions: `<td style="padding:8px">${escHtml(e.actions || '\u2014')}</td>`,
+      actions: `<td style="padding:8px">${e.actions ? _ktRenderRich(e.actions) : '\u2014'}</td>`,
     };
 
-    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'">
+    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}${canWrite?';cursor:pointer':''}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'" ${canWrite ? `data-action="_ktEditEntry" data-arg="${e.id}"` : ''}>
       ${cols.map(c => cellHtml[c]).join('')}
       ${showTs ? `
       <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>
       <td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>
       <td style="padding:8px;text-align:center;font-size:10px;background:var(--bg2);white-space:nowrap">${e.finished_at ? `<span style="color:var(--success,#27ae60)" title="${e.finished_at}">${fmtDate(e.finished_at)}</span>` : '<span style="color:var(--text-dim)">\u2014</span>'}</td>
       ` : ''}
-      ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap">
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},-1]' title="${t('kt_move_up')||'Move up'}">\u25B2</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},1]' title="${t('kt_move_down')||'Move down'}">\u25BC</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" title="${t('kt_edit')||'Edit'}">\u270F\uFE0F</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" title="${t('kt_history')||'History'}">\u{1F4DC}</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktArchiveEntry" data-arg="${e.id}" title="${t('kt_archive')||'Archive'}">\u{1F4E6}</button>
-        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
+      ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap" data-stop-prop>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},-1]' data-stop-prop title="${t('kt_move_up')||'Move up'}">\u25B2</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},1]' data-stop-prop title="${t('kt_move_down')||'Move down'}">\u25BC</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktEditEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_edit')||'Edit'}">\u270F\uFE0F</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" data-stop-prop title="${t('kt_history')||'History'}">\u{1F4DC}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" data-stop-prop title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktArchiveEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_archive')||'Archive'}">\u{1F4E6}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
       </td>` : ''}
     </tr>`;
   }
@@ -347,12 +349,12 @@ async function _ktEditEntry(entryId) {
 
     <div style="margin-bottom:10px">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">⚔️ ${t('kt_threat')||'Threat'}</label>
-      <textarea id="ktThreat" class="input" style="width:100%;height:50px;resize:vertical" placeholder="${t('kt_threat_ph')||'Current hostile pressure'}">${escHtml(entry.threat || '')}</textarea>
+      ${_ktRichField('ktThreat', entry.threat || '', t('kt_threat_ph')||'Current hostile pressure', '50px')}
     </div>
 
     <div style="margin-bottom:10px">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">🔗 ${t('kt_external')||'External Dependencies'}</label>
-      <textarea id="ktExternal" class="input" style="width:100%;height:50px;resize:vertical" placeholder="${t('kt_external_ph')||'External dependencies and peer effects'}">${escHtml(entry.external || '')}</textarea>
+      ${_ktRichField('ktExternal', entry.external || '', t('kt_external_ph')||'External dependencies and peer effects', '50px')}
     </div>
 
     <div style="margin-bottom:10px;position:relative">
@@ -364,7 +366,7 @@ async function _ktEditEntry(entryId) {
 
     <div style="margin-bottom:10px">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">🔧 ${t('kt_actions')||'Actions'}</label>
-      <textarea id="ktActions" class="input" style="width:100%;height:60px;resize:vertical" placeholder="${t('kt_actions_ph')||'What is being done to achieve effects'}">${escHtml(entry.actions || '')}</textarea>
+      ${_ktRichField('ktActions', entry.actions || '', t('kt_actions_ph')||'What is being done to achieve effects', '60px')}
     </div>
 
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -417,10 +419,10 @@ async function _ktSaveEntry(entryId) {
     function: fn,
     status: document.getElementById('ktStatus')?.value || 'unknown',
     trend: document.getElementById('ktTrend')?.value || 'stable',
-    threat: document.getElementById('ktThreat')?.value?.trim() || '',
-    external: document.getElementById('ktExternal')?.value?.trim() || '',
+    threat: _ktGetRichValue('ktThreat'),
+    external: _ktGetRichValue('ktExternal'),
     priority: parseInt(document.getElementById('ktPriority')?.value) || 0,
-    actions: document.getElementById('ktActions')?.value?.trim() || '',
+    actions: _ktGetRichValue('ktActions'),
   };
 
   const respId = parseInt(document.getElementById('ktResponsibleId')?.value);
@@ -1031,4 +1033,140 @@ function _ktShowHistory(entryId) {
   </div>`;
 
   _boardModal('ktHistoryModal', html, '520px');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Rich Text Field helpers ─────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _ktRichField(id, value, placeholder, height) {
+  const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="kt-rich-toolbar">
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-weight:700" onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-style:italic" onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:underline" onclick="document.execCommand('underline')" title="Underline"><u>U</u></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:line-through" onclick="document.execCommand('strikethrough')" title="Strikethrough"><s>S</s></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px" onclick="_ktRichInsertLink('${id}')" title="Insert link">\u{1F517}</button>
+  </div>`;
+  return `${toolbar}<div id="${id}" contenteditable="true" class="input" style="width:100%;min-height:${height};max-height:150px;overflow-y:auto;resize:vertical;padding:6px;font-size:var(--fs-xs);white-space:pre-wrap;word-break:break-word" data-placeholder="${escHtml(placeholder)}">${value}</div>`;
+}
+
+function _ktRichInsertLink(fieldId) {
+  const url = prompt('URL:');
+  if (!url) return;
+  const label = prompt('Link text (leave empty for URL):', '') || url;
+  const el = document.getElementById(fieldId);
+  if (el) { el.focus(); document.execCommand('insertHTML', false, `<a href="${escHtml(url)}" target="_blank" style="color:var(--accent)">${escHtml(label)}</a>`); }
+}
+
+function _ktGetRichValue(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  return el.innerHTML.trim() || '';
+}
+
+function _ktRenderRich(html) {
+  // If content looks like it has HTML tags, render as-is (trusted internal content)
+  if (html.includes('<') && (html.includes('<b>') || html.includes('<i>') || html.includes('<u>') || html.includes('<a ') || html.includes('<s>') || html.includes('<br'))) {
+    return `<span style="font-size:var(--fs-xs)">${html}</span>`;
+  }
+  return escHtml(html);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Help ────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _ktShowHelp() {
+  const html = `<div style="max-width:560px">
+    <h3>\u2753 ${t('kt_help_title')||'Key Terrain Board \u2014 Help'}</h3>
+
+    <div style="font-size:var(--fs-xs);line-height:1.6">
+      <p><strong>${t('kt_help_what')||'What is a Key Terrain Board?'}</strong><br>
+      A key terrain board tracks the critical functions (cyber key terrain) that matter most to operations. It provides a shared situational picture of what is working, what is degraded, what threats exist, and what actions are being taken.</p>
+
+      <h4 style="margin:12px 0 4px">${t('kt_help_columns')||'Columns'}</h4>
+      <ul style="margin:0;padding-left:18px">
+        <li><strong>\u26A1 Priority</strong> \u2014 Explicit ranking of what matters most (1 = highest).</li>
+        <li><strong>\u{1F3AF} Function</strong> \u2014 The critical function or capability being tracked.</li>
+        <li><strong>\u{1F4CA} Status</strong> \u2014 Current operational state: Working, Degraded, Down, Unknown.</li>
+        <li><strong>\u{1F4C8} Trend</strong> \u2014 Expected development next cycle: Improving, Stable, Worsening.</li>
+        <li><strong>\u2694\uFE0F Threat</strong> \u2014 Current hostile pressure on the function. Supports rich text.</li>
+        <li><strong>\u{1F517} External</strong> \u2014 External dependencies and peer effects. Supports rich text.</li>
+        <li><strong>\u{1F464} Responsible</strong> \u2014 Who is accountable. Use @name for autocomplete.</li>
+        <li><strong>\u{1F527} Actions</strong> \u2014 What is being done to achieve effects. Supports rich text.</li>
+      </ul>
+
+      <h4 style="margin:12px 0 4px">${t('kt_help_features')||'Features'}</h4>
+      <ul style="margin:0;padding-left:18px">
+        <li><strong>Click a row</strong> to edit the entry (write-access users).</li>
+        <li><strong>\u25B2 \u25BC</strong> moves a row up or down.</li>
+        <li><strong>Click column headers</strong> to sort (click again to reverse, again to clear).</li>
+        <li><strong>\u{1F50D} Filter</strong> narrows the view by any field.</li>
+        <li><strong>\u{1F552} Show Dates</strong> reveals Added / Updated / Finished timestamps.</li>
+        <li><strong>\u{1F47B} Ghost</strong> dims an entry without removing it. Style is configurable in Settings.</li>
+        <li><strong>\u{1F4E6} Archive</strong> moves an entry to a collapsed section at the bottom.</li>
+        <li><strong>\u{1F4DC} History</strong> shows a full audit trail of all changes.</li>
+        <li><strong>\u{1F4CB} Versions</strong> lets you save and view point-in-time snapshots of the board.</li>
+        <li><strong>\u2B80 Columns</strong> lets you reorder columns left/right.</li>
+        <li><strong>\u2699 Settings</strong> configures priority colors, icons, sort order, and ghost style.</li>
+        <li><strong>\u{1F5A8} Print</strong> opens a print-friendly version.</li>
+        <li><strong>\u2B07 Export</strong> saves the board as JSON, CSV, XML, PDF, SVG, or JPEG.</li>
+        <li><strong>\u29C9 Detach</strong> opens the board in its own window.</li>
+      </ul>
+
+      <h4 style="margin:12px 0 4px">${t('kt_help_access')||'Access Control'}</h4>
+      <p>Operations Lead, Staff Officers, and Staff Assistants have <strong>write access</strong>. Everyone else has <strong>read-only</strong> access.</p>
+    </div>
+
+    <div style="margin-top:16px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktHelpModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktHelpModal', html, '580px');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Detach to window ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _ktDetach() {
+  const w = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no');
+  if (!w) { alert('Popup blocked. Please allow popups for this site.'); return; }
+
+  // Copy relevant styles
+  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map(el => el.outerHTML).join('\n');
+
+  w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
+    <style>body{padding:16px;background:var(--bg1,#1a1a2e);color:var(--text,#eee);font-family:system-ui,sans-serif}
+    .modal-overlay{position:static!important;background:none!important}.modal{box-shadow:none!important;max-width:100%!important;width:100%!important;max-height:100%!important;padding:0!important;border:none!important}</style>
+    </head><body></body></html>`);
+  w.document.close();
+
+  // Copy scripts needed
+  const scriptSrcs = ['/static/i18n.js', '/static/lang/en.js', '/static/utils.js', '/static/state.js', '/static/api.js', '/static/modals.js', '/static/key-terrain.js'];
+  let loaded = 0;
+  const onAllLoaded = () => {
+    // Copy state
+    w.state = window.state;
+    w.TRANSLATIONS = window.TRANSLATIONS;
+    w._ktState = JSON.parse(JSON.stringify(_ktState));
+    w._boardModal = function(id, content, width) {
+      let el = w.document.getElementById(id);
+      if (el) el.remove();
+      w.document.body.innerHTML = `<div style="padding:16px;max-width:${width||'1100px'};margin:0 auto">${content}</div>`;
+      if (typeof w._bindActions === 'function') w._bindActions(w.document.body);
+    };
+    w._closeBoardModal = function(id) {
+      const el = w.document.getElementById(id);
+      if (el) el.remove();
+    };
+    if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
+  };
+  scriptSrcs.forEach(src => {
+    const s = w.document.createElement('script');
+    s.src = src;
+    s.onload = () => { loaded++; if (loaded === scriptSrcs.length) setTimeout(onAllLoaded, 100); };
+    w.document.head.appendChild(s);
+  });
 }
