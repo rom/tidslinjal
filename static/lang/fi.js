@@ -1868,6 +1868,18 @@ TRANSLATIONS.fi = {
     board_filter_apply: 'Käytä suodatinta',
     board_filter_clear: 'Tyhjennä',
     board_filter_list_desc: 'Suodata tauluja niiden kohteiden ominaisuuksien mukaan. Taulut ilman vastaavia kohteita piilotetaan.',
+
+    // Board search
+    board_search: 'Haku',
+    board_search_title: 'Hae taulun kohteista',
+    board_search_desc: 'Hae kaikista taulun kohteista: muistiinpanot, toimintaloki, kommentit, vastuuhenkilö, tyyppi, prioriteetti, päivämäärät, tunnisteet, linkit, liitteet ja historia.',
+    board_search_placeholder: 'Hae...',
+    board_search_go: 'Hae',
+    board_search_clear: 'Tyhjennä',
+    board_search_enter: 'Syötä hakutermi.',
+    board_search_no_results: 'Tuloksia ei löytynyt.',
+    board_search_results: 'tulosta löytyi',
+    board_search_searching: 'Haetaan...',
     board_subject: 'Aihe',
     board_assigned: 'Vastuuhenkilö',
     board_due: 'Eräpäivä',

@@ -2097,6 +2097,18 @@ TRANSLATIONS.nb = {
     board_filter_apply: 'Bruk filter',
     board_filter_clear: 'Tøm',
     board_filter_list_desc: 'Filtrer tavler etter egenskapene til elementene deres. Tavler uten matchende elementer skjules.',
+
+    // Board search
+    board_search: 'Søk',
+    board_search_title: 'Søk i tavleelementer',
+    board_search_desc: 'Søk på tvers av alle tavleelementer: notater, aktivitetslogger, kommentarer, ansvarlig, type, prioritet, datoer, tagger, lenker, vedlegg og historikk.',
+    board_search_placeholder: 'Søk...',
+    board_search_go: 'Søk',
+    board_search_clear: 'Tøm',
+    board_search_enter: 'Skriv inn et søkeord.',
+    board_search_no_results: 'Ingen resultater funnet.',
+    board_search_results: 'resultat(er) funnet',
+    board_search_searching: 'Søker...',
     board_subject: 'Emne',
     board_assigned: 'Tildelt',
     board_due: 'Forfall',

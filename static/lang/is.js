@@ -2060,6 +2060,18 @@ TRANSLATIONS.is = {
     board_filter_apply: 'Beita síu',
     board_filter_clear: 'Hreinsa',
     board_filter_list_desc: 'Sía borð eftir eiginleikum hluta þeirra. Borð án samsvarandi hluta verða falin.',
+
+    // Board search
+    board_search: 'Leita',
+    board_search_title: 'Leita í borðhlutum',
+    board_search_desc: 'Leita í öllum borðhlutum: athugasemdir, virkniannálar, ummæli, ábyrgðarmaður, tegund, forgangur, dagsetningar, merki, tenglar, viðhengi og saga.',
+    board_search_placeholder: 'Leita...',
+    board_search_go: 'Leita',
+    board_search_clear: 'Hreinsa',
+    board_search_enter: 'Sláðu inn leitarorð.',
+    board_search_no_results: 'Engar niðurstöður fundust.',
+    board_search_results: 'niðurstöður fundust',
+    board_search_searching: 'Leitar...',
     btn_edit: 'Edit',
     btn_upload: 'Upload',
     btn_create: 'Create',
