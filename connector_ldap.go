@@ -243,15 +243,3 @@ func (c *LDAPConnector) GetConfig() LDAPConfig {
 	}
 	return cfg
 }
-
-// escapeLDAPFilter escapes special characters in LDAP filter values.
-func escapeLDAPFilter(s string) string {
-	r := strings.NewReplacer(
-		`\`, `\5c`,
-		`*`, `\2a`,
-		`(`, `\28`,
-		`)`, `\29`,
-		"\x00", `\00`,
-	)
-	return r.Replace(s)
-}
