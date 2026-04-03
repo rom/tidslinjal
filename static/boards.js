@@ -2982,7 +2982,7 @@ function _openBoardFilterPanel() {
   const columns = (board.columns || []).map(c => ({ id: c.id, name: c.name }));
 
   let html = `<div style="max-width:500px">
-    <h3>🔍 ${t('board_filter')||'Filter Board Items'}</h3>
+    <h3>🔍 ${t('board_filter_board_items')||'Filter Board Items'}</h3>
 
     <div style="margin-bottom:10px">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_responsible')||'Responsible'}</label>
@@ -2996,7 +2996,7 @@ function _openBoardFilterPanel() {
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_type')||'Type'}</label>
       <select id="boardFilterType" class="input" style="width:100%;font-size:var(--fs-xs)">
         <option value="">— ${t('board_filter_all')||'All'} —</option>
-        ${types.map(ty => `<option value="${ty}" ${f.type===ty?'selected':''}>${ty}</option>`).join('')}
+        ${types.map(ty => `<option value="${ty}" ${f.type===ty?'selected':''}>${t('board_type_'+ty)||ty}</option>`).join('')}
       </select>
     </div>
 
@@ -3004,7 +3004,7 @@ function _openBoardFilterPanel() {
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_priority')||'Priority'}</label>
       <select id="boardFilterPriority" class="input" style="width:100%;font-size:var(--fs-xs)">
         <option value="">— ${t('board_filter_all')||'All'} —</option>
-        ${priorities.map(p => `<option value="${p}" ${f.priority===p?'selected':''}>${p}</option>`).join('')}
+        ${priorities.map(p => `<option value="${p}" ${f.priority===p?'selected':''}>${t('board_priority_'+p)||p}</option>`).join('')}
       </select>
     </div>
 
@@ -3102,11 +3102,11 @@ function _openBoardListFilterPanel() {
   const f = _boardsState.filter || {};
 
   let html = `<div style="max-width:500px">
-    <h3>🔍 ${t('board_filter')||'Filter Boards'}</h3>
+    <h3>🔍 ${t('board_filter_boards')||'Filter Boards'}</h3>
     <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('board_filter_list_desc')||'Filter boards by their items\' properties. Boards with no matching items will be hidden.'}</p>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_responsible')||'Responsible (board owner)'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_responsible_owner')||'Responsible (board owner)'}</label>
       <input id="boardListFilterResponsible" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('board_filter_responsible_ph')||'Owner name...'}" value="${escHtml(f.responsible||'')}">
     </div>
 
@@ -3115,20 +3115,20 @@ function _openBoardListFilterPanel() {
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_type')||'Type'}</label>
         <select id="boardListFilterType" class="input" style="width:100%;font-size:var(--fs-xs)">
           <option value="">— ${t('board_filter_all')||'All'} —</option>
-          <option value="task" ${f.type==='task'?'selected':''}>Task</option>
-          <option value="meeting" ${f.type==='meeting'?'selected':''}>Meeting</option>
-          <option value="issue" ${f.type==='issue'?'selected':''}>Issue</option>
-          <option value="note" ${f.type==='note'?'selected':''}>Note</option>
-          <option value="checklist" ${f.type==='checklist'?'selected':''}>Checklist</option>
+          <option value="task" ${f.type==='task'?'selected':''}>${t('board_type_task')||'Task'}</option>
+          <option value="meeting" ${f.type==='meeting'?'selected':''}>${t('board_type_meeting')||'Meeting'}</option>
+          <option value="issue" ${f.type==='issue'?'selected':''}>${t('board_type_issue')||'Issue'}</option>
+          <option value="note" ${f.type==='note'?'selected':''}>${t('board_type_note')||'Note'}</option>
+          <option value="checklist" ${f.type==='checklist'?'selected':''}>${t('board_type_checklist')||'Checklist'}</option>
         </select>
       </div>
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('board_filter_priority')||'Priority'}</label>
         <select id="boardListFilterPriority" class="input" style="width:100%;font-size:var(--fs-xs)">
           <option value="">— ${t('board_filter_all')||'All'} —</option>
-          <option value="low" ${f.priority==='low'?'selected':''}>Low</option>
-          <option value="high" ${f.priority==='high'?'selected':''}>High</option>
-          <option value="critical" ${f.priority==='critical'?'selected':''}>Critical</option>
+          <option value="low" ${f.priority==='low'?'selected':''}>${t('board_priority_low')||'Low'}</option>
+          <option value="high" ${f.priority==='high'?'selected':''}>${t('board_priority_high')||'High'}</option>
+          <option value="critical" ${f.priority==='critical'?'selected':''}>${t('board_priority_critical')||'Critical'}</option>
         </select>
       </div>
     </div>
@@ -3141,23 +3141,23 @@ function _openBoardListFilterPanel() {
     <div style="margin-bottom:10px">
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="boardListFilterDue2" ${f.dueSoon2?'checked':''} style="accent-color:var(--accent)">
-        ${t('board_filter_due_2days')||'Has items due within 2 days'}
+        ${t('board_filter_due_2days_has')||'Has items due within 2 days'}
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer;margin-bottom:4px">
         <input type="checkbox" id="boardListFilterDue5" ${f.dueSoon5?'checked':''} style="accent-color:var(--accent)">
-        ${t('board_filter_due_5days')||'Has items due within 5 days'}
+        ${t('board_filter_due_5days_has')||'Has items due within 5 days'}
       </label>
     </div>
 
     <div style="margin-bottom:10px">
       <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
         <input type="checkbox" id="boardListFilterHistory" ${f.hasHistory?'checked':''} style="accent-color:var(--accent)">
-        ${t('board_filter_has_history')||'Has recent history'}
+        ${t('board_filter_has_recent_history')||'Has recent history'}
       </label>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-primary btn-sm" data-action="_applyBoardListFilter">✔ ${t('board_filter_apply')||'Apply'}</button>
+      <button class="btn btn-primary btn-sm" data-action="_applyBoardListFilter">✔ ${t('board_filter_apply')||'Apply Filter'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_clearBoardListFilter">✖ ${t('board_filter_clear')||'Clear'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="boardFilterModal">${t('btn_cancel')||'Cancel'}</button>
     </div>
