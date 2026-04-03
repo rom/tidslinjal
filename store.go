@@ -41,6 +41,7 @@ type Store struct {
 	invitations          []PersonalInvitation
 	oidcSettings         OIDCPersistentConfig
 	mailConfig           MailConfig
+	meetingConfig        MeetingConfig
 	syslogConfig         SyslogConfig
 	securitySettings     SecuritySettings
 	tlsConfig            TLSConfig
@@ -199,6 +200,7 @@ func (s *Store) load() error {
 	s.loadFile("invitations.json", &s.invitations)
 	s.loadFile("oidc.json", &s.oidcSettings)
 	s.loadFile("mail.json", &s.mailConfig)
+	s.loadFile("meeting.json", &s.meetingConfig)
 	s.loadFile("syslog.json", &s.syslogConfig)
 	// Set session management defaults before loading (they're overridden if present in JSON)
 	s.securitySettings = SecuritySettings{
