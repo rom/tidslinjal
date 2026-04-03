@@ -245,3 +245,48 @@ func (app *App) handleImportIPBlacklist(w http.ResponseWriter, r *http.Request, 
 		fmt.Sprintf("SECURITY: Imported IP blacklist (%s mode, %d entries total)", mode, len(current.Entries)))
 	jsonOK(w, current)
 }
+
+// ── TLS Status endpoint (used by sidebar security tab) ─────────────────────────
+
+func (app *App) handleTLSStatus(w http.ResponseWriter, r *http.Request, user *User) {
+	tlsCfg := app.store.GetTLSConfig()
+	configured := tlsCfg.CertFile != "" && tlsCfg.KeyFile != ""
+	jsonOK(w, map[string]any{
+		"configured": configured,
+		"cert_file":  tlsCfg.CertFile,
+		"key_file":   tlsCfg.KeyFile,
+	})
+}
+
+// ── OIDC Config endpoint (used by sidebar security tab) ────────────────────────
+// This provides the /api/oidc/config endpoint that the frontend expects,
+// returning fields matching the sidebar.js expectations.
+
+func (app *App) handleOIDCConfigForSidebar(w http.ResponseWriter, r *http.Request, user *User) {
+	oidcCfg := app.store.GetOIDCSettings()
+	if !oidcCfg.Enabled || oidcCfg.Issuer == "" {
+		// Return empty/null so frontend shows "not configured"
+		jsonOK(w, map[string]any{})
+		return
+	}
+	exclusiveMode := oidcCfg.Exclusive || app.store.GetSecuritySettings().DisablePasswordLogin
+	defaultRole := oidcCfg.DefaultRole
+	if defaultRole == "" {
+		defaultRole = "teammember"
+	}
+	jsonOK(w, map[string]any{
+		"issuer":         oidcCfg.Issuer,
+		"client_id":      oidcCfg.ClientID,
+		"redirect_url":   oidcCfg.RedirectURL,
+		"exclusive_mode": exclusiveMode,
+		"sso_enabled":    oidcCfg.Enabled,
+		"default_role":   defaultRole,
+	})
+}
+
+// ── Security Policy endpoint (used by sidebar security tab) ────────────────────
+
+func (app *App) handleSecurityPolicy(w http.ResponseWriter, r *http.Request, user *User) {
+	ss := app.store.GetSecuritySettings()
+	jsonOK(w, ss)
+}

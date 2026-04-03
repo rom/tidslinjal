@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // AppVersion is the current application version.
 // Override at build time: go build -ldflags "-X main.AppVersion=1.2.3 -X main.BuildCommit=abc123 -X main.BuildTime=2024-01-01T00:00:00Z"
@@ -327,6 +330,8 @@ type UserPreferences struct {
 	A11yLargeClickTarget bool   `json:"a11y_large_click_targets,omitempty"` // enlarge click/touch targets (44px minimum)
 	A11yFontScaling      string `json:"a11y_font_scaling,omitempty"`      // 100 | 125 | 150 — percentage text scaling
 	A11ySkipLinks        bool   `json:"a11y_skip_links,omitempty"`        // show skip-to-content navigation links
+	// Dashboard widget configuration (persisted server-side)
+	DashboardConfig json.RawMessage `json:"dashboard_config,omitempty"` // JSON array of widget configs
 }
 
 // WorkspacePreset stores a full "working posture" that can be restored with one click

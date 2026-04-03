@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 )
@@ -228,4 +230,41 @@ func (app *App) handleDashboardData(w http.ResponseWriter, r *http.Request, user
 			"open_polls":        len(openPolls),
 		},
 	})
+}
+
+// ── Dashboard Config persistence ────────────────────────────────────────────
+
+// handleGetDashboardConfig returns the user's saved dashboard widget configuration.
+func (app *App) handleGetDashboardConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	prefs := app.store.GetPreferences(user.ID)
+	if len(prefs.DashboardConfig) == 0 {
+		// Return null so frontend falls back to defaults
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("null")) //nolint
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(prefs.DashboardConfig) //nolint
+}
+
+// handleSaveDashboardConfig saves the user's dashboard widget configuration.
+func (app *App) handleSaveDashboardConfig(w http.ResponseWriter, r *http.Request, user *User) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		jsonError(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+	// Validate it's valid JSON array
+	var check []json.RawMessage
+	if err := json.Unmarshal(body, &check); err != nil {
+		jsonError(w, "invalid dashboard config: expected JSON array", http.StatusBadRequest)
+		return
+	}
+	prefs := app.store.GetPreferences(user.ID)
+	prefs.DashboardConfig = json.RawMessage(body)
+	if err := app.store.SavePreferences(prefs); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "ok"})
 }

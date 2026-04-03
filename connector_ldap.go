@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"strings"
 	"sync"
-	"time"
+
+	ldaplib "github.com/go-ldap/ldap/v3"
 )
 
 // ── LDAP/Active Directory Connector ─────────────────────────────────────────
@@ -126,7 +126,7 @@ func (c *LDAPConnector) Poll(app *App) ([]IngestPayload, error) {
 	return nil, nil
 }
 
-// Authenticate performs LDAP bind authentication.
+// Authenticate performs LDAP bind authentication using go-ldap/ldap/v3.
 // Returns nil result and error message on failure.
 func (c *LDAPConnector) Authenticate(username, password string) (*LDAPAuthResult, error) {
 	c.mu.RLock()
@@ -136,38 +136,101 @@ func (c *LDAPConnector) Authenticate(username, password string) (*LDAPAuthResult
 	if !c.enabled {
 		return nil, fmt.Errorf("LDAP connector not enabled")
 	}
+	if username == "" || password == "" {
+		return nil, fmt.Errorf("username and password required")
+	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
-	// Connect
-	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	// Connect to LDAP server
+	var conn *ldaplib.Conn
+	var err error
+	if cfg.UseTLS {
+		tlsCfg := &tls.Config{
+			ServerName:         cfg.Host,
+			InsecureSkipVerify: cfg.SkipVerify, //nolint:gosec
+		}
+		conn, err = ldaplib.DialTLS("tcp", addr, tlsCfg)
+	} else {
+		conn, err = ldaplib.Dial("tcp", addr)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("LDAP connect failed: %w", err)
 	}
 	defer conn.Close()
 
-	// Upgrade to TLS if needed
-	if cfg.UseTLS || cfg.StartTLS {
-		tlsConn := tls.Client(conn, &tls.Config{
+	// Upgrade to TLS via STARTTLS if configured (non-LDAPS connections)
+	if cfg.StartTLS && !cfg.UseTLS {
+		tlsCfg := &tls.Config{
 			ServerName:         cfg.Host,
 			InsecureSkipVerify: cfg.SkipVerify, //nolint:gosec
-		})
-		if err := tlsConn.Handshake(); err != nil {
-			return nil, fmt.Errorf("LDAP TLS handshake failed: %w", err)
 		}
-		conn = tlsConn
+		if err := conn.StartTLS(tlsCfg); err != nil {
+			return nil, fmt.Errorf("LDAP STARTTLS failed: %w", err)
+		}
 	}
 
-	// SECURITY (V-02 fix): This is a stub implementation that does NOT perform
-	// actual LDAP bind authentication. Reject all authentication attempts until
-	// a proper LDAP library (e.g., go-ldap/ldap/v3) is integrated.
-	_ = conn // connection established but cannot perform LDAP bind without a proper library
+	// Step 1: Bind with service account to search for the user
+	if cfg.BindDN != "" {
+		if err := conn.Bind(cfg.BindDN, cfg.BindPassword); err != nil {
+			return nil, fmt.Errorf("LDAP service account bind failed: %w", err)
+		}
+	}
 
-	// Build the user DN from the filter (for logging only)
-	userFilter := strings.Replace(cfg.UserFilter, "%s", escapeLDAPFilter(username), 1)
+	// Step 2: Search for user entry
+	userFilter := strings.Replace(cfg.UserFilter, "%s", ldaplib.EscapeFilter(username), 1)
+	searchReq := ldaplib.NewSearchRequest(
+		cfg.BaseDN,
+		ldaplib.ScopeWholeSubtree, ldaplib.NeverDerefAliases, 1, 30, false,
+		userFilter,
+		[]string{"dn", cfg.AttrUsername, cfg.AttrDisplayName, cfg.AttrEmail, cfg.AttrGroups},
+		nil,
+	)
+	sr, err := conn.Search(searchReq)
+	if err != nil {
+		return nil, fmt.Errorf("LDAP user search failed: %w", err)
+	}
+	if len(sr.Entries) == 0 {
+		log.Printf("[LDAP] User %q not found (filter: %s)", username, userFilter)
+		return nil, fmt.Errorf("user not found in LDAP directory")
+	}
+	entry := sr.Entries[0]
 
-	log.Printf("[LDAP] REJECTED authentication for user %s — LDAP bind not implemented (filter: %s)", username, userFilter)
-	return nil, fmt.Errorf("LDAP authentication is not fully implemented — please use a proper LDAP library (go-ldap/ldap/v3) or configure OIDC instead")
+	// Step 3: Bind as the user to verify their password
+	if err := conn.Bind(entry.DN, password); err != nil {
+		log.Printf("[LDAP] Authentication failed for user %q (DN: %s)", username, entry.DN)
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	// Step 4: Extract user attributes
+	result := &LDAPAuthResult{
+		Username:    entry.GetAttributeValue(cfg.AttrUsername),
+		DisplayName: entry.GetAttributeValue(cfg.AttrDisplayName),
+		Email:       entry.GetAttributeValue(cfg.AttrEmail),
+		Groups:      entry.GetAttributeValues(cfg.AttrGroups),
+		Role:        Role(cfg.DefaultRole),
+	}
+	if result.Username == "" {
+		result.Username = username
+	}
+
+	// Step 5: Map LDAP groups to roles and J-designations
+	for _, groupDN := range result.Groups {
+		groupLower := strings.ToLower(groupDN)
+		for mappedGroup, role := range cfg.RoleMapping {
+			if strings.ToLower(mappedGroup) == groupLower {
+				result.Role = Role(role)
+			}
+		}
+		for mappedGroup, jdes := range cfg.JDesignationMapping {
+			if strings.ToLower(mappedGroup) == groupLower {
+				result.JDesignations = append(result.JDesignations, jdes)
+			}
+		}
+	}
+
+	log.Printf("[LDAP] Successfully authenticated user %q (role=%s, groups=%d)", result.Username, result.Role, len(result.Groups))
+	return result, nil
 }
 
 // GetConfig returns the current LDAP configuration (with password masked).
