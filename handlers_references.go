@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -528,4 +529,94 @@ func (app *App) handleReferenceIndex(w http.ResponseWriter, r *http.Request, use
 		"languages":   languages,
 		"tags":        tagCounts,
 	})
+}
+
+// ── Git Integration: Save / Load references to a version-controlled JSON file ──
+
+const referencesGitFile = "references_git_export.json"
+
+// handleGitSaveReferences exports all reference document metadata to a JSON file
+// in the data directory, suitable for version control with git.
+func (app *App) handleGitSaveReferences(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	refs := app.store.GetReferenceDocs()
+	data, err := json.MarshalIndent(refs, "", "  ")
+	if err != nil {
+		jsonError(w, "failed to marshal references: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	outPath := filepath.Join(app.store.ReferenceDir(), referencesGitFile)
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o750); err != nil {
+		jsonError(w, "failed to create directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := os.WriteFile(outPath, data, 0o640); err != nil {
+		jsonError(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	app.audit(user.ID, user.DisplayName, "exported", "references_git", 0,
+		fmt.Sprintf("Saved %d references to git export file", len(refs)))
+	jsonOK(w, map[string]any{"status": "ok", "count": len(refs), "path": outPath})
+}
+
+// handleGitLoadReferences imports reference document metadata from the git export
+// JSON file, merging with existing references (new entries are added, existing
+// entries with matching titles are updated).
+func (app *App) handleGitLoadReferences(w http.ResponseWriter, r *http.Request, user *User) {
+	if r.Method != http.MethodPost {
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	inPath := filepath.Join(app.store.ReferenceDir(), referencesGitFile)
+	data, err := os.ReadFile(inPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			jsonError(w, "no git export file found — save first", http.StatusNotFound)
+			return
+		}
+		jsonError(w, "failed to read file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var imported []ReferenceDoc
+	if err := json.Unmarshal(data, &imported); err != nil {
+		jsonError(w, "invalid JSON in export file: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Build lookup of existing references by title for merge
+	existing := app.store.GetReferenceDocs()
+	existingByTitle := make(map[string]int64, len(existing))
+	for _, rd := range existing {
+		existingByTitle[rd.Title] = rd.ID
+	}
+
+	added, updated := 0, 0
+	for _, rd := range imported {
+		if existingID, ok := existingByTitle[rd.Title]; ok {
+			// Update existing reference
+			rd.ID = existingID
+			if err := app.store.UpdateReferenceDoc(rd); err == nil {
+				updated++
+			}
+		} else {
+			// Add new reference
+			rd.ID = 0 // will be assigned by store
+			if _, err := app.store.AddReferenceDoc(rd); err == nil {
+				added++
+			}
+		}
+	}
+
+	app.audit(user.ID, user.DisplayName, "imported", "references_git", 0,
+		fmt.Sprintf("Loaded references from git: %d added, %d updated", added, updated))
+	jsonOK(w, map[string]any{"status": "ok", "added": added, "updated": updated})
 }

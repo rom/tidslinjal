@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -521,8 +523,9 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 			fmt.Fprintf(w, "[%d] %s | Status: %s | User: %s\n",
 				d.ID, d.Title, d.Status, d.DisplayName)
 		}
+	case "xlsx":
+		app.writeStatsXLSX(w, events, decisions)
 	default:
-		// xlsx not implemented server-side, fall back to JSON
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")
 		json.NewEncoder(w).Encode(data)
@@ -1932,4 +1935,123 @@ func (app *App) handleStatsUserLocations(w http.ResponseWriter, r *http.Request,
 		"user_locations":     userLocations,
 		"logins_by_location": loginsByLocation,
 	})
+}
+
+// ── Stats XLSX Export ──────────────────────────────────────────────────────────
+
+func (app *App) writeStatsXLSX(w http.ResponseWriter, events []Event, decisions []DecisionLogEntry) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+
+	// Two sheets: Events + Decisions
+	xlsxWriteFile(zw, "[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`)
+	xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+	xlsxWriteFile(zw, "xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Events" sheetId="1" r:id="rId1"/>
+    <sheet name="Decisions" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>`)
+	xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`)
+	xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+
+	// Sheet 1: Events
+	xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", statsXLSXEventsSheet(events))
+
+	// Sheet 2: Decisions
+	xlsxWriteFile(zw, "xl/worksheets/sheet2.xml", statsXLSXDecisionsSheet(decisions))
+
+	zw.Close()
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="stats_export_%s.xlsx"`, time.Now().Format("2006-01-02T150405")))
+	w.Write(buf.Bytes()) //nolint
+}
+
+func statsXLSXEventsSheet(events []Event) string {
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`)
+
+	headers := []string{"ID", "Title", "Status", "Type", "Start", "End", "Description", "Created By"}
+	sb.WriteString(`<row r="1">`)
+	for i, h := range headers {
+		sb.WriteString(xlsxCell(i, 1, h, 1))
+	}
+	sb.WriteString(`</row>`)
+
+	for idx, ev := range events {
+		r := idx + 2
+		endStr := ""
+		if ev.EndTime != nil {
+			endStr = ev.EndTime.Format("2006-01-02 15:04")
+		}
+		cells := []string{
+			fmt.Sprintf("%d", ev.ID),
+			ev.Title,
+			string(ev.Status),
+			ev.EventType,
+			ev.StartTime.Format("2006-01-02 15:04"),
+			endStr,
+			ev.Description,
+			ev.CreatedByName,
+		}
+		sb.WriteString(fmt.Sprintf(`<row r="%d">`, r))
+		for i, val := range cells {
+			sb.WriteString(xlsxCell(i, r, val, 0))
+		}
+		sb.WriteString(`</row>`)
+	}
+
+	sb.WriteString(`</sheetData></worksheet>`)
+	return sb.String()
+}
+
+func statsXLSXDecisionsSheet(decisions []DecisionLogEntry) string {
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`)
+
+	headers := []string{"ID", "Seq", "Title", "Decision", "Status", "Created By", "Created At"}
+	sb.WriteString(`<row r="1">`)
+	for i, h := range headers {
+		sb.WriteString(xlsxCell(i, 1, h, 1))
+	}
+	sb.WriteString(`</row>`)
+
+	for idx, d := range decisions {
+		r := idx + 2
+		cells := []string{
+			fmt.Sprintf("%d", d.ID),
+			d.SequenceNumber,
+			d.Title,
+			d.Decision,
+			d.Status,
+			d.DisplayName,
+			d.Timestamp.Format("2006-01-02 15:04"),
+		}
+		sb.WriteString(fmt.Sprintf(`<row r="%d">`, r))
+		for i, val := range cells {
+			sb.WriteString(xlsxCell(i, r, val, 0))
+		}
+		sb.WriteString(`</row>`)
+	}
+
+	sb.WriteString(`</sheetData></worksheet>`)
+	return sb.String()
 }

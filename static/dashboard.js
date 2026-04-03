@@ -19,7 +19,11 @@ let _dashboardData = null;
 let _dashboardRefreshTimer = null;
 let _dashboardClockTimer = null;
 
+let _dashboardConfigCache = null;
+
 function _getDashboardConfig() {
+  // Use cached server config if available
+  if (_dashboardConfigCache) return _dashboardConfigCache;
   try {
     const saved = localStorage.getItem('dashboard_config');
     if (saved) {
@@ -38,6 +42,39 @@ function _getDashboardConfig() {
 
 function _saveDashboardConfig(config) {
   try { localStorage.setItem('dashboard_config', JSON.stringify(config)); } catch { /* ignore */ }
+  // Persist to server (fire-and-forget)
+  _saveDashboardConfigToServer(config);
+}
+
+async function _loadDashboardConfigFromServer() {
+  try {
+    const res = await fetch('/api/dashboard/config', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data)) {
+        // Merge in any new default widgets missing from server config
+        for (const dw of _dashboardDefaults) {
+          if (!data.find(w => w.id === dw.id)) {
+            data.push({...dw});
+          }
+        }
+        _dashboardConfigCache = data;
+        // Also update localStorage as fallback
+        try { localStorage.setItem('dashboard_config', JSON.stringify(data)); } catch { /* ignore */ }
+        return data;
+      }
+    }
+  } catch { /* ignore — fall through to localStorage */ }
+  return null;
+}
+
+async function _saveDashboardConfigToServer(config) {
+  try {
+    const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const headers = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    if (csrf) headers['X-CSRF-Token'] = csrf[1];
+    await fetch('/api/dashboard/config', { method: 'PUT', headers, body: JSON.stringify(config) });
+  } catch { /* ignore */ }
 }
 
 function _closeDashboard() {
@@ -51,7 +88,9 @@ function _closeDashConfig() {
 }
 
 async function openDashboard() {
-  const config = _getDashboardConfig();
+  // Try loading config from server first, fall back to localStorage
+  const serverCfg = await _loadDashboardConfigFromServer();
+  const config = serverCfg || _getDashboardConfig();
 
   let html = `<div style="max-width:900px;width:95vw">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">

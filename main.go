@@ -181,6 +181,11 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	// Integration status (admin-only summary of SSO/TLS/Syslog/SMTP/Webhooks/API keys)
 	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 
+	// Sidebar security tab endpoints (admin-only, used by sidebar.js _optionalApiGet)
+	mux.HandleFunc("GET /api/tls/status", app.requireRole(RoleAdmin, app.handleTLSStatus))
+	mux.HandleFunc("GET /api/oidc/config", app.requireRole(RoleAdmin, app.handleOIDCConfigForSidebar))
+	mux.HandleFunc("GET /api/security/policy", app.requireRole(RoleAdmin, app.handleSecurityPolicy))
+
 	// Admin operations
 	mux.HandleFunc("/api/admin/reset", app.requireRole(RoleAdmin, app.handleAdminReset))
 	mux.HandleFunc("/api/admin/registration", func(w http.ResponseWriter, r *http.Request) {
@@ -972,6 +977,16 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/stats/slip-histogram", app.requireAuth(app.handleStatsSlipHistogram))
 	mux.HandleFunc("GET /api/stats/op-tempo", app.requireAuth(app.handleStatsOpTempo))
 	mux.HandleFunc("GET /api/dashboard", app.requireAuth(app.handleDashboardData))
+	mux.HandleFunc("/api/dashboard/config", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetDashboardConfig)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleSaveDashboardConfig)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("GET /api/stats/leadership-dashboard", app.requireRole(RoleOpLead, app.handleStatsLeadershipDashboard))
 	mux.HandleFunc("GET /api/stats/personnel-performance", app.requireAuth(app.handleStatsPersonnelPerformance))
 	mux.HandleFunc("GET /api/stats/usage", app.requireAuth(app.handleStatsUsage))
@@ -2198,6 +2213,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	})
 
 	// ── References ──
+	mux.HandleFunc("POST /api/references/git/save", app.requireRole(RoleTeamLead, app.handleGitSaveReferences))
+	mux.HandleFunc("POST /api/references/git/load", app.requireRole(RoleTeamLead, app.handleGitLoadReferences))
 	mux.HandleFunc("/api/references", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
