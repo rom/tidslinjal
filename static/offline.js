@@ -124,6 +124,12 @@ if (_origApiGet) {
 window._offlineActionQueue = JSON.parse(localStorage.getItem('tidslinjal_offline_queue') || '[]');
 
 function _queueOfflineAction(method, path, body) {
+  // Deduplicate: for PUT/DELETE on the same path, keep only the latest action
+  if (method === 'PUT' || method === 'DELETE') {
+    window._offlineActionQueue = window._offlineActionQueue.filter(
+      a => !(a.method === method && a.path === path)
+    );
+  }
   window._offlineActionQueue.push({ method, path, body, timestamp: Date.now() });
   try { localStorage.setItem('tidslinjal_offline_queue', JSON.stringify(window._offlineActionQueue)); } catch {}
 }
@@ -132,13 +138,29 @@ async function _syncOfflineQueue() {
   const queue = window._offlineActionQueue.slice();
   if (queue.length === 0) return;
   const failed = [];
+  const maxRetries = 3;
   for (const action of queue) {
-    try {
-      const res = await api(action.method, action.path, action.body);
-      if (!res.ok && res.status !== 409) failed.push(action); // 409 = conflict, skip
-    } catch {
-      failed.push(action);
+    let success = false;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const res = await api(action.method, action.path, action.body);
+        if (res.ok || res.status === 409) {
+          // 409 = conflict, skip (already applied)
+          success = true;
+          break;
+        }
+        if (res.status >= 400 && res.status < 500) {
+          // Client error (bad request, forbidden, etc.) — don't retry
+          success = true; // discard, retrying won't help
+          break;
+        }
+      } catch { /* network error, retry */ }
+      // Exponential backoff: 1s, 2s, 4s
+      if (attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+      }
     }
+    if (!success) failed.push(action);
   }
   window._offlineActionQueue = failed;
   try { localStorage.setItem('tidslinjal_offline_queue', JSON.stringify(failed)); } catch {}

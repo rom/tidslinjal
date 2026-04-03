@@ -69,11 +69,15 @@ func (app *App) handleFreeBusy(w http.ResponseWriter, r *http.Request, user *Use
 // ── Meeting config handlers ────────────────────────────────────────────────────
 
 func (app *App) handleGetMeetingConfig(w http.ResponseWriter, r *http.Request, user *User) {
-	// Return meeting config (without secrets)
-	jsonOK(w, map[string]interface{}{
-		"teams_enabled": false,
-		"zoom_enabled":  false,
-	})
+	cfg := app.store.GetMeetingConfig()
+	// Mask secrets before returning
+	if cfg.TeamsSecret != "" {
+		cfg.TeamsSecret = "••••••••"
+	}
+	if cfg.ZoomSecret != "" {
+		cfg.ZoomSecret = "••••••••"
+	}
+	jsonOK(w, cfg)
 }
 
 func (app *App) handleSaveMeetingConfig(w http.ResponseWriter, r *http.Request, user *User) {
@@ -82,7 +86,18 @@ func (app *App) handleSaveMeetingConfig(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	// Store meeting config (future: persist and use for auto-creation)
+	// If secrets are masked, preserve the existing ones
+	existing := app.store.GetMeetingConfig()
+	if cfg.TeamsSecret == "••••••••" || cfg.TeamsSecret == "" {
+		cfg.TeamsSecret = existing.TeamsSecret
+	}
+	if cfg.ZoomSecret == "••••••••" || cfg.ZoomSecret == "" {
+		cfg.ZoomSecret = existing.ZoomSecret
+	}
+	if err := app.store.SaveMeetingConfig(cfg); err != nil {
+		jsonError(w, "failed to save meeting config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.Username,
 		Action: "updated", EntityType: "meeting_config", EntityID: 0,

@@ -133,6 +133,22 @@ func (s *Store) SaveMailConfig(cfg MailConfig) error {
 	return s.persist("mail.json", snap)
 }
 
+// ── Meeting Config ────────────────────────────────────────────────────────────
+
+func (s *Store) GetMeetingConfig() MeetingConfig {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.meetingConfig
+}
+
+func (s *Store) SaveMeetingConfig(cfg MeetingConfig) error {
+	s.mu.Lock()
+	s.meetingConfig = cfg
+	snap := cfg
+	s.mu.Unlock()
+	return s.persist("meeting.json", snap)
+}
+
 // ── Syslog Config ──────────────────────────────────────────────────────────────
 
 func (s *Store) GetSyslogConfig() SyslogConfig {
@@ -360,6 +376,7 @@ func (s *Store) GetAllSettings() map[string]interface{} {
 		"registration": s.registrationSettings,
 		"oidc":         s.oidcSettings,
 		"mail":         s.mailConfig,
+		"meeting":      s.meetingConfig,
 		"syslog":       s.syslogConfig,
 		"security":     s.securitySettings,
 		"tls":          s.tlsConfig,
