@@ -2048,6 +2048,18 @@ TRANSLATIONS.nl = {
     board_filter_apply: 'Filter toepassen',
     board_filter_clear: 'Wissen',
     board_filter_list_desc: 'Filter borden op de eigenschappen van hun items. Borden zonder overeenkomende items worden verborgen.',
+
+    // Board search
+    board_search: 'Zoeken',
+    board_search_title: 'Borditems doorzoeken',
+    board_search_desc: 'Zoek in alle borditems: notities, activiteitenlogboeken, opmerkingen, verantwoordelijke, type, prioriteit, data, tags, links, bijlagen en geschiedenis.',
+    board_search_placeholder: 'Zoeken...',
+    board_search_go: 'Zoeken',
+    board_search_clear: 'Wissen',
+    board_search_enter: 'Voer een zoekterm in.',
+    board_search_no_results: 'Geen resultaten gevonden.',
+    board_search_results: 'resultaat(-aten) gevonden',
+    board_search_searching: 'Zoeken...',
     board_subject: 'Onderwerp',
     board_assigned: 'Toegewezen',
     board_due: 'Vervaldatum',

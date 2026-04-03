@@ -3251,7 +3251,7 @@ function _clearBoardListFilter() {
 function _openBoardSearchPanel() {
   const q = _boardsState.searchQuery || '';
   let html = `<div style="max-width:560px">
-    <h3>🔎 ${t('board_search')||'Search Board Items'}</h3>
+    <h3>🔎 ${t('board_search_title')||'Search Board Items'}</h3>
     <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('board_search_desc')||'Search across all board items: notes, activity logs, comments, responsible, type, priority, due dates, tags, links, attachments, and history.'}</p>
 
     <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -3283,7 +3283,7 @@ async function _doBoardSearch() {
   if (!resultsDiv) return;
   if (!q) { resultsDiv.innerHTML = `<p style="color:var(--text-dim)">${t('board_search_enter')||'Enter a search term.'}</p>`; return; }
 
-  resultsDiv.innerHTML = `<p style="color:var(--text-dim)">Searching...</p>`;
+  resultsDiv.innerHTML = `<p style="color:var(--text-dim)">${t('board_search_searching')||'Searching...'}</p>`;
 
   const results = [];
   const boards = _boardsState.boards || [];

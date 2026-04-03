@@ -1964,6 +1964,18 @@ TRANSLATIONS.sv = {
     board_filter_apply: 'Tillämpa filter',
     board_filter_clear: 'Rensa',
     board_filter_list_desc: 'Filtrera tavlor efter deras objekts egenskaper. Tavlor utan matchande objekt döljs.',
+
+    // Board search
+    board_search: 'Sök',
+    board_search_title: 'Sök bland tavlobjekt',
+    board_search_desc: 'Sök bland alla tavlobjekt: anteckningar, aktivitetsloggar, kommentarer, ansvarig, typ, prioritet, datum, taggar, länkar, bilagor och historik.',
+    board_search_placeholder: 'Sök...',
+    board_search_go: 'Sök',
+    board_search_clear: 'Rensa',
+    board_search_enter: 'Ange ett sökord.',
+    board_search_no_results: 'Inga resultat hittades.',
+    board_search_results: 'resultat hittade',
+    board_search_searching: 'Söker...',
     board_share_desc: 'Alla med ett konto och lämpliga åtkomsträttigheter kan använda denna länk för att visa tavlan.',
     board_share_item: 'Dela objektlänk',
     board_share_item_desc: 'Alla med ett konto och åtkomst till denna tavla kan använda denna länk för att visa objektet.',

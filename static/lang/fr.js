@@ -1987,6 +1987,18 @@ TRANSLATIONS.fr = {
     board_filter_apply: 'Appliquer le filtre',
     board_filter_clear: 'Effacer',
     board_filter_list_desc: 'Filtrer les tableaux par les propriétés de leurs éléments. Les tableaux sans éléments correspondants seront masqués.',
+
+    // Board search
+    board_search: 'Rechercher',
+    board_search_title: 'Rechercher dans les éléments du tableau',
+    board_search_desc: 'Rechercher dans tous les éléments du tableau : notes, journaux d\'activité, commentaires, responsable, type, priorité, dates, tags, liens, pièces jointes et historique.',
+    board_search_placeholder: 'Rechercher...',
+    board_search_go: 'Rechercher',
+    board_search_clear: 'Effacer',
+    board_search_enter: 'Entrez un terme de recherche.',
+    board_search_no_results: 'Aucun résultat trouvé.',
+    board_search_results: 'résultat(s) trouvé(s)',
+    board_search_searching: 'Recherche en cours...',
     board_subject: 'Sujet',
     board_assigned: 'Assigné',
     board_due: 'Échéance',

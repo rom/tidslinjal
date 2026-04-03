@@ -1720,6 +1720,18 @@ TRANSLATIONS.da = {
     board_filter_apply: 'Anvend filter',
     board_filter_clear: 'Ryd',
     board_filter_list_desc: 'Filtrer tavler efter deres elementers egenskaber. Tavler uden matchende elementer skjules.',
+
+    // Board search
+    board_search: 'Søg',
+    board_search_title: 'Søg i tavleelementer',
+    board_search_desc: 'Søg på tværs af alle tavleelementer: noter, aktivitetslogger, kommentarer, ansvarlig, type, prioritet, datoer, tags, links, vedhæftninger og historik.',
+    board_search_placeholder: 'Søg...',
+    board_search_go: 'Søg',
+    board_search_clear: 'Ryd',
+    board_search_enter: 'Indtast et søgeord.',
+    board_search_no_results: 'Ingen resultater fundet.',
+    board_search_results: 'resultat(er) fundet',
+    board_search_searching: 'Søger...',
     board_subject: 'Emne',
     board_assigned: 'Tildelt',
     board_due: 'Forfald',

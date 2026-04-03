@@ -2135,6 +2135,17 @@ TRANSLATIONS.en = {
     board_filter_apply: 'Apply Filter',
     board_filter_clear: 'Clear',
     board_filter_list_desc: 'Filter boards by their items\' properties. Boards with no matching items will be hidden.',
+    // Board search
+    board_search: 'Search',
+    board_search_title: 'Search Board Items',
+    board_search_desc: 'Search across all board items: notes, activity logs, comments, responsible, type, priority, due dates, tags, links, attachments, and history.',
+    board_search_placeholder: 'Search...',
+    board_search_go: 'Search',
+    board_search_clear: 'Clear',
+    board_search_enter: 'Enter a search term.',
+    board_search_no_results: 'No results found.',
+    board_search_results: 'result(s) found',
+    board_search_searching: 'Searching...',
     // Board analysis
     analysis_boards_title: 'Board Statistics',
     analysis_boards_total: 'Total Boards',

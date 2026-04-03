@@ -2048,6 +2048,18 @@ TRANSLATIONS.de = {
     board_filter_apply: 'Filter anwenden',
     board_filter_clear: 'Löschen',
     board_filter_list_desc: 'Boards nach Eigenschaften ihrer Elemente filtern. Boards ohne passende Elemente werden ausgeblendet.',
+
+    // Board search
+    board_search: 'Suchen',
+    board_search_title: 'Board-Elemente durchsuchen',
+    board_search_desc: 'Suche über alle Board-Elemente: Notizen, Aktivitätsprotokolle, Kommentare, Verantwortliche, Typ, Priorität, Termine, Tags, Links, Anhänge und Verlauf.',
+    board_search_placeholder: 'Suchen...',
+    board_search_go: 'Suchen',
+    board_search_clear: 'Löschen',
+    board_search_enter: 'Geben Sie einen Suchbegriff ein.',
+    board_search_no_results: 'Keine Ergebnisse gefunden.',
+    board_search_results: 'Ergebnis(se) gefunden',
+    board_search_searching: 'Suche läuft...',
     board_subject: 'Betreff',
     board_assigned: 'Zugewiesen',
     board_due: 'Fällig',
