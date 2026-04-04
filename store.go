@@ -52,6 +52,7 @@ type Store struct {
 	editingLocks         []EditingLock // in-memory only; not persisted
 	routingRules         []RoutingRule
 	connectorConfigs     []ConnectorConfig
+	diary                []DiaryEntry
 	decisionLog          []DecisionLogEntry
 	eventLog             []EventLogEntry
 	logBook              []LogBookEntry
@@ -108,6 +109,7 @@ type Store struct {
 	nextEventVersionID      int64
 	nextAutoReportScheduleID int64
 	nextRoutingRuleID        int64
+	nextDiaryID              int64
 	nextDecisionLogID        int64
 	nextMapLocationID        int64
 	nextRoomID               int64
@@ -224,6 +226,7 @@ func (s *Store) load() error {
 	s.loadFile("auto_report_schedules.json", &s.autoReportSchedules)
 	s.loadFile("routing_rules.json", &s.routingRules)
 	s.loadFile("connectors.json", &s.connectorConfigs)
+	s.loadFile("diary.json", &s.diary)
 	s.loadFile("decision_log.json", &s.decisionLog)
 	s.loadFile("map_locations.json", &s.mapLocations)
 	s.loadFile("federated_idps.json", &s.federatedIdPs)
@@ -387,6 +390,11 @@ func (s *Store) load() error {
 	for _, x := range s.routingRules {
 		if x.ID > s.nextRoutingRuleID {
 			s.nextRoutingRuleID = x.ID
+		}
+	}
+	for _, x := range s.diary {
+		if x.ID > s.nextDiaryID {
+			s.nextDiaryID = x.ID
 		}
 	}
 	for _, x := range s.decisionLog {

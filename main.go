@@ -936,6 +936,37 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("POST /api/decision-log/{id}/share", app.requireRole(RoleTeamLead, app.handleGenerateDecisionLogShareToken))
 	mux.HandleFunc("GET /api/decision-log/shared", app.requireAuth(app.handleGetDecisionLogByShareToken))
 
+	// ── Diary ──
+	mux.HandleFunc("GET /api/diary", app.requireAuth(app.handleListDiary))
+	mux.HandleFunc("POST /api/diary", app.requireAuth(app.handleCreateDiaryEntry))
+	mux.HandleFunc("GET /api/diary/export", app.requireAuth(app.handleExportDiary))
+	mux.HandleFunc("POST /api/diary/import", app.requireAuth(app.handleImportDiary))
+	mux.HandleFunc("/api/diary/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.Trim(r.URL.Path, "/")
+		parts := strings.Split(path, "/")
+		// /api/diary/{id}/attachment/{filename}
+		if len(parts) == 5 && parts[3] == "attachment" && r.Method == http.MethodGet {
+			app.requireAuth(app.handleDiaryAttachmentDownload)(w, r)
+			return
+		}
+		// /api/diary/{id}/attachment
+		if len(parts) == 4 && parts[3] == "attachment" && r.Method == http.MethodPost {
+			app.requireAuth(app.handleDiaryAttachment)(w, r)
+			return
+		}
+		// /api/diary/{id}
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetDiaryEntry)(w, r)
+		case http.MethodPut:
+			app.requireAuth(app.handleUpdateDiaryEntry)(w, r)
+		case http.MethodDelete:
+			app.requireAuth(app.handleDeleteDiaryEntry)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Report Archive
 	mux.HandleFunc("GET /api/report-archive", app.requireAuth(app.handleListReportArchive))
 	mux.HandleFunc("POST /api/report-archive", app.requireRole(RoleTeamLead, app.handleUploadReportArchive))
