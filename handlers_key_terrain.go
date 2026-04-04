@@ -44,6 +44,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Threat        string `json:"threat"`
 		External      string `json:"external"`
 		Priority      int    `json:"priority"`
+		Zone          string `json:"zone"`
 		ResponsibleID int64  `json:"responsible_id"`
 		Responsible   string `json:"responsible"`
 		Actions       string `json:"actions"`
@@ -57,7 +58,17 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Auto-assign seq_num
+	seqNum := 1
+	for _, e := range app.store.GetKeyTerrainEntries() {
+		if e.SeqNum >= seqNum {
+			seqNum = e.SeqNum + 1
+		}
+	}
+
 	entry := KeyTerrainEntry{
+		SeqNum:   seqNum,
+		Zone:     req.Zone,
 		Function: req.Function,
 		Status:   req.Status,
 		Trend:    req.Trend,
@@ -118,6 +129,7 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Threat        *string `json:"threat"`
 		External      *string `json:"external"`
 		Priority      *int    `json:"priority"`
+		Zone          *string `json:"zone"`
 		ResponsibleID *int64  `json:"responsible_id"`
 		Responsible   *string `json:"responsible"`
 		Actions       *string `json:"actions"`
@@ -162,6 +174,10 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	if req.Priority != nil && *req.Priority != entry.Priority {
 		addHist("priority", fmt.Sprintf("%d", entry.Priority), fmt.Sprintf("%d", *req.Priority))
 		entry.Priority = *req.Priority
+	}
+	if req.Zone != nil && *req.Zone != entry.Zone {
+		addHist("zone", entry.Zone, *req.Zone)
+		entry.Zone = *req.Zone
 	}
 	if req.Actions != nil && *req.Actions != entry.Actions {
 		addHist("actions", entry.Actions, *req.Actions)
