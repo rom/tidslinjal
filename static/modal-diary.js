@@ -4,7 +4,7 @@
 let _diaryEntries = [];
 let _diaryFilter = { search: '', tag: '', author: '', private: '' };
 
-// ── Rich text field helper (reused from key-terrain pattern) ─────────────
+// ── Rich text field helper ───────────────────────────────────────────────
 
 // Prevent keyboard events inside diary modals from leaking to the parent app
 // (timeline shortcuts, navigation keys, etc.)
@@ -17,28 +17,38 @@ function _diaryTrapModalKeys(modalId) {
   el.addEventListener('keypress', stop);
 }
 
+// Attach event listeners to toolbar buttons inside a container.
+// Uses data-diary-cmd for execCommand buttons and data-diary-action for special buttons.
+// mousedown preventDefault keeps focus in the contenteditable editor.
+function _diaryBindToolbar(container, editorId) {
+  container.querySelectorAll('[data-diary-cmd]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => document.execCommand(btn.dataset.diaryCmd));
+  });
+  container.querySelectorAll('[data-diary-action]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.diaryAction;
+      if (action === 'insertLink') _diaryInsertLink(editorId);
+      else if (action === 'insertImage') _diaryInsertImage(editorId);
+    });
+  });
+}
+
 function _diaryRichField(id, value, placeholder, height) {
-  // Use onmousedown="event.preventDefault()" on toolbar buttons to prevent
-  // them from stealing focus away from the contenteditable editor.
-  const pb = 'onmousedown="event.preventDefault()"'; // prevent blur
   const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="diary-rich-toolbar">
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('bold')" title="Bold"><b>B</b></button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('italic')" title="Italic"><i>I</i></button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('underline')" title="Underline"><u>U</u></button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('strikethrough')" title="Strikethrough"><s>S</s></button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('insertUnorderedList')" title="Bullet list">• List</button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('insertOrderedList')" title="Numbered list">1. List</button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryInsertLink('${id}')" title="Insert link">🔗</button>
-    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryInsertImage('${id}')" title="Insert image">🖼</button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="bold" title="Bold"><b>B</b></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="italic" title="Italic"><i>I</i></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="underline" title="Underline"><u>U</u></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="strikethrough" title="Strikethrough"><s>S</s></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="insertUnorderedList" title="Bullet list">• List</button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="insertOrderedList" title="Numbered list">1. List</button>
+    <button type="button" class="btn btn-sm" data-diary-action="insertLink" title="Insert link">🔗</button>
+    <button type="button" class="btn btn-sm" data-diary-action="insertImage" title="Insert image">🖼</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input"
     style="width:100%;min-height:${height};max-height:400px;overflow-y:auto;resize:vertical;padding:8px;font-size:var(--fs-sm);white-space:pre-wrap;word-break:break-word;line-height:1.5"
     data-placeholder="${escHtml(placeholder)}">${value||''}</div>`;
-}
-
-// Execute a formatting command while keeping focus in the editor
-function _diaryExecCmd(cmd) {
-  document.execCommand(cmd);
 }
 
 function _diaryInsertLink(fieldId) {
@@ -54,6 +64,18 @@ function _diaryInsertImage(fieldId) {
   if (!url) return;
   const el = document.getElementById(fieldId);
   if (el) { el.focus(); document.execCommand('insertHTML', false, `<img src="${escHtml(url)}" style="max-width:100%;border-radius:4px;margin:4px 0" alt="image">`); }
+}
+
+// ── Wire filter controls via addEventListener (CSP-safe) ─────────────────
+function _diaryBindFilterListeners() {
+  const search = document.getElementById('diarySearchInput');
+  const author = document.getElementById('diaryFilterAuthor');
+  const tag = document.getElementById('diaryFilterTag');
+  const vis = document.getElementById('diaryFilterPrivate');
+  if (search) search.addEventListener('input', _diaryApplyFilter);
+  if (author) author.addEventListener('change', _diaryApplyFilter);
+  if (tag) tag.addEventListener('change', _diaryApplyFilter);
+  if (vis) vis.addEventListener('change', _diaryApplyFilter);
 }
 
 // ── Open Diary Modal ────────────────────────────────────────────────────────
@@ -80,14 +102,14 @@ async function openDiaryModal() {
           <button class="btn btn-primary btn-sm" data-action="_diaryNewEntry">+ ${t('diary_new_entry')||'New Entry'}</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-          <input id="diarySearchInput" class="input" style="flex:1;min-width:150px;font-size:var(--fs-xs)" placeholder="${t('diary_search_placeholder')||'Search diary...'}" oninput="_diaryApplyFilter()">
-          <select id="diaryFilterAuthor" class="input" style="font-size:var(--fs-xs)" onchange="_diaryApplyFilter()">
+          <input id="diarySearchInput" class="input" style="flex:1;min-width:150px;font-size:var(--fs-xs)" placeholder="${t('diary_search_placeholder')||'Search diary...'}">
+          <select id="diaryFilterAuthor" class="input" style="font-size:var(--fs-xs)">
             <option value="">— ${t('diary_all_authors')||'All authors'} —</option>
           </select>
-          <select id="diaryFilterTag" class="input" style="font-size:var(--fs-xs)" onchange="_diaryApplyFilter()">
+          <select id="diaryFilterTag" class="input" style="font-size:var(--fs-xs)">
             <option value="">— ${t('diary_all_tags')||'All tags'} —</option>
           </select>
-          <select id="diaryFilterPrivate" class="input" style="font-size:var(--fs-xs)" onchange="_diaryApplyFilter()">
+          <select id="diaryFilterPrivate" class="input" style="font-size:var(--fs-xs)">
             <option value="">${t('diary_all_visibility')||'All'}</option>
             <option value="public">${t('diary_public')||'Public'}</option>
             <option value="private">${t('diary_private')||'Private'}</option>
@@ -99,6 +121,7 @@ async function openDiaryModal() {
   document.body.appendChild(modal);
   _diaryTrapModalKeys('diaryModal');
   if (typeof _bindActions === 'function') _bindActions(modal);
+  _diaryBindFilterListeners();
   _diaryPopulateFilters();
   _diaryRenderList();
 }
@@ -210,7 +233,7 @@ function _diaryShowEditor(entry) {
     <div class="modal" style="max-width:700px;max-height:90vh;display:flex;flex-direction:column">
       <div class="modal-header">
         <h3>${isEdit ? (t('diary_edit_entry')||'Edit Diary Entry') : (t('diary_new_entry')||'New Diary Entry')}</h3>
-        <button class="modal-close" onclick="document.getElementById('diaryEditorModal')?.remove()">&times;</button>
+        <button class="modal-close" data-action="_diaryCloseEditor">&times;</button>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
         <div style="margin-bottom:8px">
@@ -250,15 +273,20 @@ function _diaryShowEditor(entry) {
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
           <button class="btn btn-primary btn-sm" data-action="_diarySaveEntry" data-arg="${entry?.id||''}">${t('btn_save')||'Save'}</button>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('diaryEditorModal')?.remove()">${t('btn_cancel')||'Cancel'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="_diaryCloseEditor">${t('btn_cancel')||'Cancel'}</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(modal);
   _diaryTrapModalKeys('diaryEditorModal');
   if (typeof _bindActions === 'function') _bindActions(modal);
+  _diaryBindToolbar(modal, 'diaryEditBody');
   // Auto-focus the title field
   setTimeout(() => document.getElementById('diaryEditTitle')?.focus(), 50);
+}
+
+function _diaryCloseEditor() {
+  document.getElementById('diaryEditorModal')?.remove();
 }
 
 async function _diarySaveEntry(idStr) {
@@ -294,7 +322,7 @@ async function _diarySaveEntry(idStr) {
         });
       }
     }
-    document.getElementById('diaryEditorModal')?.remove();
+    _diaryCloseEditor();
     // Refresh
     _diaryEntries = await apiGet('/api/diary') || [];
     _diaryPopulateFilters();
@@ -368,24 +396,30 @@ function _diaryExportMenu() {
     <div class="modal" style="max-width:300px">
       <div class="modal-header">
         <h3>${t('diary_export')||'Export Diary'}</h3>
-        <button class="modal-close" onclick="document.getElementById('diaryExportMenu')?.remove()">&times;</button>
+        <button class="modal-close" data-action="_diaryCloseExportMenu">&times;</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn btn-secondary" onclick="_diaryDoExport('json')">JSON</button>
-        <button class="btn btn-secondary" onclick="_diaryDoExport('xml')">XML</button>
-        <button class="btn btn-secondary" onclick="_diaryDoExport('csv')">CSV</button>
-        <button class="btn btn-secondary" onclick="_diaryDoExport('txt')">${t('diary_export_text')||'Text'}</button>
-        <button class="btn btn-secondary" onclick="_diaryDoExport('rtf')">RTF</button>
-        <button class="btn btn-secondary" onclick="_diaryDoExport('xlsx')">XLSX</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="json">JSON</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="xml">XML</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="csv">CSV</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="txt">${t('diary_export_text')||'Text'}</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="rtf">RTF</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="xlsx">XLSX</button>
         <hr>
-        <button class="btn btn-secondary" onclick="_diaryPrintAll()">🖨 ${t('diary_print_all')||'Print All'}</button>
+        <button class="btn btn-secondary" data-action="_diaryPrintAll">🖨 ${t('diary_print_all')||'Print All'}</button>
       </div>
     </div>`;
   document.body.appendChild(menu);
+  _diaryTrapModalKeys('diaryExportMenu');
+  if (typeof _bindActions === 'function') _bindActions(menu);
+}
+
+function _diaryCloseExportMenu() {
+  document.getElementById('diaryExportMenu')?.remove();
 }
 
 function _diaryDoExport(format) {
-  document.getElementById('diaryExportMenu')?.remove();
+  _diaryCloseExportMenu();
   window.open('/api/diary/export?format=' + format, '_blank');
 }
 
