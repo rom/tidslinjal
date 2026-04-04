@@ -282,7 +282,7 @@ function _renderKeyTerrainBoard() {
       rounds: `<td style="padding:8px;text-align:center;font-weight:600">${e.rounds || 0}</td>`,
     };
 
-    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}${canWrite?';cursor:pointer':''}" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${rowBg}'" ${canWrite ? `data-action="_ktEditEntry" data-arg="${e.id}"` : ''}>
+    html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}${canWrite?';cursor:pointer':''}" data-row-bg="${rowBg}" ${canWrite ? `data-action="_ktEditEntry" data-arg="${e.id}"` : ''}>
       ${cols.map(c => cellHtml[c]).join('')}
       ${canWrite ? `<td style="padding:8px;text-align:center;white-space:nowrap" data-stop-prop>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 4px" data-action="_ktMoveEntry" data-args='[${e.id},-1]' data-stop-prop title="${t('kt_move_up')||'Move up'}">\u25B2</button>
@@ -340,6 +340,22 @@ function _renderKeyTerrainBoard() {
     if (typeof openModal === 'function') openModal('keyTerrainModal');
     if (typeof _bindActions === 'function') _bindActions(document.getElementById('keyTerrainModal'));
   }
+  // Wire row hover via event delegation (CSP-safe, no inline handlers)
+  _ktBindRowHover();
+}
+
+// CSP-safe row hover: attach mouseover/mouseout listeners via delegation
+function _ktBindRowHover() {
+  const table = document.getElementById('ktBoardTable');
+  if (!table) return;
+  table.addEventListener('mouseover', (e) => {
+    const tr = e.target.closest('tr[data-row-bg]');
+    if (tr) tr.style.background = 'var(--bg3)';
+  });
+  table.addEventListener('mouseout', (e) => {
+    const tr = e.target.closest('tr[data-row-bg]');
+    if (tr) tr.style.background = tr.dataset.rowBg;
+  });
 }
 
 function _ktAddEntry() {
@@ -423,6 +439,7 @@ async function _ktEditEntry(entryId) {
 
   _boardModal('ktEditModal', html, '560px');
   _ktTrapModalKeys('ktEditModal');
+  _ktBindRichToolbars(document.getElementById('ktEditModal'));
 
   // Wire autocomplete for responsible
   const respInput = document.getElementById('ktResponsible');
@@ -763,9 +780,13 @@ function _ktPrint() {
   w.document.write(`<h2>\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>`);
   w.document.write(`<p>${t('kt_desc')||'Cyber key terrain overview'} \u2014 ${new Date().toLocaleString()}</p>`);
   w.document.write(table.outerHTML);
-  w.document.write(`<br><button onclick="window.print()">Print</button></body></html>`);
+  w.document.write(`<br><button id="ktPrintBtn">Print</button></body></html>`);
   w.document.close();
-  setTimeout(() => w.print(), 300);
+  setTimeout(() => {
+    const btn = w.document.getElementById('ktPrintBtn');
+    if (btn) btn.addEventListener('click', () => w.print());
+    w.print();
+  }, 300);
 }
 
 // ── Export ──
@@ -1199,14 +1220,27 @@ function _ktShowHistory(entryId) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function _ktRichField(id, value, placeholder, height) {
-  const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="kt-rich-toolbar">
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-weight:700" onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-style:italic" onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:underline" onclick="document.execCommand('underline')" title="Underline"><u>U</u></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:line-through" onclick="document.execCommand('strikethrough')" title="Strikethrough"><s>S</s></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px" onclick="_ktRichInsertLink('${id}')" title="Insert link">\u{1F517}</button>
+  const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="kt-rich-toolbar" data-kt-editor="${id}">
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-weight:700" data-kt-cmd="bold" title="Bold"><b>B</b></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-style:italic" data-kt-cmd="italic" title="Italic"><i>I</i></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:underline" data-kt-cmd="underline" title="Underline"><u>U</u></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:line-through" data-kt-cmd="strikethrough" title="Strikethrough"><s>S</s></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px" data-kt-link="${id}" title="Insert link">\u{1F517}</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input" style="width:100%;min-height:${height};max-height:150px;overflow-y:auto;resize:vertical;padding:6px;font-size:var(--fs-xs);white-space:pre-wrap;word-break:break-word" data-placeholder="${escHtml(placeholder)}">${value}</div>`;
+}
+
+// Bind KT rich text toolbar buttons (CSP-safe) — call after modal is created
+function _ktBindRichToolbars(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-kt-cmd]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => document.execCommand(btn.dataset.ktCmd));
+  });
+  container.querySelectorAll('[data-kt-link]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => _ktRichInsertLink(btn.dataset.ktLink));
+  });
 }
 
 function _ktRichInsertLink(fieldId) {
