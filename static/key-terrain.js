@@ -179,10 +179,10 @@ function _renderKeyTerrainBoard() {
 
   // Column definitions
   const colDef = {
-    seq_num:     { icon: '#', label: t('kt_seq_num')||'#', align: 'center', extra: 'white-space:nowrap;width:40px' },
+    seq_num:     { icon: '#', label: t('kt_seq_num')||'Seq', align: 'center', extra: 'white-space:nowrap;width:40px' },
     zone:        { icon: '\u{1F310}', label: t('kt_zone')||'Zone', align: 'left', extra: 'min-width:80px' },
     priority:    { icon: '\u26A1', label: t('kt_priority')||'Pri', align: 'left', extra: 'white-space:nowrap' },
-    function:    { icon: '\u{1F3AF}', label: t('kt_function')||'Function', align: 'left', extra: 'min-width:140px' },
+    function:    { icon: '\u{1F3AF}', label: t('kt_function')||'Capability', align: 'left', extra: 'min-width:140px' },
     status:      { icon: '\u{1F4CA}', label: t('kt_status')||'Status', align: 'center', extra: '' },
     trend:       { icon: '\u{1F4C8}', label: t('kt_trend')||'Trend', align: 'center', extra: '' },
     threat:      { icon: '\u2694\uFE0F', label: t('kt_threat')||'Threat', align: 'left', extra: 'min-width:120px' },
@@ -369,14 +369,26 @@ async function _ktEditEntry(entryId) {
     if (found) entry = { ...found };
   }
 
+  // Load capabilities for the "from capability" picker
+  let capabilities = [];
+  try { capabilities = ((await _ktApi('GET', '/../rooms')) || []).filter(r => r.type === 'capability'); } catch {}
+
   const isNew = !entryId;
 
   let html = `<div style="max-width:540px">
     <h3>${isNew ? '➕' : '✏️'} ${isNew ? (t('kt_add')||'Add Entry') : (t('kt_edit')||'Edit Entry')}</h3>
 
+    ${isNew && capabilities.length > 0 ? `<div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:var(--radius)">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Load from Capability'}</label>
+      <select id="ktFromCapability" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="">— ${t('kt_select_capability')||'Select a capability...'} —</option>
+        ${capabilities.map(c => `<option value="${c.id}">${escHtml(c.name)}${c.zone ? ' [\u{1F310}'+escHtml(c.zone)+']' : ''}</option>`).join('')}
+      </select>
+    </div>` : ''}
+
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">🎯 ${t('kt_function')||'Function'} *</label>
-      <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'What matters / critical function'}">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Capability'} *</label>
+      <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'Name of the capability'}">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -440,6 +452,25 @@ async function _ktEditEntry(entryId) {
   _boardModal('ktEditModal', html, '560px');
   _ktTrapModalKeys('ktEditModal');
   _ktBindRichToolbars(document.getElementById('ktEditModal'));
+
+  // Wire "from capability" dropdown to auto-fill fields
+  const capSelect = document.getElementById('ktFromCapability');
+  if (capSelect) {
+    capSelect.addEventListener('change', () => {
+      const capId = parseInt(capSelect.value);
+      if (!capId) return;
+      const cap = capabilities.find(c => c.id === capId);
+      if (!cap) return;
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      setVal('ktFunction', cap.name);
+      setVal('ktZone', cap.zone || '');
+      setVal('ktResponsible', cap.responsibility || '');
+      // Map capability status to KT status dropdown
+      const statusMap = {'working':'working','degraded':'degraded','down':'down','unknown':'unknown'};
+      const statusSel = document.getElementById('ktStatus');
+      if (statusSel && statusMap[cap.status]) statusSel.value = cap.status;
+    });
+  }
 
   // Wire autocomplete for responsible
   const respInput = document.getElementById('ktResponsible');
@@ -721,10 +752,10 @@ async function _ktSaveSettings() {
 function _ktOpenColumnOrder() {
   const cols = _ktState.columnOrder;
   const colLabels = {
-    seq_num: '# ' + (t('kt_seq_num')||'#'),
+    seq_num: '# ' + (t('kt_seq_num')||'Seq'),
     zone: '\u{1F310} ' + (t('kt_zone')||'Zone'),
     priority: '\u26A1 ' + (t('kt_priority')||'Priority'),
-    function: '\u{1F3AF} ' + (t('kt_function')||'Function'),
+    function: '\u{1F3AF} ' + (t('kt_function')||'Capability'),
     status: '\u{1F4CA} ' + (t('kt_status')||'Status'),
     trend: '\u{1F4C8} ' + (t('kt_trend')||'Trend'),
     threat: '\u2694\uFE0F ' + (t('kt_threat')||'Threat'),

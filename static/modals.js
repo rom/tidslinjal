@@ -2717,7 +2717,7 @@ const _resourceSymbols = {
 function openRoomModal(argJson) {
   const data = typeof argJson === 'string' ? JSON.parse(argJson) : (argJson || {});
   const isEdit = !!data.id;
-  const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center', exercise_area:'Exercise Area', work_area:'Work Area', rest_room:'Rest Room', training_ground:'Training Ground'};
+  const typeLabel = {room:'Room', building:'Building', computer_service:'IT Service', data_center:'Data Center', exercise_area:'Exercise Area', work_area:'Work Area', rest_room:'Rest Room', training_ground:'Training Ground', capability:t('resource_capabilities')||'Capability', application:t('resource_applications')||'Application', infrastructure:t('resource_infrastructure')||'Infrastructure'};
   // Look up custom resource type label if not a built-in type
   let label = typeLabel[data.type] || 'Resource';
   if (!typeLabel[data.type] && state._customResourceTypes) {
@@ -2738,7 +2738,20 @@ function openRoomModal(argJson) {
         <label class="form-label">${t('name')||'Name'}</label>
         <input class="form-input" id="rmName" value="${escHtml(data.name||'')}">
         <label class="form-label" style="margin-top:8px">${t('description')||'Description'}</label>
-        <input class="form-input" id="rmDesc" value="${escHtml(data.description||'')}">
+        <textarea class="form-input" id="rmDesc" rows="${data.type === 'capability' ? 3 : 1}" style="resize:vertical">${escHtml(data.description||'')}</textarea>
+        ${data.type === 'capability' ? `
+        <label class="form-label" style="margin-top:8px">${t('kt_zone')||'Zone'}</label>
+        <input class="form-input" id="rmZone" value="${escHtml(data.zone||'')}" placeholder="${t('cap_zone_ph')||'e.g. North, HQ, DMZ'}">
+        <label class="form-label" style="margin-top:8px">${t('cap_responsibility')||'Responsibility'}</label>
+        <input class="form-input" id="rmResponsibility" value="${escHtml(data.responsibility||'')}" placeholder="${t('cap_responsibility_ph')||'e.g. J6 Cyber Ops, CISO'}">
+        <label class="form-label" style="margin-top:8px">${t('kt_status')||'Status'}</label>
+        <select class="form-input" id="rmStatus" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px">
+          <option value="working"${data.status==='working'?' selected':''}>${t('cap_status_working')||'Working'}</option>
+          <option value="degraded"${data.status==='degraded'?' selected':''}>${t('cap_status_degraded')||'Degraded'}</option>
+          <option value="down"${data.status==='down'?' selected':''}>${t('cap_status_down')||'Down'}</option>
+          <option value="unknown"${(data.status==='unknown'||!data.status)?' selected':''}>${t('cap_status_unknown')||'Unknown'}</option>
+        </select>
+        ` : ''}
         ${data.type === 'room' ? `<label class="form-label" style="margin-top:8px">${t('room_sub_type')||'Room Type'}</label>
         <select class="form-input" id="rmSubType" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px">
           <option value="">${t('room_type_general')||'General'}</option>
@@ -2825,6 +2838,12 @@ function openRoomModal(argJson) {
       icon: modal.querySelector('#rmIcon')?.value || '',
       enabled: true,
     };
+    // Capability-specific fields
+    if (data.type === 'capability') {
+      room.zone = (modal.querySelector('#rmZone')?.value || '').trim();
+      room.responsibility = (modal.querySelector('#rmResponsibility')?.value || '').trim();
+      room.status = modal.querySelector('#rmStatus')?.value || 'unknown';
+    }
     if (isEdit) {
       room.id = data.id;
       room.image_name = data.image_name || '';

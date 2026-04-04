@@ -765,6 +765,10 @@ type Room struct {
 	Icon        string    `json:"icon,omitempty"`      // selected symbol/emoji
 	ImageName   string    `json:"image_name,omitempty"` // uploaded image filename (stored)
 	Enabled     bool      `json:"enabled"`
+	// Capability-specific fields
+	Zone           string `json:"zone,omitempty"`           // zone/area placement (for capabilities)
+	Responsibility string `json:"responsibility,omitempty"` // who is responsible (for capabilities)
+	Status         string `json:"status,omitempty"`         // operational status (for capabilities)
 	CreatedAt   time.Time `json:"created_at"`
 }
 
