@@ -5,20 +5,40 @@ let _diaryEntries = [];
 let _diaryFilter = { search: '', tag: '', author: '', private: '' };
 
 // ── Rich text field helper (reused from key-terrain pattern) ─────────────
+
+// Prevent keyboard events inside diary modals from leaking to the parent app
+// (timeline shortcuts, navigation keys, etc.)
+function _diaryTrapModalKeys(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  const stop = (e) => e.stopPropagation();
+  el.addEventListener('keydown', stop);
+  el.addEventListener('keyup', stop);
+  el.addEventListener('keypress', stop);
+}
+
 function _diaryRichField(id, value, placeholder, height) {
-  const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap">
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('bold')" title="Bold"><b>B</b></button>
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('italic')" title="Italic"><i>I</i></button>
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('underline')" title="Underline"><u>U</u></button>
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('strikethrough')" title="Strikethrough"><s>S</s></button>
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('insertUnorderedList')" title="Bullet list">• List</button>
-    <button type="button" class="btn btn-sm" onclick="document.execCommand('insertOrderedList')" title="Numbered list">1. List</button>
-    <button type="button" class="btn btn-sm" onclick="_diaryInsertLink('${id}')" title="Insert link">🔗</button>
-    <button type="button" class="btn btn-sm" onclick="_diaryInsertImage('${id}')" title="Insert image">🖼</button>
+  // Use onmousedown="event.preventDefault()" on toolbar buttons to prevent
+  // them from stealing focus away from the contenteditable editor.
+  const pb = 'onmousedown="event.preventDefault()"'; // prevent blur
+  const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="diary-rich-toolbar">
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('bold')" title="Bold"><b>B</b></button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('italic')" title="Italic"><i>I</i></button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('underline')" title="Underline"><u>U</u></button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('strikethrough')" title="Strikethrough"><s>S</s></button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('insertUnorderedList')" title="Bullet list">• List</button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryExecCmd('insertOrderedList')" title="Numbered list">1. List</button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryInsertLink('${id}')" title="Insert link">🔗</button>
+    <button type="button" class="btn btn-sm" ${pb} onclick="_diaryInsertImage('${id}')" title="Insert image">🖼</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input"
     style="width:100%;min-height:${height};max-height:400px;overflow-y:auto;resize:vertical;padding:8px;font-size:var(--fs-sm);white-space:pre-wrap;word-break:break-word;line-height:1.5"
     data-placeholder="${escHtml(placeholder)}">${value||''}</div>`;
+}
+
+// Execute a formatting command while keeping focus in the editor
+function _diaryExecCmd(cmd) {
+  document.execCommand(cmd);
 }
 
 function _diaryInsertLink(fieldId) {
@@ -77,6 +97,7 @@ async function openDiaryModal() {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  _diaryTrapModalKeys('diaryModal');
   if (typeof _bindActions === 'function') _bindActions(modal);
   _diaryPopulateFilters();
   _diaryRenderList();
@@ -234,7 +255,10 @@ function _diaryShowEditor(entry) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+  _diaryTrapModalKeys('diaryEditorModal');
   if (typeof _bindActions === 'function') _bindActions(modal);
+  // Auto-focus the title field
+  setTimeout(() => document.getElementById('diaryEditTitle')?.focus(), 50);
 }
 
 async function _diarySaveEntry(idStr) {

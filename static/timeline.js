@@ -1246,6 +1246,7 @@ function setupKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
     const tag = document.activeElement ? document.activeElement.tagName : '';
     if (['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+    if (document.activeElement && document.activeElement.isContentEditable) return;
 
     switch (e.key) {
       case 'ArrowLeft':  if (!e.shiftKey) navigate(-1); break;
