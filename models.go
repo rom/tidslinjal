@@ -922,6 +922,30 @@ type DecisionAttachment struct {
 	MimeType   string `json:"mime_type"`
 }
 
+// DiaryEntry represents a single entry in a user's personal diary
+type DiaryEntry struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	UserName    string    `json:"user_name"`
+	DisplayName string    `json:"display_name"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`           // HTML rich text content
+	Tags        []string  `json:"tags,omitempty"`
+	Mood        string    `json:"mood,omitempty"`  // optional mood indicator
+	Private     bool      `json:"private"`         // if true, only author can read
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Attachments []DiaryAttachment `json:"attachments,omitempty"`
+}
+
+// DiaryAttachment is a file or image attached to a diary entry
+type DiaryAttachment struct {
+	Filename   string `json:"filename"`
+	StoredName string `json:"stored_name"`
+	Size       int64  `json:"size"`
+	MimeType   string `json:"mime_type"`
+}
+
 // ReportArchiveEntry is a report stored in the report archive (under infomanagement)
 type ReportArchiveEntry struct {
 	ID             int64     `json:"id"`

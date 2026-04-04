@@ -523,6 +523,37 @@ async function generateReport() {
       html += '<p>Failed to load board data.</p>';
     }
 
+  } else if (type === 'diary_entry' || type === 'diary_full') {
+    // Diary reports
+    try {
+      const entries = await apiGet('/api/diary') || [];
+      const sorted = entries.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      if (type === 'diary_entry') {
+        // Print the most recent entry
+        const e = sorted[0];
+        if (e) {
+          html += `<h1>${t('diary_report_entry')||'Diary Entry'}</h1>`;
+          html += `<h2>${escHtml(e.title)}</h2>`;
+          html += `<p style="color:#666">${escHtml(e.display_name)} — ${new Date(e.created_at).toLocaleString()}${e.private ? ' — 🔒 Private' : ''}</p>`;
+          if (e.tags && e.tags.length) html += `<p style="color:#888">Tags: ${e.tags.map(t => escHtml(t)).join(', ')}</p>`;
+          html += `<div style="margin-top:12px;line-height:1.6">${e.body||''}</div>`;
+        } else {
+          html += `<p>${t('diary_no_entries')||'No diary entries.'}</p>`;
+        }
+      } else {
+        html += `<h1>${t('diary_report_full')||'Full Diary'} (${sorted.length} ${t('diary_entries')||'entries'})</h1>`;
+        for (const e of sorted) {
+          html += `<div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #ddd">`;
+          html += `<h2 style="margin:0 0 4px 0">${escHtml(e.title)}</h2>`;
+          html += `<p style="color:#666;margin:0 0 8px 0">${escHtml(e.display_name)} — ${new Date(e.created_at).toLocaleString()}${e.private ? ' — 🔒 Private' : ''}</p>`;
+          if (e.tags && e.tags.length) html += `<p style="color:#888;margin:0 0 6px 0">Tags: ${e.tags.map(t => escHtml(t)).join(', ')}</p>`;
+          html += `<div style="line-height:1.6">${e.body||''}</div></div>`;
+        }
+      }
+    } catch {
+      html += '<p>Failed to load diary data.</p>';
+    }
+
   } else if (type === 'technical_system') {
     // Technical / system report
     try {

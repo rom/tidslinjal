@@ -2117,6 +2117,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('🏔️', t('kt_title')||'Key Terrain Board', 'openKeyTerrainBoard()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
+          ${toolBtn('📔', t('diary_title')||'Diary', 'openDiaryModal()')}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}
           ${toolBtn('🗺', t('btn_map')||'Map', 'openDetachedMap()')}
           ${isTeamLead || isAdminOrOplead ? toolBtn('📖', t('tab_log_book')||'Log Book', 'openLogBookModal()') : ''}
