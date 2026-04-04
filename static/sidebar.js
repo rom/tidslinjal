@@ -1152,7 +1152,7 @@ function renderSidebar() {
         </div>`;
       _bindResSubTabs(el);
       _bindActions(el);
-    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'work_areas' || resSubTab === 'alliance_partners' || resSubTab.startsWith('custom_')) {
+    } else if (resSubTab === 'rooms' || resSubTab === 'buildings' || resSubTab === 'computers' || resSubTab === 'datacenters' || resSubTab === 'work_areas' || resSubTab === 'alliance_partners' || resSubTab === 'capabilities' || resSubTab === 'applications' || resSubTab === 'infrastructure' || resSubTab.startsWith('custom_')) {
       const builtinTypeMap = {rooms:'room', buildings:'building', computers:'computer_service', datacenters:'data_center', work_areas:'work_area', alliance_partners:'alliance_partner', capabilities:'capability', applications:'application', infrastructure:'infrastructure'};
       const builtinLabelMap = {rooms:t('resource_rooms')||'Rooms', buildings:t('resource_buildings')||'Buildings', computers:t('resource_computer_services')||'Computer Services', datacenters:t('resource_data_centers')||'Data Centers', work_areas:t('resource_work_areas')||'Work Areas', alliance_partners:t('resource_alliance_partners')||'Alliance Partners', capabilities:t('resource_capabilities')||'Capabilities', applications:t('resource_applications')||'Applications', infrastructure:t('resource_infrastructure')||'Infrastructure'};
       const builtinIconMap = {rooms:'🏠', buildings:'🏢', computers:'💻', datacenters:'🖥', work_areas:'💼', alliance_partners:'🤝', capabilities:'🎯', applications:'📱', infrastructure:'🏗'};
@@ -1183,7 +1183,10 @@ function renderSidebar() {
                 <div style="flex:1;min-width:0">
                   <div style="font-size:var(--fs-sm);font-weight:600">${r.icon && !r.image_name ? r.icon+' ' : ''}${escHtml(r.name)}</div>
                   ${r.sub_type ? `<div style="font-size:var(--fs-xs);color:var(--accent);font-weight:600">${t('room_type_'+r.sub_type)||r.sub_type.replace(/_/g,' ')}</div>` : ''}
-                  ${r.location ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">📍 ${escHtml(r.location)}</div>` : ''}
+                  ${r.zone ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">\u{1F310} ${escHtml(r.zone)}</div>` : ''}
+                  ${r.responsibility ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">\u{1F464} ${escHtml(r.responsibility)}</div>` : ''}
+                  ${r.status && r.type === 'capability' ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${{'working':'\u{1F7E2}','degraded':'\u{1F7E1}','down':'\u{1F534}','unknown':'\u26AA'}[r.status]||'\u26AA'} ${r.status}</div>` : ''}
+                  ${r.location ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">\u{1F4CD} ${escHtml(r.location)}</div>` : ''}
                   ${r.capacity ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${t('capacity')||'Capacity'}: ${r.capacity}</div>` : ''}
                   ${r.description ? `<div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(r.description)}</div>` : ''}
                 </div>

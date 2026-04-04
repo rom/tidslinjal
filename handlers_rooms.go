@@ -34,6 +34,8 @@ func (app *App) handleSaveRoom(w http.ResponseWriter, r *http.Request, user *Use
 	// H-05 fix: sanitize room name/description to prevent stored XSS
 	room.Name = stripHTMLTags(room.Name)
 	room.Description = stripHTMLTags(room.Description)
+	room.Zone = stripHTMLTags(room.Zone)
+	room.Responsibility = stripHTMLTags(room.Responsibility)
 	if err := app.store.SaveRoom(room); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
