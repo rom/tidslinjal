@@ -9,7 +9,7 @@ let _ktState = {
   filter: {},             // active filters
   settings: {},           // persisted settings from server
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
-  columnOrder: ['priority','function','status','trend','threat','external','responsible','actions','created_at','updated_at','finished_at','rounds'],
+  columnOrder: ['seq_num','zone','priority','function','status','trend','threat','external','responsible','actions','created_at','updated_at','finished_at','rounds'],
   hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true }, // hidden by default
 };
 
@@ -104,6 +104,8 @@ function _ktSortEntries(entries) {
       case 'external': return (a.external || '').localeCompare(b.external || '');
       case 'responsible': return (a.responsible_name || '').localeCompare(b.responsible_name || '');
       case 'actions': return (a.actions || '').localeCompare(b.actions || '');
+      case 'zone': return (a.zone || '').localeCompare(b.zone || '');
+      case 'seq_num': return (a.seq_num || 0) - (b.seq_num || 0);
       case 'entry_order': return a.id - b.id;
       default: return (a.priority || 999) - (b.priority || 999);
     }
@@ -131,8 +133,22 @@ function _renderKeyTerrainBoard() {
   const f = _ktState.filter || {};
   const hasFilter = Object.values(f).some(v => v);
 
+  // Merge settings hidden columns with local hidden columns
+  const settingsHidden = _ktState.settings.hidden_columns || {};
+  for (const [col, val] of Object.entries(settingsHidden)) {
+    if (val && !(col in hidden)) hidden[col] = true;
+  }
+
+  // Show/hide entries without priority (settings: show_no_priority, default true)
+  const showNoPriority = _ktState.settings.show_no_priority !== false;
+
   // Separate active vs archived; hide ghosted if ghost_style === 'remove'
-  const activeEntries = allEntries.filter(e => !e.archived && !(e.ghosted && ghostStyle === 'remove'));
+  const activeEntries = allEntries.filter(e => {
+    if (e.archived) return false;
+    if (e.ghosted && ghostStyle === 'remove') return false;
+    if (!showNoPriority && (!e.priority || e.priority === 0)) return false;
+    return true;
+  });
   const archivedEntries = allEntries.filter(e => e.archived);
 
   // Filter active entries
@@ -147,6 +163,7 @@ function _renderKeyTerrainBoard() {
       if (f.threat && !q(e.threat).includes(q(f.threat))) return false;
       if (f.responsible && !q(e.responsible_name).includes(q(f.responsible))) return false;
       if (f.actions && !q(e.actions).includes(q(f.actions))) return false;
+      if (f.zone && !q(e.zone).includes(q(f.zone))) return false;
       return true;
     });
   }
@@ -157,8 +174,13 @@ function _renderKeyTerrainBoard() {
   const hasHidden = Object.values(hidden).some(v => v);
   const totalCols = cols.length + (canWrite ? 1 : 0);
 
+  // Custom status labels from settings
+  const _statusLabels = _ktState.settings.status_labels || {};
+
   // Column definitions
   const colDef = {
+    seq_num:     { icon: '#', label: t('kt_seq_num')||'#', align: 'center', extra: 'white-space:nowrap;width:40px' },
+    zone:        { icon: '\u{1F310}', label: t('kt_zone')||'Zone', align: 'left', extra: 'min-width:80px' },
     priority:    { icon: '\u26A1', label: t('kt_priority')||'Pri', align: 'left', extra: 'white-space:nowrap' },
     function:    { icon: '\u{1F3AF}', label: t('kt_function')||'Function', align: 'left', extra: 'min-width:140px' },
     status:      { icon: '\u{1F4CA}', label: t('kt_status')||'Status', align: 'center', extra: '' },
@@ -242,10 +264,13 @@ function _renderKeyTerrainBoard() {
     }
 
     // Cell renderers per column
+    const statusLabel = _statusLabels[e.status] || statusOpt.label;
     const cellHtml = {
+      seq_num: `<td style="padding:8px;text-align:center;font-weight:600;font-size:11px;color:var(--text-dim)">${e.seq_num || '\u2014'}</td>`,
+      zone: `<td style="padding:8px">${e.zone ? escHtml(e.zone) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
       priority: `<td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>`,
       function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>`,
-      status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusOpt.label}">${sIcon} ${statusOpt.label}</span></td>`,
+      status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusLabel}">${sIcon} ${statusLabel}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
       threat: `<td style="padding:8px">${e.threat ? _ktRenderRich(e.threat) : '\u2014'}</td>`,
       external: `<td style="padding:8px">${e.external ? _ktRenderRich(e.external) : '\u2014'}</td>`,
@@ -322,7 +347,7 @@ function _ktAddEntry() {
 }
 
 async function _ktEditEntry(entryId) {
-  let entry = { function: '', status: 'unknown', trend: 'stable', threat: '', external: '', priority: (_ktState.entries.length + 1), responsible_name: '', actions: '' };
+  let entry = { function: '', status: 'unknown', trend: 'stable', threat: '', external: '', priority: (_ktState.entries.length + 1), responsible_name: '', actions: '', zone: '' };
   if (entryId) {
     const found = _ktState.entries.find(e => e.id === parseInt(entryId));
     if (found) entry = { ...found };
@@ -338,7 +363,7 @@ async function _ktEditEntry(entryId) {
       <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'What matters / critical function'}">
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
         <select id="ktStatus" class="input" style="width:100%;font-size:var(--fs-xs)">
@@ -353,7 +378,11 @@ async function _ktEditEntry(entryId) {
       </div>
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">⚡ ${t('kt_priority')||'Priority'}</label>
-        <input id="ktPriority" type="number" class="input" style="width:100%" value="${entry.priority || ''}" min="1" placeholder="1">
+        <input id="ktPriority" type="number" class="input" style="width:100%" value="${entry.priority || ''}" min="0" placeholder="1">
+      </div>
+      <div>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F310} ${t('kt_zone')||'Zone'}</label>
+        <input id="ktZone" class="input" style="width:100%;font-size:var(--fs-xs)" value="${escHtml(entry.zone || '')}" placeholder="${t('kt_zone_ph')||'e.g. North, HQ, DMZ'}">
       </div>
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F504} ${t('kt_rounds')||'# Rounds'}</label>
@@ -440,6 +469,7 @@ async function _ktSaveEntry(entryId) {
     threat: _ktGetRichValue('ktThreat'),
     external: _ktGetRichValue('ktExternal'),
     priority: parseInt(document.getElementById('ktPriority')?.value) || 0,
+    zone: document.getElementById('ktZone')?.value?.trim() || '',
     rounds: parseInt(document.getElementById('ktRounds')?.value) || 0,
     actions: _ktGetRichValue('ktActions'),
   };
@@ -519,11 +549,46 @@ function _ktOpenSettings() {
   const pc = s.priority_colors || {};
   const si = s.status_icons || {};
   const ti = s.trend_icons || {};
+  const sl = s.status_labels || {};
+  const hc = s.hidden_columns || {};
   const sortBy = s.sort_by || 'priority';
   const gs = s.ghost_style || 'grey';
+  const showNoPri = s.show_no_priority !== false;
 
-  let html = `<div style="max-width:540px">
+  let html = `<div style="max-width:540px;max-height:80vh;overflow-y:auto">
     <h3>\u2699 ${t('kt_settings')||'Key Terrain Settings'}</h3>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F441} ${t('kt_show_no_priority')||'Show Functions Without Priority'}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+        <input type="checkbox" id="ktSettShowNoPriority" ${showNoPri ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('kt_show_no_priority_desc')||'Show entries with priority 0 or no priority set (enabled by default)'}
+      </label>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3F7} ${t('kt_status_labels')||'Status Labels'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_status_labels_desc')||'Customize the display labels for each status value.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${_ktStatusOptions.map(st => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:var(--fs-xs);min-width:60px">${st.icon} ${st.value}:</span>
+          <input id="ktSettStatusLabel_${st.value}" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" value="${escHtml(sl[st.value] || st.label)}" placeholder="${st.label}">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F6AB} ${t('kt_hidden_columns')||'Hide Columns'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_hidden_columns_desc')||'Select columns to hide from the board view.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+        ${_ktState.columnOrder.map(c => {
+          const lbl = {seq_num:'#',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'Rounds'}[c] || c;
+          return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer">
+            <input type="checkbox" class="ktSettHiddenCol" data-col="${c}" ${hc[c] ? 'checked' : ''} style="accent-color:var(--accent)"> ${lbl}
+          </label>`;
+        }).join('')}
+      </div>
+    </div>
 
     <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3A8} ${t('kt_priority_colors')||'Priority Color Coding'}</div>
@@ -565,6 +630,8 @@ function _ktOpenSettings() {
         <option value="status" ${sortBy==='status'?'selected':''}>\u{1F4CA} Status</option>
         <option value="trend" ${sortBy==='trend'?'selected':''}>\u{1F4C8} Trend</option>
         <option value="responsible" ${sortBy==='responsible'?'selected':''}>\u{1F464} Responsible (A\u2013Z)</option>
+        <option value="zone" ${sortBy==='zone'?'selected':''}>\u{1F310} Zone (A\u2013Z)</option>
+        <option value="seq_num" ${sortBy==='seq_num'?'selected':''}># Seq Number</option>
       </select>
     </div>
 
@@ -603,12 +670,26 @@ async function _ktSaveSettings() {
     const v = document.getElementById('ktSettTrendIcon_' + tr.value)?.value?.trim();
     if (v && v !== tr.icon) ti[tr.value] = v;
   });
+  // Status labels
+  const slOut = {};
+  _ktStatusOptions.forEach(st => {
+    const v = document.getElementById('ktSettStatusLabel_' + st.value)?.value?.trim();
+    if (v && v !== st.label) slOut[st.value] = v;
+  });
+  // Hidden columns
+  const hcOut = {};
+  document.querySelectorAll('.ktSettHiddenCol').forEach(cb => {
+    if (cb.checked) hcOut[cb.dataset.col] = true;
+  });
   const settings = {
     priority_colors: pc,
     status_icons: si,
     trend_icons: ti,
     sort_by: document.getElementById('ktSettSortBy')?.value || 'priority',
     ghost_style: document.getElementById('ktSettGhostStyle')?.value || 'grey',
+    show_no_priority: document.getElementById('ktSettShowNoPriority')?.checked !== false,
+    status_labels: slOut,
+    hidden_columns: hcOut,
   };
   try {
     await _ktApi('PUT', '/key-terrain/settings', settings);
@@ -623,6 +704,8 @@ async function _ktSaveSettings() {
 function _ktOpenColumnOrder() {
   const cols = _ktState.columnOrder;
   const colLabels = {
+    seq_num: '# ' + (t('kt_seq_num')||'#'),
+    zone: '\u{1F310} ' + (t('kt_zone')||'Zone'),
     priority: '\u26A1 ' + (t('kt_priority')||'Priority'),
     function: '\u{1F3AF} ' + (t('kt_function')||'Function'),
     status: '\u{1F4CA} ' + (t('kt_status')||'Status'),

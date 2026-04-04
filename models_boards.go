@@ -251,6 +251,8 @@ func BuiltInBoardTemplateItems() map[int64][]BoardItem {
 // KeyTerrainEntry represents a single row in the Key Terrain Board
 type KeyTerrainEntry struct {
 	ID              int64            `json:"id"`
+	SeqNum          int              `json:"seq_num,omitempty"`           // unique sequential number per entry (#)
+	Zone            string           `json:"zone,omitempty"`              // zone / area classification
 	Function        string           `json:"function"`                    // what matters / cyber key terrain
 	Status          string           `json:"status"`                      // working, degraded, down, unknown
 	Trend           string           `json:"trend"`                       // improving, stable, worsening
@@ -288,9 +290,15 @@ type KeyTerrainSettings struct {
 	// Trend icons override
 	TrendIcons map[string]string `json:"trend_icons,omitempty"` // e.g. {"improving":"⬆️","stable":"➡️"}
 	// Sort order
-	SortBy string `json:"sort_by,omitempty"` // "priority","function","status","trend","responsible","entry_order"
+	SortBy string `json:"sort_by,omitempty"` // "priority","function","status","trend","responsible","entry_order","zone"
 	// Ghosting style
 	GhostStyle string `json:"ghost_style,omitempty"` // "grey","strikethrough","remove"
+	// Show functions without priority (priority == 0); default true
+	ShowNoPriority *bool `json:"show_no_priority,omitempty"`
+	// Custom status labels: override default labels for status values
+	StatusLabels map[string]string `json:"status_labels,omitempty"` // e.g. {"working":"Normal","degraded":"Limited"}
+	// Hidden columns: columns that should not be displayed
+	HiddenColumns map[string]bool `json:"hidden_columns,omitempty"` // e.g. {"threat":true,"rounds":true}
 }
 
 // KeyTerrainSnapshot is a point-in-time copy of the board for version control
