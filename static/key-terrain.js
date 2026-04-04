@@ -371,7 +371,10 @@ async function _ktEditEntry(entryId) {
 
   // Load capabilities for the "from capability" picker
   let capabilities = [];
-  try { capabilities = ((await _ktApi('GET', '/../rooms')) || []).filter(r => r.type === 'capability'); } catch {}
+  try {
+    const res = await fetch('/api/rooms', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (res.ok) capabilities = ((await res.json()) || []).filter(r => r.type === 'capability');
+  } catch {}
 
   const isNew = !entryId;
 
