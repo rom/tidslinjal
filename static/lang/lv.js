@@ -1577,7 +1577,7 @@ admin_view: 'Administrātora skats',
     kt_hidden_columns_desc: 'Atlasiet kolonnas, ko paslēpt no tāfeles.',
 
     kt_col_order_desc: 'Izmantojiet bultiņas, lai pārkārtotu kolonnas.',
-    kt_manage: 'Pārvaldīt',    cap_zone_ph: 'piem. Ziemeļu, HQ, DMZ',
+    kt_manage: 'Pārvaldīt un eksportēt',    cap_zone_ph: 'piem. Ziemeļu, HQ, DMZ',
     cap_responsibility: 'Īpašumtiesības',
     cap_responsibility_ph: 'piem. J6 Cyber Ops, CISO',
     cap_status_working: 'Strādā',

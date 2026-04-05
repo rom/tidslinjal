@@ -152,11 +152,22 @@ type User struct {
 	Latitude     float64 `json:"latitude,omitempty"`
 	Longitude    float64 `json:"longitude,omitempty"`
 	BuildingID   int64   `json:"building_id,omitempty"` // link to a building/room resource
-	Availability string `json:"availability,omitempty"` // free | busy | dnd | away
+	Availability string      `json:"availability,omitempty"` // free | busy | dnd | away
+	Labels       []UserLabel `json:"labels,omitempty"`       // visible labels/tags on user profile
 	// OIDC-synced profile fields
 	FullName string `json:"full_name,omitempty"` // full name from IDP (given_name + family_name or name)
 	Locale   string `json:"locale,omitempty"`    // user's preferred locale from IDP (e.g. "en", "sv")
 	Address  string `json:"address,omitempty"`   // user's address from IDP
+}
+
+// UserLabel is a visible label/tag attached to a user profile.
+// Labels are visible to anyone; setting/removing labels is audit-logged.
+type UserLabel struct {
+	Text    string `json:"text"`              // label text
+	Color   string `json:"color,omitempty"`   // CSS color (e.g. "#e74c3c", "blue")
+	SetBy   int64  `json:"set_by,omitempty"`  // user ID who set this label
+	SetByName string `json:"set_by_name,omitempty"` // display name of who set it
+	SetAt   string `json:"set_at,omitempty"`  // ISO timestamp when set
 }
 
 // UserPublic is the safe view of a user (no password hash or reset tokens)
@@ -195,9 +206,10 @@ type UserPublic struct {
 	Latitude         float64    `json:"latitude,omitempty"`
 	Longitude        float64    `json:"longitude,omitempty"`
 	Availability     string     `json:"availability,omitempty"`
-	FullName         string     `json:"full_name,omitempty"`
-	Locale           string     `json:"locale,omitempty"`
-	Address          string     `json:"address,omitempty"`
+	FullName         string      `json:"full_name,omitempty"`
+	Locale           string      `json:"locale,omitempty"`
+	Address          string      `json:"address,omitempty"`
+	Labels           []UserLabel `json:"labels,omitempty"`
 }
 
 func (u *User) Public() UserPublic {
@@ -237,6 +249,7 @@ func (u *User) Public() UserPublic {
 		FullName:         u.FullName,
 		Locale:           u.Locale,
 		Address:          u.Address,
+		Labels:           u.Labels,
 	}
 }
 

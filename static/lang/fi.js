@@ -1939,7 +1939,7 @@ TRANSLATIONS.fi = {
     kt_hidden_columns_desc: 'Valitse sarakkeet piilotettavaksi taulusta.',
 
     kt_col_order_desc: 'Käytä nuolia sarakkeiden järjestyksen muuttamiseen.',
-    kt_manage: 'Hallitse',    cap_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
+    kt_manage: 'Hallitse ja vie',    cap_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
     cap_responsibility: 'Omistajuus',
     cap_responsibility_ph: 'esim. J6 Cyber Ops, CISO',
     cap_status_working: 'Toimii',

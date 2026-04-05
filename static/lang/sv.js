@@ -2563,7 +2563,7 @@ TRANSLATIONS.sv = {
     kt_hidden_columns_desc: 'Välj kolumner att dölja från tavlan.',
 
     kt_col_order_desc: 'Använd pilarna för att ändra kolumnordning.',
-    kt_manage: 'Hantera',    cap_zone_ph: 't.ex. Nord, HK, DMZ',
+    kt_manage: 'Hantera & exportera',    cap_zone_ph: 't.ex. Nord, HK, DMZ',
     cap_responsibility: 'Ägarskap',
     cap_responsibility_ph: 't.ex. J6 Cyber Ops, CISO',
     cap_status_working: 'Fungerar',

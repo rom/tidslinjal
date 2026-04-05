@@ -1831,7 +1831,7 @@ admin_view: 'Vista amministratore',
     kt_hidden_columns_desc: 'Seleziona le colonne da nascondere dalla bacheca.',
 
     kt_col_order_desc: 'Usa le frecce per riordinare le colonne.',
-    kt_manage: 'Gestisci',    cap_zone_ph: 'es. Nord, HQ, DMZ',
+    kt_manage: 'Gestisci ed esporta',    cap_zone_ph: 'es. Nord, HQ, DMZ',
     cap_responsibility: 'Proprietà',
     cap_responsibility_ph: 'es. J6 Cyber Ops, CISO',
     cap_status_working: 'Operativo',

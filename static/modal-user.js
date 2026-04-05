@@ -79,8 +79,47 @@ async function openUserModal(user) {
           ${state.user && (state.user.role === 'admin' || hasRole2(state.user.role, 'admin')) && user.id !== state.user.id ? `<button class="btn btn-secondary btn-sm" id="btnAdminChangePassword" title="${t('admin_change_password')||'Change Password'}">🔑 ${t('admin_change_password')||'Change Password'}</button>` : ''}
         </div>
         <div id="uLoginHistoryPanel" style="display:none;margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px"></div>
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+          <strong style="font-size:var(--fs-xs)">\u{1F3F7} ${t('user_labels')||'Labels'}</strong>
+          <div id="uLabelsContainer" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${(user.labels||[]).map(l => `<span class="user-label-chip" data-label-text="${escHtml(l.text)}" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 8px;border-radius:3px;background:${l.color||'var(--accent)'};color:#fff;font-weight:600;cursor:default" title="${escHtml((l.set_by_name||'')+' \u00B7 '+(l.set_at?new Date(l.set_at).toLocaleDateString():''))}">${escHtml(l.text)} <span class="user-label-remove" style="cursor:pointer;margin-left:2px;opacity:.7" title="${t('btn_remove')||'Remove'}">\u00D7</span></span>`).join('')}
+          </div>
+          <div style="display:flex;gap:4px;margin-top:6px;align-items:center">
+            <input id="uNewLabelText" class="form-input" style="flex:1;font-size:var(--fs-xs);padding:4px 6px" placeholder="${t('user_label_placeholder')||'Label text...'}">
+            <input type="color" id="uNewLabelColor" value="#3498db" style="width:30px;height:24px;border:none;padding:0;cursor:pointer">
+            <button class="btn btn-primary btn-sm" id="btnAddLabel" style="font-size:10px;padding:3px 8px">+ ${t('btn_add')||'Add'}</button>
+          </div>
+        </div>
       `;
       uUserInfo.style.display = '';
+      // Bind label add/remove
+      const btnAddLabel = document.getElementById('btnAddLabel');
+      if (btnAddLabel) btnAddLabel.addEventListener('click', async () => {
+        const text = document.getElementById('uNewLabelText')?.value?.trim();
+        const color = document.getElementById('uNewLabelColor')?.value || '#3498db';
+        if (!text) return;
+        const res = await apiPost('/api/users/' + user.id + '/labels', { text, color });
+        if (res.ok) {
+          document.getElementById('uNewLabelText').value = '';
+          showNotification('success', t('user_label_added')||'Label added');
+          closeModal('userModal');
+          renderSidebar();
+        } else { const err = await res.json().catch(()=>({})); showError(err.error || 'Failed'); }
+      });
+      document.querySelectorAll('.user-label-remove').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const chip = btn.closest('.user-label-chip');
+          const text = chip?.dataset?.labelText;
+          if (!text || !confirm((t('user_label_remove_confirm')||'Remove label') + ' "' + text + '"?')) return;
+          const res = await api('DELETE', '/api/users/' + user.id + '/labels', { text });
+          if (res.ok) {
+            chip.remove();
+            showNotification('success', t('user_label_removed')||'Label removed');
+            renderSidebar();
+          } else { const err = await res.json().catch(()=>({})); showError(err.error || 'Failed'); }
+        });
+      });
       // Bind block/unblock and login history buttons
       const btnBlock = document.getElementById('btnBlockUser');
       const btnUnblock = document.getElementById('btnUnblockUser');
