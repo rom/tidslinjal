@@ -1879,7 +1879,7 @@ role_editor_label_nb: '🇳🇴 NB',
     kt_hidden_columns_desc: 'Виберіть стовпці для приховування з дошки.',
 
     kt_col_order_desc: 'Використовуйте стрілки для зміни порядку стовпців.',
-    kt_manage: 'Керування',    cap_zone_ph: 'напр. Північ, HQ, DMZ',
+    kt_manage: 'Керування та експорт',    cap_zone_ph: 'напр. Північ, HQ, DMZ',
     cap_responsibility: 'Власність',
     cap_responsibility_ph: 'напр. J6 Cyber Ops, CISO',
     cap_status_working: 'Працює',

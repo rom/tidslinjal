@@ -1113,6 +1113,7 @@ function renderSidebar() {
                   <span class="role-badge role-${u.role}">${getRoleDisplayName(u.role)}</span>
                   ${u.can_lock?'<span title="Can lock">🔒</span>':''}
                   ${(u.nato_designations && u.nato_designations.length) ? `<span style="font-size:var(--fs-sm);color:var(--accent);font-weight:600;letter-spacing:.04em">${u.nato_designations.join(' ')}</span>` : ''}
+                  ${(u.labels && u.labels.length) ? `<div style="width:100%;display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${u.labels.map(l => `<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:${l.color||'var(--accent)'};color:#fff;font-weight:600" title="${escHtml((l.set_by_name||'')+' · '+(l.set_at?new Date(l.set_at).toLocaleDateString():''))}">${escHtml(l.text)}</span>`).join('')}</div>` : ''}
                   <div style="width:100%;display:flex;gap:10px;font-size:10px;color:var(--text-dim);margin-top:2px;padding-left:2px;flex-wrap:wrap">
                     <span title="${t('user_created_at')||'Created'}">${t('user_created_at')||'Created'}: ${u.created_at ? fmtDateTime(new Date(u.created_at)) : '—'}</span>
                     <span title="${t('user_last_login')||'Last login'}">${t('user_last_login')||'Last login'}: ${u.last_login_at ? fmtDateTime(new Date(u.last_login_at)) : '—'}</span>

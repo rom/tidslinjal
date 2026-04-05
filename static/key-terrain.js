@@ -204,7 +204,7 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
         <button class="btn btn-sm ${hasHidden ? 'btn-secondary' : 'btn-secondary'}" data-action="_ktOpenColumnVisibility">\u{1F441} ${t('kt_columns_vis')||'Columns'}${hasHidden ? ' ('+Object.values(hidden).filter(v=>v).length+' hidden)' : ''}</button>
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
-        <button class="btn btn-sm btn-secondary" data-action="_ktOpenManagePanel">\u{1F4CB} ${t('kt_manage')||'Manage'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktOpenManagePanel">\u{1F4CB} ${t('kt_manage')||'Manage & Export'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
         <button class="btn btn-sm btn-secondary" data-action="_ktShowHelp" title="${t('kt_help')||'Help'}">\u2753</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktDetach" title="${t('kt_detach')||'Detach to window'}">\u29C9</button>
@@ -819,7 +819,7 @@ function _ktSettMoveCol(idx, dir) {
 function _ktOpenManagePanel() {
   const canWrite = _ktState.access.can_write;
   let html = `<div style="max-width:400px">
-    <h3>\u{1F4CB} ${t('kt_manage')||'Manage'}</h3>
+    <h3>\u{1F4CB} ${t('kt_manage')||'Manage & Export'}</h3>
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn btn-secondary" style="text-align:left;padding:8px 12px" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History Log'}</button>
       ${canWrite ? `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions / Snapshots'}</button>` : ''}
@@ -1194,7 +1194,7 @@ function _ktOpenFilter() {
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${t('kt_priority')||'Priority'}</label>
-        <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="1">
+        <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="0">
       </div>
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
@@ -1406,7 +1406,7 @@ function _ktDetach() {
     .map(el => el.outerHTML).join('\n');
 
   w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
-    <style>body{padding:16px;background:var(--bg1,#1a1a2e);color:var(--text,#eee);font-family:system-ui,sans-serif}
+    <style>body{padding:16px;background:var(--bg1);color:var(--text);font-family:system-ui,sans-serif}
     .modal-overlay{position:static!important;background:none!important}.modal{box-shadow:none!important;max-width:100%!important;width:100%!important;max-height:100%!important;padding:0!important;border:none!important}</style>
     </head><body></body></html>`);
   w.document.close();
@@ -1415,6 +1415,14 @@ function _ktDetach() {
   const scriptSrcs = ['/static/i18n.js', '/static/lang/en.js', '/static/utils.js', '/static/state.js', '/static/api.js', '/static/modals.js', '/static/key-terrain.js'];
   let loaded = 0;
   const onAllLoaded = () => {
+    // Sync theme from parent window
+    const theme = window.state?.preferences?.theme || 'dark';
+    const themeClasses = ['light-mode', 'city-camo', 'urban-camo'];
+    const wantClass = theme === 'light' ? 'light-mode' : theme === 'city-camo' ? 'city-camo' : theme === 'urban-camo' ? 'urban-camo' : '';
+    themeClasses.forEach(c => w.document.body.classList.remove(c));
+    if (wantClass) w.document.body.classList.add(wantClass);
+    w.document.documentElement.setAttribute('data-theme', theme);
+
     // Copy state
     w.state = window.state;
     w.TRANSLATIONS = window.TRANSLATIONS;

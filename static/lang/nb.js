@@ -2168,7 +2168,7 @@ TRANSLATIONS.nb = {
     kt_hidden_columns_desc: 'Velg kolonner å skjule fra tavlen.',
 
     kt_col_order_desc: 'Bruk pilene for å endre kolonnerekkefølgen.',
-    kt_manage: 'Administrer',    cap_zone_ph: 'f.eks. Nord, HQ, DMZ',
+    kt_manage: 'Administrer og eksporter',    cap_zone_ph: 'f.eks. Nord, HQ, DMZ',
     cap_responsibility: 'Eierskap',
     cap_responsibility_ph: 'f.eks. J6 Cyber Ops, CISO',
     cap_status_working: 'Fungerer',

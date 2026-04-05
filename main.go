@@ -552,6 +552,17 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			app.requireRole(RoleAdmin, app.handleUnblockUser)(w, r)
 			return
 		}
+		// /api/users/:id/labels
+		if len(parts) == 4 && parts[3] == "labels" {
+			if r.Method == http.MethodPost {
+				app.requireAuth(app.handleAddUserLabel)(w, r)
+			} else if r.Method == http.MethodDelete {
+				app.requireAuth(app.handleRemoveUserLabel)(w, r)
+			} else {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
 		// /api/users/:id/login-history — returns recent login audit entries for a user
 		if len(parts) == 4 && parts[3] == "login-history" && r.Method == http.MethodGet {
 			app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, admin *User) {

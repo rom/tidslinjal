@@ -1831,7 +1831,7 @@ admin_view: 'Vista de administrador',
     kt_hidden_columns_desc: 'Seleccione columnas para ocultar del tablero.',
 
     kt_col_order_desc: 'Use las flechas para reordenar las columnas.',
-    kt_manage: 'Gestionar',    cap_zone_ph: 'ej. Norte, HQ, DMZ',
+    kt_manage: 'Gestionar y exportar',    cap_zone_ph: 'ej. Norte, HQ, DMZ',
     cap_responsibility: 'Propiedad',
     cap_responsibility_ph: 'ej. J6 Cyber Ops, CISO',
     cap_status_working: 'Operativo',

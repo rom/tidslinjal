@@ -1881,7 +1881,7 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     kt_hidden_columns_desc: 'Wybierz kolumny do ukrycia z tablicy.',
 
     kt_col_order_desc: 'Użyj strzałek, aby zmienić kolejność kolumn.',
-    kt_manage: 'Zarządzaj',    cap_zone_ph: 'np. Północ, HQ, DMZ',
+    kt_manage: 'Zarządzaj i eksportuj',    cap_zone_ph: 'np. Północ, HQ, DMZ',
     cap_responsibility: 'Własność',
     cap_responsibility_ph: 'np. J6 Cyber Ops, CISO',
     cap_status_working: 'Działa',

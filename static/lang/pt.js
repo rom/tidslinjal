@@ -1832,7 +1832,7 @@ manage_resource_types: 'Gerir Tipos',
     kt_hidden_columns_desc: 'Selecione colunas para ocultar do quadro.',
 
     kt_col_order_desc: 'Use as setas para reordenar as colunas.',
-    kt_manage: 'Gerir',    cap_zone_ph: 'ex. Norte, QG, DMZ',
+    kt_manage: 'Gerir e exportar',    cap_zone_ph: 'ex. Norte, QG, DMZ',
     cap_responsibility: 'Propriedade',
     cap_responsibility_ph: 'ex. J6 Cyber Ops, CISO',
     cap_status_working: 'Operacional',

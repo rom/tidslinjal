@@ -1577,7 +1577,7 @@ admin_view: 'Administraatori vaade',
     kt_hidden_columns_desc: 'Vali veerud, mida tahvlilt peita.',
 
     kt_col_order_desc: 'Kasutage nooli veergude ümberjärjestamiseks.',
-    kt_manage: 'Halda',    cap_zone_ph: 'nt. Põhja, HQ, DMZ',
+    kt_manage: 'Halda ja ekspordi',    cap_zone_ph: 'nt. Põhja, HQ, DMZ',
     cap_responsibility: 'Omanikuõigus',
     cap_responsibility_ph: 'nt. J6 Cyber Ops, CISO',
     cap_status_working: 'Töötab',

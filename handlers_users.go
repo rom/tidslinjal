@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -239,4 +240,90 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	logVerbose("user deleted: id=%d by=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// ── User Labels ─────────────────────────────────────────────────────────────
+
+// handleAddUserLabel adds a label to a user. Any authenticated user can set labels.
+func (app *App) handleAddUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	target, ok := app.store.GetUserByID(id)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Text  string `json:"text"`
+		Color string `json:"color"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Text == "" {
+		jsonError(w, "label text is required", http.StatusBadRequest)
+		return
+	}
+	req.Text = stripHTMLTags(req.Text)
+	label := UserLabel{
+		Text:      req.Text,
+		Color:     req.Color,
+		SetBy:     user.ID,
+		SetByName: user.DisplayName,
+		SetAt:     time.Now().Format(time.RFC3339),
+	}
+	target.Labels = append(target.Labels, label)
+	if err := app.store.UpdateUser(*target); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "label_added", "user", id,
+		fmt.Sprintf("Added label %q (color: %s) to user %s", req.Text, req.Color, target.DisplayName))
+	jsonOK(w, target.Public())
+}
+
+// handleRemoveUserLabel removes a label from a user by label text.
+func (app *App) handleRemoveUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := pathID(r)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	target, ok := app.store.GetUserByID(id)
+	if !ok {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	found := false
+	var updated []UserLabel
+	for _, l := range target.Labels {
+		if l.Text == req.Text && !found {
+			found = true
+			continue
+		}
+		updated = append(updated, l)
+	}
+	if !found {
+		jsonError(w, "label not found", http.StatusNotFound)
+		return
+	}
+	target.Labels = updated
+	if err := app.store.UpdateUser(*target); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "label_removed", "user", id,
+		fmt.Sprintf("Removed label %q from user %s", req.Text, target.DisplayName))
+	jsonOK(w, target.Public())
 }

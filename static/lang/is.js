@@ -2131,7 +2131,7 @@ TRANSLATIONS.is = {
     kt_hidden_columns_desc: 'Veldu dálka til að fela af borðinu.',
 
     kt_col_order_desc: 'Notaðu örvarnar til að endurraða dálka.',
-    kt_manage: 'Stjórna',    cap_zone_ph: 't.d. Norður, HQ, DMZ',
+    kt_manage: 'Stjórna og flytja út',    cap_zone_ph: 't.d. Norður, HQ, DMZ',
     cap_responsibility: 'Eignarhald',
     cap_responsibility_ph: 't.d. J6 Cyber Ops, CISO',
     cap_status_working: 'Virkt',

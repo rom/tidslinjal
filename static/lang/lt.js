@@ -1577,7 +1577,7 @@ admin_view: 'Administratoriaus rodinys',
     kt_hidden_columns_desc: 'Pasirinkite stulpelius, kuriuos paslėpti nuo lentos.',
 
     kt_col_order_desc: 'Naudokite rodykles stulpelių tvarkai pakeisti.',
-    kt_manage: 'Tvarkyti',    cap_zone_ph: 'pvz. Šiaurė, HQ, DMZ',
+    kt_manage: 'Tvarkyti ir eksportuoti',    cap_zone_ph: 'pvz. Šiaurė, HQ, DMZ',
     cap_responsibility: 'Nuosavybė',
     cap_responsibility_ph: 'pvz. J6 Cyber Ops, CISO',
     cap_status_working: 'Veikia',
