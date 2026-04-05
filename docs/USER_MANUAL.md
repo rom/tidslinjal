@@ -1,6 +1,6 @@
 # Tidslinjal User Manual
 
-**Version 6.1.0**
+**Version 8.2.0**
 
 ---
 
@@ -1159,4 +1159,58 @@ The **Legend** sidebar tab includes a **System** info panel showing language, us
 
 ---
 
-*Tidslinjal v6.1.0 — Collaborative Operational Timeline*
+## Diary
+
+The **Diary** module (📔 in Tools menu) provides a personal paper trail for each user. Diary entries support **rich text editing** with bold, italic, underline, strikethrough, bullet/numbered lists, inline links, and inline images.
+
+### Features
+- **Private entries** — mark an entry as private so only you can see it; public entries are visible to all users
+- **Tags and mood** — organize entries with comma-separated tags and optional mood indicators
+- **File attachments** — upload files to diary entries
+- **Filter and search** — filter by author, tag, visibility, or free-text search
+- **Export** — JSON, XML, CSV, XLSX, ODS, TXT, RTF, Markdown
+- **Import** — JSON or XML
+- **Print** — print a single entry or the full diary
+- **Reports** — "Diary Entry" and "Full Diary" report types available in the Reports module
+
+### Permissions
+All users have diary read and write access by default. Admins can restrict access via the `diary_read` and `diary_write` capabilities in the Role Editor.
+
+---
+
+## User Labels
+
+**Labels** are colored tags that can be attached to user profiles by TeamLead+ roles. Labels are visible to everyone in the Resources > Users list and in the user edit modal.
+
+- Click a user in **Resources > Users**, then use the label input at the bottom to add a label with custom text and color
+- Click × on a label to remove it
+- All label additions and removals are **audit-logged** (who set/removed which label on whom)
+
+---
+
+## Capabilities
+
+**Capabilities** (🎯 in Resources) represent operational capabilities that can be tracked. Each capability has:
+- **Name** — the name of the capability
+- **Zone** — optional geographic/area placement
+- **Description** — free-text description
+- **Ownership** — who owns/operates this capability
+- **Status** — Working, Degraded, Down, or Unknown
+
+Capabilities are **reactive objects**: when linked to a Key Terrain Board entry, changes to the capability's name, zone, status, and ownership automatically propagate to the board.
+
+---
+
+## Key Terrain Board Enhancements (v8.2.0)
+
+- **Seq # column** — auto-assigned unique number per entry
+- **Zone column** — sortable text field for area classification
+- **Customizable status labels** — change "Working" to "Normal" etc. in Settings
+- **Column visibility** — show/hide any column including the Management column
+- **Column order** — reorder columns directly in the Settings panel
+- **Manage & Export panel** — History, Versions, Print, and Export consolidated under one button
+- **Load from Capability** — populate entry fields from an existing capability resource
+
+---
+
+*Tidslinjal v8.2.0 — Collaborative Operational Timeline*

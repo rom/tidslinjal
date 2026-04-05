@@ -928,6 +928,20 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
+### v8.2.0 — Diary, Capabilities, Key Terrain Enhancements & Security Hardening
+
+- **Diary module** — personal paper trail with rich text editor (bold, italic, links, inline images), tags, mood, private/public visibility, file attachments, export (JSON, XML, CSV, XLSX, ODS, TXT, RTF, Markdown), import (JSON, XML), filter/search, print, and report integration
+- **User labels** — colored labels on user profiles with audit-logged setting/removal (TeamLead+ required)
+- **Capabilities in Resources** — fixed capabilities button, added Zone/Ownership/Status fields; capabilities are reactive objects that sync to Key Terrain Board entries
+- **Key Terrain Board** — new # (sequence) and Zone columns; customizable status labels; column visibility toggles; "Manage & Export" consolidated panel; "Load from Capability" integration
+- **Export format additions** — Markdown, XLSX, ODS, JPEG, TIFF, BMP added across all applicable modules
+- **LDAP authentication** — full go-ldap/ldap/v3 implementation replacing stub
+- **Meeting config persistence** — properly saved/loaded (was stub)
+- **Dashboard config persistence** — stored server-side per user
+- **Security fixes** — diary export auth bypass, user label escalation, stored XSS sanitization, XXE prevention, path traversal fix, LDAP filter validation
+- **i18n** — 100+ new translation keys across all 17 languages
+- **Online help** — Release Notes, README, and User Manual now rendered in the help modal; fixed text readability
+
 ### v8.1.0 — IP Blacklist, Debug Diagnostics & TeamLead Decisions
 
 - **IP blacklist / deny list** — block specific IP addresses or CIDR ranges from connecting; managed in the Security admin panel with enable/disable toggle, add/remove entries, reason tracking, and who-added-when attribution; blocked IPs receive 403 Forbidden; audit logging for all blocked connections
