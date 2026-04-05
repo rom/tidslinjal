@@ -2117,8 +2117,10 @@ TRANSLATIONS.nl = {
     kt_status_labels_desc: 'Pas weergavelabels aan voor elke statuswaarde.',
     kt_hidden_columns: 'Kolommen verbergen',
     kt_hidden_columns_desc: 'Selecteer kolommen om te verbergen op het bord.',
-    cap_zone_ph: 'bijv. Noord, HQ, DMZ',
-    cap_responsibility: 'Verantwoordelijkheid',
+
+    kt_col_order_desc: 'Gebruik de pijlen om de kolomvolgorde te wijzigen.',
+    kt_manage: 'Beheren',    cap_zone_ph: 'bijv. Noord, HQ, DMZ',
+    cap_responsibility: 'Eigenaarschap',
     cap_responsibility_ph: 'bijv. J6 Cyber Ops, CISO',
     cap_status_working: 'Werkend',
     cap_status_degraded: 'Verminderd',

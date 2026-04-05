@@ -2129,8 +2129,10 @@ TRANSLATIONS.is = {
     kt_status_labels_desc: 'Sérsníða birtingarmerki fyrir hvert stöðugildi.',
     kt_hidden_columns: 'Fela dálka',
     kt_hidden_columns_desc: 'Veldu dálka til að fela af borðinu.',
-    cap_zone_ph: 't.d. Norður, HQ, DMZ',
-    cap_responsibility: 'Ábyrgð',
+
+    kt_col_order_desc: 'Notaðu örvarnar til að endurraða dálka.',
+    kt_manage: 'Stjórna',    cap_zone_ph: 't.d. Norður, HQ, DMZ',
+    cap_responsibility: 'Eignarhald',
     cap_responsibility_ph: 't.d. J6 Cyber Ops, CISO',
     cap_status_working: 'Virkt',
     cap_status_degraded: 'Skert',

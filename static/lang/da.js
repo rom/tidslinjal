@@ -1789,8 +1789,10 @@ TRANSLATIONS.da = {
     kt_status_labels_desc: 'Tilpas visningsetiketter for hvert statusværdi.',
     kt_hidden_columns: 'Skjul kolonner',
     kt_hidden_columns_desc: 'Vælg kolonner der skal skjules fra tavlen.',
-    cap_zone_ph: 'f.eks. Nord, HQ, DMZ',
-    cap_responsibility: 'Ansvar',
+
+    kt_col_order_desc: 'Brug pilene til at ændre kolonnernes rækkefølge.',
+    kt_manage: 'Administrér',    cap_zone_ph: 'f.eks. Nord, HQ, DMZ',
+    cap_responsibility: 'Ejerskab',
     cap_responsibility_ph: 'f.eks. J6 Cyber Ops, CISO',
     cap_status_working: 'Fungerer',
     cap_status_degraded: 'Nedsat',

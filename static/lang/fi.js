@@ -1937,8 +1937,10 @@ TRANSLATIONS.fi = {
     kt_status_labels_desc: 'Mukauta näyttönimet kullekin tila-arvolle.',
     kt_hidden_columns: 'Piilota sarakkeet',
     kt_hidden_columns_desc: 'Valitse sarakkeet piilotettavaksi taulusta.',
-    cap_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
-    cap_responsibility: 'Vastuu',
+
+    kt_col_order_desc: 'Käytä nuolia sarakkeiden järjestyksen muuttamiseen.',
+    kt_manage: 'Hallitse',    cap_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
+    cap_responsibility: 'Omistajuus',
     cap_responsibility_ph: 'esim. J6 Cyber Ops, CISO',
     cap_status_working: 'Toimii',
     cap_status_degraded: 'Heikentynyt',
