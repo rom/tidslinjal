@@ -202,22 +202,8 @@ function _renderKeyTerrainBoard() {
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
         <button class="btn btn-sm ${hasHidden ? 'btn-secondary' : 'btn-secondary'}" data-action="_ktOpenColumnVisibility">\u{1F441} ${t('kt_columns_vis')||'Columns'}${hasHidden ? ' ('+Object.values(hidden).filter(v=>v).length+' hidden)' : ''}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History'}</button>
-        ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions'}</button>` : ''}
-        ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenColumnOrder">\u2B80 ${t('kt_col_order')||'Columns'}</button>` : ''}
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
-        <button class="btn btn-sm btn-secondary" data-action="_ktPrint">\u{1F5A8} ${t('kt_print')||'Print'}</button>
-        <div style="position:relative;display:inline-block" id="ktExportDropdown">
-          <button class="btn btn-sm btn-secondary" data-action="_ktToggleExportMenu">\u2B07 ${t('kt_export')||'Export'}</button>
-          <div id="ktExportMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:100px;margin-top:4px">
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="json">JSON</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="csv">CSV</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="xml">XML</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="pdf">PDF</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="svg">SVG</button>
-            <button class="btn btn-sm" style="width:100%;text-align:left;border:none;border-radius:0;padding:6px 12px" data-action="_ktExport" data-arg="jpeg">JPEG</button>
-          </div>
-        </div>
+        <button class="btn btn-sm btn-secondary" data-action="_ktOpenManagePanel">\u{1F4CB} ${t('kt_manage')||'Manage'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
         <button class="btn btn-sm btn-secondary" data-action="_ktShowHelp" title="${t('kt_help')||'Help'}">\u2753</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktDetach" title="${t('kt_detach')||'Detach to window'}">\u29C9</button>
@@ -381,12 +367,13 @@ async function _ktEditEntry(entryId) {
   let html = `<div style="max-width:540px">
     <h3>${isNew ? '➕' : '✏️'} ${isNew ? (t('kt_add')||'Add Entry') : (t('kt_edit')||'Edit Entry')}</h3>
 
-    ${isNew && capabilities.length > 0 ? `<div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:var(--radius)">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Load from Capability'}</label>
+    ${capabilities.length > 0 ? `<div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:var(--radius)">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Link to Capability'}</label>
       <select id="ktFromCapability" class="input" style="width:100%;font-size:var(--fs-xs)">
         <option value="">— ${t('kt_select_capability')||'Select a capability...'} —</option>
-        ${capabilities.map(c => `<option value="${c.id}">${escHtml(c.name)}${c.zone ? ' [\u{1F310}'+escHtml(c.zone)+']' : ''}</option>`).join('')}
+        ${capabilities.map(c => `<option value="${c.id}" ${entry.capability_id === c.id ? 'selected' : ''}>${escHtml(c.name)}${c.zone ? ' [\u{1F310}'+escHtml(c.zone)+']' : ''}</option>`).join('')}
       </select>
+      ${entry.capability_id ? `<div style="font-size:10px;color:var(--accent);margin-top:4px">\u{1F517} ${t('kt_linked_capability')||'Linked — fields sync from capability'}</div>` : ''}
     </div>` : ''}
 
     <div style="margin-bottom:10px">
@@ -513,6 +500,7 @@ async function _ktSaveEntry(entryId) {
   const fn = document.getElementById('ktFunction')?.value?.trim();
   if (!fn) { alert(t('kt_function_required')||'Function is required'); return; }
 
+  const capId = parseInt(document.getElementById('ktFromCapability')?.value) || 0;
   const data = {
     function: fn,
     status: document.getElementById('ktStatus')?.value || 'unknown',
@@ -521,6 +509,7 @@ async function _ktSaveEntry(entryId) {
     external: _ktGetRichValue('ktExternal'),
     priority: parseInt(document.getElementById('ktPriority')?.value) || 0,
     zone: document.getElementById('ktZone')?.value?.trim() || '',
+    capability_id: capId,
     rounds: parseInt(document.getElementById('ktRounds')?.value) || 0,
     actions: _ktGetRichValue('ktActions'),
   };
@@ -696,6 +685,21 @@ function _ktOpenSettings() {
       </select>
     </div>
 
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u2B80 ${t('kt_col_order')||'Column Order'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_col_order_desc')||'Use arrows to reorder columns.'}</p>
+      <div id="ktSettColOrderList">
+        ${_ktState.columnOrder.map((c, i) => {
+          const colLabels = {seq_num:'# Seq',zone:'\u{1F310} Zone',priority:'\u26A1 Priority',function:'\u{1F3AF} Capability',status:'\u{1F4CA} Status',trend:'\u{1F4C8} Trend',threat:'\u2694\uFE0F Threat',external:'\u{1F517} External',responsible:'\u{1F464} Responsible',actions:'\u{1F527} Actions',created_at:'\u{1F4C5} Created',updated_at:'\u{1F504} Updated',finished_at:'\u2705 Finished',rounds:'\u{1F504} Rounds'};
+          return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
+            <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktSettMoveCol" data-args='[${i},-1]' ${i===0?'disabled':''}>\u25B2</button>
+            <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktSettMoveCol" data-args='[${i},1]' ${i===_ktState.columnOrder.length-1?'disabled':''}>\u25BC</button>
+            <span style="flex:1;font-size:var(--fs-xs)">${colLabels[c] || c}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary btn-sm" data-action="_ktSaveSettings">\u2714 ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktSettingsModal">${t('btn_cancel')||'Cancel'}</button>
@@ -798,6 +802,45 @@ function _ktMoveCol(args) {
   cols[newIdx] = tmp;
   _ktOpenColumnOrder(); // re-render dialog
   _renderKeyTerrainBoard(); // re-render table behind
+}
+function _ktSettMoveCol(args) {
+  const [idx, dir] = args;
+  const cols = _ktState.columnOrder;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= cols.length) return;
+  const tmp = cols[idx];
+  cols[idx] = cols[newIdx];
+  cols[newIdx] = tmp;
+  // Re-open settings to reflect new order
+  _closeBoardModal('ktSettingsModal');
+  _ktOpenSettings();
+}
+
+// ── Manage Panel (History, Versions, Print, Export) ──
+function _ktOpenManagePanel() {
+  const canWrite = _ktState.access.can_write;
+  let html = `<div style="max-width:400px">
+    <h3>\u{1F4CB} ${t('kt_manage')||'Manage'}</h3>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-secondary" style="text-align:left;padding:8px 12px" data-action="_ktOpenHistoryLog">\u{1F4DC} ${t('kt_history_log')||'History Log'}</button>
+      ${canWrite ? `<button class="btn btn-secondary" style="text-align:left;padding:8px 12px" data-action="_ktOpenVersions">\u{1F4CB} ${t('kt_versions')||'Versions / Snapshots'}</button>` : ''}
+      <hr style="margin:4px 0;border:none;border-top:1px solid var(--border)">
+      <button class="btn btn-secondary" style="text-align:left;padding:8px 12px" data-action="_ktPrint">\u{1F5A8} ${t('kt_print')||'Print'}</button>
+      <div style="font-weight:600;font-size:var(--fs-xs);margin-top:4px">\u2B07 ${t('kt_export')||'Export'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="json">JSON</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="csv">CSV</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="xml">XML</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="pdf">PDF</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="svg">SVG</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="jpeg">JPEG</button>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktManageModal">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktManageModal', html, '420px');
 }
 
 // ── Print ──

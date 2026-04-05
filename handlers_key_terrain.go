@@ -29,6 +29,31 @@ func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Reques
 	if entries == nil {
 		entries = []KeyTerrainEntry{}
 	}
+	// Sync linked capability data: if a KT entry references a capability,
+	// overlay the capability's current name, zone, status, and responsibility.
+	rooms := app.store.GetRooms()
+	capMap := make(map[int64]Room)
+	for _, r := range rooms {
+		if r.Type == "capability" {
+			capMap[r.ID] = r
+		}
+	}
+	for i := range entries {
+		if entries[i].CapabilityID != 0 {
+			if cap, ok := capMap[entries[i].CapabilityID]; ok {
+				entries[i].Function = cap.Name
+				if cap.Zone != "" {
+					entries[i].Zone = cap.Zone
+				}
+				if cap.Status != "" {
+					entries[i].Status = cap.Status
+				}
+				if cap.Responsibility != "" {
+					entries[i].ResponsibleName = cap.Responsibility
+				}
+			}
+		}
+	}
 	jsonOK(w, entries)
 }
 
@@ -45,6 +70,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		External      string `json:"external"`
 		Priority      int    `json:"priority"`
 		Zone          string `json:"zone"`
+		CapabilityID  int64  `json:"capability_id"`
 		ResponsibleID int64  `json:"responsible_id"`
 		Responsible   string `json:"responsible"`
 		Actions       string `json:"actions"`
@@ -67,8 +93,9 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	}
 
 	entry := KeyTerrainEntry{
-		SeqNum:   seqNum,
-		Zone:     req.Zone,
+		SeqNum:       seqNum,
+		CapabilityID: req.CapabilityID,
+		Zone:         req.Zone,
 		Function: req.Function,
 		Status:   req.Status,
 		Trend:    req.Trend,
