@@ -69,6 +69,18 @@ function connectSSE() {
   es.addEventListener('key_terrain_change', () => {
     document.dispatchEvent(new CustomEvent('sse:key_terrain_change'));
   });
+  // Log changes (log_book, event_log, checklist_log, audit_log, pollster_log)
+  es.addEventListener('log_change', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      document.dispatchEvent(new CustomEvent('sse:log_change', { detail: data }));
+      // Auto-refresh the log views if they're currently displayed
+      if (data.type === 'log_book' && typeof _loadLogBook === 'function') _loadLogBook();
+      if (data.type === 'event_log' && typeof _loadEventLog === 'function') _loadEventLog();
+      if (data.type === 'checklist_log' && typeof _loadChecklistLog === 'function') _loadChecklistLog();
+      if (data.type === 'audit_log' && typeof renderSidebar === 'function') renderSidebar();
+    } catch {}
+  });
   // Day labels change
   es.addEventListener('day_labels_change', async () => {
     await fetchDayLabels();

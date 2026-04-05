@@ -1488,10 +1488,14 @@ function _ktDetach() {
     w.state = window.state;
     w.TRANSLATIONS = window.TRANSLATIONS;
     w._ktState = JSON.parse(JSON.stringify(_ktState));
+    // Store theme class to re-apply after body innerHTML changes
+    const _detachBodyClass = _detachThemeClass;
     w._boardModal = function(id, content, width) {
       let el = w.document.getElementById(id);
       if (el) el.remove();
       w.document.body.innerHTML = `<div style="padding:16px;max-width:${width||'1100px'};margin:0 auto">${content}</div>`;
+      // Re-apply theme class after innerHTML replacement
+      if (_detachBodyClass) w.document.body.classList.add(_detachBodyClass);
       if (typeof w._bindActions === 'function') w._bindActions(w.document.body);
     };
     w._closeBoardModal = function(id) {
@@ -1500,6 +1504,12 @@ function _ktDetach() {
       // Re-render the board after closing a sub-modal
       if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
     };
+    // Set up SSE forwarding from parent to detached window
+    const _ktDetachedSSEHandler = () => {
+      if (w.closed) { document.removeEventListener('sse:key_terrain_change', _ktDetachedSSEHandler); return; }
+      if (typeof w._ktHandleSSE === 'function') w._ktHandleSSE();
+    };
+    document.addEventListener('sse:key_terrain_change', _ktDetachedSSEHandler);
     if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
   };
   scriptSrcs.forEach(src => {
