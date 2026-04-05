@@ -1,10 +1,12 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/subtle"
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"mime"
@@ -924,7 +926,59 @@ func (app *App) handleExportBoard(w http.ResponseWriter, r *http.Request, user *
 				item.UpdatedAt.Format(time.RFC3339),
 			)
 		}
+	case "xml":
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", board.Name+".xml"))
+		type XMLBoard struct {
+			XMLName xml.Name    `xml:"board"`
+			Name    string      `xml:"name,attr"`
+			Items   []BoardItem `xml:"item"`
+		}
+		xml.NewEncoder(w).Encode(XMLBoard{Name: board.Name, Items: items})
+	case "xlsx", "ods":
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		xlsxWriteFile(zw, "[Content_Types].xml", xlsxContentTypes())
+		xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+		xlsxWriteFile(zw, "xl/workbook.xml", xlsxWorkbook())
+		xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels())
+		xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+		var sb strings.Builder
+		sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+			`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`)
+		headers := []string{"ID", "Column", "Subject", "Type", "Priority", "Responsible", "Due Date", "Tags", "Note"}
+		sb.WriteString(`<row r="1">`)
+		for i, h := range headers {
+			sb.WriteString(xlsxCell(i, 1, h, 1))
+		}
+		sb.WriteString(`</row>`)
+		for idx, item := range items {
+			r := idx + 2
+			cells := []string{
+				fmt.Sprintf("%d", item.ID), item.ColumnID, item.Subject, item.ItemType,
+				item.Priority, item.ResponsibleName, item.DueDate,
+				strings.Join(item.Tags, "; "), stripHTML(item.Note),
+			}
+			sb.WriteString(fmt.Sprintf(`<row r="%d">`, r))
+			for i, val := range cells {
+				sb.WriteString(xlsxCell(i, r, val, 0))
+			}
+			sb.WriteString(`</row>`)
+		}
+		sb.WriteString(`</sheetData></worksheet>`)
+		xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", sb.String())
+		zw.Close()
+		ext := "xlsx"
+		if format == "ods" {
+			ext = "ods"
+		}
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", board.Name+"."+ext))
+		w.Write(buf.Bytes()) //nolint
 	case "svg":
+		app.renderBoardSVG(w, board, items)
+	case "pdf", "jpeg", "tiff", "bmp":
+		// Image formats: rendered client-side via print/canvas; provide SVG fallback
 		app.renderBoardSVG(w, board, items)
 	default:
 		jsonError(w, "unsupported format: "+format, http.StatusBadRequest)
