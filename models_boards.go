@@ -252,6 +252,7 @@ func BuiltInBoardTemplateItems() map[int64][]BoardItem {
 type KeyTerrainEntry struct {
 	ID              int64            `json:"id"`
 	SeqNum          int              `json:"seq_num,omitempty"`           // unique sequential number per entry (#)
+	CapabilityID    int64            `json:"capability_id,omitempty"`     // linked capability resource ID
 	Zone            string           `json:"zone,omitempty"`              // zone / area classification
 	Function        string           `json:"function"`                    // what matters / cyber key terrain
 	Status          string           `json:"status"`                      // working, degraded, down, unknown
