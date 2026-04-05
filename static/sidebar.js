@@ -1060,7 +1060,7 @@ function renderSidebar() {
         </div>
       </div>` : ''}
     `;
-  } else if (tab === 'resources' && state.user && state.user.role==='admin') {
+  } else if (tab === 'resources' && state.user && (state.user.role==='admin' || state.user.role==='developer')) {
     const canSeeLoc = userHasCapability('see_location');
     const gl = getGroupLabel();
     // Sub-tab state
@@ -1524,7 +1524,7 @@ function renderSidebar() {
         <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
       </div>`;
     refreshAuditLog();
-  } else if (tab === 'integrations' && state.user && state.user.role === 'admin') {
+  } else if (tab === 'integrations' && state.user && (state.user.role === 'admin' || state.user.role === 'developer')) {
     const p = state.preferences;
     el.innerHTML = `
       <div class="sidebar-section">
@@ -2116,7 +2116,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
-          ${role === 'admin' ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
+          ${(role === 'admin' || role === 'developer') ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📊', t('dashboard_title')||'Dashboard', 'openDashboard()')}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('🏔️', t('kt_title')||'Key Terrain Board', 'openKeyTerrainBoard()')}
@@ -2135,8 +2135,9 @@ Fields: file, subject, sender, type, tags</pre>
           ${isAdminOrOplead ? toolBtn('📋', t('btn_templates')||'Templates', 'openTemplatesModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬇', t('btn_export')||'Export', 'openExportModal()') : ''}
           ${isAdminOrOplead ? toolBtn('⬆', t('btn_import')||'Import', 'openImportModal()') : ''}
-          ${role === 'admin' ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
-          ${role === 'admin' ? toolBtn('🔄', t('btn_gradual_backup')||'Gradual Backup', 'openGradualBackupModal()') : ''}
+          ${(role === 'admin' || role === 'developer') ? toolBtn('🐛', t('debug_title')||'Debug Console', 'openDebugConsole()') : ''}
+          ${(role === 'admin' || role === 'developer') ? toolBtn('💾', t('btn_backup')||'Backup', 'openBackupModal()') : ''}
+          ${(role === 'admin' || role === 'developer') ? toolBtn('🔄', t('btn_gradual_backup')||'Gradual Backup', 'openGradualBackupModal()') : ''}
         </div>
       </div>
     `;

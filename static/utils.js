@@ -205,14 +205,14 @@ function escAttr(s) {
 
 // ── Role check ──────────────────────────────────────────────────────────────
 function hasRole2(userRole, required) {
-  const order = {read:0, reporter:1, readwrite:2, teammember:2, teamlead:3, deputy_teamlead:3, oplead:4, deputy_oplead:4, staffofficer:4, staff_assistant:4, staffofficer_full:4, admin:5};
+  const order = {read:0, reporter:1, readwrite:2, teammember:2, teamlead:3, deputy_teamlead:3, oplead:4, deputy_oplead:4, staffofficer:4, staff_assistant:4, staffofficer_full:4, developer:5, admin:5};
   return (order[userRole]||0) >= (order[required]||0);
 }
 
 // Check if the current user has a named capability via role config override
 function userHasCapability(cap) {
   if (!state.user) return false;
-  if (state.user.role === 'admin') return true;
+  if (state.user.role === 'admin' || state.user.role === 'developer') return true;
   const roleKey = state.user.role;
   const configs = state.roleConfigs || [];
   const cfg = configs.find(c => c.key === roleKey);

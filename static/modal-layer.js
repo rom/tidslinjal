@@ -43,10 +43,15 @@ function openLayerModal(layer) {
   openModal('layerModal');
 }
 
+let _layerSaving = false;
 document.getElementById('btnSaveLayer').addEventListener('click', async () => {
+  if (_layerSaving) return; // Prevent double-submit
   const id = document.getElementById('layerId').value;
   const name = document.getElementById('layerName').value.trim();
   if (!name) { showError('Name required', 'Validation'); return; }
+  _layerSaving = true;
+  const saveBtn = document.getElementById('btnSaveLayer');
+  if (saveBtn) saveBtn.disabled = true;
   const groupIDs = [...document.querySelectorAll('input[name="layerGroup"]:checked')]
     .map(cb => parseInt(cb.value, 10));
   const payload = {
@@ -84,6 +89,9 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
       }
     }
   } else { const err = await res.json(); showError(err.error); }
+  _layerSaving = false;
+  const _saveBtn = document.getElementById('btnSaveLayer');
+  if (_saveBtn) _saveBtn.disabled = false;
 });
 
 async function deleteLayer(id) {

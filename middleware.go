@@ -169,6 +169,7 @@ func hasRole(userRole, required Role) bool {
 		RoleStaffOfficer:     4,
 		RoleStaffAssistant:   4,
 		RoleStaffOfficerFull: 4,
+		RoleDeveloper:        5,
 		RoleAdmin:            5,
 	}
 	return order[userRole] >= order[required]

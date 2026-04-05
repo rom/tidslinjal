@@ -18,7 +18,7 @@ async function openUserModal(user) {
     {key:'teamlead', label:'Team Lead'}, {key:'deputy_teamlead', label:'Deputy Team Lead'},
     {key:'oplead', label:'Operations Lead'}, {key:'deputy_oplead', label:'Deputy Operations Lead'},
     {key:'staffofficer', label:'Staff Officer Assistant'}, {key:'staff_assistant', label:'Staff Assistant'},
-    {key:'staffofficer_full', label:'Staff Officer'}, {key:'admin', label:'Admin'},
+    {key:'staffofficer_full', label:'Staff Officer'}, {key:'developer', label:'Developer'}, {key:'admin', label:'Admin'},
   ];
   const allRoles = [...builtinRoles];
   (state.roleConfigs || []).forEach(rc => {

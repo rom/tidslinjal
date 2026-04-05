@@ -2041,6 +2041,70 @@ func statsXLSXEventsSheet(events []Event) string {
 	return sb.String()
 }
 
+// ── Stats: Top Activities ───────────────────────────────────────────────────
+
+func (app *App) handleStatsTopActivities(w http.ResponseWriter, r *http.Request, user *User) {
+	audit := app.store.GetAudit(5000)
+	events := app.visibleEvents(user)
+	users := app.store.GetUsers()
+
+	// Top tool users (by audit actions)
+	toolUsage := map[string]int{}
+	for _, a := range audit {
+		if a.UserName != "" {
+			toolUsage[a.UserName]++
+		}
+	}
+	type userCount struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	_ = userCount{} // suppress unused warning
+
+	// Most logins
+	loginCounts := map[string]int{}
+	for _, u := range users {
+		if u.LoginCount > 0 {
+			name := u.DisplayName
+			if name == "" {
+				name = u.Username
+			}
+			loginCounts[name] = u.LoginCount
+		}
+	}
+
+	// Most events created
+	eventCounts := map[string]int{}
+	for _, e := range events {
+		if e.CreatedByName != "" {
+			eventCounts[e.CreatedByName]++
+		}
+	}
+
+	jsonOK(w, map[string]any{
+		"top_tool_users":     sortedUserCounts(toolUsage, 20),
+		"top_logins":         sortedUserCounts(loginCounts, 20),
+		"top_event_creators": sortedUserCounts(eventCounts, 20),
+	})
+}
+
+type _topUserCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+func sortedUserCounts(m map[string]int, limit int) []_topUserCount {
+	var result []_topUserCount
+	for name, count := range m {
+		result = append(result, _topUserCount{Name: name, Count: count})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Count > result[j].Count })
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result
+}
+
 func statsXLSXDecisionsSheet(decisions []DecisionLogEntry) string {
 	var sb strings.Builder
 	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
