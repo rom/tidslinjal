@@ -61,6 +61,38 @@ async function openKeyTerrainBoard() {
     _ktState.access = { can_write: false };
   }
   _renderKeyTerrainBoard();
+  _ktSubscribeSSE();
+}
+
+// ── SSE auto-refresh ──────────────────────────────────────────────────────
+let _ktSSEBound = false;
+function _ktSubscribeSSE() {
+  if (_ktSSEBound) return;
+  _ktSSEBound = true;
+  // Listen for key_terrain_change events from the SSE notification stream.
+  // The app's SSE handler dispatches custom events on document.
+  if (typeof EventSource !== 'undefined') {
+    // The main app stores the EventSource — hook into it via a document-level custom event
+    document.addEventListener('sse:key_terrain_change', _ktHandleSSE);
+  }
+}
+
+let _ktSSETimer = null;
+function _ktHandleSSE() {
+  // Debounce: don't refresh more than once per second
+  if (_ktSSETimer) return;
+  _ktSSETimer = setTimeout(async () => {
+    _ktSSETimer = null;
+    try {
+      const [entries, settings] = await Promise.all([
+        _ktApi('GET', '/key-terrain'),
+        _ktApi('GET', '/key-terrain/settings').catch(() => ({})),
+      ]);
+      _ktState.entries = entries;
+      _ktState.settings = settings || {};
+      _renderKeyTerrainBoard();
+    } catch { /* ignore refresh failures */ }
+  }, 500);
 }
 
 // ── Settings helpers ──
@@ -1429,10 +1461,15 @@ function _ktDetach() {
   const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
     .map(el => el.outerHTML).join('\n');
 
-  w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
+  // Determine theme before writing HTML so the document starts with correct theme
+  const _detachTheme = window.state?.preferences?.theme || 'dark';
+  const _detachThemeClass = _detachTheme === 'light' ? 'light-mode' : _detachTheme === 'city-camo' ? 'city-camo' : _detachTheme === 'urban-camo' ? 'urban-camo' : '';
+  const _detachDataSize = document.documentElement.getAttribute('data-size') || 'normal';
+
+  w.document.write(`<!DOCTYPE html><html data-theme="${_detachTheme}" data-size="${_detachDataSize}"><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
     <style>body{padding:16px;background:var(--bg1);color:var(--text);font-family:system-ui,sans-serif}
     .modal-overlay{position:static!important;background:none!important}.modal{box-shadow:none!important;max-width:100%!important;width:100%!important;max-height:100%!important;padding:0!important;border:none!important}</style>
-    </head><body></body></html>`);
+    </head><body class="${_detachThemeClass}"></body></html>`);
   w.document.close();
 
   // Copy scripts needed
@@ -1460,6 +1497,8 @@ function _ktDetach() {
     w._closeBoardModal = function(id) {
       const el = w.document.getElementById(id);
       if (el) el.remove();
+      // Re-render the board after closing a sub-modal
+      if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
     };
     if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
   };

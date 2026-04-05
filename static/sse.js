@@ -65,6 +65,10 @@ function connectSSE() {
       renderSidebar();
     } catch { /* ignore parse errors */ }
   });
+  // Key Terrain Board changes — dispatch custom event for key-terrain.js to handle
+  es.addEventListener('key_terrain_change', () => {
+    document.dispatchEvent(new CustomEvent('sse:key_terrain_change'));
+  });
   // Day labels change
   es.addEventListener('day_labels_change', async () => {
     await fetchDayLabels();

@@ -11,20 +11,57 @@ import (
 // Default: OpL, staff_officer, staff_officers_assistance have write access.
 // Everyone else has read access.
 
-func canWriteKeyTerrain(user *User) bool {
+// canWriteKeyTerrain checks if user has key_terrain_write capability.
+// Defaults to true for OpLead+, staff roles; checks role config for custom roles.
+func (app *App) canWriteKeyTerrain(user *User) bool {
 	if user.Role == RoleAdmin {
 		return true
 	}
+	for _, rc := range app.store.GetRoleConfigs() {
+		if rc.Key == string(user.Role) {
+			if v, ok := rc.Capabilities["key_terrain_write"]; ok {
+				return v
+			}
+			break
+		}
+	}
 	switch user.Role {
-	case RoleOpLead, RoleDeputyOpLead, RoleStaffOfficer, RoleStaffAssistant, RoleStaffOfficerFull:
+	case RoleOpLead, RoleDeputyOpLead, RoleStaffOfficer, RoleStaffAssistant, RoleStaffOfficerFull, RoleTeamLead, "deputy_teamlead":
 		return true
 	}
 	return false
 }
 
+// canReadKeyTerrain checks if user has key_terrain_read capability.
+// Defaults to true for everyone (all roles).
+func (app *App) canReadKeyTerrain(user *User) bool {
+	if user.Role == RoleAdmin {
+		return true
+	}
+	for _, rc := range app.store.GetRoleConfigs() {
+		if rc.Key == string(user.Role) {
+			if v, ok := rc.Capabilities["key_terrain_read"]; ok {
+				return v
+			}
+			return true
+		}
+	}
+	return true
+}
+
+// broadcastKeyTerrainChange notifies all connected clients that the KT board changed.
+func (app *App) broadcastKeyTerrainChange(action string) {
+	data := fmt.Sprintf(`{"action":"%s"}`, action)
+	app.broker.BroadcastAll(SSEMessage{Event: "key_terrain_change", Data: data})
+}
+
 // ── Handlers ───────────────────────────────────────────────────────────────
 
 func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Request, user *User) {
+	if !app.canReadKeyTerrain(user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	entries := app.store.GetKeyTerrainEntries()
 	if entries == nil {
 		entries = []KeyTerrainEntry{}
@@ -58,7 +95,7 @@ func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Request, user *User) {
-	if !canWriteKeyTerrain(user) {
+	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -129,12 +166,13 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	app.audit(user.ID, user.Username, "create", "key_terrain", created.ID, fmt.Sprintf("Created key terrain entry %q", created.Function))
+	app.broadcastKeyTerrainChange("entry_created")
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
 }
 
 func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Request, user *User) {
-	if !canWriteKeyTerrain(user) {
+	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -272,11 +310,12 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	app.audit(user.ID, user.Username, "update", "key_terrain", entry.ID, fmt.Sprintf("Updated key terrain entry %q", entry.Function))
+	app.broadcastKeyTerrainChange("entry_updated")
 	jsonOK(w, entry)
 }
 
 func (app *App) handleDeleteKeyTerrainEntry(w http.ResponseWriter, r *http.Request, user *User) {
-	if !canWriteKeyTerrain(user) {
+	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -295,6 +334,7 @@ func (app *App) handleDeleteKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	app.audit(user.ID, user.Username, "delete", "key_terrain", id, fmt.Sprintf("Deleted key terrain entry %q", entry.Function))
+	app.broadcastKeyTerrainChange("entry_deleted")
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -306,7 +346,7 @@ func (app *App) handleGetKeyTerrainSettings(w http.ResponseWriter, r *http.Reque
 }
 
 func (app *App) handleSaveKeyTerrainSettings(w http.ResponseWriter, r *http.Request, user *User) {
-	if !canWriteKeyTerrain(user) {
+	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -320,6 +360,7 @@ func (app *App) handleSaveKeyTerrainSettings(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	app.audit(user.ID, user.Username, "update", "key_terrain_settings", 0, "Updated key terrain settings")
+	app.broadcastKeyTerrainChange("settings_updated")
 	jsonOK(w, settings)
 }
 
@@ -363,7 +404,7 @@ func (app *App) handleGetKeyTerrainSnapshot(w http.ResponseWriter, r *http.Reque
 }
 
 func (app *App) handleCreateKeyTerrainSnapshot(w http.ResponseWriter, r *http.Request, user *User) {
-	if !canWriteKeyTerrain(user) {
+	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -440,6 +481,7 @@ func (app *App) handleSearchUsersForKeyTerrain(w http.ResponseWriter, r *http.Re
 
 func (app *App) handleGetKeyTerrainAccess(w http.ResponseWriter, r *http.Request, user *User) {
 	jsonOK(w, map[string]any{
-		"can_write": canWriteKeyTerrain(user),
+		"can_read":  app.canReadKeyTerrain(user),
+		"can_write": app.canWriteKeyTerrain(user),
 	})
 }
