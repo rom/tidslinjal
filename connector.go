@@ -28,9 +28,13 @@ type Connector interface {
 
 // ConnectorConfig stores the persisted configuration for a single connector.
 type ConnectorConfig struct {
-	Name    string          `json:"name"`
-	Enabled bool            `json:"enabled"`
-	Config  json.RawMessage `json:"config"`
+	Name       string          `json:"name"`
+	Enabled    bool            `json:"enabled"`
+	Config     json.RawMessage `json:"config"`
+	LastUsedAt string          `json:"last_used_at,omitempty"` // ISO timestamp
+	LastUsedIP string          `json:"last_used_ip,omitempty"`
+	UsageCount int64           `json:"usage_count"`
+	LastError  string          `json:"last_error,omitempty"`
 }
 
 // ConnectorRegistry manages all registered connectors.
@@ -113,8 +117,8 @@ func (cr *ConnectorRegistry) Dispatch(msg EventBusMessage) {
 
 // PollAll calls Poll on all enabled connectors and returns ingested payloads.
 func (cr *ConnectorRegistry) PollAll(app *App) []IngestPayload {
-	cr.mu.RLock()
-	defer cr.mu.RUnlock()
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
 	var results []IngestPayload
 	for name, c := range cr.connectors {
 		cfg := cr.configs[name]
@@ -122,8 +126,18 @@ func (cr *ConnectorRegistry) PollAll(app *App) []IngestPayload {
 			continue
 		}
 		payloads, err := c.Poll(app)
+		// Track usage
+		now := time.Now().Format(time.RFC3339)
+		cfg.LastUsedAt = now
+		cfg.UsageCount++
 		if err != nil {
+			cfg.LastError = err.Error()
 			log.Printf("[WARN] connector %q poll error: %v", name, err)
+		} else {
+			cfg.LastError = ""
+		}
+		cr.configs[name] = cfg
+		if err != nil {
 			continue
 		}
 		results = append(results, payloads...)
