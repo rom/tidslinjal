@@ -98,8 +98,8 @@ func (app *App) handleCreateDiaryEntry(w http.ResponseWriter, r *http.Request, u
 		UserID:      user.ID,
 		UserName:    user.Username,
 		DisplayName: user.DisplayName,
-		Title:       req.Title,
-		Body:        req.Body,
+		Title:       stripHTMLTags(req.Title),
+		Body:        sanitizeRichHTML(req.Body),
 		Tags:        req.Tags,
 		Mood:        req.Mood,
 		Private:     req.Private,
@@ -140,8 +140,8 @@ func (app *App) handleUpdateDiaryEntry(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	existing.Title = req.Title
-	existing.Body = req.Body
+	existing.Title = stripHTMLTags(req.Title)
+	existing.Body = sanitizeRichHTML(req.Body)
 	existing.Tags = req.Tags
 	existing.Mood = req.Mood
 	existing.Private = req.Private
@@ -265,8 +265,15 @@ func (app *App) handleDiaryAttachmentDownload(w http.ResponseWriter, r *http.Req
 	filename := parts[4]
 	for _, att := range entry.Attachments {
 		if att.Filename == filename || att.StoredName == filename {
-			fpath := filepath.Join(app.store.AttachmentDir(), att.StoredName)
-			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, att.Filename))
+			fpath := filepath.Join(app.store.AttachmentDir(), filepath.Base(att.StoredName))
+			// Security: verify resolved path stays within attachment directory
+			absPath, _ := filepath.Abs(fpath)
+			absDir, _ := filepath.Abs(app.store.AttachmentDir())
+			if !strings.HasPrefix(absPath, absDir+string(filepath.Separator)) {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(att.Filename)))
 			http.ServeFile(w, r, fpath)
 			return
 		}
@@ -286,6 +293,11 @@ func (app *App) handleExportDiary(w http.ResponseWriter, r *http.Request, user *
 	var entries []DiaryEntry
 	if userIDStr != "" {
 		uid, _ := strconv.ParseInt(userIDStr, 10, 64)
+		// Security: only allow exporting own diary or admin access
+		if uid != user.ID && user.Role != RoleAdmin {
+			jsonError(w, "forbidden: can only export your own diary", http.StatusForbidden)
+			return
+		}
 		entries = app.store.GetDiaryByUser(uid)
 	} else {
 		entries = app.store.GetDiaryByUser(user.ID)
@@ -433,7 +445,7 @@ func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
+	body, err := io.ReadAll(io.LimitReader(r.Body, 2<<20)) // 2MB limit
 	if err != nil {
 		jsonError(w, "failed to read body", http.StatusBadRequest)
 		return
@@ -446,7 +458,10 @@ func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *
 			Entries []DiaryEntry `xml:"entry"`
 		}
 		var xd XMLDiary
-		if err := xml.Unmarshal(body, &xd); err != nil {
+		// Security: use decoder to prevent XXE attacks
+		decoder := xml.NewDecoder(bytes.NewReader(body))
+		decoder.Strict = true
+		if err := decoder.Decode(&xd); err != nil {
 			jsonError(w, "invalid XML: "+err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -467,6 +482,113 @@ func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *
 	}
 	app.audit(user.ID, user.DisplayName, "imported", "diary", 0, fmt.Sprintf("Imported %d diary entries", added))
 	jsonOK(w, map[string]any{"status": "ok", "imported": added})
+}
+
+// ── Security: sanitize rich HTML (allow safe formatting, strip dangerous tags) ──
+
+// sanitizeRichHTML removes dangerous HTML tags and attributes while preserving
+// safe formatting tags (b, i, u, s, a, br, ul, ol, li, p, img, span, div, strong, em).
+// Strips: script, iframe, object, embed, form, input, textarea, event handlers (on*).
+func sanitizeRichHTML(s string) string {
+	// Remove script/iframe/object/embed/form tags and their content
+	for _, tag := range []string{"script", "iframe", "object", "embed", "form", "input", "textarea", "select", "button"} {
+		// Remove opening+closing with content
+		for {
+			lower := strings.ToLower(s)
+			start := strings.Index(lower, "<"+tag)
+			if start == -1 {
+				break
+			}
+			end := strings.Index(lower[start:], "</"+tag)
+			if end == -1 {
+				// Self-closing or unclosed — remove to end of tag
+				tagEnd := strings.Index(s[start:], ">")
+				if tagEnd == -1 {
+					s = s[:start]
+				} else {
+					s = s[:start] + s[start+tagEnd+1:]
+				}
+			} else {
+				closeEnd := strings.Index(s[start+end:], ">")
+				if closeEnd == -1 {
+					s = s[:start]
+				} else {
+					s = s[:start] + s[start+end+closeEnd+1:]
+				}
+			}
+		}
+	}
+	// Remove event handler attributes (on*)
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '<' {
+			// Inside a tag — copy tag but strip on* attributes
+			tagEnd := strings.Index(s[i:], ">")
+			if tagEnd == -1 {
+				result.WriteString(s[i:])
+				break
+			}
+			tag := s[i : i+tagEnd+1]
+			// Remove on* attributes: onerror, onclick, onload, onmouseover, etc.
+			cleaned := removeEventHandlers(tag)
+			// Remove javascript: URLs
+			cleaned = strings.ReplaceAll(cleaned, "javascript:", "")
+			cleaned = strings.ReplaceAll(cleaned, "JavaScript:", "")
+			result.WriteString(cleaned)
+			i += tagEnd + 1
+		} else {
+			result.WriteByte(s[i])
+			i++
+		}
+	}
+	return result.String()
+}
+
+// removeEventHandlers strips on* attributes from an HTML tag string.
+func removeEventHandlers(tag string) string {
+	lower := strings.ToLower(tag)
+	// Find and remove all on* attributes
+	for {
+		idx := strings.Index(lower, " on")
+		if idx == -1 {
+			break
+		}
+		// Check if this is actually an on* event handler (followed by alpha then =)
+		rest := lower[idx+3:]
+		eqIdx := strings.IndexByte(rest, '=')
+		if eqIdx == -1 || eqIdx > 20 {
+			break
+		}
+		// Find the end of the attribute value
+		attrStart := idx
+		valStart := idx + 3 + eqIdx + 1
+		if valStart >= len(tag) {
+			tag = tag[:attrStart] + tag[len(tag):]
+			lower = strings.ToLower(tag)
+			continue
+		}
+		valEnd := valStart
+		if valStart < len(tag) && (tag[valStart] == '"' || tag[valStart] == '\'') {
+			quote := tag[valStart]
+			closeIdx := strings.IndexByte(tag[valStart+1:], quote)
+			if closeIdx != -1 {
+				valEnd = valStart + 1 + closeIdx + 1
+			} else {
+				valEnd = len(tag)
+			}
+		} else {
+			spaceIdx := strings.IndexAny(tag[valStart:], " >")
+			if spaceIdx != -1 {
+				valEnd = valStart + spaceIdx
+			} else {
+				valEnd = len(tag)
+			}
+		}
+		tag = tag[:attrStart] + tag[valEnd:]
+		lower = strings.ToLower(tag)
+	}
+	return tag
 }
 
 // ── Helper: strip HTML tags ────────────────────────────────────────────────

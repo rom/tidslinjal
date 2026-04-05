@@ -244,8 +244,12 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 
 // ── User Labels ─────────────────────────────────────────────────────────────
 
-// handleAddUserLabel adds a label to a user. Any authenticated user can set labels.
+// handleAddUserLabel adds a label to a user. Requires TeamLead+ or admin role.
 func (app *App) handleAddUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "insufficient permissions: TeamLead or higher required", http.StatusForbidden)
+		return
+	}
 	id, err := pathID(r)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
@@ -286,8 +290,12 @@ func (app *App) handleAddUserLabel(w http.ResponseWriter, r *http.Request, user 
 	jsonOK(w, target.Public())
 }
 
-// handleRemoveUserLabel removes a label from a user by label text.
+// handleRemoveUserLabel removes a label from a user by label text. Requires TeamLead+ or admin.
 func (app *App) handleRemoveUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
+	if !hasRole(user.Role, RoleTeamLead) {
+		jsonError(w, "insufficient permissions: TeamLead or higher required", http.StatusForbidden)
+		return
+	}
 	id, err := pathID(r)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
