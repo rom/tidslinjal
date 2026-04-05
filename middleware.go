@@ -321,7 +321,7 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 					return
 				}
 				// Check API keys
-				if k := app.store.ValidateAPIKey(raw); k != nil {
+				if k := app.store.ValidateAPIKey(raw, clientIP(r)); k != nil {
 					// V-05/API key fix: apply CSRF check to API-key authenticated requests too
 					if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 						if !validateCSRF(r) {
@@ -366,7 +366,7 @@ func (app *App) authenticateAPIKey(r *http.Request) *User {
 	if !app.authLimiter.allow("apikey:"+clientIP(r), 20, time.Minute) {
 		return nil
 	}
-	k := app.store.ValidateAPIKey(raw)
+	k := app.store.ValidateAPIKey(raw, clientIP(r))
 	if k == nil {
 		return nil
 	}

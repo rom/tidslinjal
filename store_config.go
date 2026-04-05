@@ -256,19 +256,23 @@ func (s *Store) DeleteAPIKey(id int64) error {
 // ValidateAPIKey checks a raw key string against stored hashes; returns the key record or nil.
 // Uses a read lock to snapshot keys, then performs expensive bcrypt comparisons without holding
 // the lock to avoid blocking all store operations during validation.
-func (s *Store) ValidateAPIKey(raw string) *APIKey {
+func (s *Store) ValidateAPIKey(raw string, fromIP ...string) *APIKey {
 	s.mu.RLock()
 	keys := append([]APIKey(nil), s.apiKeys...)
 	s.mu.RUnlock()
 
 	for _, k := range keys {
 		if bcrypt.CompareHashAndPassword([]byte(k.KeyHash), []byte(raw)) == nil {
-			// Found match; update LastUsedAt under write lock
+			// Found match; update usage tracking under write lock
 			s.mu.Lock()
 			for i := range s.apiKeys {
 				if s.apiKeys[i].ID == k.ID {
 					now := time.Now()
 					s.apiKeys[i].LastUsedAt = &now
+					s.apiKeys[i].UsageCount++
+					if len(fromIP) > 0 && fromIP[0] != "" {
+						s.apiKeys[i].LastUsedIP = fromIP[0]
+					}
 					break
 				}
 			}

@@ -712,8 +712,10 @@ type APIKey struct {
 	Description string    `json:"description,omitempty"`
 	Role        Role      `json:"role,omitempty"` // M-05 fix: configurable role (default: read)
 	CreatedBy   int64     `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`
+	LastUsedIP   string     `json:"last_used_ip,omitempty"`
+	UsageCount   int64      `json:"usage_count"`
 }
 
 // FilterPreset is a saved filter configuration

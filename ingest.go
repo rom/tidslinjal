@@ -385,6 +385,22 @@ func (app *App) handleIngest(w http.ResponseWriter, r *http.Request, user *User)
 		}
 	}
 	result.Routed = result.Accepted // all accepted events are routed
+	// Log ingest event to event log
+	status := "success"
+	if len(result.Errors) > 0 {
+		status = "partial"
+	}
+	if result.Accepted == 0 && len(result.Errors) > 0 {
+		status = "failed"
+	}
+	app.store.AddEventLogEntry(EventLogEntry{
+		Source:   "ingest:" + source,
+		Message:  fmt.Sprintf("Ingest via %s: %d accepted, %d errors (format: %s, IP: %s)", source, result.Accepted, len(result.Errors), format, clientIP(r)),
+		Summary:  status,
+		UserName: user.DisplayName,
+		UserID:   user.ID,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
 	jsonOK(w, result)
 }
 

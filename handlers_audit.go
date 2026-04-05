@@ -48,6 +48,7 @@ func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *
 		Action: "created", EntityType: "event_log", EntityID: created.ID,
 		Summary: fmt.Sprintf("Added event log entry: %s", created.Source),
 	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
 	jsonOK(w, created)
 }
 
@@ -94,6 +95,7 @@ func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, us
 		Action: "created", EntityType: "log_book", EntityID: created.ID,
 		Summary: fmt.Sprintf("Log book entry: [%s] %s", req.Category, req.Subject),
 	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"log_book"}`})
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
@@ -115,6 +117,7 @@ func (app *App) handleDeleteLogBookEntry(w http.ResponseWriter, r *http.Request,
 		Action: "deleted", EntityType: "log_book", EntityID: id,
 		Summary: fmt.Sprintf("Deleted log book entry #%d", id),
 	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"log_book"}`})
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
