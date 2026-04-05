@@ -114,3 +114,37 @@ async function _loadStartupTextInput() {
   } catch { /* ignore */ }
 }
 
+// ── Load documentation into help modal (Release Notes, README, User Manual) ──
+function loadHelpDocs() {
+  const docs = [
+    { id: 'helpReleaseNotesContent', name: 'release_notes' },
+    { id: 'helpReadmeContent', name: 'readme' },
+    { id: 'helpUserManualContent', name: 'user_manual' },
+  ];
+  docs.forEach(doc => {
+    const el = document.getElementById(doc.id);
+    if (!el) return;
+    fetch('/api/docs?name=' + doc.name, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(res => {
+        if (!res.ok) throw new Error('Not found');
+        return res.text();
+      })
+      .then(html => { el.innerHTML = html; })
+      .catch(() => { el.innerHTML = '<p style="color:var(--text-dim)">Document not available.</p>'; });
+  });
+}
+
+// Load docs when help modal opens
+document.addEventListener('DOMContentLoaded', () => {
+  const helpModal = document.getElementById('helpModal');
+  if (helpModal) {
+    const observer = new MutationObserver(() => {
+      if (helpModal.classList.contains('open')) {
+        loadHelpDocs();
+        observer.disconnect();
+      }
+    });
+    observer.observe(helpModal, { attributes: true, attributeFilter: ['class'] });
+  }
+});
+

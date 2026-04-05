@@ -178,6 +178,9 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	// Documentation endpoint (renders markdown docs as HTML)
+	mux.HandleFunc("GET /api/docs", app.handleGetDoc)
+
 	// Integration status (admin-only summary of SSO/TLS/Syslog/SMTP/Webhooks/API keys)
 	mux.HandleFunc("/api/status", app.requireRole(RoleAdmin, app.handleStatus))
 

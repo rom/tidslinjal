@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -226,4 +228,198 @@ func (app *App) handleReleaseEditingLock(w http.ResponseWriter, r *http.Request,
 func (app *App) handleGetEditingLocks(w http.ResponseWriter, r *http.Request, user *User) {
 	locks := app.store.GetAllEditingLocks()
 	jsonOK(w, locks)
+}
+
+// handleGetDoc serves a markdown document rendered as simple HTML.
+// Allowed docs: README.md, docs/RELEASE_NOTES.md, docs/USER_MANUAL.md
+func (app *App) handleGetDoc(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	allowed := map[string]string{
+		"readme":        "README.md",
+		"release_notes": filepath.Join("docs", "RELEASE_NOTES.md"),
+		"user_manual":   filepath.Join("docs", "USER_MANUAL.md"),
+	}
+	path, ok := allowed[name]
+	if !ok {
+		jsonError(w, "unknown document", http.StatusBadRequest)
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		jsonError(w, "document not found", http.StatusNotFound)
+		return
+	}
+	// Simple markdown-to-HTML conversion (handles headers, bold, italic, lists, code blocks, links, hr)
+	html := renderMarkdown(string(data))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(html)) //nolint
+}
+
+// renderMarkdown converts markdown text to basic HTML.
+func renderMarkdown(md string) string {
+	lines := strings.Split(md, "\n")
+	var out strings.Builder
+	inCode := false
+	inList := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Code blocks
+		if strings.HasPrefix(trimmed, "```") {
+			if inCode {
+				out.WriteString("</code></pre>\n")
+				inCode = false
+			} else {
+				if inList {
+					out.WriteString("</ul>\n")
+					inList = false
+				}
+				out.WriteString("<pre><code>")
+				inCode = true
+			}
+			continue
+		}
+		if inCode {
+			out.WriteString(escHTML(line))
+			out.WriteString("\n")
+			continue
+		}
+		// Empty line
+		if trimmed == "" {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			continue
+		}
+		// Horizontal rule
+		if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			out.WriteString("<hr>\n")
+			continue
+		}
+		// Headers
+		if strings.HasPrefix(trimmed, "# ") {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			out.WriteString("<h1>" + mdInline(trimmed[2:]) + "</h1>\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			out.WriteString("<h2>" + mdInline(trimmed[3:]) + "</h2>\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "### ") {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			out.WriteString("<h3>" + mdInline(trimmed[4:]) + "</h3>\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#### ") {
+			if inList {
+				out.WriteString("</ul>\n")
+				inList = false
+			}
+			out.WriteString("<h4>" + mdInline(trimmed[5:]) + "</h4>\n")
+			continue
+		}
+		// List items
+		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+			if !inList {
+				out.WriteString("<ul>\n")
+				inList = true
+			}
+			out.WriteString("<li>" + mdInline(trimmed[2:]) + "</li>\n")
+			continue
+		}
+		// Paragraph
+		if inList {
+			out.WriteString("</ul>\n")
+			inList = false
+		}
+		out.WriteString("<p>" + mdInline(trimmed) + "</p>\n")
+	}
+	if inList {
+		out.WriteString("</ul>\n")
+	}
+	if inCode {
+		out.WriteString("</code></pre>\n")
+	}
+	return out.String()
+}
+
+func mdInline(s string) string {
+	s = escHTML(s)
+	// Bold: **text** or __text__
+	for {
+		start := strings.Index(s, "**")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(s[start+2:], "**")
+		if end == -1 {
+			break
+		}
+		s = s[:start] + "<strong>" + s[start+2:start+2+end] + "</strong>" + s[start+2+end+2:]
+	}
+	// Italic: *text* or _text_
+	for {
+		start := strings.Index(s, "*")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(s[start+1:], "*")
+		if end == -1 {
+			break
+		}
+		s = s[:start] + "<em>" + s[start+1:start+1+end] + "</em>" + s[start+1+end+1:]
+	}
+	// Inline code: `text`
+	for {
+		start := strings.Index(s, "`")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(s[start+1:], "`")
+		if end == -1 {
+			break
+		}
+		s = s[:start] + "<code>" + s[start+1:start+1+end] + "</code>" + s[start+1+end+1:]
+	}
+	// Links: [text](url)
+	for {
+		lStart := strings.Index(s, "[")
+		if lStart == -1 {
+			break
+		}
+		lEnd := strings.Index(s[lStart:], "](")
+		if lEnd == -1 {
+			break
+		}
+		urlEnd := strings.Index(s[lStart+lEnd+2:], ")")
+		if urlEnd == -1 {
+			break
+		}
+		text := s[lStart+1 : lStart+lEnd]
+		url := s[lStart+lEnd+2 : lStart+lEnd+2+urlEnd]
+		s = s[:lStart] + `<a href="` + url + `" target="_blank" style="color:var(--accent)">` + text + `</a>` + s[lStart+lEnd+2+urlEnd+1:]
+	}
+	return s
+}
+
+func escHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
 }

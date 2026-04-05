@@ -857,7 +857,7 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
 /* ── Help modal ───────────────────────────────────────────────────────────── */
 .modal-wide { max-width: 860px; width: 95vw; }
 .modal-xl   { max-width: 1200px; width: 98vw; }
-.help-body  { display: flex; flex-direction: row; gap: 20px; max-height: 70vh; overflow: hidden; padding: 0; }
+.help-body  { display: flex; flex-direction: row; gap: 20px; max-height: 80vh; overflow: hidden; padding: 0; }
 .help-toc {
   width: 140px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px;
   padding: 16px 12px; border-right: 1px solid var(--border); overflow-y: auto;
@@ -879,7 +879,7 @@ body.light-mode .tl-cell.weekend-excluded { background: repeating-linear-gradien
 .help-content code { background: var(--bg3); border-radius: 3px; padding: 1px 5px; font-size: var(--fs-xs); font-family: monospace; }
 .help-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: var(--fs-sm); }
 .help-table th { text-align: left; color: var(--text-dim); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); font-size: var(--fs-xs); text-transform: uppercase; }
-.help-table td { padding: 5px 8px; border-bottom: 1px solid rgba(42,63,86,.3); vertical-align: top; }
+.help-table td { padding: 6px 8px; border-bottom: 1px solid rgba(42,63,86,.3); vertical-align: top; line-height: 1.5; }
 .help-table tr:last-child td { border-bottom: none; }
 
 /* ── Responsive / mobile ──────────────────────────────────────────────────── */
@@ -1372,7 +1372,10 @@ body.size-huge   .ev-icon { font-size: calc(1.1em * var(--ev-zoom-scale)); }
 .help-modal-subtitle { font-size: var(--fs-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
 
 /* Help modal body: taller and two-column for wider screens */
-.help-body { max-height: 78vh; }
+.help-body { max-height: 82vh; }
+.help-table td { padding: 6px 8px; line-height: 1.5; }
+.help-section-body p { line-height: 1.6; }
+.help-section-body li { line-height: 1.5; }
 
 /* Left-pane navigation for help modal (overrides the basic block above) */
 .help-toc {
