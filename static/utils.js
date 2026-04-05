@@ -293,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Notifications ───────────────────────────────────────────────────────────
 function showNotification(type, message, duration=4000) {
   const area = document.getElementById('notification-area');
+  if (!area) return; // Safety: no notification area in detached/popup windows
   const el   = document.createElement('div');
   el.className = `notification${type==='alarm'?' alarm':''}${type==='warning'?' warning':''}`;
   const title  = type==='alarm' ? t('notif_alarm_title') : type==='warning' ? 'Warning' : t('notif_done');

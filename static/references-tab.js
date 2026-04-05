@@ -291,7 +291,7 @@ function _renderReferencesTab(el) {
   window._openReportUploadModal = function(category) {
     const html = `<div class="modal-overlay" id="reportUploadModal">
       <div class="modal" style="max-width:500px;width:90vw;padding:20px;position:relative">
-        <button class="modal-close" onclick="document.getElementById('reportUploadModal')?.remove()">✕</button>
+        <button class="modal-close" id="reportUploadClose">✕</button>
         <h3>${t('report_archive_upload') || 'Upload Report'}</h3>
         <label>Title</label>
         <input id="reportTitle" class="input" style="width:100%;margin-bottom:8px" placeholder="Report title">
@@ -305,8 +305,8 @@ function _renderReferencesTab(el) {
         <label>File</label>
         <input type="file" id="reportFile" style="margin-bottom:12px">
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" onclick="_doUploadReport()">Upload</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('reportUploadModal')?.remove()">Cancel</button>
+          <button class="btn btn-primary" id="reportUploadBtn">Upload</button>
+          <button class="btn btn-secondary" id="reportUploadCancel">Cancel</button>
         </div>
       </div>
     </div>`;
@@ -314,6 +314,12 @@ function _renderReferencesTab(el) {
     const modal = document.getElementById('reportUploadModal');
     void modal.offsetHeight;
     modal.classList.add('open');
+    // Bind close/cancel/upload buttons (CSP-safe, no inline handlers)
+    const closeModal = () => modal?.remove();
+    document.getElementById('reportUploadClose')?.addEventListener('click', closeModal);
+    document.getElementById('reportUploadCancel')?.addEventListener('click', closeModal);
+    document.getElementById('reportUploadBtn')?.addEventListener('click', () => _doUploadReport());
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
   };
 
   window._doUploadReport = async function() {

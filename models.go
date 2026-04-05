@@ -336,6 +336,7 @@ type UserPreferences struct {
 	TacticalFontFamily  string `json:"tactical_font_family,omitempty"`  // CSS font-family name for tactical font
 	TickerEnabled       bool   `json:"ticker_enabled,omitempty"`        // show narrative ticker bar at bottom
 	TickerCount         int    `json:"ticker_count,omitempty"`          // number of narrative entries in ticker (default 10)
+	ShowWelcomeMessage  *bool  `json:"show_welcome_message,omitempty"`  // show welcome window on login (default true)
 	// Accessibility settings (configurable per user)
 	A11yFocusIndicators  bool   `json:"a11y_focus_indicators,omitempty"`  // enhanced keyboard focus indicators
 	A11yReducedMotion    bool   `json:"a11y_reduced_motion,omitempty"`    // reduce animations (override OS setting)

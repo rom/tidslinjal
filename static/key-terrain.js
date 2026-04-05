@@ -1473,7 +1473,7 @@ function _ktDetach() {
       .modal-overlay { position:static !important; background:none !important; display:block !important; }
       .modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:20px !important; border:none !important; overflow:visible !important; }
     </style>
-    </head><body class="${_detachThemeClass}"><div id="ktDetachRoot"></div></body></html>`);
+    </head><body class="${_detachThemeClass}"><div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div><div id="ktDetachRoot"></div></body></html>`);
   w.document.close();
 
   // Copy scripts needed
