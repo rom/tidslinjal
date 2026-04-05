@@ -67,6 +67,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorLabel     string `json:"executor_label"`
 		Reason            string `json:"reason"`
 		CoSignRequired    bool   `json:"co_sign_required"`
+		CoSignTargetID    int64  `json:"co_sign_target_id"`
+		CoSignTargetName  string `json:"co_sign_target_name"`
 		Deadline          string `json:"deadline"`
 	}
 	if err := decode(r, &req); err != nil {
@@ -122,6 +124,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		ExecutorLabel:     req.ExecutorLabel,
 		Reason:            req.Reason,
 		CoSignRequired:    req.CoSignRequired,
+		CoSignTargetID:    req.CoSignTargetID,
+		CoSignTargetName:  req.CoSignTargetName,
 		Deadline:          req.Deadline,
 	}
 	if req.Status == "requested" {

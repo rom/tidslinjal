@@ -919,6 +919,8 @@ type DecisionLogEntry struct {
 	Reason            string     `json:"reason,omitempty"`
 	// Four-eyes / grandfather co-sign
 	CoSignRequired    bool       `json:"co_sign_required,omitempty"`     // true if a co-signer is needed
+	CoSignTargetID    int64      `json:"co_sign_target_id,omitempty"`    // designated co-signer user ID
+	CoSignTargetName  string     `json:"co_sign_target_name,omitempty"`  // designated co-signer display name
 	CoSignedBy        int64      `json:"co_signed_by,omitempty"`         // user who co-signed
 	CoSignedByName    string     `json:"co_signed_by_name,omitempty"`
 	CoSignedAt        *time.Time `json:"co_signed_at,omitempty"`

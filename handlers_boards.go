@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"crypto/subtle"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -964,6 +966,133 @@ func (app *App) handleImportBoard(w http.ResponseWriter, r *http.Request, user *
 	app.audit(user.ID, user.Username, "import", "board", created.ID, fmt.Sprintf("Imported board %q with %d items", created.Name, count))
 	app.broadcastBoardChange("board_created", created.ID)
 	jsonOK(w, map[string]interface{}{"board": created, "items_imported": count})
+}
+
+// handleImportBoardCSV imports board items from a CSV string.
+// Expected CSV columns: subject, column, type, priority, responsible, due_date, note, tags
+func (app *App) handleImportBoardCSV(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		CSV     string `json:"csv"`
+		BoardID int64  `json:"board_id"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.CSV == "" {
+		jsonError(w, "csv data is required", http.StatusBadRequest)
+		return
+	}
+
+	reader := csv.NewReader(bytes.NewBufferString(req.CSV))
+	reader.TrimLeadingSpace = true
+	reader.LazyQuotes = true
+	records, err := reader.ReadAll()
+	if err != nil {
+		jsonError(w, "invalid CSV: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(records) < 2 {
+		jsonError(w, "CSV must have a header row and at least one data row", http.StatusBadRequest)
+		return
+	}
+
+	// Parse header row to map column names to indices
+	header := records[0]
+	colIdx := make(map[string]int)
+	for i, h := range header {
+		colIdx[strings.TrimSpace(strings.ToLower(h))] = i
+	}
+
+	// If no board_id provided, create a new board from the CSV filename
+	var board *Board
+	if req.BoardID > 0 {
+		board = app.store.GetBoardByID(req.BoardID)
+		if board == nil {
+			jsonError(w, "board not found", http.StatusNotFound)
+			return
+		}
+		if !app.canEditBoard(board, user) {
+			jsonError(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	} else {
+		// Create a new board
+		newBoard := Board{
+			Name:       "CSV Import",
+			OwnerID:    user.ID,
+			OwnerName:  user.DisplayName,
+			Visibility: "private",
+			Columns:    DefaultBoardColumns(),
+		}
+		created, err := app.store.CreateBoard(newBoard)
+		if err != nil {
+			jsonError(w, "failed to create board", http.StatusInternalServerError)
+			return
+		}
+		board = &created
+	}
+
+	getCol := func(row []string, names ...string) string {
+		for _, name := range names {
+			if idx, ok := colIdx[name]; ok && idx < len(row) {
+				return strings.TrimSpace(row[idx])
+			}
+		}
+		return ""
+	}
+
+	count := 0
+	for _, row := range records[1:] {
+		subject := getCol(row, "subject", "title", "name")
+		if subject == "" {
+			continue
+		}
+		colName := getCol(row, "column", "status", "col")
+		columnID := ""
+		if colName != "" {
+			for _, c := range board.Columns {
+				if strings.EqualFold(c.Name, colName) || strings.EqualFold(c.ID, colName) {
+					columnID = c.ID
+					break
+				}
+			}
+		}
+		if columnID == "" && len(board.Columns) > 0 {
+			columnID = board.Columns[0].ID
+		}
+		pri := getCol(row, "priority")
+		var tags []string
+		if t := getCol(row, "tags"); t != "" {
+			for _, tag := range strings.Split(t, ";") {
+				tag = strings.TrimSpace(tag)
+				if tag != "" {
+					tags = append(tags, tag)
+				}
+			}
+		}
+		item := BoardItem{
+			BoardID:         board.ID,
+			ColumnID:        columnID,
+			Subject:         subject,
+			ItemType:        getCol(row, "type", "item_type"),
+			Priority:        pri,
+			ResponsibleName: getCol(row, "responsible", "assigned", "owner"),
+			DueDate:         getCol(row, "due_date", "due", "deadline"),
+			Note:            getCol(row, "note", "notes", "description"),
+			Tags:            tags,
+			CreatorID:       user.ID,
+			CreatorName:     user.DisplayName,
+		}
+		if _, err := app.store.CreateBoardItem(item); err == nil {
+			count++
+		}
+	}
+
+	app.audit(user.ID, user.Username, "import", "board", board.ID,
+		fmt.Sprintf("Imported %d items from CSV into board %q", count, board.Name))
+	app.broadcastBoardChange("board_updated", board.ID)
+	jsonOK(w, map[string]interface{}{"board_id": board.ID, "items_imported": count})
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
