@@ -1931,7 +1931,8 @@ TRANSLATIONS.fi = {
     kt_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
     kt_from_capability: 'Lataa kyvykkyydestä',
     kt_select_capability: 'Valitse kyvykkyys...',
-    kt_show_no_priority: 'Näytä toiminnot ilman prioriteettia',
+
+    kt_linked_capability: 'Linkitetty kyvykkyyteen — nimi, vyöhyke, tila ja vastuuhenkilö synkronoituvat automaattisesti',    kt_show_no_priority: 'Näytä toiminnot ilman prioriteettia',
     kt_show_no_priority_desc: 'Näytä merkinnät prioriteetilla 0 tai ilman prioriteettia (oletuksena käytössä)',
     kt_status_labels: 'Tilamerkit',
     kt_status_labels_desc: 'Mukauta näyttönimet kullekin tila-arvolle.',

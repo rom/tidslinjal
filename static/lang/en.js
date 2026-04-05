@@ -2680,6 +2680,7 @@ TRANSLATIONS.en = {
     kt_zone_ph: 'e.g. North, HQ, DMZ',
     kt_from_capability: 'Load from Capability',
     kt_select_capability: 'Select a capability...',
+    kt_linked_capability: 'Linked to capability — name, zone, status, and responsible sync automatically',
     kt_show_no_priority: 'Show Functions Without Priority',
     kt_show_no_priority_desc: 'Show entries with priority 0 or no priority set (enabled by default)',
     kt_status_labels: 'Status Labels',

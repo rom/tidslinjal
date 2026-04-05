@@ -2555,7 +2555,8 @@ TRANSLATIONS.sv = {
     kt_zone_ph: 't.ex. Nord, HK, DMZ',
     kt_from_capability: 'Ladda från förmåga',
     kt_select_capability: 'Välj en förmåga...',
-    kt_show_no_priority: 'Visa förmågor utan prioritet',
+
+    kt_linked_capability: 'Länkad till förmåga — namn, zon, status och ansvarig synkas automatiskt',    kt_show_no_priority: 'Visa förmågor utan prioritet',
     kt_show_no_priority_desc: 'Visa poster med prioritet 0 eller utan prioritet (aktiverat som standard)',
     kt_status_labels: 'Statusetiketter',
     kt_status_labels_desc: 'Anpassa visningsetiketter för varje statusvärde.',

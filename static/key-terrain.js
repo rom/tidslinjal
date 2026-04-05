@@ -373,7 +373,7 @@ async function _ktEditEntry(entryId) {
         <option value="">— ${t('kt_select_capability')||'Select a capability...'} —</option>
         ${capabilities.map(c => `<option value="${c.id}" ${entry.capability_id === c.id ? 'selected' : ''}>${escHtml(c.name)}${c.zone ? ' [\u{1F310}'+escHtml(c.zone)+']' : ''}</option>`).join('')}
       </select>
-      ${entry.capability_id ? `<div style="font-size:10px;color:var(--accent);margin-top:4px">\u{1F517} ${t('kt_linked_capability')||'Linked — fields sync from capability'}</div>` : ''}
+      ${entry.capability_id ? `<div style="font-size:10px;color:var(--accent);margin-top:4px">\u{1F517} ${t('kt_linked_capability')||'Linked to capability — name, zone, status, and responsible sync automatically'}</div>` : ''}
     </div>` : ''}
 
     <div style="margin-bottom:10px">
@@ -607,17 +607,6 @@ function _ktOpenSettings() {
     </div>
 
     <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
-      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3F7} ${t('kt_status_labels')||'Status Labels'}</div>
-      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_status_labels_desc')||'Customize the display labels for each status value.'}</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        ${_ktStatusOptions.map(st => `<div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:var(--fs-xs);min-width:60px">${st.icon} ${st.value}:</span>
-          <input id="ktSettStatusLabel_${st.value}" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" value="${escHtml(sl[st.value] || st.label)}" placeholder="${st.label}">
-        </div>`).join('')}
-      </div>
-    </div>
-
-    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F6AB} ${t('kt_hidden_columns')||'Hide Columns'}</div>
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_hidden_columns_desc')||'Select columns to hide from the board view.'}</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
@@ -647,6 +636,17 @@ function _ktOpenSettings() {
         ${_ktStatusOptions.map(st => `<div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:var(--fs-xs);min-width:60px">${st.label}:</span>
           <input id="ktSettStatusIcon_${st.value}" class="input" style="width:50px;font-size:14px;text-align:center;padding:2px" value="${escHtml(si[st.value] || st.icon)}" maxlength="4">
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3F7} ${t('kt_status_labels')||'Status Labels'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_status_labels_desc')||'Customize the display labels for each status value.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        ${_ktStatusOptions.map(st => `<div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:var(--fs-xs);min-width:60px">${st.icon} ${st.value}:</span>
+          <input id="ktSettStatusLabel_${st.value}" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" value="${escHtml(sl[st.value] || st.label)}" placeholder="${st.label}">
         </div>`).join('')}
       </div>
     </div>

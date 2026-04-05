@@ -2570,7 +2570,8 @@ TRANSLATIONS.fr = {
     kt_zone_ph: 'ex. Nord, QG, DMZ',
     kt_from_capability: 'Charger depuis capacité',
     kt_select_capability: 'Sélectionner une capacité...',
-    kt_show_no_priority: 'Afficher les fonctions sans priorité',
+
+    kt_linked_capability: 'Lié à la capacité — nom, zone, statut et responsable se synchronisent automatiquement',    kt_show_no_priority: 'Afficher les fonctions sans priorité',
     kt_show_no_priority_desc: 'Afficher les entrées avec priorité 0 ou sans priorité (activé par défaut)',
     kt_status_labels: 'Libellés de statut',
     kt_status_labels_desc: 'Personnaliser les libellés pour chaque valeur de statut.',

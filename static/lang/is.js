@@ -2123,7 +2123,8 @@ TRANSLATIONS.is = {
     kt_zone_ph: 't.d. Norður, HQ, DMZ',
     kt_from_capability: 'Hlaða frá getu',
     kt_select_capability: 'Veldu getu...',
-    kt_show_no_priority: 'Sýna aðgerðir án forgangs',
+
+    kt_linked_capability: 'Tengt getu — nafn, svæði, staða og ábyrgðarmaður samstillast sjálfkrafa',    kt_show_no_priority: 'Sýna aðgerðir án forgangs',
     kt_show_no_priority_desc: 'Sýna færslur með forgang 0 eða án forgangs (sjálfgefið virkt)',
     kt_status_labels: 'Stöðumerki',
     kt_status_labels_desc: 'Sérsníða birtingarmerki fyrir hvert stöðugildi.',

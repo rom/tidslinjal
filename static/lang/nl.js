@@ -2111,7 +2111,8 @@ TRANSLATIONS.nl = {
     kt_zone_ph: 'bijv. Noord, HQ, DMZ',
     kt_from_capability: 'Laden vanuit capaciteit',
     kt_select_capability: 'Selecteer capaciteit...',
-    kt_show_no_priority: 'Functies zonder prioriteit tonen',
+
+    kt_linked_capability: 'Gekoppeld aan capaciteit — naam, zone, status en verantwoordelijke worden automatisch gesynchroniseerd',    kt_show_no_priority: 'Functies zonder prioriteit tonen',
     kt_show_no_priority_desc: 'Toon items met prioriteit 0 of zonder prioriteit (standaard ingeschakeld)',
     kt_status_labels: 'Statuslabels',
     kt_status_labels_desc: 'Pas weergavelabels aan voor elke statuswaarde.',

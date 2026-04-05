@@ -1783,7 +1783,8 @@ TRANSLATIONS.da = {
     kt_zone_ph: 'f.eks. Nord, HQ, DMZ',
     kt_from_capability: 'Indlæs fra kapabilitet',
     kt_select_capability: 'Vælg en kapabilitet...',
-    kt_show_no_priority: 'Vis funktioner uden prioritet',
+
+    kt_linked_capability: 'Knyttet til kapabilitet — navn, zone, status og ansvarlig synkroniseres automatisk',    kt_show_no_priority: 'Vis funktioner uden prioritet',
     kt_show_no_priority_desc: 'Vis poster med prioritet 0 eller uden prioritet (aktiveret som standard)',
     kt_status_labels: 'Statusetiketter',
     kt_status_labels_desc: 'Tilpas visningsetiketter for hvert statusværdi.',
