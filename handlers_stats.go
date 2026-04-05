@@ -523,8 +523,27 @@ func (app *App) handleStatsExport(w http.ResponseWriter, r *http.Request, user *
 			fmt.Fprintf(w, "[%d] %s | Status: %s | User: %s\n",
 				d.ID, d.Title, d.Status, d.DisplayName)
 		}
-	case "xlsx":
+	case "xlsx", "ods":
 		app.writeStatsXLSX(w, events, decisions)
+	case "md":
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.md")
+		fmt.Fprintf(w, "# Statistics Export\n\nExported: %s\n\n", time.Now().Format(time.RFC3339))
+		fmt.Fprintf(w, "## Events (%d)\n\n", len(events))
+		fmt.Fprintf(w, "| ID | Title | Status | Type | Start | End |\n|---|---|---|---|---|---|\n")
+		for _, ev := range events {
+			endStr := ""
+			if ev.EndTime != nil {
+				endStr = ev.EndTime.Format(time.RFC3339)
+			}
+			fmt.Fprintf(w, "| %d | %s | %s | %s | %s | %s |\n",
+				ev.ID, ev.Title, ev.Status, ev.EventType, ev.StartTime.Format(time.RFC3339), endStr)
+		}
+		fmt.Fprintf(w, "\n## Decisions (%d)\n\n", len(decisions))
+		fmt.Fprintf(w, "| ID | Title | Status | User |\n|---|---|---|---|\n")
+		for _, d := range decisions {
+			fmt.Fprintf(w, "| %d | %s | %s | %s |\n", d.ID, d.Title, d.Status, d.DisplayName)
+		}
 	default:
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=stats_export.json")

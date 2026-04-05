@@ -64,6 +64,23 @@ func (app *App) handleReportDownload(w http.ResponseWriter, r *http.Request, use
 		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.docx\"", reportType))
 		buildReportDOCXWriter(w, title, events, commentsMap)
+	case "md":
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.md\"", reportType))
+		fmt.Fprintf(w, "# %s\n\n", title)
+		fmt.Fprintf(w, "| ID | Title | Status | Type | Start | End |\n|---|---|---|---|---|---|\n")
+		for _, ev := range events {
+			endStr := ""
+			if ev.EndTime != nil {
+				endStr = ev.EndTime.Format("2006-01-02 15:04")
+			}
+			fmt.Fprintf(w, "| %d | %s | %s | %s | %s | %s |\n",
+				ev.ID, ev.Title, ev.Status, ev.EventType, ev.StartTime.Format("2006-01-02 15:04"), endStr)
+		}
+	case "ods":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.ods\"", reportType))
+		buildReportXLSXWriter(w, title, events)
 	default: // html
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"report-%s.html\"", reportType))

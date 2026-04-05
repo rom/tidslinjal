@@ -402,9 +402,11 @@ function _diaryExportMenu() {
         <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="json">JSON</button>
         <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="xml">XML</button>
         <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="csv">CSV</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="xlsx">XLSX</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="ods">ODS</button>
         <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="txt">${t('diary_export_text')||'Text'}</button>
         <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="rtf">RTF</button>
-        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="xlsx">XLSX</button>
+        <button class="btn btn-secondary" data-action="_diaryDoExport" data-arg="md">Markdown</button>
         <hr>
         <button class="btn btn-secondary" data-action="_diaryPrintAll">🖨 ${t('diary_print_all')||'Print All'}</button>
       </div>
@@ -426,7 +428,7 @@ function _diaryDoExport(format) {
 function _diaryImportPrompt() {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json';
+  input.accept = '.json,.xml';
   input.onchange = async () => {
     if (!input.files.length) return;
     const text = await input.files[0].text();

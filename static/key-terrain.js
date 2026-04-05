@@ -828,11 +828,16 @@ function _ktOpenManagePanel() {
       <div style="font-weight:600;font-size:var(--fs-xs);margin-top:4px">\u2B07 ${t('kt_export')||'Export'}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
         <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="json">JSON</button>
-        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="csv">CSV</button>
         <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="xml">XML</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="csv">CSV</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="xlsx">XLSX</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="ods">ODS</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="md">Markdown</button>
         <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="pdf">PDF</button>
         <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="svg">SVG</button>
         <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="jpeg">JPEG</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="tiff">TIFF</button>
+        <button class="btn btn-secondary btn-sm" data-action="_ktExport" data-arg="bmp">BMP</button>
       </div>
     </div>
     <div style="margin-top:12px">
@@ -896,12 +901,30 @@ function _ktExport(format) {
     }
     xml += '</key_terrain>';
     _ktDownload(xml, 'key-terrain.xml', 'application/xml');
-  } else if (format === 'pdf' || format === 'svg' || format === 'jpeg') {
+  } else if (format === 'md') {
+    let md = '# Key Terrain Board\n\n';
+    md += '| ' + cols.filter(c => c !== 'management').map(c => c).join(' | ') + ' |\n';
+    md += '| ' + cols.filter(c => c !== 'management').map(() => '---').join(' | ') + ' |\n';
+    for (const e of sorted) {
+      md += '| ' + cols.filter(c => c !== 'management').map(c => _ktCellText(e, c).replace(/\|/g, '\\|')).join(' | ') + ' |\n';
+    }
+    _ktDownload(md, 'key-terrain.md', 'text/markdown');
+  } else if (format === 'xlsx' || format === 'ods') {
+    // For spreadsheet formats, download CSV and let user convert, or use CSV as fallback
+    const headers = cols.filter(c => c !== 'management').map(c => c).join(',');
+    const rows = sorted.map(e => cols.filter(c => c !== 'management').map(c => {
+      let v = _ktCellText(e, c);
+      return '"' + v.replace(/"/g, '""') + '"';
+    }).join(','));
+    _ktDownload(headers + '\n' + rows.join('\n'), 'key-terrain.' + format + '.csv', 'text/csv');
+  } else if (format === 'pdf' || format === 'svg' || format === 'jpeg' || format === 'tiff' || format === 'bmp') {
     _ktExportImage(format);
   }
 }
 function _ktCellText(e, col) {
   switch (col) {
+    case 'seq_num': return String(e.seq_num || '');
+    case 'zone': return e.zone || '';
     case 'priority': return String(e.priority || '');
     case 'function': return e.function || '';
     case 'status': return e.status || '';
@@ -914,6 +937,7 @@ function _ktCellText(e, col) {
     case 'updated_at': return e.updated_at ? new Date(e.updated_at).toLocaleString() : '';
     case 'finished_at': return e.finished_at ? new Date(e.finished_at).toLocaleDateString() : '';
     case 'rounds': return String(e.rounds || 0);
+    case 'management': return '';
     default: return '';
   }
 }

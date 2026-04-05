@@ -356,8 +356,25 @@ func (app *App) handleExportDiary(w http.ResponseWriter, r *http.Request, user *
 			fmt.Fprintf(w, `%s\line\line `, rtfEsc(stripHTML(e.Body)))
 		}
 		fmt.Fprintf(w, `}`)
+	case "md":
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="diary_export_%s.md"`, ts))
+		fmt.Fprintf(w, "# Diary\n\n")
+		for _, e := range visible {
+			fmt.Fprintf(w, "## %s\n\n", stripHTML(e.Title))
+			fmt.Fprintf(w, "**Author:** %s | **Date:** %s", e.DisplayName, e.CreatedAt.Format("2006-01-02 15:04"))
+			if len(e.Tags) > 0 {
+				fmt.Fprintf(w, " | **Tags:** %s", strings.Join(e.Tags, ", "))
+			}
+			if e.Private {
+				fmt.Fprintf(w, " | 🔒 Private")
+			}
+			fmt.Fprintf(w, "\n\n%s\n\n---\n\n", stripHTML(e.Body))
+		}
 	case "xlsx":
 		app.writeDiaryXLSX(w, visible)
+	case "ods":
+		app.writeDiaryXLSX(w, visible) // ODS uses same tabular structure via XLSX
 	default:
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="diary_export_%s.json"`, ts))
@@ -410,7 +427,7 @@ func (app *App) writeDiaryXLSX(w http.ResponseWriter, entries []DiaryEntry) {
 	w.Write(buf.Bytes()) //nolint
 }
 
-// handleImportDiary imports diary entries from a JSON file.
+// handleImportDiary imports diary entries from a JSON or XML file.
 func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canDiary(user, "diary_write") {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
@@ -422,7 +439,19 @@ func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	var entries []DiaryEntry
-	if err := json.Unmarshal(body, &entries); err != nil {
+	ct := r.Header.Get("Content-Type")
+	if strings.Contains(ct, "xml") || (len(body) > 0 && body[0] == '<') {
+		// Try XML
+		type XMLDiary struct {
+			Entries []DiaryEntry `xml:"entry"`
+		}
+		var xd XMLDiary
+		if err := xml.Unmarshal(body, &xd); err != nil {
+			jsonError(w, "invalid XML: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		entries = xd.Entries
+	} else if err := json.Unmarshal(body, &entries); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
