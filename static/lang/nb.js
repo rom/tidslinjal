@@ -2160,7 +2160,8 @@ TRANSLATIONS.nb = {
     kt_zone_ph: 'f.eks. Nord, HQ, DMZ',
     kt_from_capability: 'Last fra kapabilitet',
     kt_select_capability: 'Velg en kapabilitet...',
-    kt_show_no_priority: 'Vis funksjoner uten prioritet',
+
+    kt_linked_capability: 'Knyttet til kapabilitet — navn, sone, status og ansvarlig synkroniseres automatisk',    kt_show_no_priority: 'Vis funksjoner uten prioritet',
     kt_show_no_priority_desc: 'Vis oppføringer med prioritet 0 eller uten prioritet (aktivert som standard)',
     kt_status_labels: 'Statusetiketter',
     kt_status_labels_desc: 'Tilpass visningsetiketter for hver statusverdi.',

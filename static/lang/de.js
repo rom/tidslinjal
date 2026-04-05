@@ -2111,7 +2111,8 @@ TRANSLATIONS.de = {
     kt_zone_ph: 'z.B. Nord, HQ, DMZ',
     kt_from_capability: 'Aus Fähigkeit laden',
     kt_select_capability: 'Fähigkeit auswählen...',
-    kt_show_no_priority: 'Funktionen ohne Priorität anzeigen',
+
+    kt_linked_capability: 'Mit Fähigkeit verknüpft — Name, Zone, Status und Verantwortlicher werden automatisch synchronisiert',    kt_show_no_priority: 'Funktionen ohne Priorität anzeigen',
     kt_show_no_priority_desc: 'Einträge mit Priorität 0 oder ohne Priorität anzeigen (standardmäßig aktiviert)',
     kt_status_labels: 'Statusbezeichnungen',
     kt_status_labels_desc: 'Anzeigenamen für jeden Statuswert anpassen.',
