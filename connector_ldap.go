@@ -113,6 +113,15 @@ func (c *LDAPConnector) Init(cfg json.RawMessage) error {
 	if c.cfg.UserFilter == "" {
 		c.cfg.UserFilter = "(&(objectClass=user)(sAMAccountName=%s))"
 	}
+	// Security: validate UserFilter contains %s placeholder for username substitution
+	if !strings.Contains(c.cfg.UserFilter, "%s") {
+		return fmt.Errorf("LDAP UserFilter must contain %%s placeholder for username substitution")
+	}
+	// Validate basic filter syntax (must start with '(' and end with ')')
+	trimmed := strings.TrimSpace(c.cfg.UserFilter)
+	if !strings.HasPrefix(trimmed, "(") || !strings.HasSuffix(trimmed, ")") {
+		return fmt.Errorf("LDAP UserFilter must be enclosed in parentheses")
+	}
 	c.enabled = true
 	log.Printf("[INFO] LDAP connector configured: host=%s:%d baseDN=%s", c.cfg.Host, c.cfg.Port, c.cfg.BaseDN)
 	return nil
