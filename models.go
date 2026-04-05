@@ -34,6 +34,7 @@ const (
 	RoleStaffOfficer       Role = "staffofficer"       // staff officer assistant: same rights as oplead
 	RoleStaffAssistant     Role = "staff_assistant"    // same permissions as staff officer
 	RoleStaffOfficerFull   Role = "staffofficer_full"  // staff officer: same rights as oplead; requires J-designation
+	RoleDeveloper          Role = "developer"          // developer: same access as admin
 	RoleAdmin              Role = "admin"              // full access
 )
 
