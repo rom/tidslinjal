@@ -517,11 +517,9 @@ function _showWelcomeBanner(startupText) {
   document.body.appendChild(overlay);
   const dismissWelcome = () => {
     const showOnLogin = overlay.querySelector('#welcomeShowOnLogin')?.checked;
-    // Save preference via API
-    if (!showOnLogin) {
-      state.preferences.show_welcome_message = false;
-      savePreferences();
-    }
+    // Always save the preference state (checked or unchecked)
+    state.preferences.show_welcome_message = !!showOnLogin;
+    savePreferences();
     overlay.remove();
   };
   overlay.querySelector('#welcomeDismissBtn').addEventListener('click', dismissWelcome);
