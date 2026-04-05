@@ -2561,8 +2561,10 @@ TRANSLATIONS.sv = {
     kt_status_labels_desc: 'Anpassa visningsetiketter för varje statusvärde.',
     kt_hidden_columns: 'Dölj kolumner',
     kt_hidden_columns_desc: 'Välj kolumner att dölja från tavlan.',
-    cap_zone_ph: 't.ex. Nord, HK, DMZ',
-    cap_responsibility: 'Ansvar',
+
+    kt_col_order_desc: 'Använd pilarna för att ändra kolumnordning.',
+    kt_manage: 'Hantera',    cap_zone_ph: 't.ex. Nord, HK, DMZ',
+    cap_responsibility: 'Ägarskap',
     cap_responsibility_ph: 't.ex. J6 Cyber Ops, CISO',
     cap_status_working: 'Fungerar',
     cap_status_degraded: 'Nedsatt',

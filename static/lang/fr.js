@@ -2576,8 +2576,10 @@ TRANSLATIONS.fr = {
     kt_status_labels_desc: 'Personnaliser les libellés pour chaque valeur de statut.',
     kt_hidden_columns: 'Masquer les colonnes',
     kt_hidden_columns_desc: 'Sélectionner les colonnes à masquer du tableau.',
-    cap_zone_ph: 'ex. Nord, QG, DMZ',
-    cap_responsibility: 'Responsabilité',
+
+    kt_col_order_desc: 'Utilisez les flèches pour réorganiser les colonnes.',
+    kt_manage: 'Gérer',    cap_zone_ph: 'ex. Nord, QG, DMZ',
+    cap_responsibility: 'Propriété',
     cap_responsibility_ph: 'ex. J6 Cyber Ops, RSSI',
     cap_status_working: 'Opérationnel',
     cap_status_degraded: 'Dégradé',

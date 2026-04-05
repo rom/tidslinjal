@@ -2117,8 +2117,10 @@ TRANSLATIONS.de = {
     kt_status_labels_desc: 'Anzeigenamen für jeden Statuswert anpassen.',
     kt_hidden_columns: 'Spalten ausblenden',
     kt_hidden_columns_desc: 'Wählen Sie Spalten, die ausgeblendet werden sollen.',
-    cap_zone_ph: 'z.B. Nord, HQ, DMZ',
-    cap_responsibility: 'Verantwortung',
+
+    kt_col_order_desc: 'Verwenden Sie die Pfeile, um die Spaltenreihenfolge zu ändern.',
+    kt_manage: 'Verwalten',    cap_zone_ph: 'z.B. Nord, HQ, DMZ',
+    cap_responsibility: 'Eigentümerschaft',
     cap_responsibility_ph: 'z.B. J6 Cyber Ops, CISO',
     cap_status_working: 'Funktionsfähig',
     cap_status_degraded: 'Eingeschränkt',

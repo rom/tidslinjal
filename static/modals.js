@@ -2742,7 +2742,7 @@ function openRoomModal(argJson) {
         ${data.type === 'capability' ? `
         <label class="form-label" style="margin-top:8px">${t('kt_zone')||'Zone'}</label>
         <input class="form-input" id="rmZone" value="${escHtml(data.zone||'')}" placeholder="${t('cap_zone_ph')||'e.g. North, HQ, DMZ'}">
-        <label class="form-label" style="margin-top:8px">${t('cap_responsibility')||'Responsibility'}</label>
+        <label class="form-label" style="margin-top:8px">${t('cap_responsibility')||'Ownership'}</label>
         <input class="form-input" id="rmResponsibility" value="${escHtml(data.responsibility||'')}" placeholder="${t('cap_responsibility_ph')||'e.g. J6 Cyber Ops, CISO'}">
         <label class="form-label" style="margin-top:8px">${t('kt_status')||'Status'}</label>
         <select class="form-input" id="rmStatus" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px">
