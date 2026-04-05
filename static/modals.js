@@ -1017,13 +1017,21 @@ async function _loadAPIKeys() {
       return;
     }
     listEl.innerHTML = keys.map(k => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
-        <div>
-          <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
-          ${k.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${escHtml(k.description)}</span>` : ''}
-          <span style="color:var(--text-dim);font-size:var(--fs-xs);display:block">Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '—'}${k.last_used_at ? ` · Last used: ${new Date(k.last_used_at).toLocaleString()}` : ''}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
+            <span class="role-badge role-${k.role||'read'}" style="font-size:9px;padding:1px 5px">${escHtml(k.role||'read')}</span>
+          </div>
+          ${k.description ? `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(k.description)}</div>` : ''}
+          <div style="color:var(--text-dim);font-size:10px;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
+            <span>Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '\u2014'}</span>
+            <span>Last used: ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}</span>
+            ${k.last_used_ip ? `<span>IP: ${escHtml(k.last_used_ip)}</span>` : ''}
+            <span>Uses: ${k.usage_count || 0}</span>
+          </div>
         </div>
-        <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}">Delete</button>
+        <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}" style="flex-shrink:0">Delete</button>
       </div>
     `).join('');
     _bindActions(listEl);
@@ -1152,14 +1160,22 @@ async function _loadConnectorList() {
         const icon = cType ? cType.icon : '🔌';
         const label = cType ? cType.label : c.name;
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:var(--bg3);border-radius:var(--radius);margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
             <span style="font-size:16px">${icon}</span>
-            <div>
-              <strong style="font-size:var(--fs-sm)">${escHtml(label)}</strong>
-              <span style="color:${c.enabled ? 'var(--accent)' : 'var(--text-dim)'};font-size:var(--fs-xs);margin-left:6px">${c.enabled ? '● Active' : '○ Disabled'}</span>
+            <div style="flex:1;min-width:0">
+              <div>
+                <strong style="font-size:var(--fs-sm)">${escHtml(label)}</strong>
+                <span style="color:${c.enabled ? 'var(--accent)' : 'var(--text-dim)'};font-size:var(--fs-xs);margin-left:6px">${c.enabled ? '● Active' : '○ Disabled'}</span>
+              </div>
+              <div style="color:var(--text-dim);font-size:10px;display:flex;gap:8px;flex-wrap:wrap;margin-top:1px">
+                ${c.last_used_at ? `<span>Last: ${new Date(c.last_used_at).toLocaleString()}</span>` : ''}
+                ${c.last_used_ip ? `<span>IP: ${escHtml(c.last_used_ip)}</span>` : ''}
+                ${c.usage_count ? `<span>Polls: ${c.usage_count}</span>` : ''}
+                ${c.last_error ? `<span style="color:var(--red)">⚠ ${escHtml(c.last_error)}</span>` : ''}
+              </div>
             </div>
           </div>
-          <div style="display:flex;gap:4px">
+          <div style="display:flex;gap:4px;flex-shrink:0">
             <button class="btn btn-sm btn-secondary" data-action="_editConnector" data-arg="${escHtml(c.name)}" title="Configure">⚙</button>
             <button class="btn btn-sm ${c.enabled ? 'btn-danger' : 'btn-secondary'}" data-action="toggleConnector" data-arg="${escHtml(c.name)}">
               ${c.enabled ? 'Disable' : 'Enable'}

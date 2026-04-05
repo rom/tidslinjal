@@ -1467,9 +1467,13 @@ function _ktDetach() {
   const _detachDataSize = document.documentElement.getAttribute('data-size') || 'normal';
 
   w.document.write(`<!DOCTYPE html><html data-theme="${_detachTheme}" data-size="${_detachDataSize}"><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
-    <style>body{padding:16px;background:var(--bg1);color:var(--text);font-family:system-ui,sans-serif}
-    .modal-overlay{position:static!important;background:none!important}.modal{box-shadow:none!important;max-width:100%!important;width:100%!important;max-height:100%!important;padding:0!important;border:none!important}</style>
-    </head><body class="${_detachThemeClass}"></body></html>`);
+    <style>
+      body { padding:0; margin:0; background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; }
+      #ktDetachRoot { padding:16px; }
+      .modal-overlay { position:static !important; background:none !important; display:block !important; }
+      .modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:20px !important; border:none !important; overflow:visible !important; }
+    </style>
+    </head><body class="${_detachThemeClass}"><div id="ktDetachRoot"></div></body></html>`);
   w.document.close();
 
   // Copy scripts needed
@@ -1491,18 +1495,27 @@ function _ktDetach() {
     // Store theme class to re-apply after body innerHTML changes
     const _detachBodyClass = _detachThemeClass;
     w._boardModal = function(id, content, width) {
+      const root = w.document.getElementById('ktDetachRoot');
+      if (!root) return;
       let el = w.document.getElementById(id);
       if (el) el.remove();
-      w.document.body.innerHTML = `<div style="padding:16px;max-width:${width||'1100px'};margin:0 auto">${content}</div>`;
-      // Re-apply theme class after innerHTML replacement
-      if (_detachBodyClass) w.document.body.classList.add(_detachBodyClass);
-      if (typeof w._bindActions === 'function') w._bindActions(w.document.body);
+      root.innerHTML = `<div id="${id}" style="max-width:${width||'1100px'};margin:0 auto">${content}</div>`;
+      if (typeof w._bindActions === 'function') w._bindActions(root);
     };
     w._closeBoardModal = function(id) {
       const el = w.document.getElementById(id);
       if (el) el.remove();
       // Re-render the board after closing a sub-modal
       if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
+    };
+    // Override openModal/closeModal for the detached window (no overlay needed)
+    w.openModal = function(id) {
+      const el = w.document.getElementById(id);
+      if (el) el.classList.add('open');
+    };
+    w.closeModal = function(id) {
+      const el = w.document.getElementById(id);
+      if (el) { el.classList.remove('open'); el.remove(); }
     };
     // Set up SSE forwarding from parent to detached window
     const _ktDetachedSSEHandler = () => {
