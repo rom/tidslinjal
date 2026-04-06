@@ -2674,16 +2674,16 @@ Fields: file, subject, sender, type, tags</pre>
         <div class="toggle-btn-group">
           <button class="toggle-btn${p.theme==='light'?' active':''}" data-action="setPref" data-args='["theme","light"]' >${t('theme_light')||'Light'}</button>
           <button class="toggle-btn${p.theme==='dark'?' active':''}" data-action="setPref" data-args='["theme","dark"]' >${t('theme_dark')||'Dark'}</button>
-          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" data-action="setPref" data-args='["theme","city-camo"]'  title="Camouflage (greens/grays)">🏕 Camo</button>
-          <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" data-action="setPref" data-args='["theme","urban-camo"]'  title="Urban warfare (blues)">🌆 Urban Camo</button>
-          <button class="toggle-btn${p.theme==='sand'?' active':''}" data-action="setPref" data-args='["theme","sand"]' title="Warm desert tones">🏜 Sand</button>
-          <button class="toggle-btn${p.theme==='matrix'?' active':''}" data-action="setPref" data-args='["theme","matrix"]' title="Green-on-black terminal">💻 Matrix</button>
-          <button class="toggle-btn${p.theme==='sunset'?' active':''}" data-action="setPref" data-args='["theme","sunset"]' title="Warm orange and amber">🌅 Sunset</button>
-          <button class="toggle-btn${p.theme==='light-blue-sky'?' active':''}" data-action="setPref" data-args='["theme","light-blue-sky"]' title="Bright sky-blue light theme">🌤 Light Blue Sky</button>
-          <button class="toggle-btn${p.theme==='ocean'?' active':''}" data-action="setPref" data-args='["theme","ocean"]' title="Deep ocean blues and teals">🌊 Ocean</button>
-          <button class="toggle-btn${p.theme==='forest'?' active':''}" data-action="setPref" data-args='["theme","forest"]' title="Deep greens and earthy tones">🌲 Forest</button>
-          <button class="toggle-btn${p.theme==='accessible'?' active':''}" data-action="setPref" data-args='["theme","accessible"]' title="High-contrast accessible theme">♿ Accessible</button>
-          <button class="toggle-btn${p.theme==='crimson'?' active':''}" data-action="setPref" data-args='["theme","crimson"]' title="Dark theme with crimson accents">🔴 Crimson</button>
+          <button class="toggle-btn${p.theme==='city-camo'?' active':''}" data-action="setPref" data-args='["theme","city-camo"]'  title="${t('theme_camo_desc')||'Camouflage (greens/grays)'}">🏕 ${t('theme_camo')||'Camo'}</button>
+          <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" data-action="setPref" data-args='["theme","urban-camo"]'  title="${t('theme_urban_camo_desc')||'Urban warfare (blues)'}">🌆 ${t('theme_urban_camo')||'Urban Camo'}</button>
+          <button class="toggle-btn${p.theme==='sand'?' active':''}" data-action="setPref" data-args='["theme","sand"]' title="${t('theme_sand_desc')||'Warm desert tones'}">🏜 ${t('theme_sand')||'Sand'}</button>
+          <button class="toggle-btn${p.theme==='matrix'?' active':''}" data-action="setPref" data-args='["theme","matrix"]' title="${t('theme_matrix_desc')||'Green-on-black terminal'}">💻 ${t('theme_matrix')||'Matrix'}</button>
+          <button class="toggle-btn${p.theme==='sunset'?' active':''}" data-action="setPref" data-args='["theme","sunset"]' title="${t('theme_sunset_desc')||'Warm orange and amber'}">🌅 ${t('theme_sunset')||'Sunset'}</button>
+          <button class="toggle-btn${p.theme==='light-blue-sky'?' active':''}" data-action="setPref" data-args='["theme","light-blue-sky"]' title="${t('theme_light_blue_sky_desc')||'Bright sky-blue light theme'}">🌤 ${t('theme_light_blue_sky')||'Light Blue Sky'}</button>
+          <button class="toggle-btn${p.theme==='ocean'?' active':''}" data-action="setPref" data-args='["theme","ocean"]' title="${t('theme_ocean_desc')||'Deep ocean blues and teals'}">🌊 ${t('theme_ocean')||'Ocean'}</button>
+          <button class="toggle-btn${p.theme==='forest'?' active':''}" data-action="setPref" data-args='["theme","forest"]' title="${t('theme_forest_desc')||'Deep greens and earthy tones'}">🌲 ${t('theme_forest')||'Forest'}</button>
+          <button class="toggle-btn${p.theme==='accessible'?' active':''}" data-action="setPref" data-args='["theme","accessible"]' title="${t('theme_accessible_desc')||'High-contrast accessible theme'}">♿ ${t('theme_accessible')||'Accessible'}</button>
+          <button class="toggle-btn${p.theme==='crimson'?' active':''}" data-action="setPref" data-args='["theme","crimson"]' title="${t('theme_crimson_desc')||'Dark theme with crimson accents'}">🔴 ${t('theme_crimson')||'Crimson'}</button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -2743,28 +2743,28 @@ Fields: file, subject, sender, type, tags</pre>
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_timezone')||'Timezone'}:</span>
           <select id="prefTimezone" data-action="setTimezonePref" data-event="change" data-arg-value
             style="margin-top:4px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
-            <option value=""${!state.timezone?' selected':''}>Browser Default</option>
+            <option value=""${!state.timezone?' selected':''}>${t('settings_tz_browser_default')||'Browser Default'}</option>
             ${['UTC','Europe/London','Europe/Paris','Europe/Stockholm','Europe/Berlin','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'].map(tz =>
               `<option value="${tz}"${state.timezone===tz?' selected':''}>${tz}</option>`
             ).join('')}
           </select>
         </div>
         <div style="margin-top:10px">
-          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">Real time clock time format:</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_clock_format')||'Real time clock time format'}:</span>
           <div class="toggle-btn-group" style="margin-top:4px">
-            <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" data-action="setClockFormat" data-arg="local">Local time</button>
-            <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  data-action="setClockFormat" data-arg="zulu">ZULU / UTC</button>
+            <button class="toggle-btn${!_clockUTC?' active':''}" id="clockFmtLocal" data-action="setClockFormat" data-arg="local">${t('settings_clock_local')||'Local time'}</button>
+            <button class="toggle-btn${_clockUTC?' active':''}"  id="clockFmtZulu"  data-action="setClockFormat" data-arg="zulu">${t('settings_clock_zulu')||'ZULU / UTC'}</button>
           </div>
         </div>
         <div style="margin-top:10px">
-          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">Additional timezone clocks:</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${t('settings_extra_clocks')||'Additional timezone clocks'}:</span>
           <div style="margin-top:4px">
             ${(p.extra_clocks||[]).length === 0
-              ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">No extra clocks. Use the + button next to the clock to add one.</div>`
+              ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_no_extra_clocks')||'No extra clocks. Use the + button next to the clock to add one.'}</div>`
               : (p.extra_clocks||[]).map(ec => `
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:var(--fs-xs)">
                   <span style="flex:1;color:var(--text)">${escHtml(ec.label)} <span style="color:var(--text-dim)">(${escHtml(ec.timezone)})</span></span>
-                  <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="removeExtraClock" data-arg="${ec.id}">× Remove</button>
+                  <button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="removeExtraClock" data-arg="${ec.id}">× ${t('btn_remove')||'Remove'}</button>
                 </div>`).join('')
             }
           </div>
@@ -3040,8 +3040,8 @@ Fields: file, subject, sender, type, tags</pre>
           <span style="font-size:var(--fs-xs);color:var(--text-dim)">${t('settings_week_style')||'Week number style'}:</span>
           <select id="prefWeekStyle" data-action="setPrefSelect" data-event="change" data-pref-key="week_number_style"
             style="margin-left:4px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
-            <option value="iso"${(p.week_number_style||'iso')==='iso'?' selected':''}>ISO (W1–W52)</option>
-            <option value="year_week"${p.week_number_style==='year_week'?' selected':''}>Year+Week (6-W01)</option>
+            <option value="iso"${(p.week_number_style||'iso')==='iso'?' selected':''}>${t('settings_week_style_iso')||'ISO (W1–W52)'}</option>
+            <option value="year_week"${p.week_number_style==='year_week'?' selected':''}>${t('settings_week_style_year_week')||'Year+Week (6-W01)'}</option>
           </select>
         </div>` : ''}
       </div>
@@ -3097,7 +3097,7 @@ Fields: file, subject, sender, type, tags</pre>
               return '<label style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;font-size:var(--fs-xs);white-space:nowrap;' + (active ? 'background:var(--accent-muted,rgba(0,120,255,.12));border-color:var(--accent)' : '') + '">' +
                 '<input type="checkbox" class="prefQRGroup" value="' + g.id + '" ' + (active ? 'checked' : '') + ' data-action="_saveQRGroups" data-event="change" style="accent-color:var(--accent);width:12px;height:12px">' +
                 escHtml(g.name) + '</label>';
-            }).join('') || '<span style="font-size:var(--fs-xs);color:var(--text-dim)">No groups</span>'}
+            }).join('') || '<span style="font-size:var(--fs-xs);color:var(--text-dim)">' + (t('settings_no_groups')||'No groups') + '</span>'}
           </div>
         </div>
       </div>
@@ -3175,7 +3175,7 @@ Fields: file, subject, sender, type, tags</pre>
             <p><strong>Safari:</strong> ${t('push_safari')||'Safari menu → Settings → Websites → Notifications → find this site → Allow'}</p>
           </div>
         </details>` : ''}
-        ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" data-action="requestPushPermission">${Notification.permission === 'granted' ? '✓ Granted' : 'Enable Notifications'}</button>` : ''}
+        ${Notification.permission !== 'denied' ? `<button class="btn btn-secondary btn-sm" style="margin-bottom:8px" data-action="requestPushPermission">${Notification.permission === 'granted' ? '✓ ' + (t('settings_push_granted')||'Granted') : (t('settings_push_enable')||'Enable Notifications')}</button>` : ''}
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:4px">
           <input type="checkbox" ${p.push_alarms!==false?'checked':''} data-action="setPref" data-event="change" data-pref-checked="push_alarms"
             style="width:14px;height:14px;accent-color:var(--accent)">
@@ -3215,7 +3215,7 @@ Fields: file, subject, sender, type, tags</pre>
           <span title="${t('settings_force_offline_info')||'Force the application into offline mode, using locally cached data only.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
         <div id="offlineStatus" style="font-size:var(--fs-xs);padding:4px 8px;background:var(--bg3);border-radius:var(--radius)">
-          ${window._offlineMode ? '<span style="color:#e05252">● Offline</span>' : '<span style="color:#27ae60">● Online</span>'}
+          ${window._offlineMode ? '<span style="color:#e05252">● ' + (t('settings_offline_label')||'Offline') + '</span>' : '<span style="color:#27ae60">● ' + (t('settings_online_label')||'Online') + '</span>'}
         </div>
       </div>
       <div style="padding:10px 12px;margin:16px 0 12px;background:var(--bg3);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0">
@@ -3242,8 +3242,8 @@ Fields: file, subject, sender, type, tags</pre>
         ` : `
         <div style="font-size:var(--fs-sm);color:var(--text)">
           ${ex.artificial_time_enabled
-            ? `<span style="color:#27AE60">✓ Active</span> — ${ex.artificial_time ? new Date(ex.artificial_time).toLocaleString() : 'Not set'}`
-            : `<span style="color:var(--text-dim)">— Disabled</span>`}
+            ? `<span style="color:#27AE60">✓ ${t('settings_art_time_active')||'Active'}</span> — ${ex.artificial_time ? new Date(ex.artificial_time).toLocaleString() : (t('settings_art_time_not_set')||'Not set')}`
+            : `<span style="color:var(--text-dim)">— ${t('settings_art_time_disabled')||'Disabled'}</span>`}
         </div>
         <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('artificial_time_readonly')||'Contact a team lead or admin to change artificial time settings.'}</div>
         `}
@@ -3260,21 +3260,21 @@ Fields: file, subject, sender, type, tags</pre>
         <div class="sidebar-section-title">${t('settings_terminology')||'Terminology'}</div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_group_label')||'Group label'}</div>
         <div class="toggle-btn-group" style="margin-bottom:8px">
-          <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" data-action="setGroupLabel" data-arg="group">Group</button>
-          <button class="toggle-btn${ex.group_label==='unit'?' active':''}" data-action="setGroupLabel" data-arg="unit">Unit</button>
-          <button class="toggle-btn${ex.group_label==='team'?' active':''}" data-action="setGroupLabel" data-arg="team">Team</button>
+          <button class="toggle-btn${(ex.group_label||'group')==='group'?' active':''}" data-action="setGroupLabel" data-arg="group">${t('term_group')||'Group'}</button>
+          <button class="toggle-btn${ex.group_label==='unit'?' active':''}" data-action="setGroupLabel" data-arg="unit">${t('term_unit')||'Unit'}</button>
+          <button class="toggle-btn${ex.group_label==='team'?' active':''}" data-action="setGroupLabel" data-arg="team">${t('term_team')||'Team'}</button>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_user_label')||'User label'}</div>
         <div class="toggle-btn-group" style="margin-bottom:8px">
-          <button class="toggle-btn${(ex.user_label||'users')==='users'?' active':''}" data-action="setUserLabel" data-arg="users">Users</button>
-          <button class="toggle-btn${ex.user_label==='soldiers'?' active':''}" data-action="setUserLabel" data-arg="soldiers">Soldiers</button>
-          <button class="toggle-btn${ex.user_label==='personnel'?' active':''}" data-action="setUserLabel" data-arg="personnel">Personnel</button>
+          <button class="toggle-btn${(ex.user_label||'users')==='users'?' active':''}" data-action="setUserLabel" data-arg="users">${t('term_users')||'Users'}</button>
+          <button class="toggle-btn${ex.user_label==='soldiers'?' active':''}" data-action="setUserLabel" data-arg="soldiers">${t('term_soldiers')||'Soldiers'}</button>
+          <button class="toggle-btn${ex.user_label==='personnel'?' active':''}" data-action="setUserLabel" data-arg="personnel">${t('term_personnel')||'Personnel'}</button>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:4px">${t('settings_operation_mode')||'Operation mode'}</div>
         <div class="toggle-btn-group">
-          <button class="toggle-btn${(ex.operation_mode||'exercise')==='exercise'?' active':''}" data-action="setOperationMode" data-arg="exercise">Exercise</button>
-          <button class="toggle-btn${ex.operation_mode==='incident'?' active':''}" data-action="setOperationMode" data-arg="incident">Incident</button>
-          <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" data-action="setOperationMode" data-arg="operation">Operation</button>
+          <button class="toggle-btn${(ex.operation_mode||'exercise')==='exercise'?' active':''}" data-action="setOperationMode" data-arg="exercise">${t('term_exercise')||'Exercise'}</button>
+          <button class="toggle-btn${ex.operation_mode==='incident'?' active':''}" data-action="setOperationMode" data-arg="incident">${t('term_incident')||'Incident'}</button>
+          <button class="toggle-btn${ex.operation_mode==='operation'?' active':''}" data-action="setOperationMode" data-arg="operation">${t('term_operation')||'Operation'}</button>
         </div>
       </div>
       ${state.user && hasRole2(state.user.role, 'oplead') ? `

@@ -1435,6 +1435,84 @@ TRANSLATIONS.en = {
     settings_force_offline:       'Force offline mode',
     artificial_time_enable:       'Enable artificial time',
 
+    // Theme names and descriptions
+    theme_camo:                   'Camo',
+    theme_camo_desc:              'Camouflage (greens/grays)',
+    theme_urban_camo:             'Urban Camo',
+    theme_urban_camo_desc:        'Urban warfare (blues)',
+    theme_sand:                   'Sand',
+    theme_sand_desc:              'Warm desert tones',
+    theme_matrix:                 'Matrix',
+    theme_matrix_desc:            'Green-on-black terminal',
+    theme_sunset:                 'Sunset',
+    theme_sunset_desc:            'Warm orange and amber',
+    theme_light_blue_sky:         'Light Blue Sky',
+    theme_light_blue_sky_desc:    'Bright sky-blue light theme',
+    theme_ocean:                  'Ocean',
+    theme_ocean_desc:             'Deep ocean blues and teals',
+    theme_forest:                 'Forest',
+    theme_forest_desc:            'Deep greens and earthy tones',
+    theme_accessible:             'Accessible',
+    theme_accessible_desc:        'High-contrast accessible theme',
+    theme_crimson:                'Crimson',
+    theme_crimson_desc:           'Dark theme with crimson accents',
+
+    // Timezone settings
+    settings_tz_browser_default:  'Browser Default',
+    settings_clock_format:        'Real time clock time format',
+    settings_clock_local:         'Local time',
+    settings_clock_zulu:          'ZULU / UTC',
+    settings_extra_clocks:        'Additional timezone clocks',
+    settings_no_extra_clocks:     'No extra clocks. Use the + button next to the clock to add one.',
+    btn_remove:                   'Remove',
+
+    // Week number styles
+    settings_week_style_iso:      'ISO (W1–W52)',
+    settings_week_style_year_week:'Year+Week (6-W01)',
+
+    // Quick response
+    settings_no_groups:           'No groups',
+
+    // Push notifications
+    settings_push_granted:        'Granted',
+    settings_push_enable:         'Enable Notifications',
+
+    // Offline status
+    settings_offline_label:       'Offline',
+    settings_online_label:        'Online',
+
+    // Artificial time status
+    settings_art_time_active:     'Active',
+    settings_art_time_not_set:    'Not set',
+    settings_art_time_disabled:   'Disabled',
+
+    // Terminology
+    term_group:                   'Group',
+    term_unit:                    'Unit',
+    term_team:                    'Team',
+    term_users:                   'Users',
+    term_soldiers:                'Soldiers',
+    term_personnel:               'Personnel',
+    term_exercise:                'Exercise',
+    term_incident:                'Incident',
+    term_operation:               'Operation',
+
+    // Tactical font settings (previously missing)
+    settings_tactical_font:              'Tactical Task Graphics Font',
+    settings_tactical_font_desc:         'Use the NDU Tactical Task Graphics font for military symbols and icons. The font is not distributed with Tidslinjal due to licensing — download it from the official source, then install it locally.',
+    settings_tactical_font_download:     'Download Font (NDU Press)',
+    settings_tactical_font_install:      'After downloading, extract the ZIP and install the .ttf/.otf font files on your operating system. Then enable the font below.',
+    settings_tactical_font_enable:       'Enable Tactical Task Graphics font',
+    settings_tactical_font_family_desc:  'CSS font-family name (must match the installed font name).',
+
+    // Additional settings labels (previously missing)
+    settings_show_out_of_hours:          'Show time outside day hours',
+    settings_show_days_to_epoch:         'Days to epoch (Day N)',
+    settings_show_days_to_epoch_info:    'Show the day count relative to exercise epoch (Day -2, Day 0, Day 1, etc.) in the timeline header when synthetic time is active.',
+    settings_ticker_enable:              'Show narrative ticker',
+    settings_user_label:                 'User label',
+    settings_operation_mode:             'Operation mode',
+
     // Poll / Multipoll
     poll_title:              'Poll / Multipoll',
     poll_desc:               'Send a poll with one or more questions to users, groups, or roles. Responses are collected and saved to the pollster log.',
