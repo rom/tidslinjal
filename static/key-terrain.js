@@ -305,6 +305,7 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktShowHistory" data-arg="${e.id}" data-stop-prop title="${t('kt_history')||'History'}">\u{1F4DC}</button>
         <button class="btn btn-sm${e.finished_at ? '' : ' btn-secondary'}" style="font-size:10px;padding:1px 5px;${e.finished_at ? 'color:var(--success,#27ae60)' : ''}" data-action="_ktHandleEntry" data-arg="${e.id}" data-stop-prop title="${e.finished_at ? (t('kt_unhandle')||'Mark as unhandled') : (t('kt_handle')||'Mark as handled')}">${e.finished_at ? '\u2705' : '\u2611'}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktToggleGhost" data-arg="${e.id}" data-stop-prop title="${e.ghosted ? (t('kt_unghost')||'Unghost') : (t('kt_ghost')||'Ghost')}">${e.ghosted ? '\u{1F47B}\u2713' : '\u{1F47B}'}</button>
+        <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktCloneEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_clone')||'Clone'}">\u{1F4CB}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktArchiveEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_archive')||'Archive'}">\u{1F4E6}</button>
         <button class="btn btn-sm" style="font-size:10px;padding:1px 5px;color:var(--danger)" data-action="_ktDeleteEntry" data-arg="${e.id}" data-stop-prop title="${t('kt_remove')||'Remove'}">\u{1F5D1}</button>
       </td>` : `<td></td>`,
@@ -576,6 +577,28 @@ async function _ktDeleteEntry(entryId) {
     await _ktApi('DELETE', '/key-terrain/' + entryId);
     await openKeyTerrainBoard();
     if (typeof showNotification === 'function') showNotification('success', t('kt_deleted')||'Entry deleted');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function _ktCloneEntry(entryId) {
+  const orig = _ktState.entries.find(e => e.id === parseInt(entryId));
+  if (!orig) return;
+  const data = {
+    function: (t('kt_clone_prefix')||'Clone') + ' ' + orig.function,
+    status: orig.status,
+    trend: orig.trend,
+    threat: orig.threat,
+    external: orig.external,
+    priority: (orig.priority || 0) + 1,
+    zone: orig.zone || '',
+    actions: orig.actions,
+    capability_id: orig.capability_id || 0,
+  };
+  if (orig.responsible_name) data.responsible = orig.responsible_name;
+  try {
+    await _ktApi('POST', '/key-terrain', data);
+    await openKeyTerrainBoard();
+    if (typeof showNotification === 'function') showNotification('success', t('kt_cloned')||'Entry cloned');
   } catch (e) { alert('Error: ' + e.message); }
 }
 
@@ -1473,7 +1496,7 @@ function _ktDetach() {
       .modal-overlay { position:static !important; background:none !important; display:block !important; }
       .modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:20px !important; border:none !important; overflow:visible !important; }
     </style>
-    </head><body class="${_detachThemeClass}"><div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div><div id="ktDetachRoot"></div></body></html>`);
+    </head><body class="${_detachThemeClass}"><div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div><div style="padding:4px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:10px;display:flex;align-items:center;gap:8px"><span style="color:var(--text-dim)">${t('kt_detach_url')||'URL'}:</span><input id="ktDetachURL" readonly style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;font-size:10px;font-family:monospace" value="${window.location.origin}"><button id="ktDetachCopyURL" style="font-size:10px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);cursor:pointer">${t('btn_copy')||'Copy'}</button></div><div id="ktDetachRoot"></div></body></html>`);
   w.document.close();
 
   // Copy scripts needed
@@ -1524,6 +1547,16 @@ function _ktDetach() {
     };
     document.addEventListener('sse:key_terrain_change', _ktDetachedSSEHandler);
     if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
+    // Wire URL copy button
+    const copyBtn = w.document.getElementById('ktDetachCopyURL');
+    const urlInput = w.document.getElementById('ktDetachURL');
+    if (copyBtn && urlInput) {
+      copyBtn.addEventListener('click', () => {
+        urlInput.select();
+        try { w.navigator.clipboard.writeText(urlInput.value); copyBtn.textContent = '\u2713'; } catch { w.document.execCommand('copy'); }
+        setTimeout(() => { copyBtn.textContent = '${t('btn_copy')||'Copy'}'; }, 1500);
+      });
+    }
   };
   scriptSrcs.forEach(src => {
     const s = w.document.createElement('script');

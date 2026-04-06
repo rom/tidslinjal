@@ -14,7 +14,10 @@ function openDebugConsole() {
     <div class="modal" style="max-width:900px;max-height:90vh;display:flex;flex-direction:column">
       <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
         <h3>🐛 ${t('debug_title')||'Debug Console'}</h3>
-        <button class="modal-close" data-action="_closeDebugConsole">&times;</button>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-secondary" data-action="_debugDetach" title="${t('btn_detach')||'Detach to window'}">\u29C9</button>
+          <button class="modal-close" data-action="_closeDebugConsole">&times;</button>
+        </div>
       </div>
       <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px;font-family:monospace;font-size:12px">
 
@@ -57,6 +60,36 @@ function openDebugConsole() {
 
 function _closeDebugConsole() {
   document.getElementById('debugConsoleModal')?.remove();
+}
+
+function _debugDetach() {
+  _closeDebugConsole();
+  const theme = window.state?.preferences?.theme || 'dark';
+  const themeClass = theme === 'light' ? 'light-mode' : theme === 'city-camo' ? 'city-camo' : theme === 'urban-camo' ? 'urban-camo' : '';
+  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(el => el.outerHTML).join('\n');
+  const w = window.open('', '_blank', 'width=900,height=600,menubar=no,toolbar=no');
+  if (!w) { alert('Popup blocked'); return; }
+  w.document.write(`<!DOCTYPE html><html data-theme="${theme}"><head><title>Debug Console</title>${styles}
+    <style>body{padding:0;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+    #debugRoot{padding:12px}</style></head><body class="${themeClass}">
+    <div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div>
+    <div id="debugRoot"><h3 style="margin-bottom:8px">\u{1F41B} Debug Console (Detached)</h3>
+    <div id="debugLogArea" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px;height:calc(100vh - 80px);overflow-y:auto;font-size:11px;font-family:monospace;line-height:1.4">
+    ${_debugEntries.map(e => _debugFormatEntry(e)).join('')}
+    </div></div></body></html>`);
+  w.document.close();
+  // Forward new entries to the detached window
+  const origAdd = _debugAddEntry;
+  const _patchedAdd = function(entry) {
+    origAdd(entry);
+    const area = w.document?.getElementById('debugLogArea');
+    if (area && !w.closed) {
+      area.insertAdjacentHTML('beforeend', _debugFormatEntry(entry));
+      area.scrollTop = area.scrollHeight;
+    }
+  };
+  // Monkey-patch temporarily
+  window._debugAddEntryDetached = _patchedAdd;
 }
 
 function _debugFormatEntry(e) {
@@ -109,6 +142,25 @@ function _debugBindSSE() {
     const d = e.detail || {};
     _debugAddEntry({ type: 'info', source: d.type || 'log', message: `Log change: ${d.type}` });
   });
+  // Listen for user login/logoff (via user_change SSE events)
+  const origES = window._sseConnection;
+  if (origES) {
+    origES.addEventListener('user_change', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const action = data.action || '';
+        if (action === 'login' || action === 'logout' || action === 'login_failed' || action === 'blocked') {
+          _debugAddEntry({
+            type: action === 'login' ? 'success' : action === 'logout' ? 'info' : 'warning',
+            source: 'auth',
+            message: `${action}: ${data.username || data.display_name || 'user #'+data.user_id}`,
+            user: data.username || data.display_name || ''
+          });
+        }
+      } catch {}
+    });
+  }
+
   document.addEventListener('sse:key_terrain_change', () => {
     _debugAddEntry({ type: 'info', source: 'key_terrain', message: 'Key terrain board changed' });
   });
