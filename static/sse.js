@@ -82,6 +82,13 @@ function connectSSE() {
       if (data.type === 'audit_log' && typeof renderSidebar === 'function' && state.sidebarTab !== 'references') renderSidebar();
     } catch {}
   });
+  // Layer changes (e.g. auto-created External Events layer)
+  es.addEventListener('layer_change', async () => {
+    try {
+      const layers = await apiGet('/api/layers');
+      if (layers) { state.layers = layers; renderTimeline(); }
+    } catch {}
+  });
   // Day labels change
   es.addEventListener('day_labels_change', async () => {
     await fetchDayLabels();

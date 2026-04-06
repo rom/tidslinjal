@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -183,6 +184,72 @@ func (app *App) broadcastUserChange(senderID int64, action string, userID int64)
 		return
 	}
 	app.broker.BroadcastAll(SSEMessage{Event: "user_change", Data: string(data)})
+}
+
+// createExternalEvent creates a calendar event of type "external_event" on the External Events layer.
+func (app *App) createExternalEvent(subject, body, sender, keyName, fromIP string, tags []string) {
+	layer := app.getOrCreateExternalEventsLayer()
+	if layer == nil {
+		logError("createExternalEvent: could not get/create External Events layer")
+		return
+	}
+
+	desc := body
+	desc += fmt.Sprintf("\n\n--- Integration Details ---\nSender: %s\nAPI Key: %s\nSource IP: %s", sender, keyName, fromIP)
+	if len(tags) > 0 {
+		desc += fmt.Sprintf("\nTags: %s", strings.Join(tags, ", "))
+	}
+
+	layerID := layer.ID
+	now := time.Now()
+	ev := Event{
+		Title:       subject,
+		Description: stripHTMLTags(desc),
+		EventType:   "external_event",
+		Status:      StatusPlanned,
+		StartTime:   now,
+		LayerID:     &layerID,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	created, err := app.store.CreateEvent(ev)
+	if err != nil {
+		logError("createExternalEvent: failed to create event: %v", err)
+		return
+	}
+	logDebug("createExternalEvent: created event id=%d on layer %d title=%q", created.ID, layerID, subject)
+
+	// Publish to event bus and broadcast to all users
+	app.eventBus.Publish(EventBusMessage{
+		Action: ActionCreated,
+		Event:  &created,
+	})
+	app.broadcastEventChange(0, "created", &created)
+}
+
+// getOrCreateExternalEventsLayer returns the "External Events" layer, creating it if needed.
+func (app *App) getOrCreateExternalEventsLayer() *Layer {
+	layers := app.store.GetAllLayers()
+	for _, l := range layers {
+		if l.Name == "External Events" {
+			return &l
+		}
+	}
+	// Create the layer
+	layer, err := app.store.CreateLayer(Layer{
+		Name:       "External Events",
+		Description: "Events received from integrated external systems via API keys",
+		Color:      "#6C5CE7",
+		Visibility: "public",
+	})
+	if err != nil {
+		logError("failed to create External Events layer: %v", err)
+		return nil
+	}
+	logDebug("created External Events layer id=%d", layer.ID)
+	// Broadcast layer change to all connected users
+	app.broker.BroadcastAll(SSEMessage{Event: "layer_change", Data: "{}"})
+	return &layer
 }
 
 // broadcastEventChange sends an SSE notification to clients about an event change.
