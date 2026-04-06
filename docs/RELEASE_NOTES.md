@@ -1,10 +1,33 @@
-# Release Notes — Tidslinjal v8.2.0
+# Release Notes — Tidslinjal v8.3.0
 
-**Release Date:** 2026-04-05
+**Release Date:** 2026-04-06
 
 ---
 
 ## New Features
+
+### Key Terrain Board — Owner Column & Checkbox Filters
+- **Owner column** — displays the owner of each linked capability; hidden by default; sortable
+- **Owner field on capabilities** — new field in capability form, synced to Key Terrain Board entries
+- **Checkbox filters** — capability, priority (0–10), status, and trend now have checkbox filters complementing existing inputs; all unset by default
+
+### 8 New Visual Themes
+- Sand, Matrix, Sunset, Light Blue Sky, Ocean, Forest, Accessible, Crimson
+- Full CSS variable definitions with theme selector buttons in Settings
+
+### Language Additions
+- **Japanese (日本語)** and **Korean (한국어)** added — Tidslinjal now supports **19 languages**
+- Toolbar flag buttons (🇯🇵 🇰🇷) and profile dropdown entries added
+
+### Settings i18n
+- 36 hardcoded strings wrapped in `t()` calls; 60+ new translation keys across all 19 languages
+- Theme labels, timezone section, terminology buttons, notification labels, and tactical font settings fully internationalized
+
+---
+
+## Previous Release: v8.2.0 (2026-04-05)
+
+## New Features (v8.2.0)
 
 ### Diary Module
 - Personal diary with rich text editor (bold, italic, underline, strikethrough, lists, inline links, inline images)

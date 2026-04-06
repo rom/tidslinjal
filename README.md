@@ -103,7 +103,7 @@ A structured decision-tracking system accessible from the sidebar:
 - Status workflow: Proposed → Approved / Rejected
 - File attachments on decisions
 - Detachable to a standalone browser window
-- Full i18n support (14 languages)
+- Full i18n support (19 languages)
 
 ### Log Book
 
@@ -335,7 +335,7 @@ Ops Lead+ (and Team Lead, with the `can_lock` capability) can lock time slots to
 
 ### Internationalization
 
-Full UI translation in **14 languages**:
+Full UI translation in **19 languages**:
 
 | Code | Language | Locale |
 |------|----------|--------|
@@ -353,6 +353,11 @@ Full UI translation in **14 languages**:
 | `pt` | Português (Portuguese) | pt-PT |
 | `pl` | Polski (Polish) | pl-PL |
 | `uk` | Українська (Ukrainian) | uk-UA |
+| `de` | Deutsch (German) | de-DE |
+| `nl` | Nederlands (Dutch) | nl-NL |
+| `is` | Íslenska (Icelandic) | is-IS |
+| `ja` | 日本語 (Japanese) | ja-JP |
+| `ko` | 한국어 (Korean) | ko-KR |
 
 Language preference is saved per user. Administrators can restrict the available language set at startup using `--languages` or `--disable-languages` flags. English is always available as the fallback language.
 
@@ -415,7 +420,7 @@ A reference document management system for attaching and tracking operational do
 
 ### User Manuals
 
-Comprehensive user manuals are available in all 14 supported languages:
+Comprehensive user manuals are available in all 19 supported languages:
 
 | Language | Manual |
 |----------|--------|
@@ -840,14 +845,14 @@ tidslinjal/
 └── static/
     ├── index.html    # App shell with all modals
     ├── login.html    # Login page
-    ├── i18n.js       # 14-language translation strings (EN/SV/FR/FI/DA/NB/ET/LV/LT/IT/ES/PT/PL/UK)
+    ├── i18n.js       # 19-language translation strings (EN/SV/FR/DE/NL/FI/IS/DA/NB/ET/LV/LT/IT/ES/PT/PL/UK/JA/KO)
     ├── app.js        # Timeline engine, all UI logic
     ├── modals.js     # Modal dialogs (settings, templates, profile, map, PVA…)
     ├── timeline.js   # Timeline rendering and event drawing
     ├── state.js      # Shared application state
     ├── api.js        # API client helpers
     ├── utils.js      # Clock, timezone, @mention autocomplete, utilities
-    └── style.css     # Dark + light themes, 4 size variants, mobile CSS
+    └── style.css     # 12 themes (dark, light, camo, sand, matrix, sunset, ocean, forest, accessible, crimson…), 4 size variants, mobile CSS
 ```
 
 ### Performance Characteristics
@@ -927,6 +932,15 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v8.3.0 — Themes, Languages, Key Terrain Owner & Settings i18n
+
+- **8 new themes** — Sand, Matrix, Sunset, Light Blue Sky, Ocean, Forest, Accessible, Crimson (12 total themes)
+- **Japanese & Korean languages** — full UI translation; Tidslinjal now supports 19 languages
+- **Key Terrain Board — Owner column** — displays capability owner (hidden by default); new Owner field on capabilities
+- **Key Terrain Board — checkbox filters** — capability, priority (0–10), status, and trend filters with checkboxes complementing existing inputs
+- **Settings i18n** — 36 hardcoded strings internationalized; 60+ new translation keys in all 19 languages
+- **Tactical font, timezone, terminology** labels fully translatable
 
 ### v8.2.0 — Diary, Capabilities, Key Terrain Enhancements & Security Hardening
 

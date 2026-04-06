@@ -1,6 +1,6 @@
 # Tidslinjal Användarmanual
 
-**Version 6.1.0**
+**Version 8.3.0**
 
 ---
 
@@ -60,7 +60,7 @@ Nyckelfunktioner:
 - Artificiellt tidssystem för övningstidsförskjutningar
 - DTG (Date-Time Group) militärt datumformat
 - Högkontrastläge och färgblindsanpassade paletter
-- Stöd för 14 språk
+- Stöd för 19 språk
 - Referensdokumenthantering med kontrollsummor
 - Arbetsytans förval
 - Offlinesynkronisering och federationsstöd
@@ -520,9 +520,9 @@ Flaggan `kan_låsa` kan tilldelas vilken användare som helst oavsett roll.
 
 | Inställning | Alternativ |
 |---|---|
-| **Tema** | Mörkt / Ljust / City Camo / Urban Camo |
+| **Tema** | Mörkt / Ljust / City Camo / Urban Camo / Sand / Matrix / Solnedgång / Ljusblå himmel / Hav / Skog / Tillgänglig / Karmosinröd |
 | **Storlek** | Liten / Normal / Stor / Enorm |
-| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
+| **Språk** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇮🇸 Íslenska / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Datum-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Tidsformat** | 24h / 12h |
 | **Högkontrastläge** | På / Av |
@@ -925,4 +925,29 @@ Klicka **Ta bort** bredvid ett förval för att radera det.
 
 ---
 
-*Tidslinjal v6.1.0 — Samarbetsbaserad operativ tidslinje*
+## Förmågor
+
+**Förmågor** (🎯 under Resurser) representerar operativa förmågor som kan spåras. Varje förmåga har:
+- **Namn** — förmågans namn
+- **Zon** — valfri geografisk/områdesplacering
+- **Beskrivning** — fritext
+- **Ägarskap** — vem som äger/driver förmågan
+- **Status** — Fungerande, Degraderad, Nere eller Okänd
+
+Förmågor är **reaktiva objekt**: när de är kopplade till en post i Nyckelterrängtavlan sprids ändringar av förmågans namn, zon, status, ägarskap och ägare automatiskt till tavlan.
+
+---
+
+## Nyckelterrängtavlans förbättringar (v8.3.0)
+
+- **Ägarkolumn** — visar ägaren av varje kopplad förmåga; dold som standard (växla via Kolumnsynlighet); sorterbar
+- **Ägarfält på förmågor** — nytt "Ägare"-fält i förmågeformuläret, separat från Ägarskap/Ansvarig; synkroniseras automatiskt till Nyckelterrängtavlans poster
+- **Kryssrutefilter för förmåga** — kryssrutor för alla förmågenamn i poster, kompletterar befintlig textsökning
+- **Kryssrutefilter för prioritet** — kryssrutor för värdena 0–10, kompletterar nummerfältet
+- **Kryssrutefilter för status** — kryssrutor för Fungerande/Degraderad/Nere/Okänd, kompletterar rullgardinslistan
+- **Kryssrutefilter för trend** — kryssrutor för Förbättras/Stabil/Försämras, kompletterar rullgardinslistan
+- Alla kryssrutefilter är avmarkerade som standard; markerade värden filtrerar som ELLER inom en grupp, OCH mellan grupper
+
+---
+
+*Tidslinjal v8.3.0 — Samarbetsbaserad operativ tidslinje*

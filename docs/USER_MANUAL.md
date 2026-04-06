@@ -60,7 +60,7 @@ Key capabilities:
 - Artificial time system for exercise time offsets
 - DTG (Date-Time Group) military date format
 - High-contrast and color-blind accessibility modes
-- Full i18n support (14 languages)
+- Full i18n support (19 languages)
 - Reference document management with checksums
 - Workspace presets
 - Offline sync mode and federation support
@@ -561,9 +561,9 @@ Open the **Settings** sidebar tab to configure your preferences.
 
 | Setting | Options |
 |---|---|
-| **Theme** | Dark / Light / City Camo / Urban Camo |
+| **Theme** | Dark / Light / City Camo / Urban Camo / Sand / Matrix / Sunset / Light Blue Sky / Ocean / Forest / Accessible / Crimson |
 | **Display size** | Small / Normal / Large / Huge |
-| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
+| **Language** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇫🇮 Suomi / 🇮🇸 Íslenska / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Date/time format** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Time format** | 24h / 12h |
 | **High-contrast mode** | On / Off (overlay that boosts grid lines, time markers, phase bands, locks, selections) |
@@ -1197,7 +1197,7 @@ All users have diary read and write access by default. Admins can restrict acces
 - **Ownership** — who owns/operates this capability
 - **Status** — Working, Degraded, Down, or Unknown
 
-Capabilities are **reactive objects**: when linked to a Key Terrain Board entry, changes to the capability's name, zone, status, and ownership automatically propagate to the board.
+Capabilities are **reactive objects**: when linked to a Key Terrain Board entry, changes to the capability's name, zone, status, ownership, and owner automatically propagate to the board.
 
 ---
 
@@ -1211,6 +1211,16 @@ Capabilities are **reactive objects**: when linked to a Key Terrain Board entry,
 - **Manage & Export panel** — History, Versions, Print, and Export consolidated under one button
 - **Load from Capability** — populate entry fields from an existing capability resource
 
+## Key Terrain Board Enhancements (v8.3.0)
+
+- **Owner column** — displays the owner of each linked capability; hidden by default (toggle via Columns visibility); sortable
+- **Owner field on capabilities** — new "Owner" field in the capability resource form, separate from Ownership/Responsible; synced automatically to Key Terrain Board entries
+- **Capability checkbox filter** — checkboxes for all capability names in entries, complementing the existing text search
+- **Priority checkbox filter** — checkboxes for values 0–10, complementing the number input
+- **Status checkbox filter** — checkboxes for Working/Degraded/Down/Unknown, complementing the dropdown
+- **Trend checkbox filter** — checkboxes for Improving/Stable/Worsening, complementing the dropdown
+- All checkbox filters are unset by default; checked values filter as OR within a group, AND across groups
+
 ---
 
-*Tidslinjal v8.2.0 — Collaborative Operational Timeline*
+*Tidslinjal v8.3.0 — Collaborative Operational Timeline*

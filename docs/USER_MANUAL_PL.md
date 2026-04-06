@@ -1,6 +1,6 @@
 # Tidslinjal Podręcznik Użytkownika
 
-**Wersja 6.1.0**
+**Wersja 8.3.0**
 
 ---
 
@@ -510,9 +510,9 @@ Otwórz zakładkę **Ustawienia** w panelu bocznym, aby skonfigurować preferenc
 
 | Ustawienie | Opcje |
 |---|---|
-| **Motyw** | Ciemny / Jasny / City Camo / Urban Camo |
+| **Motyw** | Ciemny / Jasny / City Camo / Urban Camo / Sand / Matrix / Sunset / Light Blue Sky / Ocean / Forest / Accessible / Crimson |
 | **Rozmiar** | Mały / Normalny / Duży / Ogromny |
-| **Język** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Język** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇫🇮 Suomi / 🇮🇸 Íslenska / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Format daty/czasu** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Format czasu** | 24h / 12h |
 | **Tryb wysokiego kontrastu** | Wł. / Wył. |
@@ -527,7 +527,7 @@ Otwórz zakładkę **Ustawienia** w panelu bocznym, aby skonfigurować preferenc
 | **Domyślny typ zdarzenia** | dowolny skonfigurowany typ |
 | **Baner powitalny** | wyświetlany przy pierwszym logowaniu |
 
-Język można również zmienić bezpośrednio za pomocą przycisków flag (🇬🇧 🇸🇪 🇫🇷 🇫🇮) na pasku narzędzi.
+Język można również zmienić bezpośrednio za pomocą przycisków flag (🇬🇧 🇸🇪 🇫🇷 🇩🇪 🇳🇱 🇫🇮 🇮🇸 🇩🇰 🇳🇴 🇪🇪 🇱🇻 🇱🇹 🇮🇹 🇪🇸 🇵🇹 🇵🇱 🇺🇦 🇯🇵 🇰🇷) na pasku narzędzi.
 
 ### Format daty/czasu i godziny dnia
 
@@ -915,4 +915,39 @@ Kliknij **Usuń** obok presetu, aby go skasować.
 
 ---
 
-*Tidslinjal v6.1.0 — Oparta na współpracy operacyjna oś czasu*
+## Zdolności operacyjne
+
+**Zdolności** (🎯 w Zasobach) reprezentują zdolności operacyjne, które można śledzić. Każda zdolność posiada:
+- **Nazwa** — nazwa zdolności
+- **Strefa** — opcjonalne umiejscowienie geograficzne/obszarowe
+- **Opis** — opis w formie tekstu dowolnego
+- **Właścicielstwo** — kto posiada/obsługuje tę zdolność
+- **Status** — Sprawny, Zdegradowany, Niesprawny lub Nieznany
+
+Zdolności są **obiektami reaktywnymi**: gdy są powiązane z wpisem w Key Terrain Board, zmiany nazwy, strefy, statusu, właścicielstwa i właściciela zdolności automatycznie propagują się do tablicy.
+
+---
+
+## Ulepszenia Key Terrain Board (v8.2.0)
+
+- **Kolumna Nr sekw.** — automatycznie przypisywany unikalny numer na wpis
+- **Kolumna Strefa** — sortowalne pole tekstowe do klasyfikacji obszaru
+- **Konfigurowalne etykiety statusu** — zmiana „Sprawny" na „Normalny" itp. w Ustawieniach
+- **Widoczność kolumn** — pokaż/ukryj dowolną kolumnę, w tym kolumnę Zarządzanie
+- **Kolejność kolumn** — zmiana kolejności kolumn bezpośrednio w panelu Ustawień
+- **Panel Zarządzaj i Eksportuj** — Historia, Wersje, Drukuj i Eksportuj skonsolidowane pod jednym przyciskiem
+- **Załaduj ze Zdolności** — wypełnij pola wpisu z istniejącego zasobu zdolności
+
+## Ulepszenia Key Terrain Board (v8.3.0)
+
+- **Kolumna Właściciel** — wyświetla właściciela każdej powiązanej zdolności; domyślnie ukryta (przełącz w Widoczności kolumn); sortowalna
+- **Pole Właściciel w zdolnościach** — nowe pole „Właściciel" w formularzu zasobu zdolności, oddzielne od Właścicielstwa/Odpowiedzialnego; automatycznie synchronizowane z wpisami Key Terrain Board
+- **Filtr pól wyboru zdolności** — pola wyboru dla wszystkich nazw zdolności we wpisach, uzupełniające istniejące wyszukiwanie tekstowe
+- **Filtr pól wyboru priorytetu** — pola wyboru dla wartości 0–10, uzupełniające pole numeryczne
+- **Filtr pól wyboru statusu** — pola wyboru dla Sprawny/Zdegradowany/Niesprawny/Nieznany, uzupełniające listę rozwijaną
+- **Filtr pól wyboru trendu** — pola wyboru dla Poprawa/Stabilny/Pogorszenie, uzupełniające listę rozwijaną
+- Wszystkie filtry pól wyboru są domyślnie odznaczone; zaznaczone wartości filtrują jako LUB w ramach grupy, I między grupami
+
+---
+
+*Tidslinjal v8.3.0 — Oparta na współpracy operacyjna oś czasu*
