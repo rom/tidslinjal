@@ -2583,6 +2583,12 @@ TRANSLATIONS.sv = {
     debug_live: 'Aktiv',
     debug_waiting: 'Väntar på händelser...',
     debug_log_cleared: 'Loggen rensad.',
+
+    debug_trace_channels: 'Spårningskanaler',
+    debug_trace_webhook: 'Webhook / Ingest',
+    debug_trace_eventbus: 'Händelsebuss (utgående)',
+    debug_trace_syslog: 'Syslog',
+    debug_save_trace: 'Spara spårning till fil',
     btn_set: 'Sätt',
     btn_clear: 'Rensa',
     btn_bold: 'Fetstil',
