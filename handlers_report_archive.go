@@ -163,7 +163,9 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 
 	// Check if ingest is enabled
 	cfg := app.store.GetReportIngestConfig()
+	logDebug("report-ingest: request from %s, ingest enabled=%v", clientIP(r), cfg.Enabled)
 	if !cfg.Enabled {
+		logDebug("report-ingest: rejected — incoming report interface is disabled")
 		jsonError(w, "incoming report interface is disabled", http.StatusForbidden)
 		return
 	}
@@ -171,11 +173,14 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	// Auth via API key
 	user := app.authenticateAPIKey(r)
 	if user == nil {
+		logDebug("report-ingest: rejected — no valid API key provided from %s", clientIP(r))
 		jsonError(w, "unauthorized — provide a valid API key via Authorization: Bearer <key>", http.StatusUnauthorized)
 		return
 	}
+	logDebug("report-ingest: authenticated as %s (role=%s)", user.Username, user.Role)
 	// V-33 fix: require at least RoleReadWrite for creating report entries
-	if user.Role == RoleRead {
+	if user.Role == RoleRead || user.Role == RoleObserver {
+		logDebug("report-ingest: rejected — role %q insufficient (need readwrite+)", user.Role)
 		jsonError(w, "insufficient permissions — API key requires read-write role or higher", http.StatusForbidden)
 		return
 	}

@@ -216,11 +216,13 @@ func (app *App) broadcastEventChange(senderID int64, action string, ev *Event) {
 // fireWebhooks enqueues outbound webhook notifications for event state transitions.
 // All HTTP calls go through the bounded worker pool — no goroutine spawning here.
 func (app *App) fireWebhooks(action string, ev *Event) {
+	logDebug("webhooks: firing for action=%s event=%d title=%q", action, ev.ID, ev.Title)
 	prefs := app.store.GetAllPreferences()
 	for _, p := range prefs {
 		if p.WebhookURL == "" {
 			continue
 		}
+		logDebug("webhooks: enqueuing %s webhook to %q for user %d", p.WebhookType, p.WebhookURL, p.UserID)
 		payload := map[string]interface{}{
 			"type":        "event_" + action,
 			"event_id":    ev.ID,
@@ -408,6 +410,7 @@ func (app *App) runWebhookWorker() {
 	transport := newSSRFSafeTransport()
 	client := &http.Client{Timeout: 10 * time.Second, Transport: transport}
 	for job := range app.webhookCh {
+		logDebug("webhooks: worker sending POST to %q (type=%s, body=%d bytes)", job.url, job.wtype, len(job.body))
 		req, err := http.NewRequest("POST", job.url, bytes.NewReader(job.body))
 		if err != nil {
 			logVerbose("webhook: invalid URL %q: %v", job.url, err)
@@ -425,8 +428,10 @@ func (app *App) runWebhookWorker() {
 		resp, err := client.Do(req)
 		if err != nil {
 			logVerbose("webhook: POST %q failed: %v", job.url, err)
+			logDebug("webhooks: POST %q failed: %v", job.url, err)
 			continue
 		}
+		logDebug("webhooks: POST %q returned status %d", job.url, resp.StatusCode)
 		resp.Body.Close()
 	}
 }
@@ -442,9 +447,11 @@ func (app *App) enqueueWebhook(wtype, webhookURL string, body []byte) {
 	}
 	select {
 	case app.webhookCh <- webhookJob{url: webhookURL, wtype: wtype, body: body}:
+		logDebug("webhooks: queued %s call to %q (%d bytes)", wtype, webhookURL, len(body))
 	case <-app.stopCh:
 		logVerbose("webhook dropped during shutdown: %q", webhookURL)
 	default:
 		logVerbose("webhook queue full; dropping call to %q", webhookURL)
+		logDebug("webhooks: queue full, dropping call to %q", webhookURL)
 	}
 }

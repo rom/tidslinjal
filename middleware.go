@@ -365,16 +365,19 @@ func (app *App) authenticateAPIKey(r *http.Request) *User {
 	}
 	// API key brute-force protection
 	if !app.authLimiter.allow("apikey:"+clientIP(r), 20, time.Minute) {
+		logDebug("apikey: rate limited from %s", clientIP(r))
 		return nil
 	}
 	k := app.store.ValidateAPIKey(raw, clientIP(r))
 	if k == nil {
+		logDebug("apikey: invalid key from %s (prefix=%s...)", clientIP(r), raw[:min(8, len(raw))])
 		return nil
 	}
 	keyRole := k.Role
 	if keyRole == "" {
 		keyRole = RoleRead
 	}
+	logDebug("apikey: authenticated key=%q role=%s from %s", k.Name, keyRole, clientIP(r))
 	return &User{
 		ID:          k.CreatedBy,
 		Username:    "apikey:" + k.Name,

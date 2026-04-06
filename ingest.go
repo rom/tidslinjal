@@ -315,8 +315,10 @@ func (app *App) processIngestPayload(p IngestPayload) *Event {
 	created, err := app.store.CreateEvent(ev)
 	if err != nil {
 		log.Printf("[WARN] ingest: failed to create event from %s: %v", p.Source, err)
+		logDebug("ingest: failed to create event from source=%q title=%q: %v", p.Source, p.Title, err)
 		return nil
 	}
+	logDebug("ingest: created event id=%d from source=%q title=%q format=%s", created.ID, p.Source, p.Title, p.Format)
 
 	// Run through message routing
 	app.routeIngestedMessage(p, &created)
@@ -360,6 +362,7 @@ func (app *App) handleIngest(w http.ResponseWriter, r *http.Request, user *User)
 		source = "api"
 	}
 	formatHint := r.URL.Query().Get("format")
+	logDebug("ingest: received %d bytes from source=%q format=%q user=%s", len(body), source, formatHint, user.Username)
 
 	var format IngestFormat
 	if formatHint != "" {

@@ -91,6 +91,7 @@ func (b *SSEBroker) Notify(userID int64, n AlarmNotification) {
 func (b *SSEBroker) Broadcast(senderID int64, msg SSEMessage) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	logDebug("sse: broadcast event=%s to %d clients (sender=%d excluded)", msg.Event, len(b.clients), senderID)
 	for c := range b.clients {
 		if c.userID != senderID {
 			select {
@@ -105,6 +106,7 @@ func (b *SSEBroker) Broadcast(senderID int64, msg SSEMessage) {
 func (b *SSEBroker) BroadcastAll(msg SSEMessage) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+	logDebug("sse: broadcast-all event=%s to %d clients", msg.Event, len(b.clients))
 	for c := range b.clients {
 		select {
 		case c.broadcast <- msg:
@@ -156,6 +158,7 @@ func (b *SSEBroker) SendToUser(userID int64, msg SSEMessage) {
 	b.mu.RLock()
 	clients := b.byUser[userID]
 	b.mu.RUnlock()
+	logDebug("sse: send-to-user=%d event=%s (%d connections)", userID, msg.Event, len(clients))
 	for _, c := range clients {
 		select {
 		case c.broadcast <- msg:
