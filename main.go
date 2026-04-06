@@ -913,11 +913,18 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 	mux.HandleFunc("/api/apikeys/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
+		switch r.Method {
+		case http.MethodDelete:
 			app.requireRole(RoleAdmin, app.handleDeleteAPIKey)(w, r)
-		} else if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/reveal") {
-			app.requireRole(RoleAdmin, app.handleRevealAPIKey)(w, r)
-		} else {
+		case http.MethodPut:
+			app.requireRole(RoleAdmin, app.handleUpdateAPIKey)(w, r)
+		case http.MethodGet:
+			if strings.HasSuffix(r.URL.Path, "/reveal") {
+				app.requireRole(RoleAdmin, app.handleRevealAPIKey)(w, r)
+			} else {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})

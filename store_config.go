@@ -253,6 +253,26 @@ func (s *Store) DeleteAPIKey(id int64) error {
 	return fmt.Errorf("api key not found")
 }
 
+// UpdateAPIKeySettings updates mutable settings on an API key (route_mode, save_raw_key).
+func (s *Store) UpdateAPIKeySettings(id int64, routeMode *string, saveRawKey *bool) error {
+	s.mu.Lock()
+	for i := range s.apiKeys {
+		if s.apiKeys[i].ID == id {
+			if routeMode != nil {
+				s.apiKeys[i].RouteMode = *routeMode
+			}
+			if saveRawKey != nil {
+				s.apiKeys[i].SaveRawKey = *saveRawKey
+			}
+			snap := append([]APIKey(nil), s.apiKeys...)
+			s.mu.Unlock()
+			return s.persist("apikeys.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("api key not found")
+}
+
 // ValidateAPIKey checks a raw key string against stored hashes; returns the key record or nil.
 // Uses a read lock to snapshot keys, then performs expensive bcrypt comparisons without holding
 // the lock to avoid blocking all store operations during validation.
