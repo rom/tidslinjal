@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,7 +92,13 @@ func (app *App) handleUploadReportArchive(w http.ResponseWriter, r *http.Request
 }
 
 func (app *App) handleDownloadReportArchive(w http.ResponseWriter, r *http.Request, user *User) {
-	id, err := pathID(r)
+	// Path is /api/report-archive/{id}/download — extract {id} which is second-to-last segment
+	parts := strings.Split(strings.TrimSuffix(r.URL.Path, "/"), "/")
+	if len(parts) < 2 {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(parts[len(parts)-2], 10, 64)
 	if err != nil {
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
@@ -292,10 +299,83 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	app.audit(user.ID, user.DisplayName, "create", "report_archive_ingest", created.ID,
 		fmt.Sprintf("Incoming report from %q: %q", entry.Sender, entry.Subject))
 
+	// Also store as a message archive entry
+	rawPayload, _ := json.Marshal(map[string]interface{}{
+		"subject": entry.Subject, "sender": entry.Sender,
+		"report_type": entry.ReportType, "tags": entry.Tags,
+	})
+	app.store.AddMessageArchiveEntry(MessageArchiveEntry{
+		Category:    "incoming",
+		Subject:     entry.Subject,
+		Sender:      entry.Sender,
+		Body:        entry.Description,
+		MessageType: entry.ReportType,
+		Tags:        entry.Tags,
+		Source:       "api",
+		RawPayload:  string(rawPayload),
+		CreatedBy:   user.ID,
+		CreatedByName: user.DisplayName,
+	})
+
 	jsonOK(w, map[string]interface{}{
 		"id":      created.ID,
 		"title":   created.Title,
 		"status":  "accepted",
 		"message": "Report received and archived",
 	})
+}
+
+// ── Message Archive handlers ────────────────────────────────────────────────
+
+func (app *App) handleListMessageArchive(w http.ResponseWriter, r *http.Request, user *User) {
+	entries := app.store.GetMessageArchive()
+	if entries == nil {
+		entries = []MessageArchiveEntry{}
+	}
+	jsonOK(w, entries)
+}
+
+func (app *App) handleCreateMessageArchive(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Subject     string   `json:"subject"`
+		Body        string   `json:"body"`
+		MessageType string   `json:"message_type"`
+		Tags        []string `json:"tags"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Subject == "" {
+		jsonError(w, "subject required", http.StatusBadRequest)
+		return
+	}
+	entry := app.store.AddMessageArchiveEntry(MessageArchiveEntry{
+		Category:      "local",
+		Subject:       stripHTMLTags(req.Subject),
+		Body:          stripHTMLTags(req.Body),
+		MessageType:   req.MessageType,
+		Tags:          req.Tags,
+		Source:        "manual",
+		CreatedBy:     user.ID,
+		CreatedByName: user.DisplayName,
+	})
+	app.audit(user.ID, user.DisplayName, "create", "message_archive", entry.ID,
+		fmt.Sprintf("Created message %q", req.Subject))
+	jsonOK(w, entry)
+}
+
+func (app *App) handleDeleteMessageArchive(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/message-archive/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.DeleteMessageArchiveEntry(id); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "deleted", "message_archive", id, fmt.Sprintf("Deleted message #%d", id))
+	jsonOK(w, map[string]string{"status": "deleted"})
 }

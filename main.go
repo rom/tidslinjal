@@ -915,6 +915,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("/api/apikeys/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			app.requireRole(RoleAdmin, app.handleDeleteAPIKey)(w, r)
+		} else if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/reveal") {
+			app.requireRole(RoleAdmin, app.handleRevealAPIKey)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -986,6 +988,11 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("POST /api/report-archive", app.requireRole(RoleTeamLead, app.handleUploadReportArchive))
 	mux.HandleFunc("GET /api/report-archive/{id}/download", app.requireAuth(app.handleDownloadReportArchive))
 	mux.HandleFunc("DELETE /api/report-archive/{id}", app.requireRole(RoleTeamLead, app.handleDeleteReportArchive))
+
+	// Message Archive
+	mux.HandleFunc("GET /api/message-archive", app.requireAuth(app.handleListMessageArchive))
+	mux.HandleFunc("POST /api/message-archive", app.requireRole(RoleTeamLead, app.handleCreateMessageArchive))
+	mux.HandleFunc("DELETE /api/message-archive/", app.requireRole(RoleTeamLead, app.handleDeleteMessageArchive))
 
 	// Report Ingest Config (admin only)
 	mux.HandleFunc("/api/integrations/report-ingest", func(w http.ResponseWriter, r *http.Request) {

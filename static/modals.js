@@ -1033,13 +1033,43 @@ async function _loadAPIKeys() {
             <span>Uses: ${k.usage_count || 0}</span>
           </div>
         </div>
-        <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}" style="flex-shrink:0">Delete</button>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn btn-secondary btn-sm" data-action="revealAPIKey" data-arg="${k.id}" style="font-size:10px" title="Show key value">👁</button>
+          <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}">Delete</button>
+        </div>
       </div>
     `).join('');
     _bindActions(listEl);
   } catch {
     listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
   }
+}
+
+async function revealAPIKey(id) {
+  try {
+    const res = await apiGet('/api/apikeys/' + id + '/reveal');
+    if (!res || !res.key) { showError(res?.error || 'Failed to reveal key'); return; }
+    const keyModal = document.createElement('div');
+    keyModal.className = 'modal-overlay open';
+    keyModal.innerHTML = `
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header"><h3>${t('api_key_reveal')||'API Key'}</h3>
+          <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button></div>
+        <div class="modal-body">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" value="${escHtml(res.key)}" readonly
+              style="flex:1;font-family:monospace;font-size:var(--fs-sm);padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);user-select:all"
+              data-action="selectSelf" data-arg-el data-event="click">
+            <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${escHtml(res.key)}')">📋 ${t('btn_copy')||'Copy'}</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-action="_closeParentModal" data-arg-el>${t('btn_close')||'Close'}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(keyModal);
+    _bindActions(keyModal);
+  } catch (e) { showError(e.message || 'Failed to reveal key'); }
 }
 
 async function createAPIKey() {

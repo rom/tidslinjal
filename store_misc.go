@@ -135,6 +135,48 @@ func (s *Store) DeleteReportArchiveEntry(id int64) error {
 	return fmt.Errorf("report archive entry %d not found", id)
 }
 
+// ── Message Archive ─────────────────────────────────────────────────────────
+
+func (s *Store) GetMessageArchive() []MessageArchiveEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]MessageArchiveEntry, len(s.messageArchive))
+	copy(out, s.messageArchive)
+	return out
+}
+
+func (s *Store) AddMessageArchiveEntry(entry MessageArchiveEntry) MessageArchiveEntry {
+	s.mu.Lock()
+	s.nextMessageArchiveID++
+	entry.ID = s.nextMessageArchiveID
+	if entry.Category == "incoming" {
+		s.nextMessageSeqNum++
+		entry.SeqNum = s.nextMessageSeqNum
+	}
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = time.Now()
+	}
+	s.messageArchive = append(s.messageArchive, entry)
+	snap := append([]MessageArchiveEntry(nil), s.messageArchive...)
+	s.mu.Unlock()
+	_ = s.persist("message_archive.json", snap)
+	return entry
+}
+
+func (s *Store) DeleteMessageArchiveEntry(id int64) error {
+	s.mu.Lock()
+	for i, e := range s.messageArchive {
+		if e.ID == id {
+			s.messageArchive = append(s.messageArchive[:i], s.messageArchive[i+1:]...)
+			snap := append([]MessageArchiveEntry(nil), s.messageArchive...)
+			s.mu.Unlock()
+			return s.persist("message_archive.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("message archive entry %d not found", id)
+}
+
 // ── Person Ready Checks ─────────────────────────────────────────────────────
 
 func (s *Store) GetPersonReadyChecks() []PersonReadyCheck {

@@ -320,6 +320,20 @@ func (app *App) processIngestPayload(p IngestPayload) *Event {
 	}
 	logDebug("ingest: created event id=%d from source=%q title=%q format=%s", created.ID, p.Source, p.Title, p.Format)
 
+	// Store as message archive entry
+	rawJSON, _ := json.Marshal(p)
+	app.store.AddMessageArchiveEntry(MessageArchiveEntry{
+		Category:    "incoming",
+		Subject:     p.Title,
+		Sender:      p.Source,
+		Body:        p.Description,
+		MessageType: p.EventType,
+		Tags:        p.Tags,
+		Source:      "api",
+		ExternalID:  p.ExternalID,
+		RawPayload:  string(rawJSON),
+	})
+
 	// Run through message routing
 	app.routeIngestedMessage(p, &created)
 
