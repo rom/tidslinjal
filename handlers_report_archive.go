@@ -309,15 +309,16 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("Incoming report from %q: %q", entry.Sender, entry.Subject))
 
 	// Route based on API key settings
-	routeMode := "message_archive"
-	if apiKey != nil && apiKey.RouteMode != "" {
-		routeMode = apiKey.RouteMode
-	}
 	fromIP := clientIP(r)
 	keyName := ""
+	routeMode := "message_archive"
 	if apiKey != nil {
 		keyName = apiKey.Name
+		if apiKey.RouteMode != "" {
+			routeMode = apiKey.RouteMode
+		}
 	}
+	logDebug("report-ingest: routing message %q via %s (key=%s, IP=%s)", entry.Subject, routeMode, keyName, fromIP)
 
 	if routeMode == "external_event" {
 		// Create/update as external_event on the External Events layer
@@ -351,6 +352,16 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:     user.ID,
 		CreatedByName: user.DisplayName,
 	})
+
+	// Log to event log
+	app.store.AddEventLogEntry(EventLogEntry{
+		Source:   "report-ingest:" + routeMode,
+		Message:  fmt.Sprintf("Incoming %s from %q via key %q: %q (IP: %s, route: %s)", entry.ReportType, entry.Sender, keyName, entry.Subject, fromIP, routeMode),
+		Summary:  "received",
+		UserName: user.DisplayName,
+		UserID:   user.ID,
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
 
 	jsonOK(w, map[string]interface{}{
 		"id":      created.ID,

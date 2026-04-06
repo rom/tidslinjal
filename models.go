@@ -719,7 +719,7 @@ type APIKey struct {
 	Description string    `json:"description,omitempty"`
 	Role        Role      `json:"role,omitempty"`      // configurable role (default: read)
 	SaveRawKey  bool      `json:"save_raw_key"`        // store raw key for later reveal (default: false)
-	RouteMode   string    `json:"route_mode,omitempty"` // "message_archive" (default) | "external_event"
+	RouteMode   string    `json:"route_mode"`           // "message_archive" (default) | "external_event"
 	CreatedBy   int64     `json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`

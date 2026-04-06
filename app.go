@@ -220,6 +220,12 @@ func (app *App) createExternalEvent(p ExternalEventParams) {
 			logDebug("createExternalEvent: updated event id=%d external_id=%q end_time=%v", existing.ID, p.ExternalID, endTime)
 			app.eventBus.Publish(EventBusMessage{Action: ActionUpdated, Event: existing})
 			app.broadcastEventChange(0, "updated", existing)
+			app.store.AddEventLogEntry(EventLogEntry{
+				Source:  "external_event",
+				Message: fmt.Sprintf("Updated external event #%d %q (end_time set, sender: %s, key: %s, IP: %s)", existing.ID, p.Subject, p.Sender, p.KeyName, p.FromIP),
+				Summary: "updated",
+			})
+			app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
 			return
 		}
 	}
@@ -268,6 +274,14 @@ func (app *App) createExternalEvent(p ExternalEventParams) {
 		Event:  &created,
 	})
 	app.broadcastEventChange(0, "created", &created)
+
+	// Log to event log
+	app.store.AddEventLogEntry(EventLogEntry{
+		Source:  "external_event",
+		Message: fmt.Sprintf("External event #%d created: %q (sender: %s, key: %s, IP: %s)", created.ID, p.Subject, p.Sender, p.KeyName, p.FromIP),
+		Summary: "created",
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
 }
 
 // getOrCreateExternalEventsLayer returns the "External Events" layer, creating it if needed.
