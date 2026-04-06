@@ -90,6 +90,7 @@ type Store struct {
 	staffMembers         []StaffMember
 	areasOfResp          []AreaOfResponsibility
 	resourceIncidents    []ResourceIncident
+	messageArchive       []MessageArchiveEntry
 
 	nextEventTypeID  int64
 	nextUserID       int64
@@ -137,6 +138,8 @@ type Store struct {
 	nextStaffMemberID        int64
 	nextAreaID               int64
 	nextResourceIncidentID   int64
+	nextMessageArchiveID     int64
+	nextMessageSeqNum        int
 
 	// O(1) lookup indexes — kept in sync with the underlying slices.
 	userByID    map[int64]User
@@ -257,6 +260,7 @@ func (s *Store) load() error {
 	s.loadFile("key_terrain_snapshots.json", &s.keyTerrainSnapshots)
 	s.loadFile("report_archive.json", &s.reportArchive)
 	s.loadFile("report_ingest_config.json", &s.reportIngestConfig)
+	s.loadFile("message_archive.json", &s.messageArchive)
 
 	// Load startup text (persisted as {"text":"..."})
 	var startupTextData map[string]string
@@ -500,6 +504,14 @@ func (s *Store) load() error {
 	for _, x := range s.reportArchive {
 		if x.ID > s.nextReportArchiveID {
 			s.nextReportArchiveID = x.ID
+		}
+	}
+	for _, x := range s.messageArchive {
+		if x.ID > s.nextMessageArchiveID {
+			s.nextMessageArchiveID = x.ID
+		}
+		if x.SeqNum > s.nextMessageSeqNum {
+			s.nextMessageSeqNum = x.SeqNum
 		}
 	}
 	for _, x := range s.staffDuties {

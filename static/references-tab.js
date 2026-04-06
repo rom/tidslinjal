@@ -106,6 +106,7 @@ function _renderReferencesTab(el) {
       <div style="display:flex;gap:4px;margin-bottom:10px">
         <button class="btn btn-sm _infomgmt-tab-btn" id="btnInfoTabRefs" style="flex:1;font-weight:700;background:var(--accent);color:#fff">${t('references_title') || 'References'}</button>
         <button class="btn btn-sm _infomgmt-tab-btn" id="btnInfoTabArchive" style="flex:1">${t('report_archive_title') || 'Report Archive'}</button>
+        <button class="btn btn-sm _infomgmt-tab-btn" id="btnInfoTabMessages" style="flex:1">${t('message_archive_title') || 'Message Archive'}</button>
       </div>
       <div id="infoTabRefs">
         <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:6px">
@@ -149,6 +150,16 @@ function _renderReferencesTab(el) {
         </div>
         <div id="reportArchiveList" style="max-height:60vh;overflow-y:auto"></div>
       </div>
+      <div id="infoTabMessages" style="display:none">
+        <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:8px">
+          ${canEdit ? `<button class="btn btn-primary btn-sm" id="btnAddMessage">${t('message_archive_add') || '+ New Message'}</button>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <button class="btn btn-sm _msg-cat-btn" id="btnMsgLocal" style="flex:1;font-weight:700;background:var(--accent);color:#fff">${t('message_archive_local') || 'Local Messages'}</button>
+          <button class="btn btn-sm _msg-cat-btn" id="btnMsgIncoming" style="flex:1">${t('message_archive_incoming') || 'Incoming Messages'}</button>
+        </div>
+        <div id="messageArchiveList" style="max-height:60vh;overflow-y:auto"></div>
+      </div>
     </div>`;
   _loadAndRenderReferences();
   _checkRefGitIntegration();
@@ -166,22 +177,22 @@ function _renderReferencesTab(el) {
   if (langEl) langEl.addEventListener('change', () => _filterReferences());
 
   // Infomanagement tab switching
-  document.getElementById('btnInfoTabRefs')?.addEventListener('click', () => {
-    document.getElementById('infoTabRefs').style.display = '';
-    document.getElementById('infoTabArchive').style.display = 'none';
-    document.getElementById('btnInfoTabRefs').style.background = 'var(--accent)';
-    document.getElementById('btnInfoTabRefs').style.color = '#fff';
-    document.getElementById('btnInfoTabArchive').style.background = '';
-    document.getElementById('btnInfoTabArchive').style.color = '';
-  });
+  function _switchInfoTab(active) {
+    ['Refs','Archive','Messages'].forEach(id => {
+      const tab = document.getElementById('infoTab' + id);
+      const btn = document.getElementById('btnInfoTab' + id);
+      if (tab) tab.style.display = id === active ? '' : 'none';
+      if (btn) { btn.style.background = id === active ? 'var(--accent)' : ''; btn.style.color = id === active ? '#fff' : ''; }
+    });
+  }
+  document.getElementById('btnInfoTabRefs')?.addEventListener('click', () => _switchInfoTab('Refs'));
   document.getElementById('btnInfoTabArchive')?.addEventListener('click', () => {
-    document.getElementById('infoTabRefs').style.display = 'none';
-    document.getElementById('infoTabArchive').style.display = '';
-    document.getElementById('btnInfoTabArchive').style.background = 'var(--accent)';
-    document.getElementById('btnInfoTabArchive').style.color = '#fff';
-    document.getElementById('btnInfoTabRefs').style.background = '';
-    document.getElementById('btnInfoTabRefs').style.color = '';
+    _switchInfoTab('Archive');
     _loadAndRenderReportArchive();
+  });
+  document.getElementById('btnInfoTabMessages')?.addEventListener('click', () => {
+    _switchInfoTab('Messages');
+    _loadAndRenderMessageArchive();
   });
 
   // Report archive category switching
@@ -205,6 +216,35 @@ function _renderReferencesTab(el) {
 
   const uploadReportBtn = document.getElementById('btnUploadReport');
   if (uploadReportBtn) uploadReportBtn.addEventListener('click', () => _openReportUploadModal(_reportCategory));
+
+  // Message archive category switching
+  document.getElementById('btnMsgLocal')?.addEventListener('click', () => {
+    _messageCategory = 'local';
+    document.getElementById('btnMsgLocal').style.background = 'var(--accent)';
+    document.getElementById('btnMsgLocal').style.color = '#fff';
+    document.getElementById('btnMsgIncoming').style.background = '';
+    document.getElementById('btnMsgIncoming').style.color = '';
+    _renderMessageArchiveList();
+  });
+  document.getElementById('btnMsgIncoming')?.addEventListener('click', () => {
+    _messageCategory = 'incoming';
+    document.getElementById('btnMsgIncoming').style.background = 'var(--accent)';
+    document.getElementById('btnMsgIncoming').style.color = '#fff';
+    document.getElementById('btnMsgLocal').style.background = '';
+    document.getElementById('btnMsgLocal').style.color = '';
+    _renderMessageArchiveList();
+  });
+  const addMsgBtn = document.getElementById('btnAddMessage');
+  if (addMsgBtn) addMsgBtn.addEventListener('click', () => {
+    const subject = prompt(t('message_archive_subject_prompt') || 'Message subject:');
+    if (!subject) return;
+    const body = prompt(t('message_archive_body_prompt') || 'Message body (optional):') || '';
+    const _csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const _hdrs = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+    if (_csrf) _hdrs['X-CSRF-Token'] = _csrf[1];
+    fetch('/api/message-archive', { method: 'POST', headers: _hdrs, body: JSON.stringify({ subject, body }) })
+      .then(r => { if (r.ok) _loadAndRenderMessageArchive(); else r.json().then(e => alert(e.error)).catch(() => alert('Failed')); });
+  });
 
   // Report archive data and rendering
   let _reportArchiveData = [];
@@ -341,6 +381,70 @@ function _renderReferencesTab(el) {
     } catch (e) { alert(e.message); }
   };
 }
+
+// ── Message Archive ──────────────────────────────────────────────────────────
+let _messageArchiveData = [];
+let _messageCategory = 'local';
+
+async function _loadAndRenderMessageArchive() {
+  try {
+    const res = await fetch('/api/message-archive', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (res.ok) _messageArchiveData = await res.json() || [];
+  } catch { _messageArchiveData = []; }
+  _renderMessageArchiveList();
+}
+
+function _renderMessageArchiveList() {
+  const listEl = document.getElementById('messageArchiveList');
+  if (!listEl) return;
+  const filtered = _messageArchiveData
+    .filter(m => m.category === _messageCategory)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:12px;text-align:center">${t('message_archive_empty') || 'No messages yet.'}</div>`;
+    return;
+  }
+  const canEdit = state.user && hasRole2(state.user.role, 'teamlead');
+  listEl.innerHTML = filtered.map(m => {
+    const dateStr = m.created_at ? new Date(m.created_at).toLocaleString() : '';
+    const sourceIcon = { api: '🔌', webhook: '🔔', connector: '🔗', manual: '✍️' }[m.source] || '📨';
+    const sourceLabel = m.source ? m.source.charAt(0).toUpperCase() + m.source.slice(1) : 'Unknown';
+    const typeLabel = m.message_type ? m.message_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+    const seqLabel = m.seq_num ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--accent);color:#fff;font-weight:700;font-family:monospace">#${m.seq_num}</span>` : '';
+    const tags = (m.tags || []).map(tg => `<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:var(--bg3);border:1px solid var(--border);margin-right:3px">${escHtml(tg)}</span>`).join('');
+    return `<div style="padding:8px 6px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${seqLabel}
+            <span style="display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border);white-space:nowrap">${sourceIcon} ${escHtml(sourceLabel)}</span>
+            ${typeLabel ? `<span style="display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border);white-space:nowrap">${escHtml(typeLabel)}</span>` : ''}
+            <strong style="font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(m.subject)}</strong>
+          </div>
+          ${m.body ? `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">${escHtml(m.body)}</div>` : ''}
+          ${tags ? `<div style="margin-top:3px">${tags}</div>` : ''}
+        </div>
+        ${canEdit ? `<button class="btn btn-sm" style="color:var(--danger);font-size:10px;flex-shrink:0" onclick="_deleteMessageArchive(${m.id})" title="${t('btn_delete')||'Delete'}">✖</button>` : ''}
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap">
+        ${m.sender ? `<span>📡 ${escHtml(m.sender)}</span>` : ''}
+        <span>🕐 ${dateStr}</span>
+        ${m.created_by_name ? `<span>👤 ${escHtml(m.created_by_name)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window._deleteMessageArchive = async function(id) {
+  if (!confirm('Delete this message?')) return;
+  try {
+    const _csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const _hdrs = { 'X-Requested-With': 'XMLHttpRequest' };
+    if (_csrf) _hdrs['X-CSRF-Token'] = _csrf[1];
+    await fetch('/api/message-archive/' + id, { method: 'DELETE', headers: _hdrs });
+    _loadAndRenderMessageArchive();
+  } catch (e) { alert(e.message); }
+};
 
 async function _loadAndRenderReferences() {
   try {

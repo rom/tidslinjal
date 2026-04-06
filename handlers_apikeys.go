@@ -20,7 +20,38 @@ func (app *App) handleListAPIKeys(w http.ResponseWriter, r *http.Request, user *
 	if keys == nil {
 		keys = []APIKey{}
 	}
-	jsonOK(w, keys)
+	// Strip secrets from list response
+	safe := make([]APIKey, len(keys))
+	for i, k := range keys {
+		safe[i] = k
+		safe[i].KeyHash = ""
+		safe[i].KeyPlain = ""
+		safe[i].Key = ""
+	}
+	jsonOK(w, safe)
+}
+
+func (app *App) handleRevealAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/apikeys/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	keys := app.store.GetAPIKeys()
+	for _, k := range keys {
+		if k.ID == id {
+			if k.KeyPlain == "" {
+				jsonError(w, "key was created before reveal support — recreate it to enable reveal", http.StatusNotFound)
+				return
+			}
+			app.audit(user.ID, user.DisplayName, "revealed", "api_key", id,
+				fmt.Sprintf("Revealed API key %q", k.Name))
+			jsonOK(w, map[string]string{"key": k.KeyPlain})
+			return
+		}
+	}
+	jsonError(w, "not found", http.StatusNotFound)
 }
 
 func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
@@ -68,6 +99,7 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 		Description: req.Description,
 		Role:        req.Role,
 		KeyHash:     string(hash),
+		KeyPlain:    rawKey,
 		CreatedBy:   user.ID,
 	}
 	created, err := app.store.CreateAPIKey(k)

@@ -62,7 +62,8 @@ function connectSSE() {
         const users = await apiGet('/api/users');
         if (users) state.users = users;
       } catch { /* ignore */ }
-      renderSidebar();
+      // Only re-render sidebar if not on infomanagement tab (to avoid resetting sub-tab state)
+      if (state.sidebarTab !== 'references') renderSidebar();
     } catch { /* ignore parse errors */ }
   });
   // Key Terrain Board changes — dispatch custom event for key-terrain.js to handle
@@ -78,7 +79,7 @@ function connectSSE() {
       if (data.type === 'log_book' && typeof _loadLogBook === 'function') _loadLogBook();
       if (data.type === 'event_log' && typeof _loadEventLog === 'function') _loadEventLog();
       if (data.type === 'checklist_log' && typeof _loadChecklistLog === 'function') _loadChecklistLog();
-      if (data.type === 'audit_log' && typeof renderSidebar === 'function') renderSidebar();
+      if (data.type === 'audit_log' && typeof renderSidebar === 'function' && state.sidebarTab !== 'references') renderSidebar();
     } catch {}
   });
   // Day labels change

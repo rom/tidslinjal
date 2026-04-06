@@ -709,8 +709,9 @@ type MailConfig struct {
 type APIKey struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`
-	Key         string    `json:"key,omitempty"` // only shown on creation
+	Key         string    `json:"key,omitempty"`      // only shown on creation
 	KeyHash     string    `json:"key_hash,omitempty"`
+	KeyPlain    string    `json:"key_plain,omitempty"` // stored for admin reveal
 	Description string    `json:"description,omitempty"`
 	Role        Role      `json:"role,omitempty"` // M-05 fix: configurable role (default: read)
 	CreatedBy   int64     `json:"created_by"`
@@ -988,6 +989,24 @@ type ReportArchiveEntry struct {
 	Sender         string    `json:"sender,omitempty"`      // external system name for incoming reports
 	ReportType     string    `json:"report_type,omitempty"` // e.g. "sitrep", "incident", "assessment"
 	Subject        string    `json:"subject,omitempty"`     // subject line from external submission
+}
+
+// MessageArchiveEntry stores an incoming or local message in the message archive.
+type MessageArchiveEntry struct {
+	ID          int64     `json:"id"`
+	SeqNum      int       `json:"seq_num"`                // auto-assigned sequence number
+	Category    string    `json:"category"`                // "local" | "incoming"
+	Subject     string    `json:"subject"`
+	Sender      string    `json:"sender,omitempty"`        // originating system/user
+	Body        string    `json:"body,omitempty"`
+	MessageType string    `json:"message_type,omitempty"`  // e.g. "sitrep", "alert", "notification"
+	Tags        []string  `json:"tags,omitempty"`
+	Source      string    `json:"source,omitempty"`        // "api", "webhook", "connector", "manual"
+	ExternalID  string    `json:"external_id,omitempty"`   // ID in external system
+	RawPayload  string    `json:"raw_payload,omitempty"`   // original JSON payload
+	CreatedBy   int64     `json:"created_by,omitempty"`
+	CreatedByName string  `json:"created_by_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // ReportIngestConfig controls the incoming report interface
