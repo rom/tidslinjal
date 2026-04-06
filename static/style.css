@@ -813,7 +813,7 @@ body.hover-zoom-enabled .event-block:hover {
 .modal-overlay.open { opacity: 1; pointer-events: auto; }
 .modal {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
-  width: 500px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  width: 640px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 8px 40px var(--shadow-lg);
   transform: translateY(-12px); transition: transform .15s;
 }

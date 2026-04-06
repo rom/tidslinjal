@@ -253,7 +253,7 @@ func (app *App) createExternalEvent(p ExternalEventParams) {
 		Title:       p.Subject,
 		Description: stripHTMLTags(desc),
 		EventType:   "external_event",
-		Status:      StatusPlanned,
+		Status:      StatusCompleted,
 		StartTime:   startTime,
 		EndTime:     p.EndTime,
 		ExternalID:  p.ExternalID,
