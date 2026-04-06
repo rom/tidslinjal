@@ -38,6 +38,8 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#flagPT', 'click', function () { setPref('language', 'pt'); });
   on('#flagPL', 'click', function () { setPref('language', 'pl'); });
   on('#flagUK', 'click', function () { setPref('language', 'uk'); });
+  on('#flagJA', 'click', function () { setPref('language', 'ja'); });
+  on('#flagKO', 'click', function () { setPref('language', 'ko'); });
 
   // ---------- Header: clock area ---------------------------------------------
   on('#clockDetachedIndicator', 'click', function () {

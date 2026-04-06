@@ -2676,6 +2676,14 @@ Fields: file, subject, sender, type, tags</pre>
           <button class="toggle-btn${p.theme==='dark'?' active':''}" data-action="setPref" data-args='["theme","dark"]' >${t('theme_dark')||'Dark'}</button>
           <button class="toggle-btn${p.theme==='city-camo'?' active':''}" data-action="setPref" data-args='["theme","city-camo"]'  title="Camouflage (greens/grays)">🏕 Camo</button>
           <button class="toggle-btn${p.theme==='urban-camo'?' active':''}" data-action="setPref" data-args='["theme","urban-camo"]'  title="Urban warfare (blues)">🌆 Urban Camo</button>
+          <button class="toggle-btn${p.theme==='sand'?' active':''}" data-action="setPref" data-args='["theme","sand"]' title="Warm desert tones">🏜 Sand</button>
+          <button class="toggle-btn${p.theme==='matrix'?' active':''}" data-action="setPref" data-args='["theme","matrix"]' title="Green-on-black terminal">💻 Matrix</button>
+          <button class="toggle-btn${p.theme==='sunset'?' active':''}" data-action="setPref" data-args='["theme","sunset"]' title="Warm orange and amber">🌅 Sunset</button>
+          <button class="toggle-btn${p.theme==='light-blue-sky'?' active':''}" data-action="setPref" data-args='["theme","light-blue-sky"]' title="Bright sky-blue light theme">🌤 Light Blue Sky</button>
+          <button class="toggle-btn${p.theme==='ocean'?' active':''}" data-action="setPref" data-args='["theme","ocean"]' title="Deep ocean blues and teals">🌊 Ocean</button>
+          <button class="toggle-btn${p.theme==='forest'?' active':''}" data-action="setPref" data-args='["theme","forest"]' title="Deep greens and earthy tones">🌲 Forest</button>
+          <button class="toggle-btn${p.theme==='accessible'?' active':''}" data-action="setPref" data-args='["theme","accessible"]' title="High-contrast accessible theme">♿ Accessible</button>
+          <button class="toggle-btn${p.theme==='crimson'?' active':''}" data-action="setPref" data-args='["theme","crimson"]' title="Dark theme with crimson accents">🔴 Crimson</button>
         </div>
       </div>
       <div class="sidebar-section">
@@ -2696,7 +2704,8 @@ Fields: file, subject, sender, type, tags</pre>
             {code:'fi',name:'Suomi'},{code:'is',name:'Íslenska'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
             {code:'et',name:'Eesti'},{code:'lv',name:'Latviešu'},{code:'lt',name:'Lietuvių'},
             {code:'it',name:'Italiano'},{code:'es',name:'Español'},{code:'pt',name:'Português'},
-            {code:'pl',name:'Polski'},{code:'uk',name:'Українська'}
+            {code:'pl',name:'Polski'},{code:'uk',name:'Українська'},
+            {code:'ja',name:'日本語'},{code:'ko',name:'한국어'}
           ].filter(l => isLangEnabled(l.code)).map(l =>
             `<button class="toggle-btn${p.language===l.code?' active':''}" data-action="setPref" data-args='["language","${l.code}"]' title="${l.name}">${langAbbr(l.code)}</button>`
           ).join('')}

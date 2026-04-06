@@ -157,9 +157,11 @@ function getRoleDisplayName(roleKey) {
 function applyPreferences() {
   const body = document.body;
   body.className = '';
-  if (state.preferences.theme === 'light') body.classList.add('light-mode');
-  if (state.preferences.theme === 'city-camo') body.classList.add('city-camo');
-  if (state.preferences.theme === 'urban-camo') body.classList.add('urban-camo');
+  const _theme = state.preferences.theme || 'dark';
+  if (_theme === 'light') body.classList.add('light-mode');
+  else if (_theme === 'city-camo') body.classList.add('city-camo');
+  else if (_theme === 'urban-camo') body.classList.add('urban-camo');
+  else if (['sand','matrix','sunset','light-blue-sky','ocean','forest','accessible','crimson'].includes(_theme)) body.classList.add('theme-' + _theme);
   const sz = state.preferences.size || 'small';
   if (sz !== 'small') body.classList.add('size-'+sz);
   if (!state.preferences.show_out_of_hours) body.classList.add('hide-out-of-hours');

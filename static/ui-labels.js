@@ -314,7 +314,7 @@ function updateUILabels() {
 
 function updateLangFlags() {
   const lang = (state.preferences && state.preferences.language) || 'en';
-  ['EN', 'SV', 'FR', 'DE', 'NL', 'FI', 'IS', 'DA', 'NB', 'ET', 'LV', 'LT', 'IT', 'ES', 'PT', 'PL', 'UK'].forEach(code => {
+  ['EN', 'SV', 'FR', 'DE', 'NL', 'FI', 'IS', 'DA', 'NB', 'ET', 'LV', 'LT', 'IT', 'ES', 'PT', 'PL', 'UK', 'JA', 'KO'].forEach(code => {
     const btn = document.getElementById('flag'+code);
     if (btn) btn.classList.toggle('active', lang === code.toLowerCase());
   });
