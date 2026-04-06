@@ -1375,11 +1375,11 @@ function _ktShowHistory(entryId) {
 
 function _ktRichField(id, value, placeholder, height) {
   const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="kt-rich-toolbar" data-kt-editor="${id}">
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-weight:700" data-kt-cmd="bold" title="Bold"><b>B</b></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-style:italic" data-kt-cmd="italic" title="Italic"><i>I</i></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:underline" data-kt-cmd="underline" title="Underline"><u>U</u></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:line-through" data-kt-cmd="strikethrough" title="Strikethrough"><s>S</s></button>
-    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px" data-kt-link="${id}" title="Insert link">\u{1F517}</button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-weight:700" data-kt-cmd="bold" title="${t("btn_bold")||"Bold"}"><b>B</b></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;font-style:italic" data-kt-cmd="italic" title="${t("btn_italic")||"Italic"}"><i>I</i></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:underline" data-kt-cmd="underline" title="${t("btn_underline")||"Underline"}"><u>U</u></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px;text-decoration:line-through" data-kt-cmd="strikethrough" title="${t("btn_strikethrough")||"Strikethrough"}"><s>S</s></button>
+    <button type="button" class="btn btn-sm" style="font-size:11px;padding:1px 5px" data-kt-link="${id}" title="${t("btn_insert_link")||"Insert link"}">\u{1F517}</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input" style="width:100%;min-height:${height};max-height:150px;overflow-y:auto;resize:vertical;padding:6px;font-size:var(--fs-xs);white-space:pre-wrap;word-break:break-word" data-placeholder="${escHtml(placeholder)}">${value}</div>`;
 }
@@ -1478,7 +1478,7 @@ function _ktShowHelp() {
 
 function _ktDetach() {
   const w = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no');
-  if (!w) { alert('Popup blocked. Please allow popups for this site.'); return; }
+  if (!w) { alert(t('dialog_popup_blocked')||'Popup blocked. Please allow popups for this site.'); return; }
 
   // Copy relevant styles
   const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))

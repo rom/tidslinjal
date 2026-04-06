@@ -37,14 +37,14 @@ function _diaryBindToolbar(container, editorId) {
 
 function _diaryRichField(id, value, placeholder, height) {
   const toolbar = `<div style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap" class="diary-rich-toolbar">
-    <button type="button" class="btn btn-sm" data-diary-cmd="bold" title="Bold"><b>B</b></button>
-    <button type="button" class="btn btn-sm" data-diary-cmd="italic" title="Italic"><i>I</i></button>
-    <button type="button" class="btn btn-sm" data-diary-cmd="underline" title="Underline"><u>U</u></button>
-    <button type="button" class="btn btn-sm" data-diary-cmd="strikethrough" title="Strikethrough"><s>S</s></button>
-    <button type="button" class="btn btn-sm" data-diary-cmd="insertUnorderedList" title="Bullet list">• List</button>
-    <button type="button" class="btn btn-sm" data-diary-cmd="insertOrderedList" title="Numbered list">1. List</button>
-    <button type="button" class="btn btn-sm" data-diary-action="insertLink" title="Insert link">🔗</button>
-    <button type="button" class="btn btn-sm" data-diary-action="insertImage" title="Insert image">🖼</button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="bold" title="${t("btn_bold")||"Bold"}"><b>B</b></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="italic" title="${t("btn_italic")||"Italic"}"><i>I</i></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="underline" title="${t("btn_underline")||"Underline"}"><u>U</u></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="strikethrough" title="${t("btn_strikethrough")||"Strikethrough"}"><s>S</s></button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="insertUnorderedList" title="${t("btn_bullet_list")||"Bullet list"}">• List</button>
+    <button type="button" class="btn btn-sm" data-diary-cmd="insertOrderedList" title="${t("btn_numbered_list")||"Numbered list"}">1. List</button>
+    <button type="button" class="btn btn-sm" data-diary-action="insertLink" title="${t("btn_insert_link")||"Insert link"}">🔗</button>
+    <button type="button" class="btn btn-sm" data-diary-action="insertImage" title="${t("btn_insert_image")||"Insert image"}">🖼</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input"
     style="width:100%;min-height:${height};max-height:400px;overflow-y:auto;resize:vertical;padding:8px;font-size:var(--fs-sm);white-space:pre-wrap;word-break:break-word;line-height:1.5"
@@ -188,7 +188,7 @@ function _diaryRenderList() {
     const date = new Date(e.created_at).toLocaleString();
     const tags = (e.tags || []).map(tg => `<span style="background:var(--accent);color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;margin-right:2px">${escHtml(tg)}</span>`).join('');
     const priv = e.private ? `<span style="color:var(--red,#e74c3c);font-size:9px;margin-left:4px" title="${t('diary_private')||'Private'}">🔒</span>` : '';
-    const mood = e.mood ? `<span style="margin-left:4px" title="Mood">${escHtml(e.mood)}</span>` : '';
+    const mood = e.mood ? `<span style="margin-left:4px" title="${t("diary_mood")||"Mood"}">${escHtml(e.mood)}</span>` : '';
     const mine = isMe(e.user_id);
     html += `<div style="padding:10px;margin-bottom:8px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
