@@ -318,7 +318,7 @@ function _renderReferencesTab(el) {
   }
 
   window._deleteReportArchive = async function(id) {
-    if (!confirm('Delete this report?')) return;
+    if (!confirm(t('report_archive_delete_confirm')||'Delete this report?')) return;
     try {
       const _csrfDel = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
       const _hdrsDel = { 'X-Requested-With': 'XMLHttpRequest' };
@@ -334,19 +334,19 @@ function _renderReferencesTab(el) {
         <button class="modal-close" id="reportUploadClose">✕</button>
         <h3>${t('report_archive_upload') || 'Upload Report'}</h3>
         <label>Title</label>
-        <input id="reportTitle" class="input" style="width:100%;margin-bottom:8px" placeholder="Report title">
-        <label>Description</label>
-        <input id="reportDesc" class="input" style="width:100%;margin-bottom:8px" placeholder="Optional description">
-        <label>Category</label>
+        <input id="reportTitle" class="input" style="width:100%;margin-bottom:8px" placeholder="${t('report_archive_title_ph')||'Report title'}">
+        <label>${t('description')||'Description'}</label>
+        <input id="reportDesc" class="input" style="width:100%;margin-bottom:8px" placeholder="${t('report_archive_desc_ph')||'Optional description'}">
+        <label>${t('report_archive_category')||'Category'}</label>
         <select id="reportCat" class="input" style="width:100%;margin-bottom:8px">
           <option value="local" ${category==='local'?'selected':''}>${t('report_archive_local') || 'Local Reports'}</option>
           <option value="incoming" ${category==='incoming'?'selected':''}>${t('report_archive_incoming') || 'Incoming Reports'}</option>
         </select>
-        <label>File</label>
+        <label>${t('report_archive_file')||'File'}</label>
         <input type="file" id="reportFile" style="margin-bottom:12px">
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" id="reportUploadBtn">Upload</button>
-          <button class="btn btn-secondary" id="reportUploadCancel">Cancel</button>
+          <button class="btn btn-primary" id="reportUploadBtn">${t('btn_upload')||'Upload'}</button>
+          <button class="btn btn-secondary" id="reportUploadCancel">${t('btn_cancel')||'Cancel'}</button>
         </div>
       </div>
     </div>`;
@@ -436,7 +436,7 @@ function _renderMessageArchiveList() {
 }
 
 window._deleteMessageArchive = async function(id) {
-  if (!confirm('Delete this message?')) return;
+  if (!confirm(t('message_archive_delete_confirm')||'Delete this message?')) return;
   try {
     const _csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
     const _hdrs = { 'X-Requested-With': 'XMLHttpRequest' };
