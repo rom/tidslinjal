@@ -36,6 +36,7 @@ func (app *App) handleSaveRoom(w http.ResponseWriter, r *http.Request, user *Use
 	room.Description = stripHTMLTags(room.Description)
 	room.Zone = stripHTMLTags(room.Zone)
 	room.Responsibility = stripHTMLTags(room.Responsibility)
+	room.Owner = stripHTMLTags(room.Owner)
 	if err := app.store.SaveRoom(room); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return

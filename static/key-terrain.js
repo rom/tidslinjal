@@ -9,8 +9,8 @@ let _ktState = {
   filter: {},             // active filters
   settings: {},           // persisted settings from server
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
-  columnOrder: ['seq_num','zone','priority','function','status','trend','threat','external','responsible','actions','created_at','updated_at','finished_at','rounds','management'],
-  hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true }, // hidden by default
+  columnOrder: ['seq_num','zone','priority','function','status','trend','threat','external','responsible','owner','actions','created_at','updated_at','finished_at','rounds','management'],
+  hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true, owner: true }, // hidden by default
 };
 
 const _ktStatusOptions = [
@@ -135,6 +135,7 @@ function _ktSortEntries(entries) {
       case 'threat': return (a.threat || '').localeCompare(b.threat || '');
       case 'external': return (a.external || '').localeCompare(b.external || '');
       case 'responsible': return (a.responsible_name || '').localeCompare(b.responsible_name || '');
+      case 'owner': return (a.owner_name || '').localeCompare(b.owner_name || '');
       case 'actions': return (a.actions || '').localeCompare(b.actions || '');
       case 'zone': return (a.zone || '').localeCompare(b.zone || '');
       case 'seq_num': return (a.seq_num || 0) - (b.seq_num || 0);
@@ -163,7 +164,7 @@ function _renderKeyTerrainBoard() {
   const hidden = _ktState.hiddenColumns || {};
   const ghostStyle = _ktGhostStyle();
   const f = _ktState.filter || {};
-  const hasFilter = Object.values(f).some(v => v);
+  const hasFilter = Object.values(f).some(v => Array.isArray(v) ? v.length > 0 : !!v);
 
   // Merge settings hidden columns with local hidden columns
   const settingsHidden = _ktState.settings.hidden_columns || {};
@@ -189,9 +190,15 @@ function _renderKeyTerrainBoard() {
     const q = (v) => (v || '').toLowerCase();
     filtered = filtered.filter(e => {
       if (f.function && !q(e.function).includes(q(f.function))) return false;
+      if (f.functionChecks && f.functionChecks.length > 0 && !f.functionChecks.includes(e.function)) return false;
       if (f.priority && e.priority !== parseInt(f.priority)) return false;
-      if (f.status && e.status !== f.status) return false;
-      if (f.trend && e.trend !== f.trend) return false;
+      if (f.priorityChecks && f.priorityChecks.length > 0 && !f.priorityChecks.includes(e.priority)) return false;
+      if (f.statusChecks && f.statusChecks.length > 0) {
+        if (!f.statusChecks.includes(e.status)) return false;
+      } else if (f.status && e.status !== f.status) return false;
+      if (f.trendChecks && f.trendChecks.length > 0) {
+        if (!f.trendChecks.includes(e.trend)) return false;
+      } else if (f.trend && e.trend !== f.trend) return false;
       if (f.threat && !q(e.threat).includes(q(f.threat))) return false;
       if (f.responsible && !q(e.responsible_name).includes(q(f.responsible))) return false;
       if (f.actions && !q(e.actions).includes(q(f.actions))) return false;
@@ -220,6 +227,7 @@ function _renderKeyTerrainBoard() {
     threat:      { icon: '\u2694\uFE0F', label: t('kt_threat')||'Threat', align: 'left', extra: 'min-width:120px' },
     external:    { icon: '\u{1F517}', label: t('kt_external')||'External', align: 'left', extra: 'min-width:120px' },
     responsible: { icon: '\u{1F464}', label: t('kt_responsible')||'Responsible', align: 'left', extra: 'min-width:100px' },
+    owner:       { icon: '\u{1F451}', label: t('kt_owner')||'Owner', align: 'left', extra: 'min-width:100px' },
     actions:     { icon: '\u{1F527}', label: t('kt_actions')||'Actions', align: 'left', extra: 'min-width:140px' },
     created_at:  { icon: '\u{1F4C5}', label: t('kt_created')||'Created', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
     updated_at:  { icon: '\u{1F504}', label: t('kt_updated')||'Updated', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
@@ -293,6 +301,7 @@ function _renderKeyTerrainBoard() {
       threat: `<td style="padding:8px">${e.threat ? _ktRenderRich(e.threat) : '\u2014'}</td>`,
       external: `<td style="padding:8px">${e.external ? _ktRenderRich(e.external) : '\u2014'}</td>`,
       responsible: `<td style="padding:8px">${e.responsible_name ? escHtml(e.responsible_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
+      owner: `<td style="padding:8px">${e.owner_name ? escHtml(e.owner_name) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
       actions: `<td style="padding:8px">${e.actions ? _ktRenderRich(e.actions) : '\u2014'}</td>`,
       created_at: `<td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.created_at || ''}">${fmtDate(e.created_at)}</td>`,
       updated_at: `<td style="padding:8px;text-align:center;font-size:10px;color:var(--text-dim);background:var(--bg2);white-space:nowrap" title="${e.updated_at || ''}">${fmtDateTime(e.updated_at)}</td>`,
@@ -1262,32 +1271,61 @@ function _ktApplyColumnVisibility() {
 // ── Filter Panel ──
 function _ktOpenFilter() {
   const f = _ktState.filter || {};
-  let html = `<div style="max-width:500px">
+
+  // Collect unique capability names from entries for checkboxes
+  const capNames = [...new Set(_ktState.entries.filter(e => e.function).map(e => e.function))].sort();
+  const checkedCaps = f.functionChecks || [];
+
+  // Priority checkboxes 0-10
+  const checkedPris = f.priorityChecks || [];
+
+  // Status checkboxes
+  const checkedStatuses = f.statusChecks || [];
+
+  // Trend checkboxes
+  const checkedTrends = f.trendChecks || [];
+
+  const cbStyle = 'font-size:var(--fs-xs);display:flex;align-items:center;gap:4px;cursor:pointer';
+
+  let html = `<div style="max-width:540px">
     <h3>\u{1F50D} ${t('kt_filter')||'Filter Key Terrain'}</h3>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Function'}</label>
-      <input id="ktFilterFunction" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.function||'')}">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Capability'}</label>
+      <input id="ktFilterFunction" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.function||'')}">
+      ${capNames.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:4px 12px;max-height:120px;overflow-y:auto;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+        ${capNames.map(c => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterCapCb" value="${escHtml(c)}" ${checkedCaps.includes(c)?'checked':''}> ${escHtml(c)}</label>`).join('')}
+      </div>` : ''}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-      <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${t('kt_priority')||'Priority'}</label>
-        <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="0">
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${t('kt_priority')||'Priority'}</label>
+      <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="0">
+      <div style="display:flex;flex-wrap:wrap;gap:4px 12px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+        ${Array.from({length:11},(_,i)=>i).map(i => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterPriCb" value="${i}" ${checkedPris.includes(i)?'checked':''}> ${i}</label>`).join('')}
       </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
-        <select id="ktFilterStatus" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <select id="ktFilterStatus" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px">
           <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
           ${_ktStatusOptions.map(s => `<option value="${s.value}" ${f.status===s.value?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
         </select>
+        <div style="display:flex;flex-direction:column;gap:4px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+          ${_ktStatusOptions.map(s => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterStatusCb" value="${s.value}" ${checkedStatuses.includes(s.value)?'checked':''}> ${s.icon} ${s.label}</label>`).join('')}
+        </div>
       </div>
       <div>
         <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4C8} ${t('kt_trend')||'Trend'}</label>
-        <select id="ktFilterTrend" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <select id="ktFilterTrend" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px">
           <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
           ${_ktTrendOptions.map(tr => `<option value="${tr.value}" ${f.trend===tr.value?'selected':''}>${tr.icon} ${tr.label}</option>`).join('')}
         </select>
+        <div style="display:flex;flex-direction:column;gap:4px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+          ${_ktTrendOptions.map(tr => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterTrendCb" value="${tr.value}" ${checkedTrends.includes(tr.value)?'checked':''}> ${tr.icon} ${tr.label}</label>`).join('')}
+        </div>
       </div>
     </div>
 
@@ -1313,11 +1351,17 @@ function _ktOpenFilter() {
       <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktFilterModal">${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
-  _boardModal('ktFilterModal', html, '500px');
+  _boardModal('ktFilterModal', html, '540px');
   _ktTrapModalKeys('ktFilterModal');
 }
 
 function _ktApplyFilter() {
+  // Collect checked checkboxes
+  const capChecks = [...document.querySelectorAll('.ktFilterCapCb:checked')].map(cb => cb.value);
+  const priChecks = [...document.querySelectorAll('.ktFilterPriCb:checked')].map(cb => parseInt(cb.value));
+  const statusChecks = [...document.querySelectorAll('.ktFilterStatusCb:checked')].map(cb => cb.value);
+  const trendChecks = [...document.querySelectorAll('.ktFilterTrendCb:checked')].map(cb => cb.value);
+
   _ktState.filter = {
     function: document.getElementById('ktFilterFunction')?.value?.trim() || '',
     priority: document.getElementById('ktFilterPriority')?.value?.trim() || '',
@@ -1326,6 +1370,10 @@ function _ktApplyFilter() {
     threat: document.getElementById('ktFilterThreat')?.value?.trim() || '',
     responsible: document.getElementById('ktFilterResponsible')?.value?.trim() || '',
     actions: document.getElementById('ktFilterActions')?.value?.trim() || '',
+    functionChecks: capChecks,
+    priorityChecks: priChecks,
+    statusChecks: statusChecks,
+    trendChecks: trendChecks,
   };
   if (typeof _closeBoardModal === 'function') _closeBoardModal('ktFilterModal');
   _renderKeyTerrainBoard();

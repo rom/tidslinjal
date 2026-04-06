@@ -2760,6 +2760,8 @@ function openRoomModal(argJson) {
         <input class="form-input" id="rmZone" value="${escHtml(data.zone||'')}" placeholder="${t('cap_zone_ph')||'e.g. North, HQ, DMZ'}">
         <label class="form-label" style="margin-top:8px">${t('cap_responsibility')||'Ownership'}</label>
         <input class="form-input" id="rmResponsibility" value="${escHtml(data.responsibility||'')}" placeholder="${t('cap_responsibility_ph')||'e.g. J6 Cyber Ops, CISO'}">
+        <label class="form-label" style="margin-top:8px">${t('kt_owner')||'Owner'}</label>
+        <input class="form-input" id="rmOwner" value="${escHtml(data.owner||'')}" placeholder="${t('cap_owner_ph')||'e.g. Unit Commander, CTO'}">
         <label class="form-label" style="margin-top:8px">${t('kt_status')||'Status'}</label>
         <select class="form-input" id="rmStatus" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px">
           <option value="working"${data.status==='working'?' selected':''}>${t('cap_status_working')||'Working'}</option>
@@ -2858,6 +2860,7 @@ function openRoomModal(argJson) {
     if (data.type === 'capability') {
       room.zone = (modal.querySelector('#rmZone')?.value || '').trim();
       room.responsibility = (modal.querySelector('#rmResponsibility')?.value || '').trim();
+      room.owner = (modal.querySelector('#rmOwner')?.value || '').trim();
       room.status = modal.querySelector('#rmStatus')?.value || 'unknown';
     }
     if (isEdit) {
