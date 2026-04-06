@@ -1918,13 +1918,11 @@ function renderSidebar() {
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-section-title">🔑 API Keys</div>
+        <div class="sidebar-section-title">🔑 ${t('settings_api_keys_title')||'API Keys'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
-          API keys allow external tools (scripts, monitoring systems, integrations) to access
-          Tidslinjal without a user session. Use <code>Authorization: Bearer &lt;key&gt;</code> in HTTP requests.
-          Keys are shown only once after creation — store them securely.
+          ${t('settings_api_keys_desc')||'API keys allow external tools (scripts, monitoring systems, integrations) to access Tidslinjal without a user session. Use <code>Authorization: Bearer &lt;key&gt;</code> in HTTP requests. Keys are shown only once after creation — store them securely.'}
         </p>
-        <div id="apiKeyList" style="margin-bottom:8px">Loading…</div>
+        <div id="apiKeyList" style="margin-bottom:8px">${t('loading')||'Loading…'}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <div style="display:flex;gap:6px;align-items:center">
             <input type="text" id="newAPIKeyName" placeholder="${t('settings_api_key_name_ph')||'Key name'}"
@@ -1932,12 +1930,12 @@ function renderSidebar() {
               style="flex:2;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
             <select id="newAPIKeyRole" title="${t('settings_api_key_role_tip')||'Permission level for this key.'}"
               style="flex:1;min-width:0;max-width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
-              <option value="observer">Observer</option>
-              <option value="read">Read</option>
-              <option value="reporter">Reporter</option>
-              <option value="teammember" selected>Read-Write</option>
-              <option value="teamlead">Team Lead</option>
-              <option value="oplead">Ops Lead</option>
+              <option value="observer">${t('role_observer')||'Observer'}</option>
+              <option value="read">${t('role_read')||'Read'}</option>
+              <option value="reporter">${t('role_reporter')||'Reporter'}</option>
+              <option value="teammember" selected>${t('role_readwrite')||'Read-Write'}</option>
+              <option value="teamlead">${t('role_teamlead')||'Team Lead'}</option>
+              <option value="oplead">${t('role_oplead')||'Ops Lead'}</option>
             </select>
             <button class="btn btn-primary btn-sm" data-action="createAPIKey"
               title="${t('settings_api_key_create_tip')||'Generate a new API key. The key value will be shown once — copy it immediately.'}">+ ${t('btn_create')||'Create'}</button>
@@ -1965,7 +1963,7 @@ function renderSidebar() {
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">
           ${t('settings_connectors_desc')||'Configure external system connectors. Each connector can poll external services and push events into Tidslinjal.'}
         </p>
-        <div id="connectorList" style="margin-bottom:8px">Loading…</div>
+        <div id="connectorList" style="margin-bottom:8px">${t('loading')||'Loading…'}</div>
       </div>
 
       <div class="sidebar-section">

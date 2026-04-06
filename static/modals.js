@@ -1015,7 +1015,7 @@ async function _loadAPIKeys() {
   try {
     const keys = await apiGet('/api/apikeys');
     if (!keys || !keys.length) {
-      listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">No API keys yet.</p>';
+      listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('api_keys_empty')||'No API keys yet.'}</p>`;
       return;
     }
     listEl.innerHTML = keys.map(k => `
@@ -1025,22 +1025,22 @@ async function _loadAPIKeys() {
             <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
             <span class="role-badge role-${k.role||'read'}" style="font-size:9px;padding:1px 5px">${escHtml(k.role||'read')}</span>
             <select class="apikey-route-select" data-keyid="${k.id}" style="font-size:9px;padding:1px 4px;border-radius:3px;background:${k.route_mode==='external_event'?'#6C5CE7':'var(--bg3)'};color:${k.route_mode==='external_event'?'#fff':'var(--text)'};border:1px solid var(--border);cursor:pointer">
-              <option value="message_archive" ${k.route_mode!=='external_event'?'selected':''}>📨 Messages</option>
-              <option value="external_event" ${k.route_mode==='external_event'?'selected':''}>🔌 Calendar</option>
+              <option value="message_archive" ${k.route_mode!=='external_event'?'selected':''}>📨 ${t('api_key_route_messages')||'Messages'}</option>
+              <option value="external_event" ${k.route_mode==='external_event'?'selected':''}>🔌 ${t('api_key_route_calendar')||'Calendar'}</option>
             </select>
-            ${k.save_raw_key ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">🔓 Revealable</span>' : ''}
+            ${k.save_raw_key ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">🔓 ${t('api_key_revealable')||'Revealable'}</span>` : ''}
           </div>
           ${k.description ? `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(k.description)}</div>` : ''}
           <div style="color:var(--text-dim);font-size:10px;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
-            <span>Created: ${k.created_at ? new Date(k.created_at).toLocaleString() : '\u2014'}</span>
-            <span>Last used: ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Never'}</span>
+            <span>${t('api_key_created_at')||'Created'}: ${k.created_at ? new Date(k.created_at).toLocaleString() : '\u2014'}</span>
+            <span>${t('api_key_last_used')||'Last used'}: ${k.last_used_at ? new Date(k.last_used_at).toLocaleString() : (t('api_key_never')||'Never')}</span>
             ${k.last_used_ip ? `<span>IP: ${escHtml(k.last_used_ip)}</span>` : ''}
-            <span>Uses: ${k.usage_count || 0}</span>
+            <span>${t('api_key_usage_count')||'Uses'}: ${k.usage_count || 0}</span>
           </div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="btn btn-secondary btn-sm" data-action="revealAPIKey" data-arg="${k.id}" style="font-size:10px" title="Show key value">👁</button>
-          <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}">Delete</button>
+          <button class="btn btn-secondary btn-sm" data-action="revealAPIKey" data-arg="${k.id}" style="font-size:10px" title="${t('api_key_show')||'Show key value'}">👁</button>
+          <button class="btn btn-danger btn-sm" data-action="deleteAPIKey" data-arg="${k.id}">${t('btn_delete')||'Delete'}</button>
         </div>
       </div>
     `).join('');
@@ -1050,7 +1050,7 @@ async function _loadAPIKeys() {
       sel.addEventListener('change', () => _updateAPIKeyRoute(parseInt(sel.dataset.keyid), sel.value));
     });
   } catch {
-    listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
+    listEl.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-xs)">${t('api_keys_load_error')||'Failed to load API keys.'}</p>`;
   }
 }
 
@@ -1058,11 +1058,11 @@ window._updateAPIKeyRoute = async function(id, routeMode) {
   try {
     const res = await apiPut('/api/apikeys/' + id, { route_mode: routeMode });
     if (res.ok) {
-      if (typeof showNotification === 'function') showNotification('success', 'Route updated');
+      if (typeof showNotification === 'function') showNotification('success', t('api_key_route_updated')||'Route updated');
       await _loadAPIKeys();
     } else {
       const err = await res.json().catch(() => ({}));
-      showError(err.error || 'Failed to update');
+      showError(err.error || t('api_key_update_error')||'Failed to update');
     }
   } catch (e) { showError(e.message); }
 };
@@ -1141,10 +1141,10 @@ async function createAPIKey() {
 }
 
 async function deleteAPIKey(id) {
-  if (!confirm('Delete this API key? It will stop working immediately.')) return;
+  if (!confirm(t('api_key_delete_confirm')||'Delete this API key? It will stop working immediately.')) return;
   const res = await api('DELETE', `/api/apikeys/${id}`, null);
   if (res.ok) {
-    showNotification('success', 'API key deleted');
+    showNotification('success', t('api_key_deleted')||'API key deleted');
     await _loadAPIKeys();
   } else {
     showError('Failed to delete API key');
