@@ -23,18 +23,18 @@ function openDebugConsole() {
 
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
           <div style="flex:1;min-width:200px">
-            <label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">🔍 Trace User</label>
+            <label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">\u{1F50D} ${t('debug_trace_user')||'Trace User'}</label>
             <div style="display:flex;gap:4px">
-              <input id="debugTraceUser" class="input" style="flex:1;font-size:11px;font-family:monospace" placeholder="Username to trace..." value="${escHtml(_debugTraceUser)}">
-              <button class="btn btn-sm btn-primary" data-action="_debugSetTrace">Set</button>
-              <button class="btn btn-sm btn-secondary" data-action="_debugClearTrace">Clear</button>
+              <input id="debugTraceUser" class="input" style="flex:1;font-size:11px;font-family:monospace" placeholder="${t('debug_trace_placeholder')||'Username to trace...'}" value="${escHtml(_debugTraceUser)}">
+              <button class="btn btn-sm btn-primary" data-action="_debugSetTrace">${t('btn_set')||'Set'}</button>
+              <button class="btn btn-sm btn-secondary" data-action="_debugClearTrace">${t('btn_clear')||'Clear'}</button>
             </div>
           </div>
           <div style="flex:1;min-width:200px">
-            <label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">⚡ Triggers</label>
+            <label style="font-size:10px;font-weight:600;display:block;margin-bottom:2px">\u26A1 ${t('debug_triggers')||'Triggers'}</label>
             <div style="display:flex;gap:4px">
-              <input id="debugTriggerPattern" class="input" style="flex:1;font-size:11px;font-family:monospace" placeholder="Pattern (e.g. webhook, ingest, error)">
-              <button class="btn btn-sm btn-primary" data-action="_debugAddTrigger">Add</button>
+              <input id="debugTriggerPattern" class="input" style="flex:1;font-size:11px;font-family:monospace" placeholder="${t('debug_trigger_ph')||'Pattern (e.g. webhook, ingest, error)'}">
+              <button class="btn btn-sm btn-primary" data-action="_debugAddTrigger">${t('btn_add')||'Add'}</button>
             </div>
             <div id="debugTriggerList" style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">
               ${_debugTriggers.map((tr,i) => `<span style="font-size:10px;padding:1px 6px;background:var(--accent);color:#fff;border-radius:3px;cursor:pointer" data-action="_debugRemoveTrigger" data-arg="${i}">${escHtml(tr)} ×</span>`).join('')}
@@ -43,13 +43,13 @@ function openDebugConsole() {
         </div>
 
         <div style="display:flex;gap:4px;margin-bottom:8px">
-          <button class="btn btn-sm btn-secondary" data-action="_debugClear">Clear Log</button>
-          <button class="btn btn-sm btn-secondary" data-action="_debugLoadEventLog">Load Event Log</button>
-          <span style="font-size:10px;color:var(--text-dim);margin-left:auto;padding-top:4px" id="debugSSEStatus">● Live</span>
+          <button class="btn btn-sm btn-secondary" data-action="_debugClear">${t('debug_clear_log')||'Clear Log'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_debugLoadEventLog">${t('debug_load_event_log')||'Load Event Log'}</button>
+          <span style="font-size:10px;color:var(--text-dim);margin-left:auto;padding-top:4px" id="debugSSEStatus">\u25CF ${t('debug_live')||'Live'}</span>
         </div>
 
         <div id="debugLogArea" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;max-height:500px;overflow-y:auto;font-size:11px;line-height:1.4">
-          ${_debugEntries.length === 0 ? '<span style="color:var(--text-dim)">Waiting for events...</span>' : _debugEntries.map(e => _debugFormatEntry(e)).join('')}
+          ${_debugEntries.length === 0 ? `<span style="color:var(--text-dim)">${t('debug_waiting')||'Waiting for events...'}</span>` : _debugEntries.map(e => _debugFormatEntry(e)).join('')}
         </div>
       </div>
     </div>`;
