@@ -1024,7 +1024,7 @@ async function _loadAPIKeys() {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
             <span class="role-badge role-${k.role||'read'}" style="font-size:9px;padding:1px 5px">${escHtml(k.role||'read')}</span>
-            <select style="font-size:9px;padding:1px 4px;border-radius:3px;background:${k.route_mode==='external_event'?'#6C5CE7':'var(--bg3)'};color:${k.route_mode==='external_event'?'#fff':'var(--text)'};border:1px solid var(--border);cursor:pointer" onchange="_updateAPIKeyRoute(${k.id},this.value)">
+            <select class="apikey-route-select" data-keyid="${k.id}" style="font-size:9px;padding:1px 4px;border-radius:3px;background:${k.route_mode==='external_event'?'#6C5CE7':'var(--bg3)'};color:${k.route_mode==='external_event'?'#fff':'var(--text)'};border:1px solid var(--border);cursor:pointer">
               <option value="message_archive" ${k.route_mode!=='external_event'?'selected':''}>📨 Messages</option>
               <option value="external_event" ${k.route_mode==='external_event'?'selected':''}>🔌 Calendar</option>
             </select>
@@ -1045,6 +1045,10 @@ async function _loadAPIKeys() {
       </div>
     `).join('');
     _bindActions(listEl);
+    // Bind route-mode dropdowns (CSP-safe, no inline handlers)
+    listEl.querySelectorAll('.apikey-route-select').forEach(sel => {
+      sel.addEventListener('change', () => _updateAPIKeyRoute(parseInt(sel.dataset.keyid), sel.value));
+    });
   } catch {
     listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
   }
@@ -1078,7 +1082,7 @@ async function revealAPIKey(id) {
             <input type="text" value="${escHtml(res.key)}" readonly
               style="flex:1;font-family:monospace;font-size:var(--fs-sm);padding:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);user-select:all"
               data-action="selectSelf" data-arg-el data-event="click">
-            <button class="btn btn-primary btn-sm" onclick="navigator.clipboard.writeText('${escHtml(res.key)}')">📋 ${t('btn_copy')||'Copy'}</button>
+            <button class="btn btn-primary btn-sm" id="revealCopyBtn">📋 ${t('btn_copy')||'Copy'}</button>
           </div>
         </div>
         <div class="modal-footer">
@@ -1087,6 +1091,10 @@ async function revealAPIKey(id) {
       </div>`;
     document.body.appendChild(keyModal);
     _bindActions(keyModal);
+    const _revealKey = res.key;
+    document.getElementById('revealCopyBtn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(_revealKey).catch(() => {});
+    });
   } catch (e) { showError(e.message || 'Failed to reveal key'); }
 }
 
