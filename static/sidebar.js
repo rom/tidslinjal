@@ -767,6 +767,11 @@ function renderSidebar() {
   const el   = document.getElementById('sidebarContent');
   const lang = state.preferences.language || 'en';
 
+  // Clear rendered-tab guard when switching to a different tab
+  if (el.dataset.renderedTab && el.dataset.renderedTab !== tab) {
+    delete el.dataset.renderedTab;
+  }
+
   if (tab === 'legend') {
     const activeLayers = state.layers.filter(l => isLayerActive(l.id));
     const isSynthActive = synthActive ? synthActive() : false;
@@ -1525,6 +1530,9 @@ function renderSidebar() {
       </div>`;
     refreshAuditLog();
   } else if (tab === 'integrations' && state.user && (state.user.role === 'admin' || state.user.role === 'developer')) {
+    // Skip re-render if already on this tab (preserves form state & API key dropdowns)
+    if (el.dataset.renderedTab === 'integrations') return;
+    el.dataset.renderedTab = 'integrations';
     const p = state.preferences;
     el.innerHTML = `
       <div class="sidebar-section">
@@ -2546,9 +2554,15 @@ Fields: file, subject, sender, type, tags</pre>
     setTimeout(_initSecuritySettingsUI, 0);
     _bindActions(el);
   } else if (tab === 'references') {
+    // Skip re-render if already on this tab (preserves sub-tab state)
+    if (el.dataset.renderedTab === 'references') return;
+    el.dataset.renderedTab = 'references';
     _renderReferencesTab(el);
 
   } else if (tab === 'settings') {
+    // Skip re-render if already on this tab (preserves form state)
+    if (el.dataset.renderedTab === 'settings') return;
+    el.dataset.renderedTab = 'settings';
     const p  = state.preferences;
     const ex = state.exercise || {};
     el.innerHTML = `
