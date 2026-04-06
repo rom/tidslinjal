@@ -1602,7 +1602,7 @@ function _ktDetach() {
       copyBtn.addEventListener('click', () => {
         urlInput.select();
         try { w.navigator.clipboard.writeText(urlInput.value); copyBtn.textContent = '\u2713'; } catch { w.document.execCommand('copy'); }
-        setTimeout(() => { copyBtn.textContent = '${t('btn_copy')||'Copy'}'; }, 1500);
+        setTimeout(() => { copyBtn.textContent = t('btn_copy')||'Copy'; }, 1500);
       });
     }
   };
