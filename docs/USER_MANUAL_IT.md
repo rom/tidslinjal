@@ -1,6 +1,6 @@
 # Tidslinjal Manuale Utente
 
-**Versione 6.1.0**
+**Versione 8.3.0**
 
 ---
 
@@ -343,7 +343,7 @@ I livelli sono sovrapposizioni nominati sopra la linea master. Permettono a dive
 │ Colore   [■ #9B59B6            ]  │
 │ Descrizione [                   ] │
 │                                   │
-│ Visibilità  [Gruppi         ▼]    │
+│ Visibilitàà  [Gruppi         ▼]    │
 │ Permesso    [Lettura/Scrit. ▼]    │
 │ Gruppi      ☐ Alpha  ☐ Bravo     │
 │                                   │
@@ -351,7 +351,7 @@ I livelli sono sovrapposizioni nominati sopra la linea master. Permettono a dive
 └───────────────────────────────────┘
 ```
 
-### Visibilità
+### Visibilitàà
 
 | Impostazione | Chi può vedere il livello |
 |---|---|
@@ -510,9 +510,9 @@ Aprire la scheda **Impostazioni** nel pannello laterale per configurare le propr
 
 | Impostazione | Opzioni |
 |---|---|
-| **Tema** | Scuro / Chiaro / City Camo / Urban Camo |
+| **Tema** | Scuro / Chiaro / City Camo / Urban Camo / Sabbia / Matrix / Tramonto / Cielo azzurro / Oceano / Foresta / Accessibile / Cremisi |
 | **Dimensione** | Piccola / Normale / Grande / Enorme |
-| **Lingua** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Lingua** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇮🇸 Íslenska / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Formato data/ora** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Formato ora** | 24h / 12h |
 | **Modalità alto contrasto** | Attiva / Disattiva |
@@ -545,7 +545,7 @@ Le fasce orarie al di fuori di inizio–fine giornata vengono visualizzate in gr
 
 Cliccare su uno dei pulsanti intervallo (Giorno / 2 Giorni / 3 Giorni / 4 Giorni / Settimana) per impostare la vista predefinita. La modifica cambia anche la vista corrente immediatamente.
 
-### Visibilità dei tipi di evento
+### Visibilitàà dei tipi di evento
 
 Attivare/disattivare i singoli tipi di evento. I tipi nascosti sono attenuati nella timeline. I tipi personalizzati possono essere creati con il pulsante **+ Nuovo tipo** (Lettura/Scrittura+).
 
@@ -772,7 +772,7 @@ Salvare e riutilizzare insiemi di eventi, fasi, blocchi, gruppi e livelli:
 ### Gli eventi non vengono visualizzati
 - Controllare l'intervallo di date della **Vista** — potresti visualizzare un intervallo che non include i tuoi eventi
 - Controllare i filtri dei **Livelli** — cliccare 🗂 e assicurarsi che i livelli corretti siano attivi
-- Controllare la **Visibilità dei tipi di evento** nelle Impostazioni — i tipi nascosti non vengono visualizzati
+- Controllare la **Visibilitàà dei tipi di evento** nelle Impostazioni — i tipi nascosti non vengono visualizzati
 
 ### L'allarme non si attiva
 - SSE richiede una connessione browser persistente — assicurarsi che la pagina sia aperta
@@ -915,4 +915,29 @@ Cliccare **Elimina** accanto a un preset per rimuoverlo.
 
 ---
 
-*Tidslinjal v6.1.0 — Timeline operativa collaborativa*
+## Capacità operative
+
+Le **capacità operative** (🎯 in Risorse) rappresentano le capacità operative che possono essere monitorate. Ogni capacità ha:
+- **Nome** — il nome della capacità
+- **Zona** — posizionamento geografico/area opzionale
+- **Descrizione** — testo libero
+- **Proprietà** — chi possiede/gestisce questa capacità
+- **Stato** — Funzionante, Degradato, Fuori servizio o Sconosciuto
+
+Le capacità operative sono **oggetti reattivi**: quando collegate a una voce della Bacheca del terreno chiave, le modifiche a nome, zona, stato, proprietà e proprietario della capacità si propagano automaticamente alla bacheca.
+
+---
+
+## Miglioramenti della Bacheca del terreno chiave (v8.3.0)
+
+- **Colonna Proprietario** — mostra il proprietario di ogni capacità collegata; nascosta per impostazione predefinita (attivare tramite Visibilità delle colonne); ordinabile
+- **Campo Proprietario sulle capacità** — nuovo campo "Proprietario" nel modulo della capacità, distinto da Proprietà/Responsabile; sincronizzato automaticamente con le voci della Bacheca del terreno chiave
+- **Filtro a caselle per capacità** — caselle di controllo per tutti i nomi di capacità nelle voci, a complemento della ricerca testuale esistente
+- **Filtro a caselle per priorità** — caselle di controllo per i valori 0–10, a complemento del campo numerico
+- **Filtro a caselle per stato** — caselle di controllo per Funzionante/Degradato/Fuori servizio/Sconosciuto, a complemento del menu a discesa
+- **Filtro a caselle per tendenza** — caselle di controllo per In miglioramento/Stabile/In peggioramento, a complemento del menu a discesa
+- Tutti i filtri a caselle sono deselezionati per impostazione predefinita; i valori selezionati filtrano come O all'interno di un gruppo, E tra i gruppi
+
+---
+
+*Tidslinjal v8.3.0 — Timeline operativa collaborativa*

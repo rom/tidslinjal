@@ -1,6 +1,6 @@
 # Tidslinjal Manual de Usuario
 
-**Versión 6.1.0**
+**Versión 8.3.0**
 
 ---
 
@@ -510,9 +510,9 @@ Abra la pestaña **Configuración** en el panel lateral para configurar sus pref
 
 | Configuración | Opciones |
 |---|---|
-| **Tema** | Oscuro / Claro / City Camo / Urban Camo |
+| **Tema** | Oscuro / Claro / City Camo / Urban Camo / Sand / Matrix / Sunset / Light Blue Sky / Ocean / Forest / Accessible / Crimson |
 | **Tamaño** | Pequeño / Normal / Grande / Enorme |
-| **Idioma** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Idioma** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇫🇮 Suomi / 🇮🇸 Íslenska / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Formato de fecha/hora** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Formato de hora** | 24h / 12h |
 | **Modo de alto contraste** | Activado / Desactivado |
@@ -527,7 +527,7 @@ Abra la pestaña **Configuración** en el panel lateral para configurar sus pref
 | **Tipo de evento predeterminado** | cualquier tipo configurado |
 | **Banner de bienvenida** | se muestra en el primer inicio de sesión |
 
-El idioma también puede cambiarse directamente con los botones de bandera (🇬🇧 🇸🇪 🇫🇷 🇫🇮) en la barra de herramientas.
+El idioma también puede cambiarse directamente con los botones de bandera (🇬🇧 🇸🇪 🇫🇷 🇩🇪 🇳🇱 🇫🇮 🇮🇸 🇩🇰 🇳🇴 🇪🇪 🇱🇻 🇱🇹 🇮🇹 🇪🇸 🇵🇹 🇵🇱 🇺🇦 🇯🇵 🇰🇷) en la barra de herramientas.
 
 ### Formato de fecha/hora y horas del día
 
@@ -915,4 +915,39 @@ Haga clic en **Eliminar** junto a un preajuste para borrarlo.
 
 ---
 
-*Tidslinjal v6.1.0 — Línea de tiempo operativa colaborativa*
+## Capacidades operativas
+
+**Capacidades** (🎯 en Recursos) representan capacidades operativas que pueden ser rastreadas. Cada capacidad tiene:
+- **Nombre** — el nombre de la capacidad
+- **Zona** — ubicación geográfica/área opcional
+- **Descripción** — descripción en texto libre
+- **Propiedad** — quién posee/opera esta capacidad
+- **Estado** — Operativo, Degradado, Inactivo o Desconocido
+
+Las capacidades son **objetos reactivos**: cuando están vinculadas a una entrada del Key Terrain Board, los cambios en el nombre, zona, estado, propiedad y propietario de la capacidad se propagan automáticamente al tablero.
+
+---
+
+## Mejoras del Key Terrain Board (v8.2.0)
+
+- **Columna Nº sec.** — número único asignado automáticamente por entrada
+- **Columna Zona** — campo de texto ordenable para clasificación de área
+- **Etiquetas de estado personalizables** — cambiar "Operativo" a "Normal", etc. en Configuración
+- **Visibilidad de columnas** — mostrar/ocultar cualquier columna, incluyendo la columna de Gestión
+- **Orden de columnas** — reordenar columnas directamente en el panel de Configuración
+- **Panel Gestionar y Exportar** — Historial, Versiones, Imprimir y Exportar consolidados bajo un solo botón
+- **Cargar desde Capacidad** — rellenar los campos de la entrada desde un recurso de capacidad existente
+
+## Mejoras del Key Terrain Board (v8.3.0)
+
+- **Columna Propietario** — muestra el propietario de cada capacidad vinculada; oculta por defecto (activar mediante Visibilidad de columnas); ordenable
+- **Campo Propietario en capacidades** — nuevo campo "Propietario" en el formulario de recurso de capacidad, separado de Propiedad/Responsable; sincronizado automáticamente con las entradas del Key Terrain Board
+- **Filtro de casillas de capacidad** — casillas de verificación para todos los nombres de capacidad en las entradas, complementando la búsqueda de texto existente
+- **Filtro de casillas de prioridad** — casillas de verificación para valores 0–10, complementando la entrada numérica
+- **Filtro de casillas de estado** — casillas de verificación para Operativo/Degradado/Inactivo/Desconocido, complementando el desplegable
+- **Filtro de casillas de tendencia** — casillas de verificación para Mejorando/Estable/Empeorando, complementando el desplegable
+- Todos los filtros de casillas están desmarcados por defecto; los valores marcados filtran como O dentro de un grupo, Y entre grupos
+
+---
+
+*Tidslinjal v8.3.0 — Línea de tiempo operativa colaborativa*

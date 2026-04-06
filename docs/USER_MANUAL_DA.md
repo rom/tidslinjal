@@ -1,6 +1,6 @@
 # Tidslinjal Brugermanual
 
-**Version 6.1.0**
+**Version 8.3.0**
 
 ---
 
@@ -510,9 +510,9 @@ Flaget `kan_låse` kan tildeles enhver bruger uanset rolle.
 
 | Indstilling | Muligheder |
 |---|---|
-| **Tema** | Mørk / Lys / City Camo / Urban Camo |
+| **Tema** | Mørk / Lys / City Camo / Urban Camo / Sand / Matrix / Solnedgang / Lyseblå himmel / Hav / Skov / Tilgængelig / Karmosinrød |
 | **Størrelse** | Lille / Normal / Stor / Enorm |
-| **Sprog** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi |
+| **Sprog** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇮🇸 Íslenska / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Dato-/tidsformat** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Tidsformat** | 24h / 12h |
 | **Højkontrasttilstand** | Til / Fra |
@@ -915,4 +915,29 @@ Klik **Slet** ved siden af en forudindstilling for at fjerne den.
 
 ---
 
-*Tidslinjal v6.1.0 — Samarbejdsbaseret operativ tidslinje*
+## Kapabiliteter
+
+**Kapabiliteter** (🎯 under Ressourcer) repræsenterer operationelle kapabiliteter, der kan spores. Hver kapabilitet har:
+- **Navn** — kapabilitetens navn
+- **Zone** — valgfri geografisk/områdeplacering
+- **Beskrivelse** — fritekst
+- **Ejerskab** — hvem der ejer/driver kapabiliteten
+- **Status** — Fungerende, Degraderet, Nede eller Ukendt
+
+Kapabiliteter er **reaktive objekter**: når de er knyttet til en post i Nøgleterræntavlen, overføres ændringer af kapabilitetens navn, zone, status, ejerskab og ejer automatisk til tavlen.
+
+---
+
+## Nøgleterræntavlens forbedringer (v8.3.0)
+
+- **Ejerkolonne** — viser ejeren af hver tilknyttet kapabilitet; skjult som standard (skift via Kolonnesynlighed); sorterbar
+- **Ejerfelt på kapabiliteter** — nyt "Ejer"-felt i kapabilitetsformularen, adskilt fra Ejerskab/Ansvarlig; synkroniseres automatisk til Nøgleterræntavlens poster
+- **Afkrydsningsfilter for kapabilitet** — afkrydsningsfelter for alle kapabilitetsnavne i poster, supplerer den eksisterende tekstsøgning
+- **Afkrydsningsfilter for prioritet** — afkrydsningsfelter for værdier 0–10, supplerer talfeltet
+- **Afkrydsningsfilter for status** — afkrydsningsfelter for Fungerende/Degraderet/Nede/Ukendt, supplerer rullelisten
+- **Afkrydsningsfilter for tendens** — afkrydsningsfelter for Forbedring/Stabil/Forværring, supplerer rullelisten
+- Alle afkrydsningsfiltre er fravalgt som standard; markerede værdier filtrerer som ELLER inden for en gruppe, OG på tværs af grupper
+
+---
+
+*Tidslinjal v8.3.0 — Samarbejdsbaseret operativ tidslinje*

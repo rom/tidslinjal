@@ -1,6 +1,6 @@
 # Manuel d'utilisation de Tidslinjal
 
-**Version 6.1.0**
+**Version 8.3.0**
 
 ---
 
@@ -60,7 +60,7 @@ Fonctionnalités clés :
 - Système de temps artificiel pour les décalages de temps d'exercice
 - Format DTG (Date-Time Group) militaire
 - Mode haut contraste et palettes pour daltoniens
-- Support de 14 langues
+- Support de 19 langues
 - Gestion de documents de référence avec sommes de contrôle
 - Préréglages d'espace de travail
 - Mode de synchronisation hors ligne et support de fédération
@@ -515,9 +515,9 @@ Ouvrez l'onglet **Paramètres** dans le panneau latéral pour configurer vos pr�
 
 | Réglage | Options |
 |---|---|
-| **Thème** | Sombre / Clair / City Camo / Urban Camo |
+| **Thème** | Sombre / Clair / City Camo / Urban Camo / Sable / Matrix / Coucher de soleil / Ciel bleu clair / Océan / Forêt / Accessible / Cramoisi |
 | **Taille d'affichage** | Petit / Normal / Grand / Énorme |
-| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська |
+| **Langue** | 🇬🇧 English / 🇸🇪 Svenska / 🇫🇷 Français / 🇫🇮 Suomi / 🇩🇰 Dansk / 🇳🇴 Norsk / 🇪🇪 Eesti / 🇱🇻 Latviešu / 🇱🇹 Lietuvių / 🇮🇹 Italiano / 🇪🇸 Español / 🇵🇹 Português / 🇵🇱 Polski / 🇺🇦 Українська / 🇩🇪 Deutsch / 🇳🇱 Nederlands / 🇮🇸 Íslenska / 🇯🇵 日本語 / 🇰🇷 한국어 |
 | **Format date/heure** | ISO 8601 (2025-12-31) / UK (31/12/2025) / FR (31.12.2025) / SV (2025-12-31) / DTG (141200ZMAR26) |
 | **Format horaire** | 24h / 12h |
 | **Mode haut contraste** | Activé / Désactivé |
@@ -937,4 +937,29 @@ Supprimez les préréglages dont vous n'avez plus besoin depuis la liste des pr�
 
 ---
 
-*Tidslinjal v6.1.0 — Chronologie opérationnelle collaborative*
+## Capacités
+
+Les **capacités** (🎯 dans Ressources) représentent les capacités opérationnelles pouvant être suivies. Chaque capacité possède :
+- **Nom** — le nom de la capacité
+- **Zone** — placement géographique/zone optionnel
+- **Description** — texte libre
+- **Propriété** — qui possède/exploite cette capacité
+- **Statut** — Opérationnel, Dégradé, Hors service ou Inconnu
+
+Les capacités sont des **objets réactifs** : lorsqu'elles sont liées à une entrée du Tableau de terrain clé, les modifications du nom, de la zone, du statut, de la propriété et du propriétaire de la capacité se propagent automatiquement au tableau.
+
+---
+
+## Améliorations du Tableau de terrain clé (v8.3.0)
+
+- **Colonne Propriétaire** — affiche le propriétaire de chaque capacité liée ; masquée par défaut (basculer via Visibilité des colonnes) ; triable
+- **Champ Propriétaire sur les capacités** — nouveau champ « Propriétaire » dans le formulaire de capacité, distinct de Propriété/Responsable ; synchronisé automatiquement avec les entrées du Tableau de terrain clé
+- **Filtre à cases pour capacité** — cases à cocher pour tous les noms de capacité dans les entrées, complétant la recherche textuelle existante
+- **Filtre à cases pour priorité** — cases à cocher pour les valeurs 0–10, complétant le champ numérique
+- **Filtre à cases pour statut** — cases à cocher pour Opérationnel/Dégradé/Hors service/Inconnu, complétant la liste déroulante
+- **Filtre à cases pour tendance** — cases à cocher pour En amélioration/Stable/En dégradation, complétant la liste déroulante
+- Tous les filtres à cases sont décochés par défaut ; les valeurs cochées filtrent en OU au sein d'un groupe, en ET entre les groupes
+
+---
+
+*Tidslinjal v8.3.0 — Chronologie opérationnelle collaborative*
