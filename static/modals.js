@@ -1024,7 +1024,10 @@ async function _loadAPIKeys() {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
             <span class="role-badge role-${k.role||'read'}" style="font-size:9px;padding:1px 5px">${escHtml(k.role||'read')}</span>
-            ${k.route_mode === 'external_event' ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#6C5CE7;color:#fff">🔌 Calendar</span>' : '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">📨 Messages</span>'}
+            <select style="font-size:9px;padding:1px 4px;border-radius:3px;background:${k.route_mode==='external_event'?'#6C5CE7':'var(--bg3)'};color:${k.route_mode==='external_event'?'#fff':'var(--text)'};border:1px solid var(--border);cursor:pointer" onchange="_updateAPIKeyRoute(${k.id},this.value)">
+              <option value="message_archive" ${k.route_mode!=='external_event'?'selected':''}>📨 Messages</option>
+              <option value="external_event" ${k.route_mode==='external_event'?'selected':''}>🔌 Calendar</option>
+            </select>
             ${k.save_raw_key ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">🔓 Revealable</span>' : ''}
           </div>
           ${k.description ? `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(k.description)}</div>` : ''}
@@ -1046,6 +1049,19 @@ async function _loadAPIKeys() {
     listEl.innerHTML = '<p style="color:var(--text-dim);font-size:var(--fs-xs)">Failed to load API keys.</p>';
   }
 }
+
+window._updateAPIKeyRoute = async function(id, routeMode) {
+  try {
+    const res = await apiPut('/api/apikeys/' + id, { route_mode: routeMode });
+    if (res.ok) {
+      if (typeof showNotification === 'function') showNotification('success', 'Route updated');
+      await _loadAPIKeys();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to update');
+    }
+  } catch (e) { showError(e.message); }
+};
 
 async function revealAPIKey(id) {
   try {

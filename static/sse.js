@@ -62,8 +62,8 @@ function connectSSE() {
         const users = await apiGet('/api/users');
         if (users) state.users = users;
       } catch { /* ignore */ }
-      // Only re-render sidebar if not on infomanagement tab (to avoid resetting sub-tab state)
-      if (state.sidebarTab !== 'references') renderSidebar();
+      // Skip re-render for tabs with stateful forms/sub-tabs to avoid resetting user input
+      if (state.sidebarTab !== 'references' && state.sidebarTab !== 'integrations' && state.sidebarTab !== 'settings') renderSidebar();
     } catch { /* ignore parse errors */ }
   });
   // Key Terrain Board changes — dispatch custom event for key-terrain.js to handle
@@ -79,7 +79,7 @@ function connectSSE() {
       if (data.type === 'log_book' && typeof _loadLogBook === 'function') _loadLogBook();
       if (data.type === 'event_log' && typeof _loadEventLog === 'function') _loadEventLog();
       if (data.type === 'checklist_log' && typeof _loadChecklistLog === 'function') _loadChecklistLog();
-      if (data.type === 'audit_log' && typeof renderSidebar === 'function' && state.sidebarTab !== 'references') renderSidebar();
+      if (data.type === 'audit_log' && typeof renderSidebar === 'function' && state.sidebarTab !== 'references' && state.sidebarTab !== 'integrations' && state.sidebarTab !== 'settings') renderSidebar();
     } catch {}
   });
   // Layer changes (e.g. auto-created External Events layer)

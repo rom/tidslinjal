@@ -133,6 +133,29 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 	jsonOK(w, created)
 }
 
+func (app *App) handleUpdateAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/apikeys/"), "/")
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		RouteMode  *string `json:"route_mode"`
+		SaveRawKey *bool   `json:"save_raw_key"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		jsonError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if err := app.store.UpdateAPIKeySettings(id, req.RouteMode, req.SaveRawKey); err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	app.audit(user.ID, user.DisplayName, "updated", "api_key", id, fmt.Sprintf("Updated API key #%d settings", id))
+	jsonOK(w, map[string]string{"status": "updated"})
+}
+
 func (app *App) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request, user *User) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/apikeys/"), "/")
 	id, err := strconv.ParseInt(parts[0], 10, 64)
