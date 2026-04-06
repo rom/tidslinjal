@@ -79,6 +79,7 @@ func (eb *EventBus) Publish(msg EventBusMessage) {
 	}
 	eb.mu.RUnlock()
 	msg.Timestamp = time.Now()
+	logDebug("eventbus: publishing action=%s event=%d user=%s", msg.Action, msg.Event.ID, msg.UserName)
 	select {
 	case eb.ch <- msg:
 	default:
@@ -102,6 +103,7 @@ func (eb *EventBus) Stop() {
 func (eb *EventBus) Run() {
 	for msg := range eb.ch {
 		eb.mu.RLock()
+		logDebug("eventbus: delivering action=%s event=%d to %d subscribers", msg.Action, msg.Event.ID, len(eb.subscribers))
 		for name, sub := range eb.subscribers {
 			func(n string, s EventBusSubscriber, m EventBusMessage) {
 				defer func() {

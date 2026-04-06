@@ -100,9 +100,11 @@ func (cr *ConnectorRegistry) SetConfig(cfg ConnectorConfig) error {
 func (cr *ConnectorRegistry) Dispatch(msg EventBusMessage) {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
+	logDebug("connectors: dispatching action=%s event=%d to %d registered connectors", msg.Action, msg.Event.ID, len(cr.connectors))
 	for name, c := range cr.connectors {
 		cfg := cr.configs[name]
 		if cfg.Enabled && c.Enabled() {
+			logDebug("connectors: dispatching to connector %q", name)
 			go func(cc Connector, m EventBusMessage) {
 				defer func() {
 					if r := recover(); r != nil {
@@ -119,12 +121,14 @@ func (cr *ConnectorRegistry) Dispatch(msg EventBusMessage) {
 func (cr *ConnectorRegistry) PollAll(app *App) []IngestPayload {
 	cr.mu.Lock()
 	defer cr.mu.Unlock()
+	logDebug("connectors: polling %d registered connectors", len(cr.connectors))
 	var results []IngestPayload
 	for name, c := range cr.connectors {
 		cfg := cr.configs[name]
 		if !cfg.Enabled || !c.Enabled() {
 			continue
 		}
+		logDebug("connectors: polling %q", name)
 		payloads, err := c.Poll(app)
 		// Track usage
 		now := time.Now().Format(time.RFC3339)
@@ -133,8 +137,10 @@ func (cr *ConnectorRegistry) PollAll(app *App) []IngestPayload {
 		if err != nil {
 			cfg.LastError = err.Error()
 			log.Printf("[WARN] connector %q poll error: %v", name, err)
+			logDebug("connectors: poll %q error: %v", name, err)
 		} else {
 			cfg.LastError = ""
+			logDebug("connectors: poll %q returned %d payloads", name, len(payloads))
 		}
 		cr.configs[name] = cfg
 		if err != nil {
