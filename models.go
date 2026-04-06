@@ -785,6 +785,7 @@ type Room struct {
 	// Capability-specific fields
 	Zone           string `json:"zone,omitempty"`           // zone/area placement (for capabilities)
 	Responsibility string `json:"responsibility,omitempty"` // who is responsible (for capabilities)
+	Owner          string `json:"owner,omitempty"`          // owner of the capability
 	Status         string `json:"status,omitempty"`         // operational status (for capabilities)
 	CreatedAt   time.Time `json:"created_at"`
 }

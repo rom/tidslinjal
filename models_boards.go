@@ -262,6 +262,7 @@ type KeyTerrainEntry struct {
 	Priority        int              `json:"priority"`                    // explicit ranking (1 = highest)
 	ResponsibleID   int64            `json:"responsible_id,omitempty"`
 	ResponsibleName string           `json:"responsible_name,omitempty"`
+	OwnerName       string           `json:"owner_name,omitempty"`        // owner of the linked capability
 	Actions         string           `json:"actions"`                     // what is being done
 	Rounds          int              `json:"rounds,omitempty"`            // number of battle rhythm rounds on the board
 	Ghosted         bool             `json:"ghosted,omitempty"`           // visually dimmed / inactive

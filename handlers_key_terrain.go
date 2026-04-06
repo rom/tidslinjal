@@ -88,6 +88,7 @@ func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Reques
 				if cap.Responsibility != "" {
 					entries[i].ResponsibleName = cap.Responsibility
 				}
+				entries[i].OwnerName = cap.Owner
 			}
 		}
 	}
