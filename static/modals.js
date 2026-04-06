@@ -1046,7 +1046,8 @@ async function createAPIKey() {
   const name = document.getElementById('newAPIKeyName')?.value?.trim();
   if (!name) { showError('Key name is required'); return; }
   const comment = document.getElementById('newAPIKeyComment')?.value?.trim() || '';
-  const res = await apiPost('/api/apikeys', {name, description: comment});
+  const role = document.getElementById('newAPIKeyRole')?.value || 'readwrite';
+  const res = await apiPost('/api/apikeys', {name, description: comment, role});
   if (res.ok) {
     const key = await res.json();
     // Show the key in a modal with a copyable field

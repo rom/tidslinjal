@@ -1919,13 +1919,22 @@ function renderSidebar() {
         <div id="apiKeyList" style="margin-bottom:8px">Loading…</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" id="newAPIKeyName" placeholder="Key name"
-              title="Give the key a descriptive name so you can identify which system uses it (e.g. 'Monitoring Script', 'CI Pipeline')."
+            <input type="text" id="newAPIKeyName" placeholder="${t('settings_api_key_name_ph')||'Key name'}"
+              title="${t('settings_api_key_name_tip')||'Give the key a descriptive name so you can identify which system uses it (e.g. \'Monitoring Script\', \'CI Pipeline\').'}"
               style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+            <select id="newAPIKeyRole" title="${t('settings_api_key_role_tip')||'Permission level for this key. Use readwrite or higher for ingestion endpoints.'}"
+              style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-sm)">
+              <option value="observer">${getRoleDisplayName('observer')||'Observer'}</option>
+              <option value="read">${getRoleDisplayName('read')||'Read'}</option>
+              <option value="reporter">${getRoleDisplayName('reporter')||'Reporter'}</option>
+              <option value="readwrite" selected>${getRoleDisplayName('readwrite')||'Read-Write'}</option>
+              <option value="teamlead">${getRoleDisplayName('teamlead')||'Team Lead'}</option>
+              <option value="oplead">${getRoleDisplayName('oplead')||'Operations Lead'}</option>
+            </select>
             <button class="btn btn-primary btn-sm" data-action="createAPIKey"
-              title="Generate a new API key. The key value will be shown once — copy it immediately.">+ Create</button>
+              title="${t('settings_api_key_create_tip')||'Generate a new API key. The key value will be shown once — copy it immediately.'}">+ ${t('btn_create')||'Create'}</button>
           </div>
-          <input type="text" id="newAPIKeyComment" placeholder="Comment (optional) — e.g. what system uses this key"
+          <input type="text" id="newAPIKeyComment" placeholder="${t('settings_api_key_comment_ph')||'Comment (optional) — e.g. what system uses this key'}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
         </div>
       </div>
