@@ -42,7 +42,7 @@ func (app *App) handleRevealAPIKey(w http.ResponseWriter, r *http.Request, user 
 	for _, k := range keys {
 		if k.ID == id {
 			if k.KeyPlain == "" {
-				jsonError(w, "key was created before reveal support — recreate it to enable reveal", http.StatusNotFound)
+				jsonError(w, "key was created without 'Save raw key' enabled — recreate with that option to enable reveal", http.StatusNotFound)
 				return
 			}
 			app.audit(user.ID, user.DisplayName, "revealed", "api_key", id,
@@ -59,6 +59,8 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		Role        Role   `json:"role"`
+		SaveRawKey  bool   `json:"save_raw_key"`
+		RouteMode   string `json:"route_mode"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -94,12 +96,28 @@ func (app *App) handleCreateAPIKey(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 
+	// Validate route mode
+	if req.RouteMode == "" {
+		req.RouteMode = "message_archive"
+	}
+	if req.RouteMode != "message_archive" && req.RouteMode != "external_event" {
+		jsonError(w, "invalid route_mode (must be message_archive or external_event)", http.StatusBadRequest)
+		return
+	}
+
+	keyPlain := ""
+	if req.SaveRawKey {
+		keyPlain = rawKey
+	}
+
 	k := APIKey{
 		Name:        req.Name,
 		Description: req.Description,
 		Role:        req.Role,
 		KeyHash:     string(hash),
-		KeyPlain:    rawKey,
+		KeyPlain:    keyPlain,
+		SaveRawKey:  req.SaveRawKey,
+		RouteMode:   req.RouteMode,
 		CreatedBy:   user.ID,
 	}
 	created, err := app.store.CreateAPIKey(k)

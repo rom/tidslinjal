@@ -352,6 +352,23 @@ func (app *App) requireAPIKeyOrAuth(next func(http.ResponseWriter, *http.Request
 	}
 }
 
+// authenticateAPIKeyFull extracts and validates an API key, returning both the User and the full APIKey record.
+func (app *App) authenticateAPIKeyFull(r *http.Request) (*User, *APIKey) {
+	user := app.authenticateAPIKey(r)
+	if user == nil {
+		return nil, nil
+	}
+	// Find the full API key record by matching the name from the synthetic user
+	keyName := strings.TrimPrefix(user.Username, "apikey:")
+	keys := app.store.GetAPIKeys()
+	for _, k := range keys {
+		if k.Name == keyName {
+			return user, &k
+		}
+	}
+	return user, nil
+}
+
 // authenticateAPIKey extracts and validates an API key from the Authorization header.
 // Returns the synthetic User for the key, or nil if invalid/missing.
 func (app *App) authenticateAPIKey(r *http.Request) *User {

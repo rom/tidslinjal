@@ -1936,6 +1936,19 @@ function renderSidebar() {
           </div>
           <input type="text" id="newAPIKeyComment" placeholder="${t('settings_api_key_comment_ph')||'Comment (optional) — e.g. what system uses this key'}"
             style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:5px 8px;font-size:var(--fs-xs)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer">
+              <input type="checkbox" id="newAPIKeySaveRaw" style="accent-color:var(--accent);width:12px;height:12px">
+              ${t('settings_api_key_save_raw')||'Save raw key (allows reveal later)'}
+            </label>
+            <div style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs)">
+              <span style="color:var(--text-dim)">${t('settings_api_key_route')||'Route to'}:</span>
+              <select id="newAPIKeyRoute" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+                <option value="message_archive">${t('settings_api_key_route_msg')||'Message Archive'}</option>
+                <option value="external_event">${t('settings_api_key_route_event')||'Calendar (External Event)'}</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 

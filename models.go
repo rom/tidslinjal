@@ -83,6 +83,8 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Paus", LabelFR: "Pause"},
 	{Key: "timed_event", Label: "Timed Event", Color: "#E74C3C", IsSystem: true, Icon: "⏱",
 		LabelSV: "Tidsstyrd händelse", LabelFR: "Événement chronométré"},
+	{Key: "external_event", Label: "External Event", Color: "#6C5CE7", IsSystem: true, Icon: "🔌",
+		LabelSV: "Extern händelse", LabelFR: "Événement externe"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type
@@ -711,9 +713,11 @@ type APIKey struct {
 	Name        string    `json:"name"`
 	Key         string    `json:"key,omitempty"`      // only shown on creation
 	KeyHash     string    `json:"key_hash,omitempty"`
-	KeyPlain    string    `json:"key_plain,omitempty"` // stored for admin reveal
+	KeyPlain    string    `json:"key_plain,omitempty"` // stored for admin reveal (if SaveRawKey enabled)
 	Description string    `json:"description,omitempty"`
-	Role        Role      `json:"role,omitempty"` // M-05 fix: configurable role (default: read)
+	Role        Role      `json:"role,omitempty"`      // configurable role (default: read)
+	SaveRawKey  bool      `json:"save_raw_key"`        // store raw key for later reveal (default: false)
+	RouteMode   string    `json:"route_mode,omitempty"` // "message_archive" (default) | "external_event"
 	CreatedBy   int64     `json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`

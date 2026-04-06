@@ -1024,6 +1024,8 @@ async function _loadAPIKeys() {
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <strong style="font-size:var(--fs-sm)">${escHtml(k.name)}</strong>
             <span class="role-badge role-${k.role||'read'}" style="font-size:9px;padding:1px 5px">${escHtml(k.role||'read')}</span>
+            ${k.route_mode === 'external_event' ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#6C5CE7;color:#fff">🔌 Calendar</span>' : '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">📨 Messages</span>'}
+            ${k.save_raw_key ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:var(--bg3);border:1px solid var(--border)">🔓 Revealable</span>' : ''}
           </div>
           ${k.description ? `<div style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(k.description)}</div>` : ''}
           <div style="color:var(--text-dim);font-size:10px;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
@@ -1076,8 +1078,10 @@ async function createAPIKey() {
   const name = document.getElementById('newAPIKeyName')?.value?.trim();
   if (!name) { showError('Key name is required'); return; }
   const comment = document.getElementById('newAPIKeyComment')?.value?.trim() || '';
-  const role = document.getElementById('newAPIKeyRole')?.value || 'readwrite';
-  const res = await apiPost('/api/apikeys', {name, description: comment, role});
+  const role = document.getElementById('newAPIKeyRole')?.value || 'teammember';
+  const saveRawKey = document.getElementById('newAPIKeySaveRaw')?.checked || false;
+  const routeMode = document.getElementById('newAPIKeyRoute')?.value || 'message_archive';
+  const res = await apiPost('/api/apikeys', {name, description: comment, role, save_raw_key: saveRawKey, route_mode: routeMode});
   if (res.ok) {
     const key = await res.json();
     // Show the key in a modal with a copyable field

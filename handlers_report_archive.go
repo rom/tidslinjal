@@ -178,7 +178,7 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Auth via API key
-	user := app.authenticateAPIKey(r)
+	user, apiKey := app.authenticateAPIKeyFull(r)
 	if user == nil {
 		logDebug("report-ingest: rejected — no valid API key provided from %s", clientIP(r))
 		jsonError(w, "unauthorized — provide a valid API key via Authorization: Bearer <key>", http.StatusUnauthorized)
@@ -299,21 +299,37 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	app.audit(user.ID, user.DisplayName, "create", "report_archive_ingest", created.ID,
 		fmt.Sprintf("Incoming report from %q: %q", entry.Sender, entry.Subject))
 
-	// Also store as a message archive entry
+	// Route based on API key settings
+	routeMode := "message_archive"
+	if apiKey != nil && apiKey.RouteMode != "" {
+		routeMode = apiKey.RouteMode
+	}
+	fromIP := clientIP(r)
+	keyName := ""
+	if apiKey != nil {
+		keyName = apiKey.Name
+	}
+
+	if routeMode == "external_event" {
+		// Create as external_event on the External Events layer
+		app.createExternalEvent(entry.Subject, entry.Description, entry.Sender, keyName, fromIP, entry.Tags)
+	}
+
+	// Always store as a message archive entry
 	rawPayload, _ := json.Marshal(map[string]interface{}{
 		"subject": entry.Subject, "sender": entry.Sender,
 		"report_type": entry.ReportType, "tags": entry.Tags,
 	})
 	app.store.AddMessageArchiveEntry(MessageArchiveEntry{
-		Category:    "incoming",
-		Subject:     entry.Subject,
-		Sender:      entry.Sender,
-		Body:        entry.Description,
-		MessageType: entry.ReportType,
-		Tags:        entry.Tags,
-		Source:       "api",
-		RawPayload:  string(rawPayload),
-		CreatedBy:   user.ID,
+		Category:      "incoming",
+		Subject:       entry.Subject,
+		Sender:        entry.Sender,
+		Body:          entry.Description,
+		MessageType:   entry.ReportType,
+		Tags:          entry.Tags,
+		Source:        "api",
+		RawPayload:    string(rawPayload),
+		CreatedBy:     user.ID,
 		CreatedByName: user.DisplayName,
 	})
 
@@ -322,6 +338,7 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 		"title":   created.Title,
 		"status":  "accepted",
 		"message": "Report received and archived",
+		"route":   routeMode,
 	})
 }
 
