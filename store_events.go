@@ -62,6 +62,22 @@ func (s *Store) GetEventByID(id int64) (*Event, bool) {
 	return nil, false
 }
 
+// GetEventByExternalID returns the first event matching the given external ID, or nil.
+func (s *Store) GetEventByExternalID(externalID string) *Event {
+	if externalID == "" {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for i := range s.events {
+		if s.events[i].ExternalID == externalID {
+			e := s.events[i]
+			return &e
+		}
+	}
+	return nil
+}
+
 func (s *Store) CreateEvent(e Event) (Event, error) {
 	s.mu.Lock()
 	s.nextEventID++

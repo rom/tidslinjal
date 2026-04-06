@@ -452,6 +452,8 @@ type Event struct {
 	TimedAlarms             string `json:"timed_alarms,omitempty"`             // comma-separated alarm points, e.g. "5,10,50%"
 	TimedContinueAfter      bool   `json:"timed_continue_after"`               // continue counting (with +) after timer completes
 	TimedPreShowMinutes     int    `json:"timed_pre_show_minutes,omitempty"`   // minutes before start to show detached timer (1/2/5)
+	// External integration
+	ExternalID string `json:"external_id,omitempty"` // ID from external system (for update-by-external-id)
 }
 
 // EventComment is a comment on an event
