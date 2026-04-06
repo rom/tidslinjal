@@ -197,6 +197,9 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	_ = os.MkdirAll(dir, 0700)
 
 	var entry ReportArchiveEntry
+	var reqStartTime *time.Time
+	var reqEndTime *time.Time
+	var reqExternalID string
 	entry.Category = "incoming"
 	entry.UploadedBy = user.ID
 	entry.UploadedByName = user.DisplayName
@@ -247,12 +250,15 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// JSON body
 		var req struct {
-			Subject     string   `json:"subject"`
-			Sender      string   `json:"sender"`
-			Type        string   `json:"type"`
-			Description string   `json:"description"`
-			Tags        []string `json:"tags"`
-			Content     string   `json:"content"` // optional inline text content
+			Subject     string     `json:"subject"`
+			Sender      string     `json:"sender"`
+			Type        string     `json:"type"`
+			Description string     `json:"description"`
+			Tags        []string   `json:"tags"`
+			Content     string     `json:"content"`      // optional inline text content
+			StartTime   *time.Time `json:"start_time"`   // optional explicit start time
+			EndTime     *time.Time `json:"end_time"`     // optional explicit end time
+			ExternalID  string     `json:"external_id"`  // external system ID (for update-by-id)
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 10<<20)).Decode(&req); err != nil {
 			jsonError(w, "invalid JSON body", http.StatusBadRequest)
@@ -269,6 +275,9 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 		entry.Description = req.Description
 		entry.Tags = req.Tags
 		entry.Title = req.Subject
+		reqStartTime = req.StartTime
+		reqEndTime = req.EndTime
+		reqExternalID = req.ExternalID
 
 		if req.Content != "" {
 			// Store inline content as a JSON file
@@ -311,8 +320,18 @@ func (app *App) handleReportIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if routeMode == "external_event" {
-		// Create as external_event on the External Events layer
-		app.createExternalEvent(entry.Subject, entry.Description, entry.Sender, keyName, fromIP, entry.Tags)
+		// Create/update as external_event on the External Events layer
+		app.createExternalEvent(ExternalEventParams{
+			Subject:    entry.Subject,
+			Body:       entry.Description,
+			Sender:     entry.Sender,
+			KeyName:    keyName,
+			FromIP:     fromIP,
+			Tags:       entry.Tags,
+			StartTime:  reqStartTime,
+			EndTime:    reqEndTime,
+			ExternalID: reqExternalID,
+		})
 	}
 
 	// Always store as a message archive entry

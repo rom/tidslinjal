@@ -186,28 +186,71 @@ func (app *App) broadcastUserChange(senderID int64, action string, userID int64)
 	app.broker.BroadcastAll(SSEMessage{Event: "user_change", Data: string(data)})
 }
 
-// createExternalEvent creates a calendar event of type "external_event" on the External Events layer.
-func (app *App) createExternalEvent(subject, body, sender, keyName, fromIP string, tags []string) {
+// ExternalEventParams holds the parameters for creating or updating an external event.
+type ExternalEventParams struct {
+	Subject    string
+	Body       string
+	Sender     string
+	KeyName    string
+	FromIP     string
+	Tags       []string
+	StartTime  *time.Time
+	EndTime    *time.Time
+	ExternalID string
+}
+
+// createExternalEvent creates or updates a calendar event of type "external_event" on the External Events layer.
+// If ExternalID is provided and an event with that ID already exists, it updates the end_time (for interval tracking).
+func (app *App) createExternalEvent(p ExternalEventParams) {
+	// Check if this is an update to an existing event (same external_id)
+	if p.ExternalID != "" {
+		existing := app.store.GetEventByExternalID(p.ExternalID)
+		if existing != nil {
+			// Update: set end_time to now (or the provided end_time)
+			endTime := time.Now()
+			if p.EndTime != nil {
+				endTime = *p.EndTime
+			}
+			existing.EndTime = &endTime
+			existing.UpdatedAt = time.Now()
+			if err := app.store.UpdateEvent(*existing); err != nil {
+				logError("createExternalEvent: failed to update event id=%d: %v", existing.ID, err)
+				return
+			}
+			logDebug("createExternalEvent: updated event id=%d external_id=%q end_time=%v", existing.ID, p.ExternalID, endTime)
+			app.eventBus.Publish(EventBusMessage{Action: ActionUpdated, Event: existing})
+			app.broadcastEventChange(0, "updated", existing)
+			return
+		}
+	}
+
 	layer := app.getOrCreateExternalEventsLayer()
 	if layer == nil {
 		logError("createExternalEvent: could not get/create External Events layer")
 		return
 	}
 
-	desc := body
-	desc += fmt.Sprintf("\n\n--- Integration Details ---\nSender: %s\nAPI Key: %s\nSource IP: %s", sender, keyName, fromIP)
-	if len(tags) > 0 {
-		desc += fmt.Sprintf("\nTags: %s", strings.Join(tags, ", "))
+	desc := p.Body
+	desc += fmt.Sprintf("\n\n--- Integration Details ---\nSender: %s\nAPI Key: %s\nSource IP: %s", p.Sender, p.KeyName, p.FromIP)
+	if len(p.Tags) > 0 {
+		desc += fmt.Sprintf("\nTags: %s", strings.Join(p.Tags, ", "))
 	}
 
 	layerID := layer.ID
 	now := time.Now()
+	startTime := now
+	if p.StartTime != nil {
+		startTime = *p.StartTime
+	}
+
 	ev := Event{
-		Title:       subject,
+		Title:       p.Subject,
 		Description: stripHTMLTags(desc),
 		EventType:   "external_event",
 		Status:      StatusPlanned,
-		StartTime:   now,
+		StartTime:   startTime,
+		EndTime:     p.EndTime,
+		ExternalID:  p.ExternalID,
 		LayerID:     &layerID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -217,7 +260,7 @@ func (app *App) createExternalEvent(subject, body, sender, keyName, fromIP strin
 		logError("createExternalEvent: failed to create event: %v", err)
 		return
 	}
-	logDebug("createExternalEvent: created event id=%d on layer %d title=%q", created.ID, layerID, subject)
+	logDebug("createExternalEvent: created event id=%d external_id=%q on layer %d title=%q", created.ID, p.ExternalID, layerID, p.Subject)
 
 	// Publish to event bus and broadcast to all users
 	app.eventBus.Publish(EventBusMessage{
