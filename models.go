@@ -1015,6 +1015,30 @@ type MessageArchiveEntry struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+// Spreadsheet represents a user-created spreadsheet
+type Spreadsheet struct {
+	ID          int64             `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	OwnerID     int64             `json:"owner_id"`
+	OwnerName   string            `json:"owner_name"`
+	Visibility  string            `json:"visibility"`  // "private" | "group" | "public"
+	GroupIDs    []int64           `json:"group_ids,omitempty"`
+	Columns     []SpreadsheetCol  `json:"columns"`     // column definitions (order, name, width)
+	Data        map[string]string `json:"data"`         // cell ref → value, e.g. "A1":"=SUM(B1:B5)"
+	RowCount    int               `json:"row_count"`    // current number of rows
+	ColCount    int               `json:"col_count"`    // current number of columns
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
+// SpreadsheetCol defines a column in a spreadsheet
+type SpreadsheetCol struct {
+	Key    string `json:"key"`              // original letter key (A, B, ..., AA, AB)
+	Title  string `json:"title,omitempty"`  // custom name (empty = use key)
+	Width  int    `json:"width,omitempty"`  // pixel width (0 = default)
+}
+
 // ReportIngestConfig controls the incoming report interface
 type ReportIngestConfig struct {
 	Enabled bool `json:"enabled"`

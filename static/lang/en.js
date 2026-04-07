@@ -1287,6 +1287,23 @@ TRANSLATIONS.en = {
     report_archive_category:   'Category',
     report_archive_file:       'File',
     message_archive_delete_confirm: 'Delete this message?',
+
+    // Spreadsheet tool
+    ss_title:              'Spreadsheets',
+    ss_create:             'New Spreadsheet',
+    ss_desc:               'Create and manage spreadsheets with formulas, filters, and export.',
+    ss_empty:              'No spreadsheets yet. Create one to get started.',
+    ss_name_prompt:        'Spreadsheet name:',
+    ss_desc_prompt:        'Description (optional):',
+    ss_delete_confirm:     'Delete this spreadsheet?',
+    ss_cols:               'cols',
+    ss_rows:               'rows',
+    ss_search:             'Search...',
+    ss_add_row:            'Row',
+    ss_add_col:            'Col',
+    ss_saved:              'Spreadsheet saved',
+    ss_save_error:         'Failed to save',
+    ss_imported:           'Imported',
     boot_rate_limits:          'Rate limits',
 
     // Red line settings (i18n)
