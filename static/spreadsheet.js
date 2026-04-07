@@ -165,33 +165,39 @@ async function _openSpreadsheet(id) {
     gridEl.innerHTML = '<p style="padding:20px;color:var(--danger)">Jspreadsheet library not loaded.</p>';
     return;
   }
+
+  // v5 API uses worksheets array
   _ssState.instance = jspreadsheet(gridEl, {
-    data: data,
-    columns: columns,
-    minDimensions: [colCount, rowCount],
-    tableOverflow: true,
-    tableWidth: '100%',
-    tableHeight: '65vh',
-    allowInsertRow: true,
-    allowInsertColumn: true,
-    allowDeleteRow: true,
-    allowDeleteColumn: true,
-    allowRenameColumn: true,
-    columnSorting: true,
-    search: true,
-    wordWrap: true,
-    // Enable formula parser
-    parseFormulas: true,
+    worksheets: [{
+      data: data,
+      columns: columns,
+      minDimensions: [colCount, rowCount],
+      tableOverflow: true,
+      tableWidth: '100%',
+      tableHeight: '65vh',
+      allowInsertRow: true,
+      allowInsertColumn: true,
+      allowDeleteRow: true,
+      allowDeleteColumn: true,
+      allowRenameColumn: true,
+      columnSorting: true,
+      search: true,
+      wordWrap: true,
+      parseFormulas: true,
+    }]
   });
+
+  // Get the first worksheet for method calls
+  const ws = _ssState.instance[0];
 
   // Bind toolbar buttons
   document.getElementById('ssBackBtn')?.addEventListener('click', () => openSpreadsheetBoard());
   document.getElementById('ssSaveBtn')?.addEventListener('click', () => _saveSpreadsheet(ss));
   document.getElementById('ssAddRowBtn')?.addEventListener('click', () => {
-    if (_ssState.instance) _ssState.instance.insertRow();
+    if (ws) ws.insertRow();
   });
   document.getElementById('ssAddColBtn')?.addEventListener('click', () => {
-    if (_ssState.instance) _ssState.instance.insertColumn();
+    if (ws) ws.insertColumn();
   });
   document.getElementById('ssExportBtn')?.addEventListener('click', () => {
     const fmt = document.getElementById('ssExportFmt')?.value || 'csv';
@@ -233,8 +239,8 @@ async function _openSpreadsheet(id) {
 
   // Search
   document.getElementById('ssSearchInput')?.addEventListener('input', (e) => {
-    if (_ssState.instance && _ssState.instance.search) {
-      _ssState.instance.search(e.target.value);
+    if (ws && ws.search) {
+      ws.search(e.target.value);
     }
   });
 }
@@ -242,15 +248,16 @@ async function _openSpreadsheet(id) {
 // ── Save current spreadsheet state back to server ────────────────────────────
 
 async function _saveSpreadsheet(ss) {
-  if (!_ssState.instance) return;
-  const inst = _ssState.instance;
-  const data = inst.getData();
-  const headers = inst.getHeaders(true); // array of header strings
+  const ws = _ssState.instance ? _ssState.instance[0] : null;
+  if (!ws) return;
+  const data = ws.getData();
+  const headers = ws.getHeaders ? ws.getHeaders(true) : [];
 
   // Build sparse data map
   const cellData = {};
+  const numCols = headers.length || (data[0] ? data[0].length : 0);
   const colKeys = [];
-  for (let c = 0; c < headers.length; c++) {
+  for (let c = 0; c < numCols; c++) {
     colKeys.push(ss.columns[c]?.key || _colLetter(c));
   }
   for (let r = 0; r < data.length; r++) {
@@ -264,10 +271,11 @@ async function _saveSpreadsheet(ss) {
 
   // Build columns with custom titles
   const columns = [];
-  for (let c = 0; c < headers.length; c++) {
+  for (let c = 0; c < numCols; c++) {
     const key = ss.columns[c]?.key || _colLetter(c);
-    const title = headers[c] !== key ? headers[c] : '';
-    const width = inst.getWidth ? (parseInt(inst.getWidth(c)) || 100) : 100;
+    const hdr = headers[c] || key;
+    const title = hdr !== key ? hdr : '';
+    const width = ws.getWidth ? (parseInt(ws.getWidth(c)) || 100) : 100;
     columns.push({ key, title, width });
   }
 
