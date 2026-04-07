@@ -255,6 +255,8 @@ function closeModal(id) {
 // Focus trap: keep Tab within open modals
 document.addEventListener('keydown', e => {
   if (e.key !== 'Tab') return;
+  // Skip tab-trap when inside a spreadsheet
+  if (typeof _isInSpreadsheet === 'function' && _isInSpreadsheet(document.activeElement || e.target)) return;
   const openOverlays = [...document.querySelectorAll('.modal-overlay.open')];
   if (!openOverlays.length) return;
   const topModal = openOverlays[openOverlays.length - 1].querySelector('.modal');
