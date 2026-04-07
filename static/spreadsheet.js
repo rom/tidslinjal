@@ -154,18 +154,22 @@ async function _openSpreadsheet(id) {
     columns.push({ title: _colLetter(columns.length), width: 100 });
   }
 
-  // Build UI — two rows: top row has back/name + search/filter/export/import/save/detach/help
-  //                       second row has +Row, +Col
+  // Build UI — single toolbar row with all controls
   let html = `<div style="max-width:98vw;margin:0 auto" id="ssEditorRoot">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-sm" id="ssBackBtn">\u2190 ${t('btn_back')||'Back'}</button>
         <h3 style="margin:0" id="ssNameLabel">${escHtml(ss.name)}</h3>
         <span style="font-size:var(--fs-xs);color:var(--text-dim)" id="ssDimLabel">${colCount}\u00d7${rowCount}</span>
       </div>
-      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="ssSearchInput" placeholder="${t('ss_search')||'Search...'}" style="width:120px;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
-        <select id="ssExportFmt" style="padding:3px 4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="ssSearchInput" placeholder="${t('ss_search')||'Search...'}" style="width:110px;padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+        <button class="btn btn-sm" id="ssAddRowBtn" title="${t('ss_add_row_tip')||'Add a new row'}">+ ${t('ss_add_row')||'Row'}</button>
+        <button class="btn btn-sm" id="ssAddColBtn" title="${t('ss_add_col_tip')||'Add a new column'}">+ ${t('ss_add_col')||'Col'}</button>
+        <button class="btn btn-sm" id="ssFilterBtn">\uD83D\uDD0D ${t('ss_filter_btn')||'Filter'}</button>
+        <button class="btn btn-sm" id="ssClearFilterBtn" style="display:none">\u2716 ${t('ss_clear_filter')||'Clear'}</button>
+        <span style="color:var(--border)">|</span>
+        <select id="ssExportFmt" style="padding:2px 4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           <option value="csv">CSV</option><option value="xlsx">XLSX</option><option value="ods">ODS</option>
           <option value="json">JSON</option><option value="xml">XML</option><option value="rtf">RTF</option><option value="pdf">PDF</option>
         </select>
@@ -176,12 +180,6 @@ async function _openSpreadsheet(id) {
         <button class="btn btn-sm" id="ssDetachSheetBtn" title="${t('btn_detach')||'Detach to window'}">\u29C9</button>
         <button class="btn btn-sm" id="ssHelpBtn" title="${t('btn_help')||'Help'}">\u2753</button>
       </div>
-    </div>
-    <div style="display:flex;gap:5px;align-items:center;margin-bottom:8px">
-      <button class="btn btn-sm" id="ssAddRowBtn">+ ${t('ss_add_row')||'Row'}</button>
-      <button class="btn btn-sm" id="ssAddColBtn">+ ${t('ss_add_col')||'Col'}</button>
-      <button class="btn btn-sm" id="ssFilterBtn">\uD83D\uDD0D ${t('ss_filter')||'Filter'}</button>
-      <button class="btn btn-sm" id="ssClearFilterBtn" style="display:none">\u2716 ${t('ss_clear_filter')||'Clear Filter'}</button>
     </div>
     <div id="ssGrid" style="overflow:auto;max-height:70vh;border:1px solid var(--border);border-radius:var(--radius)"></div>
     <input type="file" id="ssImportFile" style="display:none" accept=".csv,.json,.xml,.xlsx,.ods">
@@ -303,42 +301,76 @@ async function _openSpreadsheet(id) {
     if (w && typeof w.search === 'function') w.search(e.target.value);
   });
 
-  // Filter — prompt for column and value
-  let _ssFilterActive = false;
+  // Filter — popup dialog
   doc.getElementById('ssFilterBtn')?.addEventListener('click', () => {
-    const col = prompt(t('ss_filter_col_prompt')||'Filter column (e.g. A, B, C):');
-    if (!col) return;
-    const val = prompt(t('ss_filter_val_prompt')||'Filter value (show rows containing):');
-    if (val === null) return;
-    _applyColumnFilter(col.toUpperCase(), val);
-    _ssFilterActive = true;
-    const clearBtn = doc.getElementById('ssClearFilterBtn');
-    if (clearBtn) clearBtn.style.display = '';
+    const colOpts = (ss.columns||[]).map((c,i) => '<option value="'+escHtml(c.key||_colLetter(i))+'">'+(c.title||c.key||_colLetter(i))+'</option>').join('');
+    const overlay = doc.createElement('div');
+    overlay.className = 'modal-overlay open';
+    overlay.innerHTML = '<div class="modal" style="max-width:380px;padding:20px">' +
+      '<h3>\uD83D\uDD0D '+(t('ss_filter_title')||'Filter Spreadsheet')+'</h3>' +
+      '<div style="margin-bottom:10px"><label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">'+(t('ss_filter_column')||'Column')+'</label>' +
+      '<select id="ssFilterCol" class="input" style="width:100%;font-size:var(--fs-xs)">'+colOpts+'</select></div>' +
+      '<div style="margin-bottom:10px"><label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">'+(t('ss_filter_match')||'Match type')+'</label>' +
+      '<select id="ssFilterMatch" class="input" style="width:100%;font-size:var(--fs-xs)">' +
+      '<option value="contains">'+(t('ss_filter_contains')||'Contains')+'</option>' +
+      '<option value="equals">'+(t('ss_filter_equals')||'Equals')+'</option>' +
+      '<option value="starts">'+(t('ss_filter_starts')||'Starts with')+'</option>' +
+      '<option value="ends">'+(t('ss_filter_ends')||'Ends with')+'</option>' +
+      '<option value="gt">'+(t('ss_filter_gt')||'Greater than')+'</option>' +
+      '<option value="lt">'+(t('ss_filter_lt')||'Less than')+'</option>' +
+      '<option value="empty">'+(t('ss_filter_empty')||'Is empty')+'</option>' +
+      '<option value="notempty">'+(t('ss_filter_notempty')||'Is not empty')+'</option>' +
+      '</select></div>' +
+      '<div style="margin-bottom:12px"><label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">'+(t('ss_filter_value')||'Value')+'</label>' +
+      '<input id="ssFilterVal" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="'+(t('ss_filter_value_ph')||'Filter value...')+'"></div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-primary btn-sm" id="ssFilterApplyBtn">\u2714 '+(t('ss_filter_apply')||'Apply')+'</button>' +
+      '<button class="btn btn-secondary btn-sm" id="ssFilterCancelBtn">'+(t('btn_cancel')||'Cancel')+'</button></div></div>';
+    doc.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector('#ssFilterCancelBtn').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('#ssFilterApplyBtn').addEventListener('click', () => {
+      const col = overlay.querySelector('#ssFilterCol').value;
+      const match = overlay.querySelector('#ssFilterMatch').value;
+      const val = overlay.querySelector('#ssFilterVal').value;
+      overlay.remove();
+      _applyColumnFilter(col, val, match);
+      const clearBtn = doc.getElementById('ssClearFilterBtn');
+      if (clearBtn) clearBtn.style.display = '';
+    });
   });
   doc.getElementById('ssClearFilterBtn')?.addEventListener('click', () => {
     _clearColumnFilter();
-    _ssFilterActive = false;
     const clearBtn = doc.getElementById('ssClearFilterBtn');
     if (clearBtn) clearBtn.style.display = 'none';
   });
 
-  function _applyColumnFilter(colLetter, filterVal) {
-    const w = _ws();
-    if (!w) return;
-    // Find column index from letter
+  function _applyColumnFilter(colLetter, filterVal, matchType) {
     let colIdx = -1;
     for (let c = 0; c < (ss.columns || []).length; c++) {
       if ((ss.columns[c]?.key || _colLetter(c)) === colLetter) { colIdx = c; break; }
     }
     if (colIdx < 0) { showError('Column ' + colLetter + ' not found'); return; }
-    // Hide rows that don't match
     const rows = gridEl.querySelectorAll('tbody tr');
-    const lowerVal = filterVal.toLowerCase();
-    rows.forEach((tr, ri) => {
+    const lv = (filterVal||'').toLowerCase();
+    rows.forEach(tr => {
       const cells = tr.querySelectorAll('td');
       const cell = cells[colIdx + 1]; // +1 for row header
-      const text = cell ? (cell.textContent || '').toLowerCase() : '';
-      tr.style.display = (filterVal === '' || text.includes(lowerVal)) ? '' : 'none';
+      const text = cell ? (cell.textContent || '') : '';
+      const lt = text.toLowerCase();
+      let show = true;
+      switch (matchType) {
+        case 'contains': show = lt.includes(lv); break;
+        case 'equals':   show = lt === lv; break;
+        case 'starts':   show = lt.startsWith(lv); break;
+        case 'ends':     show = lt.endsWith(lv); break;
+        case 'gt':       show = parseFloat(text) > parseFloat(filterVal); break;
+        case 'lt':       show = parseFloat(text) < parseFloat(filterVal); break;
+        case 'empty':    show = text.trim() === ''; break;
+        case 'notempty': show = text.trim() !== ''; break;
+        default:         show = lt.includes(lv); break;
+      }
+      tr.style.display = show ? '' : 'none';
     });
   }
 
@@ -438,6 +470,98 @@ async function _saveSpreadsheet(ss) {
   }
 }
 
+// ── Formula help table ────────────────────────────────────────────────────────
+
+function _ssFormulaHelpTable() {
+  const R = (f,ex,d) => '<tr><td style="padding:3px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:10px"><code>'+f+'</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border);font-size:10px">'+ex+'</td><td style="padding:3px 8px;border-bottom:1px solid var(--border);font-size:10px">'+d+'</td></tr>';
+  const H = (cat) => '<tr><td colspan="3" style="padding:6px 8px;font-weight:700;background:var(--bg3);font-size:11px">'+cat+'</td></tr>';
+  return '<table style="font-size:var(--fs-xs);width:100%;border-collapse:collapse;margin-bottom:12px">' +
+    '<tr style="background:var(--bg3)"><th style="padding:4px 8px;text-align:left">Formula</th><th style="padding:4px 8px;text-align:left">Example</th><th style="padding:4px 8px;text-align:left">Description</th></tr>' +
+    H('Arithmetic') +
+    R('=A1+B1','=A1+B1','Addition') +
+    R('=A1-B1','=A1-B1','Subtraction') +
+    R('=A1*B1','=A1*B1','Multiplication') +
+    R('=A1/B1','=A1/B1','Division') +
+    H('Math & Statistics') +
+    R('SUM(range)','=SUM(A1:A10)','Sum of values') +
+    R('AVERAGE(range)','=AVERAGE(A1:A10)','Average of values') +
+    R('MIN(range)','=MIN(A1:A10)','Smallest value') +
+    R('MAX(range)','=MAX(A1:A10)','Largest value') +
+    R('COUNT(range)','=COUNT(A1:A10)','Count numbers') +
+    R('COUNTA(range)','=COUNTA(A1:A10)','Count non-empty cells') +
+    R('MEDIAN(range)','=MEDIAN(A1:A10)','Middle value') +
+    R('STDEV(range)','=STDEV(A1:A10)','Standard deviation') +
+    R('VAR(range)','=VAR(A1:A10)','Variance') +
+    R('PRODUCT(range)','=PRODUCT(A1:A5)','Multiply all values') +
+    R('ABS(n)','=ABS(A1)','Absolute value') +
+    R('SQRT(n)','=SQRT(A1)','Square root') +
+    R('POWER(base,exp)','=POWER(2,8)','Exponentiation') +
+    R('ROUND(n,d)','=ROUND(A1,2)','Round to d decimals') +
+    R('ROUNDUP(n,d)','=ROUNDUP(A1,2)','Round up') +
+    R('ROUNDDOWN(n,d)','=ROUNDDOWN(A1,2)','Round down') +
+    R('INT(n)','=INT(3.7)','Integer part (floor)') +
+    R('MOD(n,div)','=MOD(10,3)','Remainder') +
+    R('CEILING(n,sig)','=CEILING(2.3,1)','Round up to significance') +
+    R('FLOOR(n,sig)','=FLOOR(2.7,1)','Round down to significance') +
+    R('LOG(n[,base])','=LOG(100,10)','Logarithm') +
+    R('LOG10(n)','=LOG10(1000)','Base-10 logarithm') +
+    R('EXP(n)','=EXP(1)','e raised to power') +
+    R('SIGN(n)','=SIGN(-5)','Sign: -1, 0, or 1') +
+    R('PI()','=PI()','3.14159...') +
+    R('RAND()','=RAND()','Random 0\u20131') +
+    R('LARGE(range,k)','=LARGE(A1:A10,2)','k-th largest value') +
+    R('SMALL(range,k)','=SMALL(A1:A10,2)','k-th smallest value') +
+    H('Conditional & Logic') +
+    R('IF(cond,t,f)','=IF(A1>10,"High","Low")','If/then/else') +
+    R('AND(a,b,...)','=AND(A1>0,B1>0)','All conditions true') +
+    R('OR(a,b,...)','=OR(A1>0,B1>0)','Any condition true') +
+    R('NOT(v)','=NOT(A1>10)','Negate boolean') +
+    R('IFERROR(v,fallback)','=IFERROR(A1/B1,0)','Fallback on error') +
+    R('ISBLANK(v)','=ISBLANK(A1)','Test if empty') +
+    R('ISNUMBER(v)','=ISNUMBER(A1)','Test if numeric') +
+    H('Conditional Aggregation') +
+    R('SUMIF(range,crit)','=SUMIF(A1:A10,">5")','Sum matching criteria') +
+    R('COUNTIF(range,crit)','=COUNTIF(A1:A10,">0")','Count matching criteria') +
+    R('AVERAGEIF(range,crit)','=AVERAGEIF(A1:A10,">=10")','Average matching criteria') +
+    H('Text & String') +
+    R('CONCAT(a,b,...)','=CONCAT(A1," ",B1)','Join text') +
+    R('LEFT(text,n)','=LEFT(A1,3)','First N characters') +
+    R('RIGHT(text,n)','=RIGHT(A1,3)','Last N characters') +
+    R('MID(text,start,len)','=MID(A1,2,3)','Substring') +
+    R('LEN(text)','=LEN(A1)','Text length') +
+    R('UPPER(text)','=UPPER(A1)','Uppercase') +
+    R('LOWER(text)','=LOWER(A1)','Lowercase') +
+    R('PROPER(text)','=PROPER(A1)','Title Case') +
+    R('TRIM(text)','=TRIM(A1)','Remove whitespace') +
+    R('SUBSTITUTE(t,old,new)','=SUBSTITUTE(A1,"x","y")','Replace text') +
+    R('REPT(text,n)','=REPT("*",5)','Repeat text') +
+    R('FIND(needle,hay)','=FIND("x",A1)','Find position (case-sensitive)') +
+    R('SEARCH(needle,hay)','=SEARCH("x",A1)','Find position (case-insensitive)') +
+    R('REPLACE(t,pos,len,new)','=REPLACE(A1,2,3,"xyz")','Replace by position') +
+    R('VALUE(text)','=VALUE("42")','Text to number') +
+    R('TEXT(v)','=TEXT(A1)','Value to text') +
+    R('CHAR(n)','=CHAR(65)','Number to character') +
+    R('CODE(text)','=CODE("A")','Character to number') +
+    R('EXACT(a,b)','=EXACT(A1,B1)','Case-sensitive compare') +
+    H('Date & Time') +
+    R('TODAY()','=TODAY()','Current date') +
+    R('NOW()','=NOW()','Current date+time') +
+    R('DATE(y,m,d)','=DATE(2026,4,7)','Create date') +
+    R('YEAR(date)','=YEAR(A1)','Extract year') +
+    R('MONTH(date)','=MONTH(A1)','Extract month') +
+    R('DAY(date)','=DAY(A1)','Extract day') +
+    R('HOUR(dt)','=HOUR(A1)','Extract hour') +
+    R('MINUTE(dt)','=MINUTE(A1)','Extract minute') +
+    R('SECOND(dt)','=SECOND(A1)','Extract second') +
+    R('WEEKDAY(date)','=WEEKDAY(A1)','Day of week (1=Sun)') +
+    R('DAYS(end,start)','=DAYS(B1,A1)','Days between dates') +
+    H('Reference & Utility') +
+    R('CHOOSE(idx,a,b,...)','=CHOOSE(2,"a","b","c")','Pick by index') +
+    R('TYPE(v)','=TYPE(A1)','1=num, 2=text, 4=bool') +
+    R('N(v)','=N(A1)','Convert to number') +
+    '</table>';
+}
+
 // ── Help ─────────────────────────────────────────────────────────────────────
 
 function _ssShowHelp() {
@@ -455,27 +579,8 @@ function _ssShowHelp() {
     </ul>
 
     <h4>${t('ss_help_formulas')||'Formulas'}</h4>
-    <p style="font-size:var(--fs-xs);margin-bottom:6px">${t('ss_help_formula_intro')||'Start a cell with <b>=</b> to enter a formula. Cell references use column letter + row number (e.g. A1, B3). Ranges use colon notation (e.g. A1:A10).'}</p>
-    <table style="font-size:var(--fs-xs);width:100%;border-collapse:collapse;margin-bottom:12px">
-      <tr style="background:var(--bg3)"><th style="padding:4px 8px;text-align:left">Formula</th><th style="padding:4px 8px;text-align:left">${t('ss_help_example')||'Example'}</th><th style="padding:4px 8px;text-align:left">${t('ss_help_description')||'Description'}</th></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=A1+B1</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Addition</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Add two cells</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=A1-B1</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Subtraction</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Subtract</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=A1*B1</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Multiplication</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Multiply</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=A1/B1</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Division</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Divide</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=SUM(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Sum range</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Sum of cells in range</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=AVERAGE(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Average</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Average of range</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=MIN(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Minimum</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Smallest value</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=MAX(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Maximum</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Largest value</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=COUNT(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Count numbers</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Count numeric cells</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=COUNTA(A1:A10)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Count non-empty</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Count non-empty cells</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=IF(A1>10,"High","Low")</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Conditional</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">If/then/else</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=TODAY()</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Today</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Current date</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=NOW()</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Now</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Current date+time</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=CONCAT(A1,B1)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Concatenate</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Join text</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=LEFT(A1,3)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Left</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">First N characters</td></tr>
-      <tr><td style="padding:3px 8px;border-bottom:1px solid var(--border)"><code>=RIGHT(A1,3)</code></td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Right</td><td style="padding:3px 8px;border-bottom:1px solid var(--border)">Last N characters</td></tr>
-      <tr><td style="padding:3px 8px"><code>=LEN(A1)</code></td><td style="padding:3px 8px">Length</td><td style="padding:3px 8px">Text length</td></tr>
-    </table>
+    <p style="font-size:var(--fs-xs);margin-bottom:6px">${t('ss_help_formula_intro')||'Start a cell with <b>=</b> to enter a formula. Cell references use column letter + row number (e.g. A1, B3). Ranges use colon notation (e.g. A1:A10). All function names are case-insensitive.'}</p>
+    ` + _ssFormulaHelpTable() + `
 
     <h4>${t('ss_help_export_title')||'Export & Import'}</h4>
     <p style="font-size:var(--fs-xs);margin-bottom:6px">${t('ss_help_export_desc')||'Export supports CSV, XLSX, ODS, JSON, XML, RTF, and PDF. Import supports CSV and JSON. Use the dropdown to select format before clicking Export.'}</p>
@@ -543,20 +648,24 @@ function _ssDetachWindow(title, onReady) {
     if (root) root.innerHTML = content;
   };
 
-  // jspreadsheet needs to be called with the child window's element, so load it in child
-  const jsuitesScript = w.document.createElement('script');
-  jsuitesScript.src = '/static/vendor/jsuites.min.js';
-  jsuitesScript.onload = () => {
-    const jssScript = w.document.createElement('script');
-    jssScript.src = '/static/vendor/jspreadsheet.min.js';
-    jssScript.onload = () => {
-      // Use the child window's jspreadsheet so it creates elements in the right document
-      jspreadsheet = w.jspreadsheet;
-      onReady(w);
+  // Load scripts in child window: formula engine → jsuites → jspreadsheet
+  const formulaScript = w.document.createElement('script');
+  formulaScript.src = '/static/spreadsheet-formulas.js';
+  formulaScript.onload = () => {
+    const jsuitesScript = w.document.createElement('script');
+    jsuitesScript.src = '/static/vendor/jsuites.min.js';
+    jsuitesScript.onload = () => {
+      const jssScript = w.document.createElement('script');
+      jssScript.src = '/static/vendor/jspreadsheet.min.js';
+      jssScript.onload = () => {
+        jspreadsheet = w.jspreadsheet;
+        onReady(w);
+      };
+      w.document.head.appendChild(jssScript);
     };
-    w.document.head.appendChild(jssScript);
+    w.document.head.appendChild(jsuitesScript);
   };
-  w.document.head.appendChild(jsuitesScript);
+  w.document.head.appendChild(formulaScript);
 
   // Restore parent context when child closes
   w.addEventListener('beforeunload', () => {
