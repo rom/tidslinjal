@@ -200,29 +200,45 @@ type ExternalEventParams struct {
 }
 
 // createExternalEvent creates or updates a calendar event of type "external_event" on the External Events layer.
-// If ExternalID is provided and an event with that ID already exists, it updates the end_time (for interval tracking).
+// If ExternalID is provided and an event with that ID already exists, it updates the event content.
 func (app *App) createExternalEvent(p ExternalEventParams) {
 	// Check if this is an update to an existing event (same external_id)
 	if p.ExternalID != "" {
 		existing := app.store.GetEventByExternalID(p.ExternalID)
 		if existing != nil {
-			// Update: set end_time to now (or the provided end_time)
-			endTime := time.Now()
-			if p.EndTime != nil {
-				endTime = *p.EndTime
+			// Update content from the new message
+			if p.Subject != "" {
+				existing.Title = p.Subject
 			}
-			existing.EndTime = &endTime
+			// Rebuild description with integration details
+			desc := p.Body
+			desc += fmt.Sprintf("\n\n--- Integration Details ---\nSender: %s\nAPI Key: %s\nSource IP: %s", p.Sender, p.KeyName, p.FromIP)
+			if len(p.Tags) > 0 {
+				desc += fmt.Sprintf("\nTags: %s", strings.Join(p.Tags, ", "))
+			}
+			desc += fmt.Sprintf("\nLast updated: %s", time.Now().Format(time.RFC3339))
+			existing.Description = stripHTMLTags(desc)
+			if p.StartTime != nil {
+				existing.StartTime = *p.StartTime
+			}
+			if p.EndTime != nil {
+				existing.EndTime = p.EndTime
+			} else {
+				// Default: set end_time to now (interval close pattern)
+				endTime := time.Now()
+				existing.EndTime = &endTime
+			}
 			existing.UpdatedAt = time.Now()
 			if err := app.store.UpdateEvent(*existing); err != nil {
 				logError("createExternalEvent: failed to update event id=%d: %v", existing.ID, err)
 				return
 			}
-			logDebug("createExternalEvent: updated event id=%d external_id=%q end_time=%v", existing.ID, p.ExternalID, endTime)
+			logDebug("createExternalEvent: updated event id=%d external_id=%q title=%q", existing.ID, p.ExternalID, existing.Title)
 			app.eventBus.Publish(EventBusMessage{Action: ActionUpdated, Event: existing})
 			app.broadcastEventChange(0, "updated", existing)
 			app.store.AddEventLogEntry(EventLogEntry{
 				Source:  "external_event",
-				Message: fmt.Sprintf("Updated external event #%d %q (end_time set, sender: %s, key: %s, IP: %s)", existing.ID, p.Subject, p.Sender, p.KeyName, p.FromIP),
+				Message: fmt.Sprintf("Updated external event #%d %q (sender: %s, key: %s, IP: %s)", existing.ID, existing.Title, p.Sender, p.KeyName, p.FromIP),
 				Summary: "updated",
 			})
 			app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"event_log"}`})
