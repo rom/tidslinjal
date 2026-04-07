@@ -238,6 +238,24 @@ async function _openSpreadsheet(id) {
         <button class="btn btn-sm" id="ssAddColBtn" title="${t('ss_add_col_tip')||'Add a new column'}">+ ${t('ss_add_col')||'Col'}</button>
         <button class="btn btn-sm" id="ssFilterBtn">\uD83D\uDD0D ${t('ss_filter_btn')||'Filter'}</button>
         <button class="btn btn-sm" id="ssClearFilterBtn" style="display:none">\u2716 ${t('ss_clear_filter')||'Clear'}</button>
+        <select id="ssFuncMenu" title="${t('ss_func_menu_tip')||'Apply formula to selected cells'}" style="padding:2px 4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          <option value="">\u0192x ${t('ss_func_menu')||'Function...'}</option>
+          <optgroup label="${t('ss_func_math')||'Math'}">
+            <option value="SUM">SUM</option><option value="AVERAGE">AVERAGE</option>
+            <option value="MIN">MIN</option><option value="MAX">MAX</option>
+            <option value="COUNT">COUNT</option><option value="COUNTA">COUNTA</option>
+            <option value="MEDIAN">MEDIAN</option><option value="PRODUCT">PRODUCT</option>
+            <option value="STDEV">STDEV</option><option value="VAR">VAR</option>
+          </optgroup>
+          <optgroup label="${t('ss_func_cond')||'Conditional'}">
+            <option value="SUMIF">SUMIF</option><option value="COUNTIF">COUNTIF</option>
+            <option value="AVERAGEIF">AVERAGEIF</option>
+          </optgroup>
+          <optgroup label="${t('ss_func_text')||'Text'}">
+            <option value="CONCAT">CONCAT</option><option value="LEN">LEN</option>
+            <option value="UPPER">UPPER</option><option value="LOWER">LOWER</option>
+          </optgroup>
+        </select>
         <span style="color:var(--border)">|</span>
         <select id="ssExportFmt" style="padding:2px 4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           <option value="csv">CSV</option><option value="xlsx">XLSX</option><option value="ods">ODS</option>
@@ -327,6 +345,50 @@ async function _openSpreadsheet(id) {
     const w = _ws();
     if (w && typeof w.insertColumn === 'function') { w.insertColumn(); _updateDimLabel(); }
     else console.warn('[spreadsheet] insertColumn not available. ws:', w);
+  });
+  // Function menu — apply formula to selected cells
+  doc.getElementById('ssFuncMenu')?.addEventListener('change', (e) => {
+    const funcName = e.target.value;
+    e.target.value = ''; // reset dropdown
+    if (!funcName) return;
+    const w = _ws();
+    if (!w) { showError('No active worksheet'); return; }
+    // Get selected cells from jspreadsheet
+    const sel = w.selectedCell;
+    if (!sel || !sel.length) { showError(t('ss_func_no_selection')||'Select cells first, then choose a function'); return; }
+    // sel is [startCol, startRow, endCol, endRow]
+    const c1 = sel[0], r1 = sel[1], c2 = sel[2], r2 = sel[3];
+    // Build the cell range string (e.g. "A1:A5")
+    const startRef = _colLetter(c1) + (r1 + 1);
+    const endRef = _colLetter(c2) + (r2 + 1);
+    const rangeStr = (startRef === endRef) ? startRef : startRef + ':' + endRef;
+    const formula = '=' + funcName + '(' + rangeStr + ')';
+    // Place result in the cell just below the selection (same column as end)
+    const targetRow = r2 + 1;
+    const targetCol = c2;
+    // Expand grid if needed
+    try {
+      const data = w.getData();
+      while (data.length <= targetRow) {
+        if (typeof w.insertRow === 'function') w.insertRow();
+        else break;
+      }
+    } catch {}
+    // Set the formula in the target cell
+    try {
+      w.setValue(w.records[targetRow][targetCol].element, formula);
+      _updateDimLabel();
+      showNotification('success', formula + ' \u2192 ' + _colLetter(targetCol) + (targetRow + 1));
+    } catch (err) {
+      // Fallback: try setValueFromCoords
+      try {
+        w.setValueFromCoords(targetCol, targetRow, formula);
+        _updateDimLabel();
+        showNotification('success', formula + ' \u2192 ' + _colLetter(targetCol) + (targetRow + 1));
+      } catch (err2) {
+        showError('Could not apply formula: ' + err2.message);
+      }
+    }
   });
   doc.getElementById('ssExportBtn')?.addEventListener('click', () => {
     const fmt = doc.getElementById('ssExportFmt')?.value || 'csv';

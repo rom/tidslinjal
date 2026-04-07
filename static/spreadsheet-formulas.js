@@ -130,19 +130,34 @@ function _matchCrit(val, crit) {
 // a map of cell references to values, and coordinates.
 
 function formulaEngine(expression, variables, x, y, instance) {
-  // Replace cell references with their values (already done by jspreadsheet,
-  // but function calls like SUM(...) need to be resolved)
   let expr = expression;
+
+  // Substitute cell references with their resolved values from the variables map.
+  // jspreadsheet passes variables as { "A1": value, "B2": value, ... }
+  if (variables && typeof variables === 'object') {
+    // Sort keys by length descending so "AA1" is replaced before "A1"
+    const keys = Object.keys(variables).sort((a,b) => b.length - a.length);
+    for (const ref of keys) {
+      if (variables[ref] === null || variables[ref] === undefined) continue;
+      const val = variables[ref];
+      // Escape the ref for use in regex (letters + digits)
+      const re = new RegExp('\\b' + ref + '\\b', 'g');
+      if (typeof val === 'string' && isNaN(val)) {
+        expr = expr.replace(re, JSON.stringify(val));
+      } else {
+        expr = expr.replace(re, String(val));
+      }
+    }
+  }
 
   // Replace function calls with F.FUNCNAME calls (case-insensitive)
   expr = expr.replace(/([A-Z_][A-Z0-9_]*)\s*\(/gi, function(match, name) {
     const upper = name.toUpperCase();
     if (F[upper]) return 'F.' + upper + '(';
-    return match; // leave unknown functions as-is
+    return match;
   });
 
   try {
-    // Use Function constructor with F in scope (avoids global eval)
     const fn = new Function('F', 'return (' + expr + ')');
     return fn(F);
   } catch (e) {
