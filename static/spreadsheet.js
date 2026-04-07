@@ -103,19 +103,85 @@ function _renderSpreadsheetSelector() {
 // ── Create Dialog ────────────────────────────────────────────────────────────
 
 function _createSpreadsheetDialog() {
-  const name = prompt(t('ss_name_prompt')||'Spreadsheet name:');
-  if (!name) return;
-  const desc = prompt(t('ss_desc_prompt')||'Description (optional):') || '';
-  apiPost('/api/spreadsheets', { name, description: desc, visibility: 'public', row_count: 50, col_count: 26 })
-    .then(async res => {
-      if (res.ok) {
-        const ss = await res.json();
-        _openSpreadsheet(ss.id);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        showError(err.error || 'Failed to create');
-      }
-    });
+  _ssShowSettingsDialog(null, async (data) => {
+    const res = await apiPost('/api/spreadsheets', { ...data, row_count: 50, col_count: 26 });
+    if (res.ok) {
+      const ss = await res.json();
+      _openSpreadsheet(ss.id);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to create');
+    }
+  });
+}
+
+function _ssEditSettingsDialog(ss) {
+  _ssShowSettingsDialog(ss, async (data) => {
+    const res = await apiPut('/api/spreadsheets/' + ss.id, { ...ss, ...data });
+    if (res.ok) {
+      showNotification('success', t('ss_settings_saved')||'Settings saved');
+      _openSpreadsheet(ss.id);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to update');
+    }
+  });
+}
+
+function _ssShowSettingsDialog(existing, onSave) {
+  const isEdit = !!existing;
+  const doc = _ssDoc();
+  const groups = state.groups || [];
+  const overlay = doc.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.innerHTML = `<div class="modal" style="max-width:440px;padding:20px">
+    <h3>${isEdit ? (t('ss_edit_settings')||'Spreadsheet Settings') : (t('ss_create')||'New Spreadsheet')}</h3>
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('ss_name_label')||'Name'}</label>
+      <input id="ssDlgName" class="input" style="width:100%;font-size:var(--fs-sm)" value="${escHtml(existing?.name||'')}" placeholder="${t('ss_name_ph')||'Spreadsheet name'}">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('description')||'Description'}</label>
+      <textarea id="ssDlgDesc" class="input" style="width:100%;font-size:var(--fs-xs);resize:vertical" rows="2" placeholder="${t('ss_desc_ph')||'Optional description'}">${escHtml(existing?.description||'')}</textarea>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('ss_access')||'Access'}</label>
+      <select id="ssDlgVis" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="private" ${existing?.visibility==='private'?'selected':''}>${t('ss_access_private')||'Private (only me)'}</option>
+        <option value="group" ${existing?.visibility==='group'?'selected':''}>${t('ss_access_group')||'Group members'}</option>
+        <option value="public" ${!existing||existing?.visibility==='public'?'selected':''}>${t('ss_access_public')||'Public (everyone)'}</option>
+      </select>
+    </div>
+    <div id="ssDlgGroupDiv" style="margin-bottom:12px;display:${existing?.visibility==='group'?'':'none'}">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">${t('ss_access_groups')||'Groups'}</label>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${groups.map(g => `<label style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs);cursor:pointer"><input type="checkbox" class="ssDlgGroup" value="${g.id}" ${(existing?.group_ids||[]).includes(g.id)?'checked':''} style="accent-color:var(--accent)">${escHtml(g.name)}</label>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" id="ssDlgSaveBtn">${isEdit ? (t('btn_save')||'Save') : (t('ss_create')||'Create')}</button>
+      <button class="btn btn-secondary btn-sm" id="ssDlgCancelBtn">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  doc.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#ssDlgCancelBtn').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#ssDlgVis').addEventListener('change', (e) => {
+    overlay.querySelector('#ssDlgGroupDiv').style.display = e.target.value === 'group' ? '' : 'none';
+  });
+  overlay.querySelector('#ssDlgSaveBtn').addEventListener('click', () => {
+    const name = overlay.querySelector('#ssDlgName').value.trim();
+    if (!name) { showError(t('ss_name_required')||'Name is required'); return; }
+    const groupIds = [...overlay.querySelectorAll('.ssDlgGroup:checked')].map(cb => parseInt(cb.value));
+    const data = {
+      name,
+      description: overlay.querySelector('#ssDlgDesc').value.trim(),
+      visibility: overlay.querySelector('#ssDlgVis').value,
+      group_ids: groupIds,
+    };
+    overlay.remove();
+    onSave(data);
+  });
 }
 
 // ── Open a Spreadsheet ───────────────────────────────────────────────────────
@@ -172,12 +238,14 @@ async function _openSpreadsheet(id) {
         <select id="ssExportFmt" style="padding:2px 4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           <option value="csv">CSV</option><option value="xlsx">XLSX</option><option value="ods">ODS</option>
           <option value="json">JSON</option><option value="xml">XML</option><option value="rtf">RTF</option><option value="pdf">PDF</option>
+          <option value="txt">Text</option><option value="md">Markdown</option>
         </select>
         <button class="btn btn-sm" id="ssExportBtn">\u2B07 ${t('btn_export')||'Export'}</button>
         <button class="btn btn-sm" id="ssImportBtn">\u2B06 ${t('btn_import')||'Import'}</button>
         <button class="btn btn-sm" id="ssPrintBtn">\uD83D\uDDA8 ${t('btn_print')||'Print'}</button>
         <button class="btn btn-sm" id="ssSaveBtn" style="font-weight:700">\uD83D\uDCBE ${t('btn_save')||'Save'}</button>
         <button class="btn btn-sm" id="ssDetachSheetBtn" title="${t('btn_detach')||'Detach to window'}">\u29C9</button>
+        <button class="btn btn-sm" id="ssSettingsBtn" title="${t('ss_settings')||'Settings'}">\u2699</button>
         <button class="btn btn-sm" id="ssHelpBtn" title="${t('btn_help')||'Help'}">\u2753</button>
       </div>
     </div>
@@ -394,6 +462,7 @@ async function _openSpreadsheet(id) {
   doc.getElementById('ssDetachSheetBtn')?.addEventListener('click', () => _detachSingleSpreadsheet(id, ss.name));
 
   // Help modal
+  doc.getElementById('ssSettingsBtn')?.addEventListener('click', () => _ssEditSettingsDialog(ss));
   doc.getElementById('ssHelpBtn')?.addEventListener('click', _ssShowHelp);
 }
 

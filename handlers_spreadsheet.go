@@ -354,8 +354,18 @@ func (app *App) handleExportSpreadsheet(w http.ResponseWriter, r *http.Request, 
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, ss.Name))
 		w.Write(ssPDF(ss.Name, headers, grid))
 
+	case "text", "txt":
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.txt"`, ss.Name))
+		w.Write([]byte(ssPlainText(ss.Name, headers, grid)))
+
+	case "markdown", "md":
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.md"`, ss.Name))
+		w.Write([]byte(ssMarkdown(ss.Name, headers, grid)))
+
 	default:
-		jsonError(w, "unsupported format (csv, json, xml, xlsx, ods, rtf, pdf)", http.StatusBadRequest)
+		jsonError(w, "unsupported format", http.StatusBadRequest)
 	}
 }
 
@@ -622,6 +632,103 @@ func ssRTF(name string, headers []string, grid [][]string) string {
 // rtfEsc is in handlers_diary.go — use that one
 
 // ── PDF export (minimal valid PDF with table) ─────────────────────────────────
+
+// ── Plain text export ─────────────────────────────────────────────────────────
+
+func ssPlainText(name string, headers []string, grid [][]string) string {
+	var sb strings.Builder
+	sb.WriteString(name + "\n")
+	sb.WriteString(strings.Repeat("=", len(name)) + "\n\n")
+	// Calculate column widths
+	widths := make([]int, len(headers))
+	for i, h := range headers {
+		widths[i] = len(h)
+	}
+	for _, row := range grid {
+		for i, val := range row {
+			if i < len(widths) && len(val) > widths[i] {
+				widths[i] = len(val)
+			}
+		}
+	}
+	// Cap widths
+	for i := range widths {
+		if widths[i] > 30 {
+			widths[i] = 30
+		}
+		if widths[i] < 3 {
+			widths[i] = 3
+		}
+	}
+	// Header
+	for i, h := range headers {
+		sb.WriteString(fmt.Sprintf("%-*s", widths[i]+2, h))
+	}
+	sb.WriteString("\n")
+	for i := range headers {
+		sb.WriteString(strings.Repeat("-", widths[i]) + "  ")
+	}
+	sb.WriteString("\n")
+	// Rows
+	for _, row := range grid {
+		hasData := false
+		for _, v := range row {
+			if v != "" {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			continue
+		}
+		for i, val := range row {
+			if i < len(widths) {
+				if len(val) > widths[i] {
+					val = val[:widths[i]-1] + "\u2026"
+				}
+				sb.WriteString(fmt.Sprintf("%-*s", widths[i]+2, val))
+			}
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// ── Markdown export ───────────────────────────────────────────────────────────
+
+func ssMarkdown(name string, headers []string, grid [][]string) string {
+	var sb strings.Builder
+	sb.WriteString("# " + name + "\n\n")
+	// Header row
+	sb.WriteString("|")
+	for _, h := range headers {
+		sb.WriteString(" " + h + " |")
+	}
+	sb.WriteString("\n|")
+	for range headers {
+		sb.WriteString("---|")
+	}
+	sb.WriteString("\n")
+	// Data rows
+	for _, row := range grid {
+		hasData := false
+		for _, v := range row {
+			if v != "" {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			continue
+		}
+		sb.WriteString("|")
+		for _, val := range row {
+			sb.WriteString(" " + val + " |")
+		}
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
 
 func ssPDF(name string, headers []string, grid [][]string) []byte {
 	var sb strings.Builder

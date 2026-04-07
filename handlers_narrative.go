@@ -136,6 +136,25 @@ func (app *App) handleNarrative(w http.ResponseWriter, r *http.Request, user *Us
 		}
 	}
 
+	// Gather public diary entries in range (private entries excluded from ticker)
+	for _, d := range app.store.GetDiary() {
+		if d.Private {
+			continue // never show private diary entries in the ticker
+		}
+		if d.CreatedAt.After(fromTime) && d.CreatedAt.Before(toTime) {
+			entries = append(entries, NarrativeEntry{
+				Timestamp:  d.CreatedAt,
+				Type:       "diary",
+				Summary:    fmt.Sprintf("📔 %s", d.Title),
+				EntityID:   d.ID,
+				EntityType: "diary",
+				UserName:   d.DisplayName,
+				Severity:   "info",
+				Category:   "operational",
+			})
+		}
+	}
+
 	// Sort by timestamp
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Timestamp.Before(entries[j].Timestamp)

@@ -187,7 +187,9 @@ function _diaryRenderList() {
   for (const e of sorted) {
     const date = new Date(e.created_at).toLocaleString();
     const tags = (e.tags || []).map(tg => `<span style="background:var(--accent);color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;margin-right:2px">${escHtml(tg)}</span>`).join('');
-    const priv = e.private ? `<span style="color:var(--red,#e74c3c);font-size:9px;margin-left:4px" title="${t('diary_private')||'Private'}">🔒</span>` : '';
+    const priv = e.private
+      ? `<span style="background:var(--red,#e74c3c);color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:4px">🔒 ${t('diary_private')||'Private'}</span>`
+      : `<span style="background:var(--green,#27ae60);color:#fff;padding:1px 6px;border-radius:3px;font-size:9px;margin-left:4px">🌐 ${t('diary_public')||'Public'}</span>`;
     const mood = e.mood ? `<span style="margin-left:4px" title="${t("diary_mood")||"Mood"}">${escHtml(e.mood)}</span>` : '';
     const mine = isMe(e.user_id);
     html += `<div style="padding:10px;margin-bottom:8px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
