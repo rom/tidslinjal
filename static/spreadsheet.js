@@ -58,7 +58,11 @@ function _renderSpreadsheetSelector() {
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">`;
     for (const ss of list) {
       const dateStr = ss.updated_at ? new Date(ss.updated_at).toLocaleString() : '';
-      const visBadge = ss.visibility === 'public' ? '🌐' : ss.visibility === 'group' ? '👥' : '🔒';
+      const visBadge = ss.visibility === 'public'
+        ? `<span style="background:#27ae60;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">\uD83C\uDF10 ${t('ss_access_public_short')||'Public'}</span>`
+        : ss.visibility === 'group'
+        ? `<span style="background:#3498db;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">\uD83D\uDC65 ${t('ss_access_group_short')||'Group'}</span>`
+        : `<span style="background:#e74c3c;color:#fff;padding:1px 6px;border-radius:3px;font-size:9px">\uD83D\uDD12 ${t('ss_access_private_short')||'Private'}</span>`;
       html += `<div style="padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .15s" class="ss-card" data-ssid="${ss.id}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div>
