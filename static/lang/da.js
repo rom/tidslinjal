@@ -457,6 +457,7 @@ TRANSLATIONS.da = {
     btn_add: '+ Tilføj',
     btn_add_decision: 'Tilføj beslutning',
     btn_apply: 'Anvend',
+    btn_back: 'Tilbage',
     btn_backup: 'Backup',
     btn_bulk_actions: 'Massehandlinger for hændelser',
     btn_detach: 'Frigør',
