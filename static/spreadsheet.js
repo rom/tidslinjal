@@ -3,7 +3,8 @@
 
 // Prevent keyboard events inside the spreadsheet modal from leaking to global shortcuts
 function _ssTrapKeys(modalId) {
-  const el = document.getElementById(modalId);
+  const doc = _ssDoc();
+  const el = doc.getElementById(modalId);
   if (!el) return;
   const stop = (e) => e.stopPropagation();
   el.addEventListener('keydown', stop);
@@ -11,29 +12,32 @@ function _ssTrapKeys(modalId) {
   el.addEventListener('keypress', stop);
 }
 
+// Return the active document (detached window or main)
+function _ssDoc() {
+  return _ssState.activeDoc || document;
+}
+
 let _ssState = {
   list: [],
   currentId: null,
-  instance: null,     // jspreadsheet instance
-  searchOpen: false,
+  instance: null,     // jspreadsheet root object
+  worksheet: null,    // first worksheet ref
+  activeDoc: null,    // document context (null = main, or detached window.document)
 };
 
 // ── Open Spreadsheet Board (called from sidebar/tools) ────────────────────
 
 async function openSpreadsheetBoard() {
-  const container = document.getElementById('boardContainer') || document.getElementById('sidebarContent');
-  if (!container) return;
-
   // Load list
   try {
     const res = await fetch('/api/spreadsheets', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
     if (res.ok) _ssState.list = await res.json() || [];
   } catch { _ssState.list = []; }
 
-  _renderSpreadsheetSelector(container);
+  _renderSpreadsheetSelector();
 }
 
-function _renderSpreadsheetSelector(container) {
+function _renderSpreadsheetSelector() {
   const canWrite = state.user && hasRole2(state.user.role, 'readwrite');
   const list = _ssState.list;
 
@@ -74,14 +78,16 @@ function _renderSpreadsheetSelector(container) {
 
   _boardModal('spreadsheetModal', html, '95vw');
   _ssTrapKeys('spreadsheetModal');
+
+  const doc = _ssDoc();
   // Bind card clicks
-  document.querySelectorAll('.ss-card').forEach(card => {
+  doc.querySelectorAll('.ss-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('[data-ss-delete]')) return;
       _openSpreadsheet(parseInt(card.dataset.ssid));
     });
   });
-  document.querySelectorAll('[data-ss-delete]').forEach(btn => {
+  doc.querySelectorAll('[data-ss-delete]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm(t('ss_delete_confirm')||'Delete this spreadsheet?')) return;
@@ -89,8 +95,8 @@ function _renderSpreadsheetSelector(container) {
       openSpreadsheetBoard();
     });
   });
-  document.getElementById('ssCreateBtn')?.addEventListener('click', _createSpreadsheetDialog);
-  document.getElementById('ssDetachBtn')?.addEventListener('click', _detachSpreadsheet);
+  doc.getElementById('ssCreateBtn')?.addEventListener('click', _createSpreadsheetDialog);
+  doc.getElementById('ssDetachBtn')?.addEventListener('click', _detachSpreadsheet);
 }
 
 // ── Create Dialog ────────────────────────────────────────────────────────────
@@ -126,20 +132,26 @@ async function _openSpreadsheet(id) {
   // Build jspreadsheet data from sparse map
   const colCount = ss.col_count || 26;
   const rowCount = ss.row_count || 50;
+  const cellData = ss.data || {};
   const data = [];
   for (let r = 0; r < rowCount; r++) {
     const row = [];
     for (let c = 0; c < colCount; c++) {
-      const key = (ss.columns[c]?.key || _colLetter(c)) + (r + 1);
-      row.push(ss.data[key] || '');
+      const colKey = (ss.columns && ss.columns[c]) ? ss.columns[c].key : _colLetter(c);
+      const ref = colKey + (r + 1);
+      row.push(cellData[ref] || '');
     }
     data.push(row);
   }
 
-  const columns = ss.columns.map(c => ({
+  const columns = (ss.columns || []).map(c => ({
     title: c.title || c.key,
     width: c.width || 100,
   }));
+  // Pad columns if fewer than colCount
+  while (columns.length < colCount) {
+    columns.push({ title: _colLetter(columns.length), width: 100 });
+  }
 
   // Build UI
   let html = `<div style="max-width:98vw;margin:0 auto" id="ssEditorRoot">
@@ -147,7 +159,7 @@ async function _openSpreadsheet(id) {
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-sm" id="ssBackBtn">← ${t('btn_back')||'Back'}</button>
         <h3 style="margin:0" id="ssNameLabel">${escHtml(ss.name)}</h3>
-        <span style="font-size:var(--fs-xs);color:var(--text-dim)">${ss.col_count}×${ss.row_count}</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-dim)">${colCount}×${rowCount}</span>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <input type="text" id="ssSearchInput" placeholder="${t('ss_search')||'Search...'}" style="width:140px;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
@@ -170,63 +182,81 @@ async function _openSpreadsheet(id) {
   </div>`;
 
   _boardModal('spreadsheetModal', html, '98vw');
-  // Trap keyboard events so global shortcuts don't steal keystrokes from cells
   _ssTrapKeys('spreadsheetModal');
 
+  const doc = _ssDoc();
+  const gridEl = doc.getElementById('ssGrid');
+  if (!gridEl) { console.error('[spreadsheet] ssGrid not found in document'); return; }
+
   // Initialize jspreadsheet
-  const gridEl = document.getElementById('ssGrid');
   if (typeof jspreadsheet === 'undefined') {
     gridEl.innerHTML = '<p style="padding:20px;color:var(--danger)">Jspreadsheet library not loaded.</p>';
     return;
   }
 
-  // v5 API uses worksheets array; returns object with .worksheets[]
-  const ssObj = jspreadsheet(gridEl, {
-    worksheets: [{
-      data: data,
-      columns: columns,
-      minDimensions: [colCount, rowCount],
-      tableOverflow: true,
-      tableWidth: '100%',
-      tableHeight: '65vh',
-      allowInsertRow: true,
-      allowInsertColumn: true,
-      allowDeleteRow: true,
-      allowDeleteColumn: true,
-      allowRenameColumn: true,
-      columnSorting: true,
-      search: true,
-      wordWrap: true,
-      parseFormulas: true,
-    }]
-  });
+  // v5 API: worksheets array; returns object with .worksheets[]
+  let ssObj;
+  try {
+    ssObj = jspreadsheet(gridEl, {
+      worksheets: [{
+        data: data,
+        columns: columns,
+        minDimensions: [colCount, rowCount],
+        tableOverflow: true,
+        tableWidth: '100%',
+        tableHeight: '65vh',
+        allowInsertRow: true,
+        allowInsertColumn: true,
+        allowDeleteRow: true,
+        allowDeleteColumn: true,
+        allowRenameColumn: true,
+        columnSorting: true,
+        search: true,
+        wordWrap: true,
+        parseFormulas: true,
+      }]
+    });
+  } catch (e) {
+    console.error('[spreadsheet] jspreadsheet init error:', e);
+    gridEl.innerHTML = '<p style="padding:20px;color:var(--danger)">Failed to initialize spreadsheet: ' + escHtml(e.message) + '</p>';
+    return;
+  }
   _ssState.instance = ssObj;
 
-  // Get the first worksheet for method calls
-  const ws = ssObj.worksheets ? ssObj.worksheets[0] : (Array.isArray(ssObj) ? ssObj[0] : ssObj);
-
+  // Resolve the first worksheet — v5 returns { worksheets: [...] }
+  let ws = null;
+  if (ssObj && ssObj.worksheets && ssObj.worksheets[0]) {
+    ws = ssObj.worksheets[0];
+  } else if (Array.isArray(ssObj) && ssObj[0]) {
+    ws = ssObj[0];
+  } else if (ssObj && typeof ssObj.getData === 'function') {
+    ws = ssObj; // v4 compat: instance IS the worksheet
+  }
   _ssState.worksheet = ws;
-  console.log('[spreadsheet] instance type:', typeof ssObj, 'worksheets:', ssObj.worksheets, 'ws:', ws, 'ws methods:', ws ? Object.getOwnPropertyNames(Object.getPrototypeOf(ws)).slice(0,20) : 'null');
+
+  if (!ws) {
+    console.error('[spreadsheet] no worksheet resolved. ssObj:', ssObj);
+  }
 
   // Bind toolbar buttons
-  document.getElementById('ssBackBtn')?.addEventListener('click', () => openSpreadsheetBoard());
-  document.getElementById('ssSaveBtn')?.addEventListener('click', () => _saveSpreadsheet(ss));
-  document.getElementById('ssAddRowBtn')?.addEventListener('click', () => {
+  doc.getElementById('ssBackBtn')?.addEventListener('click', () => openSpreadsheetBoard());
+  doc.getElementById('ssSaveBtn')?.addEventListener('click', () => _saveSpreadsheet(ss));
+  doc.getElementById('ssAddRowBtn')?.addEventListener('click', () => {
     if (ws && typeof ws.insertRow === 'function') ws.insertRow();
-    else console.warn('[spreadsheet] insertRow not available on', ws);
+    else console.warn('[spreadsheet] insertRow not available on worksheet');
   });
-  document.getElementById('ssAddColBtn')?.addEventListener('click', () => {
+  doc.getElementById('ssAddColBtn')?.addEventListener('click', () => {
     if (ws && typeof ws.insertColumn === 'function') ws.insertColumn();
-    else console.warn('[spreadsheet] insertColumn not available on', ws);
+    else console.warn('[spreadsheet] insertColumn not available on worksheet');
   });
-  document.getElementById('ssExportBtn')?.addEventListener('click', () => {
-    const fmt = document.getElementById('ssExportFmt')?.value || 'csv';
+  doc.getElementById('ssExportBtn')?.addEventListener('click', () => {
+    const fmt = doc.getElementById('ssExportFmt')?.value || 'csv';
     window.open('/api/spreadsheets/' + id + '/export?format=' + fmt, '_blank');
   });
-  document.getElementById('ssImportBtn')?.addEventListener('click', () => {
-    document.getElementById('ssImportFile')?.click();
+  doc.getElementById('ssImportBtn')?.addEventListener('click', () => {
+    doc.getElementById('ssImportFile')?.click();
   });
-  document.getElementById('ssImportFile')?.addEventListener('change', (e) => {
+  doc.getElementById('ssImportFile')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -238,7 +268,7 @@ async function _openSpreadsheet(id) {
       const res = await fetch('/api/spreadsheets/' + id + '/import?format=' + fmt, { method: 'POST', headers: hdrs, body: reader.result });
       if (res.ok) {
         showNotification('success', t('ss_imported')||'Imported');
-        _openSpreadsheet(id); // Reload
+        _openSpreadsheet(id);
       } else {
         const err = await res.json().catch(() => ({}));
         showError(err.error || 'Import failed');
@@ -246,10 +276,11 @@ async function _openSpreadsheet(id) {
     };
     reader.readAsText(file);
   });
-  document.getElementById('ssPrintBtn')?.addEventListener('click', () => {
-    if (!_ssState.instance) return;
-    const printW = window.open('', '_blank');
+  doc.getElementById('ssPrintBtn')?.addEventListener('click', () => {
     const tableHtml = gridEl.querySelector('table')?.outerHTML || '';
+    if (!tableHtml) { showError('No table content to print'); return; }
+    const printW = window.open('', '_blank');
+    if (!printW) return;
     printW.document.write(`<!DOCTYPE html><html><head><title>${escHtml(ss.name)}</title>
       <style>table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:4px 8px;font-size:12px;font-family:system-ui}th{background:#f0f0f0;font-weight:600}</style>
       </head><body><h2>${escHtml(ss.name)}</h2>${tableHtml}</body></html>`);
@@ -258,32 +289,49 @@ async function _openSpreadsheet(id) {
   });
 
   // Search
-  document.getElementById('ssSearchInput')?.addEventListener('input', (e) => {
-    if (_ssState.worksheet && _ssState.worksheet.search) {
+  doc.getElementById('ssSearchInput')?.addEventListener('input', (e) => {
+    if (_ssState.worksheet && typeof _ssState.worksheet.search === 'function') {
       _ssState.worksheet.search(e.target.value);
     }
   });
 
   // Detach this spreadsheet to its own window
-  document.getElementById('ssDetachSheetBtn')?.addEventListener('click', () => _detachSingleSpreadsheet(id, ss.name));
+  doc.getElementById('ssDetachSheetBtn')?.addEventListener('click', () => _detachSingleSpreadsheet(id, ss.name));
 }
 
 // ── Save current spreadsheet state back to server ────────────────────────────
 
 async function _saveSpreadsheet(ss) {
   const ws = _ssState.worksheet;
-  if (!ws) return;
-  const data = ws.getData();
-  const headers = ws.getHeaders ? ws.getHeaders(true) : [];
+  if (!ws) { showError('No worksheet to save'); return; }
+
+  // Get data safely
+  let data;
+  try { data = typeof ws.getData === 'function' ? ws.getData() : []; }
+  catch { data = []; }
+  if (!Array.isArray(data)) data = [];
+
+  // Get headers safely
+  let headers;
+  try { headers = typeof ws.getHeaders === 'function' ? ws.getHeaders(true) : []; }
+  catch { headers = []; }
+  if (!Array.isArray(headers)) headers = [];
+
+  // Determine column count from data or headers or original
+  const numCols = Math.max(
+    headers.length,
+    data.length > 0 && data[0] ? data[0].length : 0,
+    ss.col_count || 0
+  );
 
   // Build sparse data map
   const cellData = {};
-  const numCols = headers.length || (data[0] ? data[0].length : 0);
   const colKeys = [];
   for (let c = 0; c < numCols; c++) {
-    colKeys.push(ss.columns[c]?.key || _colLetter(c));
+    colKeys.push((ss.columns && ss.columns[c]) ? ss.columns[c].key : _colLetter(c));
   }
   for (let r = 0; r < data.length; r++) {
+    if (!Array.isArray(data[r])) continue;
     for (let c = 0; c < data[r].length; c++) {
       const val = data[r][c];
       if (val !== '' && val !== null && val !== undefined) {
@@ -295,19 +343,25 @@ async function _saveSpreadsheet(ss) {
   // Build columns with custom titles
   const columns = [];
   for (let c = 0; c < numCols; c++) {
-    const key = ss.columns[c]?.key || _colLetter(c);
-    const hdr = headers[c] || key;
-    const title = hdr !== key ? hdr : '';
-    const width = ws.getWidth ? (parseInt(ws.getWidth(c)) || 100) : 100;
-    columns.push({ key, title, width });
+    const key = colKeys[c];
+    const hdr = (headers[c] || key);
+    const title = hdr !== key ? hdr : (ss.columns && ss.columns[c] ? ss.columns[c].title : '');
+    let width = 100;
+    try {
+      if (ws && typeof ws.getWidth === 'function') {
+        const w = ws.getWidth(c);
+        if (w) width = parseInt(w) || 100;
+      }
+    } catch {}
+    columns.push({ key, title: title || '', width });
   }
 
   const updated = {
     ...ss,
     data: cellData,
     columns: columns,
-    row_count: data.length,
-    col_count: headers.length,
+    row_count: Math.max(data.length, ss.row_count || 0),
+    col_count: numCols,
   };
 
   const res = await apiPut('/api/spreadsheets/' + ss.id, updated);
@@ -335,52 +389,67 @@ function _ssDetachWindow(title, onReady) {
     <style>body{padding:0;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}#ssRoot{padding:16px}</style>
     </head><body class="${cls}"><div id="ssRoot"></div></body></html>`);
   w.document.close();
-  // Copy required globals
+
+  // Copy required globals to child window
   w.state = window.state;
   w.TRANSLATIONS = window.TRANSLATIONS;
   w.t = window.t;
   w.escHtml = window.escHtml;
   w.hasRole2 = window.hasRole2;
-  w.jspreadsheet = window.jspreadsheet;
-  w.jSuites = window.jSuites;
   w.apiGet = window.apiGet;
   w.apiPost = window.apiPost;
   w.apiPut = window.apiPut;
   w.apiDel = window.apiDel;
   w.showNotification = function(type, msg) { try { window.showNotification(type, msg); } catch {} };
   w.showError = function(msg) { try { window.showError(msg); } catch {} };
-  onReady(w);
+
+  // Set active document context so all getElementById calls go to the child window
+  _ssState.activeDoc = w.document;
+
+  // Override _boardModal to render into the child window
+  _boardModal = function(id, content) {
+    const root = w.document.getElementById('ssRoot');
+    if (root) root.innerHTML = content;
+  };
+
+  // jspreadsheet needs to be called with the child window's element, so load it in child
+  const jsuitesScript = w.document.createElement('script');
+  jsuitesScript.src = '/static/vendor/jsuites.min.js';
+  jsuitesScript.onload = () => {
+    const jssScript = w.document.createElement('script');
+    jssScript.src = '/static/vendor/jspreadsheet.min.js';
+    jssScript.onload = () => {
+      // Use the child window's jspreadsheet so it creates elements in the right document
+      jspreadsheet = w.jspreadsheet;
+      onReady(w);
+    };
+    w.document.head.appendChild(jssScript);
+  };
+  w.document.head.appendChild(jsuitesScript);
+
+  // Restore parent context when child closes
+  w.addEventListener('beforeunload', () => {
+    _ssState.activeDoc = null;
+    _boardModal = window._origBoardModal || _boardModal;
+    jspreadsheet = window._origJspreadsheet || jspreadsheet;
+  });
 }
+
+// Store original references
+if (typeof _boardModal === 'function') window._origBoardModal = _boardModal;
+window._origJspreadsheet = typeof jspreadsheet !== 'undefined' ? jspreadsheet : null;
 
 // Detach the spreadsheet selector
 function _detachSpreadsheet() {
   _ssDetachWindow('Spreadsheets', (w) => {
-    w._boardModal = function(id, content) { w.document.getElementById('ssRoot').innerHTML = content; };
-    // Re-export the functions into the child window and call
-    w.openSpreadsheetBoard = openSpreadsheetBoard;
-    w._openSpreadsheet = _openSpreadsheet;
-    w._createSpreadsheetDialog = _createSpreadsheetDialog;
-    w._saveSpreadsheet = _saveSpreadsheet;
-    w._ssTrapKeys = _ssTrapKeys;
-    w._ssState = _ssState;
-    w._colLetter = _colLetter;
-    w._detachSingleSpreadsheet = _detachSingleSpreadsheet;
-    setTimeout(() => openSpreadsheetBoard(), 100);
+    openSpreadsheetBoard();
   });
 }
 
 // Detach a single spreadsheet into its own window
 function _detachSingleSpreadsheet(id, name) {
   _ssDetachWindow(name || 'Spreadsheet', (w) => {
-    w._boardModal = function(modalId, content) { w.document.getElementById('ssRoot').innerHTML = content; };
-    w._openSpreadsheet = _openSpreadsheet;
-    w._saveSpreadsheet = _saveSpreadsheet;
-    w._ssTrapKeys = _ssTrapKeys;
-    w._ssState = _ssState;
-    w._colLetter = _colLetter;
-    w.openSpreadsheetBoard = openSpreadsheetBoard;
-    w._detachSingleSpreadsheet = _detachSingleSpreadsheet;
-    setTimeout(() => _openSpreadsheet(id), 100);
+    _openSpreadsheet(id);
   });
 }
 
