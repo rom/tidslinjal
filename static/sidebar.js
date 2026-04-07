@@ -2148,6 +2148,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${toolBtn('📊', t('dashboard_title')||'Dashboard', 'openDashboard()')}
           ${toolBtn('📌', t('board_title')||'Boards', 'openBoardsModal()')}
           ${toolBtn('🏔️', t('kt_title')||'Key Terrain Board', 'openKeyTerrainBoard()')}
+          ${toolBtn('📊', t('ss_title')||'Spreadsheets', 'openSpreadsheetBoard()')}
           ${toolBtn('⚖', t('decisions_title')||'Decisions', 'openDecisionLogModal()')}
           ${toolBtn('📔', t('diary_title')||'Diary', 'openDiaryModal()')}
           ${toolBtn('📋', t('checklists')||'Checklists', 'showChecklistsInSidebar()')}

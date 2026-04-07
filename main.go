@@ -996,6 +996,21 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/report-archive/{id}/download", app.requireAuth(app.handleDownloadReportArchive))
 	mux.HandleFunc("DELETE /api/report-archive/{id}", app.requireRole(RoleTeamLead, app.handleDeleteReportArchive))
 
+	// Spreadsheets
+	mux.HandleFunc("GET /api/spreadsheets", app.requireAuth(app.handleListSpreadsheets))
+	mux.HandleFunc("POST /api/spreadsheets", app.requireAuth(app.handleCreateSpreadsheet))
+	mux.HandleFunc("GET /api/spreadsheets/", app.requireAuth(app.handleGetSpreadsheet))
+	mux.HandleFunc("PUT /api/spreadsheets/", app.requireAuth(app.handleUpdateSpreadsheet))
+	mux.HandleFunc("DELETE /api/spreadsheets/", app.requireAuth(app.handleDeleteSpreadsheet))
+	mux.HandleFunc("/api/spreadsheets/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/export") && r.Method == http.MethodGet {
+			app.requireAuth(app.handleExportSpreadsheet)(w, r)
+		} else if strings.HasSuffix(path, "/import") && r.Method == http.MethodPost {
+			app.requireAuth(app.handleImportSpreadsheet)(w, r)
+		}
+	})
+
 	// Message Archive
 	mux.HandleFunc("GET /api/message-archive", app.requireAuth(app.handleListMessageArchive))
 	mux.HandleFunc("POST /api/message-archive", app.requireRole(RoleTeamLead, app.handleCreateMessageArchive))
