@@ -584,6 +584,7 @@ TRANSLATIONS.nb = {
     profile_webcal:           'Kalenderabonnement',
     btn_event_history:        'Historikk',
     btn_event_deps:           'Avhengigheter',
+    btn_back: 'Tilbake',
     btn_backup:               'Sikkerhetskopi',
     btn_pva:                  'Plan vs. faktisk',
     keyboard_shortcuts:  'Tastatursnarveier',

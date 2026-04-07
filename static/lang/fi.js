@@ -580,6 +580,7 @@ TRANSLATIONS.fi = {
     decision_filter_approved_modification: 'Muutoksella',
     decision_condition_comment_required: 'Kuvaile ehto tai muutos',
     btn_auto_report: 'Automaattiset raportit',
+    btn_back: 'Takaisin',
     btn_backup: 'Varmuuskopiointi',
     btn_bulk_actions: 'Tapahtumien joukkotoiminnot',
     btn_critical_line: 'Kriittinen polku',

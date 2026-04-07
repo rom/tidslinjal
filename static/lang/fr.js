@@ -445,6 +445,7 @@ TRANSLATIONS.fr = {
     profile_webcal:           'Abonnement calendrier',
     btn_event_history:        'Historique',
     btn_event_deps:           'Dépendances',
+    btn_back: 'Retour',
     btn_backup:               'Sauvegarde',
     btn_pva:                  'Plan vs Réel',
     keyboard_shortcuts:       'Raccourcis clavier',

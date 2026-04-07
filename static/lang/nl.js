@@ -584,6 +584,7 @@ TRANSLATIONS.nl = {
     profile_webcal: 'Calendar Subscription',
     btn_event_history: 'Geschiedenis',
     btn_event_deps: 'Dependencies',
+    btn_back: 'Terug',
     btn_backup: 'Back-up',
     btn_pva: 'Plan vs Actual',
     keyboard_shortcuts: 'Keyboard Shortcuts',

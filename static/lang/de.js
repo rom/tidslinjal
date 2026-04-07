@@ -584,6 +584,7 @@ TRANSLATIONS.de = {
     profile_webcal: 'Calendar Subscription',
     btn_event_history: 'Verlauf',
     btn_event_deps: 'Dependencies',
+    btn_back: 'Zurück',
     btn_backup: 'Sicherung',
     btn_pva: 'Plan vs Actual',
     keyboard_shortcuts: 'Keyboard Shortcuts',

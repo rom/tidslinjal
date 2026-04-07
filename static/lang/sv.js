@@ -445,6 +445,7 @@ TRANSLATIONS.sv = {
     profile_webcal:           'Kalenderprenumeration',
     btn_event_history:        'Historik',
     btn_event_deps:           'Beroenden',
+    btn_back: 'Tillbaka',
     btn_backup:               'Säkerhetskopiering',
     btn_pva:                  'Plan vs Utfall',
     keyboard_shortcuts:       'Tangentbordsgenvägar',

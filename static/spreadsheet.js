@@ -1,6 +1,16 @@
 /* ── Spreadsheet Tool ──────────────────────────────────────────────────────── */
 'use strict';
 
+// Prevent keyboard events inside the spreadsheet modal from leaking to global shortcuts
+function _ssTrapKeys(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  const stop = (e) => e.stopPropagation();
+  el.addEventListener('keydown', stop);
+  el.addEventListener('keyup', stop);
+  el.addEventListener('keypress', stop);
+}
+
 let _ssState = {
   list: [],
   currentId: null,
@@ -63,6 +73,7 @@ function _renderSpreadsheetSelector(container) {
   html += `</div>`;
 
   _boardModal('spreadsheetModal', html, '95vw');
+  _ssTrapKeys('spreadsheetModal');
   // Bind card clicks
   document.querySelectorAll('.ss-card').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -158,6 +169,8 @@ async function _openSpreadsheet(id) {
   </div>`;
 
   _boardModal('spreadsheetModal', html, '98vw');
+  // Trap keyboard events so global shortcuts don't steal keystrokes from cells
+  _ssTrapKeys('spreadsheetModal');
 
   // Initialize jspreadsheet
   const gridEl = document.getElementById('ssGrid');
