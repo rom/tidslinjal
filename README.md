@@ -438,6 +438,8 @@ Comprehensive user manuals are available in all 19 supported languages:
 | 🇵🇹 Português (Portuguese) | [USER_MANUAL_PT.md](docs/USER_MANUAL_PT.md) |
 | 🇵🇱 Polski (Polish) | [USER_MANUAL_PL.md](docs/USER_MANUAL_PL.md) |
 | 🇺🇦 Українська (Ukrainian) | [USER_MANUAL_UK.md](docs/USER_MANUAL_UK.md) |
+| 🇯🇵 日本語 (Japanese) | [USER_MANUAL_JA.md](docs/USER_MANUAL_JA.md) |
+| 🇰🇷 한국어 (Korean) | [USER_MANUAL_KO.md](docs/USER_MANUAL_KO.md) |
 
 ### Technical Documentation
 
