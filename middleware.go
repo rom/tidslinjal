@@ -468,7 +468,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		// CSP: all JS/CSS served from 'self'; nonce allows specific inline scripts if needed.
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
-				"script-src 'self' 'nonce-"+nonce+"'; "+
+				"script-src 'self' 'unsafe-eval' 'nonce-"+nonce+"'; "+
 				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob: https://*.tile.openstreetmap.org; "+
 				"connect-src 'self' https://nominatim.openstreetmap.org; "+
