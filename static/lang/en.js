@@ -1349,6 +1349,12 @@ TRANSLATIONS.en = {
     ss_help_tip_save:      'Remember to Save before leaving \u2014 changes are not auto-saved',
     ss_help_tip_detach:    'Use the \u29C9 button to open the spreadsheet in its own window',
     ss_help_tip_context:   'Right-click cells or headers for additional options (insert, delete, rename)',
+    ss_func_menu:          'Function...',
+    ss_func_menu_tip:      'Apply formula to selected cells',
+    ss_func_no_selection:  'Select cells first, then choose a function',
+    ss_func_math:          'Math',
+    ss_func_cond:          'Conditional',
+    ss_func_text:          'Text',
     boot_rate_limits:          'Rate limits',
 
     // Red line settings (i18n)
