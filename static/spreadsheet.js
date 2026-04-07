@@ -162,6 +162,7 @@ async function _openSpreadsheet(id) {
         <button class="btn btn-sm" id="ssImportBtn">⬆ ${t('btn_import')||'Import'}</button>
         <button class="btn btn-sm" id="ssPrintBtn">🖨 ${t('btn_print')||'Print'}</button>
         <button class="btn btn-sm" id="ssSaveBtn" style="font-weight:700">💾 ${t('btn_save')||'Save'}</button>
+        <button class="btn btn-sm" id="ssDetachSheetBtn" title="${t('btn_detach')||'Detach to window'}">⧉</button>
       </div>
     </div>
     <div id="ssGrid" style="overflow:auto;max-height:70vh;border:1px solid var(--border);border-radius:var(--radius)"></div>
@@ -179,8 +180,8 @@ async function _openSpreadsheet(id) {
     return;
   }
 
-  // v5 API uses worksheets array
-  _ssState.instance = jspreadsheet(gridEl, {
+  // v5 API uses worksheets array; returns object with .worksheets[]
+  const ssObj = jspreadsheet(gridEl, {
     worksheets: [{
       data: data,
       columns: columns,
@@ -199,18 +200,24 @@ async function _openSpreadsheet(id) {
       parseFormulas: true,
     }]
   });
+  _ssState.instance = ssObj;
 
   // Get the first worksheet for method calls
-  const ws = _ssState.instance[0];
+  const ws = ssObj.worksheets ? ssObj.worksheets[0] : (Array.isArray(ssObj) ? ssObj[0] : ssObj);
+
+  _ssState.worksheet = ws;
+  console.log('[spreadsheet] instance type:', typeof ssObj, 'worksheets:', ssObj.worksheets, 'ws:', ws, 'ws methods:', ws ? Object.getOwnPropertyNames(Object.getPrototypeOf(ws)).slice(0,20) : 'null');
 
   // Bind toolbar buttons
   document.getElementById('ssBackBtn')?.addEventListener('click', () => openSpreadsheetBoard());
   document.getElementById('ssSaveBtn')?.addEventListener('click', () => _saveSpreadsheet(ss));
   document.getElementById('ssAddRowBtn')?.addEventListener('click', () => {
-    if (ws) ws.insertRow();
+    if (ws && typeof ws.insertRow === 'function') ws.insertRow();
+    else console.warn('[spreadsheet] insertRow not available on', ws);
   });
   document.getElementById('ssAddColBtn')?.addEventListener('click', () => {
-    if (ws) ws.insertColumn();
+    if (ws && typeof ws.insertColumn === 'function') ws.insertColumn();
+    else console.warn('[spreadsheet] insertColumn not available on', ws);
   });
   document.getElementById('ssExportBtn')?.addEventListener('click', () => {
     const fmt = document.getElementById('ssExportFmt')?.value || 'csv';
@@ -252,16 +259,19 @@ async function _openSpreadsheet(id) {
 
   // Search
   document.getElementById('ssSearchInput')?.addEventListener('input', (e) => {
-    if (ws && ws.search) {
-      ws.search(e.target.value);
+    if (_ssState.worksheet && _ssState.worksheet.search) {
+      _ssState.worksheet.search(e.target.value);
     }
   });
+
+  // Detach this spreadsheet to its own window
+  document.getElementById('ssDetachSheetBtn')?.addEventListener('click', () => _detachSingleSpreadsheet(id, ss.name));
 }
 
 // ── Save current spreadsheet state back to server ────────────────────────────
 
 async function _saveSpreadsheet(ss) {
-  const ws = _ssState.instance ? _ssState.instance[0] : null;
+  const ws = _ssState.worksheet;
   if (!ws) return;
   const data = ws.getData();
   const headers = ws.getHeaders ? ws.getHeaders(true) : [];
@@ -310,40 +320,68 @@ async function _saveSpreadsheet(ss) {
 
 // ── Detach to window ─────────────────────────────────────────────────────────
 
-function _detachSpreadsheet() {
-  const w = window.open('', 'tidslinjal_spreadsheet', 'width=1200,height=800,resizable=yes,scrollbars=yes');
+function _ssDetachWindow(title, onReady) {
+  const w = window.open('', '', 'width=1200,height=800,resizable=yes,scrollbars=yes');
   if (!w) return;
   const theme = window.state?.preferences?.theme || 'dark';
-  const themeClass = theme === 'light' ? 'light-mode' : theme === 'city-camo' ? 'city-camo' : theme === 'urban-camo' ? 'urban-camo' : '';
-  w.document.write(`<!DOCTYPE html><html><head><title>Tidslinjal — Spreadsheets</title>
+  const themeClasses = {light:'light-mode','city-camo':'city-camo','urban-camo':'urban-camo',
+    sand:'theme-sand',matrix:'theme-matrix',sunset:'theme-sunset','light-blue-sky':'theme-light-blue-sky',
+    ocean:'theme-ocean',forest:'theme-forest',accessible:'theme-accessible',crimson:'theme-crimson'};
+  const cls = themeClasses[theme] || '';
+  w.document.write(`<!DOCTYPE html><html><head><title>Tidslinjal — ${escHtml(title)}</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/vendor/jsuites.min.css">
     <link rel="stylesheet" href="/static/vendor/jspreadsheet.min.css">
     <style>body{padding:0;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}#ssRoot{padding:16px}</style>
-    </head><body class="${themeClass}"><div id="ssRoot">Loading...</div>
-    <script src="/static/vendor/jsuites.min.js"><\/script>
-    <script src="/static/vendor/jspreadsheet.min.js"><\/script>
-    <script src="/static/i18n.js"><\/script>
-    <script src="/static/lang/en.js"><\/script>
-    <script src="/static/utils.js"><\/script>
-    <script src="/static/state.js"><\/script>
-    <script src="/static/api.js"><\/script>
-    <script src="/static/modals.js"><\/script>
-    <script src="/static/spreadsheet.js"><\/script>
-    <script>
-      setTimeout(function() {
-        if (window.opener && window.opener.state) window.state = window.opener.state;
-        if (window.opener && window.opener.TRANSLATIONS) window.TRANSLATIONS = window.opener.TRANSLATIONS;
-        var root = document.getElementById('ssRoot');
-        if (typeof openSpreadsheetBoard === 'function') {
-          window._boardModal = function(id, content, width) {
-            root.innerHTML = content;
-          };
-          openSpreadsheetBoard();
-        }
-      }, 500);
-    <\/script></body></html>`);
+    </head><body class="${cls}"><div id="ssRoot"></div></body></html>`);
   w.document.close();
+  // Copy required globals
+  w.state = window.state;
+  w.TRANSLATIONS = window.TRANSLATIONS;
+  w.t = window.t;
+  w.escHtml = window.escHtml;
+  w.hasRole2 = window.hasRole2;
+  w.jspreadsheet = window.jspreadsheet;
+  w.jSuites = window.jSuites;
+  w.apiGet = window.apiGet;
+  w.apiPost = window.apiPost;
+  w.apiPut = window.apiPut;
+  w.apiDel = window.apiDel;
+  w.showNotification = function(type, msg) { try { window.showNotification(type, msg); } catch {} };
+  w.showError = function(msg) { try { window.showError(msg); } catch {} };
+  onReady(w);
+}
+
+// Detach the spreadsheet selector
+function _detachSpreadsheet() {
+  _ssDetachWindow('Spreadsheets', (w) => {
+    w._boardModal = function(id, content) { w.document.getElementById('ssRoot').innerHTML = content; };
+    // Re-export the functions into the child window and call
+    w.openSpreadsheetBoard = openSpreadsheetBoard;
+    w._openSpreadsheet = _openSpreadsheet;
+    w._createSpreadsheetDialog = _createSpreadsheetDialog;
+    w._saveSpreadsheet = _saveSpreadsheet;
+    w._ssTrapKeys = _ssTrapKeys;
+    w._ssState = _ssState;
+    w._colLetter = _colLetter;
+    w._detachSingleSpreadsheet = _detachSingleSpreadsheet;
+    setTimeout(() => openSpreadsheetBoard(), 100);
+  });
+}
+
+// Detach a single spreadsheet into its own window
+function _detachSingleSpreadsheet(id, name) {
+  _ssDetachWindow(name || 'Spreadsheet', (w) => {
+    w._boardModal = function(modalId, content) { w.document.getElementById('ssRoot').innerHTML = content; };
+    w._openSpreadsheet = _openSpreadsheet;
+    w._saveSpreadsheet = _saveSpreadsheet;
+    w._ssTrapKeys = _ssTrapKeys;
+    w._ssState = _ssState;
+    w._colLetter = _colLetter;
+    w.openSpreadsheetBoard = openSpreadsheetBoard;
+    w._detachSingleSpreadsheet = _detachSingleSpreadsheet;
+    setTimeout(() => _openSpreadsheet(id), 100);
+  });
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
