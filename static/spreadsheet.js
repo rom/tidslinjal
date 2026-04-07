@@ -1,15 +1,16 @@
 /* ── Spreadsheet Tool ──────────────────────────────────────────────────────── */
 'use strict';
 
-// Prevent keyboard events inside the spreadsheet modal from leaking to global shortcuts
+// Mark the spreadsheet modal so global shortcuts skip it
 function _ssTrapKeys(modalId) {
   const doc = _ssDoc();
   const el = doc.getElementById(modalId);
-  if (!el) return;
-  const stop = (e) => e.stopPropagation();
-  el.addEventListener('keydown', stop);
-  el.addEventListener('keyup', stop);
-  el.addEventListener('keypress', stop);
+  if (el) el.setAttribute('data-ss-active', 'true');
+}
+
+// Check if an element is inside an active spreadsheet
+function _isInSpreadsheet(el) {
+  return el && el.closest && el.closest('[data-ss-active]');
 }
 
 // Return the active document (detached window or main)
@@ -167,8 +168,12 @@ async function _openSpreadsheet(id) {
         <button class="btn btn-sm" id="ssAddColBtn">+ ${t('ss_add_col')||'Col'}</button>
         <select id="ssExportFmt" style="padding:4px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
           <option value="csv">CSV</option>
+          <option value="xlsx">XLSX</option>
+          <option value="ods">ODS</option>
           <option value="json">JSON</option>
           <option value="xml">XML</option>
+          <option value="rtf">RTF</option>
+          <option value="pdf">PDF</option>
         </select>
         <button class="btn btn-sm" id="ssExportBtn">⬇ ${t('btn_export')||'Export'}</button>
         <button class="btn btn-sm" id="ssImportBtn">⬆ ${t('btn_import')||'Import'}</button>

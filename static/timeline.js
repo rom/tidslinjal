@@ -1247,6 +1247,8 @@ function setupKeyboardShortcuts() {
     const tag = document.activeElement ? document.activeElement.tagName : '';
     if (['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
     if (document.activeElement && document.activeElement.isContentEditable) return;
+    // Skip when inside a spreadsheet (jspreadsheet handles its own keys)
+    if (typeof _isInSpreadsheet === 'function' && _isInSpreadsheet(document.activeElement || e.target)) return;
 
     switch (e.key) {
       case 'ArrowLeft':  if (!e.shiftKey) navigate(-1); break;

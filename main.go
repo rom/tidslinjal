@@ -999,15 +999,21 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	// Spreadsheets
 	mux.HandleFunc("GET /api/spreadsheets", app.requireAuth(app.handleListSpreadsheets))
 	mux.HandleFunc("POST /api/spreadsheets", app.requireAuth(app.handleCreateSpreadsheet))
-	mux.HandleFunc("GET /api/spreadsheets/", app.requireAuth(app.handleGetSpreadsheet))
-	mux.HandleFunc("PUT /api/spreadsheets/", app.requireAuth(app.handleUpdateSpreadsheet))
-	mux.HandleFunc("DELETE /api/spreadsheets/", app.requireAuth(app.handleDeleteSpreadsheet))
 	mux.HandleFunc("/api/spreadsheets/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if strings.HasSuffix(path, "/export") && r.Method == http.MethodGet {
+		switch {
+		case strings.HasSuffix(path, "/export") && r.Method == http.MethodGet:
 			app.requireAuth(app.handleExportSpreadsheet)(w, r)
-		} else if strings.HasSuffix(path, "/import") && r.Method == http.MethodPost {
+		case strings.HasSuffix(path, "/import") && r.Method == http.MethodPost:
 			app.requireAuth(app.handleImportSpreadsheet)(w, r)
+		case r.Method == http.MethodGet:
+			app.requireAuth(app.handleGetSpreadsheet)(w, r)
+		case r.Method == http.MethodPut:
+			app.requireAuth(app.handleUpdateSpreadsheet)(w, r)
+		case r.Method == http.MethodDelete:
+			app.requireAuth(app.handleDeleteSpreadsheet)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"encoding/xml"
@@ -254,23 +256,22 @@ func (app *App) handleExportSpreadsheet(w http.ResponseWriter, r *http.Request, 
 		format = "csv"
 	}
 
-	// Build 2D grid
+	// Build 2D grid and headers
 	grid := buildGrid(ss)
+	headers := make([]string, len(ss.Columns))
+	for i, c := range ss.Columns {
+		if c.Title != "" {
+			headers[i] = c.Title
+		} else {
+			headers[i] = c.Key
+		}
+	}
 
 	switch format {
 	case "csv":
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.csv"`, ss.Name))
 		writer := csv.NewWriter(w)
-		// Header row
-		headers := make([]string, len(ss.Columns))
-		for i, c := range ss.Columns {
-			if c.Title != "" {
-				headers[i] = c.Title
-			} else {
-				headers[i] = c.Key
-			}
-		}
 		_ = writer.Write(headers)
 		for _, row := range grid {
 			_ = writer.Write(row)
@@ -318,8 +319,43 @@ func (app *App) handleExportSpreadsheet(w http.ResponseWriter, r *http.Request, 
 		enc.Indent("", "  ")
 		enc.Encode(sheet)
 
+	case "xlsx":
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.xlsx"`, ss.Name))
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		xlsxWriteFile(zw, "[Content_Types].xml", xlsxContentTypes())
+		xlsxWriteFile(zw, "_rels/.rels", xlsxRels())
+		xlsxWriteFile(zw, "xl/workbook.xml", xlsxWorkbook())
+		xlsxWriteFile(zw, "xl/_rels/workbook.xml.rels", xlsxWorkbookRels())
+		xlsxWriteFile(zw, "xl/styles.xml", xlsxStyles())
+		xlsxWriteFile(zw, "xl/worksheets/sheet1.xml", ssXlsxSheet(headers, grid))
+		zw.Close()
+		w.Write(buf.Bytes())
+
+	case "ods":
+		w.Header().Set("Content-Type", "application/vnd.oasis.opendocument.spreadsheet")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.ods"`, ss.Name))
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		xlsxWriteFile(zw, "mimetype", "application/vnd.oasis.opendocument.spreadsheet")
+		xlsxWriteFile(zw, "META-INF/manifest.xml", odsManifest())
+		xlsxWriteFile(zw, "content.xml", odsContent(ss.Name, headers, grid))
+		zw.Close()
+		w.Write(buf.Bytes())
+
+	case "rtf":
+		w.Header().Set("Content-Type", "application/rtf")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.rtf"`, ss.Name))
+		w.Write([]byte(ssRTF(ss.Name, headers, grid)))
+
+	case "pdf":
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, ss.Name))
+		w.Write(ssPDF(ss.Name, headers, grid))
+
 	default:
-		jsonError(w, "unsupported format (csv, json, xml supported)", http.StatusBadRequest)
+		jsonError(w, "unsupported format (csv, json, xml, xlsx, ods, rtf, pdf)", http.StatusBadRequest)
 	}
 }
 
@@ -480,6 +516,185 @@ func parseCellRef(ref string) (col, row int) {
 		return -1, -1
 	}
 	return col, row - 1 // 0-based
+}
+
+// ── XLSX sheet for spreadsheet export ─────────────────────────────────────────
+
+func ssXlsxSheet(headers []string, grid [][]string) string {
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>`)
+	// Header row
+	sb.WriteString(`<row r="1">`)
+	for ci, h := range headers {
+		sb.WriteString(xlsxCell(ci, 1, h, 1))
+	}
+	sb.WriteString(`</row>`)
+	// Data rows
+	for ri, row := range grid {
+		sb.WriteString(fmt.Sprintf(`<row r="%d">`, ri+2))
+		for ci, val := range row {
+			if val != "" {
+				sb.WriteString(xlsxCell(ci, ri+2, val, 0))
+			}
+		}
+		sb.WriteString(`</row>`)
+	}
+	sb.WriteString(`</sheetData></worksheet>`)
+	return sb.String()
+}
+
+// ── ODS helpers ───────────────────────────────────────────────────────────────
+
+func odsManifest() string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
+  <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>
+  <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>`
+}
+
+func odsContent(name string, headers []string, grid [][]string) string {
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+<office:body><office:spreadsheet>
+<table:table table:name="` + xmlEsc(name) + `">`)
+	// Header row
+	sb.WriteString(`<table:table-row>`)
+	for _, h := range headers {
+		sb.WriteString(`<table:table-cell><text:p>` + xmlEsc(h) + `</text:p></table:table-cell>`)
+	}
+	sb.WriteString(`</table:table-row>`)
+	// Data
+	for _, row := range grid {
+		sb.WriteString(`<table:table-row>`)
+		for _, val := range row {
+			sb.WriteString(`<table:table-cell><text:p>` + xmlEsc(val) + `</text:p></table:table-cell>`)
+		}
+		sb.WriteString(`</table:table-row>`)
+	}
+	sb.WriteString(`</table:table></office:spreadsheet></office:body></office:document-content>`)
+	return sb.String()
+}
+
+// xmlEsc is in helpers.go — use that one
+
+// ── RTF export ────────────────────────────────────────────────────────────────
+
+func ssRTF(name string, headers []string, grid [][]string) string {
+	var sb strings.Builder
+	sb.WriteString(`{\rtf1\ansi\deff0{\fonttbl{\f0 Calibri;}}`)
+	sb.WriteString(fmt.Sprintf(`\pard\b %s\b0\par\par`, rtfEsc(name)))
+	// Table
+	numCols := len(headers)
+	cellW := 2000
+	// Header row
+	for i := 0; i < numCols; i++ {
+		sb.WriteString(fmt.Sprintf(`\cellx%d`, (i+1)*cellW))
+	}
+	sb.WriteString(`\intbl`)
+	for _, h := range headers {
+		sb.WriteString(fmt.Sprintf(`\b %s\b0\cell`, rtfEsc(h)))
+	}
+	sb.WriteString(`\row`)
+	// Data rows
+	for _, row := range grid {
+		for i := 0; i < numCols; i++ {
+			sb.WriteString(fmt.Sprintf(`\cellx%d`, (i+1)*cellW))
+		}
+		sb.WriteString(`\intbl`)
+		for ci := 0; ci < numCols; ci++ {
+			val := ""
+			if ci < len(row) {
+				val = row[ci]
+			}
+			sb.WriteString(fmt.Sprintf(`%s\cell`, rtfEsc(val)))
+		}
+		sb.WriteString(`\row`)
+	}
+	sb.WriteString(`}`)
+	return sb.String()
+}
+
+// rtfEsc is in handlers_diary.go — use that one
+
+// ── PDF export (minimal valid PDF with table) ─────────────────────────────────
+
+func ssPDF(name string, headers []string, grid [][]string) []byte {
+	var sb strings.Builder
+	// Build text content
+	sb.WriteString(fmt.Sprintf("%s\n\n", name))
+	// Header line
+	for i, h := range headers {
+		if i > 0 {
+			sb.WriteString("\t")
+		}
+		sb.WriteString(h)
+	}
+	sb.WriteString("\n")
+	for i := 0; i < len(headers)*12; i++ {
+		sb.WriteString("-")
+	}
+	sb.WriteString("\n")
+	// Data
+	for _, row := range grid {
+		hasData := false
+		for _, v := range row {
+			if v != "" {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			continue
+		}
+		for ci, val := range row {
+			if ci > 0 {
+				sb.WriteString("\t")
+			}
+			sb.WriteString(val)
+		}
+		sb.WriteString("\n")
+	}
+	content := sb.String()
+	// Escape PDF special chars
+	content = strings.ReplaceAll(content, `\`, `\\`)
+	content = strings.ReplaceAll(content, `(`, `\(`)
+	content = strings.ReplaceAll(content, `)`, `\)`)
+
+	// Build minimal PDF
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.4\n")
+	// Object 1: Catalog
+	obj1Off := pdf.Len()
+	pdf.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+	// Object 2: Pages
+	obj2Off := pdf.Len()
+	pdf.WriteString("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
+	// Object 3: Page
+	obj3Off := pdf.Len()
+	pdf.WriteString("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n")
+	// Object 4: Content stream
+	stream := fmt.Sprintf("BT /F1 9 Tf 50 560 Td (%s) Tj ET", content)
+	obj4Off := pdf.Len()
+	pdf.WriteString(fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(stream), stream))
+	// Object 5: Font
+	obj5Off := pdf.Len()
+	pdf.WriteString("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n")
+	// Xref
+	xrefOff := pdf.Len()
+	pdf.WriteString("xref\n0 6\n")
+	pdf.WriteString("0000000000 65535 f \n")
+	pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", obj1Off))
+	pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", obj2Off))
+	pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", obj3Off))
+	pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", obj4Off))
+	pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", obj5Off))
+	pdf.WriteString(fmt.Sprintf("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", xrefOff))
+	return pdf.Bytes()
 }
 
 // userInGroup checks if a user belongs to a group
