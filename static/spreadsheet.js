@@ -346,15 +346,24 @@ async function _openSpreadsheet(id) {
     if (w && typeof w.insertColumn === 'function') { w.insertColumn(); _updateDimLabel(); }
     else console.warn('[spreadsheet] insertColumn not available. ws:', w);
   });
-  // Function menu — apply formula to selected cells
-  doc.getElementById('ssFuncMenu')?.addEventListener('change', (e) => {
+  // Function menu — save selection before the dropdown steals focus
+  let _savedSelection = null;
+  const funcMenu = doc.getElementById('ssFuncMenu');
+  if (funcMenu) {
+    funcMenu.addEventListener('mousedown', () => {
+      const w = _ws();
+      if (w && w.selectedCell && w.selectedCell.length) {
+        _savedSelection = [...w.selectedCell];
+      }
+    });
+    funcMenu.addEventListener('change', (e) => {
     const funcName = e.target.value;
     e.target.value = ''; // reset dropdown
     if (!funcName) return;
     const w = _ws();
     if (!w) { showError('No active worksheet'); return; }
-    // Get selected cells from jspreadsheet
-    const sel = w.selectedCell;
+    // Use saved selection (captured before dropdown stole focus)
+    const sel = _savedSelection || w.selectedCell;
     if (!sel || !sel.length) { showError(t('ss_func_no_selection')||'Select cells first, then choose a function'); return; }
     // sel is [startCol, startRow, endCol, endRow]
     const c1 = sel[0], r1 = sel[1], c2 = sel[2], r2 = sel[3];
@@ -389,7 +398,9 @@ async function _openSpreadsheet(id) {
         showError('Could not apply formula: ' + err2.message);
       }
     }
+    _savedSelection = null; // clear after use
   });
+  } // end funcMenu
   doc.getElementById('ssExportBtn')?.addEventListener('click', () => {
     const fmt = doc.getElementById('ssExportFmt')?.value || 'csv';
     window.open('/api/spreadsheets/' + id + '/export?format=' + fmt, '_blank');
