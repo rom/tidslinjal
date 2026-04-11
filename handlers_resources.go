@@ -17,7 +17,7 @@ func (app *App) handleGetResourceNotes(w http.ResponseWriter, r *http.Request, u
 			notes = []ResourceNote{}
 		}
 		// Filter notes: only show notes created by the current user (private to each individual)
-		if !hasRole(user.Role, RoleAdmin) {
+		if !app.effectiveHasRole(user, RoleAdmin) {
 			var filtered []ResourceNote
 			for _, n := range notes {
 				if n.CreatedBy == user.ID {
@@ -36,7 +36,7 @@ func (app *App) handleGetResourceNotes(w http.ResponseWriter, r *http.Request, u
 			notes = []ResourceNote{}
 		}
 		// Filter: non-admin users only see their own notes
-		if !hasRole(user.Role, RoleAdmin) {
+		if !app.effectiveHasRole(user, RoleAdmin) {
 			var filtered []ResourceNote
 			for _, n := range notes {
 				if n.CreatedBy == user.ID {

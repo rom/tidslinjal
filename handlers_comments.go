@@ -88,7 +88,7 @@ func (app *App) handleCreateComment(w http.ResponseWriter, r *http.Request, user
 	}
 	// For reporters proposing a status change
 	pendingApproval := false
-	if req.StatusChange != "" && hasRole(user.Role, RoleReporter) && !hasRole(user.Role, RoleReadWrite) {
+	if req.StatusChange != "" && app.effectiveHasRole(user, RoleReporter) && !app.effectiveHasRole(user, RoleReadWrite) {
 		pendingApproval = true
 	}
 	c, err := app.store.CreateComment(EventComment{
@@ -184,7 +184,7 @@ func (app *App) handleDeleteComment(w http.ResponseWriter, r *http.Request, user
 			return
 		}
 	}
-	isAdmin := hasRole(user.Role, RoleAdmin)
+	isAdmin := app.effectiveHasRole(user, RoleAdmin)
 	if err := app.store.DeleteComment(id, user.ID, isAdmin); err != nil {
 		if err.Error() == "forbidden" {
 			jsonError(w, "forbidden", http.StatusForbidden)
@@ -202,7 +202,7 @@ func (app *App) handleApproveComment(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "team lead or above required", http.StatusForbidden)
 		return
 	}
@@ -224,7 +224,7 @@ func (app *App) handleGetPhases(w http.ResponseWriter, r *http.Request, user *Us
 }
 
 func (app *App) handleCreatePhase(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "team lead or above required", http.StatusForbidden)
 		return
 	}
@@ -258,7 +258,7 @@ func (app *App) handleUpdatePhase(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "team lead or above required", http.StatusForbidden)
 		return
 	}
@@ -284,7 +284,7 @@ func (app *App) handleDeletePhase(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "team lead or above required", http.StatusForbidden)
 		return
 	}

@@ -47,11 +47,11 @@ func (app *App) handleUpdateEventType(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	// System types editable only by admin; custom types by creator or admin
-	if existing.IsSystem && !hasRole(user.Role, RoleAdmin) {
+	if existing.IsSystem && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	if !existing.IsSystem && existing.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if !existing.IsSystem && existing.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -90,7 +90,7 @@ func (app *App) handleDeleteEventType(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "cannot delete system event type", http.StatusBadRequest)
 		return
 	}
-	if existing.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if existing.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}

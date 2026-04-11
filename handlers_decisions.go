@@ -88,7 +88,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Check capability – admin always allowed
-	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}
@@ -408,7 +408,7 @@ func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	// Check permission
-	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !hasRole(user.Role, RoleTeamLead) {
+	if user.Role != RoleAdmin && !app.userHasCapability(user, "decision_log_readwrite") && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "insufficient permissions", http.StatusForbidden)
 		return
 	}

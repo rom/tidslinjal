@@ -37,7 +37,7 @@ func (app *App) handleCreateTemplate(w http.ResponseWriter, r *http.Request, use
 		tmpl.Items[i].Title = stripHTMLTags(tmpl.Items[i].Title)
 		tmpl.Items[i].Description = stripHTMLTags(tmpl.Items[i].Description)
 	}
-	if tmpl.Scope == "public" && !hasRole(user.Role, RoleOpLead) {
+	if tmpl.Scope == "public" && !app.effectiveHasRole(user, RoleOpLead) {
 		jsonError(w, "only operations leads and admins may create public templates", http.StatusForbidden)
 		return
 	}
@@ -69,7 +69,7 @@ func (app *App) handleDeleteTemplate(w http.ResponseWriter, r *http.Request, use
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	isAdmin := hasRole(user.Role, RoleAdmin)
+	isAdmin := app.effectiveHasRole(user, RoleAdmin)
 	if err := app.store.DeleteTemplate(id, user.ID, isAdmin); err != nil {
 		jsonError(w, err.Error(), http.StatusForbidden)
 		return

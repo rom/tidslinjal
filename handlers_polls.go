@@ -617,7 +617,7 @@ func (app *App) handleClosePoll(w http.ResponseWriter, r *http.Request, user *Us
 		return
 	}
 	// Only creator or admin can close
-	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if poll.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "only the creator or an admin can close this poll", http.StatusForbidden)
 		return
 	}
@@ -663,7 +663,7 @@ func (app *App) handlePollReminder(w http.ResponseWriter, r *http.Request, user 
 		return
 	}
 	// Only creator or admin can send reminders
-	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if poll.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "only the creator or an admin can send reminders", http.StatusForbidden)
 		return
 	}
@@ -710,7 +710,7 @@ func (app *App) handleDeletePoll(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	// Only creator or admin can delete
-	if poll.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if poll.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "only the creator or an admin can delete this poll", http.StatusForbidden)
 		return
 	}

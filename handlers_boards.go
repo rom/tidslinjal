@@ -35,7 +35,7 @@ func (app *App) canAccessBoard(board *Board, user *User) bool {
 		}
 		return board.OwnerID == user.ID
 	case "role":
-		return string(user.Role) == board.RoleKey || hasRole(user.Role, RoleAdmin) || board.OwnerID == user.ID
+		return string(user.Role) == board.RoleKey || app.effectiveHasRole(user, RoleAdmin) || board.OwnerID == user.ID
 	case "global":
 		return true
 	}
@@ -46,7 +46,7 @@ func (app *App) canEditBoard(board *Board, user *User) bool {
 	if user.Role == RoleAdmin || board.OwnerID == user.ID {
 		return true
 	}
-	if board.Visibility == "global" && hasRole(user.Role, RoleTeamLead) {
+	if board.Visibility == "global" && app.effectiveHasRole(user, RoleTeamLead) {
 		return true
 	}
 	if board.Visibility == "group" {

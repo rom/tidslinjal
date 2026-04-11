@@ -78,7 +78,7 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 	}
 
 	// Master-timeline events require oplead or admin
-	if e.LayerID == nil && !canEditMasterTimeline(user.Role) {
+	if e.LayerID == nil && !app.canEditMasterTimelineUser(user) {
 		jsonError(w, "only operations leads and admins may create master-timeline events", http.StatusForbidden)
 		return
 	}
@@ -171,17 +171,17 @@ func (app *App) handleUpdateEvent(w http.ResponseWriter, r *http.Request, user *
 		return
 	}
 	// Master-timeline events: oplead+
-	if existing.LayerID == nil && !canEditMasterTimeline(user.Role) {
+	if existing.LayerID == nil && !app.canEditMasterTimelineUser(user) {
 		jsonError(w, "only operations leads and admins may edit master-timeline events", http.StatusForbidden)
 		return
 	}
 	// Layer events: creator or readwrite+ with layer write access
-	if existing.LayerID != nil && existing.CreatedBy != user.ID && !hasRole(user.Role, RoleReadWrite) {
+	if existing.LayerID != nil && existing.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleReadWrite) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	// H-04 fix: verify canWriteLayer for layer events (even for readwrite users)
-	if existing.LayerID != nil && !hasRole(user.Role, RoleAdmin) {
+	if existing.LayerID != nil && !app.effectiveHasRole(user, RoleAdmin) {
 		if !app.canWriteLayer(*existing.LayerID, user) {
 			jsonError(w, "no write permission on this layer", http.StatusForbidden)
 			return
@@ -283,17 +283,17 @@ func (app *App) handlePatchEventStatus(w http.ResponseWriter, r *http.Request, u
 	}
 	newStatus := EventStatus(req.Status)
 	// Read-only / observer users cannot change event status at all
-	if !hasRole(user.Role, RoleReporter) {
+	if !app.effectiveHasRole(user, RoleReporter) {
 		jsonError(w, "insufficient permissions to change event status", http.StatusForbidden)
 		return
 	}
 	// Verify/reject require teamlead+
-	if (newStatus == StatusVerified || newStatus == StatusRejected) && !hasRole(user.Role, RoleTeamLead) {
+	if (newStatus == StatusVerified || newStatus == StatusRejected) && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "team lead or above required to verify or reject events", http.StatusForbidden)
 		return
 	}
 	// Reporter role: can only set responded_to or completed (pending approval)
-	if hasRole(user.Role, RoleReporter) && !hasRole(user.Role, RoleReadWrite) {
+	if app.effectiveHasRole(user, RoleReporter) && !app.effectiveHasRole(user, RoleReadWrite) {
 		if newStatus != StatusRespondedTo && newStatus != StatusCompleted {
 			jsonError(w, "reporters may only set status to responded_to or completed", http.StatusForbidden)
 			return
@@ -345,12 +345,12 @@ func (app *App) handleDeleteEvent(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if existing.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	// M-04 fix: check layer write access for non-admin users
-	if existing.LayerID != nil && !hasRole(user.Role, RoleAdmin) {
+	if existing.LayerID != nil && !app.effectiveHasRole(user, RoleAdmin) {
 		if !app.canWriteLayer(*existing.LayerID, user) {
 			jsonError(w, "no write permission on this layer", http.StatusForbidden)
 			return

@@ -15,7 +15,7 @@ func (app *App) handleGetLocks(w http.ResponseWriter, r *http.Request, user *Use
 }
 
 func (app *App) handleCreateLock(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleTeamLead) && !user.CanLock {
+	if !app.effectiveHasRole(user, RoleTeamLead) && !user.CanLock {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -43,7 +43,7 @@ func (app *App) handleDeleteLock(w http.ResponseWriter, r *http.Request, user *U
 		return
 	}
 	// Admin can always unlock; lock creator and can_lock users can unlock their own
-	if err := app.store.DeleteLockAuthorized(id, user.ID, hasRole(user.Role, RoleAdmin)); err != nil {
+	if err := app.store.DeleteLockAuthorized(id, user.ID, app.effectiveHasRole(user, RoleAdmin)); err != nil {
 		jsonError(w, err.Error(), http.StatusForbidden)
 		return
 	}

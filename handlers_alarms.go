@@ -45,7 +45,7 @@ func (app *App) handleCreateAlarm(w http.ResponseWriter, r *http.Request, user *
 	}
 	targetUserID := user.ID
 	if req.ForUserID != 0 && req.ForUserID != user.ID {
-		if !hasRole(user.Role, RoleOpLead) {
+		if !app.effectiveHasRole(user, RoleOpLead) {
 			jsonError(w, "only operations leads and admins may create alarms for other users", http.StatusForbidden)
 			return
 		}

@@ -191,7 +191,7 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 			return
 		}
 	}
-	if att.UploadedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if att.UploadedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}

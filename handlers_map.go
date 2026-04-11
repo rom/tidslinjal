@@ -260,7 +260,7 @@ func (app *App) handleLockMapOverlay(w http.ResponseWriter, r *http.Request, use
 	}
 	overlayID := parts[2]
 
-	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+	if !user.CanLock && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "no lock permission", http.StatusForbidden)
 		return
 	}
@@ -303,7 +303,7 @@ func (app *App) handleLockMap(w http.ResponseWriter, r *http.Request, user *User
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+	if !user.CanLock && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "no map lock permission", http.StatusForbidden)
 		return
 	}
@@ -329,7 +329,7 @@ func (app *App) handleUnlockMap(w http.ResponseWriter, r *http.Request, user *Us
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !user.CanLock && !hasRole(user.Role, RoleTeamLead) {
+	if !user.CanLock && !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "no map lock permission", http.StatusForbidden)
 		return
 	}
@@ -380,7 +380,7 @@ func (app *App) handleUpdateMapDrawings(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+	if mr.Locked && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "map is locked", http.StatusForbidden)
 		return
 	}
@@ -497,7 +497,7 @@ func (app *App) handleUpdateMapResourceOverlays(w http.ResponseWriter, r *http.R
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if mr.Locked && !hasRole(user.Role, RoleAdmin) {
+	if mr.Locked && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "map is locked", http.StatusForbidden)
 		return
 	}
@@ -539,7 +539,7 @@ func (app *App) handleUnlockMapOverlay(w http.ResponseWriter, r *http.Request, u
 				return
 			}
 			// Only the locker or teamlead+ can unlock
-			if mr.Overlays[i].LockedBy != user.ID && !hasRole(user.Role, RoleTeamLead) {
+			if mr.Overlays[i].LockedBy != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
 				jsonError(w, "only the lock owner or team lead can unlock", http.StatusForbidden)
 				return
 			}

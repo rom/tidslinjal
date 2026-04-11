@@ -148,7 +148,7 @@ func (app *App) requireAuth(next func(http.ResponseWriter, *http.Request, *User)
 
 func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Request, *User)) http.HandlerFunc {
 	return app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
-		if !hasRole(user.Role, role) {
+		if !app.effectiveHasRole(user, role) {
 			jsonError(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -156,27 +156,104 @@ func (app *App) requireRole(role Role, next func(http.ResponseWriter, *http.Requ
 	})
 }
 
-func hasRole(userRole, required Role) bool {
-	order := map[Role]int{
-		RoleObserver:         0,
-		RoleRead:             0,
-		RoleReporter:         1,
-		RoleReadWrite:        2,
-		RoleTeamLead:         3,
-		RoleDeputyTeamLead:   3,
-		RoleOpLead:           4,
-		RoleDeputyOpLead:     4,
-		RoleStaffOfficer:     4,
-		RoleStaffAssistant:   4,
-		RoleStaffOfficerFull: 4,
-		RoleDeveloper:        5,
-		RoleAdmin:            5,
+// effectiveHasRole checks if a user has the required role level.
+// For built-in roles, it uses the standard role hierarchy.
+// For custom roles not in the hierarchy, it computes an effective level
+// from the role's capabilities so that custom roles with appropriate
+// permissions are not blocked. Custom roles can reach up to level 4
+// (oplead/staff); level 5 (admin/developer) requires the actual role.
+func (app *App) effectiveHasRole(user *User, required Role) bool {
+	if hasRole(user.Role, required) {
+		return true
 	}
-	return order[userRole] >= order[required]
+	// If the built-in check passed, we're done. If it failed, check whether
+	// this is a custom role that should be allowed based on capabilities.
+	// Only bother computing the effective level if the role is not a known
+	// built-in role (built-in roles are already correctly ordered).
+	if _, known := roleOrder[user.Role]; known {
+		return false // built-in role genuinely too low
+	}
+	// Custom role — compute effective level from capabilities
+	level := app.customRoleLevel(user)
+	return level >= roleOrder[required]
+}
+
+// roleOrder is the shared role hierarchy used by hasRole and effectiveHasRole.
+var roleOrder = map[Role]int{
+	RoleObserver:         0,
+	RoleRead:             0,
+	RoleReporter:         1,
+	RoleReadWrite:        2,
+	RoleTeamLead:         3,
+	RoleDeputyTeamLead:   3,
+	RoleOpLead:           4,
+	RoleDeputyOpLead:     4,
+	RoleStaffOfficer:     4,
+	RoleStaffAssistant:   4,
+	RoleStaffOfficerFull: 4,
+	RoleDeveloper:        5,
+	RoleAdmin:            5,
+}
+
+func hasRole(userRole, required Role) bool {
+	return roleOrder[userRole] >= roleOrder[required]
+}
+
+// customRoleLevel computes the effective role level for a custom role based
+// on its capabilities. Returns 0-4; never 5 (admin requires actual admin role).
+func (app *App) customRoleLevel(user *User) int {
+	caps := app.getRoleCaps(user.Role)
+	if caps == nil {
+		return 0
+	}
+	level := 0
+	// Level 1 (reporter): can create events or interact
+	if caps["create_events"] || caps["comment"] || caps["manage_alarms"] {
+		level = 1
+	}
+	// Level 2 (readwrite): can edit own events
+	if caps["edit_own"] || caps["import_export"] {
+		if level < 2 {
+			level = 2
+		}
+	}
+	// Level 3 (teamlead): elevated management capabilities
+	if caps["edit_all"] || caps["manage_layers"] || caps["manage_groups"] ||
+		caps["view_audit"] || caps["manage_rooms"] || caps["boards"] ||
+		caps["teamlead_toolbox"] || caps["decision_log_readwrite"] ||
+		caps["delete_events"] || caps["report"] || caps["see_location"] {
+		if level < 3 {
+			level = 3
+		}
+	}
+	// Level 4 (oplead/staff): high-level operational capabilities
+	if caps["exercise"] || caps["manage_templates"] || caps["approve_users"] ||
+		caps["critical_line_analysis"] || caps["staff_toolbox"] ||
+		caps["manage_integrations"] || caps["lock_slots"] || caps["confidential_read"] {
+		if level < 4 {
+			level = 4
+		}
+	}
+	return level
+}
+
+// getRoleCaps returns the capability map for a role, or nil if not found.
+func (app *App) getRoleCaps(role Role) map[string]bool {
+	for _, rc := range app.store.GetRoleConfigs() {
+		if rc.Key == string(role) {
+			return rc.Capabilities
+		}
+	}
+	return nil
 }
 
 func canEditMasterTimeline(role Role) bool {
 	return hasRole(role, RoleOpLead)
+}
+
+// canEditMasterTimelineUser is the capability-aware version of canEditMasterTimeline.
+func (app *App) canEditMasterTimelineUser(user *User) bool {
+	return app.effectiveHasRole(user, RoleOpLead)
 }
 
 // clientIP extracts the real client IP from the request.
