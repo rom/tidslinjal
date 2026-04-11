@@ -1073,6 +1073,7 @@ function renderSidebar() {
       ${(hasRole2(state.user.role, 'teamlead') || userHasCapability('manage_layers')) ? `
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('layers_bulk_move')||'Bulk Move Events'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('layers_bulk_move_desc')||'Move all events from one layer to another.'}</p>
         <div style="padding:4px 0;font-size:var(--fs-sm)">
           <label style="display:block;margin-bottom:4px;color:var(--text-dim)">${t('layers_source')||'From layer'}:</label>
           <select id="bulkMoveSource" class="input" style="width:100%;font-size:var(--fs-sm);margin-bottom:8px">

@@ -287,6 +287,15 @@ TRANSLATIONS.nl = {
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
 
+    layers_bulk_move: 'Gebeurtenissen verplaatsen',
+    layers_bulk_move_desc: 'Verplaats alle gebeurtenissen van de ene laag naar de andere.',
+    layers_source: 'Van laag',
+    layers_target: 'Naar laag',
+    layers_move_btn: 'Verplaats gebeurtenissen',
+    layers_move_same: 'Bron- en doellaag moeten verschillend zijn.',
+    layers_move_confirm: 'Alle gebeurtenissen van "{src}" naar "{tgt}" verplaatsen?',
+    layers_move_done: '{n} gebeurtenissen verplaatst.',
+
     // Groups
     groups_title: 'Groepen',
     groups_add: '+ New Group',

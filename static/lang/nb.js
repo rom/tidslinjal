@@ -287,6 +287,15 @@ TRANSLATIONS.nb = {
     layer_permission_read: 'Les',
     layer_permission_readwrite: 'Les/Skriv',
 
+    layers_bulk_move: 'Masseflytting av hendelser',
+    layers_bulk_move_desc: 'Flytt alle hendelser fra ett lag til et annet.',
+    layers_source: 'Fra lag',
+    layers_target: 'Til lag',
+    layers_move_btn: 'Flytt hendelser',
+    layers_move_same: 'Kilde- og mållag må være forskjellige.',
+    layers_move_confirm: 'Flytt alle hendelser fra "{src}" til "{tgt}"?',
+    layers_move_done: '{n} hendelser flyttet.',
+
     // Groups
     groups_title: 'Grupper',
     groups_add: '+ Ny gruppe',

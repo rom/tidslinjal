@@ -287,6 +287,15 @@ TRANSLATIONS.de = {
     layer_permission_read: 'Gelesen',
     layer_permission_readwrite: 'Read/Write',
 
+    layers_bulk_move: 'Ereignisse verschieben',
+    layers_bulk_move_desc: 'Alle Ereignisse von einer Ebene in eine andere verschieben.',
+    layers_source: 'Von Ebene',
+    layers_target: 'Nach Ebene',
+    layers_move_btn: 'Ereignisse verschieben',
+    layers_move_same: 'Quell- und Zielebene müssen unterschiedlich sein.',
+    layers_move_confirm: 'Alle Ereignisse von "{src}" nach "{tgt}" verschieben?',
+    layers_move_done: '{n} Ereignisse verschoben.',
+
     // Groups
     groups_title: 'Gruppen',
     groups_add: '+ New Group',
