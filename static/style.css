@@ -683,12 +683,16 @@ body.hover-zoom-enabled .event-block:hover {
   min-height: 18px;
 }
 
-/* Transport — parallelogram with dashed top/bottom borders */
+/* Transport — motion-lines pattern, distinct from regular events */
 .event-block.ev-type-transport {
   border-radius: 2px;
-  clip-path: polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%);
-  border-left: none;
-  background-image: repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,.15) 6px, rgba(255,255,255,.15) 12px) !important;
+  border-left: 4px solid rgba(255,255,255,.5);
+  border-right: 4px solid rgba(255,255,255,.3);
+  background-image: repeating-linear-gradient(
+    -60deg,
+    transparent, transparent 5px,
+    rgba(255,255,255,.1) 5px, rgba(255,255,255,.1) 7px
+  ) !important;
   background-blend-mode: overlay;
 }
 
