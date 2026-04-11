@@ -1265,6 +1265,14 @@ TRANSLATIONS.nl = {
     settings_view_spacing_desc: 'Vertical spacing multiplier for timeline rows.',
     settings_view_spacing_info: 'Adjust the vertical spacing between rows on the timeline.',
 
+    settings_min_event_height: 'Minimale evenementgrootte',
+    settings_min_event_height_desc: 'Zorg dat korte evenementen groot genoeg worden weergegeven om de titel en tijd te lezen.',
+    settings_min_event_height_info: 'Stel een grotere minimumhoogte in voor evenementen zodat korte evenementen leesbaar blijven.',
+    settings_meh_default: 'Standaard',
+    settings_meh_medium: 'Middel',
+    settings_meh_large: 'Groot',
+    settings_meh_xlarge: 'Extra groot',
+
     // Person ready check additions
     prc_filter_online: 'Online only',
     prc_filter_all: 'All users',

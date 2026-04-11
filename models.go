@@ -85,6 +85,12 @@ var SystemEventTypes = []EventTypeDef{
 		LabelSV: "Tidsstyrd händelse", LabelFR: "Événement chronométré"},
 	{Key: "external_event", Label: "External Event", Color: "#6C5CE7", IsSystem: true, Icon: "🔌",
 		LabelSV: "Extern händelse", LabelFR: "Événement externe"},
+	{Key: "starting_point", Label: "Starting Point", Color: "#2ECC71", IsSystem: true, Icon: "▶",
+		LabelSV: "Startpunkt", LabelFR: "Point de départ"},
+	{Key: "ending_point", Label: "Ending Point", Color: "#E74C3C", IsSystem: true, Icon: "⏹",
+		LabelSV: "Slutpunkt", LabelFR: "Point d'arrivée"},
+	{Key: "transport", Label: "Transport", Color: "#3498DB", IsSystem: true, Icon: "🚚",
+		LabelSV: "Transport", LabelFR: "Transport"},
 }
 
 // EventTypeDef is a dynamic (user/admin definable) event type

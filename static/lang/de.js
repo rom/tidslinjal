@@ -1265,6 +1265,14 @@ TRANSLATIONS.de = {
     settings_view_spacing_desc: 'Vertical spacing multiplier for timeline rows.',
     settings_view_spacing_info: 'Adjust the vertical spacing between rows on the timeline.',
 
+    settings_min_event_height: 'Mindestgröße für Ereignisse',
+    settings_min_event_height_desc: 'Stellen Sie sicher, dass kurze Ereignisse groß genug angezeigt werden, um Titel und Uhrzeit lesen zu können.',
+    settings_min_event_height_info: 'Legen Sie eine größere Mindesthöhe für Ereignisse fest, damit kurze Ereignisse lesbar bleiben.',
+    settings_meh_default: 'Standard',
+    settings_meh_medium: 'Mittel',
+    settings_meh_large: 'Groß',
+    settings_meh_xlarge: 'Sehr groß',
+
     // Person ready check additions
     prc_filter_online: 'Online only',
     prc_filter_all: 'All users',

@@ -665,6 +665,31 @@ body.hover-zoom-enabled .event-block:hover {
   font-size: 12px; color: inherit; opacity: .9;
 }
 
+/* Starting point — right-pointing pentagon (arrow shape) */
+.event-block.ev-type-starting_point {
+  border-radius: 4px 0 0 4px;
+  clip-path: polygon(0% 0%, 80% 0%, 100% 50%, 80% 100%, 0% 100%);
+  border-left: none;
+  padding-right: 20%;
+}
+
+/* Ending point — left-pointing flag/stop shape */
+.event-block.ev-type-ending_point {
+  border-radius: 0 4px 4px 0;
+  clip-path: polygon(20% 0%, 100% 0%, 100% 100%, 20% 100%, 0% 50%);
+  border-left: none;
+  padding-left: 20%;
+}
+
+/* Transport — parallelogram with dashed top/bottom borders */
+.event-block.ev-type-transport {
+  border-radius: 2px;
+  clip-path: polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%);
+  border-left: none;
+  background-image: repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,.15) 6px, rgba(255,255,255,.15) 12px) !important;
+  background-blend-mode: overlay;
+}
+
 /* Intern / Extern participant badges on event blocks */
 .ev-participant {
   display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .04em;

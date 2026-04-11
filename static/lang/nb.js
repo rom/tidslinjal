@@ -1189,6 +1189,14 @@ TRANSLATIONS.nb = {
     settings_view_spacing_desc:'Multiplikator for vertikal avstand for tidslinjers rader.',
     settings_view_spacing_info:'Juster den vertikale avstanden mellom rader på tidslinjen.',
 
+    settings_min_event_height: 'Minste hendelsesstørrelse',
+    settings_min_event_height_desc: 'Sørg for at korte hendelser vises store nok til å lese tittel og tid.',
+    settings_min_event_height_info: 'Angi en større minimumshøyde for hendelser slik at korte hendelser fortsatt er lesbare.',
+    settings_meh_default: 'Standard',
+    settings_meh_medium: 'Middels',
+    settings_meh_large: 'Stor',
+    settings_meh_xlarge: 'Ekstra stor',
+
     // Person ready check additions
     prc_filter_online:         'Kun online',
     prc_filter_all:            'Alle brukere',

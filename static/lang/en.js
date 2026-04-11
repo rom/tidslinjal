@@ -1395,6 +1395,13 @@ TRANSLATIONS.en = {
     settings_view_spacing:     'Vertical Spacing',
     settings_view_spacing_desc:'Vertical spacing multiplier for timeline rows.',
     settings_view_spacing_info:'Adjust the vertical spacing between rows on the timeline.',
+    settings_min_event_height: 'Minimum Event Size',
+    settings_min_event_height_desc: 'Ensure short events are displayed large enough to read their title and time.',
+    settings_min_event_height_info: 'Set a larger minimum height for events so short-duration events are still readable.',
+    settings_meh_default: 'Default',
+    settings_meh_medium: 'Medium',
+    settings_meh_large: 'Large',
+    settings_meh_xlarge: 'Extra Large',
 
     // Person ready check additions
     prc_filter_online:         'Online only',

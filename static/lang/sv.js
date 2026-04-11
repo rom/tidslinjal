@@ -1133,6 +1133,14 @@ TRANSLATIONS.sv = {
     settings_view_spacing_desc:'Vertikal avståndsmultiplikator för tidslinjerader.',
     settings_view_spacing_info:'Justera vertikalt avstånd mellan rader på tidslinjen.',
 
+    settings_min_event_height: 'Minsta händelsestorlek',
+    settings_min_event_height_desc: 'Se till att korta händelser visas tillräckligt stora för att läsa titel och tid.',
+    settings_min_event_height_info: 'Ange en större minimihöjd för händelser så att korta händelser fortfarande är läsbara.',
+    settings_meh_default: 'Standard',
+    settings_meh_medium: 'Medel',
+    settings_meh_large: 'Stor',
+    settings_meh_xlarge: 'Extra stor',
+
     prc_filter_online:         'Bara online',
     prc_filter_all:            'Alla användare',
     prc_send_to_group:         'Skicka till grupp/team',

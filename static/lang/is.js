@@ -1289,6 +1289,14 @@ TRANSLATIONS.is = {
     settings_view_spacing_desc:'Vertical spacing multiplier for timeline rows.',
     settings_view_spacing_info:'Adjust the vertical spacing between rows on the timeline.',
 
+    settings_min_event_height: 'Lágmarksstærð atburða',
+    settings_min_event_height_desc: 'Tryggðu að stuttir atburðir birtist nógu stórir til að lesa titil og tíma.',
+    settings_min_event_height_info: 'Stilltu hærri lágmarkshæð á atburði svo stuttir atburðir séu enn læsilegir.',
+    settings_meh_default: 'Sjálfgefið',
+    settings_meh_medium: 'Miðlungs',
+    settings_meh_large: 'Stórt',
+    settings_meh_xlarge: 'Mjög stórt',
+
     // Person ready check additions
     prc_filter_online:         'Online only',
     prc_filter_all:            'All users',

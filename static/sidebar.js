@@ -794,7 +794,8 @@ function renderSidebar() {
             const lbl = lang==='sv'&&et.label_sv ? et.label_sv : lang==='fr'&&et.label_fr ? et.label_fr : et.label;
             const hidden = isTypeHidden(et.key);
             const _builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
-              instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸' };
+              instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌', pause:'⏸',
+              starting_point:'▶', ending_point:'⏹', transport:'🚚' };
             const etIcon = et.icon || _builtinTypeIcons[et.key] || '';
             return `<div class="legend-item${hidden?' hidden-type':''}" data-action="toggleType" data-arg="${et.key}">
               <div class="legend-swatch" style="background:${cbSafeColor(et.color)}"></div>
@@ -3167,6 +3168,16 @@ Fields: file, subject, sender, type, tags</pre>
           <button class="toggle-btn${(p.view_spacing||1)===1?' active':''}" data-action="setViewSpacing" data-arg="1">1×</button>
           <button class="toggle-btn${p.view_spacing===1.5?' active':''}" data-action="setViewSpacing" data-arg="1.5">1.5×</button>
           <button class="toggle-btn${p.view_spacing===2?' active':''}" data-action="setViewSpacing" data-arg="2">2×</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_min_event_height')||'Minimum Event Size'} <span title="${t('settings_min_event_height_info')||'Set a larger minimum height for events so short-duration events are still readable.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span></div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_min_event_height_desc')||'Ensure short events are displayed large enough to read their title and time.'}</p>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.min_event_height||14)===14?' active':''}" data-action="setPref" data-args='["min_event_height",14]'>${t('settings_meh_default')||'Default'}</button>
+          <button class="toggle-btn${p.min_event_height===28?' active':''}" data-action="setPref" data-args='["min_event_height",28]'>${t('settings_meh_medium')||'Medium'}</button>
+          <button class="toggle-btn${p.min_event_height===44?' active':''}" data-action="setPref" data-args='["min_event_height",44]'>${t('settings_meh_large')||'Large'}</button>
+          <button class="toggle-btn${p.min_event_height===64?' active':''}" data-action="setPref" data-args='["min_event_height",64]'>${t('settings_meh_xlarge')||'Extra Large'}</button>
         </div>
       </div>
       <div class="sidebar-section">
