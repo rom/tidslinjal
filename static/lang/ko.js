@@ -1143,6 +1143,12 @@ TRANSLATIONS.ko = {
 
     settings_show_event_creator: '이벤트에 작성자 이름 표시',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
+    settings_event_point_shape: '시작/종료 이벤트 모양',
+    settings_event_point_shape_desc: '타임라인의 시작점 및 종료점 이벤트의 시각적 스타일.',
+    settings_shape_arrow: '화살표',
+    settings_shape_diamond: '다이아몬드',
+    settings_shape_bar: '막대',
+    settings_shape_pill: '알약형',
     settings_hover_zoom: 'Hover Zoom',
     settings_hover_zoom_desc: 'Enlarge calendar events on hover',
     settings_hover_zoom_info: 'When enabled, hovering over a timeline event will enlarge it for easier reading.',

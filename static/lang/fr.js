@@ -1072,6 +1072,12 @@ TRANSLATIONS.fr = {
     settings_show_event_creator: 'Afficher le nom du créateur sur les événements',
     settings_show_event_icons_info: 'Affiche de petites icônes sur les événements indiquant leur type, pièces jointes et autres attributs.',
 
+    settings_event_point_shape: 'Forme des événements début/fin',
+    settings_event_point_shape_desc: 'Style visuel des points de départ et d'arrivée sur la chronologie.',
+    settings_shape_arrow: 'Flèche',
+    settings_shape_diamond: 'Losange',
+    settings_shape_bar: 'Barre',
+    settings_shape_pill: 'Arrondi',
     settings_hover_zoom:       'Zoom au survol',
     settings_hover_zoom_desc:  'Agrandir les événements au survol',
     settings_hover_zoom_info:  'Lorsqu\'activé, le survol d\'un événement l\'agrandit pour une lecture plus facile.',

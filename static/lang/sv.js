@@ -1132,6 +1132,12 @@ TRANSLATIONS.sv = {
     settings_show_event_creator: 'Visa skaparens namn på händelser',
     settings_show_event_icons_info: 'Visar små ikoner på tidslinjehändelser som anger typ, bilagor och andra attribut.',
 
+    settings_event_point_shape: 'Form för start-/sluthändelser',
+    settings_event_point_shape_desc: 'Visuell stil för startpunkt- och slutpunkthändelser på tidslinjen.',
+    settings_shape_arrow: 'Pil',
+    settings_shape_diamond: 'Diamant',
+    settings_shape_bar: 'Streck',
+    settings_shape_pill: 'Rundad',
     settings_hover_zoom:       'Hoverzoom',
     settings_hover_zoom_desc:  'Förstorar kalenderhändelser vid hovring',
     settings_hover_zoom_info:  'Vid aktivering förstoras en tidslinjehändelse när du hovrar över den.',

@@ -171,6 +171,9 @@ function applyPreferences() {
   // Color-blind safe palette
   const cbMode = state.preferences.color_blind_mode || 'off';
   if (cbMode !== 'off') body.classList.add('cb-' + cbMode);
+  // Start/end event shape
+  const evShape = state.preferences.event_point_shape || 'arrow';
+  if (evShape !== 'arrow') body.classList.add('ev-shape-' + evShape);
   // Apply view spacing
   const spacing = state.preferences.view_spacing || 1;
   document.documentElement.style.setProperty('--view-spacing', spacing);

@@ -1187,6 +1187,12 @@ TRANSLATIONS.nb = {
     settings_show_event_icons_info: 'Vis små ikoner på tidslinjehendelser som angir type, vedlegg og andre attributter.',
 
     // Hover zoom (i18n)
+    settings_event_point_shape: 'Form for start-/slutthendelser',
+    settings_event_point_shape_desc: 'Visuell stil for startpunkt- og sluttpunkthendelser på tidslinjen.',
+    settings_shape_arrow: 'Pil',
+    settings_shape_diamond: 'Diamant',
+    settings_shape_bar: 'Strek',
+    settings_shape_pill: 'Avrundet',
     settings_hover_zoom:       'Hover-zoom',
     settings_hover_zoom_desc:  'Forstørr kalenderhendelser ved hover',
     settings_hover_zoom_info:  'Når aktivert, vil å holde musepekeren over en tidslinjehendelse forstørre den for enklere lesing.',
