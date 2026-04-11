@@ -106,7 +106,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	if !hasRole(user.Role, RoleAdmin) && user.ID != id {
+	if !app.effectiveHasRole(user, RoleAdmin) && user.ID != id {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -148,7 +148,7 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 			return
 		}
 		// Non-admin users must verify their current password before changing it
-		if !hasRole(user.Role, RoleAdmin) {
+		if !app.effectiveHasRole(user, RoleAdmin) {
 			if err := bcrypt.CompareHashAndPassword([]byte(existing.PasswordHash), []byte(req.CurrentPassword)); err != nil {
 				jsonError(w, "current password incorrect", http.StatusUnauthorized)
 				return
@@ -171,10 +171,10 @@ func (app *App) handleUpdateUser(w http.ResponseWriter, r *http.Request, user *U
 	}
 	// V-22 fix: only update email if the request explicitly provided a value
 	// (avoid wiping email when field is omitted from JSON)
-	if req.Email != "" || hasRole(user.Role, RoleAdmin) {
+	if req.Email != "" || app.effectiveHasRole(user, RoleAdmin) {
 		existing.Email = req.Email
 	}
-	if hasRole(user.Role, RoleAdmin) {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		if req.Role != "" {
 			// V-12 fix: validate role against allowed whitelist (built-in + custom roles)
 			if !app.validRolesSet()[req.Role] {
@@ -246,7 +246,7 @@ func (app *App) handleDeleteUser(w http.ResponseWriter, r *http.Request, user *U
 
 // handleAddUserLabel adds a label to a user. Requires TeamLead+ or admin role.
 func (app *App) handleAddUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "insufficient permissions: TeamLead or higher required", http.StatusForbidden)
 		return
 	}
@@ -292,7 +292,7 @@ func (app *App) handleAddUserLabel(w http.ResponseWriter, r *http.Request, user 
 
 // handleRemoveUserLabel removes a label from a user by label text. Requires TeamLead+ or admin.
 func (app *App) handleRemoveUserLabel(w http.ResponseWriter, r *http.Request, user *User) {
-	if !hasRole(user.Role, RoleTeamLead) {
+	if !app.effectiveHasRole(user, RoleTeamLead) {
 		jsonError(w, "insufficient permissions: TeamLead or higher required", http.StatusForbidden)
 		return
 	}

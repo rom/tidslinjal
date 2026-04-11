@@ -49,7 +49,7 @@ func (app *App) handleTeamLeadQuickResponse(w http.ResponseWriter, r *http.Reque
 	case "oplead":
 		// Send only to OpLead+ roles
 		for _, u := range app.store.GetUsers() {
-			if u.ID != user.ID && hasRole(u.Role, RoleOpLead) {
+			if u.ID != user.ID && app.effectiveHasRole(&u, RoleOpLead) {
 				app.broker.SendToUser(u.ID, msg)
 			}
 		}
@@ -57,7 +57,7 @@ func (app *App) handleTeamLeadQuickResponse(w http.ResponseWriter, r *http.Reque
 		// Send to OpLead+ and Deputy OpLead roles
 		targetLabel = "Operations Lead + Deputies"
 		for _, u := range app.store.GetUsers() {
-			if u.ID != user.ID && (hasRole(u.Role, RoleOpLead) || u.Role == RoleDeputyOpLead) {
+			if u.ID != user.ID && (app.effectiveHasRole(&u, RoleOpLead) || u.Role == RoleDeputyOpLead) {
 				app.broker.SendToUser(u.ID, msg)
 			}
 		}
@@ -294,7 +294,7 @@ func (app *App) handleTeamLeadQuickReport(w http.ResponseWriter, r *http.Request
 			continue
 		}
 		// Send to OpLead+ or info_handler capability roles
-		isLeadership := hasRole(u.Role, RoleOpLead)
+		isLeadership := app.effectiveHasRole(&u, RoleOpLead)
 		isInfoHandler := infoHandlerRoles[string(u.Role)]
 		if isLeadership || isInfoHandler {
 			app.broker.SendToUser(u.ID, SSEMessage{Event: "quick_report", Data: string(payload)})
@@ -315,7 +315,7 @@ func (app *App) handleTeamLeadQuickReport(w http.ResponseWriter, r *http.Request
 
 func (app *App) handleGetQuickReports(w http.ResponseWriter, r *http.Request, user *User) {
 	// Only leadership and info_handler roles can view reports
-	isLeadership := hasRole(user.Role, RoleOpLead)
+	isLeadership := app.effectiveHasRole(user, RoleOpLead)
 	roleConfigs := app.store.GetRoleConfigs()
 	isInfoHandler := false
 	for _, rc := range roleConfigs {
@@ -325,7 +325,7 @@ func (app *App) handleGetQuickReports(w http.ResponseWriter, r *http.Request, us
 		}
 	}
 	// TeamLead+ can also see reports they sent
-	isTeamLead := hasRole(user.Role, RoleTeamLead)
+	isTeamLead := app.effectiveHasRole(user, RoleTeamLead)
 
 	if !isLeadership && !isInfoHandler && !isTeamLead {
 		jsonError(w, "forbidden", http.StatusForbidden)

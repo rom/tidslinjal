@@ -14,7 +14,7 @@ func (app *App) canReadLayer(layerID int64, user *User) bool {
 	if !ok {
 		return false
 	}
-	if layer.OwnerID == user.ID || hasRole(user.Role, RoleAdmin) {
+	if layer.OwnerID == user.ID || app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	if layer.Visibility == "public" {
@@ -40,7 +40,7 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 	if !ok {
 		return false
 	}
-	if layer.OwnerID == user.ID || hasRole(user.Role, RoleAdmin) {
+	if layer.OwnerID == user.ID || app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	// Custom roles with manage_layers capability can write to any layer
@@ -66,7 +66,7 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 // Admins get nil (meaning "all layers visible").
 // V3-H02 fix: centralized layer filtering for all event queries.
 func (app *App) visibleLayerSet(user *User) map[int64]bool {
-	if hasRole(user.Role, RoleAdmin) || app.userHasCapability(user, "manage_layers") {
+	if app.effectiveHasRole(user, RoleAdmin) || app.userHasCapability(user, "manage_layers") {
 		return nil // nil = no filter, admin/manage_layers sees everything
 	}
 	vis := make(map[int64]bool)
@@ -114,7 +114,7 @@ func (app *App) canUserSeeEvent(userID int64, ev *Event) bool {
 	if !ok {
 		return false
 	}
-	if hasRole(user.Role, RoleAdmin) {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	return app.canReadLayer(*ev.LayerID, user)
@@ -124,7 +124,7 @@ func (app *App) canUserSeeEvent(userID int64, ev *Event) bool {
 
 func (app *App) handleGetLayers(w http.ResponseWriter, r *http.Request, user *User) {
 	var layers []Layer
-	if hasRole(user.Role, RoleAdmin) {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		// Admins see all layers
 		layers = app.store.GetAllLayers()
 	} else {
@@ -177,7 +177,7 @@ func (app *App) handleUpdateLayer(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.OwnerID != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if existing.OwnerID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -212,7 +212,7 @@ func (app *App) handleDeleteLayer(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.OwnerID != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if existing.OwnerID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}

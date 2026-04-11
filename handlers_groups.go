@@ -12,8 +12,8 @@ import (
 func (app *App) handleGetGroups(w http.ResponseWriter, r *http.Request, user *User) {
 	var groups []Group
 	// ?all=true allows team leads and above to see all groups (for board sharing, etc.)
-	showAll := r.URL.Query().Get("all") == "true" && hasRole(user.Role, RoleTeamLead)
-	if hasRole(user.Role, RoleAdmin) || showAll {
+	showAll := r.URL.Query().Get("all") == "true" && app.effectiveHasRole(user, RoleTeamLead)
+	if app.effectiveHasRole(user, RoleAdmin) || showAll {
 		groups = app.store.GetGroups()
 	} else {
 		// Non-admins see only groups they're members of
@@ -111,7 +111,7 @@ func (app *App) handleUpdateGroup(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.CreatedBy != user.ID && !hasRole(user.Role, RoleAdmin) {
+	if existing.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}

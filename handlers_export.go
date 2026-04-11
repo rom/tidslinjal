@@ -9,7 +9,7 @@ import (
 )
 
 func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User) {
-	isPrivileged := hasRole(user.Role, RoleOpLead)
+	isPrivileged := app.effectiveHasRole(user, RoleOpLead)
 	include := r.URL.Query().Get("include")
 	if include == "" {
 		include = "events,groups,layers,alarms,phases,event_types,comments,day_labels"
@@ -29,7 +29,7 @@ func (app *App) handleExport(w http.ResponseWriter, r *http.Request, user *User)
 }
 
 func (app *App) handleImport(w http.ResponseWriter, r *http.Request, user *User) {
-	isPrivileged := hasRole(user.Role, RoleOpLead)
+	isPrivileged := app.effectiveHasRole(user, RoleOpLead)
 	if err := r.ParseMultipartForm(20 << 20); err != nil {
 		jsonError(w, "failed to parse form (max 20MB)", http.StatusBadRequest)
 		return
