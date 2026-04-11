@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
@@ -1488,14 +1490,18 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				case "csv":
 					w.Header().Set("Content-Type", "text/csv")
 					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.csv"`, filename))
-					b, _ := json.Marshal(data)
-					w.Write(b) // simplified — real CSV conversion would be more complex
+					writeLogCSV(w, logType, data)
 				case "xml":
 					w.Header().Set("Content-Type", "application/xml")
 					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.xml"`, filename))
-					w.Write([]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"))
-					b, _ := json.Marshal(data)
-					w.Write([]byte(fmt.Sprintf("<data>%s</data>", string(b))))
+					w.Write([]byte(xml.Header))
+					enc := xml.NewEncoder(w)
+					enc.Indent("", "  ")
+					type xmlWrap struct {
+						XMLName xml.Name    `xml:"data"`
+						Entries interface{} `xml:"entry"`
+					}
+					enc.Encode(xmlWrap{Entries: data}) //nolint
 				default:
 					w.Header().Set("Content-Type", "application/json")
 					w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.json"`, filename))
@@ -2399,6 +2405,53 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 }
 
 // apiVersionRewrite transparently rewrites /api/v1/* requests to /api/* so that
+// writeLogCSV writes log entries as proper CSV. It uses reflection-free JSON
+// marshaling to extract fields, then writes them as CSV rows.
+func writeLogCSV(w http.ResponseWriter, logType string, data interface{}) {
+	// Marshal to JSON then unmarshal as generic slice to get field names/values
+	b, err := json.Marshal(data)
+	if err != nil {
+		w.Write([]byte("error marshaling data"))
+		return
+	}
+	var rows []map[string]interface{}
+	if err := json.Unmarshal(b, &rows); err != nil {
+		// Might be a single object, not a slice
+		w.Write(b)
+		return
+	}
+	if len(rows) == 0 {
+		w.Write([]byte("No data\n"))
+		return
+	}
+	// Collect headers from all rows
+	headerSet := make(map[string]bool)
+	var headers []string
+	for _, row := range rows {
+		for k := range row {
+			if !headerSet[k] {
+				headerSet[k] = true
+				headers = append(headers, k)
+			}
+		}
+	}
+	cw := csv.NewWriter(w)
+	cw.Write(headers) //nolint
+	for _, row := range rows {
+		record := make([]string, len(headers))
+		for i, h := range headers {
+			v := row[h]
+			if v == nil {
+				record[i] = ""
+			} else {
+				record[i] = fmt.Sprintf("%v", v)
+			}
+		}
+		cw.Write(record) //nolint
+	}
+	cw.Flush()
+}
+
 // clients can start using versioned URLs today. The /api/* paths continue to work
 // as an alias for the current (v1) API version.
 func apiVersionRewrite(next http.Handler) http.Handler {
