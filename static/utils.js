@@ -286,8 +286,15 @@ function a11yAnnounce(message) {
 
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    // Track where mousedown occurred to prevent closing the modal when
+    // the user click-drags to select text inside an input and the mouse
+    // crosses outside the .modal div into the overlay background area.
+    overlay.addEventListener('mousedown', e => {
+      overlay._mdOnOverlay = (e.target === overlay);
+    });
     overlay.addEventListener('click', e => {
-      if (e.target === overlay) closeModal(overlay.id);
+      if (e.target === overlay && overlay._mdOnOverlay) closeModal(overlay.id);
+      overlay._mdOnOverlay = false;
     });
   });
 });

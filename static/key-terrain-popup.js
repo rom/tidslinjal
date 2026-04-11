@@ -5,13 +5,24 @@
 'use strict';
 
 // ── Theme sync via BroadcastChannel ────────────────────────────────────────
+// Theme class names match main style.css:
+//   dark  → no class (default, :root provides variables)
+//   light → 'light-mode'
+//   city-camo  → 'city-camo'
+//   urban-camo → 'urban-camo'
+var _themeClassMap = { 'light': 'light-mode', 'city-camo': 'city-camo', 'urban-camo': 'urban-camo' };
+var _allThemeClasses = ['light-mode', 'city-camo', 'urban-camo'];
+
 function applyTheme(theme) {
-  var cls = 'theme-' + (theme || 'dark');
-  document.body.className = cls;
-  document.documentElement.setAttribute('data-theme', theme || 'dark');
+  var t = theme || 'dark';
+  // Remove all theme classes, then add the correct one
+  _allThemeClasses.forEach(function(c) { document.body.classList.remove(c); });
+  var cls = _themeClassMap[t];
+  if (cls) document.body.classList.add(cls);
+  document.documentElement.setAttribute('data-theme', t);
 }
 
-// Try to read theme from opener, then fallback to stored preference
+// Try to read theme from opener, then default to dark (matches :root in style.css)
 (function initTheme() {
   var theme = 'dark';
   try {

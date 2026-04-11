@@ -1254,6 +1254,11 @@ function setupKeyboardShortcuts() {
     // Skip when inside a spreadsheet (jspreadsheet handles its own keys)
     if (typeof _isInSpreadsheet === 'function' && _isInSpreadsheet(document.activeElement || e.target)) return;
 
+    // When a modal is open, only allow Escape (to close it) — all other
+    // shortcuts would unexpectedly trigger actions behind the modal.
+    const openModals = document.querySelectorAll('.modal-overlay.open');
+    if (openModals.length > 0 && e.key !== 'Escape') return;
+
     switch (e.key) {
       case 'ArrowLeft':  if (!e.shiftKey) navigate(-1); break;
       case 'ArrowRight': if (!e.shiftKey) navigate(1);  break;
