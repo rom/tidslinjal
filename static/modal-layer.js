@@ -3,7 +3,7 @@
 // ── Layer Modal ────────────────────────────────────────────────────────────
 function openLayerModal(layer) {
   const isEdit = !!layer;
-  document.getElementById('layerModalTitle').textContent = isEdit ? 'Edit Layer' : t('layers_add').replace('+ ','');
+  document.getElementById('layerModalTitle').textContent = isEdit ? (t('layer_edit')||'Edit Layer') : t('layers_add').replace('+ ','');
   document.getElementById('layerId').value = layer ? layer.id : '';
   document.getElementById('layerName').value = layer ? layer.name : '';
   document.getElementById('layerDesc').value = layer ? (layer.description||'') : '';
@@ -35,6 +35,27 @@ function openLayerModal(layer) {
         ${g.description ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(g.description)}</span>` : ''}
       </label>
     `).join('');
+  }
+
+  // Show event count for existing layers
+  const countEl = document.getElementById('layerEventCount');
+  if (countEl) {
+    if (isEdit && layer && state.events) {
+      const evCount = state.events.filter(e => e.layer_id === layer.id).length;
+      if (evCount > 0) {
+        countEl.style.display = '';
+        countEl.style.background = 'var(--bg3)';
+        countEl.style.color = 'var(--text)';
+        countEl.innerHTML = `📊 <strong>${(t('layer_event_count')||'This layer contains {n} events').replace('{n}', evCount)}</strong>`;
+      } else {
+        countEl.style.display = '';
+        countEl.style.background = 'var(--bg3)';
+        countEl.style.color = 'var(--text-dim)';
+        countEl.innerHTML = t('layer_no_events')||'This layer has no events.';
+      }
+    } else {
+      countEl.style.display = 'none';
+    }
   }
 
   const delBtn = document.getElementById('btnDeleteLayer');
@@ -97,8 +118,14 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
 });
 
 async function deleteLayer(id) {
-  if (!confirm(t('confirm_delete_layer'))) return;
   const layerToDelete = state.layers.find(l => l.id === parseInt(id, 10));
+  const evCount = state.events ? state.events.filter(e => e.layer_id === parseInt(id, 10)).length : 0;
+  if (evCount > 0) {
+    const msg = (t('confirm_delete_layer_with_events')||'This layer contains {n} events.\n\nDeleting it will move all events to the Master Timeline.\n\nAre you sure you want to delete this layer?').replace('{n}', evCount);
+    if (!confirm(msg)) return;
+  } else {
+    if (!confirm(t('confirm_delete_layer')||'Delete this layer?')) return;
+  }
   const res = await apiDel(`/api/layers/${id}`);
   if (res.ok) {
     if (layerToDelete) pushUndo('delete_layer', { ...layerToDelete });

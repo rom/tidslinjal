@@ -368,6 +368,11 @@ TRANSLATIONS.ja = {
     confirm_delete_lock: 'このロックを解除しますか？',
     confirm_delete_user: 'このユーザーを削除しますか？',
     confirm_delete_layer: 'このレイヤーを削除しますか？',
+
+    confirm_delete_layer_with_events: 'このレイヤーには {n} 件のイベントがあります。\n\n削除するとマスタータイムラインに移動します。\n\n削除してよろしいですか？',
+    layer_edit: 'レイヤーを編集',
+    layer_event_count: 'このレイヤーには {n} 件のイベントがあります。',
+    layer_no_events: 'このレイヤーにはイベントがありません。',
     confirm_delete_group: 'このグループを削除しますか？',
     confirm_delete_attachment: 'この添付ファイルを削除しますか？',
     confirm_delete_type: 'このイベントタイプを削除しますか？',

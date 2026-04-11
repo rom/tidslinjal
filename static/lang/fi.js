@@ -160,6 +160,11 @@ TRANSLATIONS.fi = {
     confirm_delete_lock: 'Poista tämä lukitus?',
     confirm_delete_user: 'Poista tämä käyttäjä?',
     confirm_delete_layer: 'Poista tämä taso?',
+
+    confirm_delete_layer_with_events: 'Tämä taso sisältää {n} tapahtumaa.\n\nPoistaminen siirtää tapahtumat pääaikajanalle.\n\nHaluatko varmasti poistaa?',
+    layer_edit: 'Muokkaa tasoa',
+    layer_event_count: 'Tämä taso sisältää {n} tapahtumaa.',
+    layer_no_events: 'Tässä tasossa ei ole tapahtumia.',
     confirm_delete_group: 'Poista tämä ryhmä?',
 
     search_placeholder: 'Hae…',

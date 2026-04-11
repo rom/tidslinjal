@@ -429,6 +429,11 @@ TRANSLATIONS.nl = {
     confirm_delete_lock: 'Remove this lock?',
     confirm_delete_user: 'Delete this user?',
     confirm_delete_layer: 'Delete this layer?',
+
+    confirm_delete_layer_with_events: 'Deze laag bevat {n} gebeurtenissen.\n\nVerwijderen verplaatst alle gebeurtenissen naar de hoofdtijdlijn.\n\nWeet u het zeker?',
+    layer_edit: 'Laag bewerken',
+    layer_event_count: 'Deze laag bevat {n} gebeurtenissen.',
+    layer_no_events: 'Deze laag heeft geen gebeurtenissen.',
     confirm_delete_group: 'Delete this group?',
     confirm_delete_attachment: 'Delete this attachment?',
     confirm_delete_type: 'Delete this event type?',

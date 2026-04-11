@@ -270,6 +270,11 @@ TRANSLATIONS.fr = {
     confirm_delete_lock: 'Supprimer ce verrou ?',
     confirm_delete_user: 'Supprimer cet utilisateur ?',
     confirm_delete_layer: 'Supprimer cette couche ?',
+
+    confirm_delete_layer_with_events: 'Cette couche contient {n} événements.\n\nLa suppression déplacera tous les événements vers la chronologie principale.\n\nConfirmer la suppression ?',
+    layer_edit: 'Modifier la couche',
+    layer_event_count: 'Cette couche contient {n} événements.',
+    layer_no_events: 'Cette couche ne contient aucun événement.',
     confirm_delete_group: 'Supprimer ce groupe ?',
     confirm_delete_attachment: 'Supprimer cette pièce jointe ?',
     confirm_delete_type: 'Supprimer ce type d\'événement ?',

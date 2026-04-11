@@ -428,6 +428,11 @@ TRANSLATIONS.is = {
     confirm_delete_lock: 'Remove this lock?',
     confirm_delete_user: 'Delete this user?',
     confirm_delete_layer: 'Delete this layer?',
+
+    confirm_delete_layer_with_events: 'Þetta lag inniheldur {n} atburði.\n\nEyðing mun færa alla atburði á aðaltímalínu.\n\nErtu viss?',
+    layer_edit: 'Breyta lagi',
+    layer_event_count: 'Þetta lag inniheldur {n} atburði.',
+    layer_no_events: 'Þetta lag hefur enga atburði.',
     confirm_delete_group: 'Delete this group?',
     confirm_delete_attachment: 'Delete this attachment?',
     confirm_delete_type: 'Delete this event type?',

@@ -429,6 +429,11 @@ TRANSLATIONS.nb = {
     confirm_delete_lock: 'Fjerne denne låsen?',
     confirm_delete_user: 'Slette denne brukeren?',
     confirm_delete_layer: 'Slette dette laget?',
+
+    confirm_delete_layer_with_events: 'Dette laget inneholder {n} hendelser.\n\nSletting vil flytte alle hendelser til hovedtidslinjen.\n\nEr du sikker?',
+    layer_edit: 'Rediger lag',
+    layer_event_count: 'Dette laget inneholder {n} hendelser.',
+    layer_no_events: 'Dette laget har ingen hendelser.',
     confirm_delete_group: 'Slette denne gruppen?',
     confirm_delete_attachment: 'Slette dette vedlegget?',
     confirm_delete_type: 'Slette denne hendelsestypen?',
