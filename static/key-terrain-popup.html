@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tidslinjal — Key Terrain Board</title>
+<link rel="icon" href="/static/favicon.ico" sizes="16x16" type="image/x-icon">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── Theme overrides for standalone page ── */
+body.theme-dark  { --bg:#1a1d23; --bg2:#22262e; --bg3:#2a2e38; --text:#e8eaf0; --text-dim:#9098b0; --accent:#4a9eff; --border:#2e3340; --danger:#e05252; }
+body.theme-light { --bg:#f0f2f5; --bg2:#ffffff; --bg3:#e8eaf0; --text:#1a1d23; --text-dim:#666; --accent:#1a6ed8; --border:#d0d4de; --danger:#c0392b; }
+body.theme-city-camo { --bg:#2b3325; --bg2:#333d2c; --bg3:#3a4532; --text:#d4dbc0; --text-dim:#8d9a78; --accent:#8fb85c; --border:#404d34; --danger:#e05252; }
+body.theme-urban-camo { --bg:#1a2233; --bg2:#1e293b; --bg3:#243044; --text:#c8d8e8; --text-dim:#7a90a8; --accent:#4a90d9; --border:#3a4a5c; --danger:#e05252; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; display:flex; flex-direction:column; }
+
+/* ── Top bar ── */
+.top-bar { display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+.top-bar .title { font-size:13px; font-weight:700; color:var(--accent); letter-spacing:.05em; flex:1; }
+.top-bar button { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:4px 12px; cursor:pointer; font-size:12px; }
+.top-bar button:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
+.top-bar .url-bar { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--text-dim); }
+.top-bar .url-bar input { background:var(--bg3); border:1px solid var(--border); border-radius:3px; color:var(--text); padding:2px 6px; font-size:10px; font-family:monospace; width:220px; }
+
+/* ── Board content area ── */
+.kt-page-content { flex:1; overflow:auto; padding:16px; }
+
+/* ── Standalone overrides: no modal overlay needed ── */
+.modal-overlay { position:static !important; background:none !important; display:block !important; }
+.modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:0 !important; border:none !important; overflow:visible !important; }
+</style>
+</head>
+<body class="theme-dark">
+<div class="top-bar">
+  <span class="title">🏔️ Key Terrain Board</span>
+  <div class="url-bar">
+    <span>URL:</span>
+    <input id="ktPageURL" readonly>
+    <button id="ktPageCopyURL" title="Copy URL">Copy</button>
+  </div>
+  <button id="btnRefresh" title="Refresh data">🔄 Refresh</button>
+</div>
+<div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div>
+<div class="kt-page-content" id="ktPageRoot"></div>
+
+<!-- Core dependencies (order matters) -->
+<script src="/static/i18n.js"></script>
+<script src="/static/lang/en.js"></script>
+<script src="/static/utils.js"></script>
+<script src="/static/state.js"></script>
+<script src="/static/api.js"></script>
+<script src="/static/modals.js"></script>
+<script src="/static/key-terrain.js"></script>
+
+<!-- Standalone bootstrap -->
+<script src="/static/key-terrain-popup.js"></script>
+</body>
+</html>

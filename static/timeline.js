@@ -743,8 +743,12 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         if (ev.status === 'cancelled') block.style.opacity = '0.45';
         if (ev.status === 'rejected')  block.style.outline = '2px solid var(--red)';
         if (ev.status === 'verified')  block.style.outline = '2px solid var(--green)';
+        // Country flag from physical_location (e.g. "SE" → 🇸🇪, "Sweden" → 🇸🇪)
+        const locFlag = (typeof locationToFlag === 'function') ? locationToFlag(ev.physical_location) : '';
+        const flagSpan = locFlag ? `<span class="ev-icon" title="${escHtml(ev.physical_location)}">${locFlag}</span>` : '';
+
         block.innerHTML = `
-          <div class="ev-title">${statusDot}${recurIcon}${instantIcon}${typeIcon}${escHtml(ev.title)}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
+          <div class="ev-title">${statusDot}${recurIcon}${instantIcon}${typeIcon}${flagSpan}${escHtml(ev.title)}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
           ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>

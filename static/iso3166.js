@@ -298,3 +298,103 @@ function countryName(code) {
   const a2 = _alpha3ToAlpha2[upper];
   return a2 ? ISO3166_COUNTRIES[a2].name : upper;
 }
+
+// ── Country flag from location string ─────────────────────────────────────
+// Build reverse lookups: English name → alpha-2, alpha-3 → alpha-2
+const _nameToAlpha2 = {};
+for (const [a2, info] of Object.entries(ISO3166_COUNTRIES)) {
+  _nameToAlpha2[info.name.toLowerCase()] = a2;
+}
+
+// Common localized / endonym country names → alpha-2
+const _localizedNames = {
+  'sverige':'SE', 'schweden':'SE', 'suecia':'SE', 'svezia':'SE', 'ruotsi':'SE', 'suède':'SE',
+  'norge':'NO', 'norwegen':'NO', 'noruega':'NO', 'norja':'NO', 'norvège':'NO',
+  'danmark':'DK', 'dänemark':'DK', 'dinamarca':'DK', 'tanska':'DK', 'danemark':'DK',
+  'suomi':'FI', 'finnland':'FI', 'finlandia':'FI', 'finlande':'FI',
+  'island':'IS', 'islande':'IS', 'islandia':'IS', 'islanti':'IS',
+  'deutschland':'DE', 'alemania':'DE', 'allemagne':'DE', 'germania':'DE', 'saksa':'DE', 'tyskland':'DE',
+  'frankrike':'FR', 'frankreich':'FR', 'francia':'FR', 'ranska':'FR',
+  'storbritannien':'GB', 'großbritannien':'GB', 'grossbritannien':'GB', 'reino unido':'GB', 'royaume-uni':'GB', 'iso-britannia':'GB',
+  'förenta staterna':'US', 'vereinigte staaten':'US', 'estados unidos':'US', 'états-unis':'US', 'yhdysvallat':'US',
+  'usa':'US', 'uk':'GB',
+  'italien':'IT', 'italie':'IT', 'italia':'IT',
+  'spanien':'ES', 'espagne':'ES', 'españa':'ES', 'espanja':'ES',
+  'polen':'PL', 'pologne':'PL', 'polonia':'PL', 'puola':'PL',
+  'nederländerna':'NL', 'niederlande':'NL', 'países bajos':'NL', 'pays-bas':'NL', 'hollanti':'NL', 'holland':'NL',
+  'belgien':'BE', 'belgique':'BE', 'belgio':'BE', 'belgia':'BE',
+  'österrike':'AT', 'österreich':'AT', 'autriche':'AT', 'itävalta':'AT',
+  'schweiz':'CH', 'suisse':'CH', 'svizzera':'CH', 'sveitsi':'CH',
+  'tjeckien':'CZ', 'tschechien':'CZ', 'tchéquie':'CZ', 'tšekki':'CZ',
+  'ungern':'HU', 'ungarn':'HU', 'hongrie':'HU', 'unkari':'HU',
+  'rumänien':'RO', 'roumanie':'RO', 'romania':'RO',
+  'grekland':'GR', 'griechenland':'GR', 'grèce':'GR', 'grecia':'GR', 'kreikka':'GR',
+  'turkiet':'TR', 'türkei':'TR', 'turquie':'TR', 'turchia':'TR', 'turkki':'TR', 'türkiye':'TR',
+  'kina':'CN', 'chine':'CN', 'cina':'CN', 'kiina':'CN',
+  'japan':'JP', 'japon':'JP', 'giappone':'JP', 'japani':'JP',
+  'sydkorea':'KR', 'südkorea':'KR', 'corée du sud':'KR', 'corea del sur':'KR',
+  'indien':'IN', 'inde':'IN', 'intia':'IN',
+  'brasilien':'BR', 'brésil':'BR', 'brasile':'BR', 'brasilia':'BR',
+  'kanada':'CA',
+  'australien':'AU', 'australie':'AU',
+  'estland':'EE', 'estonie':'EE', 'viro':'EE',
+  'lettland':'LV', 'lettonie':'LV', 'latvia':'LV', 'lätti':'LV',
+  'litauen':'LT', 'lituanie':'LT', 'lituania':'LT', 'liettua':'LT',
+  'ukraina':'UA', 'ukraine':'UA', 'ucraina':'UA',
+  'ryssland':'RU', 'russland':'RU', 'russie':'RU', 'venäjä':'RU',
+  'portugal':'PT', 'portogallo':'PT',
+  'irland':'IE', 'irlande':'IE', 'irlanda':'IE', 'irlanti':'IE',
+  'kroatien':'HR', 'croatie':'HR', 'croazia':'HR', 'kroatia':'HR',
+  'slovenien':'SI', 'slovénie':'SI',
+  'slovakien':'SK', 'slovaquie':'SK', 'slovacchia':'SK',
+  'bulgarien':'BG', 'bulgarie':'BG',
+  'serbien':'RS', 'serbie':'RS',
+};
+
+/**
+ * Convert an alpha-2 country code to a flag emoji using Unicode Regional Indicator Symbols.
+ * @param {string} alpha2 - ISO 3166-1 alpha-2 code (e.g. 'SE')
+ * @returns {string} flag emoji (e.g. '🇸🇪') or empty string if invalid
+ */
+function _alpha2ToFlag(alpha2) {
+  if (!alpha2 || alpha2.length !== 2) return '';
+  const a = alpha2.toUpperCase();
+  // Validate it's a known code
+  if (!ISO3166_COUNTRIES[a]) return '';
+  return String.fromCodePoint(0x1F1E6 + a.charCodeAt(0) - 65)
+       + String.fromCodePoint(0x1F1E6 + a.charCodeAt(1) - 65);
+}
+
+/**
+ * Detect if a location string is a country (code or name) and return its flag emoji.
+ * Matches alpha-2 codes ("SE"), alpha-3 codes ("SWE"), English names ("Sweden"),
+ * and common localized names ("Sverige", "Schweden", etc.) — all case-insensitive.
+ * Returns '' if the location doesn't match a country.
+ * @param {string} location - physical location string
+ * @returns {string} flag emoji or ''
+ */
+function locationToFlag(location) {
+  if (!location) return '';
+  const trimmed = location.trim();
+  if (!trimmed) return '';
+  const upper = trimmed.toUpperCase();
+  const lower = trimmed.toLowerCase();
+
+  // 1. Exact alpha-2 code (e.g. "SE", "FR")
+  if (upper.length === 2 && ISO3166_COUNTRIES[upper]) {
+    return _alpha2ToFlag(upper);
+  }
+  // 2. Alpha-3 code (e.g. "SWE", "FRA")
+  if (upper.length === 3 && _alpha3ToAlpha2[upper]) {
+    return _alpha2ToFlag(_alpha3ToAlpha2[upper]);
+  }
+  // 3. English country name (e.g. "Sweden", "France")
+  if (_nameToAlpha2[lower]) {
+    return _alpha2ToFlag(_nameToAlpha2[lower]);
+  }
+  // 4. Localized / endonym name (e.g. "Sverige", "Deutschland")
+  if (_localizedNames[lower]) {
+    return _alpha2ToFlag(_localizedNames[lower]);
+  }
+  return '';
+}

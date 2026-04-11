@@ -42,6 +42,10 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 	if layer.OwnerID == user.ID || hasRole(user.Role, RoleAdmin) {
 		return true
 	}
+	// Custom roles with manage_layers capability can write to any layer
+	if app.userHasCapability(user, "manage_layers") {
+		return true
+	}
 	if layer.Visibility == "groups" && layer.Permission == "readwrite" {
 		userGroups := app.userGroups(user.ID)
 		groupSet := make(map[int64]bool)
@@ -61,8 +65,8 @@ func (app *App) canWriteLayer(layerID int64, user *User) bool {
 // Admins get nil (meaning "all layers visible").
 // V3-H02 fix: centralized layer filtering for all event queries.
 func (app *App) visibleLayerSet(user *User) map[int64]bool {
-	if hasRole(user.Role, RoleAdmin) {
-		return nil // nil = no filter, admin sees everything
+	if hasRole(user.Role, RoleAdmin) || app.userHasCapability(user, "manage_layers") {
+		return nil // nil = no filter, admin/manage_layers sees everything
 	}
 	vis := make(map[int64]bool)
 	userGroups := app.userGroups(user.ID)
