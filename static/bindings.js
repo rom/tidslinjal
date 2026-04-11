@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#listDateFrom',     'change', function () { renderListView(); });
   on('#listDateTo',       'change', function () { renderListView(); });
   on('#listResponsibleFilter', 'change', function () { renderListView(); });
+  on('#listLayerFilter',      'change', function () { renderListView(); });
 
   // ---------- List view sort headers (event delegation) ----------------------
   document.addEventListener('click', function (e) {
