@@ -108,3 +108,37 @@ async function deleteLayer(id) {
     showNotification('success', t('notif_saved'));
   }
 }
+
+// ── Bulk Move Events Between Layers ───────────────────────────────────────
+async function _bulkMoveLayerEvents() {
+  const srcEl = document.getElementById('bulkMoveSource');
+  const tgtEl = document.getElementById('bulkMoveTarget');
+  if (!srcEl || !tgtEl) return;
+  const sourceId = parseInt(srcEl.value, 10);
+  const targetId = parseInt(tgtEl.value, 10);
+  if (sourceId === targetId) {
+    showError(t('layers_move_same')||'Source and target layers must be different.');
+    return;
+  }
+  const srcName = srcEl.options[srcEl.selectedIndex].textContent;
+  const tgtName = tgtEl.options[tgtEl.selectedIndex].textContent;
+  if (!confirm((t('layers_move_confirm')||'Move all events from "{src}" to "{tgt}"?').replace('{src}', srcName).replace('{tgt}', tgtName))) {
+    return;
+  }
+  try {
+    const res = await apiPost('/api/layers/bulk-move', {
+      source_layer_id: sourceId,
+      target_layer_id: targetId,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showNotification('success', (t('layers_move_done')||'{n} events moved.').replace('{n}', data.moved));
+      await refreshAll();
+    } else {
+      const err = await res.json();
+      showError(err.error);
+    }
+  } catch (e) {
+    showError(e.message);
+  }
+}

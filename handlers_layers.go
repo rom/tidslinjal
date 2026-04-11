@@ -177,7 +177,7 @@ func (app *App) handleUpdateLayer(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.OwnerID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+	if !app.canWriteLayer(id, user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -212,7 +212,7 @@ func (app *App) handleDeleteLayer(w http.ResponseWriter, r *http.Request, user *
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.OwnerID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+	if !app.canWriteLayer(id, user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -224,4 +224,63 @@ func (app *App) handleDeleteLayer(w http.ResponseWriter, r *http.Request, user *
 		fmt.Sprintf("Deleted layer %q", existing.Name))
 	logDebug("layer deleted: id=%d user=%s", id, user.Username)
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// handleBulkMoveEvents moves all events from one layer to another.
+func (app *App) handleBulkMoveEvents(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		SourceLayerID int64 `json:"source_layer_id"` // 0 = master timeline
+		TargetLayerID int64 `json:"target_layer_id"` // 0 = master timeline
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.SourceLayerID == req.TargetLayerID {
+		jsonError(w, "source and target layers must be different", http.StatusBadRequest)
+		return
+	}
+	// Verify source layer exists (unless master timeline)
+	if req.SourceLayerID != 0 {
+		if _, ok := app.store.GetLayerByID(req.SourceLayerID); !ok {
+			jsonError(w, "source layer not found", http.StatusNotFound)
+			return
+		}
+		if !app.canWriteLayer(req.SourceLayerID, user) {
+			jsonError(w, "no write permission on source layer", http.StatusForbidden)
+			return
+		}
+	}
+	// Verify target layer exists (unless master timeline)
+	if req.TargetLayerID != 0 {
+		if _, ok := app.store.GetLayerByID(req.TargetLayerID); !ok {
+			jsonError(w, "target layer not found", http.StatusNotFound)
+			return
+		}
+		if !app.canWriteLayer(req.TargetLayerID, user) {
+			jsonError(w, "no write permission on target layer", http.StatusForbidden)
+			return
+		}
+	}
+	count, err := app.store.BulkMoveEventsToLayer(req.SourceLayerID, req.TargetLayerID)
+	if err != nil {
+		jsonError(w, "bulk move failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	srcName := "Master Timeline"
+	if req.SourceLayerID != 0 {
+		if sl, ok := app.store.GetLayerByID(req.SourceLayerID); ok {
+			srcName = sl.Name
+		}
+	}
+	tgtName := "Master Timeline"
+	if req.TargetLayerID != 0 {
+		if tl, ok := app.store.GetLayerByID(req.TargetLayerID); ok {
+			tgtName = tl.Name
+		}
+	}
+	app.audit(user.ID, user.DisplayName, "bulk_move", "event", 0,
+		fmt.Sprintf("Moved %d events from layer %q to %q", count, srcName, tgtName))
+	app.broker.BroadcastAll(SSEMessage{Event: "event_change", Data: `{"action":"updated"}`})
+	jsonOK(w, map[string]any{"moved": count})
 }
