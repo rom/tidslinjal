@@ -82,7 +82,9 @@ document.getElementById('btnSaveLayer').addEventListener('click', async () => {
           if (gRes.ok) {
             const newGroup = await gRes.json();
             await fetchGroups();
+            await fetchLayers(); // Backend may have linked the new group to the existing layer
             renderSidebar();
+            renderTimeline();
             showNotification('success', `Group "${name}" created.`);
           }
         }
