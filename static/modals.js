@@ -238,57 +238,22 @@ document.getElementById('eventStart').addEventListener('change', function() {
 
 // ── @username autocomplete ───────────────────────────────────────────────────
 
-document.getElementById('btnSaveAlarm').addEventListener('click', async () => {
-  const eventId     = parseInt(document.getElementById('alarmEventId').value, 10);
-  const leadTime    = parseInt(document.getElementById('alarmLeadTime').value, 10);
-  const soundEl     = document.getElementById('alarmSound');
-  const sound       = soundEl ? soundEl.value : 'klaxon';
-  const webhookEl   = document.getElementById('alarmWebhookURL');
-  const webhook_url = webhookEl ? webhookEl.value.trim() : '';
-  const res = await apiPost('/api/alarms', {event_id: eventId, lead_time: leadTime, sound, webhook_url});
-  if (res.ok) {
-    const created = await res.clone().json().catch(() => null);
-    if (created && created.id) pushUndo('create_alarm', { id: created.id });
-    closeModal('alarmModal');
-    await fetchAlarms(); renderSidebar();
-    showNotification('success', t('notif_alarm_set'));
-  } else { const err = await res.json(); showError(err.error); }
-});
+// NOTE: Modal save handlers live in their dedicated modal-*.js files:
+// - btnSaveEvent  → modal-event.js
+// - btnSaveAlarm  → modal-alarm.js
+// - btnSaveLock   → modal-lock.js
+// - btnSaveGroup  → modal-group.js
+// - btnSaveLayer  → modal-layer.js
+// - btnSaveEtype  → modal-event-type.js
+// - btnSavePhase  → modal-phase.js
 
-// ── Lock Modal ─────────────────────────────────────────────────────────────
+// ── Lock Modal open button ───────────────────────────────────────────────
 document.getElementById('btnAddLock').addEventListener('click', () => {
   const now = new Date();
   document.getElementById('lockStart').value = fmtDateInput(now);
   document.getElementById('lockEnd').value   = fmtDateInput(addHours(now, 1));
   document.getElementById('lockReason').value = '';
   openLockModal();
-});
-
-document.getElementById('btnSaveLock').addEventListener('click', async () => {
-  const sv = document.getElementById('lockStart').value;
-  const ev = document.getElementById('lockEnd').value;
-  if (!sv||!ev) { showError('Start and end required', 'Validation'); return; }
-  const scope = document.getElementById('lockScope').value;
-  let layerID = null;
-  if (scope === 'layer') {
-    const lv = document.getElementById('lockLayerSelect').value;
-    if (!lv) { showError('Please select a layer', 'Validation'); return; }
-    layerID = parseInt(lv, 10);
-  }
-  const lockPayload = {
-    start_time: new Date(sv).toISOString(),
-    end_time:   new Date(ev).toISOString(),
-    reason:     document.getElementById('lockReason').value,
-    scope,
-    layer_id:   layerID,
-  };
-  const res = await apiPost('/api/locks', lockPayload);
-  if (res.ok) {
-    const created = await res.json();
-    pushUndo('create_lock', { id: created.id });
-    closeModal('lockModal'); await fetchLocks(); renderTimeline();
-    showNotification('success', t('notif_locked'));
-  } else { const err = await res.json(); showError(err.error); }
 });
 
 window._deleteResourceNote = async function(noteId, resType, resId) {
@@ -310,125 +275,6 @@ window._deleteResourceStar = async function(starId, resType, resId) {
 };
 
 // btnSaveUser handler is in modal-user.js (single handler to avoid duplicate API calls)
-
-document.getElementById('btnSaveGroup').addEventListener('click', async () => {
-  const id = document.getElementById('groupId').value;
-  const name = document.getElementById('groupName').value.trim();
-  if (!name) { showError('Name required', 'Validation'); return; }
-  const payload = {name, description: document.getElementById('groupDesc').value};
-  const res = id ? await apiPut(`/api/groups/${id}`, payload) : await apiPost('/api/groups', payload);
-  if (res.ok) {
-    if (!id) {
-      const created = await res.clone().json().catch(() => null);
-      if (created && created.id) pushUndo('create_group', { id: created.id });
-    }
-    closeModal('groupModal'); await fetchGroups(); renderSidebar(); showNotification('success', t('notif_saved'));
-  }
-  else { const err = await res.json(); showError(err.error); }
-});
-
-document.getElementById('btnSaveLayer').addEventListener('click', async () => {
-  const id = document.getElementById('layerId').value;
-  const name = document.getElementById('layerName').value.trim();
-  if (!name) { showError('Name required', 'Validation'); return; }
-  const groupIDs = [...document.querySelectorAll('input[name="layerGroup"]:checked')]
-    .map(cb => parseInt(cb.value, 10));
-  const payload = {
-    name, description: document.getElementById('layerDesc').value,
-    color: document.getElementById('layerColor').value,
-    visibility: document.getElementById('layerVisibility').value,
-    permission: document.getElementById('layerPermission').value,
-    group_ids: groupIDs,
-  };
-  const oldLayer = id ? state.layers.find(l => l.id === parseInt(id, 10)) : null;
-  const res = id ? await apiPut(`/api/layers/${id}`, payload) : await apiPost('/api/layers', payload);
-  if (res.ok) {
-    if (id && oldLayer) {
-      pushUndo('update_layer', { id: parseInt(id, 10), old: { ...oldLayer } });
-    } else if (!id) {
-      const created = await res.clone().json().catch(() => null);
-      if (created && created.id) pushUndo('create_layer', { id: created.id });
-    }
-    closeModal('layerModal'); await fetchLayers(); renderSidebar(); renderTimeline();
-    showNotification('success', t('notif_saved'));
-    // When creating a new layer, offer to also create a group with the same name
-    if (!id) {
-      const existingGroup = state.groups.find(g => g.name.toLowerCase() === name.toLowerCase());
-      if (!existingGroup) {
-        const createGroup = confirm(`No group named "${name}" exists. Create a group with the same name?`);
-        if (createGroup) {
-          const gRes = await apiPost('/api/groups', { name, description: '' });
-          if (gRes.ok) {
-            const newGroup = await gRes.json();
-            await fetchGroups();
-            renderSidebar();
-            showNotification('success', `Group "${name}" created.`);
-          }
-        }
-      }
-    }
-  } else { const err = await res.json(); showError(err.error); }
-});
-
-document.getElementById('btnSaveEtype').addEventListener('click', async () => {
-  const id    = document.getElementById('etypeId').value;
-  const key   = document.getElementById('etypeKey').value.trim().replace(/\s+/g,'_');
-  const label = document.getElementById('etypeLabel').value.trim();
-  if (!label || (!id && !key)) { showError('Key and label required', 'Validation'); return; }
-  const payload = {
-    key, label,
-    label_sv: document.getElementById('etypeLabelSV').value,
-    label_fr: document.getElementById('etypeLabelFR').value,
-    color:    document.getElementById('etypeColor').value,
-    icon:     document.getElementById('etypeIcon').value.trim(),
-  };
-  const oldEtype = id ? state.eventTypes.find(e => String(e.id) === String(id)) : null;
-  const res = id ? await apiPut(`/api/event-types/${id}`, payload) : await apiPost('/api/event-types', payload);
-  if (res.ok) {
-    if (id && oldEtype) {
-      pushUndo('update_event_type', { id: parseInt(id, 10), old: { ...oldEtype } });
-    } else if (!id) {
-      const created = await res.clone().json().catch(() => null);
-      if (created && created.id) pushUndo('create_event_type', { id: created.id });
-    }
-    closeModal('etypeModal');
-    state.eventTypes = await apiGet('/api/event-types');
-    renderSidebar(); renderTimeline();
-    showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); showError(err.error); }
-});
-
-document.getElementById('btnSavePhase').addEventListener('click', async () => {
-  const id    = document.getElementById('phaseId').value;
-  const name  = document.getElementById('phaseName').value.trim();
-  if (!name) { showError('Name required', 'Validation'); return; }
-  const sv = document.getElementById('phaseStart').value;
-  const ev = document.getElementById('phaseEnd').value;
-  if (!sv || !ev) { showError('Start and end required', 'Validation'); return; }
-  const phaseLayVal = document.getElementById('phaseLayer')?.value;
-  const payload = {
-    name, color: document.getElementById('phaseColor').value,
-    order: parseInt(document.getElementById('phaseOrder').value, 10) || 0,
-    start_time: new Date(sv).toISOString(),
-    end_time:   new Date(ev).toISOString(),
-    layer_id:   phaseLayVal ? parseInt(phaseLayVal, 10) : null,
-  };
-  const oldPhase = id ? (state.phases||[]).find(p => String(p.id) === String(id)) : null;
-  const res = id ? await apiPut(`/api/phases/${id}`, payload) : await apiPost('/api/phases', payload);
-  if (res.ok) {
-    if (id && oldPhase) {
-      pushUndo('update_phase', { id: parseInt(id, 10), old: { ...oldPhase } });
-    } else if (!id) {
-      const created = await res.clone().json().catch(() => null);
-      if (created && created.id) pushUndo('create_phase', { id: created.id });
-    }
-    closeModal('phaseModal');
-    await fetchPhases();
-    renderSidebar();
-    renderTimeline();
-    showNotification('success', t('notif_saved'));
-  } else { const err = await res.json(); showError(err.error); }
-});
 
 // Event log: external events received via SSE/webhook
 
