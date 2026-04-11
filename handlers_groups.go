@@ -164,6 +164,20 @@ func (app *App) handleGetGroupMembers(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "invalid group id", http.StatusBadRequest)
 		return
 	}
+	// Authorization: must be a member of the group, admin, or have manage_groups capability
+	if !app.effectiveHasRole(user, RoleAdmin) && !app.userHasCapability(user, "manage_groups") {
+		isMember := false
+		for _, m := range app.store.GetGroupMembers(groupID) {
+			if m.UserID == user.ID {
+				isMember = true
+				break
+			}
+		}
+		if !isMember {
+			jsonError(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	members := app.store.GetGroupMembers(groupID)
 	type MemberView struct {
 		GroupMembership

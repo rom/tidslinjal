@@ -1152,9 +1152,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		} else if r.Method == http.MethodPost && strings.Contains(path, "/attachment") {
 			app.requireAuth(app.handleLogBookAttachment)(w, r)
 		} else if r.Method == http.MethodGet && strings.Contains(path, "/attachment/") {
-			app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
-				app.handleLogBookAttachmentDownload(w, r)
-			})(w, r)
+			app.requireAuth(app.handleLogBookAttachmentDownload)(w, r)
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

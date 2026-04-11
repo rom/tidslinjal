@@ -687,6 +687,11 @@ func (app *App) validateIDToken(rawToken, expectedNonce string) error {
 		return fmt.Errorf("token expired at %d, now %d", claims.Expiry, now)
 	}
 
+	// Validate issued-at: reject tokens issued too far in the past (10 min + clock skew)
+	if claims.IssuedAt > 0 && now-claims.IssuedAt > 720 {
+		return fmt.Errorf("token issued too long ago: iat=%d, now=%d", claims.IssuedAt, now)
+	}
+
 	// Validate nonce (prevents replay attacks)
 	if expectedNonce != "" && claims.Nonce != expectedNonce {
 		return fmt.Errorf("nonce mismatch: got %q, want %q", claims.Nonce, expectedNonce)
