@@ -5,6 +5,106 @@
    ============================================================ */
 'use strict';
 
+// ── Event Hover Tooltip ─────────────────────────────────────────────────────
+let _evTooltipEl = null;
+let _evTooltipTimer = null;
+
+function _ensureEvTooltip() {
+  if (_evTooltipEl) return _evTooltipEl;
+  _evTooltipEl = document.createElement('div');
+  _evTooltipEl.id = 'evTooltip';
+  _evTooltipEl.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;' +
+    'background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;' +
+    'padding:8px 12px;font-size:var(--fs-sm);max-width:340px;box-shadow:0 4px 16px var(--shadow-lg,rgba(0,0,0,.4));' +
+    'line-height:1.4;word-wrap:break-word;';
+  document.body.appendChild(_evTooltipEl);
+  return _evTooltipEl;
+}
+
+function _showEvTooltip(block, mouseX, mouseY) {
+  const evId = block.dataset.evId;
+  if (!evId) return;
+  const id = parseInt(evId, 10);
+  // Find the event data — handle recurring instance IDs like "123_1234567890"
+  const realId = String(evId).includes('_') ? parseInt(String(evId).split('_')[0], 10) : id;
+  const ev = state.events.find(e => e.id === realId);
+  if (!ev) return;
+
+  const tip = _ensureEvTooltip();
+  const title = ev.title || '';
+  const desc = ev.description || '';
+  const start = ev.start_time ? new Date(ev.start_time) : null;
+  const end = ev.end_time ? new Date(ev.end_time) : null;
+  const fmtDT = (d) => d ? d.toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+
+  let html = `<div style="font-weight:700;margin-bottom:4px">${escHtml(title)}</div>`;
+  if (desc) html += `<div style="color:var(--text-dim);margin-bottom:4px;white-space:pre-line">${escHtml(desc.length > 200 ? desc.slice(0, 200) + '…' : desc)}</div>`;
+  html += `<div style="font-size:var(--fs-xs);color:var(--text-dim)">`;
+  if (start) html += `${fmtDT(start)}`;
+  if (end) html += ` — ${fmtDT(end)}`;
+  html += `</div>`;
+
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+
+  // Position near the mouse, avoiding overflow off screen
+  const pad = 12;
+  let left = mouseX + pad;
+  let top = mouseY + pad;
+  const rect = tip.getBoundingClientRect();
+  if (left + rect.width > window.innerWidth - pad) left = mouseX - rect.width - pad;
+  if (top + rect.height > window.innerHeight - pad) top = mouseY - rect.height - pad;
+  tip.style.left = Math.max(pad, left) + 'px';
+  tip.style.top = Math.max(pad, top) + 'px';
+}
+
+function _hideEvTooltip() {
+  if (_evTooltipTimer) { clearTimeout(_evTooltipTimer); _evTooltipTimer = null; }
+  if (_evTooltipEl) _evTooltipEl.style.display = 'none';
+}
+
+// Wire up tooltip via event delegation on the timeline container (called once)
+let _evTooltipBound = false;
+function _bindEvTooltip() {
+  if (_evTooltipBound) return;
+  _evTooltipBound = true;
+  const container = document.getElementById('timeline');
+  if (!container) return;
+
+  container.addEventListener('mouseenter', function(e) {
+    const block = e.target.closest('.event-block');
+    if (!block) return;
+    _evTooltipTimer = setTimeout(() => _showEvTooltip(block, e.clientX, e.clientY), 350);
+  }, true);
+
+  container.addEventListener('mouseleave', function(e) {
+    const block = e.target.closest('.event-block');
+    if (!block) return;
+    _hideEvTooltip();
+  }, true);
+
+  container.addEventListener('mousemove', function(e) {
+    const block = e.target.closest('.event-block');
+    if (!block) { _hideEvTooltip(); return; }
+    if (_evTooltipEl && _evTooltipEl.style.display === 'block') {
+      // Update position as mouse moves
+      const pad = 12;
+      let left = e.clientX + pad;
+      let top = e.clientY + pad;
+      const rect = _evTooltipEl.getBoundingClientRect();
+      if (left + rect.width > window.innerWidth - pad) left = e.clientX - rect.width - pad;
+      if (top + rect.height > window.innerHeight - pad) top = e.clientY - rect.height - pad;
+      _evTooltipEl.style.left = Math.max(pad, left) + 'px';
+      _evTooltipEl.style.top = Math.max(pad, top) + 'px';
+    }
+  }, true);
+
+  // Hide on click (opening detail modal)
+  container.addEventListener('click', function(e) {
+    if (e.target.closest('.event-block')) _hideEvTooltip();
+  }, true);
+}
+
 // ── Navigation ──────────────────────────────────────────────────────────────
 function navigate(dir) {
   state.startDate = addDays(state.startDate, dir * getRangeDays());
@@ -425,6 +525,7 @@ function renderEventBlocks(days, slotH) {
   _lastRenderDays = days;
   _lastRenderSlotH = slotH;
   _renderEventBlocksInner(days, slotH, false);
+  _bindEvTooltip(); // ensure hover tooltip is wired up
 }
 
 // Incremental update: reuse existing blocks when possible
@@ -608,7 +709,8 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         if (veOff <= vsOff) return;
 
         const topPx    = realHeaderH + ((vsOff - startOff) / slotMin) * realSlotH;
-        const heightPx = Math.max(((veOff - vsOff) / slotMin) * realSlotH - 2, 14);
+        const _minEvH  = (state.preferences && state.preferences.min_event_height) || 14;
+        const heightPx = Math.max(((veOff - vsOff) / slotMin) * realSlotH - 2, _minEvH);
         evsByDay[di].push({ ev, evStart, evEnd, vsOff, veOff, topPx, heightPx });
       });
     });
@@ -715,7 +817,8 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         // Event-type icon: custom icon from type def, or built-in defaults
         const evTypeDef = _eventTypeMap.get(ev.event_type) || null;
         const builtinTypeIcons = { mote:'🤝', decision:'⚖️', deadline:'⏰', standup:'🧍', reporting:'📊',
-          instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌' };
+          instant:'⚡', repeated:'🔄', physical_meeting:'🏢', assigned_task:'📌',
+          starting_point:'▶', ending_point:'⏹', transport:'🚚' };
         const typeIconChar = showIcons
           ? (evTypeDef && evTypeDef.icon ? evTypeDef.icon : (builtinTypeIcons[ev.event_type] || ''))
           : '';
@@ -729,7 +832,9 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         }
 
         const block = document.createElement('div');
-        block.className = 'event-block';
+        // Apply type-specific CSS class for custom shapes (starting_point, ending_point, transport, instant)
+        const _shapeTypes = { instant:1, starting_point:1, ending_point:1, transport:1 };
+        block.className = _shapeTypes[ev.event_type] ? 'event-block ev-type-' + ev.event_type : 'event-block';
         block.dataset.evId = ev.id;
         block.setAttribute('role', 'button');
         block.setAttribute('tabindex', '0');

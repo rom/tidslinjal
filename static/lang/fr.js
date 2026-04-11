@@ -1073,6 +1073,14 @@ TRANSLATIONS.fr = {
     settings_view_spacing_desc:'Multiplicateur d\'espacement vertical pour les lignes de la chronologie.',
     settings_view_spacing_info:'Ajuster l\'espacement vertical entre les lignes de la chronologie.',
 
+    settings_min_event_height: 'Taille minimale des événements',
+    settings_min_event_height_desc: 'Assurez-vous que les événements courts s\'affichent assez grands pour lire le titre et l\'heure.',
+    settings_min_event_height_info: 'Définissez une hauteur minimale plus grande pour que les événements de courte durée restent lisibles.',
+    settings_meh_default: 'Par défaut',
+    settings_meh_medium: 'Moyen',
+    settings_meh_large: 'Grand',
+    settings_meh_xlarge: 'Très grand',
+
     prc_filter_online:         'En ligne uniquement',
     prc_filter_all:            'Tous les utilisateurs',
     prc_send_to_group:         'Envoyer au groupe/équipe',
