@@ -439,6 +439,40 @@ func (s *Store) BulkDeleteEvents(f BulkFilter) (int, error) {
 	return count, nil
 }
 
+// BulkMoveEventsToLayer moves all events from one layer to another.
+// sourceLayerID == 0 means "master timeline" (LayerID == nil).
+// targetLayerID == 0 means "move to master timeline".
+func (s *Store) BulkMoveEventsToLayer(sourceLayerID, targetLayerID int64) (int, error) {
+	s.mu.Lock()
+	count := 0
+	for i, ev := range s.events {
+		match := false
+		if sourceLayerID == 0 {
+			match = ev.LayerID == nil
+		} else {
+			match = ev.LayerID != nil && *ev.LayerID == sourceLayerID
+		}
+		if match {
+			if targetLayerID == 0 {
+				s.events[i].LayerID = nil
+			} else {
+				tid := targetLayerID
+				s.events[i].LayerID = &tid
+			}
+			s.events[i].UpdatedAt = time.Now()
+			count++
+		}
+	}
+	snap := append([]Event(nil), s.events...)
+	s.mu.Unlock()
+	if count > 0 {
+		if err := s.persist("events.json", snap); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
 // ── Test Stats ────────────────────────────────────────────────────────────────
 
 func (s *Store) GetTestStats() TestStats {

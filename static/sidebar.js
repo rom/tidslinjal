@@ -1018,8 +1018,9 @@ function renderSidebar() {
     `;
     _fetchQueued();
   } else if (tab === 'layers') {
-    const myLayers     = state.layers.filter(l => l.owner_id === state.user.id);
-    const sharedLayers = state.layers.filter(l => l.owner_id !== state.user.id);
+    const allLayers    = state.layers || [];
+    const myLayers     = allLayers.filter(l => l.owner_id === state.user.id);
+    const sharedLayers = allLayers.filter(l => l.owner_id !== state.user.id);
     el.innerHTML = `
       <div class="sidebar-section">
         <div class="sidebar-section-title">
@@ -1056,12 +1057,34 @@ function renderSidebar() {
         <div class="layer-list">
           ${sharedLayers.map(l => {
             const active = isLayerActive(l.id);
+            const canEditShared = hasRole2(state.user.role, 'admin')
+              || userHasCapability('manage_layers')
+              || (l.permission === 'readwrite' && l.visibility === 'groups'
+                  && (l.group_ids||[]).some(gid => (state.groups||[]).some(g => g.id === gid && (g.members||[]).some(m => m.user_id === state.user.id))));
             return `<div class="layer-item${active?' active':''}" data-action="toggleLayer" data-arg="${l.id}">
               <div class="layer-swatch" style="background:${l.color||'#4A90D9'}"></div>
               <span class="layer-name">${escHtml(l.name)}</span>
               <span class="layer-vis">${escHtml(l.owner_name||'')}</span>
+              ${canEditShared ? `<button class="btn btn-ghost btn-icon" style="font-size:11px" data-edit-layer='${escAttr(JSON.stringify(l))}' data-stop-prop-only>✏️</button>` : ''}
             </div>`;
           }).join('')}
+        </div>
+      </div>` : ''}
+      ${(hasRole2(state.user.role, 'teamlead') || userHasCapability('manage_layers')) ? `
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('layers_bulk_move')||'Bulk Move Events'}</div>
+        <div style="padding:4px 0;font-size:var(--fs-sm)">
+          <label style="display:block;margin-bottom:4px;color:var(--text-dim)">${t('layers_source')||'From layer'}:</label>
+          <select id="bulkMoveSource" class="input" style="width:100%;font-size:var(--fs-sm);margin-bottom:8px">
+            <option value="0">${t('layers_master')||'Master Timeline'}</option>
+            ${allLayers.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('')}
+          </select>
+          <label style="display:block;margin-bottom:4px;color:var(--text-dim)">${t('layers_target')||'To layer'}:</label>
+          <select id="bulkMoveTarget" class="input" style="width:100%;font-size:var(--fs-sm);margin-bottom:8px">
+            <option value="0">${t('layers_master')||'Master Timeline'}</option>
+            ${allLayers.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm" data-action="_bulkMoveLayerEvents" style="width:100%">📦 ${t('layers_move_btn')||'Move Events'}</button>
         </div>
       </div>` : ''}
     `;
