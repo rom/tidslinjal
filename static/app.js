@@ -615,6 +615,21 @@ function toggleListView() {
         });
       }
     }
+    // Populate layer filter
+    const layerEl = document.getElementById('listLayerFilter');
+    if (layerEl) {
+      layerEl.options[0].textContent = t('lv_all_layers') || 'All layers';
+      if (layerEl.options.length <= 2) { // "All layers" + "Master Timeline" already present
+        layerEl.options[1].textContent = t('layers_master') || 'Master Timeline';
+        (state.layers || []).forEach(l => {
+          const opt = document.createElement('option');
+          opt.value = l.id;
+          opt.textContent = escHtml(l.name);
+          opt.style.borderLeft = '4px solid ' + (l.color || '#4A90D9');
+          layerEl.appendChild(opt);
+        });
+      }
+    }
     renderListView();
   } else {
     if (timeline) timeline.style.display = '';
@@ -688,11 +703,20 @@ function renderListView() {
   const dateFrom   = document.getElementById('listDateFrom')?.value || '';
   const dateTo     = document.getElementById('listDateTo')?.value || '';
   const respFil    = document.getElementById('listResponsibleFilter')?.value || '';
+  const layerFil   = document.getElementById('listLayerFilter')?.value || '';
 
   const hl = state.preferences.hidden_layers || [];
   let events = (state.events || []).filter(ev => {
     if (isTypeHidden(ev.event_type)) return false;
     if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
+    // Layer filter dropdown
+    if (layerFil) {
+      if (layerFil === '_master') {
+        if (ev.layer_id != null) return false;
+      } else {
+        if (String(ev.layer_id) !== layerFil) return false;
+      }
+    }
     if (statusFil && ev.status !== statusFil) return false;
     if (typeFil   && ev.event_type !== typeFil) return false;
     if (dateFrom) {
