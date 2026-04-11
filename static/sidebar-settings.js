@@ -363,6 +363,86 @@ function openDetachedChecklists() {
   }, 1000);
 }
 
+// ── Planned vs Actual (PVA) Modal ─────────────────────────────────────────
+
+function openPVAModal() {
+  const el = document.getElementById('pvaContent');
+  if (!el) return;
+
+  const events = state.events || [];
+  const withPlanned = events.filter(e => e.planned_start);
+  if (withPlanned.length === 0) {
+    el.innerHTML = `<p style="color:var(--text-dim);padding:16px">${t('pva_no_data')||'No events have planned times set. Edit an event and set a "Planned start" to see comparisons here.'}</p>`;
+    openModal('pvaModal');
+    return;
+  }
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-sm)">';
+  html += '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">';
+  html += `<th style="padding:8px;text-align:left">${t('lv_title')||'Title'}</th>`;
+  html += `<th style="padding:8px">${t('pva_planned_start')||'Planned Start'}</th>`;
+  html += `<th style="padding:8px">${t('pva_actual_start')||'Actual Start'}</th>`;
+  html += `<th style="padding:8px">${t('pva_diff')||'Difference'}</th>`;
+  html += `<th style="padding:8px">${t('lv_status')||'Status'}</th>`;
+  html += '</tr></thead><tbody>';
+
+  const fmtDT = (d) => d ? new Date(d).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+
+  withPlanned.forEach(ev => {
+    const ps = new Date(ev.planned_start);
+    const as_ = new Date(ev.start_time);
+    const diffMs = as_ - ps;
+    const diffMin = Math.round(diffMs / 60000);
+    let diffLabel = '';
+    let diffColor = 'var(--text-dim)';
+    if (Math.abs(diffMin) < 5) {
+      diffLabel = t('pva_on_time')||'On time';
+      diffColor = 'var(--green)';
+    } else if (diffMin > 0) {
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      diffLabel = '+' + (h > 0 ? h + 'h ' : '') + m + 'm ' + (t('pva_late')||'late');
+      diffColor = 'var(--red)';
+    } else {
+      const absMin = Math.abs(diffMin);
+      const h = Math.floor(absMin / 60);
+      const m = absMin % 60;
+      diffLabel = '-' + (h > 0 ? h + 'h ' : '') + m + 'm ' + (t('pva_early')||'early');
+      diffColor = 'var(--accent)';
+    }
+    html += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;font-weight:600">${escHtml(ev.title)}</td>
+      <td style="padding:6px 8px;text-align:center">${fmtDT(ev.planned_start)}</td>
+      <td style="padding:6px 8px;text-align:center">${fmtDT(ev.start_time)}</td>
+      <td style="padding:6px 8px;text-align:center;color:${diffColor};font-weight:600">${diffLabel}</td>
+      <td style="padding:6px 8px;text-align:center"><span class="status-badge status-${ev.status||'planned'}">${t('status_'+(ev.status||'planned'))||ev.status||'planned'}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+  openModal('pvaModal');
+}
+
+function exportPVAReport() {
+  const el = document.getElementById('pvaContent');
+  if (!el) return;
+  // Open a print window with the PVA content
+  const w = window.open('', '_blank', 'width=800,height=600');
+  if (!w) return;
+  const theme = state.preferences?.theme === 'light' ? 'light-mode' : '';
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Planned vs. Actual Report</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>body{padding:20px;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif}
+    h1{font-size:18px;margin-bottom:16px;color:var(--accent)}
+    @media print{body{background:#fff;color:#000}}</style>
+    </head><body class="${theme}">
+    <h1>📊 Planned vs. Actual Comparison</h1>
+    ${el.innerHTML}
+    </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
+}
+
 // ── OIDC settings helpers ──────────────────────────────────────────────────
 
 function _setOIDCStatusBar(enabled, issuer, active) {
