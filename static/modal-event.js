@@ -25,6 +25,7 @@ function updateEventModalTimeVisibility() {
   const allDay  = document.getElementById('eventAllDay')?.checked;
   const typeVal = document.getElementById('eventType')?.value;
   const isInstant = typeVal === 'instant';
+  const isPointEvent = typeVal === 'starting_point' || typeVal === 'ending_point';
   const isTimed = typeVal === 'timed_event';
 
   const startRow = document.getElementById('eventTimeRow');
@@ -33,7 +34,7 @@ function updateEventModalTimeVisibility() {
   const timedGroup = document.getElementById('timedEventGroup');
 
   if (startRow) startRow.style.display = allDay ? 'none' : '';
-  if (endGroup) endGroup.style.display = (allDay || isInstant || isTimed) ? 'none' : '';
+  if (endGroup) endGroup.style.display = (allDay || isInstant || isPointEvent || isTimed) ? 'none' : '';
   recurRow.forEach(el => { el.style.display = allDay ? 'none' : ''; });
   if (timedGroup) timedGroup.style.display = isTimed ? '' : 'none';
 }
@@ -341,6 +342,7 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
   const allDay   = document.getElementById('eventAllDay')?.checked || false;
   const typeVal  = document.getElementById('eventType').value;
   const isInstant = typeVal === 'instant';
+  const isPointEvent = typeVal === 'starting_point' || typeVal === 'ending_point';
   const startVal = document.getElementById('eventStart').value;
   const endVal   = document.getElementById('eventEnd').value;
   if (!allDay && !startVal) { showError(t('event_start') + ' is required', 'Validation'); return; }
@@ -365,10 +367,10 @@ document.getElementById('btnSaveEvent').addEventListener('click', async () => {
     invited_user_ids:   invUserIDs,
     invited_group_ids:  invGroupIDs,
     start_time:         (!allDay && startVal) ? new Date(startVal).toISOString() : new Date().toISOString(),
-    end_time:           (!allDay && !isInstant && endVal) ? new Date(endVal).toISOString() : null,
-    is_recurring:       recurring && !allDay && !isInstant,
-    recurrence_pattern: (recurring && !allDay && !isInstant) ? document.getElementById('eventRecurrencePattern').value : '',
-    recurrence_end:     (recurring && !allDay && !isInstant && document.getElementById('eventRecurrenceEnd').value)
+    end_time:           (!allDay && !isInstant && !isPointEvent && endVal) ? new Date(endVal).toISOString() : null,
+    is_recurring:       recurring && !allDay && !isInstant && !isPointEvent,
+    recurrence_pattern: (recurring && !allDay && !isInstant && !isPointEvent) ? document.getElementById('eventRecurrencePattern').value : '',
+    recurrence_end:     (recurring && !allDay && !isInstant && !isPointEvent && document.getElementById('eventRecurrenceEnd').value)
                           ? new Date(document.getElementById('eventRecurrenceEnd').value).toISOString() : null,
     layer_id:           layerVal ? parseInt(layerVal, 10) : null,
     physical_location:  document.getElementById('eventPhysicalLocation')?.value || '',

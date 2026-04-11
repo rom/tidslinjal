@@ -1068,6 +1068,8 @@ TRANSLATIONS.fr = {
 
     settings_event_icons:      'Icônes d\'événements',
     settings_show_event_icons: 'Afficher les icônes sur les événements (type, pièces jointes, etc.)',
+
+    settings_show_event_creator: 'Afficher le nom du créateur sur les événements',
     settings_show_event_icons_info: 'Affiche de petites icônes sur les événements indiquant leur type, pièces jointes et autres attributs.',
 
     settings_hover_zoom:       'Zoom au survol',

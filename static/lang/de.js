@@ -1258,6 +1258,8 @@ TRANSLATIONS.de = {
     // Event icons setting (i18n)
     settings_event_icons: 'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
+
+    settings_show_event_creator: 'Ersteller-Name auf Ereignissen anzeigen',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
 
     // Hover zoom (i18n)

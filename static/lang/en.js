@@ -1389,6 +1389,7 @@ TRANSLATIONS.en = {
     settings_event_icons:      'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
+    settings_show_event_creator: 'Show creator name on events',
 
     // Hover zoom (i18n)
     settings_hover_zoom:       'Hover Zoom',

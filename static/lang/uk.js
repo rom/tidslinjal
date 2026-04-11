@@ -1183,6 +1183,8 @@ role_editor_label_nb: '🇳🇴 NB',
     settings_show_day_of_year: 'Показувати номер дня в році (1–365)',
     settings_show_day_of_year_info: 'Відображати порядковий номер дня (1–365) у заголовку хронології.',
     settings_show_event_icons: 'Показувати іконки на подіях (тип, вкладення тощо)',
+
+    settings_show_event_creator: 'Показувати ім\'я автора на подіях',
     settings_show_event_icons_info: 'Відображати невеликі іконки на подіях хронології, що вказують на їхній тип, вкладення та інші атрибути.',
     settings_show_lang_flags: 'Показувати прапори мов на панелі інструментів',
     settings_show_week_numbers: 'Показувати номери тижнів',

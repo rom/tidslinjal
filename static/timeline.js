@@ -755,7 +755,9 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         const colW    = Math.floor((cellWidth - PAD*2) / numCols);
         const blockL  = cellLeft + PAD + col * colW;
         const isInstant = item.ev.event_type === 'instant';
-        const blockW  = isInstant
+        const isPointEvent = item.ev.event_type === 'starting_point' || item.ev.event_type === 'ending_point';
+        const isCompact = isInstant || isPointEvent;
+        const blockW  = isCompact
           ? Math.min(colW - (col < numCols-1 ? 1 : 0), halfCell)
           : colW - (col < numCols-1 ? 1 : 0);
 
@@ -781,7 +783,7 @@ function _renderEventBlocksInner(days, slotH, incremental) {
               const timeEl = el.querySelector('.ev-time');
               if (timeEl) timeEl.style.display = heightPx > 28 ? '' : 'none';
               const creatorEl = el.querySelector('.ev-creator');
-              if (creatorEl) creatorEl.style.display = heightPx > 44 ? '' : 'none';
+              if (creatorEl) creatorEl.style.display = (heightPx > 44 && state.preferences && state.preferences.show_event_creator) ? '' : 'none';
               return;
             }
           }
@@ -855,7 +857,7 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         block.innerHTML = `
           <div class="ev-title">${statusDot}${recurIcon}${instantIcon}${typeIcon}${flagSpan}${escHtml(ev.title)}${editedIcon}${attachIcon}${commentIcon}${allDayIcon}</div>
           ${heightPx > 28 ? `<div class="ev-time">${fmtTime(evStart)}${ev.end_time?'–'+fmtTime(evEnd):''}</div>` : ''}
-          ${heightPx > 44 ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
+          ${heightPx > 44 && state.preferences && state.preferences.show_event_creator ? `<div class="ev-creator">${escHtml(ev.created_by_name||'')}</div>` : ''}
           <div class="ev-resize-handle" data-ev-id="${ev.id}"></div>
         `;
         block.onclick = e => {

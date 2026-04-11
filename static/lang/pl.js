@@ -834,6 +834,8 @@ checklist_items: 'Elementy',
     settings_show_day_of_year: 'Poka\u017c numer dnia w roku (1\u2013365)',
     settings_show_day_of_year_info: 'Wy\u015bwietlaj porz\u0105dkowy numer dnia (1\u2013365) w nag\u0142\u00f3wku osi czasu.',
     settings_show_event_icons: 'Poka\u017c ikony na zdarzeniach (typ, za\u0142\u0105czniki itp.)',
+
+    settings_show_event_creator: 'Pokaż nazwę twórcy na wydarzeniach',
     settings_show_event_icons_info: 'Wy\u015bwietlaj ma\u0142e ikony na zdarzeniach osi czasu wskazuj\u0105ce ich typ, za\u0142\u0105czniki i inne atrybuty.',
     settings_show_lang_flags: 'Poka\u017c flagi j\u0119zyk\u00f3w na pasku narz\u0119dzi',
     settings_show_week_numbers: 'Poka\u017c numery tygodni',

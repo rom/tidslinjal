@@ -1182,6 +1182,8 @@ TRANSLATIONS.nb = {
     // Event icons setting (i18n)
     settings_event_icons:      'Hendelsesikoner',
     settings_show_event_icons: 'Vis ikoner på hendelser (type, vedlegg osv.)',
+
+    settings_show_event_creator: 'Vis skaperens navn på hendelser',
     settings_show_event_icons_info: 'Vis små ikoner på tidslinjehendelser som angir type, vedlegg og andre attributter.',
 
     // Hover zoom (i18n)

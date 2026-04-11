@@ -1165,6 +1165,8 @@ admin_view: 'Administrātora skats',
     settings_show_day_of_year: 'Rādīt gada dienas numuru (1–365)',
     settings_show_day_of_year_info: 'Attēlot kārtas dienas numuru (1–365) laika līnijas galvenē.',
     settings_show_event_icons: 'Rādīt ikonas uz notikumiem (tips, pielikumi u.c.)',
+
+    settings_show_event_creator: 'Rādīt veidotāja vārdu uz notikumiem',
     settings_show_event_icons_info: 'Attēlot mazas ikonas uz laika līnijas notikumiem, norādot to tipu, pielikumus un citus atribūtus.',
     settings_show_lang_flags: 'Rādīt valodu karogus rīkjoslā',
     settings_show_week_numbers: 'Rādīt nedēļu numurus',

@@ -1165,6 +1165,8 @@ admin_view: 'Administraatori vaade',
     settings_show_day_of_year: 'Näita aasta päeva numbrit (1–365)',
     settings_show_day_of_year_info: 'Kuva järjekorra päevanumber (1–365) ajatelje päises.',
     settings_show_event_icons: 'Näita sündmustel ikoone (tüüp, manused jne)',
+
+    settings_show_event_creator: 'Näita looja nime sündmustel',
     settings_show_event_icons_info: 'Kuva ajatelje sündmustel väikesed ikoonid, mis näitavad nende tüüpi, manuseid ja muid atribuute.',
     settings_show_lang_flags: 'Näita keelelippu tööriistaribal',
     settings_show_week_numbers: 'Näita nädala numbreid',

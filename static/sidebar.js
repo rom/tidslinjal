@@ -3189,6 +3189,12 @@ Fields: file, subject, sender, type, tags</pre>
           ${t('settings_show_event_icons')||'Show icons on events (type, attachments, etc.)'}
           <span title="${t('settings_show_event_icons_info')||'Display small icons on timeline events indicating their type, attachments, and other attributes.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
         </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-top:6px">
+          <input type="checkbox" id="prefShowEventCreator" ${p.show_event_creator?'checked':''}
+            data-action="setPref" data-event="change" data-pref-checked="show_event_creator"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_show_event_creator')||'Show creator name on events'}
+        </label>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_hover_zoom')||'Hover Zoom'}</div>

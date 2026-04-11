@@ -665,20 +665,22 @@ body.hover-zoom-enabled .event-block:hover {
   font-size: 12px; color: inherit; opacity: .9;
 }
 
-/* Starting point — right-pointing pentagon (arrow shape) */
+/* Starting point — compact right-pointing arrow marker */
 .event-block.ev-type-starting_point {
   border-radius: 4px 0 0 4px;
-  clip-path: polygon(0% 0%, 80% 0%, 100% 50%, 80% 100%, 0% 100%);
+  clip-path: polygon(0% 0%, 75% 0%, 100% 50%, 75% 100%, 0% 100%);
   border-left: none;
-  padding-right: 20%;
+  padding-right: 25%;
+  min-height: 18px;
 }
 
-/* Ending point — left-pointing flag/stop shape */
+/* Ending point — compact left-pointing stop marker */
 .event-block.ev-type-ending_point {
   border-radius: 0 4px 4px 0;
-  clip-path: polygon(20% 0%, 100% 0%, 100% 100%, 20% 100%, 0% 50%);
+  clip-path: polygon(25% 0%, 100% 0%, 100% 100%, 25% 100%, 0% 50%);
   border-left: none;
-  padding-left: 20%;
+  padding-left: 25%;
+  min-height: 18px;
 }
 
 /* Transport — parallelogram with dashed top/bottom borders */

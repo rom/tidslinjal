@@ -1163,6 +1163,8 @@ admin_view: 'Administratoriaus rodinys',
     settings_show_day_of_year: 'Rodyti metų dienos numerį (1–365)',
     settings_show_day_of_year_info: 'Rodyti eilės dienos numerį (1–365) laiko juostos antraštėje.',
     settings_show_event_icons: 'Rodyti piktogramas ant įvykių (tipas, priedai ir kt.)',
+
+    settings_show_event_creator: 'Rodyti kūrėjo vardą ant įvykių',
     settings_show_event_icons_info: 'Rodyti mažas piktogramas ant laiko juostos įvykių, nurodančias jų tipą, priedus ir kitus atributus.',
     settings_show_lang_flags: 'Rodyti kalbų vėliavas įrankių juostoje',
     settings_show_week_numbers: 'Rodyti savaitės numerius',

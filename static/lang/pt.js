@@ -341,6 +341,8 @@ ready_check_force_confirm: 'Alterar todas as atividades planeadas para o estado 
     settings_show_day_of_year: 'Mostrar número do dia do ano (1–365)',
     settings_show_day_of_year_info: 'Exibir o número ordinal do dia (1–365) no cabeçalho da linha temporal.',
     settings_show_event_icons: 'Mostrar ícones nos eventos (tipo, anexos, etc.)',
+
+    settings_show_event_creator: 'Mostrar nome do criador nos eventos',
     settings_show_event_icons_info: 'Exibir pequenos ícones nos eventos da linha temporal indicando o seu tipo, anexos e outros atributos.',
     settings_show_lang_flags: 'Mostrar bandeiras de idioma na barra de ferramentas',
     settings_show_week_numbers: 'Mostrar números da semana',

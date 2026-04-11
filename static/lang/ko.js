@@ -1140,6 +1140,8 @@ TRANSLATIONS.ko = {
     settings_red_line_style_dotted: 'Dotted',
     settings_event_icons: 'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
+
+    settings_show_event_creator: '이벤트에 작성자 이름 표시',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
     settings_hover_zoom: 'Hover Zoom',
     settings_hover_zoom_desc: 'Enlarge calendar events on hover',

@@ -1128,6 +1128,8 @@ TRANSLATIONS.sv = {
 
     settings_event_icons:      'Händelseikoner',
     settings_show_event_icons: 'Visa ikoner på händelser (typ, bilagor, etc.)',
+
+    settings_show_event_creator: 'Visa skaparens namn på händelser',
     settings_show_event_icons_info: 'Visar små ikoner på tidslinjehändelser som anger typ, bilagor och andra attribut.',
 
     settings_hover_zoom:       'Hoverzoom',

@@ -1321,6 +1321,8 @@ TRANSLATIONS.fi = {
     settings_show_clock_flags: 'Lisää liput kelloihin',
     settings_show_day_of_year: 'Näytä vuodenpäivän numero (1–365)',
     settings_show_event_icons: 'Näytä kuvakkeet tapahtumissa (tyyppi, liitteet jne.)',
+
+    settings_show_event_creator: 'Näytä luojan nimi tapahtumissa',
     settings_show_event_icons_info: 'Näytä pieniä kuvakkeita aikajanan tapahtumissa ilmaisemassa niiden tyyppiä, liitteitä ja muita ominaisuuksia.',
     settings_show_week_numbers: 'Näytä viikkonumerot',
     settings_synth_label: 'Näytä H+N-merkintä viivalla',

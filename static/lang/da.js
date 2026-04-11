@@ -1167,6 +1167,8 @@ TRANSLATIONS.da = {
     settings_red_line_width_label: 'Bredde (px)',
     settings_show_clock_flags: 'Tilføj flag på ure',
     settings_show_event_icons: 'Vis ikoner på hændelser (type, vedhæftninger osv.)',
+
+    settings_show_event_creator: 'Vis skaberens navn på hændelser',
     settings_show_event_icons_info: 'Vis små ikoner på tidslinjehændelser der angiver type, vedhæftninger og andre attributter.',
     settings_synth_label: 'Vis H+N-mærkat på linje',
     settings_tooltip_delay: 'Tooltip-forsinkelse ved pegemarkør',

@@ -1163,6 +1163,8 @@ admin_view: 'Vista amministratore',
     settings_show_day_of_year: 'Mostra numero del giorno dell\'anno (1–365)',
     settings_show_day_of_year_info: 'Visualizza il numero ordinale del giorno (1–365) nell\'intestazione della linea temporale.',
     settings_show_event_icons: 'Mostra icone sugli eventi (tipo, allegati, ecc.)',
+
+    settings_show_event_creator: 'Mostra il nome del creatore sugli eventi',
     settings_show_event_icons_info: 'Visualizza piccole icone sugli eventi della linea temporale indicando tipo, allegati e altri attributi.',
     settings_show_lang_flags: 'Mostra bandiere delle lingue nella barra degli strumenti',
     settings_show_week_numbers: 'Mostra numeri settimana',
