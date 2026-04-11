@@ -532,9 +532,8 @@ func sanitizeRichHTML(s string) string {
 			tag := s[i : i+tagEnd+1]
 			// Remove on* attributes: onerror, onclick, onload, onmouseover, etc.
 			cleaned := removeEventHandlers(tag)
-			// Remove javascript: URLs
-			cleaned = strings.ReplaceAll(cleaned, "javascript:", "")
-			cleaned = strings.ReplaceAll(cleaned, "JavaScript:", "")
+			// Remove javascript:/vbscript: URLs (case-insensitive, handle whitespace/encoding tricks)
+			cleaned = removeJSProtocol(cleaned)
 			result.WriteString(cleaned)
 			i += tagEnd + 1
 		} else {
@@ -589,6 +588,23 @@ func removeEventHandlers(tag string) string {
 		lower = strings.ToLower(tag)
 	}
 	return tag
+}
+
+// removeJSProtocol removes javascript:/vbscript:/data: protocols case-insensitively
+// including whitespace/encoding tricks between characters.
+func removeJSProtocol(s string) string {
+	lower := strings.ToLower(s)
+	for _, proto := range []string{"javascript:", "vbscript:", "data:text/html"} {
+		for {
+			idx := strings.Index(lower, proto)
+			if idx == -1 {
+				break
+			}
+			s = s[:idx] + s[idx+len(proto):]
+			lower = strings.ToLower(s)
+		}
+	}
+	return s
 }
 
 // ── Helper: strip HTML tags ────────────────────────────────────────────────

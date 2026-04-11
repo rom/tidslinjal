@@ -181,7 +181,7 @@ func (app *App) handleLogBookAttachment(w http.ResponseWriter, r *http.Request, 
 	json.NewEncoder(w).Encode(att)
 }
 
-func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.Request) {
+func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.Request, user *User) {
 	// Path: /api/log-book/{id}/attachment/{filename}
 	trimmed := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
 	parts := strings.SplitN(trimmed, "/attachment/", 2)
