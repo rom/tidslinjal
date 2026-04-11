@@ -160,6 +160,11 @@ TRANSLATIONS.fi = {
     confirm_delete_lock: 'Poista tämä lukitus?',
     confirm_delete_user: 'Poista tämä käyttäjä?',
     confirm_delete_layer: 'Poista tämä taso?',
+
+    confirm_delete_layer_with_events: 'Tämä taso sisältää {n} tapahtumaa.\n\nPoistaminen siirtää tapahtumat pääaikajanalle.\n\nHaluatko varmasti poistaa?',
+    layer_edit: 'Muokkaa tasoa',
+    layer_event_count: 'Tämä taso sisältää {n} tapahtumaa.',
+    layer_no_events: 'Tässä tasossa ei ole tapahtumia.',
     confirm_delete_group: 'Poista tämä ryhmä?',
 
     search_placeholder: 'Hae…',
@@ -1316,6 +1321,8 @@ TRANSLATIONS.fi = {
     settings_show_clock_flags: 'Lisää liput kelloihin',
     settings_show_day_of_year: 'Näytä vuodenpäivän numero (1–365)',
     settings_show_event_icons: 'Näytä kuvakkeet tapahtumissa (tyyppi, liitteet jne.)',
+
+    settings_show_event_creator: 'Näytä luojan nimi tapahtumissa',
     settings_show_event_icons_info: 'Näytä pieniä kuvakkeita aikajanan tapahtumissa ilmaisemassa niiden tyyppiä, liitteitä ja muita ominaisuuksia.',
     settings_show_week_numbers: 'Näytä viikkonumerot',
     settings_synth_label: 'Näytä H+N-merkintä viivalla',

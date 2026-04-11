@@ -427,6 +427,10 @@ TRANSLATIONS.en = {
     confirm_delete_lock: 'Remove this lock?',
     confirm_delete_user: 'Delete this user?',
     confirm_delete_layer: 'Delete this layer?',
+    confirm_delete_layer_with_events: 'This layer contains {n} events.\n\nDeleting it will move all events to the Master Timeline.\n\nAre you sure you want to delete this layer?',
+    layer_edit: 'Edit Layer',
+    layer_event_count: 'This layer contains {n} events.',
+    layer_no_events: 'This layer has no events.',
     confirm_delete_group: 'Delete this group?',
     confirm_delete_attachment: 'Delete this attachment?',
     confirm_delete_type: 'Delete this event type?',
@@ -1385,6 +1389,7 @@ TRANSLATIONS.en = {
     settings_event_icons:      'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
+    settings_show_event_creator: 'Show creator name on events',
 
     // Hover zoom (i18n)
     settings_hover_zoom:       'Hover Zoom',

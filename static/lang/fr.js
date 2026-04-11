@@ -270,6 +270,11 @@ TRANSLATIONS.fr = {
     confirm_delete_lock: 'Supprimer ce verrou ?',
     confirm_delete_user: 'Supprimer cet utilisateur ?',
     confirm_delete_layer: 'Supprimer cette couche ?',
+
+    confirm_delete_layer_with_events: 'Cette couche contient {n} événements.\n\nLa suppression déplacera tous les événements vers la chronologie principale.\n\nConfirmer la suppression ?',
+    layer_edit: 'Modifier la couche',
+    layer_event_count: 'Cette couche contient {n} événements.',
+    layer_no_events: 'Cette couche ne contient aucun événement.',
     confirm_delete_group: 'Supprimer ce groupe ?',
     confirm_delete_attachment: 'Supprimer cette pièce jointe ?',
     confirm_delete_type: 'Supprimer ce type d\'événement ?',
@@ -1063,6 +1068,8 @@ TRANSLATIONS.fr = {
 
     settings_event_icons:      'Icônes d\'événements',
     settings_show_event_icons: 'Afficher les icônes sur les événements (type, pièces jointes, etc.)',
+
+    settings_show_event_creator: 'Afficher le nom du créateur sur les événements',
     settings_show_event_icons_info: 'Affiche de petites icônes sur les événements indiquant leur type, pièces jointes et autres attributs.',
 
     settings_hover_zoom:       'Zoom au survol',

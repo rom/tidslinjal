@@ -270,6 +270,11 @@ TRANSLATIONS.sv = {
     confirm_delete_lock: 'Ta bort det här låset?',
     confirm_delete_user: 'Ta bort den här användaren?',
     confirm_delete_layer: 'Ta bort det här lagret?',
+
+    confirm_delete_layer_with_events: 'Det här lagret innehåller {n} händelser.\n\nAtt ta bort det flyttar alla händelser till huvudtidslinjen.\n\nÄr du säker på att du vill ta bort lagret?',
+    layer_edit: 'Redigera lager',
+    layer_event_count: 'Det här lagret innehåller {n} händelser.',
+    layer_no_events: 'Det här lagret har inga händelser.',
     confirm_delete_group: 'Ta bort den här gruppen?',
     confirm_delete_attachment: 'Ta bort den här bilagan?',
     confirm_delete_type: 'Ta bort den här händelsetypen?',
@@ -1123,6 +1128,8 @@ TRANSLATIONS.sv = {
 
     settings_event_icons:      'Händelseikoner',
     settings_show_event_icons: 'Visa ikoner på händelser (typ, bilagor, etc.)',
+
+    settings_show_event_creator: 'Visa skaparens namn på händelser',
     settings_show_event_icons_info: 'Visar små ikoner på tidslinjehändelser som anger typ, bilagor och andra attribut.',
 
     settings_hover_zoom:       'Hoverzoom',

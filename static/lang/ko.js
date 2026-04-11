@@ -368,6 +368,11 @@ TRANSLATIONS.ko = {
     confirm_delete_lock: '이 잠금을 해제하시겠습니까?',
     confirm_delete_user: '이 사용자를 삭제하시겠습니까?',
     confirm_delete_layer: '이 레이어를 삭제하시겠습니까?',
+
+    confirm_delete_layer_with_events: '이 레이어에 {n}개의 이벤트가 있습니다.\n\n삭제하면 마스터 타임라인으로 이동합니다.\n\n삭제하시겠습니까?',
+    layer_edit: '레이어 편집',
+    layer_event_count: '이 레이어에 {n}개의 이벤트가 있습니다.',
+    layer_no_events: '이 레이어에는 이벤트가 없습니다.',
     confirm_delete_group: '이 그룹을 삭제하시겠습니까?',
     confirm_delete_attachment: '이 첨부 파일을 삭제하시겠습니까?',
     confirm_delete_type: '이 이벤트 유형을 삭제하시겠습니까?',
@@ -1135,6 +1140,8 @@ TRANSLATIONS.ko = {
     settings_red_line_style_dotted: 'Dotted',
     settings_event_icons: 'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
+
+    settings_show_event_creator: '이벤트에 작성자 이름 표시',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
     settings_hover_zoom: 'Hover Zoom',
     settings_hover_zoom_desc: 'Enlarge calendar events on hover',

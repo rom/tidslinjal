@@ -556,6 +556,11 @@ TRANSLATIONS.da = {
     confirm_delete_event: 'Slet denne hændelse?',
     confirm_delete_group: 'Slet denne gruppe?',
     confirm_delete_layer: 'Slet dette lag?',
+
+    confirm_delete_layer_with_events: 'Dette lag indeholder {n} hændelser.\n\nSletning vil flytte alle hændelser til hovedtidslinjen.\n\nEr du sikker?',
+    layer_edit: 'Rediger lag',
+    layer_event_count: 'Dette lag indeholder {n} hændelser.',
+    layer_no_events: 'Dette lag har ingen hændelser.',
     confirm_delete_lock: 'Fjern denne lås?',
     confirm_delete_phase: 'Slet denne fase?',
     confirm_delete_resource_type: 'Slet denne ressourcetype? Ressourcer af denne type forbliver, men fanen fjernes.',
@@ -1162,6 +1167,8 @@ TRANSLATIONS.da = {
     settings_red_line_width_label: 'Bredde (px)',
     settings_show_clock_flags: 'Tilføj flag på ure',
     settings_show_event_icons: 'Vis ikoner på hændelser (type, vedhæftninger osv.)',
+
+    settings_show_event_creator: 'Vis skaberens navn på hændelser',
     settings_show_event_icons_info: 'Vis små ikoner på tidslinjehændelser der angiver type, vedhæftninger og andre attributter.',
     settings_synth_label: 'Vis H+N-mærkat på linje',
     settings_tooltip_delay: 'Tooltip-forsinkelse ved pegemarkør',

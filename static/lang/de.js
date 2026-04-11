@@ -429,6 +429,11 @@ TRANSLATIONS.de = {
     confirm_delete_lock: 'Remove this lock?',
     confirm_delete_user: 'Delete this user?',
     confirm_delete_layer: 'Delete this layer?',
+
+    confirm_delete_layer_with_events: 'Diese Ebene enthält {n} Ereignisse.\n\nBeim Löschen werden alle Ereignisse in die Hauptzeitleiste verschoben.\n\nMöchten Sie diese Ebene wirklich löschen?',
+    layer_edit: 'Ebene bearbeiten',
+    layer_event_count: 'Diese Ebene enthält {n} Ereignisse.',
+    layer_no_events: 'Diese Ebene hat keine Ereignisse.',
     confirm_delete_group: 'Delete this group?',
     confirm_delete_attachment: 'Delete this attachment?',
     confirm_delete_type: 'Delete this event type?',
@@ -1253,6 +1258,8 @@ TRANSLATIONS.de = {
     // Event icons setting (i18n)
     settings_event_icons: 'Event Icons',
     settings_show_event_icons: 'Show icons on events (type, attachments, etc.)',
+
+    settings_show_event_creator: 'Ersteller-Name auf Ereignissen anzeigen',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
 
     // Hover zoom (i18n)
