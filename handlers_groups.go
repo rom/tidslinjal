@@ -70,18 +70,31 @@ func (app *App) handleCreateGroup(w http.ResponseWriter, r *http.Request, user *
 	}
 	// Auto-add creator as admin
 	app.store.AddGroupMember(GroupMembership{GroupID: created.ID, UserID: user.ID, Role: "admin"}) //nolint
-	// Auto-create a layer with the same name and add the new group to it
-	autoLayer := Layer{
-		Name:        created.Name,
-		Description: created.Description,
-		Color:       "#4A90D9",
-		OwnerID:     user.ID,
-		OwnerName:   user.DisplayName,
-		Visibility:  "groups",
-		GroupIDs:    []int64{created.ID},
-		Permission:  "readwrite",
+	// Auto-create a layer with the same name, or add group to existing layer
+	existingLayer := app.findLayerByName(created.Name)
+	if existingLayer != nil {
+		// Layer already exists — add the new group to it
+		existingLayer.GroupIDs = append(existingLayer.GroupIDs, created.ID)
+		if existingLayer.Visibility == "private" {
+			existingLayer.Visibility = "groups"
+		}
+		if existingLayer.Permission == "read" {
+			existingLayer.Permission = "readwrite"
+		}
+		app.store.UpdateLayer(*existingLayer) //nolint
+	} else {
+		autoLayer := Layer{
+			Name:        created.Name,
+			Description: created.Description,
+			Color:       "#4A90D9",
+			OwnerID:     user.ID,
+			OwnerName:   user.DisplayName,
+			Visibility:  "groups",
+			GroupIDs:    []int64{created.ID},
+			Permission:  "readwrite",
+		}
+		app.store.CreateLayer(autoLayer) //nolint
 	}
-	app.store.CreateLayer(autoLayer) //nolint
 	w.WriteHeader(http.StatusCreated)
 	logDebug("group created: id=%d name=%q user=%s", created.ID, created.Name, user.Username)
 	jsonOK(w, created)

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ── Layer helpers ──────────────────────────────────────────────────────────────
@@ -90,6 +91,17 @@ func filterVisibleEvents(events []Event, visibleLayers map[int64]bool) []Event {
 		}
 	}
 	return result
+}
+
+// findLayerByName returns the first layer with a matching name (case-insensitive), or nil.
+func (app *App) findLayerByName(name string) *Layer {
+	lower := strings.ToLower(name)
+	for _, l := range app.store.GetAllLayers() {
+		if strings.ToLower(l.Name) == lower {
+			return &l
+		}
+	}
+	return nil
 }
 
 // canUserSeeEvent checks whether a single event is visible to the user.
