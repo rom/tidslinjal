@@ -231,7 +231,7 @@ function renderTimeline() {
   const days       = getDays();
   const slots      = getSlotsPerDay();
   const slotH      = getSlotHeight();
-  const baseTimeColW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--time-col-w')) || 52;
+  const baseTimeColW = parseInt(getComputedStyle(document.body).getPropertyValue('--time-col-w')) || 52;
   const synthLabelActive = synthActive();
   const synthExtra = synthLabelActive ? 44 : 0;
   const timeColW   = baseTimeColW + synthExtra;

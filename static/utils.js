@@ -148,7 +148,9 @@ function getSlotsPerDay() {
   return Math.round(1440 / getSlotMinutes());
 }
 function getSlotHeight() {
-  const s = getComputedStyle(document.documentElement);
+  // Read from document.body — size overrides (body.size-normal, body.size-large, etc.)
+  // set CSS variables on the body element, not on :root / document.documentElement.
+  const s = getComputedStyle(document.body);
   let h;
   switch (state.resolution) {
     case 'ten':     h = parseInt(s.getPropertyValue('--slot-h-ten'))     || 24; break;

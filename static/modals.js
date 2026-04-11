@@ -3486,6 +3486,9 @@ async function setPref(key, value) {
   state.preferences[key] = value;
   applyPreferences();
   await savePreferences();
+  // Clear the renderedTab guard so the settings tab re-renders with updated values
+  const sidebarEl = document.getElementById('sidebarContent');
+  if (sidebarEl) delete sidebarEl.dataset.renderedTab;
   renderSidebar();
   renderTimeline();
   if (typeof renderListView === 'function') renderListView();
@@ -3506,6 +3509,8 @@ async function setPrefSelect() {
   if (key) state.preferences[key] = el.value;
   applyPreferences();
   await savePreferences();
+  const sidebarEl = document.getElementById('sidebarContent');
+  if (sidebarEl) delete sidebarEl.dataset.renderedTab;
   renderSidebar();
   renderTimeline();
 }
@@ -3514,6 +3519,8 @@ async function setViewSpacing(value) {
   state.preferences.view_spacing = parseFloat(value) || 1;
   applyPreferences();
   await savePreferences();
+  const sidebarEl = document.getElementById('sidebarContent');
+  if (sidebarEl) delete sidebarEl.dataset.renderedTab;
   renderSidebar();
   renderTimeline();
 }
