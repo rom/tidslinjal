@@ -205,6 +205,20 @@ function openDetachedLogBook() {
   }, 1000);
 }
 
+// ── Key Terrain Board Window (detached) ──────────────────────────────────────
+let _keyTerrainPopout = null;
+
+function openDetachedKeyTerrain() {
+  if (_keyTerrainPopout && !_keyTerrainPopout.closed) {
+    _keyTerrainPopout.focus();
+    return;
+  }
+  const w = Math.min(window.screen.availWidth, 1200);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _keyTerrainPopout = window.open('/key-terrain', 'tidslinjal-key-terrain',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+}
+
 async function _refreshLogBookPopout() {
   if (!_logBookPopout || _logBookPopout.closed) return;
   try {

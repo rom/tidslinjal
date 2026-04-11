@@ -1525,91 +1525,14 @@ function _ktShowHelp() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function _ktDetach() {
-  const w = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no');
-  if (!w) { alert(t('dialog_popup_blocked')||'Popup blocked. Please allow popups for this site.'); return; }
-
-  // Copy relevant styles
-  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-    .map(el => el.outerHTML).join('\n');
-
-  // Determine theme before writing HTML so the document starts with correct theme
-  const _detachTheme = window.state?.preferences?.theme || 'dark';
-  const _detachThemeClass = _detachTheme === 'light' ? 'light-mode' : _detachTheme === 'city-camo' ? 'city-camo' : _detachTheme === 'urban-camo' ? 'urban-camo' : '';
-  const _detachDataSize = document.documentElement.getAttribute('data-size') || 'normal';
-
-  w.document.write(`<!DOCTYPE html><html data-theme="${_detachTheme}" data-size="${_detachDataSize}"><head><title>${t('kt_title')||'Key Terrain Board'}</title>${styles}
-    <style>
-      body { padding:0; margin:0; background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; }
-      #ktDetachRoot { padding:16px; }
-      .modal-overlay { position:static !important; background:none !important; display:block !important; }
-      .modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:20px !important; border:none !important; overflow:visible !important; }
-    </style>
-    </head><body class="${_detachThemeClass}"><div id="notification-area" style="position:fixed;top:10px;right:10px;z-index:9999"></div><div style="padding:4px 16px;background:var(--bg2);border-bottom:1px solid var(--border);font-size:10px;display:flex;align-items:center;gap:8px"><span style="color:var(--text-dim)">${t('kt_detach_url')||'URL'}:</span><input id="ktDetachURL" readonly style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 6px;font-size:10px;font-family:monospace" value="${window.location.origin}"><button id="ktDetachCopyURL" style="font-size:10px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;color:var(--text);cursor:pointer">${t('btn_copy')||'Copy'}</button></div><div id="ktDetachRoot"></div></body></html>`);
-  w.document.close();
-
-  // Copy scripts needed
-  const scriptSrcs = ['/static/i18n.js', '/static/lang/en.js', '/static/utils.js', '/static/state.js', '/static/api.js', '/static/modals.js', '/static/key-terrain.js'];
-  let loaded = 0;
-  const onAllLoaded = () => {
-    // Sync theme from parent window
-    const theme = window.state?.preferences?.theme || 'dark';
-    const themeClasses = ['light-mode', 'city-camo', 'urban-camo'];
-    const wantClass = theme === 'light' ? 'light-mode' : theme === 'city-camo' ? 'city-camo' : theme === 'urban-camo' ? 'urban-camo' : '';
-    themeClasses.forEach(c => w.document.body.classList.remove(c));
-    if (wantClass) w.document.body.classList.add(wantClass);
-    w.document.documentElement.setAttribute('data-theme', theme);
-
-    // Copy state
-    w.state = window.state;
-    w.TRANSLATIONS = window.TRANSLATIONS;
-    w._ktState = JSON.parse(JSON.stringify(_ktState));
-    // Store theme class to re-apply after body innerHTML changes
-    const _detachBodyClass = _detachThemeClass;
-    w._boardModal = function(id, content, width) {
-      const root = w.document.getElementById('ktDetachRoot');
-      if (!root) return;
-      let el = w.document.getElementById(id);
-      if (el) el.remove();
-      root.innerHTML = `<div id="${id}" style="max-width:${width||'1100px'};margin:0 auto">${content}</div>`;
-      if (typeof w._bindActions === 'function') w._bindActions(root);
-    };
-    w._closeBoardModal = function(id) {
-      const el = w.document.getElementById(id);
-      if (el) el.remove();
-      // Re-render the board after closing a sub-modal
-      if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
-    };
-    // Override openModal/closeModal for the detached window (no overlay needed)
-    w.openModal = function(id) {
-      const el = w.document.getElementById(id);
-      if (el) el.classList.add('open');
-    };
-    w.closeModal = function(id) {
-      const el = w.document.getElementById(id);
-      if (el) { el.classList.remove('open'); el.remove(); }
-    };
-    // Set up SSE forwarding from parent to detached window
-    const _ktDetachedSSEHandler = () => {
-      if (w.closed) { document.removeEventListener('sse:key_terrain_change', _ktDetachedSSEHandler); return; }
-      if (typeof w._ktHandleSSE === 'function') w._ktHandleSSE();
-    };
-    document.addEventListener('sse:key_terrain_change', _ktDetachedSSEHandler);
-    if (typeof w.openKeyTerrainBoard === 'function') w.openKeyTerrainBoard();
-    // Wire URL copy button
-    const copyBtn = w.document.getElementById('ktDetachCopyURL');
-    const urlInput = w.document.getElementById('ktDetachURL');
-    if (copyBtn && urlInput) {
-      copyBtn.addEventListener('click', () => {
-        urlInput.select();
-        try { w.navigator.clipboard.writeText(urlInput.value); copyBtn.textContent = '\u2713'; } catch { w.document.execCommand('copy'); }
-        setTimeout(() => { copyBtn.textContent = t('btn_copy')||'Copy'; }, 1500);
-      });
-    }
-  };
-  scriptSrcs.forEach(src => {
-    const s = w.document.createElement('script');
-    s.src = src;
-    s.onload = () => { loaded++; if (loaded === scriptSrcs.length) setTimeout(onAllLoaded, 100); };
-    w.document.head.appendChild(s);
-  });
+  // Open the standalone key terrain page at its own URL
+  if (typeof openDetachedKeyTerrain === 'function') {
+    openDetachedKeyTerrain();
+  } else {
+    // Fallback: open the URL directly
+    const w = Math.min(window.screen.availWidth, 1200);
+    const h = Math.min(window.screen.availHeight - 100, 800);
+    window.open('/key-terrain', 'tidslinjal-key-terrain',
+      'width=' + w + ',height=' + h + ',resizable=yes,scrollbars=yes');
+  }
 }
