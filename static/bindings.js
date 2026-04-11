@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
   on('#listDateFrom',     'change', function () { renderListView(); });
   on('#listDateTo',       'change', function () { renderListView(); });
   on('#listResponsibleFilter', 'change', function () { renderListView(); });
-  on('#listLayerFilter',      'change', function () { renderListView(); });
+  // Layer filter uses checkbox panel with its own event handler (see _initLayerFilterPanel in app.js)
 
   // ---------- List view sort headers (event delegation) ----------------------
   document.addEventListener('click', function (e) {
