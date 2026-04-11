@@ -615,21 +615,8 @@ function toggleListView() {
         });
       }
     }
-    // Populate layer filter
-    const layerEl = document.getElementById('listLayerFilter');
-    if (layerEl) {
-      layerEl.options[0].textContent = t('lv_all_layers') || 'All layers';
-      if (layerEl.options.length <= 2) { // "All layers" + "Master Timeline" already present
-        layerEl.options[1].textContent = t('layers_master') || 'Master Timeline';
-        (state.layers || []).forEach(l => {
-          const opt = document.createElement('option');
-          opt.value = l.id;
-          opt.textContent = escHtml(l.name);
-          opt.style.borderLeft = '4px solid ' + (l.color || '#4A90D9');
-          layerEl.appendChild(opt);
-        });
-      }
-    }
+    // Populate layer filter checkboxes
+    _initLayerFilterPanel();
     renderListView();
   } else {
     if (timeline) timeline.style.display = '';
@@ -659,6 +646,89 @@ function toggleListView() {
     });
   });
 })();
+
+// ── List view multi-layer filter ──────────────────────────────────────────
+let _layerPanelInited = false;
+
+function _initLayerFilterPanel() {
+  const btn = document.getElementById('lvLayerBtn');
+  const panel = document.getElementById('lvLayerPanel');
+  const list = document.getElementById('lvLayerList');
+  if (!btn || !panel || !list) return;
+
+  // Populate layer checkboxes (rebuild each time in case layers changed)
+  list.innerHTML = (state.layers || []).map(l =>
+    `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm);padding:3px 0">
+      <input type="checkbox" class="lv-layer-cb" value="${l.id}" checked style="accent-color:var(--accent)">
+      <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${l.color||'#4A90D9'};flex-shrink:0"></span>
+      ${escHtml(l.name)}
+    </label>`
+  ).join('');
+
+  // i18n for static labels
+  const allCb = panel.querySelector('.lv-layer-cb[value="_all"]');
+  if (allCb) allCb.parentElement.lastChild.textContent = ' ' + (t('lv_all_layers') || 'All layers');
+  const masterCb = panel.querySelector('.lv-layer-cb[value="_master"]');
+  if (masterCb) masterCb.parentElement.lastChild.textContent = ' ' + (t('layers_master') || 'Master Timeline');
+
+  if (_layerPanelInited) return;
+  _layerPanelInited = true;
+
+  // Toggle panel visibility
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  });
+
+  // Close panel when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!panel.contains(e.target) && e.target !== btn) {
+      panel.style.display = 'none';
+    }
+  });
+
+  // Handle checkbox changes via delegation
+  panel.addEventListener('change', function(e) {
+    const cb = e.target.closest('.lv-layer-cb');
+    if (!cb) return;
+
+    if (cb.value === '_all') {
+      // "All layers" toggles all other checkboxes
+      const checked = cb.checked;
+      panel.querySelectorAll('.lv-layer-cb').forEach(c => { c.checked = checked; });
+    } else {
+      // If unchecking any specific layer, uncheck "All"
+      const allCb = panel.querySelector('.lv-layer-cb[value="_all"]');
+      if (allCb) {
+        const allOthers = [...panel.querySelectorAll('.lv-layer-cb:not([value="_all"])')];
+        allCb.checked = allOthers.every(c => c.checked);
+      }
+    }
+
+    // Update button label
+    _updateLayerBtnLabel();
+    renderListView();
+  });
+}
+
+function _updateLayerBtnLabel() {
+  const btn = document.getElementById('lvLayerBtn');
+  if (!btn) return;
+  const allCb = document.querySelector('.lv-layer-cb[value="_all"]');
+  if (allCb && allCb.checked) {
+    btn.textContent = '🗂 ' + (t('lv_all_layers') || 'All layers') + ' ▾';
+    return;
+  }
+  const checked = [...document.querySelectorAll('.lv-layer-cb:checked:not([value="_all"])')];
+  if (checked.length === 0) {
+    btn.textContent = '🗂 ' + (t('lv_no_layers') || 'No layers') + ' ▾';
+  } else if (checked.length === 1) {
+    const label = checked[0].parentElement.textContent.trim();
+    btn.textContent = '🗂 ' + label + ' ▾';
+  } else {
+    btn.textContent = '🗂 ' + checked.length + ' ' + (t('lv_layers_selected') || 'layers') + ' ▾';
+  }
+}
 
 function _listWeekLabel(date) {
   if (!state.preferences.show_week_numbers || !date) return '';
@@ -703,18 +773,28 @@ function renderListView() {
   const dateFrom   = document.getElementById('listDateFrom')?.value || '';
   const dateTo     = document.getElementById('listDateTo')?.value || '';
   const respFil    = document.getElementById('listResponsibleFilter')?.value || '';
-  const layerFil   = document.getElementById('listLayerFilter')?.value || '';
+
+  // Multi-layer filter: get checked layer checkboxes
+  const allLayerCb = document.querySelector('.lv-layer-cb[value="_all"]');
+  const layerFilterAll = !allLayerCb || allLayerCb.checked;
+  let layerAllowSet = null;
+  if (!layerFilterAll) {
+    layerAllowSet = new Set();
+    document.querySelectorAll('.lv-layer-cb:checked').forEach(cb => {
+      if (cb.value !== '_all') layerAllowSet.add(cb.value);
+    });
+  }
 
   const hl = state.preferences.hidden_layers || [];
   let events = (state.events || []).filter(ev => {
     if (isTypeHidden(ev.event_type)) return false;
     if (ev.layer_id != null && hl.includes(ev.layer_id)) return false;
-    // Layer filter dropdown
-    if (layerFil) {
-      if (layerFil === '_master') {
-        if (ev.layer_id != null) return false;
+    // Multi-layer filter
+    if (layerAllowSet) {
+      if (ev.layer_id == null) {
+        if (!layerAllowSet.has('_master')) return false;
       } else {
-        if (String(ev.layer_id) !== layerFil) return false;
+        if (!layerAllowSet.has(String(ev.layer_id))) return false;
       }
     }
     if (statusFil && ev.status !== statusFil) return false;
