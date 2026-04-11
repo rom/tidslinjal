@@ -90,6 +90,7 @@ func (s *Store) CreateGradualBackupSnapshot() (string, error) {
 		"person_ready_checks.json", "api_keys.json",
 		"security.json", "rate_limits.json", "geoblocking.json",
 		"ip_blacklist.json", "encryption.json",
+		"key_terrain.json", "key_terrain_settings.json", "key_terrain_snapshots.json",
 	}
 	for _, fn := range files {
 		data, err := os.ReadFile(filepath.Join(s.dataDir, fn))
@@ -210,6 +211,8 @@ func (s *Store) RestoreGradualBackupSnapshot(filename string, areas []string) (i
 			"checklist_instances.json": true, "tags.json": true,
 			"notifications.json": true, "polls.json": true,
 			"person_ready_checks.json": true,
+			"key_terrain.json": true, "key_terrain_settings.json": true,
+			"key_terrain_snapshots.json": true,
 		}
 	}
 

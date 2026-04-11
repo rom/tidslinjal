@@ -269,6 +269,7 @@ func (app *App) handleBackup(w http.ResponseWriter, r *http.Request, user *User)
 		"checklist_templates.json", "checklist_instances.json",
 		"tags.json", "notifications.json", "polls.json",
 		"person_ready_checks.json",
+		"key_terrain.json", "key_terrain_settings.json", "key_terrain_snapshots.json",
 	}
 	for _, f := range files {
 		path := filepath.Join(dataDir, f)
@@ -315,7 +316,8 @@ var backupRestoreAreas = map[string][]string{
 		"questionnaires.json", "tags.json", "notifications.json", "polls.json",
 		"person_ready_checks.json", "attachments.json",
 		"security.json", "rate_limits.json", "geoblocking.json",
-		"ip_blacklist.json", "encryption.json"},
+		"ip_blacklist.json", "encryption.json",
+		"key_terrain.json", "key_terrain_settings.json", "key_terrain_snapshots.json"},
 }
 
 func (app *App) handleRestore(w http.ResponseWriter, r *http.Request, user *User) {
