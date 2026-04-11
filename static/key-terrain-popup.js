@@ -22,13 +22,13 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', t);
 }
 
-// Try to read theme from opener, then default to dark (matches :root in style.css)
+// Try to read theme from opener; for deep links (no opener), default to light
 (function initTheme() {
-  var theme = 'dark';
+  var theme = 'light'; // Default to light for standalone/deep-link access
   try {
     var op = window.opener && !window.opener.closed ? window.opener : null;
     if (op && op.state && op.state.preferences) {
-      theme = op.state.preferences.theme || 'dark';
+      theme = op.state.preferences.theme || 'light';
     }
   } catch(e) {}
   applyTheme(theme);

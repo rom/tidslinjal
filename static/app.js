@@ -624,6 +624,27 @@ function toggleListView() {
   }
 }
 
+// ── List view column visibility toggle ─────────────────────────────────────
+(function _initLvColToggle() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var btn = document.getElementById('lvColToggleBtn');
+    var panel = document.getElementById('lvColTogglePanel');
+    if (!btn || !panel) return;
+    btn.addEventListener('click', function() {
+      panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    });
+    panel.querySelectorAll('.lv-col-toggle').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var col = cb.dataset.col;
+        var show = cb.checked;
+        document.querySelectorAll('.lv-col-' + col).forEach(function(el) {
+          el.style.display = show ? '' : 'none';
+        });
+      });
+    });
+  });
+})();
+
 function _listWeekLabel(date) {
   if (!state.preferences.show_week_numbers || !date) return '';
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -789,12 +810,12 @@ function renderListView() {
     return marker + `
     <tr data-ev-row="${ev.id}" ${canEdit ? 'draggable="true"' : ''} style="border-bottom:1px solid var(--border);cursor:pointer;${strikeStyle}">
       <td style="padding:8px 10px;text-align:center;color:var(--text-dim);font-size:var(--fs-xs);width:40px">${canEdit ? '<span style="cursor:grab;margin-right:2px;opacity:.4">⠿</span>' : ''}${_seqNum}</td>
-      <td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+      <td style="padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${_evColor};margin-right:6px;vertical-align:middle"></span>
         ${escHtml(ev.title)}
       </td>
-      <td style="padding:8px 10px">${typeCell}</td>
-      <td style="padding:8px 10px;white-space:nowrap">
+      <td class="lv-col-type" style="padding:8px 10px">${typeCell}</td>
+      <td class="lv-col-status" style="padding:8px 10px;white-space:nowrap">
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[ev.status]||'var(--text-dim)'};margin-right:5px;vertical-align:middle"></span>${canEdit ?
           `<select class="list-status-sel" data-ev-status="${ev.id}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:${statusColors[ev.status]||'var(--text)'};padding:2px 6px;font-size:inherit;cursor:pointer">
             ${['planned','active','completed','rejected','cancelled'].map(s =>
@@ -803,10 +824,10 @@ function renderListView() {
           </select>` :
           `<span style="color:${statusColors[ev.status]||'var(--text)'}">${t('status_'+(ev.status||'planned'))||ev.status}</span>`}
       </td>
-      <td style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}${_listWeekLabel(new Date(ev.start_time))}</td>
-      <td style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) + _listWeekLabel(new Date(ev.end_time)) : '—'}</td>
-      <td style="padding:8px 10px">${responsibleCell}</td>
-      <td style="padding:8px 10px;white-space:nowrap">
+      <td class="lv-col-start" style="padding:8px 10px;white-space:nowrap">${fmtDateTime(new Date(ev.start_time))}</td>
+      <td class="lv-col-end" style="padding:8px 10px;white-space:nowrap">${ev.end_time ? fmtDateTime(new Date(ev.end_time)) : '—'}</td>
+      <td class="lv-col-responsible" style="padding:8px 10px">${responsibleCell}</td>
+      <td class="lv-col-actions" style="padding:8px 10px;white-space:nowrap">
         ${ev.contact_url ? `<a href="${escAttr(ev.contact_url)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="margin-right:4px;text-decoration:none" title="${escHtml(ev.contact_url)}" onclick="event.stopPropagation()">🔗</a>` : ''}
         <button class="btn btn-secondary btn-sm" data-ev-view="${ev.id}">${t('lv_view')}</button>
         ${canEdit ? `<button class="btn btn-secondary btn-sm" style="margin-left:4px" data-ev-edit="${ev.id}">${t('lv_edit')}</button>` : ''}
