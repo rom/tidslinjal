@@ -665,23 +665,99 @@ body.hover-zoom-enabled .event-block:hover {
   font-size: 12px; color: inherit; opacity: .9;
 }
 
-/* Starting point — compact right-pointing arrow marker */
+/* ── Start/End point event shapes ─────────────────────────────────────────── */
+/* Default shape: arrow (uses border triangle on a ::after pseudo-element) */
+/* All shapes stay within the timeslot — no clip-path, no overflow */
+
+/* Starting point — base styles */
 .event-block.ev-type-starting_point {
+  border-left: 4px solid rgba(255,255,255,.6);
   border-radius: 4px 0 0 4px;
-  clip-path: polygon(0% 0%, 75% 0%, 100% 50%, 75% 100%, 0% 100%);
-  border-left: none;
-  padding-right: 25%;
   min-height: 18px;
+  overflow: visible;
+}
+/* Arrow indicator on right edge */
+.event-block.ev-type-starting_point::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
 }
 
-/* Ending point — compact left-pointing stop marker */
+/* Ending point — base styles */
 .event-block.ev-type-ending_point {
-  border-radius: 0 4px 4px 0;
-  clip-path: polygon(25% 0%, 100% 0%, 100% 100%, 25% 100%, 0% 50%);
+  border-right: 4px solid rgba(255,255,255,.6);
   border-left: none;
-  padding-left: 25%;
+  border-radius: 0 4px 4px 0;
   min-height: 18px;
+  overflow: visible;
 }
+/* Stop indicator on left edge */
+.event-block.ev-type-ending_point::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* ── Alternative shapes (via body class) ─────────────────────────────────── */
+
+/* Shape: diamond markers */
+body.ev-shape-diamond .event-block.ev-type-starting_point::after {
+  right: -6px; border: none;
+  width: 10px; height: 10px;
+  background: currentColor;
+  transform: translateY(-50%) rotate(45deg);
+  border-radius: 1px;
+}
+body.ev-shape-diamond .event-block.ev-type-ending_point::after {
+  left: -6px; border: none;
+  width: 10px; height: 10px;
+  background: currentColor;
+  transform: translateY(-50%) rotate(45deg);
+  border-radius: 1px;
+}
+
+/* Shape: bar (simple thick border, no pointer) */
+body.ev-shape-bar .event-block.ev-type-starting_point {
+  border-left: 6px solid rgba(255,255,255,.8);
+  border-radius: 2px;
+}
+body.ev-shape-bar .event-block.ev-type-starting_point::after { display: none; }
+body.ev-shape-bar .event-block.ev-type-ending_point {
+  border-right: 6px solid rgba(255,255,255,.8);
+  border-radius: 2px;
+}
+body.ev-shape-bar .event-block.ev-type-ending_point::after { display: none; }
+
+/* Shape: rounded pill */
+body.ev-shape-pill .event-block.ev-type-starting_point {
+  border-radius: 20px 4px 4px 20px;
+  border-left: 4px solid rgba(255,255,255,.6);
+  padding-left: 8px;
+}
+body.ev-shape-pill .event-block.ev-type-starting_point::after { display: none; }
+body.ev-shape-pill .event-block.ev-type-ending_point {
+  border-radius: 4px 20px 20px 4px;
+  border-right: 4px solid rgba(255,255,255,.6);
+  border-left: none;
+  padding-right: 8px;
+}
+body.ev-shape-pill .event-block.ev-type-ending_point::after { display: none; }
 
 /* Transport — motion-lines pattern, distinct from regular events */
 .event-block.ev-type-transport {

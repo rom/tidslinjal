@@ -1287,6 +1287,12 @@ TRANSLATIONS.is = {
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
 
     // Hover zoom (i18n)
+    settings_event_point_shape: 'Form byrjunar-/endaatburða',
+    settings_event_point_shape_desc: 'Sjónrænn stíll fyrir byrjunar- og lokapunkta á tímalínu.',
+    settings_shape_arrow: 'Ör',
+    settings_shape_diamond: 'Demantur',
+    settings_shape_bar: 'Strika',
+    settings_shape_pill: 'Ávöl',
     settings_hover_zoom:       'Hover Zoom',
     settings_hover_zoom_desc:  'Enlarge calendar events on hover',
     settings_hover_zoom_info:  'When enabled, hovering over a timeline event will enlarge it for easier reading.',

@@ -1263,6 +1263,12 @@ TRANSLATIONS.nl = {
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
 
     // Hover zoom (i18n)
+    settings_event_point_shape: 'Vorm start-/eindevents',
+    settings_event_point_shape_desc: 'Visuele stijl voor start- en eindpunten op de tijdlijn.',
+    settings_shape_arrow: 'Pijl',
+    settings_shape_diamond: 'Diamant',
+    settings_shape_bar: 'Balk',
+    settings_shape_pill: 'Afgerond',
     settings_hover_zoom: 'Hover Zoom',
     settings_hover_zoom_desc: 'Enlarge calendar events on hover',
     settings_hover_zoom_info: 'When enabled, hovering over a timeline event will enlarge it for easier reading.',

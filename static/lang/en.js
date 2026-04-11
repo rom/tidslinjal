@@ -1392,6 +1392,12 @@ TRANSLATIONS.en = {
     settings_show_event_creator: 'Show creator name on events',
 
     // Hover zoom (i18n)
+    settings_event_point_shape: 'Start/End Event Shape',
+    settings_event_point_shape_desc: 'Visual style for Starting Point and Ending Point events on the timeline.',
+    settings_shape_arrow: 'Arrow',
+    settings_shape_diamond: 'Diamond',
+    settings_shape_bar: 'Bar',
+    settings_shape_pill: 'Pill',
     settings_hover_zoom:       'Hover Zoom',
     settings_hover_zoom_desc:  'Enlarge calendar events on hover',
     settings_hover_zoom_info:  'When enabled, hovering over a timeline event will enlarge it for easier reading.',

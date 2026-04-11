@@ -3197,6 +3197,16 @@ Fields: file, subject, sender, type, tags</pre>
         </label>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_event_point_shape')||'Start/End Event Shape'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_event_point_shape_desc')||'Visual style for Starting Point and Ending Point events on the timeline.'}</p>
+        <div class="toggle-btn-group">
+          <button class="toggle-btn${(p.event_point_shape||'arrow')==='arrow'?' active':''}" data-action="setPref" data-args='["event_point_shape","arrow"]'>▶ ${t('settings_shape_arrow')||'Arrow'}</button>
+          <button class="toggle-btn${p.event_point_shape==='diamond'?' active':''}" data-action="setPref" data-args='["event_point_shape","diamond"]'>◆ ${t('settings_shape_diamond')||'Diamond'}</button>
+          <button class="toggle-btn${p.event_point_shape==='bar'?' active':''}" data-action="setPref" data-args='["event_point_shape","bar"]'>▐ ${t('settings_shape_bar')||'Bar'}</button>
+          <button class="toggle-btn${p.event_point_shape==='pill'?' active':''}" data-action="setPref" data-args='["event_point_shape","pill"]'>● ${t('settings_shape_pill')||'Pill'}</button>
+        </div>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_hover_zoom')||'Hover Zoom'}</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
           <input type="checkbox" id="prefHoverZoom" ${p.hover_zoom_enabled!==false?'checked':''}

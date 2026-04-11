@@ -51,9 +51,14 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/admin-view", app.requireRole(RoleAdmin, func(w http.ResponseWriter, r *http.Request, user *User) {
 		http.ServeFile(w, r, "static/admin.html")
 	}))
-	mux.HandleFunc("/key-terrain", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {
+	mux.HandleFunc("/key-terrain", func(w http.ResponseWriter, r *http.Request) {
+		_, user := app.getSession(r)
+		if user == nil {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
 		http.ServeFile(w, r, "static/key-terrain-popup.html")
-	}))
+	})
 
 	// Documentation / User Manual
 	mux.HandleFunc("/docs/user-manual", app.requireAuth(func(w http.ResponseWriter, r *http.Request, user *User) {

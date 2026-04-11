@@ -1143,6 +1143,12 @@ TRANSLATIONS.ja = {
 
     settings_show_event_creator: 'イベントに作成者名を表示',
     settings_show_event_icons_info: 'Display small icons on timeline events indicating their type, attachments, and other attributes.',
+    settings_event_point_shape: '開始/終了イベントの形状',
+    settings_event_point_shape_desc: 'タイムライン上の開始点・終了点の表示スタイル。',
+    settings_shape_arrow: '矢印',
+    settings_shape_diamond: 'ダイヤモンド',
+    settings_shape_bar: 'バー',
+    settings_shape_pill: '丸型',
     settings_hover_zoom: 'Hover Zoom',
     settings_hover_zoom_desc: 'Enlarge calendar events on hover',
     settings_hover_zoom_info: 'When enabled, hovering over a timeline event will enlarge it for easier reading.',
