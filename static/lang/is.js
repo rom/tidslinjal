@@ -286,6 +286,15 @@ TRANSLATIONS.is = {
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
 
+    layers_bulk_move: 'Fjöldaflutningur atburða',
+    layers_bulk_move_desc: 'Færa alla atburði úr einu lagi í annað.',
+    layers_source: 'Frá lagi',
+    layers_target: 'Í lag',
+    layers_move_btn: 'Færa atburði',
+    layers_move_same: 'Upprunalag og marklag verða að vera ólík.',
+    layers_move_confirm: 'Færa alla atburði frá "{src}" í "{tgt}"?',
+    layers_move_done: '{n} atburðir færðir.',
+
     // Groups
     groups_title: 'Groups',
     groups_add: '+ New Group',

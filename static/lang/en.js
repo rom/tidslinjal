@@ -285,6 +285,14 @@ TRANSLATIONS.en = {
     layer_visibility_public: 'Public',
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
+    layers_bulk_move: 'Bulk Move Events',
+    layers_bulk_move_desc: 'Move all events from one layer to another.',
+    layers_source: 'From layer',
+    layers_target: 'To layer',
+    layers_move_btn: 'Move Events',
+    layers_move_same: 'Source and target layers must be different.',
+    layers_move_confirm: 'Move all events from "{src}" to "{tgt}"?',
+    layers_move_done: '{n} events moved.',
 
     // Groups
     groups_title: 'Groups',
