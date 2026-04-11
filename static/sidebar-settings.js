@@ -216,6 +216,153 @@ async function saveReadyCheckSettings() {
   }
 }
 
+// ── Terminology & mode settings (global, saved to exercise config) ─────────
+
+async function _saveExerciseField(fields) {
+  const ex = state.exercise || {};
+  const payload = { ...ex, ...fields };
+  const res = await apiPut('/api/exercise', payload);
+  if (res.ok) {
+    state.exercise = await res.json();
+    // Clear settings tab cache so it re-renders with updated values
+    const sidebarEl = document.getElementById('sidebarContent');
+    if (sidebarEl) delete sidebarEl.dataset.renderedTab;
+    renderSidebar();
+    renderTimeline();
+    if (typeof updateUILabels === 'function') updateUILabels();
+    showNotification('success', t('notif_saved') || 'Saved');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to save');
+  }
+}
+
+async function setGroupLabel(value) {
+  await _saveExerciseField({ group_label: value });
+}
+
+async function setUserLabel(value) {
+  await _saveExerciseField({ user_label: value });
+}
+
+async function setOperationMode(value) {
+  await _saveExerciseField({ operation_mode: value });
+}
+
+// ── Artificial time settings (from the Settings tab) ──────────────────────
+
+async function toggleArtificialTimeSetting() {
+  const cb = document.getElementById('settingsArtTimeEnabled');
+  if (!cb) return;
+  const ex = state.exercise || {};
+  await _saveExerciseField({
+    artificial_time_enabled: cb.checked,
+    artificial_time: ex.artificial_time || '',
+  });
+}
+
+async function saveArtificialTimeSetting() {
+  const enabled = document.getElementById('settingsArtTimeEnabled')?.checked || false;
+  const timeVal = document.getElementById('settingsArtTime')?.value;
+  await _saveExerciseField({
+    artificial_time_enabled: enabled,
+    artificial_time: timeVal ? new Date(timeVal).toISOString() : '',
+  });
+}
+
+// ── Artificial time toggle (from the exercise setup section) ──────────────
+
+async function setArtificialTime() {
+  // Called when the checkbox in the exercise setup section changes
+  const cb = document.getElementById('exArtificialTimeEnabled');
+  if (!cb) return;
+  const timeVal = document.getElementById('exArtificialTime')?.value;
+  const ex = state.exercise || {};
+  await _saveExerciseField({
+    artificial_time_enabled: cb.checked,
+    artificial_time: timeVal ? new Date(timeVal).toISOString() : (ex.artificial_time || ''),
+  });
+}
+
+// ── Timezone preference ───────────────────────────────────────────────────
+
+function setTimezonePref(value) {
+  state.timezone = value || '';
+  // Store in localStorage so it persists across sessions
+  if (value) {
+    localStorage.setItem('tidslinjal_timezone', value);
+  } else {
+    localStorage.removeItem('tidslinjal_timezone');
+  }
+  // Update clock display
+  if (typeof updateClock === 'function') updateClock();
+  renderTimeline();
+}
+
+// ── Exercise index info tooltip ───────────────────────────────────────────
+
+function showExIndexInfo() {
+  alert(
+    (t('exercise_index_info') || 'The exercise index is a sequential number used to identify this exercise.\n\nIt is displayed in headers and reports to distinguish between multiple exercises.\n\nSet to 0 to hide.')
+  );
+}
+
+// ── Detached checklists window ────────────────────────────────────────────
+
+let _checklistsPopout = null;
+
+function openDetachedChecklists() {
+  if (_checklistsPopout && !_checklistsPopout.closed) {
+    _checklistsPopout.focus();
+    return;
+  }
+  // Build checklist content from the sidebar and open in new window
+  const w = Math.min(window.screen.availWidth, 700);
+  const h = Math.min(window.screen.availHeight - 100, 800);
+  _checklistsPopout = window.open('', 'tidslinjal-checklists',
+    `width=${w},height=${h},resizable=yes,scrollbars=yes`);
+  if (!_checklistsPopout) {
+    alert(t('dialog_popup_blocked') || 'Popup blocked. Please allow popups for this site.');
+    return;
+  }
+  const theme = document.body.className || '';
+  _checklistsPopout.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tidslinjal \u2014 Checklists</title>' +
+    '<link rel="stylesheet" href="/static/style.css">' +
+    '<style>body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif}' +
+    'h3{margin:0 0 12px;font-size:16px;color:var(--accent)}</style>' +
+    '</head><body class="' + escHtml(theme) + '">' +
+    '<h3>\uD83D\uDCCB ' + escHtml(t('checklists') || 'Checklists') + '</h3>' +
+    '<div id="clWrap"></div></body></html>');
+  _checklistsPopout.document.close();
+
+  // Copy checklist content from sidebar
+  const src = document.getElementById('sidebarContent');
+  if (src) {
+    const wrap = _checklistsPopout.document.getElementById('clWrap');
+    if (wrap) {
+      wrap.innerHTML = src.innerHTML;
+      // Re-bind action buttons to opener window functions
+      wrap.querySelectorAll('[data-action]').forEach(function(el) {
+        el.onclick = function() {
+          try {
+            window.focus();
+            var fn = el.dataset.action;
+            if (typeof window[fn] === 'function') window[fn]();
+          } catch(e) {}
+        };
+      });
+    }
+  }
+
+  // Monitor window closure
+  var monitor = setInterval(function() {
+    if (!_checklistsPopout || _checklistsPopout.closed) {
+      clearInterval(monitor);
+      _checklistsPopout = null;
+    }
+  }, 1000);
+}
+
 // ── OIDC settings helpers ──────────────────────────────────────────────────
 
 function _setOIDCStatusBar(enabled, issuer, active) {
