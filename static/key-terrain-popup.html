@@ -25,7 +25,21 @@ body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui
 
 /* ── Standalone overrides: no modal overlay needed ── */
 .modal-overlay { position:static !important; background:none !important; display:block !important; }
-.modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:0 !important; border:none !important; overflow:visible !important; }
+.modal { box-shadow:none !important; max-width:100% !important; width:100% !important; max-height:none !important; padding:0 !important; overflow:visible !important; }
+
+/* ── Sub-modals (edit entry, settings, etc.) need visible borders ── */
+.modal-overlay .modal-overlay { position:fixed !important; background:rgba(0,0,0,.5) !important; display:flex !important; align-items:center; justify-content:center; inset:0; z-index:10000; }
+.modal-overlay .modal-overlay .modal {
+  box-shadow:0 8px 32px rgba(0,0,0,.3) !important;
+  border:1px solid var(--border) !important;
+  border-radius:8px !important;
+  max-width:600px !important;
+  width:auto !important;
+  max-height:90vh !important;
+  overflow:auto !important;
+  padding:20px !important;
+  background:var(--bg2) !important;
+}
 </style>
 </head>
 <body>
