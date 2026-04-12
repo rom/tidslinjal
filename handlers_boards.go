@@ -21,7 +21,7 @@ import (
 // ── Board access check ──────────────────────────────────────────────────────
 
 func (app *App) canAccessBoard(board *Board, user *User) bool {
-	if user.Role == RoleAdmin {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	switch board.Visibility {
@@ -43,7 +43,7 @@ func (app *App) canAccessBoard(board *Board, user *User) bool {
 }
 
 func (app *App) canEditBoard(board *Board, user *User) bool {
-	if user.Role == RoleAdmin || board.OwnerID == user.ID {
+	if app.effectiveHasRole(user, RoleAdmin) || board.OwnerID == user.ID {
 		return true
 	}
 	if board.Visibility == "global" && app.effectiveHasRole(user, RoleTeamLead) {

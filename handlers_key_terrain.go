@@ -14,7 +14,7 @@ import (
 // canWriteKeyTerrain checks if user has key_terrain_write capability.
 // Defaults to true for OpLead+, staff roles; checks role config for custom roles.
 func (app *App) canWriteKeyTerrain(user *User) bool {
-	if user.Role == RoleAdmin {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	for _, rc := range app.store.GetRoleConfigs() {
@@ -35,7 +35,7 @@ func (app *App) canWriteKeyTerrain(user *User) bool {
 // canReadKeyTerrain checks if user has key_terrain_read capability.
 // Defaults to true for everyone (all roles).
 func (app *App) canReadKeyTerrain(user *User) bool {
-	if user.Role == RoleAdmin {
+	if app.effectiveHasRole(user, RoleAdmin) {
 		return true
 	}
 	for _, rc := range app.store.GetRoleConfigs() {

@@ -73,11 +73,13 @@ function applyRoleGatedUI() {
   roleEl.textContent = t('role_'+state.user.role) || state.user.role;
   roleEl.className   = `role-badge role-${state.user.role}`;
 
-  const canWrite = hasRole2(state.user.role, 'readwrite');
+  const canWrite = hasRole2(state.user.role, 'readwrite') || userHasCapability('create_events') || userHasCapability('edit_own');
   document.getElementById('btnAddEvent').style.display = canWrite ? '' : 'none';
-  document.getElementById('btnAddLock').style.display = (state.user.role==='admin' || state.user.can_lock) ? '' : 'none';
-  document.querySelectorAll('.admin-only').forEach(el => el.style.display = state.user.role==='admin' ? '' : 'none');
-  document.querySelectorAll('.teamlead-only').forEach(el => el.style.display = hasRole2(state.user.role, 'teamlead') ? '' : 'none');
+  document.getElementById('btnAddLock').style.display = (hasRole2(state.user.role, 'admin') || state.user.can_lock || userHasCapability('lock_slots')) ? '' : 'none';
+  // .admin-only elements: hidden unless user is admin/developer OR has manage_users/manage_integrations capability
+  const isAdminLike = hasRole2(state.user.role, 'admin') || userHasCapability('manage_users') || userHasCapability('manage_integrations');
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = isAdminLike ? '' : 'none');
+  document.querySelectorAll('.teamlead-only').forEach(el => el.style.display = (hasRole2(state.user.role, 'teamlead') || userHasCapability('view_audit') || userHasCapability('manage_layers') || userHasCapability('manage_groups')) ? '' : 'none');
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 	// Filter by access: admin sees all; others see general, own, and same-group entries
 	var visible []DecisionLogEntry
 	hasConfidentialRead := app.userHasCapability(user, "confidential_read")
-	isAdmin := user.Role == RoleAdmin
+	isAdmin := app.effectiveHasRole(user, RoleAdmin)
 	for _, e := range entries {
 		if e.Confidential && !hasConfidentialRead && !isAdmin {
 			// For confidential entries, only expose: timestamp, who decided, and confidential flag
@@ -233,7 +233,7 @@ func (app *App) handleReviewDecisionLogEntry(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Authorization: only admin, oplead, deputy_oplead, or someone acting as oplead on duty
-	canReview := user.Role == RoleAdmin || user.Role == RoleOpLead || user.Role == RoleDeputyOpLead
+	canReview := app.effectiveHasRole(user, RoleOpLead) || app.userHasCapability(user, "decision_log_readwrite")
 	if !canReview {
 		// Check if user is set as acting oplead via staff duties
 		for _, d := range app.store.GetStaffDuties() {
@@ -652,17 +652,17 @@ func (app *App) handleGetDecisionLogByShareToken(w http.ResponseWriter, r *http.
 	for _, e := range entries {
 		if e.ShareToken != "" && subtle.ConstantTimeCompare([]byte(e.ShareToken), []byte(token)) == 1 {
 			// Check access: confidential entries require capability
-			if e.Confidential && !app.userHasCapability(user, "confidential_read") && user.Role != RoleAdmin {
+			if e.Confidential && !app.userHasCapability(user, "confidential_read") && !app.effectiveHasRole(user, RoleAdmin) {
 				jsonError(w, "forbidden", http.StatusForbidden)
 				return
 			}
 			// Private entries require being the author or admin
-			if e.LogType == "private" && e.UserID != user.ID && user.Role != RoleAdmin {
+			if e.LogType == "private" && e.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 				jsonError(w, "forbidden", http.StatusForbidden)
 				return
 			}
 			// Group entries require group membership
-			if e.LogType == "group" && user.Role != RoleAdmin {
+			if e.LogType == "group" && !app.effectiveHasRole(user, RoleAdmin) {
 				inGroup := false
 				for _, gid := range app.userGroups(user.ID) {
 					if gid == e.GroupID {

@@ -268,7 +268,7 @@ function _renderDecisionLogEntries() {
     const ts = fmtDateTime(new Date(e.timestamp));
     const badge = e.confidential ? `<span style="color:var(--danger);font-size:var(--fs-xs);font-weight:700"> 🔒 ${t('confidential')||'CONFIDENTIAL'}</span>` : '';
     const typeBadge = e.log_type === 'private' ? ' 🔵' : e.log_type === 'group' ? ' 🟢' : '';
-    const isAdmin = state.user?.role === 'admin';
+    const isAdmin = hasRole2(state.user?.role, 'admin') || userHasCapability('decision_log_readwrite');
     // Status badge for decision requests
     let statusBadge = '';
     let reviewSection = '';

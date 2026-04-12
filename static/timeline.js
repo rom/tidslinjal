@@ -926,7 +926,7 @@ function _renderEventBlocksInner(days, slotH, incremental) {
         el.className = 'lock-overlay';
         el.style.cssText = `position:absolute;top:${topPx}px;left:${dayMeta[di].left}px;width:${dayMeta[di].width}px;height:${heightPx}px;background:repeating-linear-gradient(45deg,${scopeColor});border-left:2px solid ${scopeBorder};pointer-events:none;z-index:4;`;
         container.appendChild(el);
-        const canUnlock = state.user && (state.user.role==='admin' || state.user.id===lk.locked_by || state.user.can_lock);
+        const canUnlock = state.user && (hasRole2(state.user.role, 'admin') || state.user.id===lk.locked_by || state.user.can_lock || userHasCapability('lock_slots'));
         if (canUnlock) {
           const scopeTag = {'all':'ALL','master':'MASTER','layer':'LAYER'}[lk.scope||'all']||'ALL';
           const btn = document.createElement('button');

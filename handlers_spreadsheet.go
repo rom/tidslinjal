@@ -94,7 +94,7 @@ func (app *App) handleListSpreadsheets(w http.ResponseWriter, r *http.Request, u
 	// Filter by visibility
 	var visible []Spreadsheet
 	for _, ss := range all {
-		if ss.OwnerID == user.ID || ss.Visibility == "public" || user.Role == RoleAdmin {
+		if ss.OwnerID == user.ID || ss.Visibility == "public" || app.effectiveHasRole(user, RoleAdmin) {
 			visible = append(visible, ss)
 			continue
 		}

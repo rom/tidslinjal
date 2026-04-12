@@ -1090,7 +1090,7 @@ function renderSidebar() {
         </div>
       </div>` : ''}
     `;
-  } else if (tab === 'resources' && state.user && (state.user.role==='admin' || state.user.role==='developer')) {
+  } else if (tab === 'resources' && state.user && (hasRole2(state.user.role, 'teamlead') || userHasCapability('manage_users') || userHasCapability('manage_groups') || userHasCapability('manage_rooms'))) {
     const canSeeLoc = userHasCapability('see_location');
     const gl = getGroupLabel();
     // Sub-tab state
@@ -1554,7 +1554,7 @@ function renderSidebar() {
         <div id="auditLog" style="font-size:var(--fs-xs)"><em style="color:var(--text-dim)">Loading…</em></div>
       </div>`;
     refreshAuditLog();
-  } else if (tab === 'integrations' && state.user && (state.user.role === 'admin' || state.user.role === 'developer')) {
+  } else if (tab === 'integrations' && state.user && (state.user.role === 'admin' || state.user.role === 'developer' || userHasCapability('manage_integrations'))) {
     // Skip re-render if already on this tab (preserves form state & API key dropdowns)
     if (el.dataset.renderedTab === 'integrations') return;
     el.dataset.renderedTab = 'integrations';

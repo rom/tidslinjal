@@ -199,7 +199,7 @@ function _diaryRenderList() {
         </div>
         <div style="display:flex;gap:4px;align-items:center">
           ${mine ? `<button class="btn btn-sm" data-action="_diaryEditEntry" data-arg="${e.id}" title="${t('btn_edit')||'Edit'}">✏</button>` : ''}
-          ${mine || (state.user && state.user.role === 'admin') ? `<button class="btn btn-sm" data-action="_diaryDeleteEntry" data-arg="${e.id}" title="${t('btn_delete')||'Delete'}">🗑</button>` : ''}
+          ${mine || (state.user && hasRole2(state.user.role, 'admin')) ? `<button class="btn btn-sm" data-action="_diaryDeleteEntry" data-arg="${e.id}" title="${t('btn_delete')||'Delete'}">🗑</button>` : ''}
           <button class="btn btn-sm" data-action="_diaryPrintEntry" data-arg="${e.id}" title="${t('diary_print_entry')||'Print'}">🖨</button>
         </div>
       </div>
