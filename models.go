@@ -550,6 +550,9 @@ type Session struct {
 	ID        string    `json:"id"`
 	UserID    int64     `json:"user_id"`
 	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at,omitempty"` // when the session was created
+	IPAddress string    `json:"ip_address,omitempty"` // client IP that created the session
+	UserAgent string    `json:"user_agent,omitempty"` // browser/client identifier
 }
 
 // AlarmNotification sent over SSE
@@ -1098,6 +1101,15 @@ type SecuritySettings struct {
 	IdleTimeoutHours   int  `json:"idle_timeout_hours,omitempty"`    // idle timeout in hours (default 100)
 	LogoffOnPasswordChange bool `json:"logoff_on_password_change"`   // invalidate sessions on other devices when password changes (default true)
 	RotateSessionOnRoleChange bool `json:"rotate_session_on_role_change"` // invalidate sessions when user role changes (default true)
+
+	// Session hijack protection: bind sessions to the client IP / user-agent
+	// that created them so that a stolen session cookie cannot be replayed
+	// from a different client. SessionBindIPMode: "" or "subnet" (default)
+	// matches /24 for IPv4 and /64 for IPv6 (tolerates mobile roaming);
+	// "strict" requires an exact IP match.
+	SessionBindIP     bool   `json:"session_bind_ip"`                // enforce IP binding on session validation (default true)
+	SessionBindIPMode string `json:"session_bind_ip_mode,omitempty"` // "subnet" (default) or "strict"
+	SessionBindUA     bool   `json:"session_bind_ua"`                // enforce user-agent binding on session validation (default true)
 
 	// SSO-only mode: when enabled, password login is disabled for all users
 	// except the built-in admin account. Requires OIDC/SSO to be configured.

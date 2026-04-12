@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +34,13 @@ func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Reques
 	}
 	if ss.IdleTimeoutHours == 0 {
 		ss.IdleTimeoutHours = 100
+	}
+	// Session binding default IP mode
+	if ss.SessionBindIPMode == "" {
+		ss.SessionBindIPMode = "subnet"
+	} else if ss.SessionBindIPMode != "subnet" && ss.SessionBindIPMode != "strict" {
+		jsonError(w, "invalid session_bind_ip_mode (must be 'subnet' or 'strict')", http.StatusBadRequest)
+		return
 	}
 	if err := app.store.SaveSecuritySettings(ss); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -289,4 +298,133 @@ func (app *App) handleOIDCConfigForSidebar(w http.ResponseWriter, r *http.Reques
 func (app *App) handleSecurityPolicy(w http.ResponseWriter, r *http.Request, user *User) {
 	ss := app.store.GetSecuritySettings()
 	jsonOK(w, ss)
+}
+
+// ── Active Sessions (admin only) ──────────────────────────────────────────
+
+// handleListActiveSessions returns all non-expired sessions with enriched
+// user info. Admin only. Session IDs are truncated to the first 8 chars
+// to avoid exposing full tokens in the UI (cookie theft risk).
+func (app *App) handleListActiveSessions(w http.ResponseWriter, r *http.Request, user *User) {
+	sessions := app.store.GetActiveSessions()
+	type sessionView struct {
+		IDPrefix    string `json:"id_prefix"` // first 8 chars, used for display only
+		IDHash      string `json:"id_hash"`   // SHA-256 hex of full ID, used for delete lookup
+		UserID      int64  `json:"user_id"`
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+		IPAddress   string `json:"ip_address,omitempty"`
+		UserAgent   string `json:"user_agent,omitempty"`
+		CreatedAt   string `json:"created_at,omitempty"`
+		ExpiresAt   string `json:"expires_at"`
+		IsCurrent   bool   `json:"is_current"` // the session making this request
+	}
+	// Current session ID for "this session" marking
+	currentID := ""
+	if c, err := r.Cookie("session"); err == nil {
+		currentID = c.Value
+	}
+	views := make([]sessionView, 0, len(sessions))
+	for _, s := range sessions {
+		u, ok := app.store.GetUserByID(s.UserID)
+		username := ""
+		displayName := ""
+		if ok {
+			username = u.Username
+			displayName = u.DisplayName
+		}
+		idPrefix := s.ID
+		if len(idPrefix) > 8 {
+			idPrefix = idPrefix[:8]
+		}
+		hash := sha256.Sum256([]byte(s.ID))
+		created := ""
+		if !s.CreatedAt.IsZero() {
+			created = s.CreatedAt.Format(time.RFC3339)
+		}
+		views = append(views, sessionView{
+			IDPrefix:    idPrefix,
+			IDHash:      hex.EncodeToString(hash[:]),
+			UserID:      s.UserID,
+			Username:    username,
+			DisplayName: displayName,
+			IPAddress:   s.IPAddress,
+			UserAgent:   s.UserAgent,
+			CreatedAt:   created,
+			ExpiresAt:   s.ExpiresAt.Format(time.RFC3339),
+			IsCurrent:   s.ID == currentID,
+		})
+	}
+	jsonOK(w, views)
+}
+
+// handleDeleteActiveSession destroys one or more sessions by their SHA-256
+// hashed ID. Admin only. Refuses to delete the caller's current session
+// (the admin should use regular logout for that).
+func (app *App) handleDeleteActiveSession(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		IDHash      string `json:"id_hash"`
+		UserID      int64  `json:"user_id"`
+		AllForUser  bool   `json:"all_for_user"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Determine the current session ID to refuse self-deletion via this endpoint
+	currentID := ""
+	if c, err := r.Cookie("session"); err == nil {
+		currentID = c.Value
+	}
+
+	if req.AllForUser && req.UserID > 0 {
+		// Prevent admin from nuking their own sessions via this endpoint
+		if req.UserID == user.ID {
+			jsonError(w, "use regular logout to sign out your own sessions", http.StatusBadRequest)
+			return
+		}
+		u, ok := app.store.GetUserByID(req.UserID)
+		if !ok {
+			jsonError(w, "user not found", http.StatusNotFound)
+			return
+		}
+		app.store.DeleteSessionsForUser(req.UserID)
+		app.audit(user.ID, user.DisplayName, "deleted", "sessions", req.UserID,
+			fmt.Sprintf("Admin %q destroyed all sessions for user %q", user.Username, u.Username))
+		jsonOK(w, map[string]string{"status": "ok"})
+		return
+	}
+
+	// Single session deletion: find by hash
+	if req.IDHash == "" {
+		jsonError(w, "id_hash or user_id required", http.StatusBadRequest)
+		return
+	}
+	target := ""
+	var targetUserID int64
+	for _, s := range app.store.GetActiveSessions() {
+		h := sha256.Sum256([]byte(s.ID))
+		if hex.EncodeToString(h[:]) == req.IDHash {
+			target = s.ID
+			targetUserID = s.UserID
+			break
+		}
+	}
+	if target == "" {
+		jsonError(w, "session not found", http.StatusNotFound)
+		return
+	}
+	if target == currentID {
+		jsonError(w, "cannot destroy your own current session via admin endpoint; use logout", http.StatusBadRequest)
+		return
+	}
+	_ = app.store.DeleteSession(target)
+	targetName := ""
+	if u, ok := app.store.GetUserByID(targetUserID); ok {
+		targetName = u.Username
+	}
+	app.audit(user.ID, user.DisplayName, "deleted", "session", targetUserID,
+		fmt.Sprintf("Admin %q destroyed session for user %q", user.Username, targetName))
+	jsonOK(w, map[string]string{"status": "ok"})
 }

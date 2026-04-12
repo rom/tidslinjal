@@ -789,6 +789,14 @@ func (app *App) handleUploadBoardItemAttachment(w http.ResponseWriter, r *http.R
 	defer file.Close()
 
 	safeName := filepath.Base(header.Filename)
+	if safeName == "." || safeName == "/" || safeName == "" {
+		safeName = "upload"
+	}
+	// Block dangerous file types to prevent stored XSS via inline rendering
+	if isDangerousFilename(safeName) {
+		jsonError(w, "file type not allowed", http.StatusBadRequest)
+		return
+	}
 	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	dir := filepath.Join(app.store.DataDir(), "board_attachments")
 	_ = os.MkdirAll(dir, 0700)
@@ -869,6 +877,9 @@ func (app *App) handleDownloadBoardItemAttachment(w http.ResponseWriter, r *http
 	}
 	fpath := filepath.Join(app.store.DataDir(), "board_attachments", filepath.Base(att.StoredName))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", att.Filename))
+	// Defense-in-depth: prevent browsers from sniffing/rendering as HTML/SVG
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, fpath)
 }
 

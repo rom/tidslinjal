@@ -123,7 +123,80 @@ func (app *App) getSession(r *http.Request) (*Session, *User) {
 	if !user.Vetted && user.Role != RoleAdmin {
 		return nil, nil
 	}
+	// Session hijack protection: reject sessions whose bound client metadata
+	// (IP, user-agent) no longer matches the current request. A stolen
+	// session cookie replayed from a different client will fail this check.
+	ss := app.store.GetSecuritySettings()
+	if reason := sessionBindingMismatch(sess, r, ss); reason != "" {
+		ip := clientIP(r)
+		log.Printf("[SECURITY] session binding mismatch for user %d (%s): %s; ip=%s stored_ip=%s", user.ID, user.Username, reason, ip, sess.IPAddress)
+		app.store.LogAudit(AuditEntry{ //nolint
+			UserID: user.ID, UserName: user.Username,
+			Action: "session_hijack_suspected", EntityType: "session",
+			Summary: fmt.Sprintf("SECURITY: session binding mismatch (%s); original ip=%s ua=%q, current ip=%s ua=%q — session destroyed", reason, sess.IPAddress, sess.UserAgent, ip, r.UserAgent()),
+		})
+		// Destroy the suspect session so a stolen cookie can't be reused.
+		_ = app.store.DeleteSession(sess.ID)
+		return nil, nil
+	}
 	return sess, user
+}
+
+// sessionBindingMismatch returns a non-empty reason string if the current
+// request does not match the client metadata bound to the session at login
+// time. Returns "" when the binding is OK or disabled, or when the stored
+// metadata is empty (legacy sessions created before binding was added).
+func sessionBindingMismatch(sess *Session, r *http.Request, ss SecuritySettings) string {
+	if ss.SessionBindIP && sess.IPAddress != "" {
+		curIP := clientIP(r)
+		if !ipsMatchBinding(sess.IPAddress, curIP, ss.SessionBindIPMode) {
+			return "ip"
+		}
+	}
+	if ss.SessionBindUA && sess.UserAgent != "" {
+		if subtle.ConstantTimeCompare([]byte(sess.UserAgent), []byte(r.UserAgent())) != 1 {
+			return "user-agent"
+		}
+	}
+	return ""
+}
+
+// ipsMatchBinding compares two IP addresses under the configured binding mode.
+// "strict" requires an exact match; "subnet" (or any other value) uses /24 for
+// IPv4 and /64 for IPv6 so that clients on the same LAN / carrier block
+// continue to work across minor NAT churn.
+func ipsMatchBinding(storedIP, currentIP, mode string) bool {
+	if storedIP == currentIP {
+		return true
+	}
+	if mode == "strict" {
+		return false
+	}
+	a := net.ParseIP(storedIP)
+	b := net.ParseIP(currentIP)
+	if a == nil || b == nil {
+		return false
+	}
+	// Normalise: if both are IPv4, compare /24.
+	if a4, b4 := a.To4(), b.To4(); a4 != nil && b4 != nil {
+		return a4[0] == b4[0] && a4[1] == b4[1] && a4[2] == b4[2]
+	}
+	// Reject mixing IPv4 and IPv6 forms.
+	if a.To4() != nil || b.To4() != nil {
+		return false
+	}
+	// IPv6: compare first 64 bits.
+	a16 := a.To16()
+	b16 := b.To16()
+	if a16 == nil || b16 == nil {
+		return false
+	}
+	for i := 0; i < 8; i++ {
+		if a16[i] != b16[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (app *App) requireAuth(next func(http.ResponseWriter, *http.Request, *User)) http.HandlerFunc {

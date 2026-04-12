@@ -2231,6 +2231,19 @@ Fields: file, subject, sender, type, tags</pre>
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>👥 ${t('security_active_sessions')||'Active Sessions'}</span>
+          <button class="btn btn-secondary btn-sm" data-action="_refreshActiveSessions" title="${t('btn_refresh')||'Refresh'}" style="font-size:10px;padding:3px 8px">🔄</button>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('security_active_sessions_desc')||'All currently logged-in users. Click 🗑 to destroy a session and log the user out.'}
+        </p>
+        <div id="activeSessionsList" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px;max-height:320px;overflow-y:auto">
+          <div style="color:var(--text-dim);text-align:center;padding:8px">${t('loading')||'Loading…'}</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">🔒 ${t('security_tls')||'TLS / HTTPS Configuration'}</div>
         <div id="secTlsCurrentStatus" style="margin-bottom:8px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
           ${t('checking')||'Checking TLS status…'}
@@ -2415,6 +2428,24 @@ Fields: file, subject, sender, type, tags</pre>
           <input type="checkbox" id="secRotateOnRoleChange" checked style="width:14px;height:14px;accent-color:var(--accent)">
           Rotate session on role change
         </label>
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('security_session_hijack_desc')||'Session hijack protection — bind sessions to the client that created them so a stolen cookie cannot be replayed from a different device or network.'}</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+            <input type="checkbox" id="secBindIP" checked style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('security_session_bind_ip')||'Bind session to client IP address'}
+          </label>
+          <div class="form-group" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;padding-left:22px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">${t('security_session_bind_ip_mode')||'IP match mode'}</label>
+            <select id="secBindIPMode" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-sm)">
+              <option value="subnet">${t('security_session_bind_ip_subnet')||'Subnet (/24 IPv4, /64 IPv6) — tolerant'}</option>
+              <option value="strict">${t('security_session_bind_ip_strict')||'Strict (exact IP match)'}</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+            <input type="checkbox" id="secBindUA" checked style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('security_session_bind_ua')||'Bind session to browser user-agent'}
+          </label>
+        </div>
         <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Session Settings</button>
       </div>
 
@@ -2498,6 +2529,10 @@ Fields: file, subject, sender, type, tags</pre>
         </div>
       </div>
     `;
+    // Load active sessions list
+    if (typeof _refreshActiveSessions === 'function') {
+      setTimeout(_refreshActiveSessions, 0);
+    }
     // Load TLS status for security tab (optional endpoint, silence 404)
     _optionalApiGet('/api/tls/status').then(tls => {
       const el = document.getElementById('secTlsCurrentStatus');

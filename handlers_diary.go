@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 // ── Diary Handlers ──────────────────────────────────────────────────────────
@@ -486,126 +488,201 @@ func (app *App) handleImportDiary(w http.ResponseWriter, r *http.Request, user *
 
 // ── Security: sanitize rich HTML (allow safe formatting, strip dangerous tags) ──
 
-// sanitizeRichHTML removes dangerous HTML tags and attributes while preserving
-// safe formatting tags (b, i, u, s, a, br, ul, ol, li, p, img, span, div, strong, em).
-// Strips: script, iframe, object, embed, form, input, textarea, event handlers (on*).
+// sanitizeRichHTML uses a proper HTML tokenizer (golang.org/x/net/html) to
+// parse user-supplied rich text and re-emit only whitelisted tags and
+// attributes. Regex-based sanitizers are notoriously bypassable (malformed
+// tags, entity encoding, nested tricks, SVG/foreignObject, etc.) so we
+// instead walk the token stream and reject everything not on the allowlist.
+//
+// Allows: b/strong, i/em, u, s/strike/del/ins, p, br, hr, ul/ol/li,
+// blockquote, pre, code, span, div, a (with href/title/target/rel),
+// img (with src/alt/title/width/height), h1–h6.
+// Strips: everything else including script, iframe, object, embed, form,
+// svg, math, foreignObject, style, meta, link, event handlers (on*),
+// and dangerous URL schemes (javascript:, vbscript:, data:, file:).
 func sanitizeRichHTML(s string) string {
-	// Remove script/iframe/object/embed/form tags and their content
-	for _, tag := range []string{"script", "iframe", "object", "embed", "form", "input", "textarea", "select", "button"} {
-		// Remove opening+closing with content
-		for {
-			lower := strings.ToLower(s)
-			start := strings.Index(lower, "<"+tag)
-			if start == -1 {
-				break
-			}
-			end := strings.Index(lower[start:], "</"+tag)
-			if end == -1 {
-				// Self-closing or unclosed — remove to end of tag
-				tagEnd := strings.Index(s[start:], ">")
-				if tagEnd == -1 {
-					s = s[:start]
-				} else {
-					s = s[:start] + s[start+tagEnd+1:]
-				}
-			} else {
-				closeEnd := strings.Index(s[start+end:], ">")
-				if closeEnd == -1 {
-					s = s[:start]
-				} else {
-					s = s[:start] + s[start+end+closeEnd+1:]
-				}
-			}
-		}
+	// Allowed tags — limited to basic formatting used by the diary editor
+	allowedTags := map[string]bool{
+		"b": true, "strong": true, "i": true, "em": true, "u": true,
+		"s": true, "strike": true, "del": true, "ins": true,
+		"p": true, "br": true, "hr": true,
+		"ul": true, "ol": true, "li": true,
+		"blockquote": true, "pre": true, "code": true,
+		"span": true, "div": true,
+		"a":   true,
+		"img": true,
+		"h1":  true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
 	}
-	// Remove event handler attributes (on*)
-	var result strings.Builder
-	i := 0
-	for i < len(s) {
-		if s[i] == '<' {
-			// Inside a tag — copy tag but strip on* attributes
-			tagEnd := strings.Index(s[i:], ">")
-			if tagEnd == -1 {
-				result.WriteString(s[i:])
-				break
-			}
-			tag := s[i : i+tagEnd+1]
-			// Remove on* attributes: onerror, onclick, onload, onmouseover, etc.
-			cleaned := removeEventHandlers(tag)
-			// Remove javascript:/vbscript: URLs (case-insensitive, handle whitespace/encoding tricks)
-			cleaned = removeJSProtocol(cleaned)
-			result.WriteString(cleaned)
-			i += tagEnd + 1
-		} else {
-			result.WriteByte(s[i])
-			i++
-		}
+	// Allowed attributes per tag (plus any not listed: none allowed)
+	allowedAttrs := map[string]map[string]bool{
+		"a":   {"href": true, "title": true, "target": true, "rel": true},
+		"img": {"src": true, "alt": true, "title": true, "width": true, "height": true},
+		// For everything else: allow nothing (no style, no class, no id)
 	}
-	return result.String()
-}
+	// Tags whose content must be dropped entirely (they're removed along with
+	// any children). html.Tokenizer will emit StartTag/Text/EndTag tokens so
+	// we track a "skip until close" depth.
+	bannedTags := map[string]bool{
+		"script": true, "style": true, "iframe": true, "frame": true,
+		"frameset": true, "object": true, "embed": true, "applet": true,
+		"form": true, "input": true, "button": true, "select": true,
+		"textarea": true, "option": true, "meta": true, "link": true,
+		"base": true, "svg": true, "math": true, "foreignobject": true,
+	}
 
-// removeEventHandlers strips on* attributes from an HTML tag string.
-func removeEventHandlers(tag string) string {
-	lower := strings.ToLower(tag)
-	// Find and remove all on* attributes
+	z := html.NewTokenizer(strings.NewReader(s))
+	var out strings.Builder
+	skipDepth := 0 // >0 means we're inside a banned tag; drop everything
+
 	for {
-		idx := strings.Index(lower, " on")
-		if idx == -1 {
+		tt := z.Next()
+		if tt == html.ErrorToken {
 			break
 		}
-		// Check if this is actually an on* event handler (followed by alpha then =)
-		rest := lower[idx+3:]
-		eqIdx := strings.IndexByte(rest, '=')
-		if eqIdx == -1 || eqIdx > 20 {
-			break
-		}
-		// Find the end of the attribute value
-		attrStart := idx
-		valStart := idx + 3 + eqIdx + 1
-		if valStart >= len(tag) {
-			tag = tag[:attrStart] + tag[len(tag):]
-			lower = strings.ToLower(tag)
+		tok := z.Token()
+		name := strings.ToLower(tok.Data)
+
+		switch tt {
+		case html.StartTagToken:
+			if bannedTags[name] {
+				skipDepth++
+				continue
+			}
+			if skipDepth > 0 {
+				continue
+			}
+			if !allowedTags[name] {
+				continue // drop the tag but keep its text children
+			}
+			out.WriteString("<")
+			out.WriteString(name)
+			for _, a := range tok.Attr {
+				attrName := strings.ToLower(a.Key)
+				if !allowedAttrs[name][attrName] {
+					continue
+				}
+				val := a.Val
+				// Validate URL-bearing attributes: reject any protocol other
+				// than http(s), mailto:, tel:, or relative (#, /, or empty).
+				if attrName == "href" || attrName == "src" {
+					if !isSafeURL(val) {
+						continue
+					}
+				}
+				// Escape attribute value so no injection through quoting
+				out.WriteString(" ")
+				out.WriteString(attrName)
+				out.WriteString(`="`)
+				out.WriteString(html.EscapeString(val))
+				out.WriteString(`"`)
+			}
+			// Force external links to rel="noopener noreferrer" + target="_blank"
+			if name == "a" {
+				out.WriteString(` rel="noopener noreferrer"`)
+			}
+			out.WriteString(">")
+
+		case html.EndTagToken:
+			if bannedTags[name] {
+				if skipDepth > 0 {
+					skipDepth--
+				}
+				continue
+			}
+			if skipDepth > 0 {
+				continue
+			}
+			if !allowedTags[name] {
+				continue
+			}
+			out.WriteString("</")
+			out.WriteString(name)
+			out.WriteString(">")
+
+		case html.SelfClosingTagToken:
+			if bannedTags[name] {
+				continue
+			}
+			if skipDepth > 0 {
+				continue
+			}
+			if !allowedTags[name] {
+				continue
+			}
+			out.WriteString("<")
+			out.WriteString(name)
+			for _, a := range tok.Attr {
+				attrName := strings.ToLower(a.Key)
+				if !allowedAttrs[name][attrName] {
+					continue
+				}
+				val := a.Val
+				if attrName == "href" || attrName == "src" {
+					if !isSafeURL(val) {
+						continue
+					}
+				}
+				out.WriteString(" ")
+				out.WriteString(attrName)
+				out.WriteString(`="`)
+				out.WriteString(html.EscapeString(val))
+				out.WriteString(`"`)
+			}
+			out.WriteString("/>")
+
+		case html.TextToken:
+			if skipDepth > 0 {
+				continue
+			}
+			// Text is already unescaped by the tokenizer; re-escape on output
+			out.WriteString(html.EscapeString(tok.Data))
+
+		case html.CommentToken, html.DoctypeToken:
+			// Drop comments and doctypes entirely — they can hide payloads
 			continue
 		}
-		valEnd := valStart
-		if valStart < len(tag) && (tag[valStart] == '"' || tag[valStart] == '\'') {
-			quote := tag[valStart]
-			closeIdx := strings.IndexByte(tag[valStart+1:], quote)
-			if closeIdx != -1 {
-				valEnd = valStart + 1 + closeIdx + 1
-			} else {
-				valEnd = len(tag)
-			}
-		} else {
-			spaceIdx := strings.IndexAny(tag[valStart:], " >")
-			if spaceIdx != -1 {
-				valEnd = valStart + spaceIdx
-			} else {
-				valEnd = len(tag)
-			}
-		}
-		tag = tag[:attrStart] + tag[valEnd:]
-		lower = strings.ToLower(tag)
 	}
-	return tag
+	return out.String()
 }
 
-// removeJSProtocol removes javascript:/vbscript:/data: protocols case-insensitively
-// including whitespace/encoding tricks between characters.
-func removeJSProtocol(s string) string {
-	lower := strings.ToLower(s)
-	for _, proto := range []string{"javascript:", "vbscript:", "data:text/html"} {
-		for {
-			idx := strings.Index(lower, proto)
-			if idx == -1 {
-				break
-			}
-			s = s[:idx] + s[idx+len(proto):]
-			lower = strings.ToLower(s)
-		}
+// isSafeURL returns true if the URL uses a safe scheme or is a
+// relative/fragment/mailto reference. Rejects javascript:, data:,
+// vbscript:, file:, and any other dangerous scheme.
+func isSafeURL(u string) bool {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return true
 	}
-	return s
+	// Strip HTML entity decoding tricks by only looking at raw characters
+	// Lowercased for scheme comparison
+	lower := strings.ToLower(u)
+	// Relative URLs, fragments, and absolute paths are always safe
+	if strings.HasPrefix(u, "/") || strings.HasPrefix(u, "#") || strings.HasPrefix(u, "?") {
+		return true
+	}
+	// Must contain a colon to have a scheme; if no colon, it's a relative ref
+	colonIdx := strings.Index(u, ":")
+	if colonIdx == -1 {
+		return true
+	}
+	// If there's a slash or question mark before the colon, it's a relative
+	// path containing a colon (e.g. "path:with/colon") — safe
+	slashIdx := strings.IndexAny(u, "/?#")
+	if slashIdx != -1 && slashIdx < colonIdx {
+		return true
+	}
+	scheme := lower[:colonIdx]
+	// Allowlist of safe schemes
+	switch scheme {
+	case "http", "https", "mailto", "tel":
+		return true
+	}
+	return false
 }
+
+// Note: removeEventHandlers and removeJSProtocol were replaced by the
+// html.Tokenizer-based sanitizeRichHTML above, which uses a proper HTML
+// parser instead of regex matching.
 
 // ── Helper: strip HTML tags ────────────────────────────────────────────────
 

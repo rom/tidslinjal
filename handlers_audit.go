@@ -133,6 +133,18 @@ func (app *App) handleLogBookAttachment(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// IDOR fix: verify the log book entry exists and the user is allowed
+	// to add attachments to it. Previously any authenticated user could
+	// upload attachments to any entry by guessing the ID.
+	entry := app.store.GetLogBookEntryByID(id)
+	if entry == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
 		return
@@ -201,6 +213,13 @@ func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.R
 		http.NotFound(w, r)
 		return
 	}
+	// IDOR fix: require that the user is the entry author or has teamlead+
+	// role. Log book entries are part of the audit trail and should be
+	// restricted to their author or operational leadership.
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		http.NotFound(w, r) // hide existence
+		return
+	}
 	// Verify the requested file actually belongs to this entry
 	found := false
 	for _, att := range entry.Attachments {
@@ -214,6 +233,10 @@ func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.R
 		return
 	}
 	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
+	// Defense-in-depth: prevent browsers from sniffing/rendering as HTML/SVG
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", storedName))
 	http.ServeFile(w, r, filePath)
 }
 

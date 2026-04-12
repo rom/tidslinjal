@@ -45,6 +45,15 @@ func (app *App) handleUploadReportArchive(w http.ResponseWriter, r *http.Request
 	}
 
 	safeName := filepath.Base(header.Filename)
+	if safeName == "." || safeName == "/" || safeName == "" {
+		safeName = "upload"
+	}
+	// Block dangerous file types (executables, HTML, SVG, scripts) that
+	// could run code when downloaded or rendered inline.
+	if isDangerousFilename(safeName) {
+		jsonError(w, "file type not allowed", http.StatusBadRequest)
+		return
+	}
 	storedName := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeName)
 	dir := filepath.Join(app.store.DataDir(), "report_archive")
 	_ = os.MkdirAll(dir, 0700)
@@ -110,6 +119,10 @@ func (app *App) handleDownloadReportArchive(w http.ResponseWriter, r *http.Reque
 	}
 	fpath := filepath.Join(app.store.DataDir(), "report_archive", filepath.Base(entry.StoredName))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", entry.Filename))
+	// Defense-in-depth: prevent browsers from sniffing and rendering the
+	// file as HTML/SVG/etc. even if it slipped past the upload filter.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeFile(w, r, fpath)
 }
 

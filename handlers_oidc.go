@@ -976,7 +976,14 @@ func (app *App) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=session_failed", http.StatusFound)
 		return
 	}
-	sess := Session{ID: sessID, UserID: user.ID, ExpiresAt: time.Now().Add(24 * time.Hour)}
+	sess := Session{
+		ID:        sessID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		CreatedAt: time.Now(),
+		IPAddress: clientIP(r),
+		UserAgent: r.UserAgent(),
+	}
 	if err := app.store.CreateSession(sess); err != nil {
 		http.Redirect(w, r, "/login?error=session_failed", http.StatusFound)
 		return
