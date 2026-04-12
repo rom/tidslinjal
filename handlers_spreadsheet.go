@@ -89,22 +89,56 @@ func (s *Store) DeleteSpreadsheet(id int64) error {
 
 // ── Spreadsheet HTTP Handlers ────────────────────────────────────────────────
 
+// canReadSpreadsheet returns true if the user can view the spreadsheet.
+// Visibility rules: owner, admin, public, or member of one of the GroupIDs.
+func (app *App) canReadSpreadsheet(ss *Spreadsheet, user *User) bool {
+	if ss == nil || user == nil {
+		return false
+	}
+	if ss.OwnerID == user.ID || app.effectiveHasRole(user, RoleAdmin) {
+		return true
+	}
+	if ss.Visibility == "public" {
+		return true
+	}
+	if ss.Visibility == "group" {
+		for _, gid := range ss.GroupIDs {
+			if userInGroup(user, gid, app.store) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// canWriteSpreadsheet returns true if the user can modify the spreadsheet.
+// Only the owner or admin can modify, unless the visibility is "group" in
+// which case any group member can also modify (read-write for group shares).
+// This mirrors the layer permission model.
+func (app *App) canWriteSpreadsheet(ss *Spreadsheet, user *User) bool {
+	if ss == nil || user == nil {
+		return false
+	}
+	if ss.OwnerID == user.ID || app.effectiveHasRole(user, RoleAdmin) {
+		return true
+	}
+	if ss.Visibility == "group" {
+		for _, gid := range ss.GroupIDs {
+			if userInGroup(user, gid, app.store) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (app *App) handleListSpreadsheets(w http.ResponseWriter, r *http.Request, user *User) {
 	all := app.store.GetSpreadsheets()
 	// Filter by visibility
 	var visible []Spreadsheet
 	for _, ss := range all {
-		if ss.OwnerID == user.ID || ss.Visibility == "public" || app.effectiveHasRole(user, RoleAdmin) {
+		if app.canReadSpreadsheet(&ss, user) {
 			visible = append(visible, ss)
-			continue
-		}
-		if ss.Visibility == "group" {
-			for _, gid := range ss.GroupIDs {
-				if userInGroup(user, gid, app.store) {
-					visible = append(visible, ss)
-					break
-				}
-			}
 		}
 	}
 	if visible == nil {
@@ -125,6 +159,11 @@ func (app *App) handleGetSpreadsheet(w http.ResponseWriter, r *http.Request, use
 	}
 	ss := app.store.GetSpreadsheetByID(id)
 	if ss == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// IDOR fix: require read access
+	if !app.canReadSpreadsheet(ss, user) {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
@@ -193,6 +232,11 @@ func (app *App) handleUpdateSpreadsheet(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// IDOR fix: require write access
+	if !app.canWriteSpreadsheet(existing, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	var req Spreadsheet
 	if err := json.NewDecoder(io.LimitReader(r.Body, 10<<20)).Decode(&req); err != nil {
 		jsonError(w, "invalid body", http.StatusBadRequest)
@@ -223,6 +267,17 @@ func (app *App) handleDeleteSpreadsheet(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// IDOR fix: require that the user is the owner or an admin.
+	// Group members can edit but not delete (same model as layers).
+	existing := app.store.GetSpreadsheetByID(id)
+	if existing == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.OwnerID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	if err := app.store.DeleteSpreadsheet(id); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
@@ -248,6 +303,11 @@ func (app *App) handleExportSpreadsheet(w http.ResponseWriter, r *http.Request, 
 	}
 	ss := app.store.GetSpreadsheetByID(id)
 	if ss == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// IDOR fix: require read access for export
+	if !app.canReadSpreadsheet(ss, user) {
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
@@ -385,6 +445,11 @@ func (app *App) handleImportSpreadsheet(w http.ResponseWriter, r *http.Request, 
 	ss := app.store.GetSpreadsheetByID(id)
 	if ss == nil {
 		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// IDOR fix: require write access to import into a spreadsheet
+	if !app.canWriteSpreadsheet(ss, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 

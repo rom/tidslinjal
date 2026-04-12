@@ -227,6 +227,13 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
+	// IDOR fix: require that the user is the uploader, an admin, or has
+	// teamlead+ role. Previously any authenticated user could modify any
+	// reference.
+	if rd.UploadedBy != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	var req struct {
 		Title       *string  `json:"title"`
 		Description *string  `json:"description"`
@@ -285,6 +292,16 @@ func (app *App) handleDeleteReference(w http.ResponseWriter, r *http.Request, us
 	rd, ok := app.store.GetReferenceDoc(id)
 	if !ok {
 		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	// IDOR fix: require that the user is the uploader, an admin, or has
+	// teamlead+ role. Previously the route was gated by requireRole(RoleTeamLead)
+	// but had no further check, so any teamlead could delete any reference
+	// regardless of ownership. We now allow:
+	//   - the uploader to delete their own reference
+	//   - teamlead+ or admin to delete any reference
+	if rd.UploadedBy != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	// Remove file from disk

@@ -133,6 +133,18 @@ func (app *App) handleLogBookAttachment(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+	// IDOR fix: verify the log book entry exists and the user is allowed
+	// to add attachments to it. Previously any authenticated user could
+	// upload attachments to any entry by guessing the ID.
+	entry := app.store.GetLogBookEntryByID(id)
+	if entry == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
 		return
@@ -199,6 +211,13 @@ func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.R
 	entry := app.store.GetLogBookEntryByID(entryID)
 	if entry == nil {
 		http.NotFound(w, r)
+		return
+	}
+	// IDOR fix: require that the user is the entry author or has teamlead+
+	// role. Log book entries are part of the audit trail and should be
+	// restricted to their author or operational leadership.
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleTeamLead) {
+		http.NotFound(w, r) // hide existence
 		return
 	}
 	// Verify the requested file actually belongs to this entry

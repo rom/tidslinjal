@@ -1116,14 +1116,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("POST /api/staff/areas", app.requireRole(RoleStaffOfficer, app.handleCreateArea))
 	mux.HandleFunc("PUT /api/staff/areas/{id}", app.requireRole(RoleStaffOfficer, app.handleUpdateArea))
 	mux.HandleFunc("DELETE /api/staff/areas/{id}", app.requireRole(RoleStaffOfficer, app.handleDeleteArea))
-	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", func(w http.ResponseWriter, r *http.Request) {
-		_, user := app.getSession(r)
-		if user == nil {
-			jsonError(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		app.handleDecisionLogAttachmentDownload(w, r)
-	})
+	mux.HandleFunc("GET /api/decision-log/{id}/attachment/{filename}", app.requireAuth(app.handleDecisionLogAttachmentDownload))
 
 	// Event Log
 	mux.HandleFunc("/api/event-log", func(w http.ResponseWriter, r *http.Request) {
@@ -2369,7 +2362,8 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		case http.MethodPut:
 			app.requireAuth(app.handleUpdateReference)(w, r)
 		case http.MethodDelete:
-			app.requireRole(RoleTeamLead, app.handleDeleteReference)(w, r)
+			// Handler enforces uploader OR teamlead+ ownership check
+			app.requireAuth(app.handleDeleteReference)(w, r)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -460,7 +460,42 @@ func (app *App) handleDecisionLogAttachment(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(att)
 }
 
-func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *http.Request) {
+// canAccessDecisionLogEntry returns true if the user is allowed to read
+// (and by extension download attachments for) the given decision log entry.
+// This enforces the same visibility rules as handleListDecisionLog.
+func (app *App) canAccessDecisionLogEntry(user *User, entry *DecisionLogEntry) bool {
+	if user == nil || entry == nil {
+		return false
+	}
+	if app.effectiveHasRole(user, RoleAdmin) {
+		return true
+	}
+	// Author can always access their own entries
+	if entry.UserID == user.ID {
+		// Unless the entry is confidential and they somehow lost the capability
+		if entry.Confidential && !app.userHasCapability(user, "confidential_read") {
+			return false
+		}
+		return true
+	}
+	// Confidential entries require the confidential_read capability for non-authors
+	if entry.Confidential && !app.userHasCapability(user, "confidential_read") {
+		return false
+	}
+	switch entry.LogType {
+	case "general", "":
+		return true
+	case "group":
+		if entry.GroupID > 0 && app.userInGroup(user.ID, entry.GroupID) {
+			return true
+		}
+	case "private":
+		// Only author can read private entries (already handled above)
+	}
+	return false
+}
+
+func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *http.Request, user *User) {
 	entryID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		http.NotFound(w, r)
@@ -471,6 +506,13 @@ func (app *App) handleDecisionLogAttachmentDownload(w http.ResponseWriter, r *ht
 	entry := app.store.GetDecisionLogEntryByID(entryID)
 	if entry == nil {
 		http.NotFound(w, r)
+		return
+	}
+	// IDOR fix: enforce access control for the decision log entry before
+	// serving its attachment. Previously any authenticated user could
+	// download any attachment by guessing entry ID + filename.
+	if !app.canAccessDecisionLogEntry(user, entry) {
+		http.NotFound(w, r) // hide existence
 		return
 	}
 	found := false
