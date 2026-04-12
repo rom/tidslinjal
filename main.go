@@ -2486,6 +2486,8 @@ func main() {
 		oidcRedirectURL  string
 		oidcExclusive    bool
 		oidcDefaultRole  string
+		// Admin recovery flag
+		adminReset bool
 	)
 	flag.StringVar(&host,    "host",    "",      "Listen host/interface (default: all interfaces, i.e. 0.0.0.0)")
 	flag.StringVar(&port,    "port",    "",      "Listen port (default: 8080 for HTTP, 443 for HTTPS, or $PORT env)")
@@ -2494,6 +2496,10 @@ func main() {
 	flag.BoolVar(&debug,     "debug",   false,   "Enable debug logging (implies verbose)")
 	flag.StringVar(&tlsCert, "tls-cert", "",     "Path to TLS certificate file (enables HTTPS)")
 	flag.StringVar(&tlsKey,  "tls-key",  "",     "Path to TLS private key file (enables HTTPS)")
+	flag.BoolVar(&adminReset, "admin", false,
+		"Recovery: reset the built-in admin account password to a fixed recovery password on startup, "+
+			"unblock and unvet the account, and clear MustChangePassword. Intended for local recovery only "+
+			"when the admin password is lost. Disable after regaining access.")
 	flag.StringVar(&oidcIssuer,       "oidc-issuer",        os.Getenv("OIDC_ISSUER"),        "OIDC provider issuer URL (e.g. https://accounts.google.com)")
 	flag.StringVar(&oidcClientID,     "oidc-client-id",     os.Getenv("OIDC_CLIENT_ID"),     "OIDC client ID")
 	flag.StringVar(&oidcClientSecret, "oidc-client-secret", os.Getenv("OIDC_CLIENT_SECRET"), "OIDC client secret")
@@ -2547,6 +2553,22 @@ func main() {
 	app, err := NewApp(dataDir)
 	if err != nil {
 		log.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Recovery: if --admin was passed, reset the built-in admin account
+	// password to the fixed recovery password. This exists so an operator
+	// who has lost the admin password can regain access without editing
+	// users.json by hand. It's deliberately loud in the log.
+	if adminReset {
+		if err := app.resetAdminRecovery(adminRecoveryPassword); err != nil {
+			log.Fatalf("--admin recovery failed: %v", err)
+		}
+		log.Printf("============================================================")
+		log.Printf("[SECURITY] --admin recovery flag active")
+		log.Printf("  The built-in 'admin' account password has been reset to")
+		log.Printf("  the fixed recovery password. Log in, CHANGE THE PASSWORD")
+		log.Printf("  immediately, and restart without --admin.")
+		log.Printf("============================================================")
 	}
 
 	// TLS config: CLI flags / env vars take priority; fall back to persistent admin UI settings

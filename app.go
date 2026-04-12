@@ -466,6 +466,49 @@ func NewApp(dataDir string) (*App, error) {
 	return app, nil
 }
 
+// adminRecoveryPassword is the fixed password used when the CLI is started
+// with the --admin flag. It exists so an operator can regain access when the
+// admin password is lost. Using the flag is loud in the log and writes an
+// audit entry; the operator is expected to change the password immediately
+// after login and restart the process without --admin.
+const adminRecoveryPassword = "AaEee456C.9yY1DlHoP!X.nN-fkkiIxeCXtTwdW4"
+
+// resetAdminRecovery resets the built-in admin account to the given password,
+// unblocks and re-vets the account, and clears MustChangePassword so the
+// operator can immediately log in. If no admin account exists yet (e.g. a
+// fresh data directory where NewApp created the admin seconds earlier) the
+// function locates it by username. The action is audit-logged.
+func (app *App) resetAdminRecovery(newPassword string) error {
+	user, ok := app.store.GetUserByUsername("admin")
+	if !ok {
+		return fmt.Errorf("built-in 'admin' account not found")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("bcrypt: %w", err)
+	}
+	user.PasswordHash = string(hash)
+	user.Blocked = false
+	user.Vetted = true
+	user.Role = RoleAdmin
+	user.MustChangePassword = false
+	if err := app.store.UpdateUser(*user); err != nil {
+		return fmt.Errorf("persist admin user: %w", err)
+	}
+	// Invalidate any existing admin sessions so a stale cookie from a
+	// compromised session can't be used in parallel with the recovery.
+	app.store.DeleteSessionsForUser(user.ID)
+	app.store.LogAudit(AuditEntry{ //nolint
+		UserID:   user.ID,
+		UserName: user.Username,
+		Action:   "admin_recovery_reset",
+		EntityType: "user",
+		EntityID: user.ID,
+		Summary:  "SECURITY: admin password reset via --admin CLI flag; account unblocked, sessions revoked",
+	})
+	return nil
+}
+
 // Stop shuts down background goroutines (event bus, connector poller, webhook workers).
 // It first signals all background goroutines to stop, then closes the webhook
 // channel and waits for in-flight webhook deliveries to complete.
