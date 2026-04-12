@@ -781,17 +781,21 @@ func (s *Store) CreateReferenceLink(title, description, category, tags, refType,
 		}
 	}
 	contentType := "text/html"
-	filename := url
 	if refType == "local" {
 		contentType = "text/plain"
-		filename = content
 	}
+	// SECURITY: Do NOT overload Filename with URL or content for link/local
+	// references. Filename is used verbatim in filepath.Join(ReferenceDir, …)
+	// in download/delete/checksum handlers, so writing user-controlled URL or
+	// content into it opens path-traversal and arbitrary-file-delete holes.
+	// The actual URL / content is stored in rd.URL and rd.Content below;
+	// the download handler serves those directly when Filename is empty.
 	rd := ReferenceDoc{
 		ID:             s.nextReferenceDocID,
 		Title:          title,
 		Description:    description,
 		Category:       category,
-		Filename:       filename,
+		Filename:       "",
 		OriginalName:   title,
 		ContentType:    contentType,
 		Size:           int64(len(content)),

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"net/url"
@@ -19,6 +20,45 @@ import (
 	"strings"
 	"time"
 )
+
+// safeReferenceFilePath resolves a ReferenceDoc.Filename to an absolute path
+// under ReferenceDir() only if it is a safe, in-directory basename. Returns
+// ("", false) for empty filenames, filenames containing path separators or
+// ".." components, or any result that would escape ReferenceDir.
+//
+// This is the single choke-point for every disk operation that touches a
+// stored reference file (read, delete, checksum). A malicious JSON import,
+// a legacy record whose Filename was overloaded with user content (see
+// CreateReferenceLink history), or any other upstream bug cannot cause
+// directory traversal because nothing can bypass this helper.
+func (app *App) safeReferenceFilePath(filename string) (string, bool) {
+	if filename == "" {
+		return "", false
+	}
+	// Reject anything that isn't already a plain basename. This catches
+	// "../x", "a/b", "./x", "..", "/absolute", Windows "..\\x", etc.
+	if filename != filepath.Base(filename) {
+		return "", false
+	}
+	if filename == "." || filename == ".." {
+		return "", false
+	}
+	if strings.ContainsAny(filename, `/\`) {
+		return "", false
+	}
+	dir := app.store.ReferenceDir()
+	full := filepath.Join(dir, filename)
+	// Belt-and-suspenders: ensure Clean() didn't escape the dir.
+	absDir, err1 := filepath.Abs(dir)
+	absFull, err2 := filepath.Abs(full)
+	if err1 != nil || err2 != nil {
+		return "", false
+	}
+	if !strings.HasPrefix(absFull, absDir+string(filepath.Separator)) && absFull != absDir {
+		return "", false
+	}
+	return full, true
+}
 
 // ── Reference Document handlers ────────────────────────────────────────────────
 
@@ -195,15 +235,16 @@ func (app *App) handleDownloadReference(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "no file stored for this reference", http.StatusNotFound)
 		return
 	}
-	// Defense-in-depth: sanitize the stored filename before joining paths.
-	// filepath.Base strips any ../ components so even a malicious JSON
-	// import cannot escape ReferenceDir.
-	safeStored := filepath.Base(rd.Filename)
-	if safeStored == "." || safeStored == "/" || safeStored == ".." || safeStored == "" {
+	// SECURITY: route the filename through the single safeReferenceFilePath
+	// choke-point. Rejects traversal, absolute paths, and anything that
+	// would escape ReferenceDir — protects download just like it protects
+	// delete and checksum handlers.
+	filePath, safeOK := app.safeReferenceFilePath(rd.Filename)
+	if !safeOK {
 		jsonError(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
-	filePath := filepath.Join(app.store.ReferenceDir(), safeStored)
+	safeStored := filepath.Base(rd.Filename)
 	// Force safe content types for inline serving: if the file extension is
 	// in the dangerous list (html, svg, js, etc.), refuse inline display and
 	// override Content-Type to prevent browser XSS via rendered HTML/SVG.
@@ -323,8 +364,20 @@ func (app *App) handleDeleteReference(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	// Remove file from disk
-	os.Remove(filepath.Join(app.store.ReferenceDir(), rd.Filename))
+	// SECURITY: Remove the on-disk file only via safeReferenceFilePath,
+	// which refuses traversal, empty, or out-of-dir names. A malicious
+	// "local" reference that managed to land a traversal string in
+	// rd.Filename (historical overload bug) cannot delete arbitrary files.
+	if p, ok := app.safeReferenceFilePath(rd.Filename); ok {
+		_ = os.Remove(p)
+	} else if rd.Filename != "" {
+		log.Printf("[SECURITY] refusing to delete unsafe reference filename for id=%d: %q", id, rd.Filename)
+		app.store.LogAudit(AuditEntry{ //nolint
+			UserID: user.ID, UserName: user.Username,
+			Action: "refused_path_traversal", EntityType: "reference", EntityID: id,
+			Summary: fmt.Sprintf("SECURITY: blocked filesystem delete for reference %d with unsafe filename %q", id, rd.Filename),
+		})
+	}
 	if err := app.store.DeleteReferenceDoc(id); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -441,9 +494,18 @@ func (app *App) handleReferenceChecksums(w http.ResponseWriter, r *http.Request,
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	// If checksums are missing, compute them now
+	// If checksums are missing, compute them now. SECURITY: route through
+	// safeReferenceFilePath so a malicious/legacy rd.Filename can't be used
+	// to read arbitrary files off disk.
 	if rd.ChecksumMD5 == "" {
-		filePath := filepath.Join(app.store.ReferenceDir(), rd.Filename)
+		filePath, safeOK := app.safeReferenceFilePath(rd.Filename)
+		if !safeOK {
+			jsonOK(w, map[string]string{
+				"md5": rd.ChecksumMD5, "sha1": rd.ChecksumSHA1,
+				"sha256": rd.ChecksumSHA256, "sha512": rd.ChecksumSHA512,
+			})
+			return
+		}
 		if fdata, ferr := os.ReadFile(filePath); ferr == nil {
 			rd.ChecksumMD5 = fmt.Sprintf("%x", md5.Sum(fdata))
 			rd.ChecksumSHA1 = fmt.Sprintf("%x", sha1.Sum(fdata))

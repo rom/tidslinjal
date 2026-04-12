@@ -37,6 +37,22 @@ func (app *App) handleSaveRoom(w http.ResponseWriter, r *http.Request, user *Use
 	room.Zone = stripHTMLTags(room.Zone)
 	room.Responsibility = stripHTMLTags(room.Responsibility)
 	room.Owner = stripHTMLTags(room.Owner)
+	// SECURITY: ImageName is the on-disk filename joined with AttachmentDir()
+	// in the download/delete code paths. Never trust it from the client —
+	// it is only ever set server-side by the image upload handler. For an
+	// update, preserve the existing value from the DB; for a new room, clear
+	// it. This closes an arbitrary-file-read / delete chain via the
+	// /api/rooms save endpoint.
+	if room.ID > 0 {
+		for _, existing := range app.store.GetRooms() {
+			if existing.ID == room.ID {
+				room.ImageName = existing.ImageName
+				break
+			}
+		}
+	} else {
+		room.ImageName = ""
+	}
 	if err := app.store.SaveRoom(room); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -162,9 +178,13 @@ func (app *App) handleRoomImageUpload(w http.ResponseWriter, r *http.Request, us
 	rooms := app.store.GetRooms()
 	for _, rm := range rooms {
 		if rm.ID == id {
-			// Remove old image if exists
+			// Remove old image if exists — route through the safe-path
+			// helper so a legacy/tampered ImageName can never target files
+			// outside AttachmentDir.
 			if rm.ImageName != "" {
-				os.Remove(filepath.Join(app.store.AttachmentDir(), rm.ImageName))
+				if p, ok := app.safeAttachmentPath(rm.ImageName); ok {
+					os.Remove(p)
+				}
 			}
 			rm.ImageName = storedName
 			_ = app.store.SaveRoom(rm)
@@ -190,10 +210,46 @@ func (app *App) handleRoomImageDownload(w http.ResponseWriter, r *http.Request) 
 	rooms := app.store.GetRooms()
 	for _, rm := range rooms {
 		if rm.ID == id && rm.ImageName != "" {
-			filePath := filepath.Join(app.store.AttachmentDir(), rm.ImageName)
+			// SECURITY: refuse to serve anything outside AttachmentDir.
+			filePath, ok := app.safeAttachmentPath(rm.ImageName)
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
 			http.ServeFile(w, r, filePath)
 			return
 		}
 	}
 	http.NotFound(w, r)
+}
+
+// safeAttachmentPath resolves an attachment filename to an absolute path
+// under AttachmentDir() only if it is a safe, in-directory basename.
+// Same semantics as safeReferenceFilePath but for the attachment dir.
+// This is the single choke-point for every room/image on-disk operation so
+// that a tampered Room.ImageName cannot escape the attachment directory.
+func (app *App) safeAttachmentPath(filename string) (string, bool) {
+	if filename == "" {
+		return "", false
+	}
+	if filename != filepath.Base(filename) {
+		return "", false
+	}
+	if filename == "." || filename == ".." {
+		return "", false
+	}
+	if strings.ContainsAny(filename, `/\`) {
+		return "", false
+	}
+	dir := app.store.AttachmentDir()
+	full := filepath.Join(dir, filename)
+	absDir, err1 := filepath.Abs(dir)
+	absFull, err2 := filepath.Abs(full)
+	if err1 != nil || err2 != nil {
+		return "", false
+	}
+	if !strings.HasPrefix(absFull, absDir+string(filepath.Separator)) && absFull != absDir {
+		return "", false
+	}
+	return full, true
 }
