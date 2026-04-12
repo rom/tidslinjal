@@ -1223,4 +1223,108 @@ Capabilities are **reactive objects**: when linked to a Key Terrain Board entry,
 
 ---
 
-*Tidslinjal v8.3.0 — Collaborative Operational Timeline*
+## What's New in v8.4.0
+
+### Custom role authorization (capability-aware)
+Custom roles created via the admin Role Editor are now first-class citizens. Previously, custom role keys (like `bt_13_leadership`) were not recognized by the role hierarchy and were treated as observer-level. They now reach an effective level (1-4) based on their assigned capabilities:
+
+| Capability | Grants level |
+|-----------|-------------|
+| `create_events`, `comment`, `manage_alarms` | Reporter (1) |
+| `edit_own`, `import_export` | ReadWrite (2) |
+| `edit_all`, `manage_layers`, `manage_groups`, `view_audit`, `boards`, `teamlead_toolbox`, `decision_log_readwrite`, `delete_events`, `report`, `see_location` | TeamLead (3) |
+| `exercise`, `manage_templates`, `approve_users`, `critical_line_analysis`, `staff_toolbox`, `manage_integrations`, `lock_slots`, `confidential_read` | OpLead (4) |
+
+Level 5 (Admin/Developer) still requires the actual built-in role for security-critical operations like backup, OIDC config, TLS settings, and IP blacklist management.
+
+### Standalone Key Terrain Board
+The Key Terrain Board can now be opened as its own URL (`/key-terrain`):
+- **Bookmarkable** and shareable as a deep link
+- **Own SSE connection** for real-time updates without depending on the main app
+- **Default light theme** when accessed via deep link
+- **Detached window** mode with proper modal borders
+
+### Bulk move events between layers
+A new tool in the Layers sidebar lets you move all events from one layer to another in one operation:
+1. Open the Layers tab
+2. Scroll to "Bulk Move Events"
+3. Select source and target layers (Master Timeline included)
+4. Click "Move Events" and confirm
+Visible to teamlead+ users or anyone with the `manage_layers` capability.
+
+### Three new event types
+- **Starting Point** (▶) — green right-pointing arrow, marks where something begins
+- **Ending Point** (⏹) — red left-pointing arrow, marks where something ends
+- **Transport** (🚚) — blue with motion-line stripes, marks transport activities
+
+Start and End point events behave like instant events: they have no end time, can't be recurring, and use a compact width so they sit alongside regular events without overshadowing them.
+
+You can change the visual shape for start/end events in **Settings > Start/End Event Shape**: Arrow (default), Diamond, Bar, or Pill.
+
+### Event hover tooltip
+Hovering over any event on the calendar shows a floating tooltip with:
+- **Full title** (no truncation)
+- **Description** (truncated to 200 characters)
+- **Start and end times**
+
+The tooltip appears after a 350 ms delay, follows the cursor, and stays within screen edges.
+
+### Country flags on events
+If you set a country code, alpha-3 code, or country name as the **physical location** of an event, the corresponding flag emoji appears on the event block. Examples:
+- `SE`, `SWE`, `Sweden`, `Sverige` → 🇸🇪
+- `FR`, `FRA`, `France`, `Frankrike` → 🇫🇷
+- `DE`, `DEU`, `Germany`, `Deutschland`, `Tyskland` → 🇩🇪
+
+Localized country names work for ~50 countries across multiple languages.
+
+### Print tool
+The Print tool now opens a dialog that lets you choose:
+- **What to print**: Calendar view, List view, or Task-Time Matrix
+- **Date range**: From / To pickers, with quick-select buttons (Day, Week, Month, Current view, All events)
+- **Layers to include**: A checkbox panel to select exactly which layers to print
+
+When you save as PDF, the file gets a meaningful name like:
+`tidslinjal-listview-2026-04-12_to_2026-04-19.pdf`
+
+**Boards print** is similar — it opens a dialog letting you choose between:
+- **Overview only** — print the current boards list (one page)
+- **Detailed (each board)** — print every board with all items, one board per page (landscape)
+
+**Key Terrain Board** prints in landscape orientation by default.
+
+### List view improvements
+- **Multi-select layer filter** — checkbox dropdown to choose which layers' events to show
+- **Column visibility toggle** — show/hide Type, Status, Start, End, Responsible, Actions columns
+- **Wider title column** — titles are no longer truncated to 260px
+
+### Layer modal
+When you open a layer for editing, the modal now shows how many events are in that layer. When deleting a layer that contains events, a detailed warning explains that the events will be moved to the Master Timeline.
+
+Shared layers now show an edit button if you have `manage_layers` capability or are in a group with `readwrite` permission on the layer.
+
+### Minimum event size
+A new setting (**Settings > Minimum Event Size**) ensures that short-duration events stay readable when using large fonts. Four options:
+- Default (14 px)
+- Medium (28 px)
+- Large (44 px)
+- Extra Large (64 px)
+
+### Show event creator
+The creator name on event blocks is now hidden by default. Enable it via **Settings > Event Icons > "Show creator name on events"**.
+
+### Offline detection
+The client now pings the server every 30 seconds to detect connectivity issues that the browser's `navigator.onLine` event doesn't catch (server outages, firewall blocks, network partitions). When offline:
+- A warning notification appears
+- An "OFFLINE MODE — Working with cached data" banner is shown at the top
+- Outgoing API calls are queued for replay
+
+When the connection is restored, queued actions are synced and a confirmation notification appears.
+
+### Security improvements
+- **Custom roles** with appropriate capabilities can now access features they couldn't before (resources tab, integrations tab, decision log review, layer editing, etc.)
+- **Critical fixes**: log book attachment download authorization, group member list IDOR, OIDC token replay prevention, diary XSS hardening
+- **Backup coverage**: key terrain data (`key_terrain.json`, `key_terrain_settings.json`, `key_terrain_snapshots.json`) is now included in both full and gradual backups
+
+---
+
+*Tidslinjal v8.4.0 — Collaborative Operational Timeline*
