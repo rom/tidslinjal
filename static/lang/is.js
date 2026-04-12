@@ -1261,6 +1261,23 @@ TRANSLATIONS.is = {
     report_archive_category:   'Flokkur',
     report_archive_file:       'Skrá',
     message_archive_delete_confirm: 'Eyða þessum skilaboðum?',
+
+    message_archive_title: 'Skilaboðasafn',
+    message_archive_add: '+ Ný skilaboð',
+    message_archive_local: 'Staðbundin skilaboð',
+    message_archive_incoming: 'Móttekin skilaboð',
+    message_archive_empty: 'Engin skilaboð enn.',
+    message_archive_subject_prompt: 'Efni skilaboða:',
+    message_archive_body_prompt: 'Innihald skilaboða (valfrjálst):',
+    ref_index: 'Skjalayfirlit',
+    ref_type: 'Tegund',
+    ref_languages: 'Tungumál',
+    ref_category: 'Flokkur',
+    search: 'Leita...',
+    unknown: 'Óþekkt',
+    uploading: 'Hleð upp…',
+    description: 'Lýsing',
+    btn_download: 'Sækja',
     boot_rate_limits:          'Hraðatakmarkanir',
 
     // Red line settings (i18n)

@@ -1237,6 +1237,23 @@ TRANSLATIONS.nl = {
     report_archive_category:   'Categorie',
     report_archive_file:       'Bestand',
     message_archive_delete_confirm: 'Dit bericht verwijderen?',
+
+    message_archive_title: 'Berichtenarchief',
+    message_archive_add: '+ Nieuw bericht',
+    message_archive_local: 'Lokale berichten',
+    message_archive_incoming: 'Inkomende berichten',
+    message_archive_empty: 'Nog geen berichten.',
+    message_archive_subject_prompt: 'Onderwerp van het bericht:',
+    message_archive_body_prompt: 'Berichttekst (optioneel):',
+    ref_index: 'Documentindex',
+    ref_type: 'Type',
+    ref_languages: 'Talen',
+    ref_category: 'Categorie',
+    search: 'Zoeken...',
+    unknown: 'Onbekend',
+    uploading: 'Uploaden…',
+    description: 'Beschrijving',
+    btn_download: 'Downloaden',
     boot_rate_limits: 'Snelheidslimieten',
 
     // Red line settings (i18n)
