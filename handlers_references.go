@@ -195,20 +195,39 @@ func (app *App) handleDownloadReference(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "no file stored for this reference", http.StatusNotFound)
 		return
 	}
-	filePath := filepath.Join(app.store.ReferenceDir(), rd.Filename)
+	// Defense-in-depth: sanitize the stored filename before joining paths.
+	// filepath.Base strips any ../ components so even a malicious JSON
+	// import cannot escape ReferenceDir.
+	safeStored := filepath.Base(rd.Filename)
+	if safeStored == "." || safeStored == "/" || safeStored == ".." || safeStored == "" {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	filePath := filepath.Join(app.store.ReferenceDir(), safeStored)
+	// Force safe content types for inline serving: if the file extension is
+	// in the dangerous list (html, svg, js, etc.), refuse inline display and
+	// override Content-Type to prevent browser XSS via rendered HTML/SVG.
 	ct := rd.ContentType
 	if ct == "" {
 		ct = "application/octet-stream"
 	}
+	inline := r.URL.Query().Get("inline") == "1"
+	if isDangerousFilename(safeStored) {
+		// Never serve dangerous files inline. Force download + octet-stream.
+		inline = false
+		ct = "application/octet-stream"
+	}
 	w.Header().Set("Content-Type", ct)
+	// Defense-in-depth: prevent content sniffing so browsers honor the
+	// Content-Type we set (critical for the dangerous-file case above).
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	safeDisp := strings.Map(func(r rune) rune {
 		if r == '"' || r == '\\' || r == '\r' || r == '\n' {
 			return -1
 		}
 		return r
 	}, rd.OriginalName)
-	// Support inline display via ?inline=1 query parameter
-	if r.URL.Query().Get("inline") == "1" {
+	if inline {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, safeDisp))
 	} else {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeDisp))
@@ -618,6 +637,17 @@ func (app *App) handleGitLoadReferences(w http.ResponseWriter, r *http.Request, 
 
 	added, updated := 0, 0
 	for _, rd := range imported {
+		// Path traversal + XSS protection: sanitize Filename before it ends
+		// up in filepath.Join(ReferenceDir, rd.Filename). A malicious git
+		// export file could set Filename to "../../../etc/passwd".
+		rd.Filename = filepath.Base(rd.Filename)
+		if rd.Filename == "." || rd.Filename == "/" || rd.Filename == ".." {
+			rd.Filename = ""
+		}
+		// Also reject dangerous extensions (same rule as the upload path)
+		if rd.Filename != "" && isDangerousFilename(rd.Filename) {
+			continue // skip this reference entirely
+		}
 		if existingID, ok := existingByTitle[rd.Title]; ok {
 			// Update existing reference
 			rd.ID = existingID

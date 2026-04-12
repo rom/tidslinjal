@@ -233,6 +233,10 @@ func (app *App) handleLogBookAttachmentDownload(w http.ResponseWriter, r *http.R
 		return
 	}
 	filePath := filepath.Join(app.store.AttachmentDir(), storedName)
+	// Defense-in-depth: prevent browsers from sniffing/rendering as HTML/SVG
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", storedName))
 	http.ServeFile(w, r, filePath)
 }
 
