@@ -345,10 +345,25 @@ function showEventDetail(ev) {
 
   // Edit/Delete (creator or readwrite+ on layers, oplead+ on master)
   const isMaster = !ev.layer_id;
+  // Permission to edit: matches backend handleUpdateEvent logic
+  // - Master timeline: oplead+ (or custom role with oplead-equivalent capability)
+  // - Layer events: creator OR readwrite+ (with layer write check enforced server-side)
+  const _hasReadWrite = state.user && (
+    hasRole2(state.user.role, 'readwrite') ||
+    userHasCapability('edit_own') ||
+    userHasCapability('edit_all') ||
+    userHasCapability('manage_layers')
+  );
+  const _hasOpLead = state.user && (
+    hasRole2(state.user.role, 'oplead') ||
+    userHasCapability('exercise') ||
+    userHasCapability('manage_templates')
+  );
   const canEdit = !isEventLocked(ev) && state.user && (
     state.user.role === 'admin' ||
-    (!isMaster && (state.user.role === 'teammember' || state.user.role === 'readwrite' || state.user.role === 'teamlead' || state.user.id === ev.created_by)) ||
-    (isMaster && hasRole2(state.user.role, 'oplead'))
+    state.user.role === 'developer' ||
+    (!isMaster && (_hasReadWrite || state.user.id === ev.created_by)) ||
+    (isMaster && _hasOpLead)
   );
   if (canEdit) {
     const editBtn = document.createElement('button');
