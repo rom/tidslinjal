@@ -917,17 +917,24 @@ function _ktPrint() {
   if (!table) return;
   const w = window.open('', '_blank', 'width=1100,height=800');
   w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>
-    <style>body{font-family:system-ui,sans-serif;padding:20px;font-size:12px}
+    <style>
+    @page { size: landscape; margin: 1cm; }
+    body{font-family:system-ui,sans-serif;padding:20px;font-size:12px}
     table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border:1px solid #ccc;text-align:left}
     th{background:#eee;font-weight:700}tr:nth-child(even){background:#f9f9f9}
     h2{margin-bottom:8px}p{color:#666;margin-bottom:12px;font-size:11px}
     @media print{button{display:none!important}}</style></head><body>`);
+  // Set document title for the saved PDF filename
+  const _ts = new Date().toISOString().slice(0, 10);
+  w.document.title = `tidslinjal-key-terrain-board-${_ts}`;
   w.document.write(`<h2>\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>`);
   w.document.write(`<p>${t('kt_desc')||'Cyber key terrain overview'} \u2014 ${new Date().toLocaleString()}</p>`);
   w.document.write(table.outerHTML);
   w.document.write(`<br><button id="ktPrintBtn">Print</button></body></html>`);
   w.document.close();
   setTimeout(() => {
+    // Re-set title after document.close() to ensure it sticks for the print dialog
+    w.document.title = `tidslinjal-key-terrain-board-${_ts}`;
     const btn = w.document.getElementById('ktPrintBtn');
     if (btn) btn.addEventListener('click', () => w.print());
     w.print();
