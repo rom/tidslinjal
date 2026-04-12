@@ -284,6 +284,7 @@ TRANSLATIONS.de = {
     layer_visibility_private: 'Privat',
     layer_visibility_groups: 'Gruppen',
     layer_visibility_public: 'Öffentlich',
+    layer_visibility: 'Sichtbarkeit',
     layer_permission_read: 'Gelesen',
     layer_permission_readwrite: 'Read/Write',
 

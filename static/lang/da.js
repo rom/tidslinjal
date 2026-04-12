@@ -812,6 +812,7 @@ TRANSLATIONS.da = {
     layer_visibility_groups: 'Grupper',
     layer_visibility_private: 'Privat',
     layer_visibility_public: 'Offentlig',
+    layer_visibility: 'Synlighed',
     layers_multi_hint: 'Klik på lag for at vise/skjule. Flere lag kan være aktive samtidigt.',
     legend_test_cases: 'Testcases',
     legend_test_stats: 'Teststatistik',

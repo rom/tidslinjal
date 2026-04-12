@@ -247,6 +247,7 @@ TRANSLATIONS.ko = {
     layer_visibility_private: '비공개',
     layer_visibility_groups: '그룹',
     layer_visibility_public: '공개',
+    layer_visibility: '공개 범위',
     layer_permission_read: '읽기',
     layer_permission_readwrite: '읽기/쓰기',
 

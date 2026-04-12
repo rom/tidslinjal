@@ -247,6 +247,7 @@ TRANSLATIONS.ja = {
     layer_visibility_private: '非公開',
     layer_visibility_groups: 'グループ',
     layer_visibility_public: '公開',
+    layer_visibility: '表示範囲',
     layer_permission_read: '閲覧',
     layer_permission_readwrite: '閲覧/編集',
 

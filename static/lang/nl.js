@@ -284,6 +284,7 @@ TRANSLATIONS.nl = {
     layer_visibility_private: 'Privé',
     layer_visibility_groups: 'Groepen',
     layer_visibility_public: 'Openbaar',
+    layer_visibility: 'Zichtbaarheid',
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
 

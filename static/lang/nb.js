@@ -284,6 +284,7 @@ TRANSLATIONS.nb = {
     layer_visibility_private: 'Privat',
     layer_visibility_groups: 'Grupper',
     layer_visibility_public: 'Offentlig',
+    layer_visibility: 'Synlighet',
     layer_permission_read: 'Les',
     layer_permission_readwrite: 'Les/Skriv',
 

@@ -643,6 +643,7 @@ manage_resource_types: 'Gerir Tipos',
     layer_visibility_private: 'Privada',
     layer_visibility_groups: 'Grupos',
     layer_visibility_public: 'Pública',
+    layer_visibility: 'Visibilidade',
     layer_permission_read: 'Leitura',
     layer_permission_readwrite: 'Leitura/Escrita',
 

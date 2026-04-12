@@ -923,6 +923,7 @@ TRANSLATIONS.fi = {
     layer_visibility_groups: 'Ryhmät',
     layer_visibility_private: 'Yksityinen',
     layer_visibility_public: 'Julkinen',
+    layer_visibility: 'Näkyvyys',
     layers_multi_hint: 'Napsauta tasoja näyttääksesi/piilottaaksesi. Useita tasoja voi olla aktiivisena samanaikaisesti.',
     lb_action: 'Suoritettu toimenpide',
     lb_added: 'Lokikirjamerkintä lisätty',

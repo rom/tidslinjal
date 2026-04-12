@@ -283,6 +283,7 @@ TRANSLATIONS.en = {
     layer_visibility_private: 'Private',
     layer_visibility_groups: 'Groups',
     layer_visibility_public: 'Public',
+    layer_visibility: 'Visibility',
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
     layers_bulk_move: 'Bulk Move Events',

@@ -149,6 +149,7 @@ TRANSLATIONS.fr = {
     layer_visibility_private: 'Privé',
     layer_visibility_groups: 'Groupes',
     layer_visibility_public: 'Public',
+    layer_visibility: 'Visibilité',
     layer_permission_read: 'Lecture',
     layer_permission_readwrite: 'Lecture/Écriture',
 
