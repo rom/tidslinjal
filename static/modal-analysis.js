@@ -364,7 +364,7 @@ async function _renderDependenciesTab(container) {
 /* ── Leadership Dashboard Tab ─────────────────────────────────────────────── */
 async function _renderLeadershipTab(container) {
   const data = await _analysisFetch('/api/stats/leadership-dashboard');
-  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">No data available.</p>`; return; }
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
 
   const T = data.tempo || {};
   const R = data.readiness || {};
@@ -820,7 +820,7 @@ async function _renderTeamMembersTab(container) {
 /* ── Usage Tab ─────────────────────────────────────────────────────────────── */
 async function _renderUsageTab(container) {
   const data = await _analysisFetch('/api/stats/usage');
-  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">No data available.</p>`; return; }
+  if (!data) { container.innerHTML = `<p style="color:var(--text-dim)">${t('no_data')||'No data available.'}</p>`; return; }
 
   const rc = data.readychecks || {};
   const cl = data.checklists || {};

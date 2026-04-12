@@ -149,6 +149,7 @@ TRANSLATIONS.fr = {
     layer_visibility_private: 'Privé',
     layer_visibility_groups: 'Groupes',
     layer_visibility_public: 'Public',
+    layer_visibility: 'Visibilité',
     layer_permission_read: 'Lecture',
     layer_permission_readwrite: 'Lecture/Écriture',
 
@@ -1666,6 +1667,12 @@ TRANSLATIONS.fr = {
     qtype_datetime: 'Date et heure',
     qtype_dropdown: 'Liste déroulante',
     qtype_checkbox: 'Case à cocher',
+
+    qtype_scale: 'Échelle',
+    qtype_scale_0_3: 'Échelle (0–3)',
+    qtype_scale_1_5: 'Échelle (1–5)',
+    qtype_scale_1_10: 'Échelle (1–10)',
+    no_data: 'Aucune donnée disponible.',
     analysis_tab_events: 'Événements',
     analysis_tab_jstaff: 'État-major J',
     analysis_tab_leadership: 'Commandement',

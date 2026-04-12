@@ -283,6 +283,7 @@ TRANSLATIONS.is = {
     layer_visibility_private: 'Private',
     layer_visibility_groups: 'Groups',
     layer_visibility_public: 'Public',
+    layer_visibility: 'Sýnileiki',
     layer_permission_read: 'Read',
     layer_permission_readwrite: 'Read/Write',
 
@@ -893,6 +894,12 @@ TRANSLATIONS.is = {
     qtype_datetime: 'Dagsetning og tími',
     qtype_dropdown: 'Fellivalmynd',
     qtype_checkbox: 'Gátreitur',
+
+    qtype_scale: 'Skali',
+    qtype_scale_0_3: 'Skali (0–3)',
+    qtype_scale_1_5: 'Skali (1–5)',
+    qtype_scale_1_10: 'Skali (1–10)',
+    no_data: 'Engin gögn í boði.',
     analysis_status_dist:    'Event Status Distribution',
     analysis_type_breakdown: 'Event Type Breakdown',
     analysis_heatmap:        'Activity Heatmap (Day x Hour)',

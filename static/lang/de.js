@@ -284,6 +284,7 @@ TRANSLATIONS.de = {
     layer_visibility_private: 'Privat',
     layer_visibility_groups: 'Gruppen',
     layer_visibility_public: 'Öffentlich',
+    layer_visibility: 'Sichtbarkeit',
     layer_permission_read: 'Gelesen',
     layer_permission_readwrite: 'Read/Write',
 
@@ -875,6 +876,12 @@ TRANSLATIONS.de = {
     qtype_datetime: 'Datum und Zeit',
     qtype_dropdown: 'Auswahlliste',
     qtype_checkbox: 'Kontrollkästchen',
+
+    qtype_scale: 'Skala',
+    qtype_scale_0_3: 'Skala (0–3)',
+    qtype_scale_1_5: 'Skala (1–5)',
+    qtype_scale_1_10: 'Skala (1–10)',
+    no_data: 'Keine Daten verfügbar.',
     analysis_status_dist: 'Event Status Distribution',
     analysis_type_breakdown: 'Event Type Breakdown',
     analysis_heatmap: 'Activity Heatmap (Day x Hour)',

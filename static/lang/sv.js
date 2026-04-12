@@ -149,6 +149,7 @@ TRANSLATIONS.sv = {
     layer_visibility_private: 'Privat',
     layer_visibility_groups: 'Grupper',
     layer_visibility_public: 'Offentlig',
+    layer_visibility: 'Synlighet',
     layer_permission_read: 'Läs',
     layer_permission_readwrite: 'Läs/Skriv',
 
@@ -863,6 +864,12 @@ TRANSLATIONS.sv = {
     qtype_datetime: 'Datum och tid',
     qtype_dropdown: 'Rullgardinsmeny',
     qtype_checkbox: 'Kryssruta',
+
+    qtype_scale: 'Skala',
+    qtype_scale_0_3: 'Skala (0–3)',
+    qtype_scale_1_5: 'Skala (1–5)',
+    qtype_scale_1_10: 'Skala (1–10)',
+    no_data: 'Inga data tillgängliga.',
     teamlead_toolbox_title:  'Gruppledare-verktygslåda',
     narrative_title:         'Narrativ / Händelseförlopp',
     narrative_empty:         'Inga händelser i detta tidsintervall.',

@@ -143,7 +143,10 @@ function updateUILabels() {
   setElText('lbl-layer-name', t('layer_name_lbl') || 'Name *');
   setElText('lbl-layer-color', t('event_type_color'));
   setElText('lbl-layer-desc', t('event_description'));
-  setElText('lbl-layer-vis', t('layer_visibility_private').replace(/^./, '') || 'Visibility');
+  setElText('lbl-layer-vis', t('layer_visibility') || 'Visibility');
+  setElText('lbl-vis-private', t('layer_visibility_private') || 'Private');
+  setElText('lbl-vis-groups', t('layer_visibility_groups') || 'Groups');
+  setElText('lbl-vis-public', t('layer_visibility_public') || 'Public');
   setElText('lbl-layer-perm', t('layer_perm_lbl') || 'Group Permission');
   setElText('lbl-layer-groups', t('layer_shared_groups'));
   setElText('lbl-layer-cancel', t('btn_cancel'));
