@@ -73,9 +73,10 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   // Layer select
   const layerSel = document.getElementById('eventLayer');
+  const _canWriteAnyLayer = hasRole2(state.user.role, 'admin') || userHasCapability('manage_layers');
   layerSel.innerHTML = `<option value="">${t('event_master')}</option>` +
     state.layers
-      .filter(l => l.owner_id===state.user.id || state.user.role==='admin' || l.permission==='readwrite')
+      .filter(l => l.owner_id===state.user.id || _canWriteAnyLayer || l.permission==='readwrite')
       .map(l => `<option value="${l.id}" ${ev && ev.layer_id===l.id?'selected':''}>${escHtml(l.name)}</option>`)
       .join('');
 
@@ -218,7 +219,7 @@ function openEventModal(ev, defaultStart, defaultEnd) {
   }
 
   const delBtn = document.getElementById('btnDeleteEvent');
-  const canDel = !eventIsLocked && isEdit && (state.user.role==='admin' || state.user.id===ev.created_by);
+  const canDel = !eventIsLocked && isEdit && (hasRole2(state.user.role, 'admin') || state.user.id===ev.created_by || userHasCapability('delete_events'));
   delBtn.style.display = canDel ? '' : 'none';
   delBtn.onclick = canDel ? () => deleteEvent(ev.id) : null;
 

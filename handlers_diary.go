@@ -125,7 +125,7 @@ func (app *App) handleUpdateDiaryEntry(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.UserID != user.ID && user.Role != RoleAdmin {
+	if existing.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "only the author can edit their diary entry", http.StatusForbidden)
 		return
 	}
@@ -165,7 +165,7 @@ func (app *App) handleDeleteDiaryEntry(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	if existing.UserID != user.ID && user.Role != RoleAdmin {
+	if existing.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "only the author or admin can delete a diary entry", http.StatusForbidden)
 		return
 	}
@@ -194,7 +194,7 @@ func (app *App) handleDiaryAttachment(w http.ResponseWriter, r *http.Request, us
 		jsonError(w, "diary entry not found", http.StatusNotFound)
 		return
 	}
-	if entry.UserID != user.ID && user.Role != RoleAdmin {
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -294,7 +294,7 @@ func (app *App) handleExportDiary(w http.ResponseWriter, r *http.Request, user *
 	if userIDStr != "" {
 		uid, _ := strconv.ParseInt(userIDStr, 10, 64)
 		// Security: only allow exporting own diary or admin access
-		if uid != user.ID && user.Role != RoleAdmin {
+		if uid != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
 			jsonError(w, "forbidden: can only export your own diary", http.StatusForbidden)
 			return
 		}

@@ -239,7 +239,7 @@ function showEventDetail(ev) {
           <span class="attachment-name" title="${escHtml(a.filename)}">${escHtml(a.filename)}</span>
           <span class="attachment-size">${fmtFileSize(a.size)}</span>
           <a href="/api/attachments/${a.id}" class="btn btn-secondary btn-sm" download="${escHtml(a.filename)}">${t('detail_download')}</a>
-          ${state.user && (state.user.id===a.uploaded_by || state.user.role==='admin') ?
+          ${state.user && (state.user.id===a.uploaded_by || hasRole2(state.user.role, 'admin') || userHasCapability('delete_events')) ?
             `<button class="btn btn-danger btn-sm" data-del-attach="${a.id}" data-ev="${ev.id}">✕</button>` : ''}
         </div>
       `).join('')}</div>`;
@@ -287,7 +287,7 @@ function showEventDetail(ev) {
           </div>
           <div class="comment-text">${renderCommentContent(c.content)}</div>
           <div style="display:flex;gap:4px;margin-top:4px">
-            ${state.user && (state.user.id===c.author_id || state.user.role==='admin') ?
+            ${state.user && (state.user.id===c.author_id || hasRole2(state.user.role, 'admin')) ?
               `<button class="btn btn-danger btn-sm" data-del-comment="${c.id}" data-ev="${ev.id}">✕</button>` : ''}
             ${c.pending_approval && state.user && hasRole2(state.user.role,'teamlead') ?
               `<button class="btn btn-sm" style="background:var(--green)" data-approve-comment="${c.id}" data-ev="${ev.id}">✓ ${t('comments_approve')}</button>` : ''}
