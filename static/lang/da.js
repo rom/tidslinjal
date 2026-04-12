@@ -1433,6 +1433,12 @@ TRANSLATIONS.da = {
     qtype_datetime: 'Dato og tid',
     qtype_dropdown: 'Rullemenu',
     qtype_checkbox: 'Afkrydsningsfelt',
+
+    qtype_scale: 'Skala',
+    qtype_scale_0_3: 'Skala (0–3)',
+    qtype_scale_1_5: 'Skala (1–5)',
+    qtype_scale_1_10: 'Skala (1–10)',
+    no_data: 'Ingen data tilgængelig.',
     analysis_status_dist: 'Hændelsesstatusfordeling',
     analysis_type_breakdown: 'Hændelsestypefordeling',
     analysis_heatmap: 'Aktivitetskort (Dag x Time)',

@@ -1806,6 +1806,12 @@ TRANSLATIONS.nb = {
     qtype_datetime: 'Dato og tid',
     qtype_dropdown: 'Nedtrekksmeny',
     qtype_checkbox: 'Avkrysningsboks',
+
+    qtype_scale: 'Skala',
+    qtype_scale_0_3: 'Skala (0–3)',
+    qtype_scale_1_5: 'Skala (1–5)',
+    qtype_scale_1_10: 'Skala (1–10)',
+    no_data: 'Ingen data tilgjengelig.',
     analysis_status_dist: 'Hendelsesstatusfordeling',
     analysis_type_breakdown: 'Hendelsestypefordeling',
     analysis_heatmap: 'Aktivitetskart (Dag x Time)',

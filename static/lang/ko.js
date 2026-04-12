@@ -789,6 +789,12 @@ TRANSLATIONS.ko = {
     qtype_datetime: '날짜 및 시간',
     qtype_dropdown: '드롭다운',
     qtype_checkbox: '체크박스',
+
+    qtype_scale: '척도',
+    qtype_scale_0_3: '척도 (0–3)',
+    qtype_scale_1_5: '척도 (1–5)',
+    qtype_scale_1_10: '척도 (1–10)',
+    no_data: '사용 가능한 데이터가 없습니다.',
     analysis_status_dist: 'Event Status Distribution',
     analysis_type_breakdown: 'Event Type Breakdown',
     analysis_heatmap: 'Activity Heatmap (Day x Hour)',

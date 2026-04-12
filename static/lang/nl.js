@@ -875,6 +875,12 @@ TRANSLATIONS.nl = {
     qtype_datetime: 'Datum en tijd',
     qtype_dropdown: 'Vervolgkeuzelijst',
     qtype_checkbox: 'Selectievakje',
+
+    qtype_scale: 'Schaal',
+    qtype_scale_0_3: 'Schaal (0–3)',
+    qtype_scale_1_5: 'Schaal (1–5)',
+    qtype_scale_1_10: 'Schaal (1–10)',
+    no_data: 'Geen gegevens beschikbaar.',
     analysis_status_dist: 'Event Status Distribution',
     analysis_type_breakdown: 'Event Type Breakdown',
     analysis_heatmap: 'Activity Heatmap (Day x Hour)',

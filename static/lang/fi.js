@@ -1581,6 +1581,12 @@ TRANSLATIONS.fi = {
     qtype_datetime: 'Päivämäärä ja aika',
     qtype_dropdown: 'Pudotusvalikko',
     qtype_checkbox: 'Valintaruutu',
+
+    qtype_scale: 'Asteikko',
+    qtype_scale_0_3: 'Asteikko (0–3)',
+    qtype_scale_1_5: 'Asteikko (1–5)',
+    qtype_scale_1_10: 'Asteikko (1–10)',
+    no_data: 'Ei tietoja saatavilla.',
     analysis_status_dist: 'Tapahtumastatusten jakauma',
     analysis_type_breakdown: 'Tapahtumatyyppien jakauma',
     analysis_heatmap: 'Aktiivisuuskartta (Päivä x Tunti)',

@@ -789,6 +789,12 @@ TRANSLATIONS.ja = {
     qtype_datetime: '日付と時刻',
     qtype_dropdown: 'ドロップダウン',
     qtype_checkbox: 'チェックボックス',
+
+    qtype_scale: 'スケール',
+    qtype_scale_0_3: 'スケール (0–3)',
+    qtype_scale_1_5: 'スケール (1–5)',
+    qtype_scale_1_10: 'スケール (1–10)',
+    no_data: 'データがありません。',
     analysis_status_dist: 'イベントステータス分布',
     analysis_type_breakdown: 'イベントタイプ内訳',
     analysis_heatmap: 'アクティビティヒートマップ（曜日×時間）',
