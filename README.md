@@ -935,6 +935,24 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
+### v8.4.0 — Custom Roles, Offline Detection, Print Tool & Many Bug Fixes
+
+- **Custom role authorization** — `effectiveHasRole()` middleware grants custom roles up to OpLead level based on capabilities; all 184 route gates and 58 handler-level checks converted; frontend `canEdit` checks now capability-aware (custom roles like `bt_13_leadership` can finally edit events)
+- **Offline detection** — 30-second client heartbeat to `/api/auth/me`; detects server outages, firewall blocks, network partitions; immediate failure detection on regular API requests; auto-sync queue on reconnect
+- **Print tool** — new dialog with view selector (Calendar / List / Task-Time Matrix), date range picker, **layer selection panel**, smart filenames (`tidslinjal-listview-2026-04-12_to_2026-04-19.pdf`), **Boards print** with overview-vs-detailed choice, Key Terrain Board prints in landscape
+- **Bulk move events between layers** — new tool in Layers sidebar; backend `/api/layers/bulk-move` endpoint
+- **3 new event types** — Starting Point (▶), Ending Point (⏹), Transport (🚚) with custom shapes; configurable shape style (Arrow/Diamond/Bar/Pill); compact width prevents overshadowing other events
+- **Event hover tooltip** — floating popup with full title, description, and start/end times
+- **Country flags on events** — physical_location matching country codes/names shows flag emoji (~50 countries with localized names)
+- **Standalone Key Terrain Board page** (`/key-terrain`) — bookmarkable, deep-linkable, own SSE connection, light theme by default
+- **List view** — multi-select layer filter, column visibility toggle, wider title column
+- **Layer modal** — shows event count, detailed warning when deleting layers with events, edit button for shared layers when user has appropriate capabilities
+- **Minimum event size** setting — keeps short events readable (Default/Medium/Large/Extra Large)
+- **Show event creator** is now a setting (off by default)
+- **Security**: critical IDOR fix for log book attachment download; group member list authorization; OIDC `iat` token replay prevention; diary XSS hardening
+- **Major bug fixes**: double event/layer creation (duplicate listeners), modal closing on text selection, keyboard shortcuts stealing input focus, calendar grid not honoring size preference, settings panel not visually updating, French language fully broken (apostrophe syntax error), language switching race condition, print tool didn't work, 9 missing stub functions in settings UI, export stubs (KML/XML/PVA), 'rivate' label in edit layer modal
+- **i18n**: 100+ new translation keys across all 19 languages (analysis, message archive, print dialog, offline messages, list view, settings, layer visibility); 66 missing French translations restored
+
 ### v8.3.0 — Themes, Languages, Key Terrain Owner & Settings i18n
 
 - **8 new themes** — Sand, Matrix, Sunset, Light Blue Sky, Ocean, Forest, Accessible, Crimson (12 total themes)
