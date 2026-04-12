@@ -1028,10 +1028,20 @@ TRANSLATIONS.is = {
     lv_delete:       'Delete',
     lv_all_statuses: 'All statuses',
     lv_all_types:    'All types',
+
+    lv_all_responsible: 'Allir ábyrgir',
+    lv_all_layers: 'Öll lög',
+    lv_no_layers: 'Engin lög',
+    lv_layers_selected: 'lög',
     lv_search:       'Search…',
     lv_now:          'Now',
     lv_confirm_delete: 'Delete this event?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Tenging töpuð — án nettengingar virk',
+    online_restored: 'Tenging endurheimt — samstilling gagna…',
+    data_synced: 'Gögn samstillt',
+    sync_partial_fail: 'Samstilling brást að hluta — reyni aftur…',
 
     // Audit action labels
     audit_all_actions:     'All actions',

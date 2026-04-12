@@ -1010,10 +1010,20 @@ TRANSLATIONS.nl = {
     lv_delete: 'Verwijderen',
     lv_all_statuses: 'All statuses',
     lv_all_types: 'All types',
+
+    lv_all_responsible: 'Alle verantwoordelijken',
+    lv_all_layers: 'Alle lagen',
+    lv_no_layers: 'Geen lagen',
+    lv_layers_selected: 'lagen',
     lv_search: 'Search…',
     lv_now: 'Now',
     lv_confirm_delete: 'Delete this event?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Verbinding verbroken — offlinemodus actief',
+    online_restored: 'Verbinding hersteld — gegevens worden gesynchroniseerd…',
+    data_synced: 'Gegevens gesynchroniseerd',
+    sync_partial_fail: 'Synchronisatie deels mislukt — opnieuw proberen…',
 
     // Audit action labels
     audit_all_actions: 'All actions',

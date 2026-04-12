@@ -1010,10 +1010,20 @@ TRANSLATIONS.de = {
     lv_delete: 'Löschen',
     lv_all_statuses: 'All statuses',
     lv_all_types: 'All types',
+
+    lv_all_responsible: 'Alle Verantwortlichen',
+    lv_all_layers: 'Alle Ebenen',
+    lv_no_layers: 'Keine Ebenen',
+    lv_layers_selected: 'Ebenen',
     lv_search: 'Search…',
     lv_now: 'Now',
     lv_confirm_delete: 'Delete this event?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Verbindung verloren — Offline-Modus aktiv',
+    online_restored: 'Verbindung wiederhergestellt — Daten werden synchronisiert…',
+    data_synced: 'Daten synchronisiert',
+    sync_partial_fail: 'Synchronisierung teilweise fehlgeschlagen — wird wiederholt…',
 
     // Audit action labels
     audit_all_actions: 'All actions',

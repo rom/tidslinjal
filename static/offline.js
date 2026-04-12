@@ -14,25 +14,11 @@ function _initOfflineMode() {
   // Auto-detect network status
   window.addEventListener('online', () => {
     if (!window._offlineModeForced) {
-      window._offlineMode = false;
-      _updateOfflineIndicator();
-      showNotification('success', 'Connection restored — syncing data…');
-      // Sync: push any queued offline actions, then pull fresh data
-      _syncOfflineQueue().then(() => {
-        refreshAll();
-        _cacheDataForOffline();
-        showNotification('success', 'Data synchronized');
-      }).catch(() => {
-        showNotification('warning', 'Sync partially failed — retrying…');
-        setTimeout(() => _syncOfflineQueue().then(refreshAll), 5000);
-      });
+      _markOnline();
     }
   });
   window.addEventListener('offline', () => {
-    window._offlineMode = true;
-    _updateOfflineIndicator();
-    if (state.sidebarTab === 'legend') renderSidebar();
-    showNotification('warning', 'Network lost — offline mode active');
+    _markOffline('Network lost — offline mode active');
   });
 
   // Check initial state
@@ -43,6 +29,104 @@ function _initOfflineMode() {
   // Periodically cache key data
   setInterval(_cacheDataForOffline, 60000);
   _cacheDataForOffline();
+
+  // Start the heartbeat — pings the server every 30 seconds to detect
+  // server-side outages that don't trigger the browser's offline event
+  // (e.g. firewall blocks, server crashes, network partitions)
+  _startHeartbeat();
+}
+
+// ── Heartbeat: detect server-side outages ─────────────────────────────────
+let _heartbeatTimer = null;
+let _heartbeatFailures = 0;
+const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+const HEARTBEAT_FAILURE_THRESHOLD = 2; // mark offline after 2 consecutive failures
+
+function _startHeartbeat() {
+  if (_heartbeatTimer) clearInterval(_heartbeatTimer);
+  _heartbeatTimer = setInterval(_heartbeatCheck, HEARTBEAT_INTERVAL_MS);
+}
+
+async function _heartbeatCheck() {
+  if (window._offlineModeForced) return; // user forced offline; skip
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000); // 8s timeout
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok || res.status === 401) {
+      // Server reachable (401 = session expired but server is up)
+      _heartbeatFailures = 0;
+      if (window._offlineMode && !window._offlineModeForced) {
+        _markOnline();
+      }
+    } else {
+      _heartbeatFailures++;
+    }
+  } catch (e) {
+    _heartbeatFailures++;
+  }
+  if (_heartbeatFailures >= HEARTBEAT_FAILURE_THRESHOLD && !window._offlineMode) {
+    _markOffline('Server unreachable — offline mode active');
+  }
+}
+
+// Called when a regular API request fails with a network error.
+// Triggers an immediate heartbeat check rather than waiting for the next tick.
+function _reportNetworkFailure() {
+  if (window._offlineModeForced) return;
+  _heartbeatFailures++;
+  // Run heartbeat check immediately to confirm offline state
+  setTimeout(_heartbeatCheck, 100);
+}
+
+// Called when any API request succeeds — confirms we're online
+function _reportNetworkSuccess() {
+  _heartbeatFailures = 0;
+  if (window._offlineMode && !window._offlineModeForced) {
+    _markOnline();
+  }
+}
+
+function _markOffline(message) {
+  if (window._offlineMode) return; // already offline
+  window._offlineMode = true;
+  _updateOfflineIndicator();
+  if (typeof renderSidebar === 'function' && state && state.sidebarTab === 'legend') renderSidebar();
+  if (typeof showNotification === 'function') {
+    showNotification('warning', message || (typeof t === 'function' ? (t('offline_warning') || 'Network lost — offline mode active') : 'Network lost — offline mode active'));
+  }
+}
+
+function _markOnline() {
+  if (!window._offlineMode) return; // already online
+  window._offlineMode = false;
+  _heartbeatFailures = 0;
+  _updateOfflineIndicator();
+  if (typeof showNotification === 'function') {
+    showNotification('success', typeof t === 'function' ? (t('online_restored') || 'Connection restored — syncing data…') : 'Connection restored — syncing data…');
+  }
+  // Sync: push any queued offline actions, then pull fresh data
+  if (typeof _syncOfflineQueue === 'function') {
+    _syncOfflineQueue().then(() => {
+      if (typeof refreshAll === 'function') refreshAll();
+      _cacheDataForOffline();
+      if (typeof showNotification === 'function') {
+        showNotification('success', typeof t === 'function' ? (t('data_synced') || 'Data synchronized') : 'Data synchronized');
+      }
+    }).catch(() => {
+      if (typeof showNotification === 'function') {
+        showNotification('warning', typeof t === 'function' ? (t('sync_partial_fail') || 'Sync partially failed — retrying…') : 'Sync partially failed — retrying…');
+      }
+      setTimeout(() => _syncOfflineQueue().then(() => { if (typeof refreshAll === 'function') refreshAll(); }), 5000);
+    });
+  }
 }
 
 function _cacheDataForOffline() {
