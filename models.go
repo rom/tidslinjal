@@ -7,7 +7,7 @@ import (
 
 // AppVersion is the current application version.
 // Override at build time: go build -ldflags "-X main.AppVersion=1.2.3 -X main.BuildCommit=abc123 -X main.BuildTime=2024-01-01T00:00:00Z"
-var AppVersion = "8.4.0"
+var AppVersion = "8.5.0"
 
 // BuildCommit is the git commit hash, set at build time via ldflags.
 var BuildCommit = "dev"
