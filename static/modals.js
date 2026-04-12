@@ -3489,6 +3489,10 @@ async function setPref(key, value) {
   state.preferences[key] = value;
   applyPreferences();
   await savePreferences();
+  // If changing language, wait for the language file to load before re-rendering
+  if (key === 'language' && value !== 'en' && typeof _loadLang === 'function') {
+    await _loadLang(value).catch(() => {});
+  }
   // Clear the renderedTab guard so the settings tab re-renders with updated values
   const sidebarEl = document.getElementById('sidebarContent');
   if (sidebarEl) delete sidebarEl.dataset.renderedTab;

@@ -37,6 +37,10 @@ function t(key) {
   if (!TRANSLATIONS[lang] && !_langLoaded[lang]) {
     _loadLang(lang).then(() => {
       if (typeof updateUILabels === 'function') updateUILabels();
+      // Re-render sidebar so dynamically generated content (settings, tools) gets translated
+      var se = document.getElementById('sidebarContent');
+      if (se) delete se.dataset.renderedTab;
+      if (typeof renderSidebar === 'function') renderSidebar();
     });
   }
   return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
