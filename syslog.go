@@ -117,6 +117,31 @@ func syslogPriority(facility, severity int) int {
 	return facility*8 + severity
 }
 
+// sanitizeSyslogMessage strips characters that would let an attacker forge
+// additional log records. CR/LF terminate records in RFC 3164, and NUL /
+// other C0 control characters can confuse downstream parsers and SIEMs.
+// Tabs are preserved. Returns the sanitised string with replacement chars.
+func sanitizeSyslogMessage(msg string) string {
+	if msg == "" {
+		return msg
+	}
+	b := make([]byte, 0, len(msg))
+	for i := 0; i < len(msg); i++ {
+		c := msg[i]
+		switch {
+		case c == '\n', c == '\r':
+			b = append(b, ' ') // preserve word boundary
+		case c == '\t':
+			b = append(b, c)
+		case c < 0x20, c == 0x7f:
+			b = append(b, ' ') // other control chars → space
+		default:
+			b = append(b, c)
+		}
+	}
+	return string(b)
+}
+
 func (sw *syslogWriter) formatClassic(priority int, msg string) []byte {
 	// RFC 3164: <PRI>Mmm DD HH:MM:SS hostname tag: message
 	t := time.Now().UTC()
@@ -157,6 +182,14 @@ func (sw *syslogWriter) send(severity int, msg string) {
 		facility = 1 // user-level messages
 	}
 	priority := syslogPriority(facility, severity)
+
+	// SECURITY: strip CR/LF (and other control characters) from msg before
+	// formatting. RFC 3164 classic format delimits records with newlines,
+	// so an attacker-controlled string containing "\n<34>Jan 1 ..." would
+	// inject a forged record into the syslog stream and mislead SIEM/IR.
+	// JSON format auto-escapes newlines, but we sanitise for both so the
+	// behaviour is consistent and defence-in-depth.
+	msg = sanitizeSyslogMessage(msg)
 
 	var payload []byte
 	if sw.cfg.Format == "json" {

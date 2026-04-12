@@ -1127,6 +1127,12 @@ type SecuritySettings struct {
 
 	// Max comments per event
 	MaxCommentsPerEvent int `json:"max_comments_per_event,omitempty"` // 0 = unlimited, default 500
+
+	// Auto-report email recipient allowlist. When non-empty, only recipients
+	// whose domain is on this list may be used by auto-report email schedules.
+	// Prevents turning the instance into a spam relay via the schedule API.
+	// Example: ["example.com", "mil.example.org"]. Empty = any valid email.
+	AutoReportEmailDomains []string `json:"auto_report_email_domains,omitempty"`
 }
 
 // TLSConfig stores TLS certificate and key file paths for persistent server configuration.

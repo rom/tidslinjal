@@ -210,9 +210,12 @@ func (app *App) handleDeleteMapResource(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	// Remove the stored file
+	// Remove the stored file — route through the safe-path choke-point so a
+	// tampered mr.Filename cannot delete files outside MapResourceDir().
 	if mr.Filename != "" {
-		os.Remove(filepath.Join(app.store.MapResourceDir(), mr.Filename))
+		if p, ok := safeJoinFilename(app.store.MapResourceDir(), mr.Filename); ok {
+			os.Remove(p)
+		}
 	}
 	if err := app.store.DeleteMapResource(id); err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
@@ -429,7 +432,14 @@ func (app *App) handleServeMapResourceFile(w http.ResponseWriter, r *http.Reques
 		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
-	filePath := filepath.Join(app.store.MapResourceDir(), mr.Filename)
+	// SECURITY: defence-in-depth against a tampered mr.Filename (e.g. via
+	// a malicious backup restore) — force the path through the shared
+	// safeJoinFilename choke-point so it cannot escape MapResourceDir().
+	filePath, pathOK := safeJoinFilename(app.store.MapResourceDir(), mr.Filename)
+	if !pathOK {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
 	w.Header().Set("Content-Type", mr.ContentType)
 	// Prevent script execution in served SVG/HTML files
 	if strings.Contains(mr.ContentType, "svg") || strings.Contains(mr.ContentType, "html") {

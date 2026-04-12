@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -327,6 +328,40 @@ func canEditMasterTimeline(role Role) bool {
 // canEditMasterTimelineUser is the capability-aware version of canEditMasterTimeline.
 func (app *App) canEditMasterTimelineUser(user *User) bool {
 	return app.effectiveHasRole(user, RoleOpLead)
+}
+
+// safeJoinFilename resolves `name` against `dir` only if `name` is a plain,
+// in-directory basename. Returns ("", false) for empty names, names that are
+// not exactly their own basename, names containing path separators (forward
+// or back), ".", "..", or any result whose absolute path escapes `dir`.
+//
+// This is the single choke-point for every filesystem sink where a filename
+// stored in a struct field could have been tampered with upstream (e.g. via
+// a malicious backup restore, a legacy overloaded field, a client decoding
+// the whole struct). Call it instead of `filepath.Join(dir, name)` directly.
+func safeJoinFilename(dir, name string) (string, bool) {
+	if name == "" || dir == "" {
+		return "", false
+	}
+	if name != filepath.Base(name) {
+		return "", false
+	}
+	if name == "." || name == ".." {
+		return "", false
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return "", false
+	}
+	full := filepath.Join(dir, name)
+	absDir, err1 := filepath.Abs(dir)
+	absFull, err2 := filepath.Abs(full)
+	if err1 != nil || err2 != nil {
+		return "", false
+	}
+	if !strings.HasPrefix(absFull, absDir+string(filepath.Separator)) && absFull != absDir {
+		return "", false
+	}
+	return full, true
 }
 
 // clientIP extracts the real client IP from the request.
