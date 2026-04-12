@@ -1223,6 +1223,54 @@ Capabilities are **reactive objects**: when linked to a Key Terrain Board entry,
 
 ---
 
+## What's New in v8.5.0
+
+v8.5.0 is a **security hardening release**. There are no new user-facing features; instead, the authentication, authorization, and file-handling paths are significantly more resilient to the threats uncovered in an external security review. Upgrading is strongly recommended.
+
+### Session hijack protection
+A stolen session cookie could previously be replayed from any network or browser. Sessions are now **bound to the client IP and browser user-agent** captured at login. If either changes, the session is destroyed on the next request and a `session_hijack_suspected` audit entry is written.
+
+Administrators configure the new protection in **Security → Session Management**:
+
+- **Bind session to client IP address** (default on)
+- **IP match mode** — *Subnet* (/24 IPv4, /64 IPv6 — tolerates mobile-carrier roaming, default) or *Strict* (exact IP match)
+- **Bind session to browser user-agent** (default on)
+
+Sessions created before v8.4.x that don't carry IP/user-agent metadata are allowed through for graceful migration; new logins are fully bound.
+
+### Active session management
+A new **Active Sessions** list in Security → Session Management shows every currently-live session with its user, IP address, user-agent, when it was created, and when it expires. Administrators can destroy individual sessions directly from the list. The admin cannot terminate their own current session from this list (use the "log out of all sessions" button in the profile menu instead).
+
+Session identifiers are SHA-256-hashed before being shown in the UI so the full bearer token never leaves the server.
+
+### Auto-report email recipient validation
+Scheduled email reports now validate the recipient address:
+
+- Must be a syntactically valid RFC 5322 address.
+- CR/LF characters are rejected (blocks header injection).
+- An optional **domain allowlist** can be set in SecuritySettings (`auto_report_email_domains`). When non-empty, only addresses whose domain matches the list (case-insensitive) are accepted — useful for restricting auto-reports to internal addresses.
+
+This closes a "spam-relay" hole in which any TeamLead+ user could have scheduled recurring reports to arbitrary external addresses.
+
+### Behind the scenes — hardening you won't see but will benefit from
+
+- **Filesystem choke-point**: a single `safeJoinFilename` helper now gates every disk operation on reference documents, room images, map resources, and event attachments. Path traversal is rejected everywhere (no `../`, no absolute paths, no backslash escapes, no nested paths) — and the rejection is audit-logged so any tampering is visible.
+- **References**: the "local" and "URL" reference types no longer overload the internal `Filename` field with user content; this fixes an arbitrary file read / delete chain that was reachable by TeamLead+ via the reference creation API.
+- **Rooms**: the room image filename is no longer trusted from the client `Room` JSON — it's only ever settable by the server-side image upload handler.
+- **Syslog forwarding**: outgoing syslog messages are stripped of CR, LF, NUL, and other control characters, preventing an attacker-controlled event title from injecting forged records into the upstream SIEM.
+- **Diary rich text**: the HTML sanitiser is now a proper tokenizer-based allowlist parser (previously a regex), with a dedicated XSS-bypass test suite covering 13 classic bypass attempts.
+- **Logout**: CSRF double-submit cookie is now validated, and OIDC sessions trigger an RP-initiated end-session redirect to the IdP's `end_session_endpoint` so the identity provider also terminates the session.
+- **6 IDOR fixes** on spreadsheets, decision log attachments, references, and log book attachments — each now enforces ownership / layer-access checks on read, write, and delete paths.
+
+### Upgrade notes for administrators
+
+1. **No data migration required.** Existing sessions are honoured; the new binding is applied to sessions that already carry IP/UA metadata (all logins from 8.4.x onwards).
+2. **Default bindings are on.** If you have users on rotating mobile carrier IPs, leave the IP match mode on **Subnet** (the default). Flip it to **Strict** only if you require exact-IP binding.
+3. **Optional email allowlist.** If you use auto-report email schedules, consider populating `auto_report_email_domains` under Security Settings to restrict recipients to internal domains.
+4. **Downgrading to 8.4.0 is safe** — none of the new fields break the older parser.
+
+---
+
 ## What's New in v8.4.0
 
 ### Custom role authorization (capability-aware)
@@ -1327,4 +1375,4 @@ When the connection is restored, queued actions are synced and a confirmation no
 
 ---
 
-*Tidslinjal v8.4.0 — Collaborative Operational Timeline*
+*Tidslinjal v8.5.0 — Collaborative Operational Timeline*

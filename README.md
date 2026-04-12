@@ -935,6 +935,23 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
+### v8.5.0 — Security Hardening Release
+
+A defensive release that closes a series of findings from an external security review. No new user-facing features; existing installations pick up the new defaults on first restart.
+
+- **Session hijack protection** — sessions are bound to the client IP and user-agent captured at login; mismatches destroy the session and write an audit entry. New Security → Session Management controls: IP binding (Subnet / Strict), user-agent binding. Subnet mode (/24 IPv4, /64 IPv6) is the default and tolerates mobile-carrier roaming.
+- **Arbitrary file read / delete via reference `Filename`** — fixed. The `CreateReferenceLink` constructor no longer overloads `Filename` with user content; every reference disk sink now goes through a single `safeReferenceFilePath` choke-point.
+- **Arbitrary file read / delete via room `ImageName`** — fixed. `handleSaveRoom` no longer accepts `ImageName` from client JSON; every room image disk sink goes through `safeAttachmentPath`.
+- **Defence-in-depth at every remaining disk sink** — new shared `safeJoinFilename(dir, name)` helper used by map resource, event attachment, reference, and room image handlers. Blocks traversal, absolute paths, nested paths, and any `filepath.Abs` escape.
+- **Syslog log forging** — `sanitizeSyslogMessage()` strips CR/LF/NUL before the message reaches the classic or JSON formatter, preventing an attacker-controlled event title from injecting forged records into the upstream SIEM.
+- **Auto-report email recipient spam relay** — new `validateAutoReportEmail()` enforces RFC 5322 format, rejects CR/LF header injection, and supports an optional `auto_report_email_domains` allowlist on SecuritySettings.
+- **CSRF double-submit cookie on logout** + OIDC RP-initiated end-session redirect to the IdP's `end_session_endpoint`.
+- **6 IDOR fixes** — spreadsheets, decision log attachments, references, and log book attachments now enforce ownership / layer-access checks on read, write, and delete paths.
+- **Dangerous uploads** on references/report-archive/board-items rejected; downloads force `X-Content-Type-Options: nosniff` and `application/octet-stream` for dangerous extensions.
+- **Diary HTML sanitiser** rewritten from regex to the `golang.org/x/net/html` tokenizer with an allowlist parser; 13 XSS bypass tests pinned in `sanitize_test.go`.
+- **Active Sessions** management UI in Security → Session Management — list, inspect, and destroy live sessions. Session IDs are SHA-256-hashed before exposure so the full bearer token never leaves the server.
+- **Tests added**: `session_binding_test.go`, `reference_path_traversal_test.go`, `misc_security_test.go`, `sanitize_test.go`. All `go test ./...` pass.
+
 ### v8.4.0 — Custom Roles, Offline Detection, Print Tool & Many Bug Fixes
 
 - **Custom role authorization** — `effectiveHasRole()` middleware grants custom roles up to OpLead level based on capabilities; all 184 route gates and 58 handler-level checks converted; frontend `canEdit` checks now capability-aware (custom roles like `bt_13_leadership` can finally edit events)

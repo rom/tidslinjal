@@ -1,6 +1,76 @@
-# Release Notes — Tidslinjal v8.4.0
+# Release Notes — Tidslinjal v8.5.0
 
 **Release Date:** 2026-04-12
+
+v8.5.0 is a **security hardening release** that closes a series of findings reported by an external security review. All of the fixes in this release are defensive — no new user-facing features are added, but authentication, authorization, and file-handling code paths are now significantly more resilient to both direct attack and supply-chain / backup-restore threats.
+
+Upgrading is **strongly recommended**. No data-migration steps are required.
+
+---
+
+## Security Hardening
+
+### Session hijack protection — client IP / user-agent binding
+A stolen session cookie could previously be replayed from any network or browser. Sessions are now bound to the client IP and user-agent captured at login time and validated on every request. Mismatches destroy the session on the spot and write a `session_hijack_suspected` audit entry.
+
+- New **Session Hijack Protection** panel in Security → Session Management:
+  - "Bind session to client IP address" (default on)
+  - IP match mode: **Subnet** (/24 IPv4, /64 IPv6 — tolerates minor NAT/carrier churn, default) or **Strict** (exact match)
+  - "Bind session to browser user-agent" (default on)
+- Legacy sessions created before the binding fields existed are allowed through for graceful migration.
+
+### Arbitrary file read / delete via reference document `Filename` — fixed
+A TeamLead+ user could historically create a "local" reference whose `content` contained a path-traversal string; the constructor wrote that value into `ReferenceDoc.Filename`, which then flowed unsanitised into `os.Remove` and `os.ReadFile`.
+
+- `CreateReferenceLink` no longer overloads `Filename` with `URL` or `Content`; the download handler serves those via the existing `RefType` branch.
+- New `safeReferenceFilePath` choke-point used by every disk sink (download, delete, checksum).
+
+### Arbitrary file read / delete via room image name — fixed
+`Room.ImageName` was part of a full-struct JSON decode in `handleSaveRoom`; a client could POST `{"image_name": "../../../etc/passwd"}` and the next image upload or download would target that path.
+
+- `handleSaveRoom` now preserves `ImageName` from the existing DB record on update and clears it on insert.
+- New `safeAttachmentPath` choke-point used by the room image download and replace paths.
+
+### Single shared filesystem choke-point
+All remaining disk sinks now go through one shared helper so the traversal pattern cannot drift across handlers again.
+
+- New `safeJoinFilename(dir, name)` package-level helper rejects empty, `.`/`..`, forward/back separators, absolute paths, nested paths, and any `filepath.Abs` escape from the intended directory.
+- Routed through it: map resource download + delete, event attachment download + delete, reference download/delete/checksum, room image download + replace.
+
+### Syslog log forging blocked
+Classic RFC 3164 syslog uses `\n` as a record delimiter; an attacker-controlled event title containing `\n<34>Jan 1 00:00:00 host: FAKE root login` would inject a forged record into the upstream SIEM.
+
+- New `sanitizeSyslogMessage()` strips CR, LF, NUL, and C0 control characters (tabs preserved) before either formatter runs.
+
+### Auto-report email recipient validation
+TeamLead+ could previously schedule recurring email reports to any address with zero validation — spam-relay potential.
+
+- New `validateAutoReportEmail()` enforces RFC 5322 format, rejects CR/LF (header injection), and supports an optional domain allowlist.
+- New `AutoReportEmailDomains []string` field on `SecuritySettings` — empty = any valid address, populated = case-insensitive domain allowlist.
+
+### Additional fixes bundled in
+- **CSRF double-submit cookie on logout** + OIDC RP-initiated end-session redirect.
+- **IDOR fixes** on 6 endpoints (spreadsheets, decision log attachments, references, log book attachments).
+- **References `git-load` path traversal** — imported records sanitised via `filepath.Base` + `isDangerousFilename`.
+- **Dangerous uploads** on references/report-archive/board-items now rejected; downloads force `X-Content-Type-Options: nosniff` + `application/octet-stream` for dangerous extensions.
+- **Diary rich-text sanitiser** replaced the regex parser with `golang.org/x/net/html` tokenizer-based allowlist parser with a dedicated XSS-bypass test suite.
+- **Active Sessions admin UI** — list and destroy live sessions from Security → Session Management.
+
+---
+
+## Tests added
+
+- `session_binding_test.go`, `reference_path_traversal_test.go`, `misc_security_test.go`, `sanitize_test.go` — all passing on `go test ./...`.
+
+---
+
+## Upgrading
+
+No schema changes. Sessions created before the upgrade are honoured for backwards compatibility. The new binding defaults (`session_bind_ip=true`, `session_bind_ip_mode=subnet`, `session_bind_ua=true`) take effect for new logins. Downgrading to 8.4.0 is safe — none of the new fields break the older parser.
+
+---
+
+## Previous Release: v8.4.0 (2026-04-12)
 
 A major release focused on **custom role authorization**, **offline detection**, **printing improvements**, **new event types**, and dozens of bug fixes uncovered by comprehensive code audits.
 
