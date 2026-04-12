@@ -13,6 +13,7 @@ TRANSLATIONS.fr = {
     add_event: '+ Ajouter événement',
     lock_slot: '🔒 Verrouiller',
     logout: 'Déconnexion',
+    confirm_logout_all_sessions: 'Se déconnecter de tous les appareils ?\n\nCliquez sur OK pour vous déconnecter de tous les appareils où vous êtes connecté, ou sur Annuler pour vous déconnecter uniquement de cet appareil.',
     range_day: 'Jour',
     range_2days: '2 Jours',
     range_3days: '3 Jours',

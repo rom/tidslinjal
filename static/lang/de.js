@@ -17,6 +17,7 @@ TRANSLATIONS.de = {
     add_event: '+ Ereignis hinzufügen',
     lock_slot: '🔒 Lock Slot',
     logout: 'Abmelden',
+    confirm_logout_all_sessions: 'Von allen Geräten abmelden?\n\nKlicken Sie OK, um sich von allen Geräten abzumelden, oder Abbrechen, um sich nur von diesem Gerät abzumelden.',
 
     // Range options
     range_day: 'Tag',

@@ -14,6 +14,7 @@ TRANSLATIONS.ja = {
     add_event: '+ イベント追加',
     lock_slot: '🔒 スロットをロック',
     logout: 'ログアウト',
+    confirm_logout_all_sessions: 'すべてのデバイスからログアウトしますか？\n\nすべてのデバイスからログアウトするには OK、このデバイスからのみログアウトするにはキャンセルをクリックしてください。',
     range_day: '1日',
     range_2days: '2日間',
     range_3days: '3日間',

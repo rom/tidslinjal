@@ -16,6 +16,7 @@ TRANSLATIONS.en = {
     add_event: '+ Add Event',
     lock_slot: '🔒 Lock Slot',
     logout: 'Logout',
+    confirm_logout_all_sessions: 'Log out from all devices?\n\nClick OK to log out from every device where you are signed in, or Cancel to log out only from this device.',
 
     // Range options
     range_day: 'Day',

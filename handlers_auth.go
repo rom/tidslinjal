@@ -2,10 +2,13 @@ package main
 
 import (
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -169,21 +172,93 @@ func (app *App) handleLogout(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// CSRF protection: apply the same double-submit cookie check that
+	// requireAuth uses for every other mutating endpoint. Without this,
+	// logout was only protected by X-Requested-With which OWASP considers weak.
+	if !validateCSRF(r) {
+		jsonError(w, "CSRF validation failed", http.StatusForbidden)
+		return
+	}
 	_, user := app.getSession(r)
-	if c, err := r.Cookie("session"); err == nil {
+
+	// Parse optional "all_sessions" flag in request body
+	var req struct {
+		AllSessions bool `json:"all_sessions"`
+	}
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<10)).Decode(&req)
+
+	if req.AllSessions && user != nil {
+		// Log out from all devices — invalidate every session for this user
+		app.store.DeleteSessionsForUser(user.ID)
+		logDebug("logout: all sessions for user=%q", user.Username)
+	} else if c, err := r.Cookie("session"); err == nil {
 		logDebug("logout: session=%s", c.Value[:min(8, len(c.Value))])
 		app.store.DeleteSession(c.Value) //nolint
 	}
 	if user != nil {
 		ip := clientIP(r)
+		scope := "single session"
+		if req.AllSessions {
+			scope = "all sessions"
+		}
 		app.audit(user.ID, user.DisplayName, "logout", "user", user.ID,
-			fmt.Sprintf("User %q logged out from %s", user.Username, ip))
-		logVerbose("logout: user=%q ip=%s", user.Username, ip)
+			fmt.Sprintf("User %q logged out (%s) from %s", user.Username, scope, ip))
+		logVerbose("logout: user=%q ip=%s scope=%s", user.Username, ip, scope)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "session", Value: "", Path: "/", HttpOnly: true, Secure: app.secureMode, SameSite: http.SameSiteStrictMode, Expires: time.Unix(0, 0)})
+	// Clear session cookie: use both Expires and MaxAge for maximum browser compatibility
+	http.SetCookie(w, &http.Cookie{
+		Name: "session", Value: "", Path: "/",
+		HttpOnly: true, Secure: app.secureMode, SameSite: http.SameSiteStrictMode,
+		Expires: time.Unix(0, 0), MaxAge: -1,
+	})
 	// Clear CSRF cookie on logout
-	http.SetCookie(w, &http.Cookie{Name: "csrf_token", Value: "", Path: "/", Secure: app.secureMode, SameSite: http.SameSiteStrictMode, Expires: time.Unix(0, 0)})
-	jsonOK(w, map[string]string{"status": "ok"})
+	http.SetCookie(w, &http.Cookie{
+		Name: "csrf_token", Value: "", Path: "/",
+		Secure: app.secureMode, SameSite: http.SameSiteStrictMode,
+		Expires: time.Unix(0, 0), MaxAge: -1,
+	})
+	// Prevent browser from caching authenticated pages after logout
+	// (stops the "back button shows the old dashboard" UX bug).
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
+	// Build response with optional OIDC end-session URL for RP-initiated logout.
+	// If OIDC is configured, the client should redirect the user to this URL so
+	// the identity provider also invalidates its session — otherwise clicking
+	// Login again could silently re-authenticate the user without a password.
+	resp := map[string]string{"status": "ok"}
+	if app.oidc != nil && app.oidc.Issuer != "" {
+		if endSessionURL := app.oidcEndSessionURL(); endSessionURL != "" {
+			resp["oidc_logout_url"] = endSessionURL
+		}
+	}
+	jsonOK(w, resp)
+}
+
+// oidcEndSessionURL returns the OIDC provider's RP-initiated logout URL if
+// the provider supports it. Uses the end_session_endpoint from the discovery
+// document if available.
+func (app *App) oidcEndSessionURL() string {
+	if app.oidc == nil || app.oidc.EndSessionEndpoint == "" {
+		return ""
+	}
+	endSession := app.oidc.EndSessionEndpoint
+	// Append post_logout_redirect_uri so the user lands back at /login
+	sep := "?"
+	if strings.Contains(endSession, "?") {
+		sep = "&"
+	}
+	postLogout := app.oidc.RedirectURL
+	if postLogout != "" {
+		// Replace /auth/oidc/callback with /login for post-logout landing
+		postLogout = strings.Replace(postLogout, "/auth/oidc/callback", "/login", 1)
+	}
+	if postLogout == "" {
+		return endSession
+	}
+	return fmt.Sprintf("%s%spost_logout_redirect_uri=%s&client_id=%s",
+		endSession, sep, url.QueryEscape(postLogout), url.QueryEscape(app.oidc.ClientID))
 }
 
 func (app *App) handleMe(w http.ResponseWriter, r *http.Request, user *User) {
