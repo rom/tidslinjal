@@ -1318,9 +1318,16 @@ async function _renderPollsAnalysisTab(container) {
   if (data.question_type_distribution && Object.keys(data.question_type_distribution).length > 0) {
     html += `<h4 style="margin-bottom:8px">${t('analysis_polls_question_types')||'Question Type Distribution'}</h4>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">`;
+    const _qTypeLabel = (type) => {
+      const key = 'qtype_' + String(type).toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const lbl = t(key);
+      // If translation found and not the literal key, use it; otherwise prettify
+      if (lbl && lbl !== key) return lbl;
+      return String(type).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
     for (const [type, count] of Object.entries(data.question_type_distribution)) {
       html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;font-size:var(--fs-sm)">
-        <strong>${escHtml(type)}</strong>: ${count}
+        <strong>${escHtml(_qTypeLabel(type))}</strong>: ${count}
       </div>`;
     }
     html += `</div>`;
