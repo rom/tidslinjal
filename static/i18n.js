@@ -20,15 +20,18 @@ function isLangEnabled(code) {
 
 // Load a language file dynamically (returns a promise)
 const _langLoaded = { en: true };
+const _langLoading = {}; // in-flight promises to prevent duplicate loads
 function _loadLang(code) {
   if (_langLoaded[code]) return Promise.resolve();
-  return new Promise((resolve, reject) => {
+  if (_langLoading[code]) return _langLoading[code]; // reuse in-flight promise
+  _langLoading[code] = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = '/static/lang/' + code + '.js';
-    s.onload = () => { _langLoaded[code] = true; resolve(); };
-    s.onerror = reject;
+    s.onload = () => { _langLoaded[code] = true; delete _langLoading[code]; resolve(); };
+    s.onerror = () => { delete _langLoading[code]; reject(); };
     document.head.appendChild(s);
   });
+  return _langLoading[code];
 }
 
 function t(key) {

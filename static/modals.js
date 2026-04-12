@@ -3487,12 +3487,13 @@ async function setDefaultView(view) {
 // ── Preference actions ─────────────────────────────────────────────────────
 async function setPref(key, value) {
   state.preferences[key] = value;
-  applyPreferences();
-  await savePreferences();
-  // If changing language, wait for the language file to load before re-rendering
+  // If changing language, load the language file BEFORE applying preferences
+  // and re-rendering, so translations are available when the UI is rebuilt.
   if (key === 'language' && value !== 'en' && typeof _loadLang === 'function') {
     await _loadLang(value).catch(() => {});
   }
+  applyPreferences();
+  await savePreferences();
   // Clear the renderedTab guard so the settings tab re-renders with updated values
   const sidebarEl = document.getElementById('sidebarContent');
   if (sidebarEl) delete sidebarEl.dataset.renderedTab;
