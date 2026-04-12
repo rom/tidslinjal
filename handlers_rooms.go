@@ -224,32 +224,8 @@ func (app *App) handleRoomImageDownload(w http.ResponseWriter, r *http.Request) 
 }
 
 // safeAttachmentPath resolves an attachment filename to an absolute path
-// under AttachmentDir() only if it is a safe, in-directory basename.
-// Same semantics as safeReferenceFilePath but for the attachment dir.
-// This is the single choke-point for every room/image on-disk operation so
-// that a tampered Room.ImageName cannot escape the attachment directory.
+// under AttachmentDir() via the shared safeJoinFilename choke-point. Used
+// by both room image and event attachment disk sinks.
 func (app *App) safeAttachmentPath(filename string) (string, bool) {
-	if filename == "" {
-		return "", false
-	}
-	if filename != filepath.Base(filename) {
-		return "", false
-	}
-	if filename == "." || filename == ".." {
-		return "", false
-	}
-	if strings.ContainsAny(filename, `/\`) {
-		return "", false
-	}
-	dir := app.store.AttachmentDir()
-	full := filepath.Join(dir, filename)
-	absDir, err1 := filepath.Abs(dir)
-	absFull, err2 := filepath.Abs(full)
-	if err1 != nil || err2 != nil {
-		return "", false
-	}
-	if !strings.HasPrefix(absFull, absDir+string(filepath.Separator)) && absFull != absDir {
-		return "", false
-	}
-	return full, true
+	return safeJoinFilename(app.store.AttachmentDir(), filename)
 }

@@ -159,7 +159,13 @@ func (app *App) handleDownloadAttachment(w http.ResponseWriter, r *http.Request,
 			return
 		}
 	}
-	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
+	// SECURITY: route through safe-path choke-point — blocks traversal
+	// stored in att.StoredName (e.g. via a malicious backup restore).
+	path, pathOK := safeJoinFilename(app.store.AttachmentDir(), att.StoredName)
+	if !pathOK {
+		jsonError(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
 	w.Header().Set("Content-Type", att.MimeType)
 	// Sanitise filename for use in Content-Disposition to prevent header injection.
 	// Remove double-quotes, backslashes, and newline characters that could break the header.
@@ -195,9 +201,12 @@ func (app *App) handleDeleteAttachment(w http.ResponseWriter, r *http.Request, u
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	path := filepath.Join(app.store.AttachmentDir(), att.StoredName)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		log.Printf("warning: failed to remove attachment file %s: %v", path, err)
+	// SECURITY: route through safe-path choke-point to prevent arbitrary
+	// file delete via a tampered att.StoredName.
+	if path, ok := safeJoinFilename(app.store.AttachmentDir(), att.StoredName); ok {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Printf("warning: failed to remove attachment file %s: %v", path, err)
+		}
 	}
 	if err := app.store.DeleteAttachment(id); err != nil {
 		jsonError(w, "failed to delete", http.StatusInternalServerError)

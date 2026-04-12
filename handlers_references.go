@@ -22,42 +22,13 @@ import (
 )
 
 // safeReferenceFilePath resolves a ReferenceDoc.Filename to an absolute path
-// under ReferenceDir() only if it is a safe, in-directory basename. Returns
-// ("", false) for empty filenames, filenames containing path separators or
-// ".." components, or any result that would escape ReferenceDir.
-//
-// This is the single choke-point for every disk operation that touches a
-// stored reference file (read, delete, checksum). A malicious JSON import,
-// a legacy record whose Filename was overloaded with user content (see
-// CreateReferenceLink history), or any other upstream bug cannot cause
-// directory traversal because nothing can bypass this helper.
+// under ReferenceDir() via the shared safeJoinFilename choke-point. A
+// malicious JSON import, a legacy record whose Filename was overloaded with
+// user content (see CreateReferenceLink history), or any other upstream bug
+// cannot cause directory traversal because every reference disk sink
+// (download, delete, checksum) goes through here.
 func (app *App) safeReferenceFilePath(filename string) (string, bool) {
-	if filename == "" {
-		return "", false
-	}
-	// Reject anything that isn't already a plain basename. This catches
-	// "../x", "a/b", "./x", "..", "/absolute", Windows "..\\x", etc.
-	if filename != filepath.Base(filename) {
-		return "", false
-	}
-	if filename == "." || filename == ".." {
-		return "", false
-	}
-	if strings.ContainsAny(filename, `/\`) {
-		return "", false
-	}
-	dir := app.store.ReferenceDir()
-	full := filepath.Join(dir, filename)
-	// Belt-and-suspenders: ensure Clean() didn't escape the dir.
-	absDir, err1 := filepath.Abs(dir)
-	absFull, err2 := filepath.Abs(full)
-	if err1 != nil || err2 != nil {
-		return "", false
-	}
-	if !strings.HasPrefix(absFull, absDir+string(filepath.Separator)) && absFull != absDir {
-		return "", false
-	}
-	return full, true
+	return safeJoinFilename(app.store.ReferenceDir(), filename)
 }
 
 // ── Reference Document handlers ────────────────────────────────────────────────

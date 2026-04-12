@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -108,6 +109,21 @@ func (app *App) handleCreateAutoReportSchedule(w http.ResponseWriter, r *http.Re
 			return
 		}
 	}
+	// SECURITY: Validate email recipient to prevent turning the instance
+	// into a spam relay. Requires a syntactically valid address AND
+	// forbids CR/LF (header injection). An optional allowlist of domains
+	// can be configured in Security Settings (auto_report_email_domains)
+	// to further restrict recipients to internal addresses.
+	if sched.Delivery == "email" {
+		if sched.Recipient == "" {
+			jsonError(w, "email recipient required", http.StatusBadRequest)
+			return
+		}
+		if err := validateAutoReportEmail(sched.Recipient, app.store.GetSecuritySettings().AutoReportEmailDomains); err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	sched.NextRun = calcNextRun(sched.Frequency, time.Now())
 	created, err := app.store.CreateAutoReportSchedule(sched)
 	if err != nil {
@@ -136,6 +152,44 @@ func (app *App) handleDeleteAutoReportSchedule(w http.ResponseWriter, r *http.Re
 	}
 	app.audit(user.ID, user.DisplayName, "deleted", "auto_report_schedule", id, "Auto-report schedule removed")
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// validateAutoReportEmail validates an auto-report email recipient.
+// Enforces:
+//   - Syntactically valid RFC 5322 address (via net/mail.ParseAddress)
+//   - No CR/LF (header injection)
+//   - Optional domain allowlist; if non-empty, recipient's domain must match
+//     (case-insensitive). Prevents using the server as a generic spam relay.
+func validateAutoReportEmail(recipient string, allowlist []string) error {
+	// Header injection: reject any CR/LF before anything else so they can't
+	// survive in the name part.
+	if strings.ContainsAny(recipient, "\r\n") {
+		return fmt.Errorf("email contains illegal newline characters")
+	}
+	addr, err := mail.ParseAddress(recipient)
+	if err != nil {
+		return fmt.Errorf("invalid email address")
+	}
+	// mail.ParseAddress accepts "Display Name <user@host>"; extract the
+	// bare addr for the allowlist check and for storage.
+	at := strings.LastIndex(addr.Address, "@")
+	if at <= 0 || at == len(addr.Address)-1 {
+		return fmt.Errorf("invalid email address")
+	}
+	domain := strings.ToLower(addr.Address[at+1:])
+	if len(allowlist) > 0 {
+		ok := false
+		for _, d := range allowlist {
+			if strings.EqualFold(strings.TrimSpace(d), domain) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return fmt.Errorf("email domain not allowed by security policy")
+		}
+	}
+	return nil
 }
 
 func calcNextRun(frequency string, from time.Time) time.Time {
