@@ -105,6 +105,8 @@ function recurStepMs(pattern) {
 
 // ── Range helpers ───────────────────────────────────────────────────────────
 function getRangeDays() {
+  // Print override: when printing a custom range, use that exact day count
+  if (state._printDays && state._printDays > 0) return state._printDays;
   switch (state.range) {
     case 'day':     return 1;
     case '2days':   return 2;

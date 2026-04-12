@@ -559,11 +559,179 @@ let _listViewActive = false;
 let _listSortKey    = 'start_time';
 let _listSortAsc    = true;
 
-// ── Print: open browser print dialog with the current timeline/list view ──
+// ── Print: dialog to choose view + period, then trigger browser print ─────
 function printTimeline() {
-  // The print CSS in style.css (@media print) handles layout — hide chrome,
-  // expand the timeline, etc. Just trigger the browser's print dialog.
-  window.print();
+  // Build the print options modal on-the-fly
+  const existing = document.getElementById('printModal');
+  if (existing) existing.remove();
+
+  const today = new Date();
+  const fmtDateOnly = (d) => {
+    const yy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  };
+  const startDefault = fmtDateOnly(state.startDate || today);
+  const endDefault = fmtDateOnly(new Date((state.startDate || today).getTime() + 7 * 86400000));
+
+  const html = `
+    <div class="modal-overlay" id="printModal">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <h2>🖨 ${escHtml(t('print_dialog_title') || 'Print')}</h2>
+          <button class="modal-close" data-close-modal="printModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+            ${escHtml(t('print_dialog_desc') || 'Choose what to print and the time period.')}
+          </p>
+          <div class="form-group" style="margin-bottom:12px">
+            <label style="font-weight:600;display:block;margin-bottom:6px">${escHtml(t('print_what') || 'What to print')}</label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="calendar" checked style="accent-color:var(--accent)">
+              📅 ${escHtml(t('print_view_calendar') || 'Calendar view')}
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="list" style="accent-color:var(--accent)">
+              📋 ${escHtml(t('print_view_list') || 'List view')}
+            </label>
+          </div>
+          <div class="form-row" style="margin-bottom:12px">
+            <div class="form-group" style="flex:1">
+              <label>${escHtml(t('print_from') || 'From')}</label>
+              <input type="date" id="printDateFrom" value="${startDefault}" style="width:100%">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label>${escHtml(t('print_to') || 'To')}</label>
+              <input type="date" id="printDateTo" value="${endDefault}" style="width:100%">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-weight:600;font-size:var(--fs-sm);color:var(--text-dim);display:block;margin-bottom:4px">${escHtml(t('print_quick') || 'Quick select')}</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <button type="button" class="btn btn-sm btn-secondary" data-print-range="day">${escHtml(t('range_day') || 'Day')}</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-print-range="week">${escHtml(t('range_week') || 'Week')}</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-print-range="month">${escHtml(t('range_month') || 'Month')}</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-print-range="current">${escHtml(t('print_range_current') || 'Current view')}</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-print-range="all">${escHtml(t('print_range_all') || 'All events')}</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="printModal">${escHtml(t('btn_cancel') || 'Cancel')}</button>
+          <button class="btn btn-primary" id="btnDoPrint">🖨 ${escHtml(t('btn_print') || 'Print')}</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('printModal');
+  openModal('printModal');
+
+  // Quick range buttons
+  modal.querySelectorAll('[data-print-range]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const range = btn.dataset.printRange;
+      const fromEl = document.getElementById('printDateFrom');
+      const toEl = document.getElementById('printDateTo');
+      const now = new Date();
+      let from, to;
+      if (range === 'day') {
+        from = now; to = now;
+      } else if (range === 'week') {
+        const dow = now.getDay();
+        const offset = dow === 0 ? -6 : 1 - dow; // Monday start
+        from = new Date(now.getTime() + offset * 86400000);
+        to = new Date(from.getTime() + 6 * 86400000);
+      } else if (range === 'month') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      } else if (range === 'current') {
+        from = state.startDate || now;
+        to = (typeof getViewEnd === 'function') ? getViewEnd() : new Date(from.getTime() + 7 * 86400000);
+      } else if (range === 'all') {
+        const allEvents = state.events || [];
+        if (allEvents.length === 0) { from = now; to = now; }
+        else {
+          const dates = allEvents.map(e => new Date(e.start_time).getTime()).filter(t => !isNaN(t));
+          from = new Date(Math.min(...dates));
+          to = new Date(Math.max(...dates));
+        }
+      }
+      if (fromEl) fromEl.value = fmtDateOnly(from);
+      if (toEl) toEl.value = fmtDateOnly(to);
+    });
+  });
+
+  // Print button
+  document.getElementById('btnDoPrint').addEventListener('click', async () => {
+    const view = modal.querySelector('input[name="printView"]:checked')?.value || 'calendar';
+    const fromVal = document.getElementById('printDateFrom').value;
+    const toVal = document.getElementById('printDateTo').value;
+    if (!fromVal || !toVal) {
+      showError(t('print_invalid_range') || 'Please select a valid date range.');
+      return;
+    }
+    const from = new Date(fromVal);
+    const to = new Date(toVal + 'T23:59:59');
+    if (from > to) {
+      showError(t('print_invalid_range') || 'Please select a valid date range.');
+      return;
+    }
+    closeModal('printModal');
+    modal.remove();
+
+    // Save current state to restore after printing
+    const savedRange = state.range;
+    const savedStart = state.startDate;
+    const savedListActive = _listViewActive;
+    const savedListFrom = document.getElementById('listDateFrom')?.value || '';
+    const savedListTo = document.getElementById('listDateTo')?.value || '';
+
+    if (view === 'list') {
+      // Switch to list view if needed
+      if (!_listViewActive) toggleListView();
+      // Apply date range to list view filters
+      const fromEl = document.getElementById('listDateFrom');
+      const toEl = document.getElementById('listDateTo');
+      if (fromEl) fromEl.value = fromVal;
+      if (toEl) toEl.value = toVal;
+      renderListView();
+    } else {
+      // Calendar view: switch back if currently in list view
+      if (_listViewActive) toggleListView();
+      // Use the print override to render the exact day range
+      const dayCount = Math.ceil((to - from) / 86400000) + 1;
+      state.startDate = startOfDay(from);
+      state._printDays = dayCount;
+      if (typeof refreshAll === 'function') await refreshAll();
+      renderTimeline();
+    }
+
+    // Wait a tick for the DOM to update, then trigger the print dialog
+    setTimeout(() => {
+      window.print();
+      // Restore previous state after the print dialog closes
+      setTimeout(() => {
+        state._printDays = null;
+        state.startDate = savedStart;
+        state.range = savedRange;
+        if (view === 'list') {
+          // Restore original list view filters
+          const fromEl = document.getElementById('listDateFrom');
+          const toEl = document.getElementById('listDateTo');
+          if (fromEl) fromEl.value = savedListFrom;
+          if (toEl) toEl.value = savedListTo;
+          if (savedListActive !== _listViewActive) toggleListView();
+          else renderListView();
+        } else {
+          if (savedListActive !== _listViewActive) toggleListView();
+          if (typeof refreshAll === 'function') refreshAll();
+        }
+      }, 1000);
+    }, 300);
+  });
 }
 
 function toggleListView() {
