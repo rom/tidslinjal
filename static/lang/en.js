@@ -1048,10 +1048,20 @@ TRANSLATIONS.en = {
     lv_delete:       'Delete',
     lv_all_statuses: 'All statuses',
     lv_all_types:    'All types',
+    lv_all_responsible: 'All responsible',
+    lv_all_layers:   'All layers',
+    lv_no_layers:    'No layers',
+    lv_layers_selected: 'layers',
     lv_search:       'Search…',
     lv_now:          'Now',
     lv_confirm_delete: 'Delete this event?',
     lv_no_responsible: '—',
+
+    // Offline / connection
+    offline_warning: 'Network lost — offline mode active',
+    online_restored: 'Connection restored — syncing data…',
+    data_synced: 'Data synchronized',
+    sync_partial_fail: 'Sync partially failed — retrying…',
 
     // Audit action labels
     audit_all_actions:     'All actions',

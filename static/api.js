@@ -20,7 +20,16 @@ async function api(method, path, body) {
   } else if (body instanceof FormData) {
     opts.body = body;
   }
-  const res = await fetch(path, opts);
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch (err) {
+    // Network error: report to offline detection so it can mark the client offline
+    if (typeof _reportNetworkFailure === 'function') _reportNetworkFailure();
+    throw err;
+  }
+  // Successful response (any status) means server is reachable
+  if (typeof _reportNetworkSuccess === 'function') _reportNetworkSuccess();
   if (res.status === 401) {
     // Avoid multiple simultaneous redirects and allow multi-device sessions.
     // Verify the session is truly gone before redirecting (handles transient errors).

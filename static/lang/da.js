@@ -243,7 +243,17 @@ TRANSLATIONS.da = {
     lv_actions: 'Handlinger', lv_view: 'Vis', lv_edit: 'Redigér', lv_delete: 'Slet',
     lv_search: 'Søg i begivenheder…', lv_all_statuses: 'Alle statusser',
     lv_all_types: 'Alle typer', lv_now: 'Nu',
+
+    lv_all_responsible: 'Alle ansvarlige',
+    lv_all_layers: 'Alle lag',
+    lv_no_layers: 'Ingen lag',
+    lv_layers_selected: 'lag',
     lv_confirm_delete: 'Slet denne begivenhed?', lv_no_responsible: '—',
+
+    offline_warning: 'Forbindelse tabt — offline-tilstand aktiv',
+    online_restored: 'Forbindelse genoprettet — synkroniserer data…',
+    data_synced: 'Data synkroniseret',
+    sync_partial_fail: 'Synkronisering delvist mislykket — prøver igen…',
     lb_incoming: 'Indgående sag', lb_outgoing: 'Udgående sag',
     lb_incident: 'Særlig hændelse', lb_directive: 'Direktiv',
     lb_decision: 'Beslutning', lb_action: 'Handling foretaget',

@@ -924,10 +924,20 @@ TRANSLATIONS.sv = {
     lv_delete:       'Radera',
     lv_all_statuses: 'Alla statusar',
     lv_all_types:    'Alla typer',
+
+    lv_all_responsible: 'Alla ansvariga',
+    lv_all_layers: 'Alla lager',
+    lv_no_layers: 'Inga lager',
+    lv_layers_selected: 'lager',
     lv_search:       'Sök…',
     lv_now:          'Nu',
     lv_confirm_delete: 'Radera denna händelse?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Anslutning förlorad — offline-läge aktivt',
+    online_restored: 'Anslutning återställd — synkroniserar data…',
+    data_synced: 'Data synkroniserad',
+    sync_partial_fail: 'Synkronisering delvis misslyckad — försöker igen…',
 
     // Audit action labels
     audit_all_actions:     'Alla åtgärder',

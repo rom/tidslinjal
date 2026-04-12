@@ -934,10 +934,20 @@ TRANSLATIONS.nb = {
     lv_delete:       'Slett',
     lv_all_statuses: 'Alle statuser',
     lv_all_types:    'Alle typer',
+
+    lv_all_responsible: 'Alle ansvarlige',
+    lv_all_layers: 'Alle lag',
+    lv_no_layers: 'Ingen lag',
+    lv_layers_selected: 'lag',
     lv_search:       'Søk…',
     lv_now:          'Nå',
     lv_confirm_delete: 'Slette denne hendelsen?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Tilkobling tapt — frakoblet modus aktiv',
+    online_restored: 'Tilkobling gjenopprettet — synkroniserer data…',
+    data_synced: 'Data synkronisert',
+    sync_partial_fail: 'Synkronisering delvis mislykket — prøver igjen…',
 
     // Audit action labels
     audit_all_actions:     'Alle handlinger',

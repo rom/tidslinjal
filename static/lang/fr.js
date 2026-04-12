@@ -864,10 +864,20 @@ TRANSLATIONS.fr = {
     lv_delete:       'Supprimer',
     lv_all_statuses: 'Tous les statuts',
     lv_all_types:    'Tous les types',
+
+    lv_all_responsible: 'Tous les responsables',
+    lv_all_layers: 'Toutes les couches',
+    lv_no_layers: 'Aucune couche',
+    lv_layers_selected: 'couches',
     lv_search:       'Rechercher…',
     lv_now:          'Maintenant',
     lv_confirm_delete: 'Supprimer cet événement ?',
     lv_no_responsible: '—',
+
+    offline_warning: 'Connexion perdue — mode hors ligne actif',
+    online_restored: 'Connexion rétablie — synchronisation des données…',
+    data_synced: 'Données synchronisées',
+    sync_partial_fail: 'Échec partiel de la synchronisation — nouvelle tentative…',
 
     // Audit action labels
     audit_all_actions:     'Toutes les actions',
