@@ -151,6 +151,7 @@ TRANSLATIONS.nb = {
     print_range_current: 'Nåværende visning',
     print_range_all: 'Alle hendelser',
     print_invalid_range: 'Velg et gyldig datointervall.',
+    print_layers: 'Lag som skal inkluderes',
     btn_templates: 'Maler',
     btn_layers: 'Lag',
     btn_import: 'Importer',

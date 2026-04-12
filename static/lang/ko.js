@@ -139,6 +139,7 @@ TRANSLATIONS.ko = {
     print_range_current: '현재 보기',
     print_range_all: '모든 이벤트',
     print_invalid_range: '유효한 날짜 범위를 선택하세요.',
+    print_layers: '포함할 레이어',
     btn_templates: '템플릿',
     btn_layers: '레이어',
     btn_import: '가져오기',

@@ -147,6 +147,7 @@ TRANSLATIONS.fi = {
     print_range_current: 'Nykyinen näkymä',
     print_range_all: 'Kaikki tapahtumat',
     print_invalid_range: 'Valitse kelvollinen päivämääräväli.',
+    print_layers: 'Sisällytettävät tasot',
     btn_templates: 'Mallit',
     btn_layers: 'Tasot',
     btn_import: 'Tuo',

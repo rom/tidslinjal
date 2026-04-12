@@ -568,6 +568,7 @@ TRANSLATIONS.sv = {
     print_range_current: 'Nuvarande vy',
     print_range_all: 'Alla händelser',
     print_invalid_range: 'Välj ett giltigt datumintervall.',
+    print_layers: 'Lager att inkludera',
     btn_templates: 'Mallar',
     btn_layers: 'Lager',
     btn_import: 'Importera',

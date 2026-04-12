@@ -185,6 +185,7 @@ TRANSLATIONS.da = {
     print_range_current: 'Nuværende visning',
     print_range_all: 'Alle hændelser',
     print_invalid_range: 'Vælg et gyldigt datointerval.',
+    print_layers: 'Lag der skal inkluderes',
     btn_templates: 'Skabeloner', btn_layers: 'Lag',
     btn_import: 'Importér', btn_auto_report: 'Autorapporter',
     btn_synth_time: '⏱ T+', synth_day: 'Dag',

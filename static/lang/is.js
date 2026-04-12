@@ -151,6 +151,7 @@ TRANSLATIONS.is = {
     print_range_current: 'Núverandi sýn',
     print_range_all: 'Allir atburðir',
     print_invalid_range: 'Veldu gilt dagsetningabil.',
+    print_layers: 'Lög sem á að taka með',
     btn_templates: 'Templates',
     btn_layers: 'Layers',
     btn_import: 'Import',

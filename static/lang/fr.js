@@ -568,6 +568,7 @@ TRANSLATIONS.fr = {
     print_range_current: 'Vue actuelle',
     print_range_all: 'Tous les événements',
     print_invalid_range: 'Veuillez sélectionner une plage de dates valide.',
+    print_layers: 'Couches à inclure',
     btn_templates: 'Modèles',
     btn_layers: 'Couches',
     btn_import: 'Importer',

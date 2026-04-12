@@ -561,7 +561,7 @@ let _listViewActive = false;
 let _listSortKey    = 'start_time';
 let _listSortAsc    = true;
 
-// ── Print: dialog to choose view + period, then trigger browser print ─────
+// ── Print: dialog to choose view + period + layers, then trigger browser print ──
 function printTimeline() {
   // Build the print options modal on-the-fly
   const existing = document.getElementById('printModal');
@@ -577,9 +577,28 @@ function printTimeline() {
   const startDefault = fmtDateOnly(state.startDate || today);
   const endDefault = fmtDateOnly(new Date((state.startDate || today).getTime() + 7 * 86400000));
 
+  // Build the layer checkbox list (currently visible layers checked by default)
+  const _hiddenLayers = (state.preferences && state.preferences.hidden_layers) || [];
+  const layerCheckboxesHTML = `
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm);padding:3px 0;font-weight:700;border-bottom:1px solid var(--border);margin-bottom:4px">
+      <input type="checkbox" class="print-layer-cb" value="_all" checked style="accent-color:var(--accent)"> ${escHtml(t('lv_all_layers') || 'All layers')}
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm);padding:3px 0">
+      <input type="checkbox" class="print-layer-cb" value="_master" checked style="accent-color:var(--accent)"> ${escHtml(t('layers_master') || 'Master Timeline')}
+    </label>
+    ${(state.layers || []).map(l => {
+      const checked = !_hiddenLayers.includes(l.id) ? 'checked' : '';
+      return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-sm);padding:3px 0">
+        <input type="checkbox" class="print-layer-cb" value="${l.id}" ${checked} style="accent-color:var(--accent)">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${l.color||'#4A90D9'};flex-shrink:0"></span>
+        ${escHtml(l.name)}
+      </label>`;
+    }).join('')}
+  `;
+
   const html = `
     <div class="modal-overlay" id="printModal">
-      <div class="modal" style="max-width:480px">
+      <div class="modal" style="max-width:520px">
         <div class="modal-header">
           <h2>🖨 ${escHtml(t('print_dialog_title') || 'Print')}</h2>
           <button class="modal-close" data-close-modal="printModal">&times;</button>
@@ -598,6 +617,10 @@ function printTimeline() {
               <input type="radio" name="printView" value="list" style="accent-color:var(--accent)">
               📋 ${escHtml(t('print_view_list') || 'List view')}
             </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="ttm" style="accent-color:var(--accent)">
+              📊 ${escHtml(t('btn_task_time_matrix') || 'Task-Time Matrix')}
+            </label>
           </div>
           <div class="form-row" style="margin-bottom:12px">
             <div class="form-group" style="flex:1">
@@ -609,7 +632,7 @@ function printTimeline() {
               <input type="date" id="printDateTo" value="${endDefault}" style="width:100%">
             </div>
           </div>
-          <div class="form-group" style="margin-bottom:0">
+          <div class="form-group" style="margin-bottom:12px">
             <label style="font-weight:600;font-size:var(--fs-sm);color:var(--text-dim);display:block;margin-bottom:4px">${escHtml(t('print_quick') || 'Quick select')}</label>
             <div style="display:flex;flex-wrap:wrap;gap:6px">
               <button type="button" class="btn btn-sm btn-secondary" data-print-range="day">${escHtml(t('range_day') || 'Day')}</button>
@@ -617,6 +640,12 @@ function printTimeline() {
               <button type="button" class="btn btn-sm btn-secondary" data-print-range="month">${escHtml(t('range_month') || 'Month')}</button>
               <button type="button" class="btn btn-sm btn-secondary" data-print-range="current">${escHtml(t('print_range_current') || 'Current view')}</button>
               <button type="button" class="btn btn-sm btn-secondary" data-print-range="all">${escHtml(t('print_range_all') || 'All events')}</button>
+            </div>
+          </div>
+          <div class="form-group" id="printLayerGroup" style="margin-bottom:0">
+            <label style="font-weight:600;font-size:var(--fs-sm);color:var(--text-dim);display:block;margin-bottom:4px">${escHtml(t('print_layers') || 'Layers to include')}</label>
+            <div id="printLayerList" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:8px;background:var(--bg2)">
+              ${layerCheckboxesHTML}
             </div>
           </div>
         </div>
@@ -630,6 +659,33 @@ function printTimeline() {
   document.body.insertAdjacentHTML('beforeend', html);
   const modal = document.getElementById('printModal');
   openModal('printModal');
+
+  // Hide layer selection for task-time matrix (it has its own filtering)
+  const _updateLayerVisibility = () => {
+    const view = modal.querySelector('input[name="printView"]:checked')?.value;
+    const layerGroup = document.getElementById('printLayerGroup');
+    if (layerGroup) layerGroup.style.display = view === 'ttm' ? 'none' : '';
+  };
+  modal.querySelectorAll('input[name="printView"]').forEach(r =>
+    r.addEventListener('change', _updateLayerVisibility)
+  );
+  _updateLayerVisibility();
+
+  // Layer "All" checkbox toggles all others
+  modal.addEventListener('change', (e) => {
+    const cb = e.target.closest('.print-layer-cb');
+    if (!cb) return;
+    if (cb.value === '_all') {
+      const checked = cb.checked;
+      modal.querySelectorAll('.print-layer-cb').forEach(c => { c.checked = checked; });
+    } else {
+      const allCb = modal.querySelector('.print-layer-cb[value="_all"]');
+      if (allCb) {
+        const allOthers = [...modal.querySelectorAll('.print-layer-cb:not([value="_all"])')];
+        allCb.checked = allOthers.every(c => c.checked);
+      }
+    }
+  });
 
   // Quick range buttons
   modal.querySelectorAll('[data-print-range]').forEach(btn => {
@@ -681,15 +737,71 @@ function printTimeline() {
       showError(t('print_invalid_range') || 'Please select a valid date range.');
       return;
     }
+
+    // Collect selected layers (only for calendar/list views)
+    const selectedLayerIds = [];
+    let includeMaster = true;
+    if (view !== 'ttm') {
+      const allCb = modal.querySelector('.print-layer-cb[value="_all"]');
+      const checked = [...modal.querySelectorAll('.print-layer-cb:checked')];
+      if (!allCb || !allCb.checked) {
+        includeMaster = checked.some(c => c.value === '_master');
+        checked.forEach(c => {
+          if (c.value !== '_all' && c.value !== '_master') {
+            selectedLayerIds.push(parseInt(c.value, 10));
+          }
+        });
+      }
+    }
+
     closeModal('printModal');
     modal.remove();
 
-    // Save current state to restore after printing
+    // Build the file name (set as document.title for the PDF save dialog)
+    const viewSlug = view === 'calendar' ? 'calendarview' : view === 'list' ? 'listview' : 'task-time-matrix';
+    const fileName = `tidslinjal-${viewSlug}-${fromVal}_to_${toVal}`;
+    const savedTitle = document.title;
+    document.title = fileName;
+
+    // Save current state
     const savedRange = state.range;
     const savedStart = state.startDate;
     const savedListActive = _listViewActive;
     const savedListFrom = document.getElementById('listDateFrom')?.value || '';
     const savedListTo = document.getElementById('listDateTo')?.value || '';
+    const savedHiddenLayers = (state.preferences.hidden_layers || []).slice();
+
+    // Apply layer filtering by setting hidden_layers to all unselected layers
+    if (view !== 'ttm' && selectedLayerIds.length > 0) {
+      const allLayerIds = (state.layers || []).map(l => l.id);
+      state.preferences.hidden_layers = allLayerIds.filter(id => !selectedLayerIds.includes(id));
+    } else if (view !== 'ttm') {
+      // No specific layers selected (or "All" was checked) — keep current visibility
+      // But if "All" was unchecked and nothing else, show nothing
+      const allCb = modal.querySelector('.print-layer-cb[value="_all"]');
+      if (allCb && !allCb.checked && selectedLayerIds.length === 0 && !includeMaster) {
+        state.preferences.hidden_layers = (state.layers || []).map(l => l.id);
+      }
+    }
+
+    if (view === 'ttm') {
+      // Open the task-time matrix modal
+      if (typeof openTaskTimeMatrix === 'function') {
+        await openTaskTimeMatrix();
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => {
+            document.title = savedTitle;
+            // Close the matrix modal
+            if (typeof closeModal === 'function') closeModal('taskTimeMatrixModal');
+          }, 1000);
+        }, 500);
+      } else {
+        showError('Task-Time Matrix not available');
+        document.title = savedTitle;
+      }
+      return;
+    }
 
     if (view === 'list') {
       // Switch to list view if needed
@@ -716,11 +828,12 @@ function printTimeline() {
       window.print();
       // Restore previous state after the print dialog closes
       setTimeout(() => {
+        document.title = savedTitle;
         state._printDays = null;
         state.startDate = savedStart;
         state.range = savedRange;
+        state.preferences.hidden_layers = savedHiddenLayers;
         if (view === 'list') {
-          // Restore original list view filters
           const fromEl = document.getElementById('listDateFrom');
           const toEl = document.getElementById('listDateTo');
           if (fromEl) fromEl.value = savedListFrom;

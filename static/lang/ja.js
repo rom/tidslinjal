@@ -139,6 +139,7 @@ TRANSLATIONS.ja = {
     print_range_current: '現在の表示',
     print_range_all: 'すべてのイベント',
     print_invalid_range: '有効な日付範囲を選択してください。',
+    print_layers: '含めるレイヤー',
     btn_templates: 'テンプレート',
     btn_layers: 'レイヤー',
     btn_import: 'インポート',

@@ -152,6 +152,7 @@ TRANSLATIONS.de = {
     print_range_current: 'Aktuelle Ansicht',
     print_range_all: 'Alle Ereignisse',
     print_invalid_range: 'Bitte gültigen Datumsbereich wählen.',
+    print_layers: 'Einzubeziehende Ebenen',
     btn_templates: 'Vorlagen',
     btn_layers: 'Ebenen',
     btn_import: 'Importieren',

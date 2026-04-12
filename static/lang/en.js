@@ -150,6 +150,7 @@ TRANSLATIONS.en = {
     print_range_current: 'Current view',
     print_range_all: 'All events',
     print_invalid_range: 'Please select a valid date range.',
+    print_layers: 'Layers to include',
     btn_templates: 'Templates',
     btn_layers: 'Layers',
     btn_import: 'Import',

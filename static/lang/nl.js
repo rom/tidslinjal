@@ -152,6 +152,7 @@ TRANSLATIONS.nl = {
     print_range_current: 'Huidige weergave',
     print_range_all: 'Alle gebeurtenissen',
     print_invalid_range: 'Selecteer een geldig datumbereik.',
+    print_layers: 'Lagen om op te nemen',
     btn_templates: 'Sjablonen',
     btn_layers: 'Lagen',
     btn_import: 'Importeren',
