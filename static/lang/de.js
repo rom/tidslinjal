@@ -1237,6 +1237,23 @@ TRANSLATIONS.de = {
     report_archive_category:   'Kategorie',
     report_archive_file:       'Datei',
     message_archive_delete_confirm: 'Diese Nachricht löschen?',
+
+    message_archive_title: 'Nachrichtenarchiv',
+    message_archive_add: '+ Neue Nachricht',
+    message_archive_local: 'Lokale Nachrichten',
+    message_archive_incoming: 'Eingehende Nachrichten',
+    message_archive_empty: 'Noch keine Nachrichten.',
+    message_archive_subject_prompt: 'Betreff der Nachricht:',
+    message_archive_body_prompt: 'Nachrichtentext (optional):',
+    ref_index: 'Dokumentenindex',
+    ref_type: 'Typ',
+    ref_languages: 'Sprachen',
+    ref_category: 'Kategorie',
+    search: 'Suchen...',
+    unknown: 'Unbekannt',
+    uploading: 'Wird hochgeladen…',
+    description: 'Beschreibung',
+    btn_download: 'Herunterladen',
     boot_rate_limits: 'Ratenbegrenzungen',
 
     // Red line settings (i18n)

@@ -1161,6 +1161,23 @@ TRANSLATIONS.nb = {
     report_archive_category:   'Kategori',
     report_archive_file:       'Fil',
     message_archive_delete_confirm: 'Slette denne meldingen?',
+
+    message_archive_title: 'Meldingsarkiv',
+    message_archive_add: '+ Ny melding',
+    message_archive_local: 'Lokale meldinger',
+    message_archive_incoming: 'Innkommende meldinger',
+    message_archive_empty: 'Ingen meldinger ennå.',
+    message_archive_subject_prompt: 'Meldingens emne:',
+    message_archive_body_prompt: 'Meldingstekst (valgfritt):',
+    ref_index: 'Dokumentindeks',
+    ref_type: 'Type',
+    ref_languages: 'Språk',
+    ref_category: 'Kategori',
+    search: 'Søk...',
+    unknown: 'Ukjent',
+    uploading: 'Laster opp…',
+    description: 'Beskrivelse',
+    btn_download: 'Last ned',
     boot_rate_limits:          'Hastighetsgrenser',
 
     // Red line settings (i18n)
