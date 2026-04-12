@@ -152,6 +152,13 @@ TRANSLATIONS.is = {
     print_range_all: 'Allir atburðir',
     print_invalid_range: 'Veldu gilt dagsetningabil.',
     print_layers: 'Lög sem á að taka með',
+
+    boards_print_title: 'Prenta töflur',
+    boards_print_desc: 'Veldu hvað á að prenta.',
+    boards_print_overview: 'Aðeins yfirlit',
+    boards_print_overview_desc: 'Prenta núverandi lista yfir töflur (ein síða).',
+    boards_print_detailed: 'Ítarlegt (hver tafla)',
+    boards_print_detailed_desc: 'Prenta hverja töflu með öllum atriðum í röð.',
     btn_templates: 'Templates',
     btn_layers: 'Layers',
     btn_import: 'Import',

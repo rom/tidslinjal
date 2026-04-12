@@ -186,6 +186,13 @@ TRANSLATIONS.da = {
     print_range_all: 'Alle hændelser',
     print_invalid_range: 'Vælg et gyldigt datointerval.',
     print_layers: 'Lag der skal inkluderes',
+
+    boards_print_title: 'Udskriv tavler',
+    boards_print_desc: 'Vælg hvad der skal udskrives.',
+    boards_print_overview: 'Kun oversigt',
+    boards_print_overview_desc: 'Udskriv den nuværende liste over tavler (én side).',
+    boards_print_detailed: 'Detaljeret (hver tavle)',
+    boards_print_detailed_desc: 'Udskriv hver enkelt tavle med alle elementer, i rækkefølge.',
     btn_templates: 'Skabeloner', btn_layers: 'Lag',
     btn_import: 'Importér', btn_auto_report: 'Autorapporter',
     btn_synth_time: '⏱ T+', synth_day: 'Dag',

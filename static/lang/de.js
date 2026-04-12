@@ -153,6 +153,13 @@ TRANSLATIONS.de = {
     print_range_all: 'Alle Ereignisse',
     print_invalid_range: 'Bitte gültigen Datumsbereich wählen.',
     print_layers: 'Einzubeziehende Ebenen',
+
+    boards_print_title: 'Boards drucken',
+    boards_print_desc: 'Wählen Sie aus, was gedruckt werden soll.',
+    boards_print_overview: 'Nur Übersicht',
+    boards_print_overview_desc: 'Aktuelle Board-Liste drucken (eine Seite).',
+    boards_print_detailed: 'Detailliert (jedes Board)',
+    boards_print_detailed_desc: 'Jedes Board mit allen Elementen einzeln drucken.',
     btn_templates: 'Vorlagen',
     btn_layers: 'Ebenen',
     btn_import: 'Importieren',

@@ -152,6 +152,13 @@ TRANSLATIONS.nb = {
     print_range_all: 'Alle hendelser',
     print_invalid_range: 'Velg et gyldig datointervall.',
     print_layers: 'Lag som skal inkluderes',
+
+    boards_print_title: 'Skriv ut tavler',
+    boards_print_desc: 'Velg hva som skal skrives ut.',
+    boards_print_overview: 'Kun oversikt',
+    boards_print_overview_desc: 'Skriv ut nåværende liste over tavler (én side).',
+    boards_print_detailed: 'Detaljert (hver tavle)',
+    boards_print_detailed_desc: 'Skriv ut hver enkelt tavle med alle elementer, i rekkefølge.',
     btn_templates: 'Maler',
     btn_layers: 'Lag',
     btn_import: 'Importer',

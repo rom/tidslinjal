@@ -569,6 +569,13 @@ TRANSLATIONS.sv = {
     print_range_all: 'Alla händelser',
     print_invalid_range: 'Välj ett giltigt datumintervall.',
     print_layers: 'Lager att inkludera',
+
+    boards_print_title: 'Skriv ut tavlor',
+    boards_print_desc: 'Välj vad som ska skrivas ut.',
+    boards_print_overview: 'Endast översikt',
+    boards_print_overview_desc: 'Skriv ut den aktuella listan över tavlor (en sida).',
+    boards_print_detailed: 'Detaljerat (varje tavla)',
+    boards_print_detailed_desc: 'Skriv ut varje enskild tavla med alla dess objekt, i sekvens.',
     btn_templates: 'Mallar',
     btn_layers: 'Lager',
     btn_import: 'Importera',

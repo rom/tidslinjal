@@ -131,6 +131,7 @@ function _renderBoardListModal() {
       <h2 style="margin:0">📌 ${t('board_title')||'Boards'}</h2>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm btn-primary" data-action="_openCreateBoardDialog">+ ${t('board_new')||'New Board'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_openBoardsPrintDialog" title="${t('board_print')||'Print'}">🖨 ${t('btn_print')||'Print'}</button>
         <div style="position:relative;display:inline-block" id="boardListImpExpDropdown">
           <button class="btn btn-sm btn-secondary" data-action="_toggleBoardListImpExpMenu">⬆⬇ ${t('board_import_export')||'Import / Export'}</button>
           <div id="boardListImpExpMenu" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:160px;margin-top:4px">
@@ -2363,9 +2364,174 @@ async function _archiveColumnItems(colId) {
   } catch (e) { alert(e.message); }
 }
 
-// ── Print ──
+// ── Print: from inside a single board, just print the current view ──
 function _printBoard() {
-  window.print();
+  const board = _boardsState.activeBoard;
+  const ts = new Date().toISOString().slice(0, 10);
+  const slug = board && board.name
+    ? board.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    : 'board';
+  const savedTitle = document.title;
+  document.title = `tidslinjal-board-${slug}-${ts}`;
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { document.title = savedTitle; }, 1000);
+  }, 100);
+}
+
+// ── Print dialog from boards overview ─────────────────────────────────────
+// Lets the user choose between printing the boards list overview or
+// printing every individual board in detail.
+function _openBoardsPrintDialog() {
+  const existing = document.getElementById('boardsPrintModal');
+  if (existing) existing.remove();
+
+  const html = `
+    <div class="modal-overlay" id="boardsPrintModal">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-header">
+          <h2>🖨 ${escHtml(t('boards_print_title') || 'Print Boards')}</h2>
+          <button class="modal-close" data-close-modal="boardsPrintModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:12px">
+            ${escHtml(t('boards_print_desc') || 'Choose what to print.')}
+          </p>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:8px 0">
+            <input type="radio" name="boardsPrintMode" value="overview" checked style="accent-color:var(--accent);margin-top:3px">
+            <div>
+              <div style="font-weight:600">📋 ${escHtml(t('boards_print_overview') || 'Overview only')}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(t('boards_print_overview_desc') || 'Print the current list of boards (one page).')}</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:8px 0">
+            <input type="radio" name="boardsPrintMode" value="detailed" style="accent-color:var(--accent);margin-top:3px">
+            <div>
+              <div style="font-weight:600">📑 ${escHtml(t('boards_print_detailed') || 'Detailed (each board)')}</div>
+              <div style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(t('boards_print_detailed_desc') || 'Print every individual board with all its items, in sequence.')}</div>
+            </div>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="boardsPrintModal">${escHtml(t('btn_cancel') || 'Cancel')}</button>
+          <button class="btn btn-primary" id="btnDoBoardsPrint">🖨 ${escHtml(t('btn_print') || 'Print')}</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  openModal('boardsPrintModal');
+
+  document.getElementById('btnDoBoardsPrint').addEventListener('click', async () => {
+    const modal = document.getElementById('boardsPrintModal');
+    const mode = modal.querySelector('input[name="boardsPrintMode"]:checked')?.value || 'overview';
+    closeModal('boardsPrintModal');
+    modal.remove();
+
+    const ts = new Date().toISOString().slice(0, 10);
+    const savedTitle = document.title;
+
+    if (mode === 'overview') {
+      // Just print the current overview view
+      document.title = `tidslinjal-boards-overview-${ts}`;
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => { document.title = savedTitle; }, 1000);
+      }, 100);
+      return;
+    }
+
+    // Detailed: build a printable HTML document containing every board
+    document.title = `tidslinjal-boards-detailed-${ts}`;
+    const boards = _boardsState.boards || [];
+    if (boards.length === 0) {
+      showError(t('board_empty') || 'No boards to print.');
+      document.title = savedTitle;
+      return;
+    }
+
+    // Open a new window with all boards rendered as printable HTML
+    const w = window.open('', '_blank', 'width=1100,height=800');
+    if (!w) {
+      showError(t('dialog_popup_blocked') || 'Popup blocked. Please allow popups.');
+      document.title = savedTitle;
+      return;
+    }
+    const fileName = `tidslinjal-boards-detailed-${ts}`;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fileName}</title>
+      <style>
+        @page { size: landscape; margin: 1cm; }
+        body { font-family: system-ui, sans-serif; padding: 20px; font-size: 12px; color: #222; }
+        h1 { font-size: 18px; margin: 0 0 8px; }
+        h2 { font-size: 16px; margin: 24px 0 6px; page-break-before: always; border-bottom: 2px solid #333; padding-bottom: 4px; }
+        h2:first-of-type { page-break-before: auto; }
+        .board-meta { color: #666; font-size: 11px; margin-bottom: 12px; }
+        .columns { display: flex; gap: 12px; flex-wrap: nowrap; }
+        .column { flex: 1; min-width: 0; border: 1px solid #ccc; border-radius: 4px; padding: 8px; background: #f9f9f9; }
+        .col-title { font-weight: 700; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #ddd; }
+        .item { background: #fff; border: 1px solid #ddd; border-radius: 3px; padding: 6px 8px; margin-bottom: 4px; font-size: 11px; }
+        .item-subject { font-weight: 600; }
+        .item-meta { color: #888; font-size: 10px; margin-top: 2px; }
+        .empty { color: #999; font-style: italic; padding: 4px; font-size: 11px; }
+        @media print { button { display: none !important; } }
+      </style>
+    </head><body>
+      <h1>📌 ${escHtml(t('board_title') || 'Boards')}</h1>
+      <p class="board-meta">${escHtml(t('boards_print_detailed') || 'Detailed boards')} — ${new Date().toLocaleString()} — ${boards.length} ${escHtml(t('board_title') || 'boards')}</p>
+    `);
+
+    // Fetch items for each board sequentially
+    for (const b of boards) {
+      let items = [];
+      try {
+        items = await _boardApi('GET', '/boards/' + b.id + '/items') || [];
+      } catch { items = []; }
+
+      const cols = (b.columns || []).filter(c => !c.archived);
+      const itemsByCol = {};
+      cols.forEach(c => { itemsByCol[c.id] = []; });
+      items.forEach(it => {
+        if (it.archived) return;
+        if (itemsByCol[it.column_id]) itemsByCol[it.column_id].push(it);
+      });
+
+      let bhtml = `<h2>${escHtml(b.name)}</h2>`;
+      bhtml += `<div class="board-meta">${escHtml(b.description || '')} — ${escHtml(b.owner_name || '')} — ${escHtml(b.visibility || 'private')}</div>`;
+      bhtml += `<div class="columns">`;
+      if (cols.length === 0) {
+        bhtml += `<div class="empty">${escHtml(t('board_no_columns') || 'No columns')}</div>`;
+      } else {
+        cols.forEach(c => {
+          bhtml += `<div class="column"><div class="col-title">${escHtml(_tColName(c.name))} (${itemsByCol[c.id].length})</div>`;
+          if (itemsByCol[c.id].length === 0) {
+            bhtml += `<div class="empty">—</div>`;
+          } else {
+            itemsByCol[c.id].forEach(it => {
+              bhtml += `<div class="item"><div class="item-subject">${escHtml(it.subject || '')}</div>`;
+              if (it.note) bhtml += `<div class="item-meta">${escHtml(it.note.slice(0, 200))}</div>`;
+              const meta = [];
+              if (it.responsible) meta.push(escHtml(it.responsible));
+              if (it.due_date) meta.push(new Date(it.due_date).toLocaleDateString());
+              if (it.priority) meta.push('P' + escHtml(it.priority));
+              if (meta.length > 0) bhtml += `<div class="item-meta">${meta.join(' · ')}</div>`;
+              bhtml += `</div>`;
+            });
+          }
+          bhtml += `</div>`;
+        });
+      }
+      bhtml += `</div>`;
+      w.document.write(bhtml);
+    }
+
+    w.document.write(`</body></html>`);
+    w.document.close();
+    setTimeout(() => {
+      w.document.title = fileName;
+      w.print();
+      setTimeout(() => { document.title = savedTitle; }, 1000);
+    }, 500);
+  });
 }
 
 // ── Undo action from board view ──

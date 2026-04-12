@@ -148,6 +148,13 @@ TRANSLATIONS.fi = {
     print_range_all: 'Kaikki tapahtumat',
     print_invalid_range: 'Valitse kelvollinen päivämääräväli.',
     print_layers: 'Sisällytettävät tasot',
+
+    boards_print_title: 'Tulosta taulut',
+    boards_print_desc: 'Valitse mitä tulostetaan.',
+    boards_print_overview: 'Vain yleiskuva',
+    boards_print_overview_desc: 'Tulosta nykyinen taululuettelo (yksi sivu).',
+    boards_print_detailed: 'Yksityiskohtainen (jokainen taulu)',
+    boards_print_detailed_desc: 'Tulosta jokainen taulu kaikkine kohteineen järjestyksessä.',
     btn_templates: 'Mallit',
     btn_layers: 'Tasot',
     btn_import: 'Tuo',

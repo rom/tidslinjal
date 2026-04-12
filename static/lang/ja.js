@@ -140,6 +140,13 @@ TRANSLATIONS.ja = {
     print_range_all: 'すべてのイベント',
     print_invalid_range: '有効な日付範囲を選択してください。',
     print_layers: '含めるレイヤー',
+
+    boards_print_title: 'ボードを印刷',
+    boards_print_desc: '印刷する内容を選択してください。',
+    boards_print_overview: '概要のみ',
+    boards_print_overview_desc: '現在のボードリストを印刷します（1ページ）。',
+    boards_print_detailed: '詳細（各ボード）',
+    boards_print_detailed_desc: '各ボードのすべての項目を順番に印刷します。',
     btn_templates: 'テンプレート',
     btn_layers: 'レイヤー',
     btn_import: 'インポート',
