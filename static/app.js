@@ -559,6 +559,13 @@ let _listViewActive = false;
 let _listSortKey    = 'start_time';
 let _listSortAsc    = true;
 
+// ── Print: open browser print dialog with the current timeline/list view ──
+function printTimeline() {
+  // The print CSS in style.css (@media print) handles layout — hide chrome,
+  // expand the timeline, etc. Just trigger the browser's print dialog.
+  window.print();
+}
+
 function toggleListView() {
   _listViewActive = !_listViewActive;
   const timeline  = document.getElementById('timeline-container');
