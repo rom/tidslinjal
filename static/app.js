@@ -251,8 +251,24 @@ async function init() {
   });
 
   document.getElementById('btnLogout').addEventListener('click', async () => {
-    await apiPost('/api/auth/logout', {});
-    window.location.href = '/login';
+    // Ask whether to log out from all devices (only if user has multiple sessions)
+    const allSessions = confirm(
+      (t('confirm_logout_all_sessions') || 'Log out from all devices?\n\nClick OK to log out from every device where you are signed in, or Cancel to log out only from this device.')
+    );
+    try {
+      const res = await apiPost('/api/auth/logout', { all_sessions: allSessions });
+      let target = '/login';
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        // If OIDC is configured, redirect to the provider's end-session endpoint
+        // so the user is also logged out at the identity provider (RP-initiated logout).
+        if (data && data.oidc_logout_url) target = data.oidc_logout_url;
+      }
+      window.location.href = target;
+    } catch (e) {
+      // Even if the request failed, redirect away from the authenticated view
+      window.location.href = '/login';
+    }
   });
 
   // Sidebar tabs

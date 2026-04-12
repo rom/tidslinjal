@@ -13,6 +13,7 @@ TRANSLATIONS.sv = {
     add_event: '+ Lägg till händelse',
     lock_slot: '🔒 Lås tidslucka',
     logout: 'Logga ut',
+    confirm_logout_all_sessions: 'Logga ut från alla enheter?\n\nKlicka på OK för att logga ut från alla enheter där du är inloggad, eller Avbryt för att logga ut endast från denna enhet.',
     range_day: 'Dag',
     range_2days: '2 Dagar',
     range_3days: '3 Dagar',

@@ -698,6 +698,7 @@ type OIDCConfig struct {
 	TokenEndpoint         string `json:"token_endpoint"`
 	UserinfoEndpoint      string `json:"userinfo_endpoint"`
 	JWKSEndpoint          string `json:"jwks_uri"`
+	EndSessionEndpoint    string `json:"end_session_endpoint,omitempty"` // RP-initiated logout
 	ClientID              string `json:"-"`
 	ClientSecret          string `json:"-"`
 	RedirectURL           string `json:"-"`

@@ -13,6 +13,7 @@ TRANSLATIONS.da = {
     add_event: '+ Tilføj begivenhed',
     lock_slot: '🔒 Lås tidsslot',
     logout: 'Log ud',
+    confirm_logout_all_sessions: 'Log ud fra alle enheder?\n\nKlik OK for at logge ud fra alle enheder, hvor du er logget ind, eller Annuller for kun at logge ud fra denne enhed.',
     range_day: 'Dag', range_2days: '2 dage', range_3days: '3 dage', range_4days: '4 dage', range_5days: '5 dage',
     range_week: 'Uge', range_2weeks: '2 uger', range_3weeks: '3 uger',
     range_month: 'Måned', range_2months: '2 måneder', range_3months: '3 måneder',

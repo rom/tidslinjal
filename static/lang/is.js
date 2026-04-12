@@ -16,6 +16,7 @@ TRANSLATIONS.is = {
     add_event: '+ Add Event',
     lock_slot: '🔒 Lock Slot',
     logout: 'Logout',
+    confirm_logout_all_sessions: 'Skrá út úr öllum tækjum?\n\nSmelltu á Í lagi til að skrá þig út úr öllum tækjum, eða Hætta við til að skrá þig aðeins út úr þessu tæki.',
 
     // Range options
     range_day: 'Day',

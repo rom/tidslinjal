@@ -13,6 +13,7 @@ TRANSLATIONS.fi = {
     add_event: '+ Lisää tapahtuma',
     lock_slot: '🔒 Lukitse aikaväli',
     logout: 'Kirjaudu ulos',
+    confirm_logout_all_sessions: 'Kirjaa ulos kaikista laitteista?\n\nNapsauta OK kirjautuaksesi ulos kaikilta laitteilta, tai Peruuta kirjautuaksesi ulos vain tältä laitteelta.',
 
     range_day: 'Päivä',
     range_2days: '2 päivää',

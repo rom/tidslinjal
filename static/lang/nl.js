@@ -17,6 +17,7 @@ TRANSLATIONS.nl = {
     add_event: '+ Gebeurtenis toevoegen',
     lock_slot: '🔒 Lock Slot',
     logout: 'Uitloggen',
+    confirm_logout_all_sessions: 'Afmelden op alle apparaten?\n\nKlik OK om af te melden op alle apparaten waar u bent ingelogd, of Annuleren om alleen op dit apparaat af te melden.',
 
     // Range options
     range_day: 'Dag',

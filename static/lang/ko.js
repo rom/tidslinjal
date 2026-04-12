@@ -14,6 +14,7 @@ TRANSLATIONS.ko = {
     add_event: '+ 이벤트 추가',
     lock_slot: '🔒 시간 잠금',
     logout: '로그아웃',
+    confirm_logout_all_sessions: '모든 기기에서 로그아웃하시겠습니까?\n\n모든 기기에서 로그아웃하려면 확인을, 이 기기에서만 로그아웃하려면 취소를 클릭하세요.',
     range_day: '1일',
     range_2days: '2일',
     range_3days: '3일',

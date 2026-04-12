@@ -16,6 +16,7 @@ TRANSLATIONS.nb = {
     add_event: '+ Legg til hendelse',
     lock_slot: '🔒 Lås tidsluke',
     logout: 'Logg ut',
+    confirm_logout_all_sessions: 'Logg ut fra alle enheter?\n\nKlikk OK for å logge ut fra alle enheter der du er pålogget, eller Avbryt for kun å logge ut fra denne enheten.',
 
     // Range options
     range_day: 'Dag',
