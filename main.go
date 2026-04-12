@@ -198,6 +198,9 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	mux.HandleFunc("GET /api/tls/status", app.requireRole(RoleAdmin, app.handleTLSStatus))
 	mux.HandleFunc("GET /api/oidc/config", app.requireRole(RoleAdmin, app.handleOIDCConfigForSidebar))
 	mux.HandleFunc("GET /api/security/policy", app.requireRole(RoleAdmin, app.handleSecurityPolicy))
+	// Active sessions admin API
+	mux.HandleFunc("GET /api/admin/active-sessions", app.requireRole(RoleAdmin, app.handleListActiveSessions))
+	mux.HandleFunc("POST /api/admin/active-sessions/delete", app.requireRole(RoleAdmin, app.handleDeleteActiveSession))
 
 	// Admin operations
 	mux.HandleFunc("/api/admin/reset", app.requireRole(RoleAdmin, app.handleAdminReset))

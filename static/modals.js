@@ -509,6 +509,104 @@ async function saveSecSsoEnabled() {
   }
 }
 
+// ── Active Sessions (admin) ────────────────────────────────────────────────
+
+async function _refreshActiveSessions() {
+  const list = document.getElementById('activeSessionsList');
+  if (!list) return;
+  list.innerHTML = `<div style="color:var(--text-dim);text-align:center;padding:8px">${escHtml(t('loading')||'Loading…')}</div>`;
+  try {
+    const sessions = await apiGet('/api/admin/active-sessions');
+    if (!sessions || sessions.length === 0) {
+      list.innerHTML = `<div style="color:var(--text-dim);text-align:center;padding:8px">${escHtml(t('security_sessions_none')||'No active sessions.')}</div>`;
+      return;
+    }
+    // Group by user so admins see per-user session counts
+    const byUser = {};
+    sessions.forEach(s => {
+      if (!byUser[s.user_id]) byUser[s.user_id] = { user_id: s.user_id, username: s.username, display_name: s.display_name, sessions: [] };
+      byUser[s.user_id].sessions.push(s);
+    });
+    const users = Object.values(byUser).sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+    const fmt = (iso) => {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    };
+    const truncateUA = (ua) => {
+      if (!ua) return '';
+      // Pull out browser/OS hints from the user agent
+      let label = '';
+      if (/Firefox/i.test(ua)) label = 'Firefox';
+      else if (/Edg\//i.test(ua)) label = 'Edge';
+      else if (/Chrome/i.test(ua)) label = 'Chrome';
+      else if (/Safari/i.test(ua)) label = 'Safari';
+      else label = ua.slice(0, 30);
+      if (/Windows/i.test(ua)) label += ' · Windows';
+      else if (/Mac OS/i.test(ua)) label += ' · macOS';
+      else if (/Linux/i.test(ua)) label += ' · Linux';
+      else if (/Android/i.test(ua)) label += ' · Android';
+      else if (/iPhone|iPad/i.test(ua)) label += ' · iOS';
+      return label;
+    };
+
+    list.innerHTML = users.map(u => `
+      <div style="border-bottom:1px solid var(--border);padding:6px 4px;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div style="font-weight:600">👤 ${escHtml(u.display_name || u.username || '?')} <span style="color:var(--text-dim);font-weight:normal">(${escHtml(u.username||'')})</span></div>
+          <button class="btn btn-sm btn-danger" data-action="_destroyUserSessions" data-arg="${u.user_id}" title="${escHtml(t('security_destroy_all_for_user')||'Log out all sessions for this user')}" style="font-size:10px;padding:3px 6px">🗑 ${escHtml(t('security_destroy_all_short')||'All')}</button>
+        </div>
+        ${u.sessions.map(s => `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;padding:4px 0 4px 16px;font-size:10px;color:var(--text-dim);border-top:1px dashed var(--border);margin-top:4px">
+            <div style="flex:1;min-width:0">
+              <div><code style="font-size:9px;background:var(--bg2);padding:1px 4px;border-radius:2px">${escHtml(s.id_prefix)}…</code> ${s.is_current ? `<span style="color:var(--accent);font-weight:700">(${escHtml(t('security_this_session')||'this session')})</span>` : ''}</div>
+              ${s.ip_address ? `<div>🌐 ${escHtml(s.ip_address)}</div>` : ''}
+              ${s.user_agent ? `<div>💻 ${escHtml(truncateUA(s.user_agent))}</div>` : ''}
+              ${s.created_at ? `<div>📅 ${escHtml(t('security_created')||'Created')}: ${escHtml(fmt(s.created_at))}</div>` : ''}
+              <div>⏰ ${escHtml(t('security_expires')||'Expires')}: ${escHtml(fmt(s.expires_at))}</div>
+            </div>
+            ${!s.is_current ? `<button class="btn btn-sm btn-danger" data-action="_destroySession" data-arg="${escAttr(s.id_hash)}" title="${escHtml(t('security_destroy_session')||'Destroy session')}" style="font-size:9px;padding:2px 5px;flex-shrink:0">🗑</button>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="color:var(--red);padding:8px">${escHtml(t('security_sessions_error')||'Failed to load sessions.')} ${escHtml(e.message || '')}</div>`;
+  }
+}
+
+async function _destroySession(idHash) {
+  if (!confirm(t('security_destroy_session_confirm')||'Destroy this session? The user will be immediately logged out.')) return;
+  try {
+    const res = await apiPost('/api/admin/active-sessions/delete', { id_hash: idHash });
+    if (res.ok) {
+      showNotification('success', t('security_session_destroyed')||'Session destroyed.');
+      _refreshActiveSessions();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to destroy session.');
+    }
+  } catch (e) {
+    showError(e.message || 'Failed to destroy session.');
+  }
+}
+
+async function _destroyUserSessions(userID) {
+  const uid = parseInt(userID, 10);
+  if (!confirm(t('security_destroy_user_sessions_confirm')||'Destroy ALL sessions for this user? They will be immediately logged out from every device.')) return;
+  try {
+    const res = await apiPost('/api/admin/active-sessions/delete', { user_id: uid, all_for_user: true });
+    if (res.ok) {
+      showNotification('success', t('security_user_sessions_destroyed')||'All sessions destroyed for this user.');
+      _refreshActiveSessions();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Failed to destroy sessions.');
+    }
+  } catch (e) {
+    showError(e.message || 'Failed to destroy sessions.');
+  }
+}
+
 async function saveSecRateLimits() {
   const val = id => parseInt(document.getElementById(id)?.value || '0', 10);
   const payload = {

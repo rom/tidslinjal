@@ -550,6 +550,9 @@ type Session struct {
 	ID        string    `json:"id"`
 	UserID    int64     `json:"user_id"`
 	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at,omitempty"` // when the session was created
+	IPAddress string    `json:"ip_address,omitempty"` // client IP that created the session
+	UserAgent string    `json:"user_agent,omitempty"` // browser/client identifier
 }
 
 // AlarmNotification sent over SSE

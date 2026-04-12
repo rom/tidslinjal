@@ -2231,6 +2231,19 @@ Fields: file, subject, sender, type, tags</pre>
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>👥 ${t('security_active_sessions')||'Active Sessions'}</span>
+          <button class="btn btn-secondary btn-sm" data-action="_refreshActiveSessions" title="${t('btn_refresh')||'Refresh'}" style="font-size:10px;padding:3px 8px">🔄</button>
+        </div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">
+          ${t('security_active_sessions_desc')||'All currently logged-in users. Click 🗑 to destroy a session and log the user out.'}
+        </p>
+        <div id="activeSessionsList" style="font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px;max-height:320px;overflow-y:auto">
+          <div style="color:var(--text-dim);text-align:center;padding:8px">${t('loading')||'Loading…'}</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <div class="sidebar-section-title">🔒 ${t('security_tls')||'TLS / HTTPS Configuration'}</div>
         <div id="secTlsCurrentStatus" style="margin-bottom:8px;padding:8px 10px;border-radius:var(--radius);background:var(--bg3);border:1px solid var(--border);font-size:var(--fs-xs)">
           ${t('checking')||'Checking TLS status…'}
@@ -2498,6 +2511,10 @@ Fields: file, subject, sender, type, tags</pre>
         </div>
       </div>
     `;
+    // Load active sessions list
+    if (typeof _refreshActiveSessions === 'function') {
+      setTimeout(_refreshActiveSessions, 0);
+    }
     // Load TLS status for security tab (optional endpoint, silence 404)
     _optionalApiGet('/api/tls/status').then(tls => {
       const el = document.getElementById('secTlsCurrentStatus');

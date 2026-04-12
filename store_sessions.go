@@ -41,6 +41,20 @@ func (s *Store) DeleteSession(id string) error {
 	return nil
 }
 
+// GetActiveSessions returns all non-expired sessions.
+func (s *Store) GetActiveSessions() []Session {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now()
+	out := make([]Session, 0, len(s.sessions))
+	for _, sess := range s.sessions {
+		if sess.ExpiresAt.After(now) {
+			out = append(out, sess)
+		}
+	}
+	return out
+}
+
 // DeleteSessionsForUser removes all sessions belonging to a specific user (V-03 fix).
 func (s *Store) DeleteSessionsForUser(userID int64) {
 	s.mu.Lock()

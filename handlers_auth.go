@@ -117,7 +117,14 @@ func (app *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if secSettings.SessionTimeEnabled && secSettings.SessionTimeHours > 0 {
 		sessionDuration = time.Duration(secSettings.SessionTimeHours) * time.Hour
 	}
-	sess := Session{ID: sessID, UserID: user.ID, ExpiresAt: time.Now().Add(sessionDuration)}
+	sess := Session{
+		ID:        sessID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(sessionDuration),
+		CreatedAt: time.Now(),
+		IPAddress: clientIP(r),
+		UserAgent: r.UserAgent(),
+	}
 	if err := app.store.CreateSession(sess); err != nil {
 		jsonError(w, "internal error", http.StatusInternalServerError)
 		return
