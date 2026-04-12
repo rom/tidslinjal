@@ -35,6 +35,13 @@ func (app *App) handleSaveSecuritySettings(w http.ResponseWriter, r *http.Reques
 	if ss.IdleTimeoutHours == 0 {
 		ss.IdleTimeoutHours = 100
 	}
+	// Session binding default IP mode
+	if ss.SessionBindIPMode == "" {
+		ss.SessionBindIPMode = "subnet"
+	} else if ss.SessionBindIPMode != "subnet" && ss.SessionBindIPMode != "strict" {
+		jsonError(w, "invalid session_bind_ip_mode (must be 'subnet' or 'strict')", http.StatusBadRequest)
+		return
+	}
 	if err := app.store.SaveSecuritySettings(ss); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return

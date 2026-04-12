@@ -2873,6 +2873,8 @@ func main() {
 		log.Printf("    Idle timeout         : enabled=%v  hours=%d", ss.IdleTimeoutEnabled, ss.IdleTimeoutHours)
 		log.Printf("    Logoff on pw change  : %v", ss.LogoffOnPasswordChange)
 		log.Printf("    Rotate sess on role  : %v", ss.RotateSessionOnRoleChange)
+		log.Printf("    Session bind IP      : %v (mode=%s)", ss.SessionBindIP, ss.SessionBindIPMode)
+		log.Printf("    Session bind UA      : %v", ss.SessionBindUA)
 		log.Printf("    Disable pw login     : %v", ss.DisablePasswordLogin)
 		uploadDaily := ss.UploadQuotaDailyMB
 		if uploadDaily <= 0 { uploadDaily = 500 }

@@ -2428,6 +2428,24 @@ Fields: file, subject, sender, type, tags</pre>
           <input type="checkbox" id="secRotateOnRoleChange" checked style="width:14px;height:14px;accent-color:var(--accent)">
           Rotate session on role change
         </label>
+        <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+          <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('security_session_hijack_desc')||'Session hijack protection — bind sessions to the client that created them so a stolen cookie cannot be replayed from a different device or network.'}</div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:6px">
+            <input type="checkbox" id="secBindIP" checked style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('security_session_bind_ip')||'Bind session to client IP address'}
+          </label>
+          <div class="form-group" style="margin-bottom:6px;display:flex;align-items:center;gap:6px;padding-left:22px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap">${t('security_session_bind_ip_mode')||'IP match mode'}</label>
+            <select id="secBindIPMode" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 6px;font-size:var(--fs-sm)">
+              <option value="subnet">${t('security_session_bind_ip_subnet')||'Subnet (/24 IPv4, /64 IPv6) — tolerant'}</option>
+              <option value="strict">${t('security_session_bind_ip_strict')||'Strict (exact IP match)'}</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm);margin-bottom:8px">
+            <input type="checkbox" id="secBindUA" checked style="width:14px;height:14px;accent-color:var(--accent)">
+            ${t('security_session_bind_ua')||'Bind session to browser user-agent'}
+          </label>
+        </div>
         <button class="btn btn-secondary btn-sm" data-action="saveSecuritySettings">${t('btn_save')||'Save'} Session Settings</button>
       </div>
 

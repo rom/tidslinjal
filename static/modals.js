@@ -445,6 +445,11 @@ async function _initSecuritySettingsUI() {
     setVal('secIdleTimeoutHours',   ss.idle_timeout_hours || 100);
     setCb('secLogoffOnPwChange',    ss.logoff_on_password_change !== false);
     setCb('secRotateOnRoleChange',  ss.rotate_session_on_role_change !== false);
+    // Session hijack protection (default on when unset)
+    setCb('secBindIP',              ss.session_bind_ip !== false);
+    const bindMode = document.getElementById('secBindIPMode');
+    if (bindMode) bindMode.value = ss.session_bind_ip_mode || 'subnet';
+    setCb('secBindUA',              ss.session_bind_ua !== false);
     setCb('secDisablePasswordLogin', ss.disable_password_login);
   } catch { /* not configured yet */ }
 }
@@ -466,6 +471,10 @@ async function saveSecuritySettings() {
     idle_timeout_hours:           parseInt(val('secIdleTimeoutHours'), 10) || 100,
     logoff_on_password_change:    cb('secLogoffOnPwChange'),
     rotate_session_on_role_change: cb('secRotateOnRoleChange'),
+    // Session hijack protection
+    session_bind_ip:              cb('secBindIP'),
+    session_bind_ip_mode:         (document.getElementById('secBindIPMode')?.value || 'subnet'),
+    session_bind_ua:              cb('secBindUA'),
     disable_password_login:       cb('secDisablePasswordLogin'),
   };
   const res = await api('PUT', '/api/admin/security', ss);

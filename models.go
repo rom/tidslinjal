@@ -1102,6 +1102,15 @@ type SecuritySettings struct {
 	LogoffOnPasswordChange bool `json:"logoff_on_password_change"`   // invalidate sessions on other devices when password changes (default true)
 	RotateSessionOnRoleChange bool `json:"rotate_session_on_role_change"` // invalidate sessions when user role changes (default true)
 
+	// Session hijack protection: bind sessions to the client IP / user-agent
+	// that created them so that a stolen session cookie cannot be replayed
+	// from a different client. SessionBindIPMode: "" or "subnet" (default)
+	// matches /24 for IPv4 and /64 for IPv6 (tolerates mobile roaming);
+	// "strict" requires an exact IP match.
+	SessionBindIP     bool   `json:"session_bind_ip"`                // enforce IP binding on session validation (default true)
+	SessionBindIPMode string `json:"session_bind_ip_mode,omitempty"` // "subnet" (default) or "strict"
+	SessionBindUA     bool   `json:"session_bind_ua"`                // enforce user-agent binding on session validation (default true)
+
 	// SSO-only mode: when enabled, password login is disabled for all users
 	// except the built-in admin account. Requires OIDC/SSO to be configured.
 	DisablePasswordLogin bool `json:"disable_password_login"`

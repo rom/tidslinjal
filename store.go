@@ -215,6 +215,10 @@ func (s *Store) load() error {
 		IdleTimeoutHours:          100,
 		LogoffOnPasswordChange:    true,
 		RotateSessionOnRoleChange: true,
+		// Session hijack protection: bind to IP (subnet) and user-agent by default
+		SessionBindIP:     true,
+		SessionBindIPMode: "subnet",
+		SessionBindUA:     true,
 	}
 	s.loadFile("security.json", &s.securitySettings)
 	// Apply defaults for session management if JSON had zero values
@@ -223,6 +227,9 @@ func (s *Store) load() error {
 	}
 	if s.securitySettings.IdleTimeoutHours == 0 {
 		s.securitySettings.IdleTimeoutHours = 100
+	}
+	if s.securitySettings.SessionBindIPMode == "" {
+		s.securitySettings.SessionBindIPMode = "subnet"
 	}
 	s.loadFile("tls.json", &s.tlsConfig)
 	s.loadFile("apikeys.json", &s.apiKeys)
