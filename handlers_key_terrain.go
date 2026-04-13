@@ -106,6 +106,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Trend         string `json:"trend"`
 		Threat        string `json:"threat"`
 		External      string `json:"external"`
+		Comments      string `json:"comments"`
 		Priority      int    `json:"priority"`
 		Zone          string `json:"zone"`
 		CapabilityID  int64  `json:"capability_id"`
@@ -139,6 +140,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Trend:    req.Trend,
 		Threat:   req.Threat,
 		External: req.External,
+		Comments: req.Comments,
 		Priority: req.Priority,
 		Actions:  req.Actions,
 		History: []KeyTerrainHist{
@@ -194,6 +196,7 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Trend         *string `json:"trend"`
 		Threat        *string `json:"threat"`
 		External      *string `json:"external"`
+		Comments      *string `json:"comments"`
 		Priority      *int    `json:"priority"`
 		Zone          *string `json:"zone"`
 		ResponsibleID *int64  `json:"responsible_id"`
@@ -236,6 +239,10 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	if req.External != nil && *req.External != entry.External {
 		addHist("external", entry.External, *req.External)
 		entry.External = *req.External
+	}
+	if req.Comments != nil && *req.Comments != entry.Comments {
+		addHist("comments", entry.Comments, *req.Comments)
+		entry.Comments = *req.Comments
 	}
 	if req.Priority != nil && *req.Priority != entry.Priority {
 		addHist("priority", fmt.Sprintf("%d", entry.Priority), fmt.Sprintf("%d", *req.Priority))

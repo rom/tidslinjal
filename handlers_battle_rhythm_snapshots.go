@@ -208,7 +208,7 @@ func renderBattleRhythmCSV(entries []KeyTerrainEntry) ([]byte, error) {
 	w := csv.NewWriter(&sb)
 	header := []string{
 		"seq_num", "zone", "priority", "function", "status", "trend",
-		"threat", "external", "responsible", "owner", "actions",
+		"threat", "external", "responsible", "owner", "actions", "comments",
 		"created_at", "updated_at", "finished_at", "rounds",
 	}
 	if err := w.Write(header); err != nil {
@@ -227,6 +227,7 @@ func renderBattleRhythmCSV(entries []KeyTerrainEntry) ([]byte, error) {
 			e.ResponsibleName,
 			e.OwnerName,
 			e.Actions,
+			e.Comments,
 			rfcOrEmpty(&e.CreatedAt),
 			rfcOrEmpty(&e.UpdatedAt),
 			rfcOrEmpty(e.FinishedAt),
@@ -283,6 +284,7 @@ func renderBattleRhythmXML(entries []KeyTerrainEntry, cycleStart time.Time, offs
 		External    string   `xml:"external,omitempty"`
 		Responsible string   `xml:"responsible,omitempty"`
 		Actions     string   `xml:"actions,omitempty"`
+		Comments    string   `xml:"comments,omitempty"`
 	}
 	type doc struct {
 		XMLName    xml.Name   `xml:"key_terrain_snapshot"`
@@ -302,6 +304,7 @@ func renderBattleRhythmXML(entries []KeyTerrainEntry, cycleStart time.Time, offs
 			Function: e.Function, Status: e.Status, Trend: e.Trend,
 			Threat: e.Threat, External: e.External,
 			Responsible: e.ResponsibleName, Actions: e.Actions,
+			Comments: e.Comments,
 		})
 	}
 	body, err := xml.MarshalIndent(out, "", "  ")

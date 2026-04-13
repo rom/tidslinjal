@@ -259,6 +259,7 @@ type KeyTerrainEntry struct {
 	Trend           string           `json:"trend"`                       // improving, stable, worsening
 	Threat          string           `json:"threat"`                      // hostile pressure description
 	External        string           `json:"external"`                    // external dependencies / peer effects
+	Comments        string           `json:"comments,omitempty"`          // free-form notes / remarks / flags for this entry
 	Priority        int              `json:"priority"`                    // explicit ranking (1 = highest)
 	ResponsibleID   int64            `json:"responsible_id,omitempty"`
 	ResponsibleName string           `json:"responsible_name,omitempty"`
