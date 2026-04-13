@@ -365,6 +365,10 @@ func (app *App) handleListBattleRhythmSnapshots(w http.ResponseWriter, r *http.R
 		Mtime   time.Time `json:"mtime"`
 		Format  string    `json:"format"`
 		OffsetM int       `json:"offset_min"`
+		// TakenAt is the safe-timestamp substring parsed out of the
+		// filename (e.g. "2026-04-13T09-30-00Z"), when the file uses
+		// the post-8.6.0 timestamped naming. Empty for legacy files.
+		TakenAt string `json:"taken_at,omitempty"`
 	}
 	type cycleGroup struct {
 		CycleDir string     `json:"cycle_dir"`
@@ -395,11 +399,21 @@ func (app *App) handleListBattleRhythmSnapshots(w http.ResponseWriter, r *http.R
 				continue
 			}
 			fi := fileInfo{Name: f.Name(), Size: info.Size(), Mtime: info.ModTime()}
-			// h+30.csv → offset 30, format csv
+			// Filename shapes, both accepted for forward/backward
+			// compatibility:
+			//   h+30_2026-04-13T09-30-00Z.csv → offset 30, format csv,
+			//                                   snapshot instant 09:30 UTC
+			//   h+30.csv                      → offset 30, format csv
+			//                                   (legacy pre-dated files)
 			if dot := strings.LastIndex(f.Name(), "."); dot > 0 {
 				fi.Format = f.Name()[dot+1:]
 				base := strings.TrimPrefix(f.Name()[:dot], "h")
-				if n, err := strconv.Atoi(base); err == nil {
+				offsetStr := base
+				if us := strings.Index(base, "_"); us > 0 {
+					offsetStr = base[:us]
+					fi.TakenAt = base[us+1:] // raw safe-timestamp string
+				}
+				if n, err := strconv.Atoi(offsetStr); err == nil {
 					fi.OffsetM = n
 				}
 			}

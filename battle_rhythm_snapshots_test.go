@@ -95,10 +95,16 @@ func TestRunDueBattleRhythmSnapshots(t *testing.T) {
 	now := cycleStart.Add(15 * time.Minute)
 	app.runDueBattleRhythmSnapshots(now)
 
-	// Verify the snapshot files exist.
+	// Verify the snapshot files exist. Filenames now include the
+	// wall-clock instant of the snapshot, so h+15 snapshots are
+	// named h+15_<cycleStart+15m>.ext. Build the expected stamp
+	// from the same (cycleStart, offset) tuple the scheduler uses.
 	dir := app.store.BattleRhythmSnapshotDir()
 	cycleDir := safeTimestamp(cycleStart)
-	for _, name := range []string{"h+15.csv", "h+15.json"} {
+	wantStamp := safeTimestamp(cycleStart.Add(15 * time.Minute))
+	csvName := "h+15_" + wantStamp + ".csv"
+	jsonName := "h+15_" + wantStamp + ".json"
+	for _, name := range []string{csvName, jsonName} {
 		path := dir + "/" + cycleDir + "/" + name
 		info, err := os.Stat(path)
 		if err != nil {
@@ -110,11 +116,12 @@ func TestRunDueBattleRhythmSnapshots(t *testing.T) {
 		}
 	}
 	// Running the scheduler a second time for the same offset must NOT
-	// re-write the files (deduplication via os.Stat).
-	firstInfo, _ := os.Stat(dir + "/" + cycleDir + "/h+15.csv")
+	// re-write the files (deduplication via os.Stat — the filename is
+	// deterministic from cycleStart + offset).
+	firstInfo, _ := os.Stat(dir + "/" + cycleDir + "/" + csvName)
 	time.Sleep(10 * time.Millisecond)
 	app.runDueBattleRhythmSnapshots(now)
-	secondInfo, _ := os.Stat(dir + "/" + cycleDir + "/h+15.csv")
+	secondInfo, _ := os.Stat(dir + "/" + cycleDir + "/" + csvName)
 	if !firstInfo.ModTime().Equal(secondInfo.ModTime()) {
 		t.Errorf("snapshot should not be overwritten on re-fire")
 	}

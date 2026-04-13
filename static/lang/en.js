@@ -3017,6 +3017,8 @@ TRANSLATIONS.en = {
     kt_br_snap_empty: 'No snapshots yet.',
     kt_br_snap_error: 'Failed to load: ',
     kt_br_steps_tooltip_title: 'Battle rhythm steps',
+    kt_br_no_steps_tooltip: 'No steps defined. Open Settings → Battle Rhythm to add steps.',
+    kt_br_no_cycle: 'cycle length not set',
     kt_comments: 'Comments',
     kt_comments_ph: 'Notes, remarks, flags…',
     kt_seq_num: 'Seq',
