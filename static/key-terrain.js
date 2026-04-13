@@ -1558,12 +1558,30 @@ async function _ktViewSnapshot(snapId) {
 function _ktOpenColumnVisibility() {
   const allCols = _ktState.columnOrder;
   const hidden = _ktState.hiddenColumns || {};
-  const colLabels = {
-    priority: '\u26A1 Priority', function: '\u{1F3AF} Function', status: '\u{1F4CA} Status',
-    trend: '\u{1F4C8} Trend', threat: '\u2694\uFE0F Threat', external: '\u{1F517} External',
-    responsible: '\u{1F464} Responsible', actions: '\u{1F527} Actions',
-    created_at: '\u{1F4C5} Created', updated_at: '\u{1F504} Updated',
-    finished_at: '\u2705 Finished', rounds: '\u{1F504} # Rounds',
+  // Icon + default label per column. The default label is only used
+  // if the operator hasn't overridden the heading under Settings →
+  // Column Labels and the current language has no translation. This
+  // list MUST cover every column in columnOrder — otherwise a newly
+  // added column (like "comments") shows up as a bare column id in
+  // the show/hide dialog.
+  const colMeta = {
+    seq_num:     { icon: '#',          dflt: 'Seq' },
+    zone:        { icon: '\u{1F310}',  dflt: 'Zone' },
+    priority:    { icon: '\u26A1',     dflt: 'Priority' },
+    function:    { icon: '\u{1F3AF}',  dflt: 'Function' },
+    status:      { icon: '\u{1F4CA}',  dflt: 'Status' },
+    trend:       { icon: '\u{1F4C8}',  dflt: 'Trend' },
+    threat:      { icon: '\u2694\uFE0F', dflt: 'Threat' },
+    external:    { icon: '\u{1F517}',  dflt: 'External' },
+    responsible: { icon: '\u{1F464}',  dflt: 'Responsible' },
+    owner:       { icon: '\u{1F451}',  dflt: 'Owner' },
+    actions:     { icon: '\u{1F527}',  dflt: 'Actions' },
+    comments:    { icon: '\u{1F4AC}',  dflt: 'Comments' },
+    created_at:  { icon: '\u{1F4C5}',  dflt: 'Created' },
+    updated_at:  { icon: '\u{1F504}',  dflt: 'Updated' },
+    finished_at: { icon: '\u2705',     dflt: 'Finished' },
+    rounds:      { icon: '\u{1F504}',  dflt: '# Cycles' },
+    management:  { icon: '\u2699',     dflt: 'Management' },
   };
   let html = `<div style="max-width:400px">
     <h3>\u{1F441} ${t('kt_columns_vis')||'Show / Hide Columns'}</h3>
@@ -1571,9 +1589,14 @@ function _ktOpenColumnVisibility() {
     <div style="display:flex;flex-direction:column;gap:4px">`;
   for (const c of allCols) {
     const isHidden = !!hidden[c];
+    const meta = colMeta[c] || { icon: '', dflt: c };
+    // _ktColLabel resolves the custom override → localized default →
+    // hardcoded fallback, so the show/hide list uses the same labels
+    // the operator sees in the table header.
+    const label = (meta.icon ? meta.icon + ' ' : '') + _ktColLabel(c, meta.dflt);
     html += `<label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);cursor:pointer;padding:4px 6px;background:var(--bg3);border-radius:var(--radius)">
       <input type="checkbox" ${!isHidden ? 'checked' : ''} data-col="${c}" class="ktVisCheck" style="accent-color:var(--accent)">
-      ${colLabels[c] || c}
+      ${escHtml(label)}
     </label>`;
   }
   html += `</div>
@@ -1937,6 +1960,7 @@ let _ktBrLastState = null;     // last server snapshot
 let _ktBrLastFetchAt = 0;      // ms since epoch
 let _ktBrShellKey = '';        // last-rendered shell layout key; '' forces a shell rebuild
 let _ktBrFireOnH0 = false;     // guards the immediate poll at H0 from firing repeatedly
+let _ktBrPollFailures = 0;     // consecutive _ktBrPoll() failure counter; stops the loop at 3
 
 // Palette used when a battle rhythm step doesn't specify its own color.
 // Indices wrap modulo palette length so more than 8 steps still get a
@@ -1977,8 +2001,31 @@ async function _ktBrPoll() {
     const st = await _ktApi('GET', '/key-terrain/battle-rhythm');
     _ktBrLastState = st;
     _ktBrLastFetchAt = Date.now();
+    _ktBrPollFailures = 0;
     _ktBrTick();
-  } catch { /* silent */ }
+  } catch (e) {
+    // Defensively stop the polling loop after a few consecutive
+    // failures so the console doesn't fill with 401/5xx spam when
+    // the session has gone stale or the endpoint is unreachable.
+    // We log once on the first failure; further retries are silent.
+    _ktBrPollFailures++;
+    const msg = (e && e.message) || String(e);
+    if (_ktBrPollFailures === 1) {
+      console.warn('[battle-rhythm] poll failed:', msg);
+    }
+    // 401 means the session is invalid — stop immediately rather
+    // than retrying every 2 s forever. Also unauthorized (403) or
+    // any "unauthorized"/"forbidden" error message text.
+    const authFailed = /401|403|unauthoriz|forbidden/i.test(msg);
+    if (authFailed || _ktBrPollFailures >= 3) {
+      _ktBrStopTicker();
+      if (authFailed) {
+        console.warn('[battle-rhythm] stopped polling — session appears to be invalid. Reload the page or log in again.');
+      } else {
+        console.warn('[battle-rhythm] stopped polling after', _ktBrPollFailures, 'consecutive failures');
+      }
+    }
+  }
 }
 
 // Given the last-known server state and how many ms have passed locally
@@ -2142,7 +2189,18 @@ function _ktBrBuildShell(layout, st, canWrite) {
          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Jump the clock to the next step\'s nominal start (cycle ends sooner)'}">\u23E9</button>`
       : '';
     if (layout === 'stopped') {
-      controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
+      // Two plain number inputs for hour and minute — avoids the
+      // native <input type="time"> picker which some browsers render
+      // inconsistently or with unreliable keyboard handling. Leave
+      // both blank to start "now"; fill in values to arm the clock
+      // for that wall-clock moment (today if still in the future,
+      // otherwise tomorrow).
+      controls = `<div style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs)" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM). Leave blank to start immediately.'}">
+          <span style="color:var(--text-dim);font-size:10px">${t('kt_br_start_at')||'Start at'}</span>
+          <input type="number" id="ktBrStartH" class="input" min="0" max="23" placeholder="HH" style="width:44px;padding:3px 4px;text-align:center;font-size:var(--fs-xs)">
+          <span style="font-weight:700">:</span>
+          <input type="number" id="ktBrStartM" class="input" min="0" max="59" placeholder="MM" style="width:44px;padding:3px 4px;text-align:center;font-size:var(--fs-xs)">
+        </div>
         <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>`;
     } else if (layout === 'starting') {
       controls = `<button class="btn btn-sm btn-secondary" disabled style="opacity:.6">\u23F3 ${t('kt_br_starting')||'Starting…'}</button>`;
@@ -2410,16 +2468,38 @@ async function _ktBrControl(action) {
   // layout right away so the operator sees that the click registered.
   // The pending state is cleared when the server responds (success) or
   // when the error alert fires (failure).
+  //
+  // Read the scheduled-start HH:MM BEFORE we flip the pending layout —
+  // the shell rebuild on 'starting' removes the two inputs from the
+  // DOM so a later read would come back empty.
+  let startAtStr = '';
   if (action === 'start') {
+    const hInp = document.getElementById('ktBrStartH');
+    const mInp = document.getElementById('ktBrStartM');
+    const hStr = hInp ? hInp.value.trim() : '';
+    const mStr = mInp ? mInp.value.trim() : '';
+    if (hStr !== '' || mStr !== '') {
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      if (!isNaN(h) && h >= 0 && h <= 23 && !isNaN(m) && m >= 0 && m <= 59) {
+        startAtStr = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      } else {
+        if (typeof showError === 'function') {
+          showError(t('kt_br_start_at_bad')||'Enter a valid HH:MM time (hour 0-23, minute 0-59) or leave both fields blank.');
+        } else {
+          alert('Enter a valid HH:MM time (hour 0-23, minute 0-59) or leave both fields blank.');
+        }
+        return;
+      }
+    }
     _ktBrPendingLayout = 'starting';
     _ktBrShellKey = ''; // force shell rebuild on next tick
     _ktBrTick();
   }
   try {
     const body = { action: action };
-    if (action === 'start') {
-      const startAt = document.getElementById('ktBrStartAt')?.value || '';
-      if (startAt) body.start_at = startAt;
+    if (action === 'start' && startAtStr) {
+      body.start_at = startAtStr;
     }
     const st = await _ktApi('POST', '/key-terrain/battle-rhythm/control', body);
     _ktBrLastState = st;

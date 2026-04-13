@@ -416,6 +416,72 @@ func TestComputeBattleRhythmStateScheduledTransition(t *testing.T) {
 	}
 }
 
+// TestComputeBattleRhythmStatePreH0Wrap pins the step-active check for
+// wrapping windows: a step defined with a negative StartOffsetMin like
+// "−15" in a 120-min cycle should be active in the last 15 minutes of
+// every cycle, i.e. positions 105..120. Before v8.6.x these steps were
+// silently never active because the comparison used raw offsets rather
+// than normalising them into [0, cycle).
+func TestComputeBattleRhythmStatePreH0Wrap(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+	h0 := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+		Steps: []BattleRhythmStep{
+			// "Prep": last 15 minutes of the previous cycle (or
+			// equivalently, H−15..H0). Defined with negative offsets.
+			{Name: "Prep", StartOffsetMin: -15, EndOffsetMin: intPtr(0)},
+			// "Brief": H+0..H+30.
+			{Name: "Brief", StartOffsetMin: 0, EndOffsetMin: intPtr(30)},
+		},
+	}
+
+	// At the exact moment of H0, Prep ended and Brief began. With
+	// half-open [start, end) intervals only Brief should be active.
+	st := computeBattleRhythmState(cfg, h0)
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Brief" {
+		t.Errorf("at H0: current = %v, want Brief", st.CurrentStep)
+	}
+
+	// 5 minutes into the first cycle: still Brief.
+	st = computeBattleRhythmState(cfg, h0.Add(5*time.Minute))
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Brief" {
+		t.Errorf("at H+5: current = %v, want Brief", st.CurrentStep)
+	}
+
+	// 110 minutes into the first cycle (= 5 minutes before the end of
+	// the cycle, which wraps to a position of 105 equivalent to H−15 of
+	// the NEXT cycle). Prep's normalized window is [105, 120). So at
+	// position 110 we should see Prep as the current step.
+	st = computeBattleRhythmState(cfg, h0.Add(110*time.Minute))
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Prep" {
+		t.Errorf("at H+110 (= H−10 of next cycle): current = %v, want Prep", st.CurrentStep)
+	}
+
+	// Exactly at position 105 (the very start of Prep's wrapping
+	// window): Prep is active.
+	st = computeBattleRhythmState(cfg, h0.Add(105*time.Minute))
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Prep" {
+		t.Errorf("at H+105: current = %v, want Prep", st.CurrentStep)
+	}
+
+	// At position 90: neither Prep (105..120) nor Brief (0..30) is
+	// active. There's a gap — no current step, next should be Prep
+	// in 15 minutes.
+	st = computeBattleRhythmState(cfg, h0.Add(90*time.Minute))
+	if st.CurrentStep != nil {
+		t.Errorf("at H+90 (gap): current = %v, want nil", st.CurrentStep)
+	}
+	if st.NextStep == nil || st.NextStep.Name != "Prep" {
+		t.Errorf("at H+90: next = %v, want Prep", st.NextStep)
+	}
+	if st.NextStepInMin == nil || *st.NextStepInMin < 14.99 || *st.NextStepInMin > 15.01 {
+		t.Errorf("at H+90: next_in = %v, want ~15", st.NextStepInMin)
+	}
+}
+
 // TestResolveBattleRhythmStartTime covers the "start at 09:00" behaviour:
 // when the requested wall-clock time is in the future today, schedule for
 // today; when it's already past, schedule for tomorrow.

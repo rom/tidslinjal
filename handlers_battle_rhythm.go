@@ -127,11 +127,47 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	st.CycleEnd = &cycleEnd
 
 	// Find current + next step. Steps may have negative StartOffsetMin
-	// (pre-H0); we normalise them into the visible cycle window [0, cycle).
-	// A negative-offset step actually fires in the *previous* cycle; it is
-	// visible near the end of that cycle. We render steps relative to the
-	// closest cycle start.
-	if len(cfg.Steps) > 0 {
+	// (pre-H0) or EndOffsetMin that exceeds the cycle length. We
+	// normalise each step's [start, end) interval into the visible
+	// cycle window [0, cycle) so comparison against the current
+	// position works regardless of how the operator defined the
+	// offsets. A step whose normalised window wraps the cycle boundary
+	// (e.g. start=-15, end=15 in a 120-min cycle → normalised to
+	// [105, 15)) is active in both [105, 120) and [0, 15).
+	if len(cfg.Steps) > 0 && cfg.CycleMinutes > 0 {
+		cycleF := float64(cfg.CycleMinutes)
+		// mod returns x modulo cycle, always in [0, cycle).
+		mod := func(x float64) float64 {
+			m := math.Mod(x, cycleF)
+			if m < 0 {
+				m += cycleF
+			}
+			return m
+		}
+		// inHalfOpen reports whether pos lies within [start, end) when
+		// end > start. If end <= start, the window wraps the cycle
+		// boundary and the active region is [start, cycle) ∪ [0, end).
+		inHalfOpen := func(pos, start, end float64) bool {
+			if start == end {
+				// Degenerate zero-length window → only active at start.
+				return math.Abs(pos-start) < 0.5
+			}
+			if start < end {
+				return start <= pos && pos < end
+			}
+			return pos >= start || pos < end
+		}
+		// distanceTo returns how many minutes forward you'd have to go
+		// from `pos` to reach `target`, wrapping around the cycle if
+		// necessary. Always in [0, cycle).
+		distanceTo := func(pos, target float64) float64 {
+			d := target - pos
+			if d < 0 {
+				d += cycleF
+			}
+			return d
+		}
+
 		var firstCurrent *BattleRhythmStep
 		firstCurrentIdx := -1
 		var currentSteps []BattleRhythmStep
@@ -139,27 +175,32 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 		var nextDelta float64 = -1
 		for i := range cfg.Steps {
 			step := cfg.Steps[i]
-			start := step.StartOffsetMin
-			end := start
+			startRaw := float64(step.StartOffsetMin)
 			instant := step.EndOffsetMin == nil
+			endRaw := startRaw
 			if !instant {
-				end = *step.EndOffsetMin
+				endRaw = float64(*step.EndOffsetMin)
 			}
-			if end < start {
-				end = start
+			if endRaw < startRaw {
+				endRaw = startRaw
 			}
-			// Step-active check. Ranged steps use the half-open interval
-			// [start, end): a step that ends at minute 60 is no longer
-			// active at position 60 (the next step starting at 60 is).
-			// Instant steps (EndOffsetMin == nil) are reported active
-			// when the position is within 0.5 min of their start so a
-			// whole-minute scheduler tick doesn't miss them entirely.
+			start := mod(startRaw)
+			end := mod(endRaw)
+			// Instant steps: active when pos is within 0.5 min of the
+			// (normalised) start. The whole-minute server tick can
+			// otherwise miss them entirely.
 			active := false
 			if instant {
-				if math.Abs(st.PositionMin-float64(start)) < 0.5 {
+				diff := math.Abs(st.PositionMin - start)
+				// Handle wrap: if the step is at the very end of the
+				// cycle, positions near 0 are also "close".
+				if diff > cycleF/2 {
+					diff = cycleF - diff
+				}
+				if diff < 0.5 {
 					active = true
 				}
-			} else if float64(start) <= st.PositionMin && st.PositionMin < float64(end) {
+			} else if inHalfOpen(st.PositionMin, start, end) {
 				active = true
 			}
 			if active {
@@ -169,23 +210,28 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 					firstCurrentIdx = i
 				}
 			}
-			// Next step: smallest strictly-positive delta from the
-			// current position. Only consider steps that are not
-			// currently active so "Next" always looks forward.
-			if !active && float64(start) > st.PositionMin+1e-9 {
-				delta := float64(start) - st.PositionMin
-				if nextDelta < 0 || delta < nextDelta {
+			// Next step: smallest forward distance to a step start that
+			// is NOT currently active. Only the step start matters for
+			// the "next" marker — the user wants to know when the next
+			// step fires, not when the current one ends.
+			if !active {
+				delta := distanceTo(st.PositionMin, start)
+				if delta > 1e-9 && (nextDelta < 0 || delta < nextDelta) {
 					nextDelta = delta
 					next = &cfg.Steps[i]
 				}
 			}
 		}
-		// If every step is either active or behind us, look one cycle
-		// ahead so the "Next" field still has a reasonable value.
+		// Fallback: every step is currently active. Pick the smallest
+		// forward distance to any step start, wrapped. This keeps
+		// "Next" meaningful even in weird configurations.
 		if next == nil {
 			for i := range cfg.Steps {
-				s := cfg.Steps[i]
-				delta := float64(s.StartOffsetMin) - st.PositionMin + float64(cfg.CycleMinutes)
+				s := mod(float64(cfg.Steps[i].StartOffsetMin))
+				delta := distanceTo(st.PositionMin, s)
+				if delta < 1e-9 {
+					delta = cycleF
+				}
 				if nextDelta < 0 || delta < nextDelta {
 					nextDelta = delta
 					next = &cfg.Steps[i]
