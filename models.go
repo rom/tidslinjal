@@ -1107,9 +1107,17 @@ type SecuritySettings struct {
 	// from a different client. SessionBindIPMode: "" or "subnet" (default)
 	// matches /24 for IPv4 and /64 for IPv6 (tolerates mobile roaming);
 	// "strict" requires an exact IP match.
-	SessionBindIP     bool   `json:"session_bind_ip"`                // enforce IP binding on session validation (default true)
-	SessionBindIPMode string `json:"session_bind_ip_mode,omitempty"` // "subnet" (default) or "strict"
-	SessionBindUA     bool   `json:"session_bind_ua"`                // enforce user-agent binding on session validation (default true)
+	//
+	// SessionHijackProtection is the master switch. Defaults to FALSE
+	// because the IP/UA binding can unexpectedly kick legitimate users
+	// out when they're behind a reverse proxy that rotates client IPs,
+	// or when a browser extension mutates the user-agent mid-session.
+	// Operators who need strict binding can enable it explicitly, then
+	// tune the individual SessionBindIP / SessionBindUA toggles.
+	SessionHijackProtection bool   `json:"session_hijack_protection"`      // master switch (default false)
+	SessionBindIP           bool   `json:"session_bind_ip"`                // sub-option: enforce IP binding (only applied when master is on)
+	SessionBindIPMode       string `json:"session_bind_ip_mode,omitempty"` // "subnet" (default) or "strict"
+	SessionBindUA           bool   `json:"session_bind_ua"`                // sub-option: enforce user-agent binding (only applied when master is on)
 
 	// SSO-only mode: when enabled, password login is disabled for all users
 	// except the built-in admin account. Requires OIDC/SSO to be configured.

@@ -215,10 +215,19 @@ func (s *Store) load() error {
 		IdleTimeoutHours:          100,
 		LogoffOnPasswordChange:    true,
 		RotateSessionOnRoleChange: true,
-		// Session hijack protection: bind to IP (subnet) and user-agent by default
-		SessionBindIP:     true,
-		SessionBindIPMode: "subnet",
-		SessionBindUA:     true,
+		// Session hijack protection is DISABLED by default. The master
+		// switch (SessionHijackProtection) defaults to false so fresh
+		// installs don't kick users out of their sessions when the
+		// server is behind a reverse proxy or the client's IP/UA
+		// shifts mid-session. Operators who need strict binding can
+		// flip the master toggle on in Security → Session Management.
+		// The sub-options (SessionBindIP, SessionBindUA) still default
+		// to their recommended values so enabling the master switch
+		// produces a sensible default configuration.
+		SessionHijackProtection: false,
+		SessionBindIP:           true,
+		SessionBindIPMode:       "subnet",
+		SessionBindUA:           true,
 	}
 	s.loadFile("security.json", &s.securitySettings)
 	// Apply defaults for session management if JSON had zero values

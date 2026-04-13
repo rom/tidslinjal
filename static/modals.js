@@ -445,7 +445,9 @@ async function _initSecuritySettingsUI() {
     setVal('secIdleTimeoutHours',   ss.idle_timeout_hours || 100);
     setCb('secLogoffOnPwChange',    ss.logoff_on_password_change !== false);
     setCb('secRotateOnRoleChange',  ss.rotate_session_on_role_change !== false);
-    // Session hijack protection (default on when unset)
+    // Session hijack protection master switch (default off — explicit !==true
+    // because empty / unset / false all mean disabled).
+    setCb('secHijackProtection',    ss.session_hijack_protection === true);
     setCb('secBindIP',              ss.session_bind_ip !== false);
     const bindMode = document.getElementById('secBindIPMode');
     if (bindMode) bindMode.value = ss.session_bind_ip_mode || 'subnet';
@@ -471,7 +473,8 @@ async function saveSecuritySettings() {
     idle_timeout_hours:           parseInt(val('secIdleTimeoutHours'), 10) || 100,
     logoff_on_password_change:    cb('secLogoffOnPwChange'),
     rotate_session_on_role_change: cb('secRotateOnRoleChange'),
-    // Session hijack protection
+    // Session hijack protection (master switch gates the rest)
+    session_hijack_protection:    cb('secHijackProtection'),
     session_bind_ip:              cb('secBindIP'),
     session_bind_ip_mode:         (document.getElementById('secBindIPMode')?.value || 'subnet'),
     session_bind_ua:              cb('secBindUA'),

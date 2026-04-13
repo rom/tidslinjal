@@ -308,6 +308,14 @@ type KeyTerrainSettings struct {
 	// and export column headings. Leave a key out to keep the default.
 	ColumnLabels map[string]string `json:"column_labels,omitempty"` // e.g. {"function":"Task","threat":"Risk"}
 
+	// Column responsibles: one "who is responsible for this column"
+	// assignment per column. Rendered as a mouseover tooltip on the
+	// column header and on every cell in that column when
+	// ShowColumnResponsibles is true. Stored globally so the whole
+	// operator group sees the same mapping.
+	ColumnResponsibles     map[string]string `json:"column_responsibles,omitempty"` // e.g. {"threat":"J2 Intel","actions":"Watch Floor"}
+	ShowColumnResponsibles bool              `json:"show_column_responsibles,omitempty"`
+
 	// Battle rhythm — shared exercise clock with cyclic steps. All fields
 	// live server-side so every connected client sees the same H0.
 	BattleRhythm BattleRhythmConfig `json:"battle_rhythm,omitempty"`
