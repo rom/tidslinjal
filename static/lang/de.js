@@ -2445,14 +2445,14 @@ TRANSLATIONS.de = {
     kt_help_access: 'Zugangskontrolle',
 
     // Key Terrain
-    kt_function: 'Fähigkeit',
-    kt_function_ph: 'Name der Fähigkeit',
-    kt_function_required: 'Name der Fähigkeit ist erforderlich',
+    kt_function: 'Funktion',
+    kt_function_ph: 'Name der Funktion',
+    kt_function_required: 'Name der Funktion ist erforderlich',
     kt_seq_num: 'Nr',
     kt_zone: 'Zone',
     kt_zone_ph: 'z.B. Nord, HQ, DMZ',
-    kt_from_capability: 'Aus Fähigkeit laden',
-    kt_select_capability: 'Fähigkeit auswählen...',
+    kt_from_capability: 'Aus Funktion laden',
+    kt_select_capability: 'Funktion auswählen...',
 
     kt_linked_capability: 'Mit Fähigkeit verknüpft — Name, Zone, Status und Verantwortlicher werden automatisch synchronisiert',    kt_show_no_priority: 'Funktionen ohne Priorität anzeigen',
     kt_show_no_priority_desc: 'Einträge mit Priorität 0 oder ohne Priorität anzeigen (standardmäßig aktiviert)',

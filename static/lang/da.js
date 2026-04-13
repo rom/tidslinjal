@@ -2117,14 +2117,14 @@ TRANSLATIONS.da = {
     kt_help_access: 'Adgangskontrol',
 
     // Key Terrain
-    kt_function: 'Kapabilitet',
-    kt_function_ph: 'Navn på kapabiliteten',
-    kt_function_required: 'Kapabilitetens navn er påkrævet',
+    kt_function: 'Funktion',
+    kt_function_ph: 'Navn på funktionen',
+    kt_function_required: 'Funktionsnavn er påkrævet',
     kt_seq_num: 'Nr',
     kt_zone: 'Zone',
     kt_zone_ph: 'f.eks. Nord, HQ, DMZ',
-    kt_from_capability: 'Indlæs fra kapabilitet',
-    kt_select_capability: 'Vælg en kapabilitet...',
+    kt_from_capability: 'Indlæs fra funktion',
+    kt_select_capability: 'Vælg en funktion...',
 
     kt_linked_capability: 'Knyttet til kapabilitet — navn, zone, status og ansvarlig synkroniseres automatisk',    kt_show_no_priority: 'Vis funktioner uden prioritet',
     kt_show_no_priority_desc: 'Vis poster med prioritet 0 eller uden prioritet (aktiveret som standard)',
