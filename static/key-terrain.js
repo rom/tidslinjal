@@ -224,10 +224,17 @@ function _renderKeyTerrainBoard() {
   // Filter active entries
   let filtered = [...activeEntries];
   if (hasFilter) {
-    const q = (v) => (v || '').toLowerCase();
+    const q = (v) => (v || '').trim().toLowerCase();
     filtered = filtered.filter(e => {
       if (f.function && !q(e.function).includes(q(f.function))) return false;
-      if (f.functionChecks && f.functionChecks.length > 0 && !f.functionChecks.includes(e.function)) return false;
+      if (f.functionChecks && f.functionChecks.length > 0) {
+        // Case- and whitespace-insensitive match so a function name with
+        // trailing whitespace or differing capitalisation still hits the
+        // checkbox the operator picked.
+        const target = q(e.function);
+        const hit = f.functionChecks.some(c => q(c) === target);
+        if (!hit) return false;
+      }
       if (f.priority && e.priority !== parseInt(f.priority)) return false;
       if (f.priorityChecks && f.priorityChecks.length > 0 && !f.priorityChecks.includes(e.priority)) return false;
       if (f.statusChecks && f.statusChecks.length > 0) {
@@ -897,6 +904,10 @@ function _ktBrRenderStepList(initial) {
       <input class="input ktBrStepDesc" data-idx="${i}" value="${escHtml(step.description||'')}" placeholder="${t('kt_br_step_desc')||'Description (optional)'}" style="grid-column:1/-1;font-size:10px;padding:2px 6px">
     </div>
   `;}).join('');
+  // Re-bind the remove-step buttons we just injected; _bindActions from
+  // the initial settings-modal open only processed the DOM present at
+  // that moment.
+  if (typeof _bindActions === 'function') _bindActions(host);
 }
 function _ktBrAddStep() {
   _ktBrFlushStepInputs();
@@ -1470,8 +1481,22 @@ function _ktApplyColumnVisibility() {
 function _ktOpenFilter() {
   const f = _ktState.filter || {};
 
-  // Collect unique capability names from entries for checkboxes
-  const capNames = [...new Set(_ktState.entries.filter(e => e.function).map(e => e.function))].sort();
+  // Collect unique function names from the CURRENT live entries. This
+  // is recomputed each time the filter modal opens, so any function
+  // added to the board since last time appears in the checkbox list.
+  // Trim whitespace + dedupe case-insensitively so "Power" and "power "
+  // don't show up as separate entries.
+  const seen = new Set();
+  const capNames = [];
+  (_ktState.entries || []).forEach(e => {
+    const fn = (e.function || '').trim();
+    if (!fn) return;
+    const key = fn.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    capNames.push(fn);
+  });
+  capNames.sort((a, b) => a.localeCompare(b));
   const checkedCaps = f.functionChecks || [];
 
   // Priority checkboxes 0-10
@@ -1485,19 +1510,30 @@ function _ktOpenFilter() {
 
   const cbStyle = 'font-size:var(--fs-xs);display:flex;align-items:center;gap:4px;cursor:pointer';
 
+  // Use the custom column labels (_ktColLabel) so the filter panel shows
+  // the same headings the operator configured under Settings → Column
+  // Labels. Falls back to the localized defaults when no override is set.
+  const lblFunction    = _ktColLabel('function',    t('kt_function')||'Function');
+  const lblPriority    = _ktColLabel('priority',    t('kt_priority')||'Priority');
+  const lblStatus      = _ktColLabel('status',      t('kt_status')||'Status');
+  const lblTrend       = _ktColLabel('trend',       t('kt_trend')||'Trend');
+  const lblThreat      = _ktColLabel('threat',      t('kt_threat')||'Threat');
+  const lblResponsible = _ktColLabel('responsible', t('kt_responsible')||'Responsible');
+  const lblActions     = _ktColLabel('actions',     t('kt_actions')||'Actions');
+
   let html = `<div style="max-width:540px">
     <h3>\u{1F50D} ${t('kt_filter')||'Filter Key Terrain'}</h3>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Function'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${escHtml(lblFunction)}</label>
       <input id="ktFilterFunction" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.function||'')}">
       ${capNames.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:4px 12px;max-height:120px;overflow-y:auto;padding:4px;background:var(--bg2);border-radius:var(--radius)">
         ${capNames.map(c => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterCapCb" value="${escHtml(c)}" ${checkedCaps.includes(c)?'checked':''}> ${escHtml(c)}</label>`).join('')}
-      </div>` : ''}
+      </div>` : `<div style="font-size:10px;color:var(--text-dim);font-style:italic">${t('kt_filter_no_functions')||'No functions added to the board yet.'}</div>`}
     </div>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${t('kt_priority')||'Priority'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u26A1 ${escHtml(lblPriority)}</label>
       <input id="ktFilterPriority" type="number" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px" placeholder="${t('kt_filter_any')||'Any'}" value="${f.priority||''}" min="0">
       <div style="display:flex;flex-wrap:wrap;gap:4px 12px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
         ${Array.from({length:11},(_,i)=>i).map(i => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterPriCb" value="${i}" ${checkedPris.includes(i)?'checked':''}> ${i}</label>`).join('')}
@@ -1506,7 +1542,7 @@ function _ktOpenFilter() {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${t('kt_status')||'Status'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4CA} ${escHtml(lblStatus)}</label>
         <select id="ktFilterStatus" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px">
           <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
           ${_ktStatusOptions.map(s => `<option value="${s.value}" ${f.status===s.value?'selected':''}>${s.icon} ${s.label}</option>`).join('')}
@@ -1516,7 +1552,7 @@ function _ktOpenFilter() {
         </div>
       </div>
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4C8} ${t('kt_trend')||'Trend'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4C8} ${escHtml(lblTrend)}</label>
         <select id="ktFilterTrend" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px">
           <option value="">\u2014 ${t('kt_filter_any')||'Any'} \u2014</option>
           ${_ktTrendOptions.map(tr => `<option value="${tr.value}" ${f.trend===tr.value?'selected':''}>${tr.icon} ${tr.label}</option>`).join('')}
@@ -1528,17 +1564,17 @@ function _ktOpenFilter() {
     </div>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u2694\uFE0F ${t('kt_threat')||'Threat'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u2694\uFE0F ${escHtml(lblThreat)}</label>
       <input id="ktFilterThreat" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.threat||'')}">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F464} ${t('kt_responsible')||'Responsible'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F464} ${escHtml(lblResponsible)}</label>
         <input id="ktFilterResponsible" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.responsible||'')}">
       </div>
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F527} ${t('kt_actions')||'Actions'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F527} ${escHtml(lblActions)}</label>
         <input id="ktFilterActions" class="input" style="width:100%;font-size:var(--fs-xs)" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.actions||'')}">
       </div>
     </div>
@@ -1828,6 +1864,7 @@ function _ktBrFormatHOffset(posMin, cycleMin) {
 // widget on every tick, because that would destroy any <input> or
 // <button> the operator is currently interacting with — which is exactly
 // the bug that made Start / the HH:MM time picker unusable.
+let _ktBrPendingLayout = ''; // optimistic layout override while a control POST is in flight
 function _ktBrTick() {
   const host = document.getElementById('ktBattleRhythmWidget');
   if (!host) return;
@@ -1841,16 +1878,43 @@ function _ktBrTick() {
   host.style.display = '';
   const st = _ktBrLastState ? _ktBrExtrapolate(_ktBrLastState) : null;
   const canWrite = _ktState.access.can_write;
-  const layout = !st || !st.running ? 'stopped' : (st.paused ? 'paused' : 'running');
+  // Layout classification:
+  //   stopped:   no state / Running=false / Scheduled=false
+  //   scheduled: StartedAt is in the future, waiting for H0
+  //   paused:    StartedAt set, PausedAt set
+  //   running:   StartedAt set, elapsed >= 0, not paused
+  //   starting:  optimistic override set by _ktBrControl while waiting
+  //              for the server confirmation
+  let layout;
+  if (_ktBrPendingLayout) {
+    layout = _ktBrPendingLayout;
+  } else if (!st) {
+    layout = 'stopped';
+  } else if (st.scheduled) {
+    layout = 'scheduled';
+  } else if (!st.running) {
+    layout = 'stopped';
+  } else if (st.paused) {
+    layout = 'paused';
+  } else {
+    layout = 'running';
+  }
   const shellKey = layout + '|' + (canWrite ? 'w' : 'r');
   // Self-healing: if the board was fully re-rendered (SSE, bulk move,
   // etc.) the host is an empty div. childElementCount === 0 means we
   // need to rebuild the shell even if the layout key hasn't changed.
   if (shellKey !== _ktBrShellKey || host.childElementCount === 0) {
-    host.innerHTML = _ktBrBuildShell(st, canWrite);
+    host.innerHTML = _ktBrBuildShell(layout, st, canWrite);
     _ktBrShellKey = shellKey;
+    // CRITICAL: the shared _bindActions dispatcher only binds click
+    // handlers once per modal open, so any element we inject via
+    // innerHTML afterwards has no click handler. Re-bind here so the
+    // Start / Pause / Resume / Reset buttons actually fire when the
+    // operator clicks them. Without this, pressing Start does nothing
+    // (the previous bug report).
+    if (typeof _bindActions === 'function') _bindActions(host);
   }
-  _ktBrUpdateValues(cfg, st);
+  _ktBrUpdateValues(layout, cfg, st);
   // Border colour: follow the current step's colour if a step is active.
   const border = (st && st.current_step && st.current_step_idx >= 0)
     ? _ktBrStepColor(st.current_step, st.current_step_idx)
@@ -1862,32 +1926,69 @@ function _ktBrTick() {
 // layout state. Every dynamic value (H offset, current step, countdown,
 // cycles completed, state badge) is wrapped in an element with a stable
 // id so _ktBrUpdateValues can rewrite only the text nodes afterwards.
-function _ktBrBuildShell(st, canWrite) {
-  const stateLabel = !st || !st.running
-    ? (t('kt_br_stopped')||'Stopped')
-    : st.paused ? (t('kt_br_paused')||'Paused') : (t('kt_br_running')||'Running');
-  const stateColor = !st || !st.running ? 'var(--text-dim)' : (st.paused ? '#f1c40f' : '#27ae60');
+function _ktBrBuildShell(layout, st, canWrite) {
+  let stateLabel, stateColor, bgStyle = 'background:var(--bg2);border:1px solid var(--border)';
+  switch (layout) {
+    case 'starting':
+      stateLabel = (t('kt_br_starting')||'Starting…');
+      stateColor = '#3498db';
+      bgStyle = 'background:var(--bg2);border:2px dashed #3498db';
+      break;
+    case 'scheduled':
+      stateLabel = (t('kt_br_waiting')||'Waiting for H0');
+      stateColor = '#f39c12';
+      bgStyle = 'background:var(--bg2);border:2px solid #f39c12;box-shadow:0 0 0 2px rgba(243,156,18,.15)';
+      break;
+    case 'paused':
+      stateLabel = (t('kt_br_paused')||'Paused');
+      stateColor = '#f1c40f';
+      break;
+    case 'running':
+      stateLabel = (t('kt_br_running')||'Running');
+      stateColor = '#27ae60';
+      break;
+    default:
+      stateLabel = (t('kt_br_stopped')||'Stopped');
+      stateColor = 'var(--text-dim)';
+  }
   let controls = '';
   if (canWrite) {
-    if (!st || !st.running) {
+    if (layout === 'stopped') {
       controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
         <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>`;
-    } else if (st.paused) {
+    } else if (layout === 'starting') {
+      controls = `<button class="btn btn-sm btn-secondary" disabled style="opacity:.6">\u23F3 ${t('kt_br_starting')||'Starting…'}</button>`;
+    } else if (layout === 'scheduled') {
+      controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_cancel')||'Cancel'}</button>`;
+    } else if (layout === 'paused') {
       controls = `<button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
-    } else {
+    } else if (layout === 'running') {
       controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
     }
   }
+  // In "scheduled" mode, the big headline shows the waiting time and the
+  // target wall-clock time instead of an H-offset.
+  let headline = 'H--';
+  let subline = '';
+  if (layout === 'scheduled' && st && st.started_at) {
+    // The countdown text is updated on every tick; the target time is
+    // stable so it can be baked into the shell once.
+    const d = new Date(st.started_at);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    subline = `<div style="font-size:10px;color:#f39c12">${t('kt_br_waiting_for')||'Waiting for'} ${hh}:${mm}</div>`;
+  }
   return `
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
-      <div style="display:flex;flex-direction:column;min-width:100px">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--radius);${bgStyle};transition:background .3s, border-color .3s">
+      <div style="display:flex;flex-direction:column;min-width:110px">
         <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">${t('kt_br_clock')||'Battle Rhythm'}</div>
-        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1" id="ktBrHOffset">H--</div>
+        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1" id="ktBrHOffset">${headline}</div>
         <div style="font-size:10px;color:${stateColor}" id="ktBrState">● ${stateLabel}</div>
+        ${subline}
       </div>
-      <div style="display:flex;flex-direction:column;min-width:140px;font-size:var(--fs-xs)">
+      <div style="display:flex;flex-direction:column;min-width:160px;font-size:var(--fs-xs)">
         <div><span style="color:var(--text-dim)">${t('kt_br_cycle')||'Cycle'}:</span> <span id="ktBrCycleLen">\u2014</span></div>
         <div><span style="color:var(--text-dim)">${t('kt_br_cycles_done')||'Cycles completed'}:</span> <b id="ktBrCyclesDone">0</b></div>
         <div><span style="color:var(--text-dim)">${t('kt_br_current')||'Now'}:</span> <b id="ktBrCurrent">\u2014</b></div>
@@ -1899,9 +2000,21 @@ function _ktBrBuildShell(st, canWrite) {
 
 // _ktBrUpdateValues rewrites the text-only content of the widget so the
 // ticker animation runs without destroying any focus-holding input.
-function _ktBrUpdateValues(cfg, st) {
-  const hoffset = st && st.running ? _ktBrFormatHOffset(st.position_min, st.cycle_minutes) : 'H--';
+function _ktBrUpdateValues(layout, cfg, st) {
   const hEl = document.getElementById('ktBrHOffset');
+  let hoffset = 'H--';
+  if (layout === 'scheduled' && st && st.scheduled_seconds != null) {
+    // Live countdown: Tm:SS until H0.
+    const secs = Math.max(0, Math.round(st.scheduled_seconds - ((Date.now() - _ktBrLastFetchAt) / 1000)));
+    const mm = Math.floor(secs / 60);
+    const ss = secs % 60;
+    if (mm > 0) hoffset = '\u23F3 ' + mm + 'm ' + String(ss).padStart(2, '0') + 's';
+    else hoffset = '\u23F3 ' + ss + 's';
+  } else if (layout === 'running' || layout === 'paused') {
+    hoffset = _ktBrFormatHOffset(st.position_min, st.cycle_minutes);
+  } else if (layout === 'starting') {
+    hoffset = '\u23F3';
+  }
   if (hEl && hEl.textContent !== hoffset) hEl.textContent = hoffset;
   const cycleLen = (cfg.cycle_minutes || 0) + ' min';
   const cLen = document.getElementById('ktBrCycleLen');
@@ -1919,14 +2032,6 @@ function _ktBrUpdateValues(cfg, st) {
   }
   const nEl = document.getElementById('ktBrNext');
   if (nEl && nEl.textContent !== nxt) nEl.textContent = nxt;
-  // State badge text.
-  if (st) {
-    const stateLabel = !st.running
-      ? (t('kt_br_stopped')||'Stopped')
-      : st.paused ? (t('kt_br_paused')||'Paused') : (t('kt_br_running')||'Running');
-    const sEl = document.getElementById('ktBrState');
-    if (sEl && sEl.textContent !== '● ' + stateLabel) sEl.textContent = '● ' + stateLabel;
-  }
 }
 
 // _ktBrApplyBorderColor toggles the step-border CSS variable on the main
@@ -1945,6 +2050,15 @@ function _ktBrApplyBorderColor(color) {
 }
 
 async function _ktBrControl(action) {
+  // Immediate UI feedback: flip the widget into a "starting…" pending
+  // layout right away so the operator sees that the click registered.
+  // The pending state is cleared when the server responds (success) or
+  // when the error alert fires (failure).
+  if (action === 'start') {
+    _ktBrPendingLayout = 'starting';
+    _ktBrShellKey = ''; // force shell rebuild on next tick
+    _ktBrTick();
+  }
   try {
     const body = { action: action };
     if (action === 'start') {
@@ -1954,13 +2068,29 @@ async function _ktBrControl(action) {
     const st = await _ktApi('POST', '/key-terrain/battle-rhythm/control', body);
     _ktBrLastState = st;
     _ktBrLastFetchAt = Date.now();
+    _ktBrPendingLayout = '';
     // Also refresh the settings so the local cached copy picks up the
     // started_at / paused_at changes and the widget state is coherent.
     try {
       _ktState.settings = await _ktApi('GET', '/key-terrain/settings');
     } catch {}
-    _ktBrRenderWidget();
-  } catch (e) { alert('Error: ' + e.message); }
+    _ktBrShellKey = ''; // force shell rebuild now that we have the real state
+    _ktBrTick();
+    // Light confirmation toast so the operator is sure something happened.
+    if (typeof showNotification === 'function') {
+      const label = { start: t('kt_br_toast_started')||'Battle rhythm started',
+                      pause: t('kt_br_toast_paused')||'Battle rhythm paused',
+                      resume: t('kt_br_toast_resumed')||'Battle rhythm resumed',
+                      reset: t('kt_br_toast_reset')||'Battle rhythm reset' }[action] || action;
+      showNotification('success', label);
+    }
+  } catch (e) {
+    _ktBrPendingLayout = '';
+    _ktBrShellKey = '';
+    _ktBrTick();
+    if (typeof showError === 'function') showError('Battle rhythm: ' + e.message);
+    else alert('Error: ' + e.message);
+  }
 }
 
 
