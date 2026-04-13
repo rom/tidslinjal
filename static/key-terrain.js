@@ -104,8 +104,37 @@ function _ktSubscribeSSE() {
 }
 
 let _ktSSETimer = null;
-function _ktHandleSSE() {
-  // Debounce: don't refresh more than once per second
+function _ktHandleSSE(ev) {
+  // Branch on the action type in the SSE payload. Battle rhythm control
+  // actions (start, pause, resume, reset, backward, forward,
+  // fast_forward) only affect the clock widget — a full board re-render
+  // is unnecessary and visibly wipes the table (the "flash" bug). For
+  // those events we just poll the battle rhythm state and let the
+  // ticker redraw the widget in place.
+  const action = (ev && ev.detail && ev.detail.action) || '';
+  if (action && action.indexOf('battle_rhythm_') === 0) {
+    if (typeof _ktBrPoll === 'function') _ktBrPoll();
+    return;
+  }
+  // Cycle rollover: the Rounds field on every entry has been bumped on
+  // the server, so we do need to refresh entries — but we can skip the
+  // settings fetch because the only setting that changed is
+  // LastCycleIdx, which the widget doesn't care about between ticks.
+  if (action === 'cycle_rollover') {
+    if (_ktSSETimer) return;
+    _ktSSETimer = setTimeout(async () => {
+      _ktSSETimer = null;
+      try {
+        _ktState.entries = await _ktApi('GET', '/key-terrain');
+        _renderKeyTerrainBoard();
+        if (typeof _ktBrPoll === 'function') _ktBrPoll();
+      } catch {}
+    }, 200);
+    return;
+  }
+  // Everything else (entry_created, entry_updated, entry_deleted,
+  // settings_updated) goes through the full refresh. Debounced so
+  // bursty changes don't cause multiple re-renders within a second.
   if (_ktSSETimer) return;
   _ktSSETimer = setTimeout(async () => {
     _ktSSETimer = null;
@@ -1953,6 +1982,16 @@ function _ktBrBuildShell(layout, st, canWrite) {
   }
   let controls = '';
   if (canWrite) {
+    // Step navigation buttons — shown whenever the clock is running or
+    // paused. Forward / Fast Forward skip ahead to the start of the next
+    // step; Backward rewinds to the start of the previous one. Only
+    // disabled in stopped / scheduled / starting layouts where there's
+    // no "current position" to navigate from yet.
+    const navButtons = (layout === 'running' || layout === 'paused')
+      ? `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="backward" title="${t('kt_br_backward_h')||'Rewind to previous step'}">\u23EA</button>
+         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="forward" title="${t('kt_br_forward_h')||'Advance to next step (current step cut short)'}">\u23ED</button>
+         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Fast-forward to next step (catch up to schedule)'}">\u23E9</button>`
+      : '';
     if (layout === 'stopped') {
       controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
         <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>`;
@@ -1961,10 +2000,12 @@ function _ktBrBuildShell(layout, st, canWrite) {
     } else if (layout === 'scheduled') {
       controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_cancel')||'Cancel'}</button>`;
     } else if (layout === 'paused') {
-      controls = `<button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
+      controls = `${navButtons}
+        <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
     } else if (layout === 'running') {
-      controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
+      controls = `${navButtons}
+        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
     }
   }
@@ -2069,11 +2110,16 @@ async function _ktBrControl(action) {
     _ktBrLastState = st;
     _ktBrLastFetchAt = Date.now();
     _ktBrPendingLayout = '';
-    // Also refresh the settings so the local cached copy picks up the
-    // started_at / paused_at changes and the widget state is coherent.
-    try {
-      _ktState.settings = await _ktApi('GET', '/key-terrain/settings');
-    } catch {}
+    // Mirror the new started_at/paused_at onto the cached settings so
+    // the widget's cfg.* lookup is coherent without a settings GET.
+    // Fetching settings here used to trigger a board-level SSE roundtrip
+    // in parallel with the server's own broadcast, which contributed to
+    // the "flash" bug. Reading just the clock state is enough.
+    if (_ktState.settings && _ktState.settings.battle_rhythm) {
+      _ktState.settings.battle_rhythm.started_at = st.started_at || null;
+      // Derive paused state from the computed state.
+      _ktState.settings.battle_rhythm.paused_at = st.paused ? new Date().toISOString() : null;
+    }
     _ktBrShellKey = ''; // force shell rebuild now that we have the real state
     _ktBrTick();
     // Light confirmation toast so the operator is sure something happened.
@@ -2081,7 +2127,10 @@ async function _ktBrControl(action) {
       const label = { start: t('kt_br_toast_started')||'Battle rhythm started',
                       pause: t('kt_br_toast_paused')||'Battle rhythm paused',
                       resume: t('kt_br_toast_resumed')||'Battle rhythm resumed',
-                      reset: t('kt_br_toast_reset')||'Battle rhythm reset' }[action] || action;
+                      reset: t('kt_br_toast_reset')||'Battle rhythm reset',
+                      forward: t('kt_br_toast_forward')||'Advanced to next step',
+                      backward: t('kt_br_toast_backward')||'Rewound to previous step',
+                      fast_forward: t('kt_br_toast_fforward')||'Fast-forwarded to next step' }[action] || action;
       showNotification('success', label);
     }
   } catch (e) {

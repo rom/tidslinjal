@@ -73,8 +73,10 @@ function connectPopupSSE() {
   if (_sseConn) { _sseConn.close(); _sseConn = null; }
   try {
     _sseConn = new EventSource('/api/notifications/stream');
-    _sseConn.addEventListener('key_terrain_change', function() {
-      document.dispatchEvent(new CustomEvent('sse:key_terrain_change'));
+    _sseConn.addEventListener('key_terrain_change', function(e) {
+      var detail = {};
+      try { detail = JSON.parse(e.data || '{}'); } catch (err) {}
+      document.dispatchEvent(new CustomEvent('sse:key_terrain_change', { detail: detail }));
     });
     _sseConn.onopen = function() { _sseReconnectAttempts = 0; };
     _sseConn.onerror = function() {

@@ -66,9 +66,15 @@ function connectSSE() {
       if (state.sidebarTab !== 'references' && state.sidebarTab !== 'integrations' && state.sidebarTab !== 'settings') renderSidebar();
     } catch { /* ignore parse errors */ }
   });
-  // Key Terrain Board changes — dispatch custom event for key-terrain.js to handle
-  es.addEventListener('key_terrain_change', () => {
-    document.dispatchEvent(new CustomEvent('sse:key_terrain_change'));
+  // Key Terrain Board changes — dispatch custom event for key-terrain.js
+  // to handle. Forward the raw payload as event.detail so the KT handler
+  // can branch on the action type (e.g. skip a full board re-render when
+  // the change is just a battle_rhythm_* clock control — that's what
+  // caused the Start/Pause flash).
+  es.addEventListener('key_terrain_change', (e) => {
+    let detail = {};
+    try { detail = JSON.parse(e.data || '{}'); } catch {}
+    document.dispatchEvent(new CustomEvent('sse:key_terrain_change', { detail: detail }));
   });
   // Log changes (log_book, event_log, checklist_log, audit_log, pollster_log)
   es.addEventListener('log_change', (e) => {
