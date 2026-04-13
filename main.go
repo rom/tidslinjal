@@ -2657,7 +2657,7 @@ func main() {
 	}
 
 	// Resolve enabled languages
-	allLangs := []string{"en", "sv", "fr", "fi", "da", "de", "nb", "nl", "et", "lv", "lt", "it", "es", "pt", "pl", "uk", "is", "ko", "ja"}
+	allLangs := []string{"en", "sv", "fr", "fi", "da", "de", "nb", "nl", "et", "lv", "lt", "it", "es", "pt", "pl", "uk", "is", "ko", "ja", "hu"}
 	if languagesFlag != "" {
 		// Explicit whitelist
 		var enabled []string

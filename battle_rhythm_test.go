@@ -351,6 +351,71 @@ func TestComputeBattleRhythmStateOverlappingSteps(t *testing.T) {
 	}
 }
 
+// TestComputeBattleRhythmStateScheduledTransition pins the transition
+// from the "scheduled" state (StartedAt in the future) to the running
+// state at exactly H0 and thereafter. When an operator presses Start
+// with a future HH:MM time, the clock must stay in Scheduled=true
+// until the wall clock hits that moment, and then flip to Running=true
+// so the widget automatically advances from the countdown to the
+// H-offset display.
+func TestComputeBattleRhythmStateScheduledTransition(t *testing.T) {
+	// H0 is set for exactly 09:00 local time today.
+	h0 := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		ShowClock:    true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+	}
+
+	// 1. Five minutes before H0: Scheduled=true, Running=false, countdown ≈ 300 s.
+	st := computeBattleRhythmState(cfg, h0.Add(-5*time.Minute))
+	if st.Running {
+		t.Errorf("5 min before H0: Running=true, want false")
+	}
+	if !st.Scheduled {
+		t.Errorf("5 min before H0: Scheduled=false, want true")
+	}
+	if st.ScheduledSeconds < 299 || st.ScheduledSeconds > 301 {
+		t.Errorf("ScheduledSeconds = %v, want ~300", st.ScheduledSeconds)
+	}
+
+	// 2. One nanosecond before H0: still Scheduled.
+	st = computeBattleRhythmState(cfg, h0.Add(-1))
+	if !st.Scheduled || st.Running {
+		t.Errorf("just before H0: got scheduled=%v running=%v, want true/false", st.Scheduled, st.Running)
+	}
+
+	// 3. Exactly at H0: now is NOT before H0 so the branch exits
+	//    Scheduled and enters Running. Position should be 0.
+	st = computeBattleRhythmState(cfg, h0)
+	if st.Scheduled {
+		t.Errorf("at H0: Scheduled=true, want false")
+	}
+	if !st.Running {
+		t.Errorf("at H0: Running=false, want true")
+	}
+	if st.PositionMin < 0 || st.PositionMin > 0.01 {
+		t.Errorf("at H0: PositionMin = %v, want ~0", st.PositionMin)
+	}
+
+	// 4. Thirty seconds past H0: Running, position ~0.5 minute.
+	st = computeBattleRhythmState(cfg, h0.Add(30*time.Second))
+	if !st.Running || st.Scheduled {
+		t.Errorf("30 s after H0: got running=%v scheduled=%v, want true/false", st.Running, st.Scheduled)
+	}
+	if st.PositionMin < 0.49 || st.PositionMin > 0.51 {
+		t.Errorf("30 s after H0: PositionMin = %v, want ~0.5", st.PositionMin)
+	}
+
+	// 5. StartedAt is preserved in the state so the frontend can show
+	//    "Waiting for HH:MM" while scheduled.
+	st = computeBattleRhythmState(cfg, h0.Add(-1*time.Minute))
+	if st.StartedAt == nil || !st.StartedAt.Equal(h0) {
+		t.Errorf("state.started_at = %v, want %v", st.StartedAt, h0)
+	}
+}
+
 // TestResolveBattleRhythmStartTime covers the "start at 09:00" behaviour:
 // when the requested wall-clock time is in the future today, schedule for
 // today; when it's already past, schedule for tomorrow.

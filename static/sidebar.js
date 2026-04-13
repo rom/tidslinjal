@@ -2799,7 +2799,7 @@ Fields: file, subject, sender, type, tags</pre>
             {code:'fi',name:'Suomi'},{code:'is',name:'Íslenska'},{code:'da',name:'Dansk'},{code:'nb',name:'Norsk (Bokmål)'},
             {code:'et',name:'Eesti'},{code:'lv',name:'Latviešu'},{code:'lt',name:'Lietuvių'},
             {code:'it',name:'Italiano'},{code:'es',name:'Español'},{code:'pt',name:'Português'},
-            {code:'pl',name:'Polski'},{code:'uk',name:'Українська'},
+            {code:'pl',name:'Polski'},{code:'uk',name:'Українська'},{code:'hu',name:'Magyar'},
             {code:'ja',name:'日本語'},{code:'ko',name:'한국어'}
           ].filter(l => isLangEnabled(l.code)).map(l =>
             `<button class="toggle-btn${p.language===l.code?' active':''}" data-action="setPref" data-args='["language","${l.code}"]' title="${l.name}">${langAbbr(l.code)}</button>`
