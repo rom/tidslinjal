@@ -51,8 +51,19 @@ type battleRhythmState struct {
 	StartedAt        *time.Time         `json:"started_at,omitempty"`      // raw scheduled H0 (same as cfg.StartedAt)
 	ElapsedMinutes   float64            `json:"elapsed_minutes"`           // minutes since H0, may exceed cycle when clock spans cycles
 	PositionMin      float64            `json:"position_min"`              // elapsed modulo cycle
+	// CurrentStep is the first step whose [start, end] interval contains
+	// the current clock position. For backwards compatibility only; the
+	// canonical "what is active now" source is CurrentSteps below, which
+	// can contain more than one entry when two or more steps overlap at
+	// the current position.
 	CurrentStep      *BattleRhythmStep  `json:"current_step,omitempty"`
-	CurrentStepIdx   int                `json:"current_step_idx,omitempty"` // index into Steps of CurrentStep, or -1
+	CurrentStepIdx   int                `json:"current_step_idx,omitempty"` // index of CurrentStep inside cfg.Steps, or -1
+	// CurrentSteps lists every step whose interval contains the current
+	// clock position, in the order they were defined. When two or more
+	// steps overlap (fully or partially) the frontend joins their names
+	// in the "Now" field, e.g. "Brief + Assess", and the border colour
+	// is taken from the first active step.
+	CurrentSteps     []BattleRhythmStep `json:"current_steps,omitempty"`
 	NextStep         *BattleRhythmStep  `json:"next_step,omitempty"`
 	NextStepInMin    *float64           `json:"next_step_in_min,omitempty"`
 	// CyclesCompleted is the zero-based index of the cycle the clock is
@@ -121,38 +132,69 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	// visible near the end of that cycle. We render steps relative to the
 	// closest cycle start.
 	if len(cfg.Steps) > 0 {
-		var current *BattleRhythmStep
-		currentIdx := -1
+		var firstCurrent *BattleRhythmStep
+		firstCurrentIdx := -1
+		var currentSteps []BattleRhythmStep
 		var next *BattleRhythmStep
 		var nextDelta float64 = -1
 		for i := range cfg.Steps {
 			step := cfg.Steps[i]
 			start := step.StartOffsetMin
 			end := start
-			if step.EndOffsetMin != nil {
+			instant := step.EndOffsetMin == nil
+			if !instant {
 				end = *step.EndOffsetMin
 			}
 			if end < start {
 				end = start
 			}
-			// Is the clock currently inside this step?
-			if float64(start) <= st.PositionMin && st.PositionMin <= float64(end) {
-				current = &cfg.Steps[i]
-				currentIdx = i
+			// Step-active check. Ranged steps use the half-open interval
+			// [start, end): a step that ends at minute 60 is no longer
+			// active at position 60 (the next step starting at 60 is).
+			// Instant steps (EndOffsetMin == nil) are reported active
+			// when the position is within 0.5 min of their start so a
+			// whole-minute scheduler tick doesn't miss them entirely.
+			active := false
+			if instant {
+				if math.Abs(st.PositionMin-float64(start)) < 0.5 {
+					active = true
+				}
+			} else if float64(start) <= st.PositionMin && st.PositionMin < float64(end) {
+				active = true
 			}
-			// Next step: smallest positive delta from current position.
-			delta := float64(start) - st.PositionMin
-			if delta < 0 {
-				// Wraps to next cycle.
-				delta += float64(cfg.CycleMinutes)
+			if active {
+				currentSteps = append(currentSteps, cfg.Steps[i])
+				if firstCurrent == nil {
+					firstCurrent = &cfg.Steps[i]
+					firstCurrentIdx = i
+				}
 			}
-			if nextDelta < 0 || delta < nextDelta {
-				nextDelta = delta
-				next = &cfg.Steps[i]
+			// Next step: smallest strictly-positive delta from the
+			// current position. Only consider steps that are not
+			// currently active so "Next" always looks forward.
+			if !active && float64(start) > st.PositionMin+1e-9 {
+				delta := float64(start) - st.PositionMin
+				if nextDelta < 0 || delta < nextDelta {
+					nextDelta = delta
+					next = &cfg.Steps[i]
+				}
 			}
 		}
-		st.CurrentStep = current
-		st.CurrentStepIdx = currentIdx
+		// If every step is either active or behind us, look one cycle
+		// ahead so the "Next" field still has a reasonable value.
+		if next == nil {
+			for i := range cfg.Steps {
+				s := cfg.Steps[i]
+				delta := float64(s.StartOffsetMin) - st.PositionMin + float64(cfg.CycleMinutes)
+				if nextDelta < 0 || delta < nextDelta {
+					nextDelta = delta
+					next = &cfg.Steps[i]
+				}
+			}
+		}
+		st.CurrentStep = firstCurrent
+		st.CurrentStepIdx = firstCurrentIdx
+		st.CurrentSteps = currentSteps
 		if next != nil {
 			st.NextStep = next
 			st.NextStepInMin = &nextDelta

@@ -275,6 +275,82 @@ func TestDonateLeftoverToNextStep(t *testing.T) {
 	}
 }
 
+// TestComputeBattleRhythmStateOverlappingSteps verifies that two (or
+// more) steps whose intervals genuinely overlap at the current position
+// are both reported in CurrentSteps, in definition order. The first
+// active step remains the backwards-compatible CurrentStep field so
+// older clients that only look at CurrentStep still get a sensible
+// answer.
+func TestComputeBattleRhythmStateOverlappingSteps(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+	h0 := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+		Steps: []BattleRhythmStep{
+			// Brief [30, 75) — long, overlaps into Assess.
+			{Name: "Brief", StartOffsetMin: 30, EndOffsetMin: intPtr(75)},
+			// Assess [60, 90) — starts while Brief is still running.
+			{Name: "Assess", StartOffsetMin: 60, EndOffsetMin: intPtr(90)},
+			// Execute [90, 120) — starts when Assess ends.
+			{Name: "Execute", StartOffsetMin: 90, EndOffsetMin: intPtr(120)},
+		},
+	}
+
+	// At H+70: Brief and Assess both contain this position.
+	at70 := h0.Add(70 * time.Minute)
+	st := computeBattleRhythmState(cfg, at70)
+	if len(st.CurrentSteps) != 2 {
+		t.Fatalf("expected 2 active steps at H+70, got %d", len(st.CurrentSteps))
+	}
+	if st.CurrentSteps[0].Name != "Brief" || st.CurrentSteps[1].Name != "Assess" {
+		t.Errorf("overlap order = [%s, %s], want [Brief, Assess]",
+			st.CurrentSteps[0].Name, st.CurrentSteps[1].Name)
+	}
+	// CurrentStep (singular, compat) should be the first active step.
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Brief" {
+		t.Errorf("CurrentStep (compat) = %v, want Brief", st.CurrentStep)
+	}
+	// Next step when Brief+Assess are active should be Execute.
+	if st.NextStep == nil || st.NextStep.Name != "Execute" {
+		t.Errorf("NextStep with overlap active = %v, want Execute", st.NextStep)
+	}
+
+	// At H+50: only Brief is active.
+	at50 := h0.Add(50 * time.Minute)
+	st = computeBattleRhythmState(cfg, at50)
+	if len(st.CurrentSteps) != 1 || st.CurrentSteps[0].Name != "Brief" {
+		t.Errorf("at H+50: CurrentSteps = %v, want [Brief]", st.CurrentSteps)
+	}
+
+	// Half-open interval: at H+60 exactly, Assess has just started and
+	// Brief (which actually ends at 75 here) is still running. So the
+	// overlap still applies — both active.
+	at60 := h0.Add(60 * time.Minute)
+	st = computeBattleRhythmState(cfg, at60)
+	if len(st.CurrentSteps) != 2 {
+		t.Errorf("at H+60 with overlap interval: got %d active steps, want 2", len(st.CurrentSteps))
+	}
+
+	// Non-overlapping boundary: in a cycle where Brief is strictly
+	// [30, 60) and Assess is [60, 90), at H+60 only Assess should be
+	// active (no single-point double-count at the boundary).
+	cfgStrict := BattleRhythmConfig{
+		Enabled:      true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+		Steps: []BattleRhythmStep{
+			{Name: "Brief", StartOffsetMin: 30, EndOffsetMin: intPtr(60)},
+			{Name: "Assess", StartOffsetMin: 60, EndOffsetMin: intPtr(90)},
+		},
+	}
+	st = computeBattleRhythmState(cfgStrict, at60)
+	if len(st.CurrentSteps) != 1 || st.CurrentSteps[0].Name != "Assess" {
+		t.Errorf("non-overlapping boundary at H+60: got %v, want [Assess]", st.CurrentSteps)
+	}
+}
+
 // TestResolveBattleRhythmStartTime covers the "start at 09:00" behaviour:
 // when the requested wall-clock time is in the future today, schedule for
 // today; when it's already past, schedule for tomorrow.

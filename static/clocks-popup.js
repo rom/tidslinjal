@@ -2508,7 +2508,20 @@ function tickBattleRhythm() {
   const cycle = st.cycle_minutes || 0;
   const pos = cycle ? ((st.position_min || 0) + deltaMin) % cycle : st.position_min;
   hEl.textContent = _brFormatHOffset(pos, cycle);
-  if (curEl) curEl.textContent = st.current_step ? st.current_step.name : (st.paused ? 'Paused' : '—');
+  if (curEl) {
+    // Multiple overlapping steps are joined with " + " so the card's
+    // middle line reads e.g. "Brief + Assess" when two steps overlap
+    // the current position.
+    let label = '—';
+    if (Array.isArray(st.current_steps) && st.current_steps.length > 0) {
+      label = st.current_steps.map(function (s) { return s.name; }).join(' + ');
+    } else if (st.current_step) {
+      label = st.current_step.name;
+    } else if (st.paused) {
+      label = 'Paused';
+    }
+    curEl.textContent = label;
+  }
   if (nxtEl) {
     if (st.next_step && st.next_step_in_min != null) {
       const nxtIn = Math.max(0, Math.round(st.next_step_in_min - deltaMin));
