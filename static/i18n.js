@@ -46,7 +46,14 @@ function t(key) {
       if (typeof renderSidebar === 'function') renderSidebar();
     });
   }
-  return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
+  // Return the localized value, falling back to English, and finally
+  // to an empty string when the key is missing everywhere. Returning
+  // "" instead of the raw key lets call sites chain `t(key) || 'default'`
+  // to provide a hardcoded English fallback that survives missing keys.
+  // Before: a missing key returned its own name so `t('foo') || 'bar'`
+  // kept the raw literal "foo" visible in the UI (non-empty strings are
+  // truthy) — which is exactly what the kt_help_br bug report showed.
+  return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || (TRANSLATIONS.en && TRANSLATIONS.en[key]) || '';
 }
 
 function getLocale() {
