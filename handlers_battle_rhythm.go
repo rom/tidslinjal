@@ -169,17 +169,36 @@ func (app *App) handleGetBattleRhythmState(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, st)
 }
 
-// handleBattleRhythmControl starts, pauses, resumes, or resets the clock.
-// Teamlead+ only (same gating as other Key Terrain writes).
+// handleBattleRhythmControl starts, pauses, resumes, resets or navigates
+// the clock between steps. Teamlead+ only (same gating as other Key
+// Terrain writes).
 //
-// Body: {"action":"start"|"pause"|"resume"|"reset", "start_at":"15:04"?}
-// - start:  sets StartedAt to now (or to today's clock-time when start_at
-//           is provided, e.g. "09:00" — in the server's local zone).
-// - pause:  sets PausedAt to now (no-op if already paused).
-// - resume: shifts StartedAt forward by the pause duration and clears
-//           PausedAt so the elapsed position resumes from where it froze.
-// - reset:  clears StartedAt and PausedAt; Enabled/ShowClock/Steps etc.
-//           are preserved.
+// Body: {"action":"start"|"pause"|"resume"|"reset"|"backward"|"forward"|
+//        "fast_forward", "start_at":"15:04"?}
+//
+// - start:        sets StartedAt to now (or to today's clock-time when
+//                 start_at is provided, e.g. "09:00" — server-local).
+// - pause:        sets PausedAt to now (no-op if already paused).
+// - resume:       shifts StartedAt forward by the pause duration and
+//                 clears PausedAt so the elapsed position resumes from
+//                 where it froze.
+// - reset:        clears StartedAt and PausedAt; Enabled/ShowClock/Steps
+//                 are preserved.
+// - backward:     shifts H0 forward by (current_position - prev_step_start)
+//                 so the clock position rewinds to the start of the
+//                 previous step. If no previous step in this cycle,
+//                 rewinds to H0 of the current cycle.
+// - forward:      shifts H0 backward by (next_step_start - current_position)
+//                 so the clock position jumps to the start of the next
+//                 step. The current step is effectively cut short; wall
+//                 clock continues normally. Cycle rollover happens
+//                 earlier in wall clock.
+// - fast_forward: same H0 shift as forward. Conceptually: "catch up to
+//                 the step we should have started by now". Emitted as a
+//                 separate action so the frontend can distinguish the
+//                 toast/label, and left deliberately close-to-equivalent
+//                 until the operator confirms the exact semantic they
+//                 want (skip wall clock vs donate leftover time).
 func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
@@ -232,8 +251,33 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 		cfg.StartedAt = nil
 		cfg.PausedAt = nil
 		cfg.LastCycleIdx = 0
+	case "backward", "forward", "fast_forward":
+		if cfg.StartedAt == nil {
+			jsonError(w, "battle rhythm is not running", http.StatusBadRequest)
+			return
+		}
+		if cfg.CycleMinutes <= 0 {
+			jsonError(w, "cycle length must be > 0", http.StatusBadRequest)
+			return
+		}
+		shift, err := computeBattleRhythmStepShift(cfg, now, req.Action)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// Applying the shift: positive shift means "rewind" (H0 moves
+		// forward in time); negative means "advance" (H0 moves back).
+		shifted := cfg.StartedAt.Add(shift)
+		cfg.StartedAt = &shifted
+		// If paused, keep PausedAt consistent with the new H0 so the
+		// frozen position is preserved relative to the step we just
+		// jumped to.
+		if cfg.PausedAt != nil {
+			pausedShifted := cfg.PausedAt.Add(shift)
+			cfg.PausedAt = &pausedShifted
+		}
 	default:
-		jsonError(w, "action must be start|pause|resume|reset", http.StatusBadRequest)
+		jsonError(w, "action must be start|pause|resume|reset|backward|forward|fast_forward", http.StatusBadRequest)
 		return
 	}
 	settings.BattleRhythm = cfg
@@ -349,6 +393,108 @@ func (app *App) handleDownloadBattleRhythmSnapshot(w http.ResponseWriter, r *htt
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, parts[1]))
 	http.ServeFile(w, r, full)
+}
+
+// computeBattleRhythmStepShift returns the duration to add to
+// BattleRhythmConfig.StartedAt for a backward / forward / fast_forward
+// navigation. A positive result means H0 moves forward in wall clock
+// (the apparent position rewinds); a negative result means H0 moves
+// backward (the apparent position advances).
+//
+// The shift is computed against the position we'd compute for `now`
+// against the current config, and against the list of step start
+// offsets in the cycle. "backward" lands the apparent position on the
+// start of the most recent step that has already begun; "forward" and
+// "fast_forward" land it on the start of the next step whose offset
+// lies strictly after the current position. If there is no such
+// neighbour inside the current cycle, we fall back to the cycle
+// boundary (H0 of the previous or next cycle).
+func computeBattleRhythmStepShift(cfg BattleRhythmConfig, now time.Time, action string) (time.Duration, error) {
+	st := computeBattleRhythmState(cfg, now)
+	cycle := cfg.CycleMinutes
+	if cycle <= 0 {
+		return 0, errors.New("cycle length must be > 0")
+	}
+	// Current position in the cycle, 0..cycle.
+	pos := st.PositionMin
+	// Build a sorted list of step starts normalised into [0, cycle).
+	// Negative offsets wrap to the end of the cycle (e.g. a step with
+	// start=-15 in a 120-min cycle appears at offset 105). Duplicates
+	// are kept so a cycle with two steps starting at the same minute
+	// still behaves deterministically.
+	starts := make([]float64, 0, len(cfg.Steps))
+	for _, step := range cfg.Steps {
+		offset := float64(step.StartOffsetMin)
+		mod := offset - float64(cycle)*(floorDiv(offset, float64(cycle)))
+		if mod < 0 {
+			mod += float64(cycle)
+		}
+		starts = append(starts, mod)
+	}
+	sort.Float64s(starts)
+
+	switch action {
+	case "backward":
+		// Find the largest start strictly less than the current position.
+		// If at position 0 (rare), rewind one cycle; otherwise land at
+		// the previous step start, or at 0 if no earlier step.
+		target := -1.0
+		for _, s := range starts {
+			if s < pos-1e-9 {
+				if s > target {
+					target = s
+				}
+			}
+		}
+		if target < 0 {
+			// No previous step — rewind to H0 of the current cycle
+			// (position 0). If we're already there, rewind a full cycle.
+			if pos < 1e-6 {
+				return time.Duration(cycle) * time.Minute, nil
+			}
+			target = 0
+		}
+		// Delta (how far back in cycle we want to go) is (pos - target).
+		// Shift H0 FORWARD by that many minutes so new_position = target.
+		delta := (pos - target) * float64(time.Minute)
+		return time.Duration(delta), nil
+
+	case "forward", "fast_forward":
+		// Find the smallest start strictly greater than the current
+		// position. If none, land at the cycle boundary (cycle end =
+		// start of next cycle's H0).
+		target := -1.0
+		for _, s := range starts {
+			if s > pos+1e-9 {
+				if target < 0 || s < target {
+					target = s
+				}
+			}
+		}
+		if target < 0 {
+			target = float64(cycle) // next cycle boundary
+		}
+		// Delta is (target - pos). Shift H0 BACKWARD by that many
+		// minutes so new_position = target.
+		delta := (target - pos) * float64(time.Minute)
+		return -time.Duration(delta), nil
+	}
+	return 0, fmt.Errorf("unknown navigation action %q", action)
+}
+
+// floorDiv returns math.Floor(a/b) as a float64, avoiding imports.
+func floorDiv(a, b float64) float64 {
+	q := a / b
+	if q >= 0 {
+		// integer floor via truncation
+		return float64(int64(q))
+	}
+	// negative: truncation is toward zero, floor goes further negative
+	n := int64(q)
+	if float64(n) == q {
+		return float64(n)
+	}
+	return float64(n - 1)
 }
 
 // resolveBattleRhythmStartTime returns the effective H0 for a new cycle.

@@ -88,6 +88,107 @@ func TestComputeBattleRhythmState(t *testing.T) {
 	}
 }
 
+// TestComputeBattleRhythmStepShift pins the forward / backward / fast-
+// forward step navigation math. Given a cycle with steps at fixed
+// offsets, each action should return a H0 shift that lands the
+// apparent clock position on the correct neighbouring step start.
+func TestComputeBattleRhythmStepShift(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+	h0 := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+		Steps: []BattleRhythmStep{
+			{Name: "Brief", StartOffsetMin: 30, EndOffsetMin: intPtr(60)},
+			{Name: "Assess", StartOffsetMin: 60, EndOffsetMin: intPtr(90)},
+			{Name: "Execute", StartOffsetMin: 90, EndOffsetMin: intPtr(120)},
+		},
+	}
+	// At H+45 (inside Brief): forward → +15 min advance, so H0 shifts
+	// back by 15 min (negative delta); backward → rewind 15 min (delta 0
+	// → previous start is H+30, so positive 15).
+	at45 := h0.Add(45 * time.Minute)
+
+	fwd, err := computeBattleRhythmStepShift(cfg, at45, "forward")
+	if err != nil {
+		t.Fatalf("forward: %v", err)
+	}
+	if fwd != -15*time.Minute {
+		t.Errorf("forward at H+45: got shift %v, want -15m", fwd)
+	}
+	// Verify forward actually lands us at H+60.
+	cfgFwd := cfg
+	newH0Fwd := h0.Add(fwd)
+	cfgFwd.StartedAt = &newH0Fwd
+	stFwd := computeBattleRhythmState(cfgFwd, at45)
+	if stFwd.PositionMin < 59.99 || stFwd.PositionMin > 60.01 {
+		t.Errorf("forward shift landed at %v, want ~60", stFwd.PositionMin)
+	}
+	if stFwd.CurrentStep == nil || stFwd.CurrentStep.Name != "Assess" {
+		t.Errorf("forward shift: current step = %v, want Assess", stFwd.CurrentStep)
+	}
+
+	back, err := computeBattleRhythmStepShift(cfg, at45, "backward")
+	if err != nil {
+		t.Fatalf("backward: %v", err)
+	}
+	if back != 15*time.Minute {
+		t.Errorf("backward at H+45: got shift %v, want +15m", back)
+	}
+	cfgBack := cfg
+	newH0Back := h0.Add(back)
+	cfgBack.StartedAt = &newH0Back
+	stBack := computeBattleRhythmState(cfgBack, at45)
+	if stBack.PositionMin < 29.99 || stBack.PositionMin > 30.01 {
+		t.Errorf("backward shift landed at %v, want ~30", stBack.PositionMin)
+	}
+
+	// fast_forward is currently defined to match forward's shift.
+	ff, err := computeBattleRhythmStepShift(cfg, at45, "fast_forward")
+	if err != nil {
+		t.Fatalf("fast_forward: %v", err)
+	}
+	if ff != fwd {
+		t.Errorf("fast_forward shift = %v, expected to match forward (%v)", ff, fwd)
+	}
+
+	// Forward past the last step rolls to the next cycle boundary.
+	at100 := h0.Add(100 * time.Minute) // inside Execute (H+90..H+120)
+	fwdRoll, err := computeBattleRhythmStepShift(cfg, at100, "forward")
+	if err != nil {
+		t.Fatalf("forward rollover: %v", err)
+	}
+	if fwdRoll != -20*time.Minute {
+		t.Errorf("forward rollover: got %v, want -20m (to reach next cycle start)", fwdRoll)
+	}
+
+	// Backward when already at H+30 (start of Brief) rewinds to H+0.
+	at30 := h0.Add(30 * time.Minute)
+	backToZero, err := computeBattleRhythmStepShift(cfg, at30, "backward")
+	if err != nil {
+		t.Fatalf("backward to zero: %v", err)
+	}
+	if backToZero != 30*time.Minute {
+		t.Errorf("backward from H+30: got %v, want +30m (→ H+0)", backToZero)
+	}
+
+	// Backward when already at H+0 rewinds one full cycle.
+	atZero := h0
+	backFullCycle, err := computeBattleRhythmStepShift(cfg, atZero, "backward")
+	if err != nil {
+		t.Fatalf("backward full cycle: %v", err)
+	}
+	if backFullCycle != 120*time.Minute {
+		t.Errorf("backward from H+0: got %v, want +120m (one full cycle)", backFullCycle)
+	}
+
+	// Unknown action returns an error.
+	if _, err := computeBattleRhythmStepShift(cfg, at45, "wiggle"); err == nil {
+		t.Errorf("expected error for unknown action")
+	}
+}
+
 // TestResolveBattleRhythmStartTime covers the "start at 09:00" behaviour:
 // when the requested wall-clock time is in the future today, schedule for
 // today; when it's already past, schedule for tomorrow.
