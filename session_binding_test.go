@@ -45,7 +45,16 @@ func TestSessionBindingMismatch(t *testing.T) {
 	}
 
 	sess := &Session{IPAddress: "10.0.0.5", UserAgent: "Mozilla/5.0 Foo"}
-	ss := SecuritySettings{SessionBindIP: true, SessionBindIPMode: "subnet", SessionBindUA: true}
+	// With the master switch enabled, the sub-options take effect.
+	ss := SecuritySettings{SessionHijackProtection: true, SessionBindIP: true, SessionBindIPMode: "subnet", SessionBindUA: true}
+
+	// Master switch OFF (default): every mismatch is ignored even
+	// when the sub-options say to check. The feature is DISABLED by
+	// default to avoid kicking users out behind reverse proxies.
+	ssMasterOff := SecuritySettings{SessionHijackProtection: false, SessionBindIP: true, SessionBindUA: true}
+	if r := sessionBindingMismatch(sess, mkReq("8.8.8.8", "completely different"), ssMasterOff); r != "" {
+		t.Errorf("expected no mismatch with master switch off, got %q", r)
+	}
 
 	// Matching request — no mismatch.
 	if r := sessionBindingMismatch(sess, mkReq("10.0.0.5", "Mozilla/5.0 Foo"), ss); r != "" {
@@ -69,10 +78,10 @@ func TestSessionBindingMismatch(t *testing.T) {
 	if r := sessionBindingMismatch(sess, mkReq("10.0.0.6", "Mozilla/5.0 Foo"), strict); r != "ip" {
 		t.Errorf("expected strict ip mismatch, got %q", r)
 	}
-	// Disabled binding — mismatches ignored.
-	off := SecuritySettings{SessionBindIP: false, SessionBindUA: false}
+	// Disabled sub-options (but master switch on) — mismatches ignored.
+	off := SecuritySettings{SessionHijackProtection: true, SessionBindIP: false, SessionBindUA: false}
 	if r := sessionBindingMismatch(sess, mkReq("8.8.8.8", "something else"), off); r != "" {
-		t.Errorf("expected no mismatch when binding disabled, got %q", r)
+		t.Errorf("expected no mismatch when sub-options disabled, got %q", r)
 	}
 	// Legacy sessions with empty stored binding metadata — gracefully allowed.
 	legacy := &Session{}

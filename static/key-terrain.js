@@ -407,7 +407,18 @@ function _renderKeyTerrainBoard() {
     };
 
     html += `<tr style="background:${rowBg};border-bottom:1px solid var(--border);transition:background .15s;${rowStyle}${canWrite?';cursor:pointer':''}" data-row-bg="${rowBg}" ${canWrite ? `data-action="_ktEditEntry" data-arg="${e.id}"` : ''}>
-      ${cols.map(c => cellHtml[c] || '').join('')}
+      ${cols.map(c => {
+        let cell = cellHtml[c] || '';
+        // Inject the column's native tooltip into the cell's <td>
+        // opening tag when ShowColumnResponsibles is enabled and a
+        // responsible is assigned. Keeps the existing cell HTML
+        // untouched except for the one new attribute.
+        const title = _ktColResponsibleTitle(c);
+        if (title && cell.indexOf('<td') === 0) {
+          cell = '<td title="' + escHtml(title) + '"' + cell.substring(3);
+        }
+        return cell;
+      }).join('')}
     </tr>`;
   }
 
@@ -838,6 +849,25 @@ function _ktOpenSettings() {
     </div>
 
     <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F464} ${t('kt_col_responsibles')||'Column Responsibles'}</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="ktSettShowColResp" ${s.show_column_responsibles ? 'checked' : ''} style="accent-color:var(--accent)">
+        ${t('kt_col_responsibles_show')||'Show responsible on mouseover of column header / cells'}
+      </label>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_col_responsibles_desc')||'Assign who is responsible for each column. The name appears as a native tooltip when hovering the column header or any cell in that column.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px">
+        ${_ktState.columnOrder.filter(c => c !== 'management').map(c => {
+          const defaultLabel = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',comments:'Comments',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Cycles'}[c] || c;
+          const current = (s.column_responsibles||{})[c] || '';
+          return `<div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:10px;color:var(--text-dim);min-width:70px;white-space:nowrap">${escHtml(_ktColLabel(c, defaultLabel))}:</span>
+            <input class="ktSettColResp input" data-col="${c}" value="${escHtml(current)}" placeholder="${t('kt_col_responsible_ph')||'@name or role'}" style="flex:1;font-size:var(--fs-xs);padding:3px 6px">
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F522} ${t('kt_sort_order')||'Sort Order'}</div>
       <select id="ktSettSortBy" class="input" style="width:100%;font-size:var(--fs-xs)">
         <option value="priority" ${sortBy==='priority'?'selected':''}>\u26A1 Priority</option>
@@ -1098,6 +1128,14 @@ async function _ktSaveSettings() {
     const v = inp.value.trim();
     if (v) clOut[inp.dataset.col] = v;
   });
+  // Column responsibles — one name per column, assigned globally.
+  // Empty entries are dropped.
+  const crOut = {};
+  document.querySelectorAll('.ktSettColResp').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) crOut[inp.dataset.col] = v;
+  });
+  const showColResp = document.getElementById('ktSettShowColResp')?.checked || false;
   // Battle rhythm: collect config from the step editor and the snapshot
   // controls. Preserve StartedAt/PausedAt from the server-side settings so
   // saving the config while the clock is running does not stop the clock.
@@ -1128,6 +1166,8 @@ async function _ktSaveSettings() {
     status_labels: slOut,
     hidden_columns: hcOut,
     column_labels: clOut,
+    column_responsibles: crOut,
+    show_column_responsibles: showColResp,
     battle_rhythm: battleRhythm,
   };
   try {
@@ -1528,7 +1568,25 @@ function _ktExportImage(format) {
 function _ktSortTh(col, label, align, extra) {
   const cs = _ktState.columnSort;
   const arrow = cs && cs.col === col ? (cs.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
-  return `<th style="padding:8px;text-align:${align};cursor:pointer;user-select:none;${extra}" data-action="_ktSortByColumn" data-arg="${col}">${label}${arrow}</th>`;
+  // Optional native title tooltip showing "who is responsible for
+  // this column" when the operator has configured ColumnResponsibles
+  // and enabled ShowColumnResponsibles in Settings → Column Responsibles.
+  const title = _ktColResponsibleTitle(col);
+  const titleAttr = title ? ` title="${escHtml(title)}"` : '';
+  return `<th style="padding:8px;text-align:${align};cursor:pointer;user-select:none;${extra}" data-action="_ktSortByColumn" data-arg="${col}"${titleAttr}>${label}${arrow}</th>`;
+}
+
+// _ktColResponsibleTitle returns the native-title text for a given
+// column, or an empty string if the feature is disabled or no
+// responsible is assigned. The returned text is plain ASCII + a
+// single Unicode separator so it renders correctly in browser
+// native tooltips on every platform.
+function _ktColResponsibleTitle(col) {
+  const s = _ktState.settings || {};
+  if (!s.show_column_responsibles) return '';
+  const who = (s.column_responsibles || {})[col];
+  if (!who) return '';
+  return (t('kt_col_responsible_prefix')||'Responsible:') + ' ' + who;
 }
 
 // ── Move row up/down ──
@@ -2268,7 +2326,7 @@ function _ktBrTick() {
   // etc.) the host is an empty div. childElementCount === 0 means we
   // need to rebuild the shell even if the layout key hasn't changed.
   if (shellKey !== _ktBrShellKey || host.childElementCount === 0) {
-    host.innerHTML = _ktBrBuildShell(layout, st, canWrite);
+    host.innerHTML = _ktBrBuildShell(layout, st, canWrite, cfg);
     _ktBrShellKey = shellKey;
     // CRITICAL: the shared _bindActions dispatcher only binds click
     // handlers once per modal open, so any element we inject via
@@ -2290,7 +2348,7 @@ function _ktBrTick() {
 // layout state. Every dynamic value (H offset, current step, countdown,
 // cycles completed, state badge) is wrapped in an element with a stable
 // id so _ktBrUpdateValues can rewrite only the text nodes afterwards.
-function _ktBrBuildShell(layout, st, canWrite) {
+function _ktBrBuildShell(layout, st, canWrite, cfg) {
   let stateLabel, stateColor, bgStyle = 'background:var(--bg2);border:1px solid var(--border)';
   switch (layout) {
     case 'starting':

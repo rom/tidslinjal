@@ -148,6 +148,17 @@ func (app *App) getSession(r *http.Request) (*Session, *User) {
 // time. Returns "" when the binding is OK or disabled, or when the stored
 // metadata is empty (legacy sessions created before binding was added).
 func sessionBindingMismatch(sess *Session, r *http.Request, ss SecuritySettings) string {
+	// Master switch: when session hijack protection is disabled, skip
+	// all binding checks. This is the default because the IP/UA
+	// binding was kicking legitimate users out of long-running sessions
+	// when they were behind a reverse proxy that rotated client IPs or
+	// a browser whose user-agent changed mid-session (extensions etc).
+	// Operators who need strict binding can flip the master toggle on
+	// in Security → Session Management and then configure the
+	// individual IP / UA sub-options.
+	if !ss.SessionHijackProtection {
+		return ""
+	}
 	if ss.SessionBindIP && sess.IPAddress != "" {
 		curIP := clientIP(r)
 		if !ipsMatchBinding(sess.IPAddress, curIP, ss.SessionBindIPMode) {
