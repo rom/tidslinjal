@@ -314,7 +314,7 @@ function _renderKeyTerrainBoard() {
   };
 
   let html = `<div style="width:100%;max-width:none;margin:0 auto" id="ktBoardContent" data-kt-zoom="${escHtml(_ktState.zoom)}">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px" class="kt-no-print">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;padding-right:44px" class="kt-no-print">
       <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
@@ -326,6 +326,7 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
         <button class="btn btn-sm ${hasHidden ? 'btn-secondary' : 'btn-secondary'}" data-action="_ktOpenColumnVisibility">\u{1F441} ${t('kt_columns_vis')||'Columns'}${hasHidden ? ' ('+Object.values(hidden).filter(v=>v).length+' hidden)' : ''}</button>
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
+        <button class="btn btn-sm btn-secondary" data-action="_ktPrint" title="${t('kt_print_title')||'Print Key Terrain Board'}">\u{1F5A8} ${t('btn_print')||'Print'}</button>
         <button class="btn btn-sm btn-secondary" data-action="_ktOpenManagePanel">\u{1F4CB} ${t('kt_manage')||'Manage & Export'}</button>
         ${canWrite ? `<button class="btn btn-sm btn-primary" data-action="_ktAddEntry">+ ${t('kt_add')||'Add Entry'}</button>` : ''}
         <button class="btn btn-sm btn-secondary" data-action="_ktShowHelp" title="${t('kt_help')||'Help'}">\u2753</button>
@@ -1232,29 +1233,167 @@ function _ktOpenManagePanel() {
 }
 
 // ── Print ──
+// _ktPrint opens a column-selection dialog, then builds a filtered
+// print view of the currently-displayed KT board. The dialog lets the
+// operator tick/untick which columns should be included so the printout
+// can be tailored for a briefing (e.g. drop internal fields like Owner
+// or the timestamp columns). Selection is remembered per browser via
+// localStorage so repeated prints don't require re-picking.
 function _ktPrint() {
-  const table = document.getElementById('ktBoardTable');
-  if (!table) return;
+  // Default selection: current visible columns on the board. Operator
+  // choices made in a previous print session override the defaults via
+  // localStorage['ktPrintCols'] (set after Print is clicked).
+  const hidden = _ktState.hiddenColumns || {};
+  const canWrite = _ktState.access && _ktState.access.can_write;
+  const allCols = _ktState.columnOrder.filter(c => c !== 'management'); // management is interactive, never printed
+  let saved = [];
+  try {
+    const raw = localStorage.getItem('ktPrintCols');
+    if (raw) saved = JSON.parse(raw);
+  } catch {}
+  const selected = new Set(
+    Array.isArray(saved) && saved.length > 0
+      ? saved.filter(c => allCols.includes(c))
+      : allCols.filter(c => !hidden[c])
+  );
+  const colMeta = {
+    seq_num:     { icon: '#',         dflt: 'Seq' },
+    zone:        { icon: '\u{1F310}', dflt: 'Zone' },
+    priority:    { icon: '\u26A1',    dflt: 'Priority' },
+    function:    { icon: '\u{1F3AF}', dflt: 'Function' },
+    status:      { icon: '\u{1F4CA}', dflt: 'Status' },
+    trend:       { icon: '\u{1F4C8}', dflt: 'Trend' },
+    threat:      { icon: '\u2694\uFE0F', dflt: 'Threat' },
+    external:    { icon: '\u{1F517}', dflt: 'External' },
+    responsible: { icon: '\u{1F464}', dflt: 'Responsible' },
+    owner:       { icon: '\u{1F451}', dflt: 'Owner' },
+    actions:     { icon: '\u{1F527}', dflt: 'Actions' },
+    comments:    { icon: '\u{1F4AC}', dflt: 'Comments' },
+    created_at:  { icon: '\u{1F4C5}', dflt: 'Created' },
+    updated_at:  { icon: '\u{1F504}', dflt: 'Updated' },
+    finished_at: { icon: '\u2705',    dflt: 'Finished' },
+    rounds:      { icon: '\u{1F504}', dflt: '# Cycles' },
+  };
+  const rows = allCols.map(c => {
+    const meta = colMeta[c] || { icon: '', dflt: c };
+    const label = (meta.icon ? meta.icon + ' ' : '') + _ktColLabel(c, meta.dflt);
+    return `<label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-xs);cursor:pointer;padding:4px 6px;background:var(--bg3);border-radius:var(--radius)">
+      <input type="checkbox" class="ktPrintCb" data-col="${c}" ${selected.has(c) ? 'checked' : ''} style="accent-color:var(--accent)">
+      ${escHtml(label)}
+    </label>`;
+  }).join('');
+  const html = `<div style="max-width:460px">
+    <h3>\u{1F5A8} ${t('kt_print_title')||'Print Key Terrain Board'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:10px">${t('kt_print_desc')||'Select which columns should appear in the printout.'}</p>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button type="button" class="btn btn-sm btn-secondary" data-action="_ktPrintSelectAll">${t('kt_print_all')||'Select all'}</button>
+      <button type="button" class="btn btn-sm btn-secondary" data-action="_ktPrintSelectNone">${t('kt_print_none')||'Select none'}</button>
+      <button type="button" class="btn btn-sm btn-secondary" data-action="_ktPrintSelectVisible">${t('kt_print_visible')||'Currently visible'}</button>
+    </div>
+    <div id="ktPrintColList" style="display:flex;flex-direction:column;gap:4px;max-height:360px;overflow-y:auto;margin-bottom:12px">${rows}</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" data-action="_ktDoPrint">\u{1F5A8} ${t('btn_print')||'Print'}</button>
+      <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktPrintModal">${t('btn_cancel')||'Cancel'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktPrintModal', html, '480px');
+}
+
+function _ktPrintSelectAll() {
+  document.querySelectorAll('.ktPrintCb').forEach(cb => { cb.checked = true; });
+}
+function _ktPrintSelectNone() {
+  document.querySelectorAll('.ktPrintCb').forEach(cb => { cb.checked = false; });
+}
+function _ktPrintSelectVisible() {
+  const hidden = _ktState.hiddenColumns || {};
+  document.querySelectorAll('.ktPrintCb').forEach(cb => {
+    cb.checked = !hidden[cb.dataset.col];
+  });
+}
+
+function _ktDoPrint() {
+  const chosen = Array.from(document.querySelectorAll('.ktPrintCb:checked')).map(cb => cb.dataset.col);
+  if (chosen.length === 0) {
+    if (typeof showError === 'function') showError(t('kt_print_empty')||'Select at least one column to print.');
+    else alert(t('kt_print_empty')||'Select at least one column to print.');
+    return;
+  }
+  try { localStorage.setItem('ktPrintCols', JSON.stringify(chosen)); } catch {}
+  // Build a fresh print window with a filtered table so the printout
+  // shows ONLY the selected columns in the operator's current column
+  // order. We walk the live entries rather than cloning DOM rows so
+  // the cell contents are plain text (stripped of rich-HTML) and the
+  // print layout isn't affected by the board's current zoom level.
+  const entries = _ktState.entries.filter(e => !e.archived);
+  const sorted = _ktSortEntries(entries);
+  const cols = _ktState.columnOrder.filter(c => chosen.includes(c));
+  const colMeta = {
+    seq_num:     { icon: '#',         dflt: 'Seq' },
+    zone:        { icon: '\u{1F310}', dflt: 'Zone' },
+    priority:    { icon: '\u26A1',    dflt: 'Priority' },
+    function:    { icon: '\u{1F3AF}', dflt: 'Function' },
+    status:      { icon: '\u{1F4CA}', dflt: 'Status' },
+    trend:       { icon: '\u{1F4C8}', dflt: 'Trend' },
+    threat:      { icon: '\u2694\uFE0F', dflt: 'Threat' },
+    external:    { icon: '\u{1F517}', dflt: 'External' },
+    responsible: { icon: '\u{1F464}', dflt: 'Responsible' },
+    owner:       { icon: '\u{1F451}', dflt: 'Owner' },
+    actions:     { icon: '\u{1F527}', dflt: 'Actions' },
+    comments:    { icon: '\u{1F4AC}', dflt: 'Comments' },
+    created_at:  { icon: '\u{1F4C5}', dflt: 'Created' },
+    updated_at:  { icon: '\u{1F504}', dflt: 'Updated' },
+    finished_at: { icon: '\u2705',    dflt: 'Finished' },
+    rounds:      { icon: '\u{1F504}', dflt: '# Cycles' },
+  };
+  const headers = cols.map(c => {
+    const meta = colMeta[c] || { icon: '', dflt: c };
+    return (meta.icon ? meta.icon + ' ' : '') + _ktColLabel(c, meta.dflt);
+  });
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const rowsHtml = sorted.map(e => {
+    return '<tr>' + cols.map(c => {
+      const txt = _ktCellText(e, c);
+      return '<td>' + esc(txt).replace(/\n/g, '<br>') + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  const _ts = new Date().toISOString().slice(0, 10);
+  const docTitle = `tidslinjal-key-terrain-board-${_ts}`;
   const w = window.open('', '_blank', 'width=1100,height=800');
-  w.document.write(`<!DOCTYPE html><html><head><title>${t('kt_title')||'Key Terrain Board'}</title>
+  if (!w) {
+    alert('Popup blocked — please allow popups for this site so the print window can open.');
+    return;
+  }
+  w.document.write(`<!DOCTYPE html><html><head><title>${esc(docTitle)}</title>
     <style>
     @page { size: landscape; margin: 1cm; }
-    body{font-family:system-ui,sans-serif;padding:20px;font-size:12px}
-    table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border:1px solid #ccc;text-align:left}
-    th{background:#eee;font-weight:700}tr:nth-child(even){background:#f9f9f9}
-    h2{margin-bottom:8px}p{color:#666;margin-bottom:12px;font-size:11px}
-    @media print{button{display:none!important}}</style></head><body>`);
-  // Set document title for the saved PDF filename
-  const _ts = new Date().toISOString().slice(0, 10);
-  w.document.title = `tidslinjal-key-terrain-board-${_ts}`;
-  w.document.write(`<h2>\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>`);
-  w.document.write(`<p>${t('kt_desc')||'Cyber key terrain overview'} \u2014 ${new Date().toLocaleString()}</p>`);
-  w.document.write(table.outerHTML);
-  w.document.write(`<br><button id="ktPrintBtn">Print</button></body></html>`);
+    body { font-family: system-ui, sans-serif; padding: 20px; font-size: 11px; }
+    h2 { margin-bottom: 4px; }
+    .subtitle { color: #666; margin-bottom: 12px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 5px 7px; border: 1px solid #ccc; text-align: left; vertical-align: top; }
+    th { background: #eee; font-weight: 700; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    @media print {
+      button { display: none !important; }
+      .subtitle { font-size: 10px; }
+    }
+    </style></head><body>
+    <h2>\u{1F3D4}\uFE0F ${esc(t('kt_title') || 'Key Terrain Board')}</h2>
+    <div class="subtitle">${esc(new Date().toLocaleString())} — ${sorted.length} entries, ${cols.length} columns</div>
+    <table>
+      <thead><tr>${headers.map(h => '<th>' + esc(h) + '</th>').join('')}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <br><button id="ktPrintBtn">\u{1F5A8} Print</button>
+    </body></html>`);
+  w.document.title = docTitle;
   w.document.close();
+  if (typeof _closeBoardModal === 'function') _closeBoardModal('ktPrintModal');
   setTimeout(() => {
-    // Re-set title after document.close() to ensure it sticks for the print dialog
-    w.document.title = `tidslinjal-key-terrain-board-${_ts}`;
+    w.document.title = docTitle;
     const btn = w.document.getElementById('ktPrintBtn');
     if (btn) btn.addEventListener('click', () => w.print());
     w.print();
@@ -2238,9 +2377,16 @@ function _ktBrBuildShell(layout, st, canWrite) {
   // The left "info block" (label + H-offset + state) is hoverable —
   // mousing over it calls _ktBrShowStepsTooltip which pops a panel
   // listing every step with its start/end offsets and description.
+  // Build a plain-text summary of the steps and stash it on the info
+  // block's title attribute. Native HTML tooltips are guaranteed to
+  // render across every browser — the custom floating tooltip below
+  // is an enhancement, but this title= attribute is the reliable
+  // fallback. Refreshed by _ktBrUpdateValues on every tick so the
+  // active-step markers stay current.
+  const titleSummary = _ktBrBuildStepsTitleText(cfg, st);
   return `
     <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;border-radius:var(--radius);${bgStyle};transition:background .3s, border-color .3s;font-size:14px">
-      <div id="ktBrInfoBlock" data-kt-br-tip="1" style="display:flex;flex-direction:column;min-width:130px;cursor:help">
+      <div id="ktBrInfoBlock" data-kt-br-tip="1" title="${escHtml(titleSummary)}" style="display:flex;flex-direction:column;min-width:130px;cursor:help">
         <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600">${t('kt_br_clock')||'Battle Rhythm'}</div>
         <div style="font-family:monospace;font-size:28px;font-weight:700;color:var(--accent);line-height:1.05" id="ktBrHOffset">${headline}</div>
         <div style="font-size:12px;color:${stateColor}" id="ktBrState">● ${stateLabel}</div>
@@ -2308,6 +2454,53 @@ function _ktBrUpdateValues(layout, cfg, st) {
   }
   const nEl = document.getElementById('ktBrNext');
   if (nEl && nEl.textContent !== nxt) nEl.textContent = nxt;
+  // Refresh the info block's native title so the browser tooltip
+  // shows the latest steps-summary (including which step is active).
+  const infoEl = document.getElementById('ktBrInfoBlock');
+  if (infoEl) {
+    const newTitle = _ktBrBuildStepsTitleText(cfg, st);
+    if (infoEl.getAttribute('title') !== newTitle) infoEl.setAttribute('title', newTitle);
+  }
+}
+
+// _ktBrBuildStepsTitleText produces a plain-text multi-line summary
+// of the configured steps for the info block's native title attribute.
+// Used as the reliable fallback tooltip when the custom floating
+// popover isn't visible (different browsers, CSP quirks, etc).
+function _ktBrBuildStepsTitleText(cfg, st) {
+  const steps = (cfg && Array.isArray(cfg.steps)) ? cfg.steps : [];
+  const cycleMin = cfg ? (cfg.cycle_minutes || 0) : 0;
+  const lines = [];
+  lines.push((t('kt_br_steps_tooltip_title') || 'Battle rhythm steps') + ' — ' + (cycleMin ? cycleMin + ' min cycle' : (t('kt_br_no_cycle') || 'cycle length not set')));
+  if (steps.length === 0) {
+    lines.push('');
+    lines.push(t('kt_br_no_steps_tooltip') || 'No steps defined. Open Settings → Battle Rhythm to add steps.');
+    return lines.join('\n');
+  }
+  const activeNames = new Set();
+  if (st && Array.isArray(st.current_steps)) {
+    st.current_steps.forEach(s => activeNames.add(s.name));
+  } else if (st && st.current_step) {
+    activeNames.add(st.current_step.name);
+  }
+  const fmt = (n) => {
+    const sign = n < 0 ? '-' : '+';
+    const abs = Math.abs(n);
+    const h = Math.floor(abs / 60);
+    const m = abs % 60;
+    if (h > 0) return 'H' + sign + h + 'h' + String(m).padStart(2, '0');
+    return 'H' + sign + String(m).padStart(2, '0');
+  };
+  steps.forEach((s) => {
+    const start = typeof s.start_offset_min === 'number' ? s.start_offset_min : 0;
+    const endVal = (s.end_offset_min === null || s.end_offset_min === undefined) ? null : s.end_offset_min;
+    const range = endVal == null ? fmt(start) : fmt(start) + ' – ' + fmt(endVal);
+    const active = activeNames.has(s.name) ? '  ← ' + (t('kt_br_active') || 'active') : '';
+    let line = '• ' + (s.name || '(unnamed)') + '   ' + range + active;
+    if (s.description) line += '\n    ' + s.description;
+    lines.push(line);
+  });
+  return lines.join('\n');
 }
 
 // ── Battle rhythm step tooltip ─────────────────────────────────────────

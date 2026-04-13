@@ -24,19 +24,36 @@ func TestComputeBattleRhythmState(t *testing.T) {
 		},
 	}
 
-	// 1. Still before H0 — clock is armed but not yet counting. The new
-	// Scheduled state means Running=false, Scheduled=true, and the
-	// countdown in ScheduledSeconds is the positive delta to H0.
-	before := h0.Add(-5 * time.Minute)
-	st := computeBattleRhythmState(cfg, before)
+	// 1a. 20 min before H0 — scheduled (outside the lead-in window,
+	// because leadIn = 15 min). Countdown is 5 min to lead-in start.
+	beforeLeadIn := h0.Add(-20 * time.Minute)
+	st := computeBattleRhythmState(cfg, beforeLeadIn)
 	if st.Running {
-		t.Errorf("expected not-running before H0, got running=%v", st.Running)
+		t.Errorf("expected not-running 20 min before H0 (outside lead-in), got running=%v", st.Running)
 	}
 	if !st.Scheduled {
-		t.Errorf("expected Scheduled=true before H0")
+		t.Errorf("expected Scheduled=true 20 min before H0 (outside lead-in)")
 	}
 	if st.ScheduledSeconds < 299 || st.ScheduledSeconds > 301 {
-		t.Errorf("ScheduledSeconds = %v, want ~300", st.ScheduledSeconds)
+		t.Errorf("ScheduledSeconds = %v, want ~300 (counting down to lead-in start)", st.ScheduledSeconds)
+	}
+
+	// 1b. 5 min before H0 — INSIDE the lead-in, inside Alpha [-15, 0].
+	// The clock is now running with a signed-negative position and
+	// Alpha as the current step.
+	before := h0.Add(-5 * time.Minute)
+	st = computeBattleRhythmState(cfg, before)
+	if !st.Running {
+		t.Errorf("expected running in lead-in, got running=%v", st.Running)
+	}
+	if st.Scheduled {
+		t.Errorf("expected Scheduled=false during lead-in")
+	}
+	if st.PositionMin < -5.01 || st.PositionMin > -4.99 {
+		t.Errorf("PositionMin in lead-in = %v, want ~-5", st.PositionMin)
+	}
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Alpha" {
+		t.Errorf("current step in lead-in = %v, want Alpha", st.CurrentStep)
 	}
 
 	// 2. At H+15 — inside Bravo, next step Charlie in 45 min.
@@ -479,6 +496,94 @@ func TestComputeBattleRhythmStatePreH0Wrap(t *testing.T) {
 	}
 	if st.NextStepInMin == nil || *st.NextStepInMin < 14.99 || *st.NextStepInMin > 15.01 {
 		t.Errorf("at H+90: next_in = %v, want ~15", st.NextStepInMin)
+	}
+}
+
+// TestComputeBattleRhythmStateLeadInImmediateStart pins the "press
+// Start now with pre-H0 steps" flow: when the operator clicks Start
+// with no HH:MM and the config has a step like [-15, 0], the clock
+// should immediately enter the cycle-0 lead-in (Running=true,
+// PositionMin≈−15, current step = Prep). After 15 minutes of wall
+// clock, the clock should have advanced to H0 and the next step.
+func TestComputeBattleRhythmStateLeadInImmediateStart(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+	pressTime := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	// This is what the Start handler would produce when StartAt is
+	// blank and minStart = -15: StartedAt = pressTime + 15 min.
+	h0 := pressTime.Add(15 * time.Minute)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		ShowClock:    true,
+		CycleMinutes: 120,
+		StartedAt:    &h0,
+		Steps: []BattleRhythmStep{
+			{Name: "Prep", StartOffsetMin: -15, EndOffsetMin: intPtr(0)},
+			{Name: "Brief", StartOffsetMin: 0, EndOffsetMin: intPtr(30)},
+			{Name: "Assess", StartOffsetMin: 30, EndOffsetMin: intPtr(60)},
+			{Name: "Execute", StartOffsetMin: 60, EndOffsetMin: intPtr(120)},
+		},
+	}
+
+	// At the moment of press (= 15 min before H0, inside lead-in,
+	// inside Prep).
+	st := computeBattleRhythmState(cfg, pressTime)
+	if !st.Running || st.Scheduled {
+		t.Errorf("at press: running=%v scheduled=%v, want true/false", st.Running, st.Scheduled)
+	}
+	if st.PositionMin < -15.01 || st.PositionMin > -14.99 {
+		t.Errorf("at press: PositionMin = %v, want ~-15", st.PositionMin)
+	}
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Prep" {
+		t.Errorf("at press: current = %v, want Prep", st.CurrentStep)
+	}
+	// Brief should NOT be active — we're still in lead-in.
+	for _, s := range st.CurrentSteps {
+		if s.Name == "Brief" {
+			t.Errorf("at press: Brief should not be active in lead-in")
+		}
+	}
+
+	// 5 min later — still in Prep, position ~-10.
+	st = computeBattleRhythmState(cfg, pressTime.Add(5*time.Minute))
+	if st.PositionMin < -10.01 || st.PositionMin > -9.99 {
+		t.Errorf("press+5: PositionMin = %v, want ~-10", st.PositionMin)
+	}
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Prep" {
+		t.Errorf("press+5: current = %v, want Prep", st.CurrentStep)
+	}
+
+	// At exactly H0 (press + 15 min): Prep ended, Brief begins.
+	st = computeBattleRhythmState(cfg, h0)
+	if st.PositionMin < -0.01 || st.PositionMin > 0.01 {
+		t.Errorf("at H0: PositionMin = %v, want ~0", st.PositionMin)
+	}
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Brief" {
+		t.Errorf("at H0: current = %v, want Brief", st.CurrentStep)
+	}
+
+	// 110 min past H0 (= position 110 in cycle 0): Execute [60, 120)
+	// is active, AND Prep [−15, 0] wraps into [105, 0) so Prep is
+	// ALSO active. The widget should show "Now: Execute + Prep".
+	st = computeBattleRhythmState(cfg, h0.Add(110*time.Minute))
+	if len(st.CurrentSteps) < 2 {
+		t.Fatalf("at H+110: expected 2 active steps, got %d", len(st.CurrentSteps))
+	}
+	names := map[string]bool{}
+	for _, s := range st.CurrentSteps {
+		names[s.Name] = true
+	}
+	if !names["Execute"] || !names["Prep"] {
+		t.Errorf("at H+110: current steps = %v, want [Execute, Prep]", names)
+	}
+
+	// At H+120 (cycle 2 begins): position wraps to 0, Prep ends,
+	// Execute ends, Brief begins.
+	st = computeBattleRhythmState(cfg, h0.Add(120*time.Minute))
+	if st.CyclesCompleted != 1 {
+		t.Errorf("at H+120: cycles_completed = %d, want 1", st.CyclesCompleted)
+	}
+	if st.CurrentStep == nil || st.CurrentStep.Name != "Brief" {
+		t.Errorf("at H+120: current = %v, want Brief", st.CurrentStep)
 	}
 }
 

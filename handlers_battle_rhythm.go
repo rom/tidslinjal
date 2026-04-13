@@ -95,33 +95,56 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 		st.Paused = true
 		effectiveNow = *cfg.PausedAt
 	}
-	// Scheduled state: the operator pressed Start with a future HH:MM and
-	// the wall clock hasn't reached H0 yet. Expose a positive countdown
-	// so the widget can show "Waiting for 09:00 — starts in 1m 23s".
-	if effectiveNow.Before(*cfg.StartedAt) {
+	// Pre-H0 lead-in: if any step has a negative start offset, the
+	// operator wants the clock to enter that step immediately when
+	// pressed, run until H0, and THEN proceed with the positive-offset
+	// steps. We model this by setting cfg.StartedAt to the target H0
+	// moment (press_time + leadIn, or the operator's HH:MM), and
+	// allowing `elapsed` to go negative in the [StartedAt - leadIn,
+	// StartedAt) window. `leadIn` is the magnitude of the most negative
+	// step start, capped at 0 when no pre-H0 steps exist.
+	minStartMin := 0
+	for _, s := range cfg.Steps {
+		if s.StartOffsetMin < minStartMin {
+			minStartMin = s.StartOffsetMin
+		}
+	}
+	leadInMin := -minStartMin // positive magnitude, 0 when no pre-H0 steps
+	leadInStart := cfg.StartedAt.Add(-time.Duration(leadInMin) * time.Minute)
+	// Scheduled: before even the pre-H0 lead-in begins. The countdown
+	// targets the earliest moment at which the operator should see any
+	// step activity (lead-in start), NOT the nominal H0.
+	if effectiveNow.Before(leadInStart) {
 		st.Scheduled = true
-		st.ScheduledSeconds = cfg.StartedAt.Sub(effectiveNow).Seconds()
-		// The clock is armed but not yet counting; don't set Running so
-		// the widget can render a distinct "waiting" UI state.
+		st.ScheduledSeconds = leadInStart.Sub(effectiveNow).Seconds()
 		return st
 	}
 	st.Running = true
-	// Elapsed since the very first H0 (can be many cycles).
+	// Elapsed since StartedAt (H0). CAN be negative during the
+	// [leadInStart, StartedAt) window — that's cycle 0 lead-in.
 	elapsed := effectiveNow.Sub(*cfg.StartedAt)
-	if elapsed < 0 {
-		// Defensive: should already have returned via the Scheduled
-		// branch above, but keep the clamp for safety.
-		elapsed = 0
-	}
 	cycle := time.Duration(cfg.CycleMinutes) * time.Minute
-	posMs := elapsed % cycle
-	// Normalise to whole-minute precision for display but keep fractional
-	// minutes for "next step in" countdowns.
 	st.ElapsedMinutes = elapsed.Minutes()
-	st.PositionMin = posMs.Minutes()
-	cycleIndex := int(elapsed / cycle)
+	// Position semantics: for elapsed >= 0 the position is elapsed
+	// modulo cycle (non-negative), and cycle N begins at StartedAt +
+	// N*cycle. For elapsed < 0 we're in the cycle-0 lead-in: the
+	// position is simply elapsed (negative) and the cycle count is 0.
+	inLeadIn := elapsed < 0
+	var cycleIndex int
+	var cycleStart time.Time
+	if inLeadIn {
+		cycleIndex = 0
+		// PositionMin stays signed-negative so the frontend's H-offset
+		// formatter renders "H-10" for elapsed = -10 minutes.
+		st.PositionMin = elapsed.Minutes()
+		cycleStart = *cfg.StartedAt
+	} else {
+		cycleIndex = int(elapsed / cycle)
+		posMs := elapsed % cycle
+		st.PositionMin = posMs.Minutes()
+		cycleStart = cfg.StartedAt.Add(time.Duration(cycleIndex) * cycle)
+	}
 	st.CyclesCompleted = cycleIndex
-	cycleStart := cfg.StartedAt.Add(time.Duration(cycleIndex) * cycle)
 	cycleEnd := cycleStart.Add(cycle)
 	st.CycleStart = &cycleStart
 	st.CycleEnd = &cycleEnd
@@ -184,41 +207,59 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 			if endRaw < startRaw {
 				endRaw = startRaw
 			}
-			start := mod(startRaw)
-			end := mod(endRaw)
-			// Instant steps: active when pos is within 0.5 min of the
-			// (normalised) start. The whole-minute server tick can
-			// otherwise miss them entirely.
 			active := false
-			if instant {
-				diff := math.Abs(st.PositionMin - start)
-				// Handle wrap: if the step is at the very end of the
-				// cycle, positions near 0 are also "close".
-				if diff > cycleF/2 {
-					diff = cycleF - diff
-				}
-				if diff < 0.5 {
+			if inLeadIn {
+				// Cycle 0 lead-in: use RAW step offsets (no modulo).
+				// A step is active if its raw [start, end) contains
+				// the current (negative) position. Only steps with
+				// startRaw < 0 can possibly be active here, which is
+				// exactly what "pre-H0 steps" are. Non-negative steps
+				// compare as inactive.
+				if instant {
+					if math.Abs(st.PositionMin-startRaw) < 0.5 {
+						active = true
+					}
+				} else if startRaw <= st.PositionMin && st.PositionMin < endRaw {
 					active = true
 				}
-			} else if inHalfOpen(st.PositionMin, start, end) {
-				active = true
+				// Next step during lead-in: the next step with
+				// startRaw > PositionMin, smallest delta.
+				if !active && startRaw > st.PositionMin+1e-9 {
+					delta := startRaw - st.PositionMin
+					if nextDelta < 0 || delta < nextDelta {
+						nextDelta = delta
+						next = &cfg.Steps[i]
+					}
+				}
+			} else {
+				// Normal running: normalise step offsets into [0, cycle)
+				// and use the half-open interval check with wrap-around.
+				start := mod(startRaw)
+				end := mod(endRaw)
+				if instant {
+					diff := math.Abs(st.PositionMin - start)
+					if diff > cycleF/2 {
+						diff = cycleF - diff
+					}
+					if diff < 0.5 {
+						active = true
+					}
+				} else if inHalfOpen(st.PositionMin, start, end) {
+					active = true
+				}
+				if !active {
+					delta := distanceTo(st.PositionMin, start)
+					if delta > 1e-9 && (nextDelta < 0 || delta < nextDelta) {
+						nextDelta = delta
+						next = &cfg.Steps[i]
+					}
+				}
 			}
 			if active {
 				currentSteps = append(currentSteps, cfg.Steps[i])
 				if firstCurrent == nil {
 					firstCurrent = &cfg.Steps[i]
 					firstCurrentIdx = i
-				}
-			}
-			// Next step: smallest forward distance to a step start that
-			// is NOT currently active. Only the step start matters for
-			// the "next" marker — the user wants to know when the next
-			// step fires, not when the current one ends.
-			if !active {
-				delta := distanceTo(st.PositionMin, start)
-				if delta > 1e-9 && (nextDelta < 0 || delta < nextDelta) {
-					nextDelta = delta
-					next = &cfg.Steps[i]
 				}
 			}
 		}
@@ -312,6 +353,29 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			jsonError(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		// Pre-H0 lead-in: if the operator has defined steps with
+		// negative StartOffsetMin (e.g. "Prep" at −15..0) AND they
+		// pressed Start without specifying a future HH:MM, shift
+		// StartedAt forward by the lead-in magnitude so that the
+		// cycle-0 lead-in is active IMMEDIATELY. The operator sees
+		// the pre-H0 step running from the moment they click Start;
+		// H0 is reached after the lead-in elapses.
+		//
+		// If a specific HH:MM WAS provided, we respect it as the
+		// exact H0 moment — the lead-in is still computed from
+		// StartedAt − leadIn, so the pre-H0 step starts leadIn
+		// minutes before the operator's requested H0.
+		if strings.TrimSpace(req.StartAt) == "" {
+			minStart := 0
+			for _, s := range cfg.Steps {
+				if s.StartOffsetMin < minStart {
+					minStart = s.StartOffsetMin
+				}
+			}
+			if minStart < 0 {
+				ts = ts.Add(time.Duration(-minStart) * time.Minute)
+			}
 		}
 		cfg.StartedAt = &ts
 		cfg.PausedAt = nil
