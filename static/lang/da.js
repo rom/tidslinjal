@@ -2100,7 +2100,7 @@ TRANSLATIONS.da = {
     kt_created: 'Oprettet',
     kt_updated: 'Opdateret',
     kt_finished: 'Afsluttet',
-    kt_rounds: 'Runder',
+    kt_rounds: '# Cyklusser',
     kt_show_ts: 'Vis tidsstempler',
     kt_hide_ts: 'Skjul tidsstempler',
     kt_threat_ph: 'Beskriv aktuel fjendtlig pres',

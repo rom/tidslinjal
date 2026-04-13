@@ -2680,7 +2680,7 @@ TRANSLATIONS.ko = {
     kt_help_access: '접근 제어',
     kt_detach: '새 창으로 분리',
     kt_created: '생성됨',
-    kt_rounds: '라운드',
+    kt_rounds: '# 사이클',
     kt_columns_vis: '열',
     kt_columns_vis_desc: '테이블에 표시할 열을 선택합니다.',
     kt_apply: '적용',

@@ -2476,7 +2476,7 @@ TRANSLATIONS.nb = {
     kt_created: 'Opprettet',
     kt_updated: 'Oppdatert',
     kt_finished: 'Fullført',
-    kt_rounds: 'Runder',
+    kt_rounds: '# Sykluser',
     kt_show_ts: 'Vis tidsstempler',
     kt_hide_ts: 'Skjul tidsstempler',
     kt_threat_ph: 'Beskriv nåværende fiendtlig press',

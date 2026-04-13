@@ -2919,7 +2919,7 @@ TRANSLATIONS.fr = {
     kt_help_access: 'Contrôle d\u2019accès',
     kt_detach: 'Détacher dans une fenêtre',
     kt_created: 'Créé',
-    kt_rounds: 'Nbre de tours',
+    kt_rounds: '# Cycles',
     kt_columns_vis: 'Afficher / Masquer les colonnes',
     kt_columns_vis_desc: 'Choisissez quelles colonnes sont visibles dans le tableau.',
     kt_apply: 'Appliquer',

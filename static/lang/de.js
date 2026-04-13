@@ -2428,7 +2428,7 @@ TRANSLATIONS.de = {
     kt_created: 'Erstellt',
     kt_updated: 'Aktualisiert',
     kt_finished: 'Abgeschlossen',
-    kt_rounds: 'Runden',
+    kt_rounds: '# Zyklen',
     kt_show_ts: 'Zeitstempel anzeigen',
     kt_hide_ts: 'Zeitstempel ausblenden',
     kt_threat_ph: 'Aktuelle feindliche Bedrohung beschreiben',

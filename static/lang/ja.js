@@ -2680,7 +2680,7 @@ TRANSLATIONS.ja = {
     kt_help_access: 'アクセス制御',
     kt_detach: '新しいウィンドウで開く',
     kt_created: '作成日',
-    kt_rounds: 'ラウンド',
+    kt_rounds: '# サイクル',
     kt_columns_vis: '列',
     kt_columns_vis_desc: 'テーブルに表示する列を切り替えます。',
     kt_apply: '適用',

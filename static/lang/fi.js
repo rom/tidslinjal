@@ -2248,7 +2248,7 @@ TRANSLATIONS.fi = {
     kt_created: 'Luotu',
     kt_updated: 'Päivitetty',
     kt_finished: 'Valmis',
-    kt_rounds: 'Kierrokset',
+    kt_rounds: '# Sykliä',
     kt_show_ts: 'Näytä aikaleimat',
     kt_hide_ts: 'Piilota aikaleimat',
     kt_threat_ph: 'Kuvaa nykyinen vihamielinen paine',

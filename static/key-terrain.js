@@ -17,7 +17,7 @@ let _ktState = {
   zoom: (() => { try { return localStorage.getItem('ktZoom') || 'md'; } catch { return 'md'; } })(),
 };
 
-const _ktZoomLevels = ['xs','sm','md','lg','xl'];
+const _ktZoomLevels = ['xxs','xs','sm','md','lg','xl','xxl','xxxl'];
 
 function _ktSetZoom(level) {
   if (!_ktZoomLevels.includes(level)) return;
@@ -270,7 +270,7 @@ function _renderKeyTerrainBoard() {
     created_at:  { icon: '\u{1F4C5}', label: _ktColLabel('created_at', 'Created'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
     updated_at:  { icon: '\u{1F504}', label: _ktColLabel('updated_at', 'Updated'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
     finished_at: { icon: '\u2705', label: _ktColLabel('finished_at', 'Finished'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
-    rounds:      { icon: '\u{1F504}', label: _ktColLabel('rounds', '# Rounds'), align: 'center', extra: 'white-space:nowrap' },
+    rounds:      { icon: '\u{1F504}', label: _ktColLabel('rounds', '# Cycles'), align: 'center', extra: 'white-space:nowrap' },
     management:  { icon: '\u2699', label: _ktColLabel('management', 'Management'), align: 'center', extra: 'width:160px' },
   };
 
@@ -490,7 +490,7 @@ async function _ktEditEntry(entryId) {
         <input id="ktZone" class="input" style="width:100%;font-size:var(--fs-xs)" value="${escHtml(entry.zone || '')}" placeholder="${t('kt_zone_ph')||'e.g. North, HQ, DMZ'}">
       </div>
       <div>
-        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F504} ${t('kt_rounds')||'# Rounds'}</label>
+        <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F504} ${t('kt_rounds')||'# Cycles'}</label>
         <input id="ktRounds" type="number" class="input" style="width:100%" value="${entry.rounds || 0}" min="0" placeholder="0">
       </div>
     </div>
@@ -724,7 +724,7 @@ function _ktOpenSettings() {
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_hidden_columns_desc')||'Select columns to hide from the board view.'}</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
         ${_ktState.columnOrder.map(c => {
-          const defLbl = {seq_num:'#',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'Rounds',management:'Management'}[c] || c;
+          const defLbl = {seq_num:'#',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'Cycles',management:'Management'}[c] || c;
           const lbl = _ktColLabel(c, defLbl);
           return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer">
             <input type="checkbox" class="ktSettHiddenCol" data-col="${c}" ${hc[c] ? 'checked' : ''} style="accent-color:var(--accent)"> ${lbl}
@@ -780,7 +780,7 @@ function _ktOpenSettings() {
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_col_labels_desc')||'Rename any column heading. Leave empty to use the default translation.'}</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px">
         ${_ktState.columnOrder.map(c => {
-          const defaultLabel = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Rounds',management:'Management'}[c] || c;
+          const defaultLabel = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Cycles',management:'Management'}[c] || c;
           const current = (s.column_labels||{})[c] || '';
           return `<div style="display:flex;align-items:center;gap:4px">
             <span style="font-size:10px;color:var(--text-dim);min-width:70px;white-space:nowrap">${defaultLabel}:</span>
@@ -820,7 +820,7 @@ function _ktOpenSettings() {
       <div id="ktSettColOrderList">
         ${_ktState.columnOrder.map((c, i) => {
           const colIcons = {seq_num:'#',zone:'\u{1F310}',priority:'\u26A1',function:'\u{1F3AF}',status:'\u{1F4CA}',trend:'\u{1F4C8}',threat:'\u2694\uFE0F',external:'\u{1F517}',responsible:'\u{1F464}',owner:'\u{1F451}',actions:'\u{1F527}',created_at:'\u{1F4C5}',updated_at:'\u{1F504}',finished_at:'\u2705',rounds:'\u{1F504}',management:'\u2699'};
-          const defLabels = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Rounds',management:'Management'};
+          const defLabels = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Cycles',management:'Management'};
           const label = (colIcons[c] || '') + ' ' + _ktColLabel(c, defLabels[c] || c);
           return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
             <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktSettMoveCol" data-args='[${i},-1]' ${i===0?'disabled':''}>\u25B2</button>
@@ -884,15 +884,19 @@ function _ktBrRenderStepList(initial) {
     host.innerHTML = `<div style="font-size:10px;color:var(--text-dim);padding:4px 0">${t('kt_br_no_steps')||'No steps defined yet.'}</div>`;
     return;
   }
-  host.innerHTML = _ktBrWorkingSteps.map((step, i) => `
-    <div style="display:grid;grid-template-columns:1fr 70px 70px auto;gap:4px;align-items:center;margin-bottom:4px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+  host.innerHTML = _ktBrWorkingSteps.map((step, i) => {
+    const fallback = _ktBrPalette[i % _ktBrPalette.length];
+    const colorVal = (step.color && /^#[0-9a-fA-F]{3,8}$/.test(step.color)) ? step.color : fallback;
+    return `
+    <div style="display:grid;grid-template-columns:1fr 70px 70px 34px auto;gap:4px;align-items:center;margin-bottom:4px;padding:4px;background:var(--bg2);border-radius:var(--radius);border-left:4px solid ${colorVal}">
       <input class="input ktBrStepName" data-idx="${i}" value="${escHtml(step.name||'')}" placeholder="${t('kt_br_step_name')||'Step name'}" style="font-size:var(--fs-xs);padding:3px 6px">
       <input class="input ktBrStepStart" data-idx="${i}" type="number" value="${step.start_offset_min ?? 0}" placeholder="Start" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_start_h')||'Start offset (minutes from H0)'}">
       <input class="input ktBrStepEnd" data-idx="${i}" type="number" value="${step.end_offset_min != null ? step.end_offset_min : ''}" placeholder="End" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_end_h')||'End offset or blank for instant'}">
+      <input type="color" class="ktBrStepColor" data-idx="${i}" value="${colorVal}" title="${t('kt_br_step_color_h')||'Border colour while this step is active'}" style="width:30px;height:24px;border:none;cursor:pointer;padding:0;background:transparent">
       <button type="button" class="btn btn-sm btn-secondary" data-action="_ktBrRemoveStep" data-arg="${i}" style="font-size:10px;padding:2px 6px">\u2716</button>
       <input class="input ktBrStepDesc" data-idx="${i}" value="${escHtml(step.description||'')}" placeholder="${t('kt_br_step_desc')||'Description (optional)'}" style="grid-column:1/-1;font-size:10px;padding:2px 6px">
     </div>
-  `).join('');
+  `;}).join('');
 }
 function _ktBrAddStep() {
   _ktBrFlushStepInputs();
@@ -920,6 +924,10 @@ function _ktBrFlushStepInputs() {
       const v = inp.value.trim();
       _ktBrWorkingSteps[i].end_offset_min = v === '' ? null : parseInt(v, 10);
     }
+  });
+  document.querySelectorAll('.ktBrStepColor').forEach(inp => {
+    const i = parseInt(inp.dataset.idx, 10);
+    if (_ktBrWorkingSteps[i]) _ktBrWorkingSteps[i].color = inp.value;
   });
   document.querySelectorAll('.ktBrStepDesc').forEach(inp => {
     const i = parseInt(inp.dataset.idx, 10);
@@ -1019,7 +1027,7 @@ function _ktOpenColumnOrder() {
     created_at: '\u{1F4C5} ' + (t('kt_created')||'Created'),
     updated_at: '\u{1F504} ' + (t('kt_updated')||'Updated'),
     finished_at: '\u2705 ' + (t('kt_finished')||'Finished'),
-    rounds: '\u{1F504} ' + (t('kt_rounds')||'# Rounds'),
+    rounds: '\u{1F504} ' + (t('kt_rounds')||'# Cycles'),
     management: '\u2699 ' + (t('kt_mgmt_label')||'Management'),
   };
   let html = `<div style="max-width:400px">
@@ -1738,23 +1746,46 @@ let _ktBrTickTimer = null;
 let _ktBrPollTimer = null;
 let _ktBrLastState = null;     // last server snapshot
 let _ktBrLastFetchAt = 0;      // ms since epoch
+let _ktBrShellKey = '';        // last-rendered shell layout key; '' forces a shell rebuild
+
+// Palette used when a battle rhythm step doesn't specify its own color.
+// Indices wrap modulo palette length so more than 8 steps still get a
+// deterministic colour assignment.
+const _ktBrPalette = [
+  '#3498db', '#e67e22', '#9b59b6', '#27ae60',
+  '#e74c3c', '#f39c12', '#1abc9c', '#34495e',
+];
+function _ktBrStepColor(step, idx) {
+  if (!step) return '';
+  if (step.color && /^#[0-9a-fA-F]{3,8}$/.test(step.color)) return step.color;
+  if (idx < 0) return '';
+  return _ktBrPalette[idx % _ktBrPalette.length];
+}
 
 function _ktBrStartTicker() {
   if (_ktBrTickTimer) return;
   _ktBrPoll();
-  _ktBrPollTimer = setInterval(_ktBrPoll, 5000);
-  _ktBrTickTimer = setInterval(_ktBrRenderWidget, 500);
+  // Poll interval: 2 s so a Start/Pause/Reset from one operator propagates
+  // to the rest of the Key Terrain Board users quickly. The SSE hook
+  // (below) also forces an immediate poll on every battle_rhythm_* event,
+  // so in practice the widget is usually in sync within one SSE round-trip.
+  _ktBrPollTimer = setInterval(_ktBrPoll, 2000);
+  _ktBrTickTimer = setInterval(_ktBrTick, 500);
+  // Reset the shell key so the next tick rebuilds the DOM once.
+  _ktBrShellKey = '';
+  document.addEventListener('sse:key_terrain_change', _ktBrPoll);
 }
 function _ktBrStopTicker() {
   if (_ktBrTickTimer) { clearInterval(_ktBrTickTimer); _ktBrTickTimer = null; }
   if (_ktBrPollTimer) { clearInterval(_ktBrPollTimer); _ktBrPollTimer = null; }
+  document.removeEventListener('sse:key_terrain_change', _ktBrPoll);
 }
 async function _ktBrPoll() {
   try {
     const st = await _ktApi('GET', '/key-terrain/battle-rhythm');
     _ktBrLastState = st;
     _ktBrLastFetchAt = Date.now();
-    _ktBrRenderWidget();
+    _ktBrTick();
   } catch { /* silent */ }
 }
 
@@ -1791,52 +1822,126 @@ function _ktBrFormatHOffset(posMin, cycleMin) {
   return 'H' + sign + String(Math.floor(absM)).padStart(2,'0');
 }
 
-function _ktBrRenderWidget() {
+// _ktBrTick runs every 500 ms. It either rebuilds the widget shell (once
+// per layout transition) or updates only the text nodes inside the
+// existing shell. CRITICAL: we must NOT replace the .innerHTML of the
+// widget on every tick, because that would destroy any <input> or
+// <button> the operator is currently interacting with — which is exactly
+// the bug that made Start / the HH:MM time picker unusable.
+function _ktBrTick() {
   const host = document.getElementById('ktBattleRhythmWidget');
   if (!host) return;
   const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
   if (!cfg.enabled || !cfg.show_clock) {
     host.style.display = 'none';
+    _ktBrShellKey = 'hidden';
+    _ktBrApplyBorderColor('');
     return;
   }
   host.style.display = '';
-  const raw = _ktBrLastState;
-  const st = raw ? _ktBrExtrapolate(raw) : null;
+  const st = _ktBrLastState ? _ktBrExtrapolate(_ktBrLastState) : null;
   const canWrite = _ktState.access.can_write;
-  const hoffset = st && st.running ? _ktBrFormatHOffset(st.position_min, st.cycle_minutes) : 'H--';
-  const cycleStr = (cfg.cycle_minutes || 0) + ' min';
-  const current = st && st.current_step ? st.current_step.name : '\u2014';
-  const nextName = st && st.next_step ? st.next_step.name : '\u2014';
-  const nextIn = st && st.next_step_in_min != null ? Math.round(st.next_step_in_min) + ' min' : '\u2014';
+  const layout = !st || !st.running ? 'stopped' : (st.paused ? 'paused' : 'running');
+  const shellKey = layout + '|' + (canWrite ? 'w' : 'r');
+  // Self-healing: if the board was fully re-rendered (SSE, bulk move,
+  // etc.) the host is an empty div. childElementCount === 0 means we
+  // need to rebuild the shell even if the layout key hasn't changed.
+  if (shellKey !== _ktBrShellKey || host.childElementCount === 0) {
+    host.innerHTML = _ktBrBuildShell(st, canWrite);
+    _ktBrShellKey = shellKey;
+  }
+  _ktBrUpdateValues(cfg, st);
+  // Border colour: follow the current step's colour if a step is active.
+  const border = (st && st.current_step && st.current_step_idx >= 0)
+    ? _ktBrStepColor(st.current_step, st.current_step_idx)
+    : '';
+  _ktBrApplyBorderColor(border);
+}
+
+// _ktBrBuildShell returns the static HTML for the widget under the given
+// layout state. Every dynamic value (H offset, current step, countdown,
+// cycles completed, state badge) is wrapped in an element with a stable
+// id so _ktBrUpdateValues can rewrite only the text nodes afterwards.
+function _ktBrBuildShell(st, canWrite) {
   const stateLabel = !st || !st.running
     ? (t('kt_br_stopped')||'Stopped')
     : st.paused ? (t('kt_br_paused')||'Paused') : (t('kt_br_running')||'Running');
   const stateColor = !st || !st.running ? 'var(--text-dim)' : (st.paused ? '#f1c40f' : '#27ae60');
-  host.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
-      <div style="display:flex;flex-direction:column;min-width:90px">
+  let controls = '';
+  if (canWrite) {
+    if (!st || !st.running) {
+      controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
+        <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>`;
+    } else if (st.paused) {
+      controls = `<button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
+    } else {
+      controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
+        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
+    }
+  }
+  return `
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;flex-direction:column;min-width:100px">
         <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">${t('kt_br_clock')||'Battle Rhythm'}</div>
-        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1">${hoffset}</div>
-        <div style="font-size:10px;color:${stateColor}">● ${stateLabel}</div>
+        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1" id="ktBrHOffset">H--</div>
+        <div style="font-size:10px;color:${stateColor}" id="ktBrState">● ${stateLabel}</div>
       </div>
-      <div style="display:flex;flex-direction:column;min-width:120px;font-size:var(--fs-xs)">
-        <div><span style="color:var(--text-dim)">${t('kt_br_cycle')||'Cycle'}:</span> ${cycleStr}</div>
-        <div><span style="color:var(--text-dim)">${t('kt_br_current')||'Now'}:</span> <b>${escHtml(current)}</b></div>
-        <div><span style="color:var(--text-dim)">${t('kt_br_next')||'Next'}:</span> ${escHtml(nextName)} <span style="color:var(--text-dim)">${t('kt_br_in')||'in'} ${nextIn}</span></div>
+      <div style="display:flex;flex-direction:column;min-width:140px;font-size:var(--fs-xs)">
+        <div><span style="color:var(--text-dim)">${t('kt_br_cycle')||'Cycle'}:</span> <span id="ktBrCycleLen">\u2014</span></div>
+        <div><span style="color:var(--text-dim)">${t('kt_br_cycles_done')||'Cycles completed'}:</span> <b id="ktBrCyclesDone">0</b></div>
+        <div><span style="color:var(--text-dim)">${t('kt_br_current')||'Now'}:</span> <b id="ktBrCurrent">\u2014</b></div>
+        <div><span style="color:var(--text-dim)">${t('kt_br_next')||'Next'}:</span> <span id="ktBrNext">\u2014</span></div>
       </div>
-      ${canWrite ? `<div style="display:flex;gap:6px;margin-left:auto;align-items:center">
-        ${(!st || !st.running) ? `
-          <input type="time" id="ktBrStartAt" class="input" style="width:90px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
-          <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>
-        ` : (st.paused ? `
-          <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
-          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
-        ` : `
-          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
-          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
-        `)}
-      </div>` : ''}
+      ${controls ? `<div style="display:flex;gap:6px;margin-left:auto;align-items:center">${controls}</div>` : ''}
     </div>`;
+}
+
+// _ktBrUpdateValues rewrites the text-only content of the widget so the
+// ticker animation runs without destroying any focus-holding input.
+function _ktBrUpdateValues(cfg, st) {
+  const hoffset = st && st.running ? _ktBrFormatHOffset(st.position_min, st.cycle_minutes) : 'H--';
+  const hEl = document.getElementById('ktBrHOffset');
+  if (hEl && hEl.textContent !== hoffset) hEl.textContent = hoffset;
+  const cycleLen = (cfg.cycle_minutes || 0) + ' min';
+  const cLen = document.getElementById('ktBrCycleLen');
+  if (cLen && cLen.textContent !== cycleLen) cLen.textContent = cycleLen;
+  const cyclesDone = st && st.cycles_completed != null ? String(st.cycles_completed) : '0';
+  const cDoneEl = document.getElementById('ktBrCyclesDone');
+  if (cDoneEl && cDoneEl.textContent !== cyclesDone) cDoneEl.textContent = cyclesDone;
+  const cur = st && st.current_step ? st.current_step.name : '\u2014';
+  const curEl = document.getElementById('ktBrCurrent');
+  if (curEl && curEl.textContent !== cur) curEl.textContent = cur;
+  let nxt = '\u2014';
+  if (st && st.next_step) {
+    const nxtIn = st.next_step_in_min != null ? Math.max(0, Math.round(st.next_step_in_min)) + ' min' : '';
+    nxt = st.next_step.name + (nxtIn ? ' (' + (t('kt_br_in')||'in') + ' ' + nxtIn + ')' : '');
+  }
+  const nEl = document.getElementById('ktBrNext');
+  if (nEl && nEl.textContent !== nxt) nEl.textContent = nxt;
+  // State badge text.
+  if (st) {
+    const stateLabel = !st.running
+      ? (t('kt_br_stopped')||'Stopped')
+      : st.paused ? (t('kt_br_paused')||'Paused') : (t('kt_br_running')||'Running');
+    const sEl = document.getElementById('ktBrState');
+    if (sEl && sEl.textContent !== '● ' + stateLabel) sEl.textContent = '● ' + stateLabel;
+  }
+}
+
+// _ktBrApplyBorderColor toggles the step-border CSS variable on the main
+// board container. Passing "" clears the border; a hex colour turns on an
+// 8 px box-shadow ring in that colour (see style.css .kt-br-bordered).
+function _ktBrApplyBorderColor(color) {
+  const root = document.getElementById('ktBoardContent');
+  if (!root) return;
+  if (color) {
+    root.style.setProperty('--kt-br-color', color);
+    root.classList.add('kt-br-bordered');
+  } else {
+    root.classList.remove('kt-br-bordered');
+    root.style.removeProperty('--kt-br-color');
+  }
 }
 
 async function _ktBrControl(action) {

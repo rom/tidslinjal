@@ -119,3 +119,64 @@ func TestRunDueBattleRhythmSnapshots(t *testing.T) {
 		t.Errorf("snapshot should not be overwritten on re-fire")
 	}
 }
+
+// TestRunDueBattleRhythmCycles verifies that the per-cycle rollover
+// scheduler increments the Rounds counter on every active entry exactly
+// once per cycle boundary, and that LastCycleIdx is persisted so a
+// repeated run at the same "now" does nothing.
+func TestRunDueBattleRhythmCycles(t *testing.T) {
+	app, _ := newTestApp(t)
+
+	// Two active entries and one archived one.
+	e1, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Power", Status: "working"})
+	e2, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Comms", Status: "working"})
+	eArchived, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Old", Status: "working", Archived: true})
+
+	cycleStart := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
+	cfg := BattleRhythmConfig{
+		Enabled:      true,
+		CycleMinutes: 120,
+		StartedAt:    &cycleStart,
+	}
+	settings := app.store.GetKeyTerrainSettings()
+	settings.BattleRhythm = cfg
+	if err := app.store.SaveKeyTerrainSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+
+	// Still inside cycle 0 — no rollover, no increment.
+	app.runDueBattleRhythmCycles(cycleStart.Add(90 * time.Minute))
+	got1 := app.store.GetKeyTerrainEntryByID(e1.ID)
+	if got1.Rounds != 0 {
+		t.Errorf("expected no increment before rollover, got Rounds=%d", got1.Rounds)
+	}
+
+	// Now at H0 + 2 cycles = cycle index 2 → delta of 2 vs LastCycleIdx=0.
+	app.runDueBattleRhythmCycles(cycleStart.Add(240 * time.Minute))
+	got1 = app.store.GetKeyTerrainEntryByID(e1.ID)
+	got2 := app.store.GetKeyTerrainEntryByID(e2.ID)
+	gotArch := app.store.GetKeyTerrainEntryByID(eArchived.ID)
+	if got1.Rounds != 2 {
+		t.Errorf("e1: expected Rounds=2 after two rollovers, got %d", got1.Rounds)
+	}
+	if got2.Rounds != 2 {
+		t.Errorf("e2: expected Rounds=2 after two rollovers, got %d", got2.Rounds)
+	}
+	if gotArch.Rounds != 0 {
+		t.Errorf("archived: expected Rounds=0, got %d", gotArch.Rounds)
+	}
+
+	// Re-running at the same "now" must not increment again (dedup via LastCycleIdx).
+	app.runDueBattleRhythmCycles(cycleStart.Add(240 * time.Minute))
+	got1 = app.store.GetKeyTerrainEntryByID(e1.ID)
+	if got1.Rounds != 2 {
+		t.Errorf("e1: re-fire should be a no-op, got Rounds=%d", got1.Rounds)
+	}
+
+	// Advance one more cycle → LastCycleIdx should be 3 and Rounds=3.
+	app.runDueBattleRhythmCycles(cycleStart.Add(360 * time.Minute))
+	got1 = app.store.GetKeyTerrainEntryByID(e1.ID)
+	if got1.Rounds != 3 {
+		t.Errorf("e1: expected Rounds=3 after third cycle, got %d", got1.Rounds)
+	}
+}

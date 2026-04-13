@@ -32,31 +32,38 @@ import (
 // frontend uses to render the widget. It's derived on each fetch so the
 // server stays stateless between requests.
 type battleRhythmState struct {
-	Enabled        bool               `json:"enabled"`
-	ShowClock      bool               `json:"show_clock"`
-	Running        bool               `json:"running"`
-	Paused         bool               `json:"paused"`
-	CycleMinutes   int                `json:"cycle_minutes"`
-	CycleStart     *time.Time         `json:"cycle_start,omitempty"`     // H0 of the current cycle
-	CycleEnd       *time.Time         `json:"cycle_end,omitempty"`       // H0 + cycle
-	ElapsedMinutes float64            `json:"elapsed_minutes"`           // minutes since H0, may exceed cycle when clock spans cycles
-	PositionMin    float64            `json:"position_min"`              // elapsed modulo cycle
-	CurrentStep    *BattleRhythmStep  `json:"current_step,omitempty"`
-	NextStep       *BattleRhythmStep  `json:"next_step,omitempty"`
-	NextStepInMin  *float64           `json:"next_step_in_min,omitempty"`
-	ServerTime     time.Time          `json:"server_time"`
-	Steps          []BattleRhythmStep `json:"steps,omitempty"`
+	Enabled          bool               `json:"enabled"`
+	ShowClock        bool               `json:"show_clock"`
+	Running          bool               `json:"running"`
+	Paused           bool               `json:"paused"`
+	CycleMinutes     int                `json:"cycle_minutes"`
+	CycleStart       *time.Time         `json:"cycle_start,omitempty"`     // H0 of the current cycle
+	CycleEnd         *time.Time         `json:"cycle_end,omitempty"`       // H0 + cycle
+	ElapsedMinutes   float64            `json:"elapsed_minutes"`           // minutes since H0, may exceed cycle when clock spans cycles
+	PositionMin      float64            `json:"position_min"`              // elapsed modulo cycle
+	CurrentStep      *BattleRhythmStep  `json:"current_step,omitempty"`
+	CurrentStepIdx   int                `json:"current_step_idx,omitempty"` // index into Steps of CurrentStep, or -1
+	NextStep         *BattleRhythmStep  `json:"next_step,omitempty"`
+	NextStepInMin    *float64           `json:"next_step_in_min,omitempty"`
+	// CyclesCompleted is the zero-based index of the cycle the clock is
+	// currently inside — i.e. when the clock is 5 minutes into the very
+	// first cycle the value is 0, and after it wraps around for the first
+	// time it becomes 1. The frontend shows this as "Cycles completed".
+	CyclesCompleted int                `json:"cycles_completed"`
+	ServerTime      time.Time          `json:"server_time"`
+	Steps           []BattleRhythmStep `json:"steps,omitempty"`
 }
 
 // computeBattleRhythmState evaluates the clock relative to `now`.
 // When the clock is paused, `now` is effectively replaced by PausedAt.
 func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhythmState {
 	st := battleRhythmState{
-		Enabled:      cfg.Enabled,
-		ShowClock:    cfg.ShowClock,
-		CycleMinutes: cfg.CycleMinutes,
-		ServerTime:   now,
-		Steps:        cfg.Steps,
+		Enabled:        cfg.Enabled,
+		ShowClock:      cfg.ShowClock,
+		CycleMinutes:   cfg.CycleMinutes,
+		ServerTime:     now,
+		Steps:          cfg.Steps,
+		CurrentStepIdx: -1,
 	}
 	if cfg.StartedAt == nil || cfg.CycleMinutes <= 0 {
 		return st
@@ -80,6 +87,7 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	st.ElapsedMinutes = elapsed.Minutes()
 	st.PositionMin = posMs.Minutes()
 	cycleIndex := int(elapsed / cycle)
+	st.CyclesCompleted = cycleIndex
 	cycleStart := cfg.StartedAt.Add(time.Duration(cycleIndex) * cycle)
 	cycleEnd := cycleStart.Add(cycle)
 	st.CycleStart = &cycleStart
@@ -92,6 +100,7 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	// closest cycle start.
 	if len(cfg.Steps) > 0 {
 		var current *BattleRhythmStep
+		currentIdx := -1
 		var next *BattleRhythmStep
 		var nextDelta float64 = -1
 		for i := range cfg.Steps {
@@ -107,6 +116,7 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 			// Is the clock currently inside this step?
 			if float64(start) <= st.PositionMin && st.PositionMin <= float64(end) {
 				current = &cfg.Steps[i]
+				currentIdx = i
 			}
 			// Next step: smallest positive delta from current position.
 			delta := float64(start) - st.PositionMin
@@ -120,6 +130,7 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 			}
 		}
 		st.CurrentStep = current
+		st.CurrentStepIdx = currentIdx
 		if next != nil {
 			st.NextStep = next
 			st.NextStepInMin = &nextDelta
@@ -173,6 +184,9 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 		}
 		cfg.StartedAt = &ts
 		cfg.PausedAt = nil
+		// Fresh start: the first cycle is cycle 0, so the rollover scheduler
+		// must not think the previous LastCycleIdx has already been handled.
+		cfg.LastCycleIdx = 0
 	case "pause":
 		if cfg.StartedAt == nil {
 			jsonError(w, "battle rhythm is not running", http.StatusBadRequest)
@@ -196,6 +210,7 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 	case "reset":
 		cfg.StartedAt = nil
 		cfg.PausedAt = nil
+		cfg.LastCycleIdx = 0
 	default:
 		jsonError(w, "action must be start|pause|resume|reset", http.StatusBadRequest)
 		return
