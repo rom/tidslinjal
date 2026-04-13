@@ -1919,6 +1919,7 @@ let _ktBrPollTimer = null;
 let _ktBrLastState = null;     // last server snapshot
 let _ktBrLastFetchAt = 0;      // ms since epoch
 let _ktBrShellKey = '';        // last-rendered shell layout key; '' forces a shell rebuild
+let _ktBrFireOnH0 = false;     // guards the immediate poll at H0 from firing repeatedly
 
 // Palette used when a battle rhythm step doesn't specify its own color.
 // Indices wrap modulo palette length so more than 8 steps still get a
@@ -2016,6 +2017,19 @@ function _ktBrTick() {
   host.style.display = '';
   const st = _ktBrLastState ? _ktBrExtrapolate(_ktBrLastState) : null;
   const canWrite = _ktState.access.can_write;
+  // Speculative H0 transition. When the server-reported scheduled
+  // state has a started_at in the past (i.e. we crossed H0 between
+  // polls), we locally flip the widget into 'running' so the layout
+  // doesn't flicker on "⏳ 0s" while the next poll is in flight. The
+  // authoritative state still comes from the backend on the next
+  // poll; this is just eager UI.
+  let effectiveScheduled = st && st.scheduled;
+  if (effectiveScheduled && st && st.started_at) {
+    const startedMs = new Date(st.started_at).getTime();
+    if (!isNaN(startedMs) && startedMs <= Date.now()) {
+      effectiveScheduled = false;
+    }
+  }
   // Layout classification:
   //   stopped:   no state / Running=false / Scheduled=false
   //   scheduled: StartedAt is in the future, waiting for H0
@@ -2028,8 +2042,17 @@ function _ktBrTick() {
     layout = _ktBrPendingLayout;
   } else if (!st) {
     layout = 'stopped';
-  } else if (st.scheduled) {
+  } else if (effectiveScheduled) {
     layout = 'scheduled';
+  } else if (st.scheduled && !effectiveScheduled) {
+    // Speculative transition: we were scheduled but wall clock has
+    // passed H0. Show 'running' layout immediately; the next poll
+    // fetches the real position and cycles-completed count.
+    layout = 'running';
+    if (!_ktBrFireOnH0) {
+      _ktBrFireOnH0 = true;
+      _ktBrPoll().finally(() => { _ktBrFireOnH0 = false; });
+    }
   } else if (!st.running) {
     layout = 'stopped';
   } else if (st.paused) {
@@ -2170,6 +2193,15 @@ function _ktBrUpdateValues(layout, cfg, st) {
     const ss = secs % 60;
     if (mm > 0) hoffset = '\u23F3 ' + mm + 'm ' + String(ss).padStart(2, '0') + 's';
     else hoffset = '\u23F3 ' + ss + 's';
+    // When the countdown crosses zero, poll the backend immediately so
+    // the widget transitions into the running layout within one round
+    // trip instead of waiting up to 2s for the next tick. We guard the
+    // trigger with a module-scope flag so the 500ms ticker doesn't fire
+    // multiple polls while the poll is in flight.
+    if (secs === 0 && !_ktBrFireOnH0) {
+      _ktBrFireOnH0 = true;
+      _ktBrPoll().finally(() => { _ktBrFireOnH0 = false; });
+    }
   } else if (layout === 'running' || layout === 'paused') {
     hoffset = _ktBrFormatHOffset(st.position_min, st.cycle_minutes);
   } else if (layout === 'starting') {
