@@ -637,6 +637,10 @@ function printTimeline() {
               <input type="radio" name="printView" value="ttm" style="accent-color:var(--accent)">
               📊 ${escHtml(t('btn_task_time_matrix') || 'Task-Time Matrix')}
             </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="keyterrain" style="accent-color:var(--accent)">
+              🏔 ${escHtml(t('print_view_keyterrain') || 'Key Terrain Board')}
+            </label>
           </div>
           <div class="form-row" style="margin-bottom:12px">
             <div class="form-group" style="flex:1">
@@ -676,11 +680,13 @@ function printTimeline() {
   const modal = document.getElementById('printModal');
   openModal('printModal');
 
-  // Hide layer selection for task-time matrix (it has its own filtering)
+  // Hide layer selection for views that don't use timeline layers
+  // (task-time matrix has its own filtering; the Key Terrain Board is
+  // a completely separate tool with its own column selector).
   const _updateLayerVisibility = () => {
     const view = modal.querySelector('input[name="printView"]:checked')?.value;
     const layerGroup = document.getElementById('printLayerGroup');
-    if (layerGroup) layerGroup.style.display = view === 'ttm' ? 'none' : '';
+    if (layerGroup) layerGroup.style.display = (view === 'ttm' || view === 'keyterrain') ? 'none' : '';
   };
   modal.querySelectorAll('input[name="printView"]').forEach(r =>
     r.addEventListener('change', _updateLayerVisibility)
@@ -741,6 +747,20 @@ function printTimeline() {
   // Print button
   document.getElementById('btnDoPrint').addEventListener('click', async () => {
     const view = modal.querySelector('input[name="printView"]:checked')?.value || 'calendar';
+    // Key Terrain Board branch — delegate to _ktPrint which opens its
+    // own column-selection dialog. We don't need the timeline date
+    // range or layer filter for this view; the KT board is
+    // point-in-time.
+    if (view === 'keyterrain') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _ktPrint === 'function') {
+        _ktPrint();
+      } else {
+        showError(t('print_kt_unavailable') || 'Key Terrain Board printing is not available — open the board first.');
+      }
+      return;
+    }
     const fromVal = document.getElementById('printDateFrom').value;
     const toVal = document.getElementById('printDateTo').value;
     if (!fromVal || !toVal) {
