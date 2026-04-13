@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -50,8 +51,19 @@ type battleRhythmState struct {
 	StartedAt        *time.Time         `json:"started_at,omitempty"`      // raw scheduled H0 (same as cfg.StartedAt)
 	ElapsedMinutes   float64            `json:"elapsed_minutes"`           // minutes since H0, may exceed cycle when clock spans cycles
 	PositionMin      float64            `json:"position_min"`              // elapsed modulo cycle
+	// CurrentStep is the first step whose [start, end] interval contains
+	// the current clock position. For backwards compatibility only; the
+	// canonical "what is active now" source is CurrentSteps below, which
+	// can contain more than one entry when two or more steps overlap at
+	// the current position.
 	CurrentStep      *BattleRhythmStep  `json:"current_step,omitempty"`
-	CurrentStepIdx   int                `json:"current_step_idx,omitempty"` // index into Steps of CurrentStep, or -1
+	CurrentStepIdx   int                `json:"current_step_idx,omitempty"` // index of CurrentStep inside cfg.Steps, or -1
+	// CurrentSteps lists every step whose interval contains the current
+	// clock position, in the order they were defined. When two or more
+	// steps overlap (fully or partially) the frontend joins their names
+	// in the "Now" field, e.g. "Brief + Assess", and the border colour
+	// is taken from the first active step.
+	CurrentSteps     []BattleRhythmStep `json:"current_steps,omitempty"`
 	NextStep         *BattleRhythmStep  `json:"next_step,omitempty"`
 	NextStepInMin    *float64           `json:"next_step_in_min,omitempty"`
 	// CyclesCompleted is the zero-based index of the cycle the clock is
@@ -120,38 +132,69 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	// visible near the end of that cycle. We render steps relative to the
 	// closest cycle start.
 	if len(cfg.Steps) > 0 {
-		var current *BattleRhythmStep
-		currentIdx := -1
+		var firstCurrent *BattleRhythmStep
+		firstCurrentIdx := -1
+		var currentSteps []BattleRhythmStep
 		var next *BattleRhythmStep
 		var nextDelta float64 = -1
 		for i := range cfg.Steps {
 			step := cfg.Steps[i]
 			start := step.StartOffsetMin
 			end := start
-			if step.EndOffsetMin != nil {
+			instant := step.EndOffsetMin == nil
+			if !instant {
 				end = *step.EndOffsetMin
 			}
 			if end < start {
 				end = start
 			}
-			// Is the clock currently inside this step?
-			if float64(start) <= st.PositionMin && st.PositionMin <= float64(end) {
-				current = &cfg.Steps[i]
-				currentIdx = i
+			// Step-active check. Ranged steps use the half-open interval
+			// [start, end): a step that ends at minute 60 is no longer
+			// active at position 60 (the next step starting at 60 is).
+			// Instant steps (EndOffsetMin == nil) are reported active
+			// when the position is within 0.5 min of their start so a
+			// whole-minute scheduler tick doesn't miss them entirely.
+			active := false
+			if instant {
+				if math.Abs(st.PositionMin-float64(start)) < 0.5 {
+					active = true
+				}
+			} else if float64(start) <= st.PositionMin && st.PositionMin < float64(end) {
+				active = true
 			}
-			// Next step: smallest positive delta from current position.
-			delta := float64(start) - st.PositionMin
-			if delta < 0 {
-				// Wraps to next cycle.
-				delta += float64(cfg.CycleMinutes)
+			if active {
+				currentSteps = append(currentSteps, cfg.Steps[i])
+				if firstCurrent == nil {
+					firstCurrent = &cfg.Steps[i]
+					firstCurrentIdx = i
+				}
 			}
-			if nextDelta < 0 || delta < nextDelta {
-				nextDelta = delta
-				next = &cfg.Steps[i]
+			// Next step: smallest strictly-positive delta from the
+			// current position. Only consider steps that are not
+			// currently active so "Next" always looks forward.
+			if !active && float64(start) > st.PositionMin+1e-9 {
+				delta := float64(start) - st.PositionMin
+				if nextDelta < 0 || delta < nextDelta {
+					nextDelta = delta
+					next = &cfg.Steps[i]
+				}
 			}
 		}
-		st.CurrentStep = current
-		st.CurrentStepIdx = currentIdx
+		// If every step is either active or behind us, look one cycle
+		// ahead so the "Next" field still has a reasonable value.
+		if next == nil {
+			for i := range cfg.Steps {
+				s := cfg.Steps[i]
+				delta := float64(s.StartOffsetMin) - st.PositionMin + float64(cfg.CycleMinutes)
+				if nextDelta < 0 || delta < nextDelta {
+					nextDelta = delta
+					next = &cfg.Steps[i]
+				}
+			}
+		}
+		st.CurrentStep = firstCurrent
+		st.CurrentStepIdx = firstCurrentIdx
+		st.CurrentSteps = currentSteps
 		if next != nil {
 			st.NextStep = next
 			st.NextStepInMin = &nextDelta
@@ -188,17 +231,19 @@ func (app *App) handleGetBattleRhythmState(w http.ResponseWriter, r *http.Reques
 //                 so the clock position rewinds to the start of the
 //                 previous step. If no previous step in this cycle,
 //                 rewinds to H0 of the current cycle.
-// - forward:      shifts H0 backward by (next_step_start - current_position)
+// - forward:      mutates the Steps so the current step's EndOffsetMin
+//                 and the next step's StartOffsetMin both become the
+//                 current position. Effect: the current step is "ended
+//                 early" and the next step GAINS the leftover time —
+//                 it runs longer than its original definition. H0 and
+//                 cycle length are unchanged. The mutation persists
+//                 across cycles until the operator reconfigures steps
+//                 via Settings.
+// - fast_forward: shifts H0 backward by (next_step_start - current_position)
 //                 so the clock position jumps to the start of the next
-//                 step. The current step is effectively cut short; wall
-//                 clock continues normally. Cycle rollover happens
-//                 earlier in wall clock.
-// - fast_forward: same H0 shift as forward. Conceptually: "catch up to
-//                 the step we should have started by now". Emitted as a
-//                 separate action so the frontend can distinguish the
-//                 toast/label, and left deliberately close-to-equivalent
-//                 until the operator confirms the exact semantic they
-//                 want (skip wall clock vs donate leftover time).
+//                 step. The current step is cut short; wall clock
+//                 continues normally; cycle rollover happens earlier
+//                 in wall clock. Steps are NOT mutated.
 func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
@@ -251,7 +296,7 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 		cfg.StartedAt = nil
 		cfg.PausedAt = nil
 		cfg.LastCycleIdx = 0
-	case "backward", "forward", "fast_forward":
+	case "backward", "fast_forward":
 		if cfg.StartedAt == nil {
 			jsonError(w, "battle rhythm is not running", http.StatusBadRequest)
 			return
@@ -276,6 +321,20 @@ func (app *App) handleBattleRhythmControl(w http.ResponseWriter, r *http.Request
 			pausedShifted := cfg.PausedAt.Add(shift)
 			cfg.PausedAt = &pausedShifted
 		}
+	case "forward":
+		if cfg.StartedAt == nil {
+			jsonError(w, "battle rhythm is not running", http.StatusBadRequest)
+			return
+		}
+		if cfg.CycleMinutes <= 0 {
+			jsonError(w, "cycle length must be > 0", http.StatusBadRequest)
+			return
+		}
+		// Mutate Steps: the current step's end and the next step's
+		// start both become the current position. The cycle length
+		// and H0 are untouched, so the next step's wall-clock duration
+		// grows by (original_next_start - current_position).
+		cfg.Steps = donateLeftoverToNextStep(cfg.Steps, cfg, now)
 	default:
 		jsonError(w, "action must be start|pause|resume|reset|backward|forward|fast_forward", http.StatusBadRequest)
 		return
@@ -396,7 +455,7 @@ func (app *App) handleDownloadBattleRhythmSnapshot(w http.ResponseWriter, r *htt
 }
 
 // computeBattleRhythmStepShift returns the duration to add to
-// BattleRhythmConfig.StartedAt for a backward / forward / fast_forward
+// BattleRhythmConfig.StartedAt for a backward or fast_forward
 // navigation. A positive result means H0 moves forward in wall clock
 // (the apparent position rewinds); a negative result means H0 moves
 // backward (the apparent position advances).
@@ -404,11 +463,14 @@ func (app *App) handleDownloadBattleRhythmSnapshot(w http.ResponseWriter, r *htt
 // The shift is computed against the position we'd compute for `now`
 // against the current config, and against the list of step start
 // offsets in the cycle. "backward" lands the apparent position on the
-// start of the most recent step that has already begun; "forward" and
-// "fast_forward" land it on the start of the next step whose offset
-// lies strictly after the current position. If there is no such
-// neighbour inside the current cycle, we fall back to the cycle
-// boundary (H0 of the previous or next cycle).
+// start of the most recent step that has already begun; "fast_forward"
+// lands it on the start of the next step whose offset lies strictly
+// after the current position. If there is no such neighbour inside the
+// current cycle, we fall back to the cycle boundary (H0 of the
+// previous or next cycle).
+//
+// The "forward" action is NOT handled here — it mutates the Steps
+// slice instead of shifting H0 (see donateLeftoverToNextStep).
 func computeBattleRhythmStepShift(cfg BattleRhythmConfig, now time.Time, action string) (time.Duration, error) {
 	st := computeBattleRhythmState(cfg, now)
 	cycle := cfg.CycleMinutes
@@ -459,7 +521,7 @@ func computeBattleRhythmStepShift(cfg BattleRhythmConfig, now time.Time, action 
 		delta := (pos - target) * float64(time.Minute)
 		return time.Duration(delta), nil
 
-	case "forward", "fast_forward":
+	case "fast_forward":
 		// Find the smallest start strictly greater than the current
 		// position. If none, land at the cycle boundary (cycle end =
 		// start of next cycle's H0).
@@ -480,6 +542,68 @@ func computeBattleRhythmStepShift(cfg BattleRhythmConfig, now time.Time, action 
 		return -time.Duration(delta), nil
 	}
 	return 0, fmt.Errorf("unknown navigation action %q", action)
+}
+
+// donateLeftoverToNextStep implements the "forward" step navigation by
+// mutating the Steps slice rather than shifting H0. The current step
+// (the step whose [start, end) contains the current position) has its
+// EndOffsetMin clamped to the current position, and the next step (the
+// step with the smallest StartOffsetMin strictly greater than the
+// current position) has its StartOffsetMin moved to the current
+// position. The next step's EndOffsetMin is NOT touched, so its
+// wall-clock duration grows by the amount of leftover time donated
+// from the current step.
+//
+// Returns a new slice; never mutates the input slice in place (so the
+// caller can safely compare or roll back if needed).
+//
+// Edge cases:
+//   - If there is no current step (we're in a gap or at H+0 with no
+//     step starting at 0), the leftover donation is just absorbing
+//     the gap: the next step's start moves back to the current pos.
+//   - If there is no next step in the current cycle, only the current
+//     step is truncated; nothing to grow.
+//   - If both are absent, the Steps slice is returned unchanged.
+func donateLeftoverToNextStep(steps []BattleRhythmStep, cfg BattleRhythmConfig, now time.Time) []BattleRhythmStep {
+	if len(steps) == 0 {
+		return steps
+	}
+	st := computeBattleRhythmState(cfg, now)
+	pos := int(math.Round(st.PositionMin))
+	out := make([]BattleRhythmStep, len(steps))
+	copy(out, steps)
+
+	currentIdx := -1
+	nextIdx := -1
+	nextStart := -1
+	for i := range out {
+		start := out[i].StartOffsetMin
+		end := start
+		if out[i].EndOffsetMin != nil {
+			end = *out[i].EndOffsetMin
+		}
+		if end < start {
+			end = start
+		}
+		// Current step: pos is within [start, end). Use half-open
+		// interval so a step that ends at pos is NOT the current
+		// step — the step that starts at pos is.
+		if start <= pos && pos < end {
+			currentIdx = i
+		}
+		if start > pos && (nextIdx == -1 || start < nextStart) {
+			nextIdx = i
+			nextStart = start
+		}
+	}
+	if currentIdx >= 0 {
+		end := pos
+		out[currentIdx].EndOffsetMin = &end
+	}
+	if nextIdx >= 0 {
+		out[nextIdx].StartOffsetMin = pos
+	}
+	return out
 }
 
 // floorDiv returns math.Floor(a/b) as a float64, avoiding imports.

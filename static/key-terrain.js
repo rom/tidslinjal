@@ -1774,6 +1774,33 @@ function _ktShowHelp() {
 
       <h4 style="margin:12px 0 4px">${t('kt_help_access')||'Access Control'}</h4>
       <p>Operations Lead, Staff Officers, and Staff Assistants have <strong>write access</strong>. Everyone else has <strong>read-only</strong> access.</p>
+
+      <h4 style="margin:14px 0 4px">\u23F1\uFE0F ${t('kt_help_br')||'Battle Rhythm'}</h4>
+      <p>The <strong>battle rhythm</strong> is a shared exercise clock with cyclic steps. Every connected user sees the same <strong>H0</strong> (the start of the current cycle) and the same step progression.</p>
+      <ul style="margin:0;padding-left:18px">
+        <li>Configure under <strong>\u2699 Settings → Battle Rhythm</strong>: cycle length, named steps with start/end offsets relative to H0 (negative offsets allowed for pre-H0 steps), a colour picker per step, and an automatic snapshot schedule.</li>
+        <li>The clock widget appears at the top of the board when <em>Show clock widget</em> is enabled. It shows the current H-offset, the cycle length, the number of cycles completed so far, the current step, and the next step with a countdown.</li>
+        <li>The <strong>board's outer border</strong> changes colour while a step is active — it uses the colour you picked for that step, or an automatic palette if you left the picker at default.</li>
+      </ul>
+
+      <h5 style="margin:10px 0 4px">Controls</h5>
+      <ul style="margin:0;padding-left:18px">
+        <li><strong>\u25B6 Start</strong> \u2014 starts the clock at wall-clock <em>now</em>. Type a time in the HH:MM field beside Start to <em>arm</em> the clock for a future moment; the widget then shows a waiting state with a live countdown until H0.</li>
+        <li><strong>\u23F8 Pause</strong> / <strong>\u25B6 Resume</strong> \u2014 freezes / restarts the clock. The elapsed position is preserved across the pause.</li>
+        <li><strong>\u27F2 Reset</strong> \u2014 stops the clock and clears H0. Steps and cycle length are preserved.</li>
+        <li><strong>\u23EA Backward</strong> \u2014 rewinds the apparent clock position to the start of the previous step (or to H+0, or one full cycle back if already at H+0). Wall clock unchanged.</li>
+        <li><strong>\u23ED Forward</strong> \u2014 ends the current step <em>now</em>; the next step absorbs the leftover time and runs longer. The cycle length is unchanged. The mutation persists across cycles until you reconfigure the steps.</li>
+        <li><strong>\u23E9 Fast-forward</strong> \u2014 jumps the clock forward to the next step's nominal start. The current step is cut short, wall clock continues, and the cycle ends sooner than its original wall-clock end.</li>
+      </ul>
+
+      <h5 style="margin:10px 0 4px">Cycle rollover and snapshots</h5>
+      <ul style="margin:0;padding-left:18px">
+        <li>Every time the clock rolls over into a new cycle, the <strong># Cycles</strong> counter on every active entry is incremented by one. The scheduler runs once per minute.</li>
+        <li>Snapshot offsets (minutes from H0, comma-separated in Settings) auto-capture the full board in every selected format (<strong>CSV / JSON / XML / SVG</strong>) and write them under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code> on the server.</li>
+      </ul>
+
+      <h5 style="margin:10px 0 4px">Detached clock window</h5>
+      <p>The <strong>Clocks</strong> popup (toolbar in the main app) has a <em>Battle Rhythm</em> button that adds a read-only clock card showing the same H-offset, current step, next-step countdown, and cycles-completed counter alongside the other clocks.</p>
     </div>
 
     <div style="margin-top:16px">
@@ -1989,8 +2016,8 @@ function _ktBrBuildShell(layout, st, canWrite) {
     // no "current position" to navigate from yet.
     const navButtons = (layout === 'running' || layout === 'paused')
       ? `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="backward" title="${t('kt_br_backward_h')||'Rewind to previous step'}">\u23EA</button>
-         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="forward" title="${t('kt_br_forward_h')||'Advance to next step (current step cut short)'}">\u23ED</button>
-         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Fast-forward to next step (catch up to schedule)'}">\u23E9</button>`
+         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="forward" title="${t('kt_br_forward_h')||'End current step now; next step absorbs the leftover time and runs longer'}">\u23ED</button>
+         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Jump the clock to the next step\\'s nominal start (cycle ends sooner)'}">\u23E9</button>`
       : '';
     if (layout === 'stopped') {
       controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
@@ -2019,17 +2046,23 @@ function _ktBrBuildShell(layout, st, canWrite) {
     const d = new Date(st.started_at);
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    subline = `<div style="font-size:10px;color:#f39c12">${t('kt_br_waiting_for')||'Waiting for'} ${hh}:${mm}</div>`;
+    subline = `<div style="font-size:12px;color:#f39c12;font-weight:600">${t('kt_br_waiting_for')||'Waiting for'} ${hh}:${mm}</div>`;
   }
+  // Font sizing notes: the battle rhythm widget now renders noticeably
+  // larger than the default --fs-xs used elsewhere on the board. The
+  // label/state badge are 12px (was 10), the info column text is 14px
+  // (was --fs-xs ≈ 12), and the H-offset headline is 28px (was 22).
+  // That makes the widget scannable from across a briefing room
+  // without interfering with the dense table below it.
   return `
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--radius);${bgStyle};transition:background .3s, border-color .3s">
-      <div style="display:flex;flex-direction:column;min-width:110px">
-        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">${t('kt_br_clock')||'Battle Rhythm'}</div>
-        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1" id="ktBrHOffset">${headline}</div>
-        <div style="font-size:10px;color:${stateColor}" id="ktBrState">● ${stateLabel}</div>
+    <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;border-radius:var(--radius);${bgStyle};transition:background .3s, border-color .3s;font-size:14px">
+      <div style="display:flex;flex-direction:column;min-width:130px">
+        <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600">${t('kt_br_clock')||'Battle Rhythm'}</div>
+        <div style="font-family:monospace;font-size:28px;font-weight:700;color:var(--accent);line-height:1.05" id="ktBrHOffset">${headline}</div>
+        <div style="font-size:12px;color:${stateColor}" id="ktBrState">● ${stateLabel}</div>
         ${subline}
       </div>
-      <div style="display:flex;flex-direction:column;min-width:160px;font-size:var(--fs-xs)">
+      <div style="display:flex;flex-direction:column;min-width:200px;font-size:14px;line-height:1.45">
         <div><span style="color:var(--text-dim)">${t('kt_br_cycle')||'Cycle'}:</span> <span id="ktBrCycleLen">\u2014</span></div>
         <div><span style="color:var(--text-dim)">${t('kt_br_cycles_done')||'Cycles completed'}:</span> <b id="ktBrCyclesDone">0</b></div>
         <div><span style="color:var(--text-dim)">${t('kt_br_current')||'Now'}:</span> <b id="ktBrCurrent">\u2014</b></div>
@@ -2063,7 +2096,16 @@ function _ktBrUpdateValues(layout, cfg, st) {
   const cyclesDone = st && st.cycles_completed != null ? String(st.cycles_completed) : '0';
   const cDoneEl = document.getElementById('ktBrCyclesDone');
   if (cDoneEl && cDoneEl.textContent !== cyclesDone) cDoneEl.textContent = cyclesDone;
-  const cur = st && st.current_step ? st.current_step.name : '\u2014';
+  // "Now" field supports multiple simultaneously-active steps — when two
+  // or more steps overlap we join their names with " + ". The backend
+  // gives us current_steps (plural), and current_step stays as a
+  // compatibility alias for the first active step.
+  let cur = '\u2014';
+  if (st && Array.isArray(st.current_steps) && st.current_steps.length > 0) {
+    cur = st.current_steps.map(s => s.name).join(' + ');
+  } else if (st && st.current_step) {
+    cur = st.current_step.name;
+  }
   const curEl = document.getElementById('ktBrCurrent');
   if (curEl && curEl.textContent !== cur) curEl.textContent = cur;
   let nxt = '\u2014';
@@ -2128,7 +2170,7 @@ async function _ktBrControl(action) {
                       pause: t('kt_br_toast_paused')||'Battle rhythm paused',
                       resume: t('kt_br_toast_resumed')||'Battle rhythm resumed',
                       reset: t('kt_br_toast_reset')||'Battle rhythm reset',
-                      forward: t('kt_br_toast_forward')||'Advanced to next step',
+                      forward: t('kt_br_toast_forward')||'Step ended early — leftover time donated to next step',
                       backward: t('kt_br_toast_backward')||'Rewound to previous step',
                       fast_forward: t('kt_br_toast_fforward')||'Fast-forwarded to next step' }[action] || action;
       showNotification('success', label);
