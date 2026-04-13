@@ -2017,7 +2017,7 @@ function _ktBrBuildShell(layout, st, canWrite) {
     const navButtons = (layout === 'running' || layout === 'paused')
       ? `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="backward" title="${t('kt_br_backward_h')||'Rewind to previous step'}">\u23EA</button>
          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="forward" title="${t('kt_br_forward_h')||'End current step now; next step absorbs the leftover time and runs longer'}">\u23ED</button>
-         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Jump the clock to the next step\\'s nominal start (cycle ends sooner)'}">\u23E9</button>`
+         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="fast_forward" title="${t('kt_br_fforward_h')||'Jump the clock to the next step\'s nominal start (cycle ends sooner)'}">\u23E9</button>`
       : '';
     if (layout === 'stopped') {
       controls = `<input type="time" id="ktBrStartAt" class="input" style="width:100px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
