@@ -1948,6 +1948,7 @@
         <a class="help-toc-link" href="#h-decisionlog">⚖ Decision Log</a>
         <a class="help-toc-link" href="#h-logbook">📓 Log Book</a>
         <a class="help-toc-link" href="#h-resources">🏗 Resources</a>
+        <a class="help-toc-link" href="#h-keyterrain">🏔 Key Terrain Board</a>
         <a class="help-toc-link" href="#h-map">🗺 Map</a>
         <a class="help-toc-link" href="#h-detach">🪟 Detachable Windows</a>
         <a class="help-toc-link" href="#h-connectors">🔌 Connectors</a>
@@ -2595,6 +2596,58 @@
             <h4>Ready Check</h4>
             <p>In <b>Settings</b>, team leads can enable a <b>Ready Check</b> that verifies all activities have changed from "planned" to another status before a set time. This ensures all preparations are complete before the operation starts. The check time can be set as an absolute time or as a number of minutes before the epoch/STARTEX.</p>
             <p>Resources with location coordinates appear as markers on the <b>Map Projection</b> and can be toggled by type.</p>
+          </div>
+        </div>
+
+        <div class="help-section" id="h-keyterrain">
+          <div class="help-section-icon">🏔</div>
+          <div class="help-section-body">
+            <h3>Key Terrain Board</h3>
+            <p>The Key Terrain Board tracks critical <b>functions</b> (cyber key terrain) — their priority, current status, trend, threat picture, responsible owner, and in-flight response actions. It is designed for continuous operational awareness during exercises and incidents and can be opened as its own window at <code>/key-terrain</code>.</p>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Entries &amp; columns</h4>
+            <ul class="help-list">
+              <li>Click <b>+ Add Entry</b> to create a new function. Each entry has a seq number, zone, priority (1 = highest), status (Working / Degraded / Down / Unknown), trend, threat description, external dependencies, responsible operator, and an actions field.</li>
+              <li>Click any column header to sort ascending / descending / back to default.</li>
+              <li>Use <b>👁 Columns</b> to hide any column you don't need, and <b>⚙ Settings → Column Labels</b> to rename any column heading (e.g. <em>Function</em> → <em>Task</em>). Renames are global and visible to every user of the board.</li>
+              <li>Entries can be linked to a <b>Capability resource</b> — when the capability's status or zone changes the linked entries update automatically.</li>
+              <li>The board auto-updates in real time via SSE; when another operator edits an entry you see the change immediately.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Zoom &amp; window-fill</h4>
+            <ul class="help-list">
+              <li>Use the <span class="help-kbd">A−</span> / <span class="help-kbd">A+</span> buttons in the toolbar to shrink or enlarge the board. Eight levels from <em>XXS</em> (ultra-compact) to <em>XXXL</em> (big-screen).</li>
+              <li>The middle button of the zoom group resets to <em>MD</em>.</li>
+              <li>When detached to <code>/key-terrain</code>, the board fills the whole window so a wall display shows the maximum amount of data.</li>
+              <li>Zoom is per-browser (stored in localStorage) and does not affect other operators.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Filter</h4>
+            <ul class="help-list">
+              <li>Click <b>🔍 Filter</b> to narrow the view. Checkboxes are built dynamically from the functions currently on the board, so any new entry automatically appears in the filter panel the next time it's opened.</li>
+              <li>Text filters use a case-insensitive substring match; checkboxes pick exact values. Multiple checkboxes in one group act as OR; different groups AND together.</li>
+              <li>Function matching ignores leading / trailing whitespace and is case-insensitive, so "Power" and " power " match the same checkbox.</li>
+              <li>The filter panel uses your custom column labels, so if you renamed <em>Function</em> to <em>Task</em> the filter heading says <em>Task</em>.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Battle Rhythm — shared exercise clock</h4>
+            <p>Open <b>⚙ Settings → Battle Rhythm</b> to configure a shared clock that every operator sees in lockstep.</p>
+            <ul class="help-list">
+              <li><b>Cycle length</b> (minutes) defines one battle rhythm cycle, e.g. 120 min for a two-hour cadence. The first tick of each cycle is <b>H0</b>.</li>
+              <li><b>Steps</b> are named events inside each cycle, timed relative to H0. Offsets can be negative: a step with <em>Start −15, End 0</em> fires in the last 15 minutes of the previous cycle. Leave <em>End</em> blank for an instant marker. Each step has a colour picker — the board's outer border swaps to that colour while the step is the active one.</li>
+              <li><b>Snapshot offsets</b> are a comma-separated list of minute offsets; at each offset the scheduler auto-captures the board in every selected format (<b>CSV / JSON / XML / SVG</b>) and stores it under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code>. Teamlead+ can list and download snapshots from the Manage &amp; Export panel.</li>
+              <li><b># Cycles</b> column: every time the clock rolls over to a new cycle, the <em># Cycles</em> counter on every active entry is incremented by one, so you can see how many rhythm cycles have touched each function.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Running the battle rhythm clock</h4>
+            <ul class="help-list">
+              <li>The clock widget appears at the top of the board (toggle with <em>Show clock widget</em> in Settings).</li>
+              <li>Press <b>▶ Start</b> to begin immediately. Type a time in the <em>HH:MM</em> field beside Start to arm the clock for a future moment — the widget switches to a waiting state (<b>⏳ Waiting for 09:00</b> with a live countdown) until H0 fires. If the time is already past for today, H0 is scheduled for <em>tomorrow</em> at that wall-clock time so the clock actually fires.</li>
+              <li><b>⏸ Pause</b> freezes the clock; <b>▶ Resume</b> continues from where it stopped. <b>⟲ Reset</b> stops and clears H0.</li>
+              <li>Start / Pause / Reset are shared: one operator's action propagates to every other open Key Terrain Board within one round-trip via SSE. A success toast confirms the action.</li>
+              <li>Detach the clock into its own pane via the <b>Clocks</b> popup → <em>Battle Rhythm</em> toolbar button; it shows the same H-offset and step information as a read-only card beside other clocks.</li>
+              <li>The colour of the <b>border around the entire board</b> reflects the current step, giving instant visual awareness of where you are in the cycle.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Access control</h4>
+            <ul class="help-list">
+              <li>Everyone with access to the board can view entries and filter them.</li>
+              <li>Creating, editing, deleting entries, changing settings, running the battle rhythm clock and configuring snapshots require <b>TeamLead+</b> (or any custom role with the <code>key_terrain_write</code> capability).</li>
+            </ul>
           </div>
         </div>
 

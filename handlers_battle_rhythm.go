@@ -36,9 +36,18 @@ type battleRhythmState struct {
 	ShowClock        bool               `json:"show_clock"`
 	Running          bool               `json:"running"`
 	Paused           bool               `json:"paused"`
+	// Scheduled is true when the clock has been "armed" by pressing Start
+	// with a future HH:MM start time but the wall clock hasn't yet reached
+	// H0. In this state the widget shows a countdown to the scheduled
+	// start rather than an H-offset.
+	Scheduled        bool               `json:"scheduled"`
+	// ScheduledSeconds is the positive number of seconds remaining until
+	// H0 fires, when Scheduled is true.
+	ScheduledSeconds float64            `json:"scheduled_seconds,omitempty"`
 	CycleMinutes     int                `json:"cycle_minutes"`
 	CycleStart       *time.Time         `json:"cycle_start,omitempty"`     // H0 of the current cycle
 	CycleEnd         *time.Time         `json:"cycle_end,omitempty"`       // H0 + cycle
+	StartedAt        *time.Time         `json:"started_at,omitempty"`      // raw scheduled H0 (same as cfg.StartedAt)
 	ElapsedMinutes   float64            `json:"elapsed_minutes"`           // minutes since H0, may exceed cycle when clock spans cycles
 	PositionMin      float64            `json:"position_min"`              // elapsed modulo cycle
 	CurrentStep      *BattleRhythmStep  `json:"current_step,omitempty"`
@@ -68,16 +77,28 @@ func computeBattleRhythmState(cfg BattleRhythmConfig, now time.Time) battleRhyth
 	if cfg.StartedAt == nil || cfg.CycleMinutes <= 0 {
 		return st
 	}
-	st.Running = true
+	st.StartedAt = cfg.StartedAt
 	effectiveNow := now
 	if cfg.PausedAt != nil {
 		st.Paused = true
 		effectiveNow = *cfg.PausedAt
 	}
+	// Scheduled state: the operator pressed Start with a future HH:MM and
+	// the wall clock hasn't reached H0 yet. Expose a positive countdown
+	// so the widget can show "Waiting for 09:00 — starts in 1m 23s".
+	if effectiveNow.Before(*cfg.StartedAt) {
+		st.Scheduled = true
+		st.ScheduledSeconds = cfg.StartedAt.Sub(effectiveNow).Seconds()
+		// The clock is armed but not yet counting; don't set Running so
+		// the widget can render a distinct "waiting" UI state.
+		return st
+	}
+	st.Running = true
 	// Elapsed since the very first H0 (can be many cycles).
 	elapsed := effectiveNow.Sub(*cfg.StartedAt)
 	if elapsed < 0 {
-		// Clock scheduled to start in the future.
+		// Defensive: should already have returned via the Scheduled
+		// branch above, but keep the clamp for safety.
 		elapsed = 0
 	}
 	cycle := time.Duration(cfg.CycleMinutes) * time.Minute

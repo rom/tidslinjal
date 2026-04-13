@@ -24,14 +24,19 @@ func TestComputeBattleRhythmState(t *testing.T) {
 		},
 	}
 
-	// 1. Still before H0 — clock is running but elapsed == 0.
+	// 1. Still before H0 — clock is armed but not yet counting. The new
+	// Scheduled state means Running=false, Scheduled=true, and the
+	// countdown in ScheduledSeconds is the positive delta to H0.
 	before := h0.Add(-5 * time.Minute)
 	st := computeBattleRhythmState(cfg, before)
-	if !st.Running || st.Paused {
-		t.Errorf("expected running+not-paused before H0, got running=%v paused=%v", st.Running, st.Paused)
+	if st.Running {
+		t.Errorf("expected not-running before H0, got running=%v", st.Running)
 	}
-	if st.ElapsedMinutes != 0 {
-		t.Errorf("before H0: elapsed should be 0, got %v", st.ElapsedMinutes)
+	if !st.Scheduled {
+		t.Errorf("expected Scheduled=true before H0")
+	}
+	if st.ScheduledSeconds < 299 || st.ScheduledSeconds > 301 {
+		t.Errorf("ScheduledSeconds = %v, want ~300", st.ScheduledSeconds)
 	}
 
 	// 2. At H+15 — inside Bravo, next step Charlie in 45 min.
