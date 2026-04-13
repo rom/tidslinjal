@@ -2439,7 +2439,7 @@ TRANSLATIONS.is = {
     kt_created: 'Búið til',
     kt_updated: 'Uppfært',
     kt_finished: 'Lokið',
-    kt_rounds: 'Umferðir',
+    kt_rounds: '# Lotur',
     kt_show_ts: 'Sýna tímastimpla',
     kt_hide_ts: 'Fela tímastimpla',
     kt_threat_ph: 'Lýsið núverandi fjandsamlegum þrýstingi',

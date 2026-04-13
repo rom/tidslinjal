@@ -2904,7 +2904,7 @@ TRANSLATIONS.sv = {
     kt_help_access: 'Behörighetskontroll',
     kt_detach: 'Öppna i eget fönster',
     kt_created: 'Skapad',
-    kt_rounds: '# Omgångar',
+    kt_rounds: '# Cykler',
     kt_columns_vis: 'Visa / Dölj kolumner',
     kt_columns_vis_desc: 'Välj vilka kolumner som ska vara synliga i tabellen.',
     kt_apply: 'Tillämpa',

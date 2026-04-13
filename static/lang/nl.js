@@ -2428,7 +2428,7 @@ TRANSLATIONS.nl = {
     kt_created: 'Aangemaakt',
     kt_updated: 'Bijgewerkt',
     kt_finished: 'Voltooid',
-    kt_rounds: 'Rondes',
+    kt_rounds: '# Cycli',
     kt_show_ts: 'Tijdstempels tonen',
     kt_hide_ts: 'Tijdstempels verbergen',
     kt_threat_ph: 'Beschrijf de huidige vijandelijke druk',

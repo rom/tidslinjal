@@ -345,6 +345,12 @@ type BattleRhythmConfig struct {
 	// SnapshotFormats: any of "csv","json","xml","svg". Multiple formats
 	// may be selected — every configured format is written each fire.
 	SnapshotFormats []string `json:"snapshot_formats,omitempty"`
+	// LastCycleIdx tracks the highest cycle index for which the per-cycle
+	// scheduler has already incremented the Rounds counter on every active
+	// Key Terrain entry. Incremented atomically by runDueBattleRhythmCycles
+	// so a server restart or a delayed tick cannot double-increment.
+	// Reset to 0 by the start and reset control actions.
+	LastCycleIdx int `json:"last_cycle_idx,omitempty"`
 }
 
 // BattleRhythmStep is a single named event inside a cycle.
@@ -353,6 +359,10 @@ type BattleRhythmStep struct {
 	Description      string `json:"description,omitempty"`
 	StartOffsetMin   int    `json:"start_offset_min"`           // minutes from H0; may be negative
 	EndOffsetMin     *int   `json:"end_offset_min,omitempty"`    // nil = instant step; otherwise spans [start,end]
+	// Color is an optional hex colour (e.g. "#3498db") used for the board
+	// border while this step is the active one. Empty means "fall back to
+	// a palette colour picked from the step's index on the client".
+	Color            string `json:"color,omitempty"`
 }
 
 // KeyTerrainSnapshot is a point-in-time copy of the board for version control

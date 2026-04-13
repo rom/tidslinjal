@@ -464,6 +464,7 @@ function rebuildClocks() {
       <div class="clock-label" style="color:var(--accent)">Battle Rhythm</div>
       <div class="clock-time" id="br-hoffset" style="color:var(--accent);font-family:monospace">H--</div>
       <div class="clock-date" id="br-current" style="font-size:12px">—</div>
+      <div class="clock-tz" id="br-cycles" style="font-size:10px;color:var(--text-dim)">Cycles: 0</div>
       <div class="clock-tz" id="br-next" style="font-size:10px;color:var(--text-dim)">—</div>
     </div>`;
   }
@@ -2484,16 +2485,22 @@ let _brPollCounter = 0;
 function tickBattleRhythm() {
   if (!_showBattleRhythm) return;
   _brPollCounter++;
-  if (_brPollCounter % 5 === 1) _brPoll();
+  // Poll every 2 seconds so one operator pressing Start / Pause / Reset
+  // shows up on the clocks popup within ~2s. The main board uses SSE
+  // for sub-second sync; the detached window doesn't have SSE of its
+  // own so it relies on this poll interval.
+  if (_brPollCounter % 2 === 1) _brPoll();
   const st = _brLastState;
   const hEl = document.getElementById('br-hoffset');
   const curEl = document.getElementById('br-current');
   const nxtEl = document.getElementById('br-next');
+  const cycEl = document.getElementById('br-cycles');
   if (!hEl) return;
   if (!st || !st.running) {
     hEl.textContent = 'H--';
     if (curEl) curEl.textContent = 'Stopped';
     if (nxtEl) nxtEl.textContent = '';
+    if (cycEl) cycEl.textContent = 'Cycles: 0';
     return;
   }
   // Extrapolate from last fetch.
@@ -2508,6 +2515,7 @@ function tickBattleRhythm() {
       nxtEl.textContent = 'Next: ' + st.next_step.name + ' in ' + nxtIn + 'm';
     } else { nxtEl.textContent = ''; }
   }
+  if (cycEl) cycEl.textContent = 'Cycles: ' + (st.cycles_completed || 0);
 }
 // Reload timed events and narrative periodically
 setInterval(loadTimedEvents, 30000);

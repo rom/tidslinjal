@@ -49,10 +49,61 @@ func (app *App) startBattleRhythmScheduler() {
 			case <-app.stopCh:
 				return
 			case <-ticker.C:
-				app.runDueBattleRhythmSnapshots(time.Now())
+				now := time.Now()
+				// Cycle rollover first so the rounds column is fresh
+				// before the snapshot writer serialises entries.
+				app.runDueBattleRhythmCycles(now)
+				app.runDueBattleRhythmSnapshots(now)
 			}
 		}
 	}()
+}
+
+// runDueBattleRhythmCycles detects cycle rollover (the clock has wrapped
+// past the previous cycle boundary) and increments the Rounds counter on
+// every non-archived Key Terrain entry by the number of cycles that have
+// elapsed since LastCycleIdx. The per-minute ticker makes this an at-most
+// once-per-minute update per entry. LastCycleIdx is persisted so restarts
+// and delayed ticks do not double-increment.
+func (app *App) runDueBattleRhythmCycles(now time.Time) {
+	settings := app.store.GetKeyTerrainSettings()
+	cfg := settings.BattleRhythm
+	if !cfg.Enabled || cfg.StartedAt == nil || cfg.PausedAt != nil {
+		return
+	}
+	if cfg.CycleMinutes <= 0 {
+		return
+	}
+	elapsed := now.Sub(*cfg.StartedAt)
+	if elapsed < 0 {
+		return
+	}
+	cycle := time.Duration(cfg.CycleMinutes) * time.Minute
+	currentIdx := int(elapsed / cycle)
+	if currentIdx <= cfg.LastCycleIdx {
+		return
+	}
+	delta := currentIdx - cfg.LastCycleIdx
+	entries := app.store.GetKeyTerrainEntries()
+	updated := 0
+	for _, e := range entries {
+		if e.Archived {
+			continue
+		}
+		e.Rounds += delta
+		if err := app.store.UpdateKeyTerrainEntry(e); err == nil {
+			updated++
+		}
+	}
+	cfg.LastCycleIdx = currentIdx
+	settings.BattleRhythm = cfg
+	_ = app.store.SaveKeyTerrainSettings(settings)
+	app.store.LogAudit(AuditEntry{ //nolint
+		Action: "cycle_rollover", EntityType: "battle_rhythm",
+		Summary: fmt.Sprintf("Battle rhythm cycle %d began; rounds incremented on %d entries (+%d)",
+			currentIdx, updated, delta),
+	})
+	app.broadcastKeyTerrainChange("cycle_rollover")
 }
 
 // runDueBattleRhythmSnapshots is the core of the scheduler: given the
