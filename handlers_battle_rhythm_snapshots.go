@@ -155,7 +155,16 @@ func (app *App) runDueBattleRhythmSnapshots(now time.Time) {
 			if format == "" {
 				continue
 			}
-			name := fmt.Sprintf("h%+d.%s", normalised, format)
+			// Actual wall-clock time of this snapshot instant: cycle
+			// start plus the normalised offset. Folded into the
+			// filename so operators can tell when a snapshot was
+			// captured without opening the cycle-directory name or
+			// inspecting the file mtime. The same (cycle, offset)
+			// tuple always yields the same filename, so the
+			// os.Stat-based dedup check below still works.
+			snapshotTime := cycleStart.Add(time.Duration(normalised) * time.Minute)
+			snapshotStamp := safeTimestamp(snapshotTime)
+			name := fmt.Sprintf("h%+d_%s.%s", normalised, snapshotStamp, format)
 			full := filepath.Join(cycleDir, name)
 			if _, err := os.Stat(full); err == nil {
 				continue // already written for this cycle+offset+format
@@ -171,8 +180,8 @@ func (app *App) runDueBattleRhythmSnapshots(now time.Time) {
 			}
 			app.store.LogAudit(AuditEntry{ //nolint
 				Action: "snapshot", EntityType: "battle_rhythm", EntityID: 0,
-				Summary: fmt.Sprintf("Battle rhythm snapshot: cycle=%s offset=%d format=%s entries=%d",
-					cycleDirName, normalised, format, len(entries)),
+				Summary: fmt.Sprintf("Battle rhythm snapshot: cycle=%s offset=%d at=%s format=%s entries=%d",
+					cycleDirName, normalised, snapshotStamp, format, len(entries)),
 			})
 		}
 	}

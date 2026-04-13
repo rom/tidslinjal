@@ -963,14 +963,31 @@ async function _ktBrReloadSnapFiles() {
         }
       } catch {}
       const files = (g.files || []).slice().sort((a, b) => (a.offset_min - b.offset_min) || a.name.localeCompare(b.name));
+      // Convert a safe-timestamp like "2026-04-13T09-30-00Z" back to
+      // a locale-formatted human-readable string. The time portion
+      // has dashes instead of colons so the filename is portable;
+      // we restore the colons before parsing.
+      const fmtTakenAt = (stamp) => {
+        if (!stamp) return '';
+        // Replace only the dashes between the time components, not
+        // the ones in the date. Pattern: YYYY-MM-DD T HH - MM - SS Z.
+        const iso = stamp.replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+        try {
+          const d = new Date(iso);
+          if (!isNaN(d.getTime())) return d.toLocaleString();
+        } catch {}
+        return stamp;
+      };
       return `<div style="margin-bottom:6px">
         <div style="font-weight:600;font-size:10px;color:var(--accent);margin-bottom:2px">\u{1F552} ${escHtml(title)}</div>
         ${files.map(f => {
           const url = '/api/key-terrain/battle-rhythm/snapshots/' + encodeURIComponent(g.cycle_dir) + '/' + encodeURIComponent(f.name);
+          const takenAt = fmtTakenAt(f.taken_at || '');
           return `<div style="display:flex;align-items:center;gap:6px;padding:2px 4px">
-            <a href="${url}" download="${escHtml(f.name)}" style="flex:1;color:var(--text);text-decoration:none" title="${escHtml(f.name)}">
-              <span style="font-family:monospace">${escHtml(f.name)}</span>
-              <span style="color:var(--text-dim);margin-left:6px">${fmtSize(f.size)}</span>
+            <a href="${url}" download="${escHtml(f.name)}" style="flex:1;color:var(--text);text-decoration:none;min-width:0" title="${escHtml(f.name)}">
+              <span style="font-family:monospace;font-size:10px">H${f.offset_min >= 0 ? '+' : ''}${f.offset_min} ${escHtml((f.format || '').toUpperCase())}</span>
+              ${takenAt ? `<span style="color:var(--text-dim);margin-left:6px;font-size:10px">${escHtml(takenAt)}</span>` : ''}
+              <span style="color:var(--text-dim);margin-left:6px;font-size:10px">${fmtSize(f.size)}</span>
             </a>
           </div>`;
         }).join('')}
@@ -2268,16 +2285,6 @@ function _ktBrEnsureTipListeners() {
 function _ktBrShowStepsTooltip(mouseEvent) {
   const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
   const steps = Array.isArray(cfg.steps) ? cfg.steps : [];
-  if (steps.length === 0) return;
-  // Determine active step ids from the last fetched state so we can
-  // highlight them in the tooltip.
-  const activeNames = new Set();
-  const lastState = _ktBrLastState;
-  if (lastState && Array.isArray(lastState.current_steps)) {
-    lastState.current_steps.forEach(s => activeNames.add(s.name));
-  } else if (lastState && lastState.current_step) {
-    activeNames.add(lastState.current_step.name);
-  }
   // Build the tooltip element lazily. It lives on document.body so it
   // is not clipped by any modal overflow rules.
   if (!_ktBrTipEl) {
@@ -2301,6 +2308,15 @@ function _ktBrShowStepsTooltip(mouseEvent) {
     ].join(';');
     document.body.appendChild(_ktBrTipEl);
   }
+  // Determine active step ids from the last fetched state so we can
+  // highlight them in the tooltip.
+  const activeNames = new Set();
+  const lastState = _ktBrLastState;
+  if (lastState && Array.isArray(lastState.current_steps)) {
+    lastState.current_steps.forEach(s => activeNames.add(s.name));
+  } else if (lastState && lastState.current_step) {
+    activeNames.add(lastState.current_step.name);
+  }
   const fmt = (n) => {
     const sign = n < 0 ? '-' : '+';
     const abs = Math.abs(n);
@@ -2309,6 +2325,23 @@ function _ktBrShowStepsTooltip(mouseEvent) {
     if (h > 0) return 'H' + sign + h + 'h' + String(m).padStart(2, '0');
     return 'H' + sign + String(m).padStart(2, '0');
   };
+  const cycleLabel = cfg.cycle_minutes ? (cfg.cycle_minutes + ' min') : (t('kt_br_no_cycle')||'cycle length not set');
+  // Empty-steps fallback: still show the tooltip so the operator gets
+  // visual feedback on hover and knows where to configure the rhythm.
+  if (steps.length === 0) {
+    _ktBrTipEl.innerHTML = `
+      <div style="font-weight:700;font-size:13px;color:var(--accent);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">
+        ${escHtml(t('kt_br_steps_tooltip_title')||'Battle rhythm steps')}
+        <span style="font-weight:400;color:var(--text-dim);font-size:11px;float:right">${escHtml(cycleLabel)}</span>
+      </div>
+      <div style="color:var(--text-dim);font-style:italic;padding:8px 0">
+        ${escHtml(t('kt_br_no_steps_tooltip')||'No steps defined. Open Settings → Battle Rhythm to add steps.')}
+      </div>
+    `;
+    _ktBrTipEl.style.display = 'block';
+    _ktBrPositionTip(mouseEvent);
+    return;
+  }
   const rows = steps.map((s, i) => {
     const start = typeof s.start_offset_min === 'number' ? s.start_offset_min : 0;
     const endVal = (s.end_offset_min === null || s.end_offset_min === undefined) ? null : s.end_offset_min;
@@ -2324,11 +2357,10 @@ function _ktBrShowStepsTooltip(mouseEvent) {
       <div style="font-family:monospace;font-size:11px;color:var(--text-dim);white-space:nowrap;align-self:flex-start;padding-top:2px">${range}</div>
     </div>`;
   }).join('');
-  const cycleLabel = (cfg.cycle_minutes || 0) + ' min';
   _ktBrTipEl.innerHTML = `
     <div style="font-weight:700;font-size:13px;color:var(--accent);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">
       ${escHtml(t('kt_br_steps_tooltip_title')||'Battle rhythm steps')}
-      <span style="font-weight:400;color:var(--text-dim);font-size:11px;float:right">${cycleLabel}</span>
+      <span style="font-weight:400;color:var(--text-dim);font-size:11px;float:right">${escHtml(cycleLabel)}</span>
     </div>
     ${rows}
   `;
