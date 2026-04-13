@@ -103,7 +103,7 @@ A structured decision-tracking system accessible from the sidebar:
 - Status workflow: Proposed → Approved / Rejected
 - File attachments on decisions
 - Detachable to a standalone browser window
-- Full i18n support (19 languages)
+- Full i18n support (20 languages)
 
 ### Log Book
 
@@ -335,7 +335,7 @@ Ops Lead+ (and Team Lead, with the `can_lock` capability) can lock time slots to
 
 ### Internationalization
 
-Full UI translation in **19 languages**:
+Full UI translation in **20 languages**:
 
 | Code | Language | Locale |
 |------|----------|--------|
@@ -353,6 +353,7 @@ Full UI translation in **19 languages**:
 | `pt` | Português (Portuguese) | pt-PT |
 | `pl` | Polski (Polish) | pl-PL |
 | `uk` | Українська (Ukrainian) | uk-UA |
+| `hu` | Magyar (Hungarian) | hu-HU |
 | `de` | Deutsch (German) | de-DE |
 | `nl` | Nederlands (Dutch) | nl-NL |
 | `is` | Íslenska (Icelandic) | is-IS |
@@ -934,6 +935,30 @@ The `training/` directory contains step-by-step training guides and reference ma
 ---
 
 ## Changelog
+
+### v8.6.0 — Key Terrain Board: Battle Rhythm, Comments column, Hungarian
+
+A large feature release focused on the Key Terrain Board. Introduces a new Battle Rhythm subsystem and adds Hungarian as the 20th supported language.
+
+- **Battle Rhythm** — shared exercise clock under Key Terrain Board → Settings. Named steps with start / end offsets (negative allowed for pre-H0 steps), per-step colour picker, optional HH:MM armed start with a "⏳ Waiting for 09:00" countdown, Start / Pause / Resume / Reset controls. Every connected client polls every 2 s and extrapolates locally for a smooth countdown; SSE hooks push state changes within one round trip. The board's outer border fades between step colours as the active step changes.
+- **Step navigation** — three new buttons in the widget:
+  - Backward ⏮ — rewinds to the start of the previous step (or H+0 / one full cycle back if already at H+0). Wall clock unchanged.
+  - Forward ⏭ — ends the current step now and **donates the leftover time to the next step**, which runs longer than its original definition. Steps are mutated in place.
+  - Fast-forward ⏩ — jumps the clock forward to the next step's nominal start. Current step cut short, cycle ends sooner in wall clock.
+- **Snapshot scheduler** — a per-minute server goroutine writes CSV / JSON / XML / SVG snapshots of the board at configured offsets (e.g. `0, 15, 60` minutes from H0) under `data/key_terrain_battle_rhythm/<cycle_start>/`. Teamlead+ can browse and download past snapshots from a new file list in the settings modal.
+- **Cycle rollover auto-increment** — when the clock rolls over into a new cycle, the per-minute goroutine increments the `# Cycles` column on every non-archived Key Terrain entry by the delta (dedup via `LastCycleIdx`, audit-logged).
+- **Overlapping steps** — two or more steps whose intervals genuinely overlap at the current position are both reported in the widget's "Now" field (joined with `+`). Half-open `[start, end)` intervals so single-point boundaries don't double-count.
+- **Step hover tooltip** — hovering the widget's left info block pops a floating panel listing every configured step with its time range, description, and per-step colour; active steps are highlighted.
+- **Detachable clock card** — the existing Clocks popup gains a "Battle Rhythm" button that adds a read-only card showing H-offset, current step, next-step countdown, and cycles-completed counter next to the other clocks.
+- **Comments column** — new `comments` field on every Key Terrain entry, visible between Actions and the date columns, sortable, filterable, and included in every snapshot format. Line breaks in the edit textarea are preserved in the rendered cell.
+- **Customizable column labels** — teamlead+ can rename any Key Terrain Board column from Settings → Column Labels. Overrides propagate to the header, filter panel, hide-columns grid, column-order editor, and print/export dialogs.
+- **"Function" UI rename** — reverts the v8.3.0 UI rename of *Function* to *Capability* in the Key Terrain Board display strings for all 19 original languages. Backend field names (`capability_id`, `from_capability`) are intentionally unchanged for integration compatibility.
+- **Board zoom** — 8 levels (xxs / xs / sm / md / lg / xl / xxl / xxxl) from 9 px to 20 px, per-browser localStorage. Detached `/key-terrain` page now fills the full window width.
+- **Mouse-over step tooltip, filter label + whitespace handling, extended `?` help** covering Battle Rhythm.
+- **# Rounds → # Cycles** rename in all 19 pre-existing languages; the column auto-increments on every battle-rhythm cycle rollover.
+- **Hungarian (`hu`)** added as the 20th supported language. Roughly 600 of the ~2675 keys are hand-translated covering the visible UI (toolbar, sidebar, settings, event / layer / group / user dialogs, Key Terrain Board including Battle Rhythm, reports, filters, common status messages); untranslated keys fall back to English.
+- **Bug fixes**: Start button binding after shell rebuilds (`_bindActions` re-run), Start/Pause flash (SSE dispatcher now forwards event detail so `_ktHandleSSE` can branch on action type), scheduled → running transition at H0 (widget self-heals and force-triggers an immediate poll), double-escaped apostrophe in the fast-forward tooltip fallback that broke the board on load, widget re-render destroying focus-holding inputs.
+- **Tests**: `TestComputeBattleRhythmState` + `ScheduledTransition` + `OverlappingSteps`, `TestResolveBattleRhythmStartTime`, `TestComputeBattleRhythmStepShift`, `TestDonateLeftoverToNextStep`, `TestRunDueBattleRhythmCycles`, `TestRunDueBattleRhythmSnapshots`, `TestRenderBattleRhythm{CSV,JSON,XML,SVG}`. All `go test ./...` green.
 
 ### v8.5.0 — Security Hardening Release
 

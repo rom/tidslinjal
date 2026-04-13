@@ -1,6 +1,48 @@
-# Release Notes — Tidslinjal v8.5.0
+# Release Notes — Tidslinjal v8.6.0
 
-**Release Date:** 2026-04-12
+**Release Date:** 2026-04-13
+
+v8.6.0 is a large feature release focused on the **Key Terrain Board** tool. It introduces a new **Battle Rhythm** subsystem — a shared exercise clock with cyclic steps, per-step coloured borders, automatic snapshot scheduling, and forward / backward / fast-forward step navigation — plus a new **Comments** column, a significantly expanded zoom range, a step-level hover tooltip, terminology customization, and a fresh **Hungarian** locale (the 20th supported language).
+
+Upgrading from 8.5.0 requires no data migration.
+
+---
+
+## Headline features
+
+- **Battle Rhythm** — shared exercise clock with named steps, H0 tracking, start / pause / resume / reset, backward / forward / fast-forward step navigation, per-step coloured board border, automatic snapshot scheduler (CSV / JSON / XML / SVG), detachable clock card, and an auto-incrementing `# Cycles` counter on every entry. See the "⏱ Battle Rhythm" section in the Key Terrain Board's `?` help for full operator docs.
+- **Comments column** — a new free-form field on every Key Terrain entry, visible between Actions and the date columns, sortable, filterable, and included in every snapshot format.
+- **Customizable column labels** — teamlead+ can rename any Key Terrain Board column from Settings → Column Labels. Overrides are global and propagate to header, filter, hide-columns, column-order, and export dialogs.
+- **"Function" UI rename** — reverts the v8.3.0 rename of *Function* to *Capability* in the Key Terrain Board display strings (all 19 original languages). Backend field names are intentionally unchanged so integrations and the Resources tool keep working.
+- **Board zoom** — 8 levels (xxs / xs / sm / md / lg / xl / xxl / xxxl) spanning 9 px – 20 px, per-browser localStorage. Detached `/key-terrain` page fills the full window.
+- **Hungarian (`hu`) language** — 20th supported locale.
+
+## Improvements
+
+- Battle-rhythm widget re-architected into a shell + in-place text-updates split so inputs (the HH:MM Start picker) and buttons survive every tick. `_bindActions` is re-run after every shell rebuild so Start / Pause / Reset actually fire.
+- Start / Pause no longer flash the board — SSE `key_terrain_change` events now carry the action payload, and `_ktHandleSSE` branches on it: `battle_rhythm_*` only polls the widget, `cycle_rollover` refetches entries only, everything else triggers the full refresh.
+- Scheduled → running clock transition at H0 is now responsive — the widget flips layout within the same tick the wall clock crosses `started_at` and force-triggers an immediate poll.
+- Filter panel uses custom column labels; function checkbox list is rebuilt on every open; matching is case- and whitespace-insensitive.
+- Multiple overlapping steps (e.g. Brief = [30, 75), Assess = [60, 90)) report **both** step names in the widget's "Now" field, joined with ` + `. Single-point boundaries (A ends at 60 where B starts at 60) do NOT double-count.
+- Mouse-over tooltip on the widget's left info block shows every configured step with its time range, description, and colour swatch, with the active step highlighted.
+- "# Rounds" column renamed to "# Cycles" in all 19 pre-existing language files.
+- In-board `?` help modal has a dedicated **Battle Rhythm** section covering configuration, controls, cycle rollover + snapshots, and the detached clock card.
+
+## Bug fixes
+
+- Key-terrain.js syntax error from a double-escaped apostrophe in the fast-forward tooltip fallback string (would break the entire board on load).
+- Start button was unclickable because `_bindActions` only runs once per modal open; the widget's shell rebuilds on layout transitions now re-bind the host immediately.
+- Battle-rhythm widget no longer destroys focus-holding inputs on every 500 ms tick — only text nodes are updated between shell rebuilds.
+
+## Upgrading
+
+No schema changes. Existing `key_terrain_settings.json` loads cleanly with empty defaults for the new fields. Downgrading to 8.5.0 is safe.
+
+See **[`docs/RELEASE_NOTES_v8.6.0.md`](RELEASE_NOTES_v8.6.0.md)** for the full details including the test additions.
+
+---
+
+## Previous Release: v8.5.0 (2026-04-12)
 
 v8.5.0 is a **security hardening release** that closes a series of findings reported by an external security review. All of the fixes in this release are defensive — no new user-facing features are added, but authentication, authorization, and file-handling code paths are now significantly more resilient to both direct attack and supply-chain / backup-restore threats.
 
