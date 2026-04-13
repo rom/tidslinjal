@@ -2456,14 +2456,14 @@ TRANSLATIONS.is = {
     kt_help_access: 'Aðgangsstýring',
 
     // Key Terrain
-    kt_function: 'Geta',
-    kt_function_ph: 'Nafn á getu',
-    kt_function_required: 'Nafn á getu er nauðsynlegt',
+    kt_function: 'Aðgerð',
+    kt_function_ph: 'Nafn aðgerðar',
+    kt_function_required: 'Nafn aðgerðar er nauðsynlegt',
     kt_seq_num: 'Nr',
     kt_zone: 'Svæði',
     kt_zone_ph: 't.d. Norður, HQ, DMZ',
-    kt_from_capability: 'Hlaða frá getu',
-    kt_select_capability: 'Veldu getu...',
+    kt_from_capability: 'Hlaða frá aðgerð',
+    kt_select_capability: 'Veldu aðgerð...',
 
     kt_linked_capability: 'Tengt getu — nafn, svæði, staða og ábyrgðarmaður samstillast sjálfkrafa',    kt_show_no_priority: 'Sýna aðgerðir án forgangs',
     kt_show_no_priority_desc: 'Sýna færslur með forgang 0 eða án forgangs (sjálfgefið virkt)',

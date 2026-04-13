@@ -2,8 +2,20 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
+
+// BattleRhythmSnapshotDir returns the directory under which automated
+// battle-rhythm snapshots of the Key Terrain Board are written, creating
+// it if needed. One subdirectory per cycle-start timestamp holds all the
+// format files for that cycle's snapshots.
+func (s *Store) BattleRhythmSnapshotDir() string {
+	dir := filepath.Join(s.dataDir, "key_terrain_battle_rhythm")
+	_ = os.MkdirAll(dir, 0o750)
+	return dir
+}
 
 // ── Key Terrain Store ──────────────────────────────────────────────────────
 

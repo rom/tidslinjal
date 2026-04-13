@@ -2265,14 +2265,14 @@ TRANSLATIONS.fi = {
     kt_help_access: 'Käyttöoikeudet',
 
     // Key Terrain
-    kt_function: 'Kyvykkyys',
-    kt_function_ph: 'Kyvykkyyden nimi',
-    kt_function_required: 'Kyvykkyyden nimi vaaditaan',
+    kt_function: 'Toiminto',
+    kt_function_ph: 'Toiminnon nimi',
+    kt_function_required: 'Toiminnon nimi vaaditaan',
     kt_seq_num: 'Nro',
     kt_zone: 'Vyöhyke',
     kt_zone_ph: 'esim. Pohjoinen, HQ, DMZ',
-    kt_from_capability: 'Lataa kyvykkyydestä',
-    kt_select_capability: 'Valitse kyvykkyys...',
+    kt_from_capability: 'Lataa toiminnosta',
+    kt_select_capability: 'Valitse toiminto...',
 
     kt_linked_capability: 'Linkitetty kyvykkyyteen — nimi, vyöhyke, tila ja vastuuhenkilö synkronoituvat automaattisesti',    kt_show_no_priority: 'Näytä toiminnot ilman prioriteettia',
     kt_show_no_priority_desc: 'Näytä merkinnät prioriteetilla 0 tai ilman prioriteettia (oletuksena käytössä)',

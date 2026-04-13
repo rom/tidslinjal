@@ -2757,15 +2757,15 @@ TRANSLATIONS.sv = {
     kt_add: 'Lägg till post',
     kt_edit: 'Redigera post',
     kt_remove: 'Ta bort',
-    kt_function: 'Förmåga',
-    kt_function_ph: 'Namn på förmågan',
-    kt_function_required: 'Förmågans namn krävs',
+    kt_function: 'Funktion',
+    kt_function_ph: 'Namn på funktionen',
+    kt_function_required: 'Funktionens namn krävs',
 
     kt_seq_num: 'Nr',
     kt_zone: 'Zon',
     kt_zone_ph: 't.ex. Nord, HK, DMZ',
-    kt_from_capability: 'Ladda från förmåga',
-    kt_select_capability: 'Välj en förmåga...',
+    kt_from_capability: 'Ladda från funktion',
+    kt_select_capability: 'Välj en funktion...',
 
     kt_linked_capability: 'Länkad till förmåga — namn, zon, status och ansvarig synkas automatiskt',    kt_show_no_priority: 'Visa förmågor utan prioritet',
 

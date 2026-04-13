@@ -301,6 +301,58 @@ type KeyTerrainSettings struct {
 	StatusLabels map[string]string `json:"status_labels,omitempty"` // e.g. {"working":"Normal","degraded":"Limited"}
 	// Hidden columns: columns that should not be displayed
 	HiddenColumns map[string]bool `json:"hidden_columns,omitempty"` // e.g. {"threat":true,"rounds":true}
+	// Custom column labels: override the default i18n label for a column.
+	// Keys are the internal column IDs (e.g. "function","zone","threat");
+	// values are the label text shown in the board header, filter panel,
+	// and export column headings. Leave a key out to keep the default.
+	ColumnLabels map[string]string `json:"column_labels,omitempty"` // e.g. {"function":"Task","threat":"Risk"}
+
+	// Battle rhythm — shared exercise clock with cyclic steps. All fields
+	// live server-side so every connected client sees the same H0.
+	BattleRhythm BattleRhythmConfig `json:"battle_rhythm,omitempty"`
+}
+
+// BattleRhythmConfig describes a recurring cycle (e.g. "every 2 hours")
+// used to drive exercise battle rhythm. Steps are timed relative to H0
+// (the start of the current cycle) and may occur before or after H0.
+type BattleRhythmConfig struct {
+	// Enabled reveals the clock widget on the Key Terrain Board toolbar
+	// and in the detached clock window. Must be true for the snapshot
+	// scheduler to fire.
+	Enabled bool `json:"enabled"`
+	// ShowClock toggles the clock widget in the Key Terrain toolbar and
+	// the card in the detached clock window independently of Enabled.
+	ShowClock bool `json:"show_clock"`
+	// CycleMinutes is the duration of one full cycle. Must be > 0 when
+	// enabled. Typical values: 60, 120, 180.
+	CycleMinutes int `json:"cycle_minutes,omitempty"`
+	// StartedAt is the wall-clock time of H0 for the current cycle, or
+	// nil if the clock is stopped/reset. When set, the current elapsed
+	// position into the cycle is Now.Sub(StartedAt) mod CycleMinutes.
+	StartedAt *time.Time `json:"started_at,omitempty"`
+	// PausedAt freezes the clock at this moment. While non-nil, the
+	// elapsed position is computed as PausedAt.Sub(StartedAt) rather
+	// than Now.Sub(StartedAt), so the clock face and current step stop
+	// advancing until the operator hits resume. nil means running.
+	PausedAt *time.Time `json:"paused_at,omitempty"`
+	// Steps are named events within each cycle, ordered by start offset.
+	Steps []BattleRhythmStep `json:"steps,omitempty"`
+	// SnapshotOffsets lists the minute offsets (relative to H0) at which
+	// the snapshot scheduler should fire. Negative values are allowed
+	// (e.g. -15 = fifteen minutes before H0 of each cycle) but are
+	// normalised modulo CycleMinutes by the scheduler.
+	SnapshotOffsets []int `json:"snapshot_offsets,omitempty"`
+	// SnapshotFormats: any of "csv","json","xml","svg". Multiple formats
+	// may be selected — every configured format is written each fire.
+	SnapshotFormats []string `json:"snapshot_formats,omitempty"`
+}
+
+// BattleRhythmStep is a single named event inside a cycle.
+type BattleRhythmStep struct {
+	Name             string `json:"name"`
+	Description      string `json:"description,omitempty"`
+	StartOffsetMin   int    `json:"start_offset_min"`           // minutes from H0; may be negative
+	EndOffsetMin     *int   `json:"end_offset_min,omitempty"`    // nil = instant step; otherwise spans [start,end]
 }
 
 // KeyTerrainSnapshot is a point-in-time copy of the board for version control

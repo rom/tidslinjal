@@ -2445,14 +2445,14 @@ TRANSLATIONS.nl = {
     kt_help_access: 'Toegangsbeheer',
 
     // Key Terrain
-    kt_function: 'Capaciteit',
-    kt_function_ph: 'Naam van de capaciteit',
-    kt_function_required: 'Naam van de capaciteit is verplicht',
+    kt_function: 'Functie',
+    kt_function_ph: 'Naam van de functie',
+    kt_function_required: 'Naam van de functie is verplicht',
     kt_seq_num: 'Nr',
     kt_zone: 'Zone',
     kt_zone_ph: 'bijv. Noord, HQ, DMZ',
-    kt_from_capability: 'Laden vanuit capaciteit',
-    kt_select_capability: 'Selecteer capaciteit...',
+    kt_from_capability: 'Laden vanuit functie',
+    kt_select_capability: 'Selecteer functie...',
 
     kt_linked_capability: 'Gekoppeld aan capaciteit — naam, zone, status en verantwoordelijke worden automatisch gesynchroniseerd',    kt_show_no_priority: 'Functies zonder prioriteit tonen',
     kt_show_no_priority_desc: 'Toon items met prioriteit 0 of zonder prioriteit (standaard ingeschakeld)',

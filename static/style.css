@@ -2263,3 +2263,24 @@ body.a11y-font-150 :root { --fs-base: 20px; --fs-md: 18px; --fs-sm: 16px; --fs-x
 
 /* Connector type option hover */
 .connector-type-option:hover { background: var(--bg2); }
+
+/* ── Key Terrain Board zoom levels ─────────────────────────────────────── */
+/* Per-browser zoom for the Key Terrain Board view, independent of the
+   global body.size-* setting. Scales font size, cell padding, and the
+   priority icon size. Applied by setting data-kt-zoom on #ktBoardContent. */
+#ktBoardContent[data-kt-zoom] { --kt-font: var(--fs-xs); --kt-pad: 4px 8px; --kt-line: 1.35; }
+#ktBoardContent[data-kt-zoom="xs"] { --kt-font: 10px;              --kt-pad: 2px 4px; --kt-line: 1.2;  }
+#ktBoardContent[data-kt-zoom="sm"] { --kt-font: 11px;              --kt-pad: 3px 6px; --kt-line: 1.3;  }
+#ktBoardContent[data-kt-zoom="md"] { --kt-font: var(--fs-xs);      --kt-pad: 4px 8px; --kt-line: 1.35; }
+#ktBoardContent[data-kt-zoom="lg"] { --kt-font: var(--fs-sm);      --kt-pad: 6px 10px; --kt-line: 1.45; }
+#ktBoardContent[data-kt-zoom="xl"] { --kt-font: var(--fs-base);    --kt-pad: 8px 12px; --kt-line: 1.55; }
+#ktBoardContent[data-kt-zoom] #ktBoardTable { font-size: var(--kt-font); line-height: var(--kt-line); }
+#ktBoardContent[data-kt-zoom] #ktBoardTable th,
+#ktBoardContent[data-kt-zoom] #ktBoardTable td { padding: var(--kt-pad); font-size: var(--kt-font); }
+#ktBoardContent[data-kt-zoom] h2 { font-size: calc(var(--kt-font) + 6px); }
+#ktBoardContent[data-kt-zoom="xl"] #ktBoardTable th,
+#ktBoardContent[data-kt-zoom="lg"] #ktBoardTable th { font-weight: 700; }
+
+/* When detached into /key-terrain the board fills the window; scope the
+   max-width override there so the main-app popup still respects its modal. */
+body.kt-detached #ktBoardContent { max-width: none; width: 100%; padding: 0 12px; }

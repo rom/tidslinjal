@@ -54,6 +54,9 @@ let _localIsUTC = null; // null = follow opener, true/false = local override
 let _hourFormat = '24'; // '24' | '12'
 let _timeSep = ':';     // ':' | '.'
 let _showSynthClock = false; // synthetic exercise clock toggle
+let _showBattleRhythm = false; // battle rhythm card toggle
+let _brLastState = null;       // last fetched /api/key-terrain/battle-rhythm response
+let _brLastFetchMs = 0;        // performance.now-ish epoch ms of the last fetch
 
 function pad(n) { return String(n).padStart(2,'0'); }
 
@@ -366,7 +369,7 @@ let _lastShowFlags = null;
 function rebuildClocks() {
   const {isUTC, extra, showFlags} = getClockData();
   _lastShowFlags = showFlags;
-  const total = 1 + extra.length + (_showSynthClock ? 1 : 0);
+  const total = 1 + extra.length + (_showSynthClock ? 1 : 0) + (_showBattleRhythm ? 1 : 0);
   const wrap = document.getElementById('clocksWrap');
   if (!wrap) return;
   _lastClockCount = total;
@@ -454,12 +457,30 @@ function rebuildClocks() {
       </div>`;
     }
   }
+  // Battle rhythm card (read-only view of the Key Terrain shared clock).
+  if (_showBattleRhythm) {
+    html += `<div class="clock-card br-card" id="card-br">
+      <button class="clock-remove" title="${removeTip}" data-rm-br>&times;</button>
+      <div class="clock-label" style="color:var(--accent)">Battle Rhythm</div>
+      <div class="clock-time" id="br-hoffset" style="color:var(--accent);font-family:monospace">H--</div>
+      <div class="clock-date" id="br-current" style="font-size:12px">—</div>
+      <div class="clock-tz" id="br-next" style="font-size:10px;color:var(--text-dim)">—</div>
+    </div>`;
+  }
   wrap.innerHTML = html;
   wrap.querySelectorAll('[data-rm-clock]').forEach(btn => {
     btn.addEventListener('click', () => removeClock(parseInt(btn.dataset.rmClock, 10)));
   });
   wrap.querySelectorAll('[data-rm-synth]').forEach(btn => {
     btn.addEventListener('click', () => { _showSynthClock = false; rebuildClocks(); });
+  });
+  wrap.querySelectorAll('[data-rm-br]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _showBattleRhythm = false;
+      const b = document.getElementById('btnAddBattleRhythm');
+      if (b) b.classList.remove('active');
+      rebuildClocks();
+    });
   });
   const mainLbl = document.getElementById('main-label');
   if (mainLbl) mainLbl.addEventListener('click', toggleUTC);
@@ -500,7 +521,7 @@ function tick() {
   const locale = _getLocale();
 
   const curShowFlags = !!(window.opener?.state?.preferences?.show_clock_flags);
-  if (1 + extra.length + (_showSynthClock ? 1 : 0) !== _lastClockCount || clockMode !== _lastMode || curShowFlags !== _lastShowFlags) {
+  if (1 + extra.length + (_showSynthClock ? 1 : 0) + (_showBattleRhythm ? 1 : 0) !== _lastClockCount || clockMode !== _lastMode || curShowFlags !== _lastShowFlags) {
     rebuildClocks();
   }
 
@@ -1383,6 +1404,16 @@ document.getElementById('btnAddSynth').addEventListener('click', function() {
   rebuildClocks();
   tick();
 });
+const btnBr = document.getElementById('btnAddBattleRhythm');
+if (btnBr) {
+  btnBr.addEventListener('click', function() {
+    _showBattleRhythm = !_showBattleRhythm;
+    this.classList.toggle('active', _showBattleRhythm);
+    rebuildClocks();
+    if (_showBattleRhythm) _brPoll();
+    tickBattleRhythm();
+  });
+}
 document.getElementById('tmrCancel').addEventListener('click', hideTimerPopover);
 document.getElementById('timerOverlay').addEventListener('click', hideTimerPopover);
 document.getElementById('tmrStart').addEventListener('click', function() {
@@ -2424,7 +2455,60 @@ setInterval(function() {
   tickAlarms();
   tickPhaseClocks();
   tickF1Starts();
+  tickBattleRhythm();
 }, 1000);
+
+// ── Battle rhythm card ───────────────────────────────────────────────────
+// Poll the shared clock state every 5 seconds and render a locally-
+// extrapolated H±NN display on every tick so the card updates smoothly.
+async function _brPoll() {
+  try {
+    const res = await fetch('/api/key-terrain/battle-rhythm', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!res.ok) return;
+    _brLastState = await res.json();
+    _brLastFetchMs = Date.now();
+  } catch {}
+}
+function _brFormatHOffset(posMin, cycleMin) {
+  if (!cycleMin) return 'H+' + Math.floor(posMin || 0);
+  let m = posMin;
+  if (m > cycleMin / 2) m = m - cycleMin;
+  const sign = m < 0 ? '-' : '+';
+  const absM = Math.abs(m);
+  const hh = Math.floor(absM / 60);
+  const mm = Math.floor(absM % 60);
+  if (hh > 0) return 'H' + sign + hh + 'h' + String(mm).padStart(2, '0');
+  return 'H' + sign + String(Math.floor(absM)).padStart(2, '0');
+}
+let _brPollCounter = 0;
+function tickBattleRhythm() {
+  if (!_showBattleRhythm) return;
+  _brPollCounter++;
+  if (_brPollCounter % 5 === 1) _brPoll();
+  const st = _brLastState;
+  const hEl = document.getElementById('br-hoffset');
+  const curEl = document.getElementById('br-current');
+  const nxtEl = document.getElementById('br-next');
+  if (!hEl) return;
+  if (!st || !st.running) {
+    hEl.textContent = 'H--';
+    if (curEl) curEl.textContent = 'Stopped';
+    if (nxtEl) nxtEl.textContent = '';
+    return;
+  }
+  // Extrapolate from last fetch.
+  const deltaMin = st.paused ? 0 : Math.max(0, (Date.now() - _brLastFetchMs) / 60000);
+  const cycle = st.cycle_minutes || 0;
+  const pos = cycle ? ((st.position_min || 0) + deltaMin) % cycle : st.position_min;
+  hEl.textContent = _brFormatHOffset(pos, cycle);
+  if (curEl) curEl.textContent = st.current_step ? st.current_step.name : (st.paused ? 'Paused' : '—');
+  if (nxtEl) {
+    if (st.next_step && st.next_step_in_min != null) {
+      const nxtIn = Math.max(0, Math.round(st.next_step_in_min - deltaMin));
+      nxtEl.textContent = 'Next: ' + st.next_step.name + ' in ' + nxtIn + 'm';
+    } else { nxtEl.textContent = ''; }
+  }
+}
 // Reload timed events and narrative periodically
 setInterval(loadTimedEvents, 30000);
 setInterval(function() { if (_narrativeClocks.length > 0) fetchNarrativeData(); }, 30000);

@@ -11,7 +11,30 @@ let _ktState = {
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
   columnOrder: ['seq_num','zone','priority','function','status','trend','threat','external','responsible','owner','actions','created_at','updated_at','finished_at','rounds','management'],
   hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true, owner: true }, // hidden by default
+  // Per-browser zoom level for the board — persists in localStorage so
+  // each operator can size the board to their screen without polluting
+  // the shared KeyTerrainSettings. Valid levels: xs, sm, md, lg, xl.
+  zoom: (() => { try { return localStorage.getItem('ktZoom') || 'md'; } catch { return 'md'; } })(),
 };
+
+const _ktZoomLevels = ['xs','sm','md','lg','xl'];
+
+function _ktSetZoom(level) {
+  if (!_ktZoomLevels.includes(level)) return;
+  _ktState.zoom = level;
+  try { localStorage.setItem('ktZoom', level); } catch {}
+  const root = document.getElementById('ktBoardContent');
+  if (root) root.setAttribute('data-kt-zoom', level);
+}
+function _ktZoomIn() {
+  const i = _ktZoomLevels.indexOf(_ktState.zoom);
+  if (i < _ktZoomLevels.length - 1) _ktSetZoom(_ktZoomLevels[i+1]);
+}
+function _ktZoomOut() {
+  const i = _ktZoomLevels.indexOf(_ktState.zoom);
+  if (i > 0) _ktSetZoom(_ktZoomLevels[i-1]);
+}
+function _ktZoomReset() { _ktSetZoom('md'); }
 
 const _ktStatusOptions = [
   { value: 'working',  label: 'Working',  icon: '🟢', color: 'rgba(39,174,96,0.15)' },
@@ -62,6 +85,9 @@ async function openKeyTerrainBoard() {
   }
   _renderKeyTerrainBoard();
   _ktSubscribeSSE();
+  // Start the live battle rhythm ticker if the function is defined
+  // (it's defined later in this same file so it's always available here).
+  if (typeof _ktBrStartTicker === 'function') _ktBrStartTicker();
 }
 
 // ── SSE auto-refresh ──────────────────────────────────────────────────────
@@ -114,6 +140,17 @@ function _ktGetPriorityColor(pri) {
 }
 function _ktGhostStyle() {
   return _ktState.settings.ghost_style || 'grey';
+}
+// _ktColLabel returns the display label for a column, preferring a
+// teamlead-configured override from settings.column_labels, then the
+// localized default from the i18n dictionary, then a hardcoded fallback.
+function _ktColLabel(col, fallback) {
+  const overrides = _ktState.settings.column_labels || {};
+  if (overrides[col]) return overrides[col];
+  const key = 'kt_' + col;
+  const tr = t(key);
+  if (tr && tr !== key) return tr;
+  return fallback || col;
 }
 function _ktSortEntries(entries) {
   // Column sort (from clicking headers) takes precedence over settings sort
@@ -216,31 +253,37 @@ function _renderKeyTerrainBoard() {
   // Custom status labels from settings
   const _statusLabels = _ktState.settings.status_labels || {};
 
-  // Column definitions
+  // Column definitions. Labels flow through _ktColLabel so teamlead+ users
+  // can override any header text via the Settings → Column Labels panel.
   const colDef = {
-    seq_num:     { icon: '#', label: t('kt_seq_num')||'Seq', align: 'center', extra: 'white-space:nowrap;width:40px' },
-    zone:        { icon: '\u{1F310}', label: t('kt_zone')||'Zone', align: 'left', extra: 'min-width:80px' },
-    priority:    { icon: '\u26A1', label: t('kt_priority')||'Pri', align: 'left', extra: 'white-space:nowrap' },
-    function:    { icon: '\u{1F3AF}', label: t('kt_function')||'Capability', align: 'left', extra: 'min-width:140px' },
-    status:      { icon: '\u{1F4CA}', label: t('kt_status')||'Status', align: 'center', extra: '' },
-    trend:       { icon: '\u{1F4C8}', label: t('kt_trend')||'Trend', align: 'center', extra: '' },
-    threat:      { icon: '\u2694\uFE0F', label: t('kt_threat')||'Threat', align: 'left', extra: 'min-width:120px' },
-    external:    { icon: '\u{1F517}', label: t('kt_external')||'External', align: 'left', extra: 'min-width:120px' },
-    responsible: { icon: '\u{1F464}', label: t('kt_responsible')||'Responsible', align: 'left', extra: 'min-width:100px' },
-    owner:       { icon: '\u{1F451}', label: t('kt_owner')||'Owner', align: 'left', extra: 'min-width:100px' },
-    actions:     { icon: '\u{1F527}', label: t('kt_actions')||'Actions', align: 'left', extra: 'min-width:140px' },
-    created_at:  { icon: '\u{1F4C5}', label: t('kt_created')||'Created', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
-    updated_at:  { icon: '\u{1F504}', label: t('kt_updated')||'Updated', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
-    finished_at: { icon: '\u2705', label: t('kt_finished')||'Finished', align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
-    rounds:      { icon: '\u{1F504}', label: t('kt_rounds')||'# Rounds', align: 'center', extra: 'white-space:nowrap' },
-    management:  { icon: '\u2699', label: t('kt_mgmt_label')||'Management', align: 'center', extra: 'width:160px' },
+    seq_num:     { icon: '#', label: _ktColLabel('seq_num', 'Seq'), align: 'center', extra: 'white-space:nowrap;width:40px' },
+    zone:        { icon: '\u{1F310}', label: _ktColLabel('zone', 'Zone'), align: 'left', extra: 'min-width:80px' },
+    priority:    { icon: '\u26A1', label: _ktColLabel('priority', 'Pri'), align: 'left', extra: 'white-space:nowrap' },
+    function:    { icon: '\u{1F3AF}', label: _ktColLabel('function', 'Function'), align: 'left', extra: 'min-width:140px' },
+    status:      { icon: '\u{1F4CA}', label: _ktColLabel('status', 'Status'), align: 'center', extra: '' },
+    trend:       { icon: '\u{1F4C8}', label: _ktColLabel('trend', 'Trend'), align: 'center', extra: '' },
+    threat:      { icon: '\u2694\uFE0F', label: _ktColLabel('threat', 'Threat'), align: 'left', extra: 'min-width:120px' },
+    external:    { icon: '\u{1F517}', label: _ktColLabel('external', 'External'), align: 'left', extra: 'min-width:120px' },
+    responsible: { icon: '\u{1F464}', label: _ktColLabel('responsible', 'Responsible'), align: 'left', extra: 'min-width:100px' },
+    owner:       { icon: '\u{1F451}', label: _ktColLabel('owner', 'Owner'), align: 'left', extra: 'min-width:100px' },
+    actions:     { icon: '\u{1F527}', label: _ktColLabel('actions', 'Actions'), align: 'left', extra: 'min-width:140px' },
+    created_at:  { icon: '\u{1F4C5}', label: _ktColLabel('created_at', 'Created'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    updated_at:  { icon: '\u{1F504}', label: _ktColLabel('updated_at', 'Updated'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    finished_at: { icon: '\u2705', label: _ktColLabel('finished_at', 'Finished'), align: 'center', extra: 'white-space:nowrap;background:var(--bg2)' },
+    rounds:      { icon: '\u{1F504}', label: _ktColLabel('rounds', '# Rounds'), align: 'center', extra: 'white-space:nowrap' },
+    management:  { icon: '\u2699', label: _ktColLabel('management', 'Management'), align: 'center', extra: 'width:160px' },
   };
 
-  let html = `<div style="max-width:98vw;margin:0 auto" id="ktBoardContent">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px" class="kt-no-print">
+  let html = `<div style="width:100%;max-width:none;margin:0 auto" id="ktBoardContent" data-kt-zoom="${escHtml(_ktState.zoom)}">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px" class="kt-no-print">
       <h2 style="margin:0">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${!canWrite ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);background:var(--bg3);padding:2px 8px;border-radius:var(--radius)">\u{1F512} ${t('kt_read_only')||'Read Only'}</span>` : ''}
+        <div class="kt-zoom-group" role="group" aria-label="Zoom" style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <button class="btn btn-sm btn-secondary" style="border-radius:0;border:none" data-action="_ktZoomOut" title="${t('kt_zoom_out')||'Smaller text'}">A\u2013</button>
+          <button class="btn btn-sm btn-secondary" style="border-radius:0;border:none;border-left:1px solid var(--border);font-size:10px;min-width:26px" data-action="_ktZoomReset" title="${t('kt_zoom_reset')||'Reset zoom'}">${escHtml(_ktState.zoom.toUpperCase())}</button>
+          <button class="btn btn-sm btn-secondary" style="border-radius:0;border:none;border-left:1px solid var(--border)" data-action="_ktZoomIn" title="${t('kt_zoom_in')||'Larger text'}">A+</button>
+        </div>
         <button class="btn btn-sm ${hasFilter ? 'btn-primary' : 'btn-secondary'}" data-action="_ktOpenFilter">\u{1F50D} ${t('kt_filter')||'Filter'}${hasFilter ? ' \u2713' : ''}</button>
         <button class="btn btn-sm ${hasHidden ? 'btn-secondary' : 'btn-secondary'}" data-action="_ktOpenColumnVisibility">\u{1F441} ${t('kt_columns_vis')||'Columns'}${hasHidden ? ' ('+Object.values(hidden).filter(v=>v).length+' hidden)' : ''}</button>
         ${canWrite ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenSettings">\u2699 ${t('kt_settings')||'Settings'}</button>` : ''}
@@ -250,6 +293,8 @@ function _renderKeyTerrainBoard() {
         <button class="btn btn-sm btn-secondary" data-action="_ktDetach" title="${t('kt_detach')||'Detach to window'}">\u29C9</button>
       </div>
     </div>
+
+    <div id="ktBattleRhythmWidget" class="kt-no-print" style="display:none;margin-bottom:12px"></div>
 
     <h2 class="kt-print-only" style="display:none;margin-bottom:8px">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
     <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('kt_desc')||'Cyber key terrain overview \u2014 tracks critical functions, their status, threats, and response actions.'}</p>
@@ -410,17 +455,17 @@ async function _ktEditEntry(entryId) {
     <h3>${isNew ? '➕' : '✏️'} ${isNew ? (t('kt_add')||'Add Entry') : (t('kt_edit')||'Edit Entry')}</h3>
 
     ${capabilities.length > 0 ? `<div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:var(--radius)">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Link to Capability'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Load from Function'}</label>
       <select id="ktFromCapability" class="input" style="width:100%;font-size:var(--fs-xs)">
-        <option value="">— ${t('kt_select_capability')||'Select a capability...'} —</option>
+        <option value="">— ${t('kt_select_capability')||'Select a function...'} —</option>
         ${capabilities.map(c => `<option value="${c.id}" ${entry.capability_id === c.id ? 'selected' : ''}>${escHtml(c.name)}${c.zone ? ' [\u{1F310}'+escHtml(c.zone)+']' : ''}</option>`).join('')}
       </select>
-      ${entry.capability_id ? `<div style="font-size:10px;color:var(--accent);margin-top:4px">\u{1F517} ${t('kt_linked_capability')||'Linked to capability — name, zone, status, and responsible sync automatically'}</div>` : ''}
+      ${entry.capability_id ? `<div style="font-size:10px;color:var(--accent);margin-top:4px">\u{1F517} ${t('kt_linked_capability')||'Linked to function — name, zone, status, and responsible sync automatically'}</div>` : ''}
     </div>` : ''}
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Capability'} *</label>
-      <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'Name of the capability'}">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Function'} *</label>
+      <input id="ktFunction" class="input" style="width:100%" value="${escHtml(entry.function)}" placeholder="${t('kt_function_ph')||'Name of the function'}">
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -658,6 +703,10 @@ function _ktOpenSettings() {
   const sortBy = s.sort_by || 'priority';
   const gs = s.ghost_style || 'grey';
   const showNoPri = s.show_no_priority !== false;
+  const br = s.battle_rhythm || {};
+  const brSteps = Array.isArray(br.steps) ? br.steps : [];
+  const brSnapOffsets = Array.isArray(br.snapshot_offsets) ? br.snapshot_offsets : [];
+  const brSnapFormats = Array.isArray(br.snapshot_formats) ? br.snapshot_formats : [];
 
   let html = `<div style="max-width:540px;max-height:80vh;overflow-y:auto">
     <h3>\u2699 ${t('kt_settings')||'Key Terrain Settings'}</h3>
@@ -675,7 +724,8 @@ function _ktOpenSettings() {
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_hidden_columns_desc')||'Select columns to hide from the board view.'}</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
         ${_ktState.columnOrder.map(c => {
-          const lbl = {seq_num:'#',zone:'Zone',priority:'Priority',function:'Capability',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'Rounds',management:'Management'}[c] || c;
+          const defLbl = {seq_num:'#',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'Rounds',management:'Management'}[c] || c;
+          const lbl = _ktColLabel(c, defLbl);
           return `<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer">
             <input type="checkbox" class="ktSettHiddenCol" data-col="${c}" ${hc[c] ? 'checked' : ''} style="accent-color:var(--accent)"> ${lbl}
           </label>`;
@@ -726,6 +776,21 @@ function _ktOpenSettings() {
     </div>
 
     <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F3F7}\uFE0F ${t('kt_col_labels')||'Column Labels'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_col_labels_desc')||'Rename any column heading. Leave empty to use the default translation.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px">
+        ${_ktState.columnOrder.map(c => {
+          const defaultLabel = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Rounds',management:'Management'}[c] || c;
+          const current = (s.column_labels||{})[c] || '';
+          return `<div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:10px;color:var(--text-dim);min-width:70px;white-space:nowrap">${defaultLabel}:</span>
+            <input class="ktSettColLabel input" data-col="${c}" value="${escHtml(current)}" placeholder="${escHtml(defaultLabel)}" style="flex:1;font-size:var(--fs-xs);padding:3px 6px">
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
       <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u{1F522} ${t('kt_sort_order')||'Sort Order'}</div>
       <select id="ktSettSortBy" class="input" style="width:100%;font-size:var(--fs-xs)">
         <option value="priority" ${sortBy==='priority'?'selected':''}>\u26A1 Priority</option>
@@ -754,13 +819,48 @@ function _ktOpenSettings() {
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_col_order_desc')||'Use arrows to reorder columns.'}</p>
       <div id="ktSettColOrderList">
         ${_ktState.columnOrder.map((c, i) => {
-          const colLabels = {seq_num:'# Seq',zone:'\u{1F310} Zone',priority:'\u26A1 Priority',function:'\u{1F3AF} Capability',status:'\u{1F4CA} Status',trend:'\u{1F4C8} Trend',threat:'\u2694\uFE0F Threat',external:'\u{1F517} External',responsible:'\u{1F464} Responsible',actions:'\u{1F527} Actions',created_at:'\u{1F4C5} Created',updated_at:'\u{1F504} Updated',finished_at:'\u2705 Finished',rounds:'\u{1F504} Rounds',management:'\u2699 Management'};
+          const colIcons = {seq_num:'#',zone:'\u{1F310}',priority:'\u26A1',function:'\u{1F3AF}',status:'\u{1F4CA}',trend:'\u{1F4C8}',threat:'\u2694\uFE0F',external:'\u{1F517}',responsible:'\u{1F464}',owner:'\u{1F451}',actions:'\u{1F527}',created_at:'\u{1F4C5}',updated_at:'\u{1F504}',finished_at:'\u2705',rounds:'\u{1F504}',management:'\u2699'};
+          const defLabels = {seq_num:'Seq',zone:'Zone',priority:'Priority',function:'Function',status:'Status',trend:'Trend',threat:'Threat',external:'External',responsible:'Responsible',owner:'Owner',actions:'Actions',created_at:'Created',updated_at:'Updated',finished_at:'Finished',rounds:'# Rounds',management:'Management'};
+          const label = (colIcons[c] || '') + ' ' + _ktColLabel(c, defLabels[c] || c);
           return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:3px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
             <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktSettMoveCol" data-args='[${i},-1]' ${i===0?'disabled':''}>\u25B2</button>
             <button type="button" class="btn btn-sm" style="font-size:10px;padding:1px 5px" data-action="_ktSettMoveCol" data-args='[${i},1]' ${i===_ktState.columnOrder.length-1?'disabled':''}>\u25BC</button>
-            <span style="flex:1;font-size:var(--fs-xs)">${colLabels[c] || c}</span>
+            <span style="flex:1;font-size:var(--fs-xs)">${label}</span>
           </div>`;
         }).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
+      <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u23F1\uFE0F ${t('kt_battle_rhythm')||'Battle Rhythm'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:8px">${t('kt_battle_rhythm_desc')||'Shared exercise clock with cyclic steps. Every client sees the same H0.'}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+          <input type="checkbox" id="ktBrEnabled" ${br.enabled ? 'checked' : ''} style="accent-color:var(--accent)">
+          ${t('kt_br_enabled')||'Enable battle rhythm'}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+          <input type="checkbox" id="ktBrShowClock" ${br.show_clock !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+          ${t('kt_br_show_clock')||'Show clock widget on toolbar'}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs)">
+          ${t('kt_br_cycle_min')||'Cycle length (minutes)'}
+          <input type="number" id="ktBrCycleMin" class="input" min="1" max="1440" value="${br.cycle_minutes || 120}" style="width:70px;font-size:var(--fs-xs);padding:3px 6px">
+        </label>
+      </div>
+      <div style="font-weight:600;font-size:var(--fs-xs);margin:8px 0 4px">${t('kt_br_steps')||'Steps in one cycle'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_steps_desc')||'Offsets are in minutes from H0. Negative values schedule a step before H0. Leave End blank for an instant step.'}</p>
+      <div id="ktBrStepList" style="margin-bottom:6px"></div>
+      <button type="button" class="btn btn-sm btn-secondary" data-action="_ktBrAddStep" style="font-size:10px">+ ${t('kt_br_add_step')||'Add step'}</button>
+      <div style="font-weight:600;font-size:var(--fs-xs);margin:12px 0 4px">${t('kt_br_snap_offsets')||'Snapshot offsets (minutes from H0)'}</div>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_snap_offsets_desc')||'Comma-separated list, e.g. "0, 15, 60". A board snapshot is captured in each selected format when the clock reaches each offset, every cycle.'}</p>
+      <input type="text" id="ktBrSnapOffsets" class="input" value="${escHtml(brSnapOffsets.join(', '))}" placeholder="0, 15, 60" style="width:100%;font-size:var(--fs-xs);padding:4px 6px">
+      <div style="font-weight:600;font-size:var(--fs-xs);margin:12px 0 4px">${t('kt_br_snap_formats')||'Snapshot formats'}</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        ${['csv','json','xml','svg'].map(f => `<label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer">
+          <input type="checkbox" class="ktBrSnapFmt" data-fmt="${f}" ${brSnapFormats.includes(f) ? 'checked' : ''} style="accent-color:var(--accent)">
+          ${f.toUpperCase()}
+        </label>`).join('')}
       </div>
     </div>
 
@@ -769,8 +869,62 @@ function _ktOpenSettings() {
       <button class="btn btn-secondary btn-sm" data-action="_closeBoardModal" data-arg="ktSettingsModal">${t('btn_cancel')||'Cancel'}</button>
     </div>
   </div>`;
-  _boardModal('ktSettingsModal', html, '560px');
+  _boardModal('ktSettingsModal', html, '620px');
   _ktTrapModalKeys('ktSettingsModal');
+  _ktBrRenderStepList(brSteps);
+}
+
+// ── Battle rhythm: step editor helpers ──
+let _ktBrWorkingSteps = [];
+function _ktBrRenderStepList(initial) {
+  if (Array.isArray(initial)) _ktBrWorkingSteps = initial.map(s => Object.assign({}, s));
+  const host = document.getElementById('ktBrStepList');
+  if (!host) return;
+  if (_ktBrWorkingSteps.length === 0) {
+    host.innerHTML = `<div style="font-size:10px;color:var(--text-dim);padding:4px 0">${t('kt_br_no_steps')||'No steps defined yet.'}</div>`;
+    return;
+  }
+  host.innerHTML = _ktBrWorkingSteps.map((step, i) => `
+    <div style="display:grid;grid-template-columns:1fr 70px 70px auto;gap:4px;align-items:center;margin-bottom:4px;padding:4px;background:var(--bg2);border-radius:var(--radius)">
+      <input class="input ktBrStepName" data-idx="${i}" value="${escHtml(step.name||'')}" placeholder="${t('kt_br_step_name')||'Step name'}" style="font-size:var(--fs-xs);padding:3px 6px">
+      <input class="input ktBrStepStart" data-idx="${i}" type="number" value="${step.start_offset_min ?? 0}" placeholder="Start" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_start_h')||'Start offset (minutes from H0)'}">
+      <input class="input ktBrStepEnd" data-idx="${i}" type="number" value="${step.end_offset_min != null ? step.end_offset_min : ''}" placeholder="End" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_end_h')||'End offset or blank for instant'}">
+      <button type="button" class="btn btn-sm btn-secondary" data-action="_ktBrRemoveStep" data-arg="${i}" style="font-size:10px;padding:2px 6px">\u2716</button>
+      <input class="input ktBrStepDesc" data-idx="${i}" value="${escHtml(step.description||'')}" placeholder="${t('kt_br_step_desc')||'Description (optional)'}" style="grid-column:1/-1;font-size:10px;padding:2px 6px">
+    </div>
+  `).join('');
+}
+function _ktBrAddStep() {
+  _ktBrFlushStepInputs();
+  _ktBrWorkingSteps.push({ name: '', start_offset_min: 0, end_offset_min: null, description: '' });
+  _ktBrRenderStepList();
+}
+function _ktBrRemoveStep(idx) {
+  _ktBrFlushStepInputs();
+  _ktBrWorkingSteps.splice(idx, 1);
+  _ktBrRenderStepList();
+}
+function _ktBrFlushStepInputs() {
+  // Copy the current DOM values back into _ktBrWorkingSteps before a re-render.
+  document.querySelectorAll('.ktBrStepName').forEach(inp => {
+    const i = parseInt(inp.dataset.idx, 10);
+    if (_ktBrWorkingSteps[i]) _ktBrWorkingSteps[i].name = inp.value;
+  });
+  document.querySelectorAll('.ktBrStepStart').forEach(inp => {
+    const i = parseInt(inp.dataset.idx, 10);
+    if (_ktBrWorkingSteps[i]) _ktBrWorkingSteps[i].start_offset_min = parseInt(inp.value, 10) || 0;
+  });
+  document.querySelectorAll('.ktBrStepEnd').forEach(inp => {
+    const i = parseInt(inp.dataset.idx, 10);
+    if (_ktBrWorkingSteps[i]) {
+      const v = inp.value.trim();
+      _ktBrWorkingSteps[i].end_offset_min = v === '' ? null : parseInt(v, 10);
+    }
+  });
+  document.querySelectorAll('.ktBrStepDesc').forEach(inp => {
+    const i = parseInt(inp.dataset.idx, 10);
+    if (_ktBrWorkingSteps[i]) _ktBrWorkingSteps[i].description = inp.value;
+  });
 }
 
 async function _ktSaveSettings() {
@@ -800,6 +954,33 @@ async function _ktSaveSettings() {
   document.querySelectorAll('.ktSettHiddenCol').forEach(cb => {
     if (cb.checked) hcOut[cb.dataset.col] = true;
   });
+  // Column label overrides — only persist non-empty values so unset entries
+  // continue to use the localised default.
+  const clOut = {};
+  document.querySelectorAll('.ktSettColLabel').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) clOut[inp.dataset.col] = v;
+  });
+  // Battle rhythm: collect config from the step editor and the snapshot
+  // controls. Preserve StartedAt/PausedAt from the server-side settings so
+  // saving the config while the clock is running does not stop the clock.
+  _ktBrFlushStepInputs();
+  const existingBr = _ktState.settings.battle_rhythm || {};
+  const snapOffsetsRaw = (document.getElementById('ktBrSnapOffsets')?.value || '').trim();
+  const snapOffsets = snapOffsetsRaw
+    ? snapOffsetsRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+    : [];
+  const snapFormats = Array.from(document.querySelectorAll('.ktBrSnapFmt:checked')).map(cb => cb.dataset.fmt);
+  const battleRhythm = {
+    enabled: document.getElementById('ktBrEnabled')?.checked || false,
+    show_clock: document.getElementById('ktBrShowClock')?.checked !== false,
+    cycle_minutes: parseInt(document.getElementById('ktBrCycleMin')?.value, 10) || 120,
+    started_at: existingBr.started_at || null,
+    paused_at: existingBr.paused_at || null,
+    steps: _ktBrWorkingSteps.filter(st => (st.name || '').trim() !== ''),
+    snapshot_offsets: snapOffsets,
+    snapshot_formats: snapFormats,
+  };
   const settings = {
     priority_colors: pc,
     status_icons: si,
@@ -809,6 +990,8 @@ async function _ktSaveSettings() {
     show_no_priority: document.getElementById('ktSettShowNoPriority')?.checked !== false,
     status_labels: slOut,
     hidden_columns: hcOut,
+    column_labels: clOut,
+    battle_rhythm: battleRhythm,
   };
   try {
     await _ktApi('PUT', '/key-terrain/settings', settings);
@@ -826,7 +1009,7 @@ function _ktOpenColumnOrder() {
     seq_num: '# ' + (t('kt_seq_num')||'Seq'),
     zone: '\u{1F310} ' + (t('kt_zone')||'Zone'),
     priority: '\u26A1 ' + (t('kt_priority')||'Priority'),
-    function: '\u{1F3AF} ' + (t('kt_function')||'Capability'),
+    function: '\u{1F3AF} ' + (t('kt_function')||'Function'),
     status: '\u{1F4CA} ' + (t('kt_status')||'Status'),
     trend: '\u{1F4C8} ' + (t('kt_trend')||'Trend'),
     threat: '\u2694\uFE0F ' + (t('kt_threat')||'Threat'),
@@ -1298,7 +1481,7 @@ function _ktOpenFilter() {
     <h3>\u{1F50D} ${t('kt_filter')||'Filter Key Terrain'}</h3>
 
     <div style="margin-bottom:10px">
-      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Capability'}</label>
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_function')||'Function'}</label>
       <input id="ktFilterFunction" class="input" style="width:100%;font-size:var(--fs-xs);margin-bottom:6px" placeholder="${t('kt_filter_text_ph')||'Contains text...'}" value="${escHtml(f.function||'')}">
       ${capNames.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:4px 12px;max-height:120px;overflow-y:auto;padding:4px;background:var(--bg2);border-radius:var(--radius)">
         ${capNames.map(c => `<label style="${cbStyle}"><input type="checkbox" class="ktFilterCapCb" value="${escHtml(c)}" ${checkedCaps.includes(c)?'checked':''}> ${escHtml(c)}</label>`).join('')}
@@ -1543,3 +1726,136 @@ function _ktDetach() {
       'width=' + w + ',height=' + h + ',resizable=yes,scrollbars=yes');
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Battle Rhythm widget ────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Pulls shared clock state from /api/key-terrain/battle-rhythm every 5s,
+// then uses requestAnimationFrame (well, a 500ms setInterval) to advance a
+// locally-extrapolated display so the operator sees smooth countdown.
+
+let _ktBrTickTimer = null;
+let _ktBrPollTimer = null;
+let _ktBrLastState = null;     // last server snapshot
+let _ktBrLastFetchAt = 0;      // ms since epoch
+
+function _ktBrStartTicker() {
+  if (_ktBrTickTimer) return;
+  _ktBrPoll();
+  _ktBrPollTimer = setInterval(_ktBrPoll, 5000);
+  _ktBrTickTimer = setInterval(_ktBrRenderWidget, 500);
+}
+function _ktBrStopTicker() {
+  if (_ktBrTickTimer) { clearInterval(_ktBrTickTimer); _ktBrTickTimer = null; }
+  if (_ktBrPollTimer) { clearInterval(_ktBrPollTimer); _ktBrPollTimer = null; }
+}
+async function _ktBrPoll() {
+  try {
+    const st = await _ktApi('GET', '/key-terrain/battle-rhythm');
+    _ktBrLastState = st;
+    _ktBrLastFetchAt = Date.now();
+    _ktBrRenderWidget();
+  } catch { /* silent */ }
+}
+
+// Given the last-known server state and how many ms have passed locally
+// since the fetch, advance the clock by that delta so the ticker runs
+// smoothly between polls. Returns a shallow-cloned state object.
+function _ktBrExtrapolate(st) {
+  if (!st || !st.running || st.paused) return st;
+  const deltaMs = Date.now() - _ktBrLastFetchAt;
+  if (deltaMs <= 0) return st;
+  const cycle = st.cycle_minutes || 0;
+  if (cycle <= 0) return st;
+  const deltaMin = deltaMs / 60000;
+  const out = Object.assign({}, st);
+  out.elapsed_minutes = (st.elapsed_minutes || 0) + deltaMin;
+  out.position_min = ((st.position_min || 0) + deltaMin) % cycle;
+  if (out.next_step_in_min != null) {
+    out.next_step_in_min = Math.max(0, (st.next_step_in_min || 0) - deltaMin);
+  }
+  return out;
+}
+
+function _ktBrFormatHOffset(posMin, cycleMin) {
+  // Prefer "H+NN" / "H-NN" where magnitude < cycle/2, so a clock at 115 min
+  // into a 120-min cycle reads as "H-5" rather than "H+115".
+  if (!cycleMin) return 'H+' + Math.floor(posMin || 0);
+  let m = posMin;
+  if (m > cycleMin / 2) m = m - cycleMin;
+  const sign = m < 0 ? '-' : '+';
+  const absM = Math.abs(m);
+  const hh = Math.floor(absM / 60);
+  const mm = Math.floor(absM % 60);
+  if (hh > 0) return 'H' + sign + hh + 'h' + String(mm).padStart(2,'0');
+  return 'H' + sign + String(Math.floor(absM)).padStart(2,'0');
+}
+
+function _ktBrRenderWidget() {
+  const host = document.getElementById('ktBattleRhythmWidget');
+  if (!host) return;
+  const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
+  if (!cfg.enabled || !cfg.show_clock) {
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = '';
+  const raw = _ktBrLastState;
+  const st = raw ? _ktBrExtrapolate(raw) : null;
+  const canWrite = _ktState.access.can_write;
+  const hoffset = st && st.running ? _ktBrFormatHOffset(st.position_min, st.cycle_minutes) : 'H--';
+  const cycleStr = (cfg.cycle_minutes || 0) + ' min';
+  const current = st && st.current_step ? st.current_step.name : '\u2014';
+  const nextName = st && st.next_step ? st.next_step.name : '\u2014';
+  const nextIn = st && st.next_step_in_min != null ? Math.round(st.next_step_in_min) + ' min' : '\u2014';
+  const stateLabel = !st || !st.running
+    ? (t('kt_br_stopped')||'Stopped')
+    : st.paused ? (t('kt_br_paused')||'Paused') : (t('kt_br_running')||'Running');
+  const stateColor = !st || !st.running ? 'var(--text-dim)' : (st.paused ? '#f1c40f' : '#27ae60');
+  host.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;flex-direction:column;min-width:90px">
+        <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em">${t('kt_br_clock')||'Battle Rhythm'}</div>
+        <div style="font-family:monospace;font-size:22px;font-weight:700;color:var(--accent);line-height:1">${hoffset}</div>
+        <div style="font-size:10px;color:${stateColor}">● ${stateLabel}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;min-width:120px;font-size:var(--fs-xs)">
+        <div><span style="color:var(--text-dim)">${t('kt_br_cycle')||'Cycle'}:</span> ${cycleStr}</div>
+        <div><span style="color:var(--text-dim)">${t('kt_br_current')||'Now'}:</span> <b>${escHtml(current)}</b></div>
+        <div><span style="color:var(--text-dim)">${t('kt_br_next')||'Next'}:</span> ${escHtml(nextName)} <span style="color:var(--text-dim)">${t('kt_br_in')||'in'} ${nextIn}</span></div>
+      </div>
+      ${canWrite ? `<div style="display:flex;gap:6px;margin-left:auto;align-items:center">
+        ${(!st || !st.running) ? `
+          <input type="time" id="ktBrStartAt" class="input" style="width:90px;font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_start_at_h')||'Optional wall-clock start time (HH:MM)'}">
+          <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>
+        ` : (st.paused ? `
+          <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
+        ` : `
+          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
+        `)}
+      </div>` : ''}
+    </div>`;
+}
+
+async function _ktBrControl(action) {
+  try {
+    const body = { action: action };
+    if (action === 'start') {
+      const startAt = document.getElementById('ktBrStartAt')?.value || '';
+      if (startAt) body.start_at = startAt;
+    }
+    const st = await _ktApi('POST', '/key-terrain/battle-rhythm/control', body);
+    _ktBrLastState = st;
+    _ktBrLastFetchAt = Date.now();
+    // Also refresh the settings so the local cached copy picks up the
+    // started_at / paused_at changes and the widget state is coherent.
+    try {
+      _ktState.settings = await _ktApi('GET', '/key-terrain/settings');
+    } catch {}
+    _ktBrRenderWidget();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+

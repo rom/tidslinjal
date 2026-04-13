@@ -2493,14 +2493,14 @@ TRANSLATIONS.nb = {
     kt_help_access: 'Tilgangskontroll',
 
     // Key Terrain
-    kt_function: 'Kapabilitet',
-    kt_function_ph: 'Navn på kapabiliteten',
-    kt_function_required: 'Kapabilitetens navn er påkrevd',
+    kt_function: 'Funksjon',
+    kt_function_ph: 'Navn på funksjonen',
+    kt_function_required: 'Funksjonsnavn er påkrevd',
     kt_seq_num: 'Nr',
     kt_zone: 'Sone',
     kt_zone_ph: 'f.eks. Nord, HQ, DMZ',
-    kt_from_capability: 'Last fra kapabilitet',
-    kt_select_capability: 'Velg en kapabilitet...',
+    kt_from_capability: 'Last fra funksjon',
+    kt_select_capability: 'Velg en funksjon...',
 
     kt_linked_capability: 'Knyttet til kapabilitet — navn, sone, status og ansvarlig synkroniseres automatisk',    kt_show_no_priority: 'Vis funksjoner uten prioritet',
     kt_show_no_priority_desc: 'Vis oppføringer med prioritet 0 eller uten prioritet (aktivert som standard)',
