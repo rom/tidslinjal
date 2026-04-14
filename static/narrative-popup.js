@@ -240,10 +240,19 @@ try {
    'prc_new_check', 'prc_update', 'board_item_updated', 'refresh'].forEach(function(evName) {
     _nrSSE.addEventListener(evName, _nrSSERefresh);
   });
+  // Wire SSE open/error into the shared offline banner so the operator
+  // sees the red "offline" bar the moment the stream dies, and it clears
+  // when the connection comes back (EventSource auto-reconnects).
+  _nrSSE.onopen = function() {
+    try { if (typeof reportPopupOnline === 'function') reportPopupOnline(); } catch(e) {}
+  };
   _nrSSE.onerror = function() {
-    // EventSource will auto-reconnect
+    try { if (typeof reportPopupOffline === 'function') reportPopupOffline('SSE error'); } catch(e) {}
   };
 } catch(e) {}
+
+// Offline-mode banner: shared watchdog, started once on load.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}
 
 // Init: try opener first, always fall back to API for auth if needed
 (async () => {

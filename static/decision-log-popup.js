@@ -347,4 +347,8 @@ setInterval(function() {
   }
   setupUI();
   loadEntries();
+  // Offline-mode banner: shows a red bar at the top when network /
+  // server connectivity is lost, so the operator can tell at a glance
+  // that the decisions they're seeing may be stale.
+  try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}
 })();

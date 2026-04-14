@@ -2278,3 +2278,8 @@ function _renderBulkOpsBar() {
     '<button class="btn-map" onclick="_deleteSelectedItems()">Delete</button>' +
     '<button class="btn-map" onclick="_selectedItems.clear();_renderOverlayItems(_currentOverlay)">Clear</button>';
 }
+
+// Offline-mode banner: the map popup loads tiles / markers from the
+// server and from Leaflet tile providers, so losing connectivity gives
+// stale data. Show a fixed red banner at the top when offline.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}

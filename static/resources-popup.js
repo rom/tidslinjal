@@ -101,7 +101,13 @@ function connectSSE() {
     var es = new EventSource('/api/notifications/stream');
     es.addEventListener('user_change', function() { apiGet('/api/users').then(function(u) { _users = u || []; renderContent(); }); });
     es.addEventListener('event_change', function() { loadAll(); });
-    es.onerror = function() { setTimeout(connectSSE, 5000); };
+    es.onopen = function() {
+      try { if (typeof reportPopupOnline === 'function') reportPopupOnline(); } catch(e) {}
+    };
+    es.onerror = function() {
+      try { if (typeof reportPopupOffline === 'function') reportPopupOffline('SSE error'); } catch(e) {}
+      setTimeout(connectSSE, 5000);
+    };
   } catch(e) {}
 }
 
@@ -490,5 +496,8 @@ connectSSE();
 
 // Periodic data refresh (every 30 seconds)
 setInterval(loadAll, 30000);
+
+// Offline-mode banner: fixed red bar when connectivity is lost.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}
 
 })();
