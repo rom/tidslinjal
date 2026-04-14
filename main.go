@@ -2086,6 +2086,13 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+	mux.HandleFunc("/api/key-terrain/reset-cycles", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			app.requireAuth(app.handleResetKeyTerrainCycles)(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 	mux.HandleFunc("/api/key-terrain/battle-rhythm", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			app.requireAuth(app.handleGetBattleRhythmState)(w, r)

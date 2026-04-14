@@ -924,6 +924,18 @@ function _ktOpenSettings() {
           ${t('kt_br_cycle_min')||'Cycle length (minutes)'}
           <input type="number" id="ktBrCycleMin" class="input" min="1" max="1440" value="${br.cycle_minutes || 120}" style="width:70px;font-size:var(--fs-xs);padding:3px 6px">
         </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
+          <input type="checkbox" id="ktBrShowSeconds" ${s.battle_rhythm_show_seconds ? 'checked' : ''} style="accent-color:var(--accent)">
+          ${t('kt_br_show_seconds')||'Show seconds in H-offset (H+00:00 instead of H+00)'}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer" title="${t('kt_br_step_end_sound_h')||'Play a short audio chime in the browser 60 seconds before the current step ends.'}">
+          <input type="checkbox" id="ktBrStepEndSound" ${s.battle_rhythm_step_end_sound ? 'checked' : ''} style="accent-color:var(--accent)">
+          \u{1F514} ${t('kt_br_step_end_sound')||'1-minute warning sound before a step ends'}
+        </label>
+      </div>
+      <div style="margin-bottom:10px">
+        <button type="button" class="btn btn-sm btn-secondary" data-action="_ktResetCyclesConfirm" style="font-size:10px">\u{1F504} ${t('kt_reset_cycles')||'Reset # Cycles counter on all rows'}</button>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('kt_reset_cycles_desc')||'Zero the # Cycles column for every non-archived entry. Use this to wipe the counter between exercises without rebuilding the board.'}</div>
       </div>
       <div style="font-weight:600;font-size:var(--fs-xs);margin:8px 0 4px">${t('kt_br_steps')||'Steps in one cycle'}</div>
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_steps_desc')||'Offsets are in minutes from H0. Negative values schedule a step before H0. Leave End blank for an instant step.'}</p>
@@ -1168,6 +1180,8 @@ async function _ktSaveSettings() {
     column_labels: clOut,
     column_responsibles: crOut,
     show_column_responsibles: showColResp,
+    battle_rhythm_show_seconds: document.getElementById('ktBrShowSeconds')?.checked || false,
+    battle_rhythm_step_end_sound: document.getElementById('ktBrStepEndSound')?.checked || false,
     battle_rhythm: battleRhythm,
   };
   try {
@@ -2246,16 +2260,120 @@ function _ktBrExtrapolate(st) {
 
 function _ktBrFormatHOffset(posMin, cycleMin) {
   // Prefer "H+NN" / "H-NN" where magnitude < cycle/2, so a clock at 115 min
-  // into a 120-min cycle reads as "H-5" rather than "H+115".
+  // into a 120-min cycle reads as "H-5" rather than "H+115". When the
+  // "show seconds" option is on, renders the seconds component too:
+  // H+15:30 instead of H+15 for positions with fractional minutes.
   if (!cycleMin) return 'H+' + Math.floor(posMin || 0);
   let m = posMin;
   if (m > cycleMin / 2) m = m - cycleMin;
   const sign = m < 0 ? '-' : '+';
   const absM = Math.abs(m);
+  const showSeconds = !!(_ktState.settings && _ktState.settings.battle_rhythm_show_seconds);
+  if (showSeconds) {
+    // Convert to whole seconds, then to hh:mm:ss or mm:ss.
+    const totalSec = Math.max(0, Math.round(absM * 60));
+    const h = Math.floor(totalSec / 3600);
+    const mRem = Math.floor((totalSec % 3600) / 60);
+    const sRem = totalSec % 60;
+    if (h > 0) {
+      return 'H' + sign + h + 'h' + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
+    }
+    return 'H' + sign + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
+  }
   const hh = Math.floor(absM / 60);
   const mm = Math.floor(absM % 60);
   if (hh > 0) return 'H' + sign + hh + 'h' + String(mm).padStart(2,'0');
   return 'H' + sign + String(Math.floor(absM)).padStart(2,'0');
+}
+
+// Reset # Cycles counter — prompts the operator, then calls the
+// /api/key-terrain/reset-cycles endpoint. Broadcasted via SSE so all
+// clients pick up the change.
+async function _ktResetCyclesConfirm() {
+  const msg = t('kt_reset_cycles_confirm') || 'Reset the # Cycles counter to 0 on every non-archived entry?\n\nThis cannot be undone — though individual entries will record the change in their history.';
+  if (!confirm(msg)) return;
+  try {
+    const res = await _ktApi('POST', '/key-terrain/reset-cycles');
+    if (typeof showNotification === 'function') {
+      const count = (res && res.updated) || 0;
+      showNotification('success', (t('kt_reset_cycles_done') || 'Reset # Cycles on ') + count + ' ' + (t('kt_reset_cycles_entries') || 'entries'));
+    }
+  } catch (e) {
+    if (typeof showError === 'function') showError('Reset failed: ' + e.message);
+    else alert('Reset failed: ' + e.message);
+  }
+}
+
+// ── 1-minute step-end warning sound ─────────────────────────────────────
+// When settings.battle_rhythm_step_end_sound is on, play a short chime
+// exactly once when the current step has ≤60 s remaining until its end.
+// We track the last-warned (step, cycle) tuple so each step only fires
+// once per cycle, and we use the Web Audio API to generate a short
+// two-tone beep — no audio file required.
+let _ktBrAudioCtx = null;
+let _ktBrLastWarned = ''; // "stepName|cycleIdx"
+
+function _ktBrPlayStepEndWarning() {
+  try {
+    if (!_ktBrAudioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      _ktBrAudioCtx = new Ctx();
+    }
+    const ctx = _ktBrAudioCtx;
+    // Two short beeps at 880 Hz — distinct from any ambient UI sounds
+    // and short enough not to disrupt a briefing.
+    const play = (startAt, freq, dur) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + startAt);
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startAt + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + startAt);
+      osc.stop(ctx.currentTime + startAt + dur + 0.05);
+    };
+    play(0,    880, 0.18);
+    play(0.22, 660, 0.28);
+  } catch {}
+}
+
+// _ktBrCheckStepEndWarning is called from _ktBrTick on every tick.
+// It compares the current step's remaining time to 60 seconds and
+// fires the warning when we first cross that threshold for a given
+// (step, cycle) tuple.
+function _ktBrCheckStepEndWarning(st) {
+  const s = _ktState.settings || {};
+  if (!s.battle_rhythm_step_end_sound) return;
+  if (!st || !st.running || st.paused) return;
+  if (!st.current_step) return;
+  const cycleMin = st.cycle_minutes || 0;
+  if (!cycleMin) return;
+  // Compute seconds remaining inside the active step. Handle wrap-
+  // around steps whose normalised window spans the cycle boundary.
+  const pos = st.position_min;
+  const step = st.current_step;
+  const start = step.start_offset_min || 0;
+  const hasEnd = step.end_offset_min != null;
+  if (!hasEnd) return; // instant steps don't have a "1 min before end"
+  const endRaw = step.end_offset_min;
+  const duration = endRaw - start; // can span negative into positive
+  if (duration <= 0) return;
+  // Minutes into the step, handling the possible lead-in (pos may be
+  // signed negative for cycle-0 pre-H0 steps).
+  let intoStep = pos - start;
+  if (intoStep < 0) intoStep += cycleMin;
+  if (intoStep > duration) return;
+  const secRemaining = (duration - intoStep) * 60;
+  if (secRemaining > 0 && secRemaining <= 60) {
+    const key = step.name + '|' + (st.cycles_completed || 0);
+    if (_ktBrLastWarned !== key) {
+      _ktBrLastWarned = key;
+      _ktBrPlayStepEndWarning();
+    }
+  }
 }
 
 // _ktBrTick runs every 500 ms. It either rebuilds the widget shell (once
@@ -2337,6 +2455,10 @@ function _ktBrTick() {
     if (typeof _bindActions === 'function') _bindActions(host);
   }
   _ktBrUpdateValues(layout, cfg, st);
+  // Play the 1-minute step-end warning once per (step, cycle) tuple
+  // when the setting is on. Gated inside the helper; safe no-op when
+  // disabled or when no current step is active.
+  _ktBrCheckStepEndWarning(st);
   // Border colour: follow the current step's colour if a step is active.
   const border = (st && st.current_step && st.current_step_idx >= 0)
     ? _ktBrStepColor(st.current_step, st.current_step_idx)
