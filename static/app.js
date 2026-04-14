@@ -551,7 +551,12 @@ async function _checkBoardDueItems() {
     if (!dueItems || dueItems.length === 0) return;
     const banner = document.createElement('div');
     banner.id = 'boardDueBanner';
-    banner.style.cssText = 'background:var(--orange,#e67e22);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:var(--fs-sm);z-index:100;position:relative';
+    // flex-shrink:0 stops the parent #app flex column from squishing the
+    // banner to zero height (which otherwise hides the buttons inside the
+    // overflow:hidden viewport). High z-index + pointer-events:auto +
+    // isolation guards against any stale fixed-position overlay (closed
+    // modal-overlay backdrops, popovers) that might capture clicks above it.
+    banner.style.cssText = 'background:var(--orange,#e67e22);color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:var(--fs-sm);z-index:1500;position:relative;flex-shrink:0;pointer-events:auto;isolation:isolate';
     const overdueCount = dueItems.filter(i => i.due_date < new Date().toISOString().slice(0,10)).length;
     const dueTodayCount = dueItems.length - overdueCount;
     let msg = '';
