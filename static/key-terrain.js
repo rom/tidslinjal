@@ -362,10 +362,18 @@ function _renderKeyTerrainBoard() {
     const trIcon = _ktGetTrendIcon(e.trend);
     const priColor = _ktGetPriorityColor(e.priority);
 
-    // Ghosting styles
+    // Ghosting styles. An entry is visually ghosted when either:
+    //   - the operator explicitly ghosted it (e.ghosted == true), or
+    //   - Priority is 0 / unset → treated as "inactive" and excluded
+    //     from the battle-rhythm cycle counter.
+    // Both conditions use the same style the operator configured
+    // under Settings → Ghosting Style so the whole board stays
+    // visually consistent.
+    const isInactive = !e.priority || e.priority === 0;
+    const showAsGhost = e.ghosted || isInactive;
     let rowBg = statusOpt.color;
     let rowStyle = '';
-    if (e.ghosted) {
+    if (showAsGhost) {
       if (ghostStyle === 'grey') {
         rowBg = 'rgba(150,150,150,0.08)';
         rowStyle = 'opacity:0.5;';
@@ -380,7 +388,7 @@ function _renderKeyTerrainBoard() {
       seq_num: `<td style="padding:8px;text-align:center;font-weight:600;font-size:11px;color:var(--text-dim)">${e.seq_num || '\u2014'}</td>`,
       zone: `<td style="padding:8px">${e.zone ? escHtml(e.zone) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
       priority: `<td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>`,
-      function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : ''}</td>`,
+      function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : (isInactive ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(' + (t('kt_inactive')||'inactive') + ')</span>' : '')}</td>`,
       status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusLabel}">${sIcon} ${statusLabel}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
       threat: `<td style="padding:8px">${e.threat ? _ktRenderRich(e.threat) : '\u2014'}</td>`,
@@ -2554,12 +2562,12 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
   // That makes the widget scannable from across a briefing room
   // without interfering with the dense table below it.
   //
-  // The left "info block" (label + H-offset + state) is hoverable —
-  // mousing over it calls _ktBrShowStepsTooltip which pops a panel
-  // listing every step with its start/end offsets and description.
-  // Build a plain-text summary of the steps and stash it on the info
-  // block's title attribute. Native HTML tooltips are guaranteed to
-  // render across every browser — the custom floating tooltip below
+  // The left "info block" (label + H-offset + state) is hoverable via
+  // a native HTML title attribute carrying a plain-text summary of
+  // every configured step. Native browser tooltips render reliably
+  // in every context including the detached Key Terrain window, and
+  // avoid the duplicate-popup problem the previous custom floating
+  // tooltip caused. The title text is refreshed on every 500 ms tick
   // is an enhancement, but this title= attribute is the reliable
   // fallback. Refreshed by _ktBrUpdateValues on every tick so the
   // active-step markers stay current.
@@ -2684,142 +2692,18 @@ function _ktBrBuildStepsTitleText(cfg, st) {
 }
 
 // ── Battle rhythm step tooltip ─────────────────────────────────────────
-// Attached to the widget's left "info block" (#ktBrInfoBlock). On
-// mouseover we build a floating panel listing every step with its
-// start/end offsets and description, highlight the one(s) currently
-// active, and follow the cursor until the operator moves off.
-
-let _ktBrTipEl = null;
-let _ktBrTipBound = false;
-
-function _ktBrEnsureTipListeners() {
-  if (_ktBrTipBound) return;
-  _ktBrTipBound = true;
-  // Single delegated listener on document so it survives shell
-  // rebuilds inside the widget host.
-  document.addEventListener('mouseover', (e) => {
-    const target = e.target && e.target.closest ? e.target.closest('[data-kt-br-tip]') : null;
-    if (!target) return;
-    _ktBrShowStepsTooltip(e);
-  });
-  document.addEventListener('mousemove', (e) => {
-    if (!_ktBrTipEl || _ktBrTipEl.style.display === 'none') return;
-    _ktBrPositionTip(e);
-  });
-  document.addEventListener('mouseout', (e) => {
-    const src = e.target && e.target.closest ? e.target.closest('[data-kt-br-tip]') : null;
-    const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('[data-kt-br-tip]') : null;
-    if (src && !to) _ktBrHideStepsTooltip();
-  });
-}
-
-function _ktBrShowStepsTooltip(mouseEvent) {
-  const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
-  const steps = Array.isArray(cfg.steps) ? cfg.steps : [];
-  // Build the tooltip element lazily. It lives on document.body so it
-  // is not clipped by any modal overflow rules.
-  if (!_ktBrTipEl) {
-    _ktBrTipEl = document.createElement('div');
-    _ktBrTipEl.id = 'ktBrStepsTip';
-    _ktBrTipEl.style.cssText = [
-      'position:fixed',
-      'z-index:10001',
-      'background:var(--bg2,#222)',
-      'color:var(--text,#eee)',
-      'border:1px solid var(--border,#444)',
-      'border-radius:8px',
-      'box-shadow:0 8px 24px rgba(0,0,0,.35)',
-      'padding:10px 14px',
-      'font-size:12px',
-      'line-height:1.45',
-      'min-width:260px',
-      'max-width:420px',
-      'pointer-events:none',
-      'display:none',
-    ].join(';');
-    document.body.appendChild(_ktBrTipEl);
-  }
-  // Determine active step ids from the last fetched state so we can
-  // highlight them in the tooltip.
-  const activeNames = new Set();
-  const lastState = _ktBrLastState;
-  if (lastState && Array.isArray(lastState.current_steps)) {
-    lastState.current_steps.forEach(s => activeNames.add(s.name));
-  } else if (lastState && lastState.current_step) {
-    activeNames.add(lastState.current_step.name);
-  }
-  const fmt = (n) => {
-    const sign = n < 0 ? '-' : '+';
-    const abs = Math.abs(n);
-    const h = Math.floor(abs / 60);
-    const m = abs % 60;
-    if (h > 0) return 'H' + sign + h + 'h' + String(m).padStart(2, '0');
-    return 'H' + sign + String(m).padStart(2, '0');
-  };
-  const cycleLabel = cfg.cycle_minutes ? (cfg.cycle_minutes + ' min') : (t('kt_br_no_cycle')||'cycle length not set');
-  // Empty-steps fallback: still show the tooltip so the operator gets
-  // visual feedback on hover and knows where to configure the rhythm.
-  if (steps.length === 0) {
-    _ktBrTipEl.innerHTML = `
-      <div style="font-weight:700;font-size:13px;color:var(--accent);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">
-        ${escHtml(t('kt_br_steps_tooltip_title')||'Battle rhythm steps')}
-        <span style="font-weight:400;color:var(--text-dim);font-size:11px;float:right">${escHtml(cycleLabel)}</span>
-      </div>
-      <div style="color:var(--text-dim);font-style:italic;padding:8px 0">
-        ${escHtml(t('kt_br_no_steps_tooltip')||'No steps defined. Open Settings → Battle Rhythm to add steps.')}
-      </div>
-    `;
-    _ktBrTipEl.style.display = 'block';
-    _ktBrPositionTip(mouseEvent);
-    return;
-  }
-  const rows = steps.map((s, i) => {
-    const start = typeof s.start_offset_min === 'number' ? s.start_offset_min : 0;
-    const endVal = (s.end_offset_min === null || s.end_offset_min === undefined) ? null : s.end_offset_min;
-    const range = endVal == null ? fmt(start) : fmt(start) + ' – ' + fmt(endVal);
-    const isActive = activeNames.has(s.name);
-    const palette = ['#3498db','#e67e22','#9b59b6','#27ae60','#e74c3c','#f39c12','#1abc9c','#34495e'];
-    const color = (s.color && /^#[0-9a-fA-F]{3,8}$/.test(s.color)) ? s.color : palette[i % palette.length];
-    return `<div style="display:flex;gap:8px;padding:4px 0;${isActive ? 'background:rgba(39,174,96,.12);border-left:3px solid ' + color + ';padding-left:6px;margin-left:-6px;border-radius:3px' : 'border-left:3px solid ' + color + ';padding-left:6px;margin-left:-6px'}">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600${isActive ? ';color:var(--accent)' : ''}">${escHtml(s.name || '(unnamed)')}${isActive ? ' \u2190 ' + (t('kt_br_active')||'active') : ''}</div>
-        ${s.description ? `<div style="color:var(--text-dim);font-size:11px;margin-top:2px">${escHtml(s.description)}</div>` : ''}
-      </div>
-      <div style="font-family:monospace;font-size:11px;color:var(--text-dim);white-space:nowrap;align-self:flex-start;padding-top:2px">${range}</div>
-    </div>`;
-  }).join('');
-  _ktBrTipEl.innerHTML = `
-    <div style="font-weight:700;font-size:13px;color:var(--accent);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">
-      ${escHtml(t('kt_br_steps_tooltip_title')||'Battle rhythm steps')}
-      <span style="font-weight:400;color:var(--text-dim);font-size:11px;float:right">${escHtml(cycleLabel)}</span>
-    </div>
-    ${rows}
-  `;
-  _ktBrTipEl.style.display = 'block';
-  _ktBrPositionTip(mouseEvent);
-}
-
-function _ktBrHideStepsTooltip() {
-  if (_ktBrTipEl) _ktBrTipEl.style.display = 'none';
-}
-
-function _ktBrPositionTip(mouseEvent) {
-  if (!_ktBrTipEl) return;
-  const padding = 14;
-  const rect = _ktBrTipEl.getBoundingClientRect();
-  let left = mouseEvent.clientX + padding;
-  let top = mouseEvent.clientY + padding;
-  if (left + rect.width > window.innerWidth - 8) {
-    left = mouseEvent.clientX - rect.width - padding;
-  }
-  if (top + rect.height > window.innerHeight - 8) {
-    top = mouseEvent.clientY - rect.height - padding;
-  }
-  if (left < 8) left = 8;
-  if (top < 8) top = 8;
-  _ktBrTipEl.style.left = left + 'px';
-  _ktBrTipEl.style.top = top + 'px';
-}
+// The step list is shown via the native HTML `title` attribute on
+// #ktBrInfoBlock (set in _ktBrBuildShell and refreshed on every tick
+// by _ktBrUpdateValues through _ktBrBuildStepsTitleText). Native
+// browser tooltips are reliable across every environment — including
+// the detached Key Terrain window — and don't require any event
+// wiring. The previous implementation had a custom floating tooltip
+// layered on top which ran in parallel with the native one, causing
+// TWO popup panels in the detached window. That layer is gone now.
+//
+// _ktBrEnsureTipListeners is kept as a no-op shim so the ticker's
+// call site doesn't need to branch.
+function _ktBrEnsureTipListeners() { /* intentionally empty; native title handles hover */ }
 
 // _ktBrApplyBorderColor toggles the step-border CSS variable on the main
 // board container. Passing "" clears the border; a hex colour turns on an
