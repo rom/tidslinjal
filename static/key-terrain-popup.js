@@ -77,8 +77,23 @@ function connectPopupSSE() {
       var detail = {};
       try { detail = JSON.parse(e.data || '{}'); } catch (err) {}
       document.dispatchEvent(new CustomEvent('sse:key_terrain_change', { detail: detail }));
+      // Belt-and-suspenders: also trigger a battle-rhythm state poll
+      // directly. If the ticker has died (from an earlier transient
+      // poll failure), the custom-event path won't revive it because
+      // _ktBrStopTicker removes the document listener for _ktBrPoll.
+      // Calling _ktBrPoll here bypasses that and keeps the clock
+      // live-synced even when the in-tab ticker is dead. Guarded by
+      // typeof so pre-bootstrap events don't throw.
+      try { if (typeof _ktBrPoll === 'function') _ktBrPoll(); } catch (err) {}
     });
-    _sseConn.onopen = function() { _sseReconnectAttempts = 0; };
+    _sseConn.onopen = function() {
+      _sseReconnectAttempts = 0;
+      // SSE is back. Re-prime the battle rhythm ticker so a previously-
+      // killed poll loop comes back online. _ktBrStartTicker is a no-op
+      // when the tick timer is still alive, so this is safe on first open
+      // too.
+      try { if (typeof _ktBrStartTicker === 'function') _ktBrStartTicker(); } catch (err) {}
+    };
     _sseConn.onerror = function() {
       _sseConn.close();
       _sseConn = null;

@@ -2197,6 +2197,12 @@ function _ktBrStepColor(step, idx) {
 
 function _ktBrStartTicker() {
   if (_ktBrTickTimer) return;
+  // Reset the failure counter so a ticker restart (e.g. after closing
+  // a sub-modal, or bootstrap re-running) gets a clean slate. Without
+  // this, a previous run that hit the failure threshold leaves the
+  // counter at 3+ and any single transient error on the next run
+  // immediately kills the ticker again.
+  _ktBrPollFailures = 0;
   _ktBrPoll();
   // Poll interval: 2 s so a Start/Pause/Reset from one operator propagates
   // to the rest of the Key Terrain Board users quickly. The SSE hook
@@ -2223,26 +2229,24 @@ async function _ktBrPoll() {
     _ktBrPollFailures = 0;
     _ktBrTick();
   } catch (e) {
-    // Defensively stop the polling loop after a few consecutive
-    // failures so the console doesn't fill with 401/5xx spam when
-    // the session has gone stale or the endpoint is unreachable.
-    // We log once on the first failure; further retries are silent.
+    // Auth failures stop the ticker (the session is gone; no amount of
+    // retrying will bring it back, and spamming the console hides the
+    // real problem). Everything else — network blips, server restart,
+    // 5xx hiccups — is treated as transient: log the first failure,
+    // keep the ticker alive, and let the next interval tick retry.
+    // The ticker used to self-destruct after 3 consecutive failures,
+    // which killed the clock permanently in the detached window after
+    // any momentary connection issue because there was no UI path to
+    // restart it without reloading the page.
     _ktBrPollFailures++;
     const msg = (e && e.message) || String(e);
     if (_ktBrPollFailures === 1) {
-      console.warn('[battle-rhythm] poll failed:', msg);
+      console.warn('[battle-rhythm] poll failed (will keep retrying):', msg);
     }
-    // 401 means the session is invalid — stop immediately rather
-    // than retrying every 2 s forever. Also unauthorized (403) or
-    // any "unauthorized"/"forbidden" error message text.
     const authFailed = /401|403|unauthoriz|forbidden/i.test(msg);
-    if (authFailed || _ktBrPollFailures >= 3) {
+    if (authFailed) {
       _ktBrStopTicker();
-      if (authFailed) {
-        console.warn('[battle-rhythm] stopped polling — session appears to be invalid. Reload the page or log in again.');
-      } else {
-        console.warn('[battle-rhythm] stopped polling after', _ktBrPollFailures, 'consecutive failures');
-      }
+      console.warn('[battle-rhythm] stopped polling — session appears to be invalid. Reload the page or log in again.');
     }
   }
 }
