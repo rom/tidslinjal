@@ -67,7 +67,16 @@ func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Reques
 		entries = []KeyTerrainEntry{}
 	}
 	// Sync linked capability data: if a KT entry references a capability,
-	// overlay the capability's current name, zone, status, and responsibility.
+	// overlay the capability's identity fields (name, zone, owner) so
+	// the entry's display tracks renames / moves of the capability.
+	//
+	// Operational state (Status, ResponsibleName) used to be overlaid
+	// too, which broke manual status updates — the operator changed
+	// status to "down" in the edit form, the PUT saved it, but the
+	// next GET overlaid the capability's status back on top. Status,
+	// Trend, Threat, and ResponsibleName are now OWNED by the KT entry
+	// itself so operators can set them per exercise without the
+	// Resources tool fighting them.
 	rooms := app.store.GetRooms()
 	capMap := make(map[int64]Room)
 	for _, r := range rooms {
@@ -81,12 +90,6 @@ func (app *App) handleGetKeyTerrainEntries(w http.ResponseWriter, r *http.Reques
 				entries[i].Function = cap.Name
 				if cap.Zone != "" {
 					entries[i].Zone = cap.Zone
-				}
-				if cap.Status != "" {
-					entries[i].Status = cap.Status
-				}
-				if cap.Responsibility != "" {
-					entries[i].ResponsibleName = cap.Responsibility
 				}
 				entries[i].OwnerName = cap.Owner
 			}
@@ -346,7 +349,59 @@ func (app *App) handleDeleteKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
-// ── Key Terrain Settings ──────────────────────────────────────────────────
+// handleResetKeyTerrainCycles zeroes out the Rounds counter on every
+// non-archived Key Terrain entry. Teamlead+ only — the per-cycle auto-
+// increment (runDueBattleRhythmCycles) will start counting from zero
+// again. Useful when an operator wants a clean slate after an exercise
+// setup period without tearing down and rebuilding the board.
+func (app *App) handleResetKeyTerrainCycles(w http.ResponseWriter, r *http.Request, user *User) {
+	if !app.canWriteKeyTerrain(user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	entries := app.store.GetKeyTerrainEntries()
+	updated := 0
+	for _, e := range entries {
+		if e.Archived || e.Rounds == 0 {
+			continue
+		}
+		old := e.Rounds
+		e.Rounds = 0
+		e.History = append(e.History, KeyTerrainHist{
+			Timestamp: time.Now(),
+			UserID:    user.ID,
+			UserName:  user.DisplayName,
+			Field:     "rounds",
+			OldValue:  fmt.Sprintf("%d", old),
+			NewValue:  "0",
+		})
+		if err := app.store.UpdateKeyTerrainEntry(e); err == nil {
+			updated++
+		}
+	}
+	// Also reset the battle-rhythm cycle rollover bookkeeping so the
+	// next cycle boundary triggers a fresh increment to 1 rather than
+	// noticing nothing changed. LastCycleIdx is set to the CURRENT
+	// cycle index (if the clock is running) so the rollover scheduler
+	// sees the next boundary as "+1 from here" rather than re-running
+	// all the skipped increments.
+	settings := app.store.GetKeyTerrainSettings()
+	if settings.BattleRhythm.StartedAt != nil && settings.BattleRhythm.CycleMinutes > 0 {
+		elapsed := time.Since(*settings.BattleRhythm.StartedAt)
+		cycleIdx := int(elapsed / (time.Duration(settings.BattleRhythm.CycleMinutes) * time.Minute))
+		if cycleIdx < 0 {
+			cycleIdx = 0
+		}
+		settings.BattleRhythm.LastCycleIdx = cycleIdx
+		_ = app.store.SaveKeyTerrainSettings(settings)
+	}
+	app.audit(user.ID, user.Username, "reset_cycles", "key_terrain", 0,
+		fmt.Sprintf("Reset # Cycles counter on %d entries", updated))
+	app.broadcastKeyTerrainChange("cycles_reset")
+	jsonOK(w, map[string]any{"updated": updated})
+}
+
+// ── Key Terrain Settings ──────────────────────────────────────────────
 
 func (app *App) handleGetKeyTerrainSettings(w http.ResponseWriter, r *http.Request, user *User) {
 	settings := app.store.GetKeyTerrainSettings()

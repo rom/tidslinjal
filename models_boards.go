@@ -316,6 +316,18 @@ type KeyTerrainSettings struct {
 	ColumnResponsibles     map[string]string `json:"column_responsibles,omitempty"` // e.g. {"threat":"J2 Intel","actions":"Watch Floor"}
 	ShowColumnResponsibles bool              `json:"show_column_responsibles,omitempty"`
 
+	// Battle rhythm display toggles.
+	// BattleRhythmShowSeconds: when true, the widget's H-offset
+	// headline shows the seconds component (e.g. "H+15:30" instead of
+	// "H+15"). Useful for operators who run short cycles where minute
+	// resolution isn't granular enough.
+	// BattleRhythmStepEndSound: play a short audio warning 60 seconds
+	// before the current step ends. Fires once per step boundary. The
+	// sound is generated client-side via the Web Audio API, no audio
+	// file to deploy.
+	BattleRhythmShowSeconds  bool `json:"battle_rhythm_show_seconds,omitempty"`
+	BattleRhythmStepEndSound bool `json:"battle_rhythm_step_end_sound,omitempty"`
+
 	// Battle rhythm — shared exercise clock with cyclic steps. All fields
 	// live server-side so every connected client sees the same H0.
 	BattleRhythm BattleRhythmConfig `json:"battle_rhythm,omitempty"`
