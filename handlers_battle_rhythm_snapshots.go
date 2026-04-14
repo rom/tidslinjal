@@ -90,6 +90,13 @@ func (app *App) runDueBattleRhythmCycles(now time.Time) {
 		if e.Archived {
 			continue
 		}
+		// Skip entries with Priority 0 (or unset) — these are treated
+		// as "inactive" on the board and shouldn't count cycles. The
+		// frontend ghosts them so it's visually obvious they're not
+		// participating in the current rhythm.
+		if e.Priority <= 0 {
+			continue
+		}
 		e.Rounds += delta
 		if err := app.store.UpdateKeyTerrainEntry(e); err == nil {
 			updated++

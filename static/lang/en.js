@@ -2975,6 +2975,7 @@ TRANSLATIONS.en = {
     kt_br_show_seconds: 'Show seconds in H-offset (H+00:00 instead of H+00)',
     kt_br_step_end_sound: '1-minute warning sound before a step ends',
     kt_br_step_end_sound_h: 'Play a short audio chime in the browser 60 seconds before the current step ends.',
+    kt_inactive: 'inactive',
     security_session_hijack_master: 'Enable session hijack protection',
     security_session_hijack_sub_desc: 'Fine-tune which checks run when the master switch above is ON. These have no effect when the master is OFF.',
     kt_zoom_in: 'Larger text',

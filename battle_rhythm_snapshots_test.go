@@ -134,10 +134,13 @@ func TestRunDueBattleRhythmSnapshots(t *testing.T) {
 func TestRunDueBattleRhythmCycles(t *testing.T) {
 	app, _ := newTestApp(t)
 
-	// Two active entries and one archived one.
-	e1, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Power", Status: "working"})
-	e2, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Comms", Status: "working"})
-	eArchived, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Old", Status: "working", Archived: true})
+	// Two active entries (Priority > 0), one archived, and one with
+	// Priority 0 (treated as "inactive" and ghosted on the board —
+	// must NOT have its Rounds counter incremented).
+	e1, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Power", Status: "working", Priority: 1})
+	e2, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Comms", Status: "working", Priority: 2})
+	eArchived, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Old", Status: "working", Priority: 1, Archived: true})
+	eInactive, _ := app.store.CreateKeyTerrainEntry(KeyTerrainEntry{Function: "Idle", Status: "working", Priority: 0})
 
 	cycleStart := time.Date(2026, 4, 13, 9, 0, 0, 0, time.UTC)
 	cfg := BattleRhythmConfig{
@@ -171,6 +174,11 @@ func TestRunDueBattleRhythmCycles(t *testing.T) {
 	}
 	if gotArch.Rounds != 0 {
 		t.Errorf("archived: expected Rounds=0, got %d", gotArch.Rounds)
+	}
+	// Priority-0 "inactive" entries must not be incremented.
+	gotInactive := app.store.GetKeyTerrainEntryByID(eInactive.ID)
+	if gotInactive.Rounds != 0 {
+		t.Errorf("priority-0: expected Rounds=0 (skipped), got %d", gotInactive.Rounds)
 	}
 
 	// Re-running at the same "now" must not increment again (dedup via LastCycleIdx).
