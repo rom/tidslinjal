@@ -418,6 +418,14 @@ func (app *App) handleSaveKeyTerrainSettings(w http.ResponseWriter, r *http.Requ
 		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	// Preserve server-side runtime fields that the frontend doesn't (and
+	// shouldn't) round-trip. LastCycleIdx in particular: the rollover
+	// scheduler bumps it as the clock crosses each cycle boundary; if a
+	// settings save (e.g. the operator toggling "show clock") clobbers it
+	// back to 0, the next tick sees `currentIdx - 0 = N` cycles to apply
+	// and double-counts the Rounds column on every active entry.
+	existing := app.store.GetKeyTerrainSettings()
+	settings.BattleRhythm.LastCycleIdx = existing.BattleRhythm.LastCycleIdx
 	if err := app.store.SaveKeyTerrainSettings(settings); err != nil {
 		jsonError(w, "save failed", http.StatusInternalServerError)
 		return

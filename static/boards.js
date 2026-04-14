@@ -66,11 +66,29 @@ function _tColName(name) {
 
 // ── Modal helper (creates dynamic overlay modals) ──
 function _boardModal(id, content, width) {
+  const closeBtnHtml = `<button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;z-index:10">&#x2715;</button>`;
   let el = document.getElementById(id);
-  if (el) el.remove();
+  if (el) {
+    // In-place update: replace just the .modal inner content rather
+    // than removing and re-inserting the overlay. Preserves DOM order
+    // so any child modals opened on top of this one (e.g. the Key
+    // Terrain Settings dialog opened on top of the board) stay visually
+    // on top when the parent re-renders. Re-inserting would push the
+    // parent to the end of <body> and visually swallow its children.
+    const inner = el.querySelector('.modal');
+    if (inner) {
+      if (width) inner.style.width = width;
+      inner.innerHTML = closeBtnHtml + content;
+      void inner.offsetHeight;
+      if (typeof _bindActions === 'function') _bindActions(el);
+      openModal(id);
+      return;
+    }
+    el.remove();
+  }
   const html = `<div class="modal-overlay" id="${id}">
     <div class="modal" style="width:${width||'800px'};max-width:96vw;max-height:94vh;overflow:auto;padding:20px;position:relative;resize:both;min-width:320px;min-height:200px;box-sizing:border-box">
-      <button class="modal-close" data-action="_closeBoardModal" data-arg="${id}" style="position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;border-radius:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;z-index:10">&#x2715;</button>
+      ${closeBtnHtml}
       ${content}
     </div>
   </div>`;

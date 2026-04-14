@@ -9,7 +9,7 @@ let _ktState = {
   filter: {},             // active filters
   settings: {},           // persisted settings from server
   columnSort: null,       // {col:'priority', dir:'asc'} for per-column sorting
-  columnOrder: ['seq_num','zone','priority','function','status','trend','threat','external','responsible','owner','actions','comments','created_at','updated_at','finished_at','rounds','management'],
+  columnOrder: ['seq_num','zone','priority','rounds','function','status','trend','threat','external','responsible','owner','actions','comments','created_at','updated_at','finished_at','management'],
   hiddenColumns: { created_at: true, updated_at: true, finished_at: true, rounds: true, owner: true }, // hidden by default
   // Per-browser zoom level for the board — persists in localStorage so
   // each operator can size the board to their screen without polluting
