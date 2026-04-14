@@ -14,9 +14,10 @@ async function _openReferenceIndex() {
     objectives: t('ref_category_objectives') || 'Objectives',
     presentation_material: t('ref_category_presentation_material') || 'Presentation Material',
     exercise_documents: t('ref_category_exercise_documents') || 'Exercise Documents',
+    threat_intel: t('ref_category_threat_intel') || 'Threat Intel',
     other: t('ref_category_other') || 'Other'
   };
-  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', other:'#95A5A6' };
+  const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', threat_intel:'#C0392B', other:'#95A5A6' };
   const langNames = {en:'English',sv:'Svenska',fr:'Français',fi:'Suomi',de:'Deutsch',no:'Norsk',nb:'Norsk (Bokmål)',da:'Dansk',es:'Español',it:'Italiano',pt:'Português',nl:'Nederlands',pl:'Polski',uk:'Українська',ru:'Русский',et:'Eesti',lv:'Latviešu',lt:'Lietuvių'};
 
   let data;
@@ -127,6 +128,7 @@ function _renderReferencesTab(el) {
           <option value="faq">${t('ref_category_faq') || 'FAQ'}</option>
           <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
           <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
+          <option value="threat_intel">${t('ref_category_threat_intel') || 'Threat Intel'}</option>
           <option value="other">${t('ref_category_other') || 'Other'}</option>
         </select>
         <select id="refLanguageFilter" style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text)">
@@ -469,14 +471,14 @@ async function _loadAndRenderReferences() {
   // Populate info area with category counts
   const infoArea = document.getElementById('refInfoArea');
   if (infoArea) {
-    const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', other:'#95A5A6' };
+    const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', threat_intel:'#C0392B', other:'#95A5A6' };
     const catCounts = {};
     (state.references || []).forEach(r => {
       const c = r.category || 'other';
       catCounts[c] = (catCounts[c] || 0) + 1;
     });
     const total = (state.references || []).length;
-    const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','presentation_material','exercise_documents','other'];
+    const catKeys = ['handbook','sop','policy','map','reference','checklist','faq','objectives','presentation_material','exercise_documents','threat_intel','other'];
     const badges = catKeys.filter(k => catCounts[k]).map(k =>
       `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;background:${catColors[k]};color:#fff;margin-right:4px">${t('ref_category_'+k)||k} ${catCounts[k]}</span>`
     ).join('');
@@ -711,6 +713,7 @@ function _openReferenceUploadModal() {
             <option value="objectives">${t('ref_category_objectives') || 'Objectives'}</option>
             <option value="presentation_material">${t('ref_category_presentation_material') || 'Presentation Material'}</option>
             <option value="exercise_documents">${t('ref_category_exercise_documents') || 'Exercise Documents'}</option>
+            <option value="threat_intel">${t('ref_category_threat_intel') || 'Threat Intel'}</option>
             <option value="other">${t('ref_category_other') || 'Other'}</option>
           </select>
           <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
@@ -958,9 +961,10 @@ function _openRefEditModal(id) {
   if (!ref) return;
   const _langOpts = [{v:'',l:'—'},{v:'en',l:'English'},{v:'sv',l:'Svenska'},{v:'fr',l:'Français'},{v:'fi',l:'Suomi'},{v:'de',l:'Deutsch'},{v:'nb',l:'Norsk (Bokmål)'},{v:'da',l:'Dansk'},{v:'es',l:'Español'},{v:'it',l:'Italiano'},{v:'pt',l:'Português'},{v:'nl',l:'Nederlands'},{v:'pl',l:'Polski'},{v:'ru',l:'Русский'},{v:'et',l:'Eesti'},{v:'lv',l:'Latviešu'},{v:'lt',l:'Lietuvių'}];
   const _copyOpts = [{v:'',l:'—'},{v:'central',l:t('ref_copy_central')||'Central copy'},{v:'local',l:t('ref_copy_local')||'Local copy'},{v:'link',l:t('ref_copy_link')||'Show link'},{v:'git',l:t('ref_copy_git')||'Push to Git'}];
+  const ti = ref.threat_intel || {};
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
-  overlay.innerHTML = `<div class="modal" style="max-width:460px">
+  overlay.innerHTML = `<div class="modal" style="max-width:520px">
     <div class="modal-header"><h3>${t('ref_edit_title') || 'Edit Reference'}</h3><button class="modal-close" data-close-overlay>×</button></div>
     <div class="modal-body">
       <label>${t('ref_title') || 'Title'}</label>
@@ -971,7 +975,7 @@ function _openRefEditModal(id) {
       <input type="text" id="refEditAuthors" class="form-input" value="${escHtml(ref.authors || '')}" placeholder="${t('ref_authors_placeholder') || 'Author names (comma-separated)'}">
       <label style="margin-top:8px">${t('ref_category') || 'Category'}</label>
       <select id="refEditCategory" class="form-input">
-        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'presentation_material',l:t('ref_category_presentation_material')||'Presentation Material'},{v:'exercise_documents',l:t('ref_category_exercise_documents')||'Exercise Documents'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
+        ${[{v:'handbook',l:t('ref_category_handbook')||'Handbook'},{v:'sop',l:t('ref_category_sop')||'SOP'},{v:'policy',l:t('ref_category_policy')||'Policy'},{v:'map',l:t('ref_category_map')||'Map'},{v:'reference',l:t('ref_category_reference')||'Reference'},{v:'checklist',l:t('ref_category_checklist')||'Checklist'},{v:'faq',l:t('ref_category_faq')||'FAQ'},{v:'objectives',l:t('ref_category_objectives')||'Objectives'},{v:'presentation_material',l:t('ref_category_presentation_material')||'Presentation Material'},{v:'exercise_documents',l:t('ref_category_exercise_documents')||'Exercise Documents'},{v:'threat_intel',l:t('ref_category_threat_intel')||'Threat Intel'},{v:'other',l:t('ref_category_other')||'Other'}].map(o => `<option value="${o.v}"${o.v === (ref.category || 'other') ? ' selected' : ''}>${o.l}</option>`).join('')}
       </select>
       <label style="margin-top:8px">${t('ref_language') || 'Language'}</label>
       <select id="refEditLang" class="form-input">${_langOpts.map(o => `<option value="${o.v}"${o.v === (ref.language || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
@@ -983,6 +987,45 @@ function _openRefEditModal(id) {
       <select id="refEditCopyMode" class="form-input">${_copyOpts.map(o => `<option value="${o.v}"${o.v === (ref.copy_mode || '') ? ' selected' : ''}>${o.l}</option>`).join('')}</select>
       <label style="margin-top:8px">${t('ref_tags') || 'Tags'} (comma-separated)</label>
       <input type="text" id="refEditTags" class="form-input" value="${escHtml((ref.tags || []).join(', '))}">
+      <!-- Threat Intel fieldset: only visible when category == threat_intel.
+           Shown/hidden by _tiToggle() on category changes, below. Fields map
+           1:1 onto the ThreatIntelMeta Go struct; the collect step below
+           packs them back into a nested object before the PUT. -->
+      <fieldset id="refEditThreatIntel" style="margin-top:14px;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:none">
+        <legend style="font-size:var(--fs-xs);color:var(--text-dim);padding:0 4px">\u{1F6A8} ${t('threat_intel_section')||'Threat Intel'}</legend>
+        <label style="font-size:var(--fs-xs)">${t('threat_intel_aliases')||'Aliases'} (comma-separated)</label>
+        <input type="text" id="refEditTiAliases" class="form-input" value="${escHtml((ti.aliases||[]).join(', '))}" placeholder="APT29, Cozy Bear, The Dukes">
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_actor_type')||'Actor Type'}</label>
+        <select id="refEditTiActorType" class="form-input">
+          ${[{v:'',l:'—'},{v:'apt',l:'APT'},{v:'nation_state',l:'Nation State'},{v:'ransomware',l:'Ransomware'},{v:'cybercrime',l:'Cybercrime'},{v:'hacktivist',l:'Hacktivist'},{v:'insider',l:'Insider'},{v:'unknown',l:'Unknown'}].map(o => `<option value="${o.v}"${o.v === (ti.actor_type||'') ? ' selected':''}>${o.l}</option>`).join('')}
+        </select>
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_severity')||'Severity'}</label>
+        <select id="refEditTiSeverity" class="form-input">
+          ${[{v:'',l:'—'},{v:'low',l:'Low'},{v:'medium',l:'Medium'},{v:'high',l:'High'},{v:'critical',l:'Critical'}].map(o => `<option value="${o.v}"${o.v === (ti.severity||'') ? ' selected':''}>${o.l}</option>`).join('')}
+        </select>
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_origin')||'Origin'}</label>
+        <input type="text" id="refEditTiOrigin" class="form-input" value="${escHtml(ti.origin||'')}" placeholder="RU / CN / Unknown">
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1">
+            <label style="font-size:var(--fs-xs)">${t('threat_intel_first_seen')||'First Seen'}</label>
+            <input type="date" id="refEditTiFirstSeen" class="form-input" value="${escHtml(ti.first_seen||'')}">
+          </div>
+          <div style="flex:1">
+            <label style="font-size:var(--fs-xs)">${t('threat_intel_last_seen')||'Last Seen'}</label>
+            <input type="date" id="refEditTiLastSeen" class="form-input" value="${escHtml(ti.last_seen||'')}">
+          </div>
+        </div>
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_ttps')||'TTPs'} (one per line)</label>
+        <textarea id="refEditTiTtps" class="form-input" rows="3" style="resize:vertical" placeholder="spearphishing with macro&#10;dll sideloading via signed binary">${escHtml((ti.ttps||[]).join('\n'))}</textarea>
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_known_apts')||'Known APTs'} (comma-separated)</label>
+        <input type="text" id="refEditTiKnownApts" class="form-input" value="${escHtml((ti.known_apts||[]).join(', '))}" placeholder="APT28, APT29">
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_attack_mappings')||'ATT&amp;CK Mappings'}</label>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${t('threat_intel_attack_mappings_help')||'One per line: technique_id | tactic | sub_technique | note'}</div>
+        <textarea id="refEditTiAttack" class="form-input" rows="4" style="resize:vertical;font-family:monospace;font-size:11px" placeholder="T1566.001 | Initial Access | Spearphishing Attachment | Observed Q1 2026">${escHtml((ti.attack_mappings||[]).map(m => [m.technique_id||'', m.tactic||'', m.sub_technique||'', m.note||''].join(' | ')).join('\n'))}</textarea>
+        <label style="margin-top:8px;font-size:var(--fs-xs)">${t('threat_intel_refs')||'External References'}</label>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">${t('threat_intel_refs_help')||'One per line: label | https://…'}</div>
+        <textarea id="refEditTiRefs" class="form-input" rows="3" style="resize:vertical;font-size:11px" placeholder="CISA advisory | https://www.cisa.gov/...">${escHtml((ti.refs||[]).map(r => [r.label||'', r.url||''].join(' | ')).join('\n'))}</textarea>
+      </fieldset>
     </div>
     <div class="modal-footer">
       <button class="btn btn-primary" id="btnSaveRefEdit">${t('btn_save') || 'Save'}</button>
@@ -993,17 +1036,59 @@ function _openRefEditModal(id) {
   // Populate owner/custodian user selects with current values
   _populateRefUserSelects(['refEditOwner', 'refEditCustodian'], { refEditOwner: ref.owner || '', refEditCustodian: ref.custodian || '' });
   overlay.querySelectorAll('[data-close-overlay]').forEach(b => b.addEventListener('click', () => overlay.remove()));
+  // Show/hide the threat intel fieldset based on the selected category.
+  const _tiToggle = () => {
+    const catEl = document.getElementById('refEditCategory');
+    const fs = document.getElementById('refEditThreatIntel');
+    if (fs) fs.style.display = (catEl && catEl.value === 'threat_intel') ? '' : 'none';
+  };
+  document.getElementById('refEditCategory').addEventListener('change', _tiToggle);
+  _tiToggle();
   document.getElementById('btnSaveRefEdit').addEventListener('click', async () => {
+    const category = document.getElementById('refEditCategory').value;
+    // Build the threat intel payload only when the category is threat_intel.
+    // The server will ignore it for other categories anyway, but skipping it
+    // here keeps the PUT body small and avoids noise in git-synced JSON.
+    let threatIntel = null;
+    if (category === 'threat_intel') {
+      const parseList = (s) => (s||'').split(',').map(x => x.trim()).filter(Boolean);
+      const parseLines = (s) => (s||'').split('\n').map(x => x.trim()).filter(Boolean);
+      const attackLines = parseLines(document.getElementById('refEditTiAttack').value);
+      const mappings = attackLines.map(line => {
+        const parts = line.split('|').map(x => x.trim());
+        return { technique_id: parts[0]||'', tactic: parts[1]||'', sub_technique: parts[2]||'', note: parts[3]||'' };
+      }).filter(m => m.technique_id);
+      const refLines = parseLines(document.getElementById('refEditTiRefs').value);
+      const refs = refLines.map(line => {
+        const parts = line.split('|').map(x => x.trim());
+        // A single-part line is treated as a bare URL with no label.
+        if (parts.length === 1) return { url: parts[0] };
+        return { label: parts[0]||'', url: parts[1]||'' };
+      }).filter(r => r.url);
+      threatIntel = {
+        aliases: parseList(document.getElementById('refEditTiAliases').value),
+        actor_type: document.getElementById('refEditTiActorType').value,
+        severity: document.getElementById('refEditTiSeverity').value,
+        origin: document.getElementById('refEditTiOrigin').value.trim(),
+        first_seen: document.getElementById('refEditTiFirstSeen').value,
+        last_seen: document.getElementById('refEditTiLastSeen').value,
+        ttps: parseLines(document.getElementById('refEditTiTtps').value),
+        known_apts: parseList(document.getElementById('refEditTiKnownApts').value),
+        attack_mappings: mappings,
+        refs: refs,
+      };
+    }
     const body = {
       title: document.getElementById('refEditTitle').value.trim(),
       description: document.getElementById('refEditDesc').value.trim(),
-      category: document.getElementById('refEditCategory').value,
+      category: category,
       language: document.getElementById('refEditLang').value,
       owner: document.getElementById('refEditOwner').value.trim(),
       authors: document.getElementById('refEditAuthors')?.value?.trim() || '',
       custodian: document.getElementById('refEditCustodian').value.trim(),
       copy_mode: document.getElementById('refEditCopyMode').value,
       tags: document.getElementById('refEditTags').value.trim().split(',').map(t => t.trim()).filter(Boolean),
+      threat_intel: threatIntel,
     };
     try {
       const res = await api('PUT', '/api/references/' + id, body);

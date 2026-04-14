@@ -575,7 +575,17 @@ try {
       }
     } catch(e) {}
   };
+  _anlSSE.onopen = function() {
+    try { if (typeof reportPopupOnline === 'function') reportPopupOnline(); } catch(e) {}
+  };
+  _anlSSE.onerror = function() {
+    try { if (typeof reportPopupOffline === 'function') reportPopupOffline('SSE error'); } catch(e) {}
+  };
 } catch(e) {}
+
+// Offline-mode banner: shared red bar at the top when network /
+// server connectivity is lost.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}
 
 // Init
 initThemeAndI18n();

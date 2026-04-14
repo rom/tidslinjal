@@ -13,6 +13,30 @@ const _isPhone = () => window.innerWidth < 600;
 const _isTablet = () => window.innerWidth >= 600 && window.innerWidth <= 1024;
 const _isMobile = () => window.innerWidth <= 1024;
 
+// Tag <body> with a viewport class so CSS rules can target the three
+// modes directly (body.viewport-phone / .viewport-tablet / .viewport-desktop)
+// instead of relying on media queries alone. Media queries don't pick up
+// orientation + pointer capability combinations cleanly, and some touch
+// targets need tighter rules than what `@media` can express without
+// stacking conditions. The class is refreshed on every resize /
+// orientationchange via onResponsiveResize → applyViewportClasses().
+function applyViewportClasses() {
+  const body = document.body;
+  if (!body) return;
+  body.classList.remove('viewport-phone', 'viewport-tablet', 'viewport-desktop');
+  // Treat phone as <= 640 for looser phone styling, tablet up to 1100
+  // to include iPads in landscape. Desktop everything else.
+  const w = window.innerWidth;
+  if (w < 640) body.classList.add('viewport-phone');
+  else if (w <= 1100) body.classList.add('viewport-tablet');
+  else body.classList.add('viewport-desktop');
+  // Additional orientation class so landscape-tablet rules can keep the
+  // sidebar inline while portrait-tablet rules flip it to an overlay.
+  const isLandscape = window.innerWidth > window.innerHeight;
+  body.classList.toggle('viewport-landscape', isLandscape);
+  body.classList.toggle('viewport-portrait', !isLandscape);
+}
+
 // ── P1: Pointer Events — replace mouse events in interaction setup ──────────
 // We wrap the existing setup functions with pointer-event-aware versions.
 // The original mouse-based handlers in timeline.js remain for fallback;
@@ -642,6 +666,7 @@ let _resizeDebounce = null;
 function onResponsiveResize() {
   if (_resizeDebounce) clearTimeout(_resizeDebounce);
   _resizeDebounce = setTimeout(() => {
+    applyViewportClasses();
     adaptViewRangeToViewport();
     _updateToolbarOverflow();
     _updateFABVisibility();
@@ -658,11 +683,20 @@ function _updateFABVisibility() {
 
 function _updateMobileNavVisibility() {
   const nav = document.getElementById('mobileNav');
-  if (nav) nav.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+  if (!nav) return;
+  // Show on phone always; show on tablets too when in portrait (where
+  // the sidebar is an overlay and the operator needs a quick way to
+  // pop open the legend/layers/settings tabs without hunting for the
+  // ☰ button up in the header).
+  const w = window.innerWidth;
+  const isPortrait = w <= window.innerHeight;
+  const showOnTablet = w <= 1100 && isPortrait;
+  nav.style.display = (w <= 768 || showOnTablet) ? 'flex' : 'none';
 }
 
 // ── Init all responsive features ─────────────────────────────────────────────
 function initResponsive() {
+  applyViewportClasses();
   setupPointerEvents();
   setupToolbarOverflow();
   setupSidebarSwipe();
@@ -679,7 +713,7 @@ function initResponsive() {
 
   // Also re-check on orientation change
   window.addEventListener('orientationchange', () => {
-    setTimeout(onResponsiveResize, 300);
+    setTimeout(() => { applyViewportClasses(); onResponsiveResize(); }, 300);
   });
 }
 

@@ -266,15 +266,16 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 		return
 	}
 	var req struct {
-		Title       *string  `json:"title"`
-		Description *string  `json:"description"`
-		Category    *string  `json:"category"`
-		Tags        []string `json:"tags"`
-		Language    *string  `json:"language"`
-		CopyMode   *string  `json:"copy_mode"`
-		Owner      *string  `json:"owner"`
-		Authors    *string  `json:"authors"`
-		Custodian  *string  `json:"custodian"`
+		Title       *string          `json:"title"`
+		Description *string          `json:"description"`
+		Category    *string          `json:"category"`
+		Tags        []string         `json:"tags"`
+		Language    *string          `json:"language"`
+		CopyMode    *string          `json:"copy_mode"`
+		Owner       *string          `json:"owner"`
+		Authors     *string          `json:"authors"`
+		Custodian   *string          `json:"custodian"`
+		ThreatIntel *ThreatIntelMeta `json:"threat_intel"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -306,6 +307,16 @@ func (app *App) handleUpdateReference(w http.ResponseWriter, r *http.Request, us
 	}
 	if req.Custodian != nil {
 		rd.Custodian = *req.Custodian
+	}
+	// Threat intel metadata is only meaningful when the reference sits in
+	// the threat_intel category. If the category is being changed away
+	// from threat_intel the metadata is cleared so stale fields don't
+	// leak into other categories.
+	if req.ThreatIntel != nil {
+		rd.ThreatIntel = req.ThreatIntel
+	}
+	if rd.Category != "threat_intel" {
+		rd.ThreatIntel = nil
 	}
 	if err := app.store.UpdateReferenceDoc(rd); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
@@ -523,7 +534,7 @@ func (app *App) handleReferenceIndex(w http.ResponseWriter, r *http.Request, use
 
 	// Group by category
 	catMap := make(map[string][]IndexEntry)
-	catOrder := []string{"handbook", "sop", "policy", "map", "reference", "checklist", "faq", "objectives", "presentation_material", "exercise_documents", "other"}
+	catOrder := []string{"handbook", "sop", "policy", "map", "reference", "checklist", "faq", "objectives", "presentation_material", "exercise_documents", "threat_intel", "other"}
 	for _, rd := range refs {
 		cat := rd.Category
 		if cat == "" {

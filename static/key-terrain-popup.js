@@ -88,15 +88,19 @@ function connectPopupSSE() {
     });
     _sseConn.onopen = function() {
       _sseReconnectAttempts = 0;
-      // SSE is back. Re-prime the battle rhythm ticker so a previously-
-      // killed poll loop comes back online. _ktBrStartTicker is a no-op
-      // when the tick timer is still alive, so this is safe on first open
-      // too.
+      // SSE is back → clear the offline banner and re-prime the ticker.
+      // _ktBrStartTicker is a no-op when the tick timer is still alive,
+      // so this is safe on first open too.
+      try { if (typeof reportPopupOnline === 'function') reportPopupOnline(); } catch (err) {}
       try { if (typeof _ktBrStartTicker === 'function') _ktBrStartTicker(); } catch (err) {}
     };
     _sseConn.onerror = function() {
       _sseConn.close();
       _sseConn = null;
+      // Flag offline right away so the operator sees the banner within a
+      // couple of seconds of losing the connection, instead of waiting
+      // for the popup-offline.js heartbeat (~15s) to catch up.
+      try { if (typeof reportPopupOffline === 'function') reportPopupOffline('SSE error'); } catch (err) {}
       // Reconnect with exponential backoff
       var delay = Math.min(30000, 1000 * Math.pow(2, _sseReconnectAttempts));
       _sseReconnectAttempts++;
@@ -161,6 +165,14 @@ async function bootstrap() {
 
   // Connect SSE for real-time updates
   connectPopupSSE();
+
+  // Start the offline-mode banner watchdog. Uses navigator.onLine +
+  // online/offline browser events + a 15s heartbeat ping against
+  // /api/auth/me to detect network loss, and flips a fixed red banner
+  // at the top of the window so the operator knows data is stale.
+  // SSE onerror/onopen above also drives reportPopupOffline/Online
+  // for sub-second feedback.
+  try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}
 
   // Set up UI
   setupURLBar();

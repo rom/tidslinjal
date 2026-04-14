@@ -1358,7 +1358,7 @@ type ReferenceDoc struct {
 	ID             int64     `json:"id"`
 	Title          string    `json:"title"`
 	Description    string    `json:"description,omitempty"`
-	Category       string    `json:"category"` // handbook | sop | policy | map | reference | checklist | faq | objectives | exercise_documents | other
+	Category       string    `json:"category"` // handbook | sop | policy | map | reference | checklist | faq | objectives | exercise_documents | threat_intel | other
 	Filename       string    `json:"filename"`
 	OriginalName   string    `json:"original_name"`
 	ContentType    string    `json:"content_type"`
@@ -1382,6 +1382,59 @@ type ReferenceDoc struct {
 	ChecksumSHA1   string    `json:"checksum_sha1,omitempty"`
 	ChecksumSHA256 string    `json:"checksum_sha256,omitempty"`
 	ChecksumSHA512 string    `json:"checksum_sha512,omitempty"`
+	// v8.7.0 — Threat intel category metadata. Only populated when
+	// Category == "threat_intel"; omitempty on all fields keeps the JSON
+	// backward-compatible for every other reference type.
+	ThreatIntel *ThreatIntelMeta `json:"threat_intel,omitempty"`
+}
+
+// ThreatIntelMeta holds the structured fields specific to the Threat Intel
+// reference category. It's an optional nested struct on ReferenceDoc so we
+// reuse the existing references storage (JSON file, git sync, upload flow,
+// CRUD endpoints) without a second persistence path.
+type ThreatIntelMeta struct {
+	// Aliases the actor/threat is known by, e.g. ["APT29","Cozy Bear","The Dukes"].
+	Aliases []string `json:"aliases,omitempty"`
+	// ActorType: one of "apt","ransomware","hacktivist","insider","cybercrime",
+	// "nation_state","unknown". Free-form text is accepted but the UI offers
+	// this list in a dropdown.
+	ActorType string `json:"actor_type,omitempty"`
+	// Severity: "low","medium","high","critical". Drives a coloured badge in
+	// the reference list.
+	Severity string `json:"severity,omitempty"`
+	// Origin country/region attribution, free-form ("RU","CN","Unknown"…).
+	Origin string `json:"origin,omitempty"`
+	// FirstSeen is an ISO date (YYYY-MM-DD) of the earliest observed activity.
+	FirstSeen string `json:"first_seen,omitempty"`
+	// LastSeen is an ISO date of the latest observed activity.
+	LastSeen string `json:"last_seen,omitempty"`
+	// TTPs: plain-text list of tactics, techniques and procedures not
+	// necessarily mapped to a framework (e.g. "spearphishing with macro
+	// document", "dll sideloading via signed binary").
+	TTPs []string `json:"ttps,omitempty"`
+	// KnownAPTs: associated / affiliated APT groups when the main subject
+	// is a TTP, campaign, or tool rather than the actor itself.
+	KnownAPTs []string `json:"known_apts,omitempty"`
+	// AttackMappings: MITRE ATT&CK framework mappings.
+	AttackMappings []AttackMapping `json:"attack_mappings,omitempty"`
+	// Refs: external references (CVE, vendor report URL, blog post, etc.)
+	// rendered as a bulleted list with clickable URLs in the info panel.
+	Refs []ThreatIntelRef `json:"refs,omitempty"`
+}
+
+// AttackMapping is one row of the MITRE ATT&CK framework mapping table on
+// a threat intel reference.
+type AttackMapping struct {
+	TechniqueID  string `json:"technique_id"`          // e.g. "T1566.001"
+	Tactic       string `json:"tactic,omitempty"`      // e.g. "Initial Access"
+	SubTechnique string `json:"sub_technique,omitempty"` // free-form label
+	Note         string `json:"note,omitempty"`        // optional operator note
+}
+
+// ThreatIntelRef is a single external reference link on a threat intel entry.
+type ThreatIntelRef struct {
+	Label string `json:"label,omitempty"`
+	URL   string `json:"url"`
 }
 
 // PollQuestionType defines the type of a poll question

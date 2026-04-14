@@ -2055,6 +2055,25 @@ TRANSLATIONS.en = {
     // Reference categories (additions)
     ref_category_presentation_material: 'Presentation Material',
     ref_category_exercise_documents: 'Exercise Documents',
+    ref_category_threat_intel: 'Threat Intel',
+
+    // Detached-window offline banner
+    popup_offline_banner: 'Offline mode — connection lost. Data may be stale.',
+
+    // Threat Intel metadata (shown on references in the threat_intel category)
+    threat_intel_section: 'Threat Intel',
+    threat_intel_aliases: 'Aliases',
+    threat_intel_actor_type: 'Actor Type',
+    threat_intel_severity: 'Severity',
+    threat_intel_origin: 'Origin',
+    threat_intel_first_seen: 'First Seen',
+    threat_intel_last_seen: 'Last Seen',
+    threat_intel_ttps: 'TTPs',
+    threat_intel_known_apts: 'Known APTs',
+    threat_intel_attack_mappings: 'ATT&CK Mappings',
+    threat_intel_attack_mappings_help: 'One per line: technique_id | tactic | sub_technique | note',
+    threat_intel_refs: 'External References',
+    threat_intel_refs_help: 'One per line: label | https://…',
 
 
     // Analysis tabs

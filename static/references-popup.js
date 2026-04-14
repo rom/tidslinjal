@@ -1,5 +1,5 @@
 'use strict';
-const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', other:'#95A5A6' };
+const catColors = { handbook:'#3498DB', sop:'#E67E22', policy:'#9B59B6', map:'#2ECC71', reference:'#1ABC9C', checklist:'#27AE60', faq:'#F39C12', objectives:'#E74C3C', presentation_material:'#E91E63', exercise_documents:'#8E44AD', threat_intel:'#C0392B', other:'#95A5A6' };
 let references = [];
 let gitEnabled = false;
 
@@ -173,3 +173,6 @@ setInterval(syncTheme, 3000);
 loadReferences();
 checkGitIntegration();
 setInterval(loadReferences, 30000);
+// Offline-mode banner: the references popup is pure REST (no SSE) so
+// detection runs on navigator.onLine + heartbeat ping.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}

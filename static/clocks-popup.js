@@ -2533,3 +2533,8 @@ function tickBattleRhythm() {
 // Reload timed events and narrative periodically
 setInterval(loadTimedEvents, 30000);
 setInterval(function() { if (_narrativeClocks.length > 0) fetchNarrativeData(); }, 30000);
+// Offline-mode banner: the clocks popup has no SSE channel of its own so
+// detection runs entirely off navigator.onLine + a 15s heartbeat. A
+// fixed red banner appears at the top of the window if connectivity
+// is lost, telling the operator the times shown may be stale.
+try { if (typeof initPopupOfflineBanner === 'function') initPopupOfflineBanner(); } catch(e) {}

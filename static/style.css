@@ -2305,3 +2305,198 @@ body.a11y-font-150 :root { --fs-base: 20px; --fs-md: 18px; --fs-sm: 16px; --fs-x
 /* When detached into /key-terrain the board fills the window; scope the
    max-width override there so the main-app popup still respects its modal. */
 body.kt-detached #ktBoardContent { max-width: none; width: 100%; padding: 0 12px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+ * Tablet + phone responsive enhancements (v8.7.0)
+ *
+ * The existing @media queries above cover the bulk of the layout
+ * collapse. These rules layer on top of the viewport classes that
+ * responsive.js tags on <body> (viewport-phone / viewport-tablet /
+ * viewport-desktop + viewport-landscape / viewport-portrait) so we can
+ * target combinations that are awkward in pure CSS media-query syntax.
+ *
+ *   viewport-phone   (<640px, or small tablets in portrait)
+ *   viewport-tablet  (640–1100px — includes iPads)
+ *   viewport-desktop (>1100px)
+ *
+ * The goal is to make Tidslinjal usable on:
+ *   - A horizontally-held tablet: same layout as desktop, larger hit
+ *     targets, wrappable toolbars, compact Key Terrain columns.
+ *   - A vertical tablet: sidebar becomes an overlay, bottom mobile nav
+ *     comes up to speed navigation, modals become 100vw cards.
+ *   - A phone: single-column layout, dense content hidden behind
+ *     expand-on-tap affordances, Battle Rhythm widget wrapped into
+ *     two lines so buttons stay reachable, Key Terrain table hides
+ *     columns that don't matter for a quick status glance.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet (shared) ───────────────────────────────────────────────────
+ * Bigger hit targets on all interactive elements; spacing loosened so
+ * fingers don't mis-tap adjacent buttons. These rules apply to both
+ * orientations; landscape-specific rules come next. */
+body.viewport-tablet .btn,
+body.viewport-tablet .btn-sm,
+body.viewport-tablet button.toolbar-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+body.viewport-tablet .btn-icon {
+  min-width: 40px;
+  min-height: 40px;
+}
+body.viewport-tablet select.ctrl-select,
+body.viewport-tablet .form-input {
+  min-height: 40px;
+  font-size: 14px;
+}
+/* Header controls wrap to two rows on tablet rather than getting
+   overflowed into the ☰ menu, which keeps the most-used buttons one
+   tap away. */
+body.viewport-tablet .header-controls {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+/* Give sub-modals opened by the key-terrain board more breathing room:
+   the board itself is a 96vw modal already, and any child sub-modal was
+   previously sized 800px which clipped past the right edge on most
+   tablets. */
+body.viewport-tablet .modal-overlay .modal {
+  max-width: 94vw !important;
+  max-height: 92vh !important;
+}
+
+/* ── Tablet landscape ─────────────────────────────────────────────────
+ * Landscape tablets are wide enough to keep the sidebar inline next to
+ * the main timeline, matching the desktop layout. The tablet media
+ * query further up pushes the sidebar into a fixed overlay for every
+ * tablet; undo that when the orientation is landscape and the viewport
+ * is wide enough that a 280px sidebar doesn't crowd the timeline. */
+body.viewport-tablet.viewport-landscape #sidebar {
+  position: static;
+  transform: none;
+  box-shadow: none;
+  width: 260px;
+  z-index: auto;
+}
+body.viewport-tablet.viewport-landscape #sidebarResizeHandle {
+  display: block;
+}
+body.viewport-tablet.viewport-landscape #main {
+  flex-direction: row;
+}
+/* Landscape tablets don't need the mobile nav — JS hides it, but reset
+   the bottom padding on #app so the timeline claims the full height. */
+body.viewport-tablet.viewport-landscape #app { padding-bottom: 0; }
+
+/* ── Tablet — Key Terrain Board tuning ────────────────────────────────
+ * The KT board table has 17 possible columns; on a tablet several of
+ * them are impractical (tiny text + horizontal scroll). Hide the
+ * pure-audit columns (created_at / updated_at / finished_at) and the
+ * owner column by default. Operators can re-enable any of them via
+ * Settings → Column Visibility. */
+body.viewport-tablet #ktBoardTable th:nth-child(n+12),
+body.viewport-tablet #ktBoardTable td:nth-child(n+12) {
+  /* Don't force-hide — just tighten cell padding so 11 columns fit. */
+  padding: 6px 4px !important;
+  font-size: 10px !important;
+}
+/* Battle rhythm widget — wrap the three info blocks onto two rows so
+   the H-offset stays big and readable while buttons stay reachable. */
+body.viewport-tablet #ktBattleRhythmWidget > div {
+  gap: 10px;
+  padding: 10px 12px;
+}
+body.viewport-tablet #ktBattleRhythmWidget #ktBrHOffset {
+  font-size: 24px !important;
+}
+
+/* ── Phone ─────────────────────────────────────────────────────────────
+ * The phone is treated as a "light" variant of Tidslinjal — operators
+ * in the field doing spot checks rather than running a full CP. We
+ * aggressively hide non-essentials and simplify the Key Terrain Board
+ * and Battle Rhythm widget. The phone also picks up the mobile nav
+ * (already shown by the @media (max-width:768px) rule above). */
+
+/* Key Terrain Board: collapse to 6 essential columns on phone.
+ *   # | Function | Status | Trend | Priority | Rounds
+ * Everything else is hidden. This matches the typical "glance to see
+ * if anything is on fire" use case, not the full editing flow. */
+body.viewport-phone #ktBoardTable th:nth-child(n+7),
+body.viewport-phone #ktBoardTable td:nth-child(n+7) {
+  display: none !important;
+}
+body.viewport-phone #ktBoardTable { font-size: 11px; }
+body.viewport-phone #ktBoardTable th,
+body.viewport-phone #ktBoardTable td {
+  padding: 6px 4px !important;
+}
+/* Key Terrain board toolbar: reduce to the essentials on phone. The
+   add + filter + settings buttons stay; zoom, columns, print, manage,
+   detach and help are pushed into a collapsed "more" behaviour — here
+   we just hide them via CSS. Advanced operations can still be reached
+   from the desktop / tablet view. */
+body.viewport-phone [data-action="_ktZoomIn"],
+body.viewport-phone [data-action="_ktZoomOut"],
+body.viewport-phone [data-action="_ktZoomReset"],
+body.viewport-phone [data-action="_ktOpenColumnVisibility"],
+body.viewport-phone [data-action="_ktPrint"],
+body.viewport-phone [data-action="_ktOpenManagePanel"],
+body.viewport-phone [data-action="_ktDetach"],
+body.viewport-phone [data-action="_ktShowHelp"] {
+  display: none !important;
+}
+
+/* Battle Rhythm widget: stack into a single column on phone, shrink
+   the headline from 28px to 22px, and wrap the control buttons onto
+   a new row so they're always reachable with one thumb. */
+body.viewport-phone #ktBattleRhythmWidget > div {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px;
+  padding: 10px 12px;
+}
+body.viewport-phone #ktBattleRhythmWidget #ktBrHOffset {
+  font-size: 22px !important;
+}
+body.viewport-phone #ktBattleRhythmWidget [style*="margin-left:auto"] {
+  margin-left: 0 !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap;
+}
+
+/* Boards modal on phone: kanban already wraps via the existing
+ * media query, but the outer toolbar overflows. Wrap it and shrink
+ * the button padding. */
+body.viewport-phone #boardsModal .modal > div:first-of-type {
+  flex-wrap: wrap !important;
+}
+
+/* References / info management tabs on phone: make tab buttons
+ * full-width so the operator can tap any of them without mis-aiming. */
+body.viewport-phone #sidebarTabs {
+  flex-wrap: wrap;
+}
+body.viewport-phone #sidebarTabs .sidebar-tab {
+  flex: 1 0 33%;
+  min-width: 0;
+  font-size: 10px;
+  padding: 8px 4px;
+}
+
+/* Phone: ensure all form inputs in any modal are at least 40px tall
+ * and 16px font so iOS doesn't zoom in when they receive focus. */
+body.viewport-phone input:not([type="checkbox"]):not([type="radio"]),
+body.viewport-phone select,
+body.viewport-phone textarea {
+  font-size: 16px;
+  min-height: 40px;
+}
+
+/* ── Shared: reduce the cal-nav-arrow size on phone so it doesn't
+ * clobber the swipe zone the user wants for paging. */
+body.viewport-phone .cal-nav-arrow {
+  width: 28px;
+  height: 44px;
+  font-size: 18px;
+  opacity: 0.6;
+}
