@@ -14,7 +14,9 @@ function connectSSE() {
   _sseConnection = es;
   es.addEventListener('alarm', e => {
     const data = JSON.parse(e.data);
-    playAlarmSound(data.sound || 'klaxon');
+    // Start a repeating alarm sound that keeps firing every minute
+    // until the user acknowledges or dismisses the alarm.
+    startRepeatingAlarm('alarm-' + data.alarm_id, data.sound || 'klaxon', 60000);
     showAlarmNotification(data, 0);
   });
   // Listen for event changes from other users
@@ -104,14 +106,25 @@ function connectSSE() {
   es.addEventListener('personal_notification', e => {
     try {
       const data = JSON.parse(e.data);
-      // Play bell sound
-      _playNotifBellSound();
+      // For polls and poll reminders, start a repeating alarm sound that
+      // fires every minute until the user submits a response. For other
+      // personal notifications, the normal bell chime is enough.
+      if ((data.type === 'poll' || data.type === 'poll_reminder') && data.ref_id) {
+        if (typeof startRepeatingAlarm === 'function') {
+          startRepeatingAlarm('poll-' + data.ref_id, 'chime', 60000);
+        } else {
+          _playNotifBellSound();
+        }
+      } else {
+        // Play bell sound
+        _playNotifBellSound();
+      }
       // Browser notification
       if (Notification.permission === 'granted') {
         try { new Notification('Tidslinjal', { body: `${data.title}\n${data.body}`, icon: '/static/favicon.ico', tag: `notif-${data.id}` }); } catch {}
       }
       // Toast — for polls, make it clickable to open the poll modal
-      if (data.type === 'poll') {
+      if (data.type === 'poll' || data.type === 'poll_reminder') {
         showNotification('info', `📊 ${data.title}: ${data.body}`, 8000);
         // Auto-open poll modal so the user can respond immediately
         setTimeout(() => { if (typeof openPollModal === 'function') openPollModal({hideCreate: true}); }, 500);
@@ -143,7 +156,9 @@ function connectSSE() {
       if (popup) {
         const me = (data.participants || []).find(p => p.user_id === state.user.id);
         if (me && me.status !== 'pending') {
-          popup.remove(); // Already responded
+          // Already responded — silence the repeating alarm and remove popup
+          if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('prc-' + data.id);
+          popup.remove();
         }
       }
       // If the person ready check modal is open, live-update it
@@ -169,6 +184,11 @@ function connectSSE() {
   });
   es.addEventListener('poll_closed', e => {
     try {
+      const data = (() => { try { return JSON.parse(e.data); } catch { return {}; } })();
+      // Silence any repeating alarm for this poll — nothing left to respond to.
+      if (data && data.id != null && typeof stopRepeatingAlarm === 'function') {
+        stopRepeatingAlarm('poll-' + data.id);
+      }
       const pollModal = document.querySelector('.poll-respond-form, .poll-close-btn, #pollActiveList');
       if (pollModal) {
         const modal = pollModal.closest('.modal-overlay');
