@@ -1145,6 +1145,10 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		path := r.URL.Path
 		if r.Method == http.MethodDelete && !strings.Contains(path, "/attachment") {
 			app.requireRole(RoleTeamLead, app.handleDeleteLogBookEntry)(w, r)
+		} else if r.Method == http.MethodPut && !strings.Contains(path, "/attachment") {
+			// Author (or admin) edits an existing entry. Author check is
+			// enforced inside the handler; here we only require auth.
+			app.requireAuth(app.handleUpdateLogBookEntry)(w, r)
 		} else if r.Method == http.MethodPost && strings.Contains(path, "/attachment") {
 			app.requireAuth(app.handleLogBookAttachment)(w, r)
 		} else if r.Method == http.MethodGet && strings.Contains(path, "/attachment/") {

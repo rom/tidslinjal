@@ -497,34 +497,104 @@ const _crc32 = (() => {
 
 // ── Log Book ───────────────────────────────────────────────────────────────
 let _logBookEntries = [];
-async function _loadLogBook() {
+// UI-only filter state for the log book (search, category, visibility).
+// Mirrors the pattern used by the diary (_diaryFilter).
+let _logBookFilter = { search: '', category: '', visibility: '' };
+
+// Catalogue of category icons so every render path shows the same glyph.
+const _lbCategoryIcons = {
+  incoming: '📥', outgoing: '📤', incident: '🚨', directive: '🎯',
+  decision: '⚖️', action: '✅', briefing: '📊', situation: '🔄',
+  logistics: '📦', meeting: '📝', other: '📌'
+};
+
+// Pre-defined background tints users can apply to an entry. "" means no colour.
+const _lbColorSwatches = ['', '#FFF4C2', '#D6F5D6', '#FFD6D6', '#D6E4FF', '#E6D6FF', '#FFE0B3'];
+
+function _lbFilterEntries() {
+  const q = (_logBookFilter.search || '').toLowerCase().trim();
+  const catF = _logBookFilter.category || '';
+  const visF = _logBookFilter.visibility || '';
+  return (_logBookEntries || []).filter(e => {
+    if (catF && e.category !== catF) return false;
+    if (visF) {
+      const vt = e.log_type || 'public';
+      if (vt !== visF) return false;
+    }
+    if (q) {
+      const hay = `${e.sequence_number||''} ${e.subject||''} ${e.body||''} ${e.display_name||e.user_name||''} ${e.category||''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function _lbApplyFilter() {
+  _logBookFilter.search = (document.getElementById('lbSearchInput')?.value || '').trim();
+  _logBookFilter.category = document.getElementById('lbFilterCategory')?.value || '';
+  _logBookFilter.visibility = document.getElementById('lbFilterVisibility')?.value || '';
+  _loadLogBook(true); // re-render only, skip the network call
+}
+
+// Render the log book list into #logBookEntries. When `skipFetch` is true
+// the cached _logBookEntries array is used as-is — this lets the search /
+// filter inputs re-render without a network round-trip.
+async function _loadLogBook(skipFetch) {
   const el = document.getElementById('logBookEntries');
   if (!el) return;
-  try {
-    _logBookEntries = await apiGet('/api/log-book') || [];
-  } catch { _logBookEntries = []; }
-  if (_logBookEntries.length === 0) {
+  if (!skipFetch) {
+    try {
+      _logBookEntries = await apiGet('/api/log-book') || [];
+    } catch { _logBookEntries = []; }
+  }
+  if ((_logBookEntries || []).length === 0) {
     el.innerHTML = `<em style="color:var(--text-dim)">${t('lb_empty')||'No log book entries yet.'}</em>`;
     return;
   }
+  const filtered = _lbFilterEntries();
+  if (filtered.length === 0) {
+    el.innerHTML = `<em style="color:var(--text-dim)">${t('lb_no_matches')||'No entries match the filter.'}</em>`;
+    return;
+  }
   const isAdmin = state.user?.role === 'admin';
-  const catIcons = {incoming:'📥',outgoing:'📤',incident:'🚨',directive:'🎯',decision:'⚖️',action:'✅',briefing:'📊',situation:'🔄',meeting:'📝',other:'📌'};
-  el.innerHTML = _logBookEntries.slice().reverse().map(e => {
+  const me = state.user?.id;
+  // Newest first
+  const sorted = filtered.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  el.innerHTML = sorted.map(e => {
     const ts = new Date(e.timestamp).toLocaleString();
-    const icon = catIcons[e.category] || '📌';
+    const icon = _lbCategoryIcons[e.category] || '📌';
     const attHtml = (e.attachments && e.attachments.length) ? `<div style="margin-top:2px">${e.attachments.map(a =>
       `<a href="/api/log-book/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">📎 ${escHtml(a.filename)}</a>`
     ).join(' ')}</div>` : '';
-    return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
+    // Visibility badge — public (green), group (blue), private (red).
+    const vt = e.log_type || 'public';
+    const visBadge = vt === 'private'
+      ? `<span style="background:#E74C3C;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">🔒 ${t('lb_private')||'Private'}</span>`
+      : vt === 'group'
+      ? `<span style="background:#3498DB;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">👥 ${t('lb_group')||'Group'}</span>`
+      : `<span style="background:#27AE60;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">🌐 ${t('lb_public')||'Public'}</span>`;
+    const seqLabel = e.sequence_number
+      ? `<span style="font-family:monospace;font-size:10px;color:var(--text-dim);margin-right:4px">${escHtml(e.sequence_number)}</span>`
+      : '';
+    const bg = e.color ? `background:${escHtml(e.color)};color:#222` : '';
+    const canEdit = me && (me === e.user_id || isAdmin);
+    const canDelete = canEdit; // same rule
+    return `<div style="padding:6px 8px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--radius);${bg}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="flex:1;min-width:0">
+          ${seqLabel}
           <span>${icon}</span>
           <span style="font-weight:600;font-size:var(--fs-xs)">${escHtml(e.subject)}</span>
-          <span style="color:var(--text-dim);font-size:10px;margin-left:4px">${escHtml(e.display_name||e.user_name)} — ${ts}</span>
+          ${visBadge}
+          <div style="color:var(--text-dim);font-size:10px;margin-top:2px">${escHtml(e.display_name||e.user_name||'')} — ${ts}${e.updated_at ? ' · ' + (t('lb_edited')||'edited') : ''}</div>
         </div>
-        ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:0 4px;font-size:10px" data-action="deleteLogBookEntry" data-arg="${e.id}">×</button>` : ''}
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          ${canEdit ? `<button class="btn btn-sm" style="padding:0 4px;font-size:11px" data-action="_lbOpenEditor" data-arg="${e.id}" title="${t('btn_edit')||'Edit'}">✏</button>` : ''}
+          <button class="btn btn-sm" style="padding:0 4px;font-size:11px" data-action="_lbPrintEntry" data-arg="${e.id}" title="${t('btn_print')||'Print'}">🖨</button>
+          ${canDelete ? `<button class="btn btn-sm" style="padding:0 4px;font-size:11px;color:var(--danger,#e74c3c)" data-action="deleteLogBookEntry" data-arg="${e.id}" title="${t('btn_delete')||'Delete'}">🗑</button>` : ''}
+        </div>
       </div>
-      ${e.body ? `<div style="margin-top:2px;white-space:pre-wrap;color:var(--text-dim)">${escHtml(e.body)}</div>` : ''}
+      ${e.body ? `<div style="margin-top:4px;font-size:var(--fs-xs);line-height:1.5">${e.body}</div>` : ''}
       ${attHtml}
     </div>`;
   }).join('');
@@ -534,9 +604,14 @@ async function _loadLogBook() {
 async function addLogBookEntry() {
   const category = document.getElementById('lbCategory')?.value || 'other';
   const subject = document.getElementById('lbSubject')?.value?.trim();
-  const body = document.getElementById('lbBody')?.value?.trim() || '';
+  // The body field may be a plain <textarea> (quick-add) or a
+  // contenteditable div (rich editor) — accept either.
+  const bodyEl = document.getElementById('lbBody');
+  const body = bodyEl ? (bodyEl.tagName === 'TEXTAREA' ? bodyEl.value.trim() : bodyEl.innerHTML.trim()) : '';
+  const logType = document.getElementById('lbVisibility')?.value || 'public';
+  const color = document.getElementById('lbColor')?.value || '';
   if (!subject) { showError(t('lb_subject_required')||'Subject is required'); return; }
-  const res = await apiPost('/api/log-book', {category, subject, body});
+  const res = await apiPost('/api/log-book', {category, subject, body, log_type: logType, color});
   if (res.ok) {
     const created = await res.json().catch(() => null);
     // Upload attachments
@@ -550,7 +625,10 @@ async function addLogBookEntry() {
       fileInput.value = '';
     }
     document.getElementById('lbSubject').value = '';
-    document.getElementById('lbBody').value = '';
+    if (bodyEl) {
+      if (bodyEl.tagName === 'TEXTAREA') bodyEl.value = '';
+      else bodyEl.innerHTML = '';
+    }
     showNotification('success', t('lb_added')||'Log book entry added');
     await _loadLogBook();
   } else {
@@ -566,6 +644,189 @@ async function deleteLogBookEntry(id) {
     showNotification('success', t('lb_deleted')||'Entry deleted');
     await _loadLogBook();
   }
+}
+
+// ── Log Book rich editor (new / edit existing) ────────────────────────────
+// Mirrors _diaryShowEditor: modal with rich text body, visibility, colour
+// swatches and category selector. Reuses the diary's rich-text helper
+// (_diaryRichField / _diaryBindToolbar) so we don't duplicate a toolbar.
+function _lbOpenEditor(idRaw) {
+  const id = (typeof idRaw === 'number') ? idRaw : parseInt(idRaw, 10);
+  const isEdit = !!id && !Number.isNaN(id);
+  const entry = isEdit ? (_logBookEntries || []).find(e => e.id === id) : null;
+  if (isEdit && !entry) { showError(t('lb_not_found')||'Entry not found'); return; }
+  const cats = Object.keys(_lbCategoryIcons).map(k => ({ v: k, l: t('lb_'+k) || k }));
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'lbEditorModal';
+  const curColor = entry?.color || '';
+  const swatchesHtml = _lbColorSwatches.map(sw => {
+    const label = sw || (t('lb_no_color')||'None');
+    const bg = sw || 'transparent';
+    const border = sw ? '#888' : '#aaa';
+    const sel = (curColor === sw) ? 'outline:2px solid var(--accent);' : '';
+    return `<button type="button" class="lb-swatch" data-lb-color="${escHtml(sw)}" title="${escHtml(label)}"
+      style="width:22px;height:22px;border:1px solid ${border};border-radius:4px;background:${bg};${sel}cursor:pointer"></button>`;
+  }).join('');
+
+  // If the diary rich-text helper is available, use it; otherwise fall back
+  // to a plain textarea so the feature still works in any load ordering.
+  const bodyField = (typeof _diaryRichField === 'function')
+    ? _diaryRichField('lbEditBody', entry?.body || '', t('lb_body_placeholder')||'Write the entry…', '180px')
+    : `<textarea id="lbEditBody" rows="8" class="input" placeholder="${t('lb_body_placeholder')||'Write the entry…'}" style="width:100%;font-size:var(--fs-xs)">${escHtml((entry?.body||'').replace(/<[^>]+>/g,''))}</textarea>`;
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <h3>📖 ${isEdit ? (t('lb_edit_entry')||'Edit Log Book Entry') : (t('lb_new_entry')||'New Log Book Entry')}</h3>
+        <button class="modal-close" data-action="_lbCloseEditor">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:var(--fs-xs);font-weight:600">${t('lb_category')||'Category'}</label>
+            <select id="lbEditCategory" class="input" style="width:100%;font-size:var(--fs-xs)">
+              ${cats.map(c => `<option value="${c.v}" ${entry?.category===c.v?'selected':''}>${escHtml(c.l)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:var(--fs-xs);font-weight:600">${t('lb_visibility')||'Visibility'}</label>
+            <select id="lbEditVisibility" class="input" style="width:100%;font-size:var(--fs-xs)">
+              <option value="public" ${(entry?.log_type||'public')==='public'?'selected':''}>🌐 ${t('lb_public')||'Public'}</option>
+              <option value="group" ${entry?.log_type==='group'?'selected':''}>👥 ${t('lb_group')||'Group'}</option>
+              <option value="private" ${entry?.log_type==='private'?'selected':''}>🔒 ${t('lb_private')||'Private'}</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600">${t('lb_subject')||'Subject'}</label>
+          <input id="lbEditSubject" class="input" style="width:100%;font-size:var(--fs-sm)" value="${escHtml(entry?.subject||'')}" placeholder="${t('lb_subject')||'Subject'}">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600">${t('lb_body')||'Details'}</label>
+          ${bodyField}
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:4px">${t('lb_background_color')||'Background colour'}</label>
+          <div id="lbEditSwatches" style="display:flex;gap:6px;flex-wrap:wrap">${swatchesHtml}</div>
+          <input type="hidden" id="lbEditColor" value="${escHtml(curColor)}">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary btn-sm" data-action="_lbSaveEntry" data-arg="${entry?.id||''}">${t('btn_save')||'Save'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="_lbCloseEditor">${t('btn_cancel')||'Cancel'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  // Wire the rich text toolbar (if present) and swatch buttons.
+  if (typeof _diaryBindToolbar === 'function') {
+    _diaryBindToolbar(modal, 'lbEditBody');
+  }
+  modal.querySelectorAll('.lb-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.lbColor || '';
+      document.getElementById('lbEditColor').value = val;
+      modal.querySelectorAll('.lb-swatch').forEach(b => { b.style.outline = ''; });
+      btn.style.outline = '2px solid var(--accent)';
+    });
+  });
+  // Trap keys so timeline shortcuts don't fire while editing
+  if (typeof _diaryTrapModalKeys === 'function') _diaryTrapModalKeys('lbEditorModal');
+  setTimeout(() => document.getElementById('lbEditSubject')?.focus(), 50);
+}
+
+function _lbCloseEditor() {
+  document.getElementById('lbEditorModal')?.remove();
+}
+
+async function _lbSaveEntry(idStr) {
+  const isEdit = idStr && idStr !== '';
+  const subject = document.getElementById('lbEditSubject')?.value?.trim() || '';
+  if (!subject) { showError(t('lb_subject_required')||'Subject is required'); return; }
+  const category = document.getElementById('lbEditCategory')?.value || 'other';
+  const visibility = document.getElementById('lbEditVisibility')?.value || 'public';
+  const color = document.getElementById('lbEditColor')?.value || '';
+  const bodyEl = document.getElementById('lbEditBody');
+  const body = bodyEl ? (bodyEl.tagName === 'TEXTAREA' ? bodyEl.value : (bodyEl.innerHTML || '')) : '';
+  const payload = { category, subject, body, log_type: visibility, color };
+  try {
+    const res = isEdit
+      ? await api('PUT',  '/api/log-book/' + encodeURIComponent(idStr), payload)
+      : await api('POST', '/api/log-book', payload);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save');
+    }
+    _lbCloseEditor();
+    showNotification('success', isEdit ? (t('lb_updated')||'Entry updated') : (t('lb_added')||'Log book entry added'));
+    await _loadLogBook();
+  } catch (e) {
+    showError(e.message || 'Failed to save');
+  }
+}
+
+// ── Log book print helpers ────────────────────────────────────────────────
+function _lbEntryToHTML(e) {
+  const ts = new Date(e.timestamp).toLocaleString();
+  const catLabel = t('lb_'+e.category) || e.category || '';
+  const vt = e.log_type || 'public';
+  const visLabel = vt === 'private' ? (t('lb_private')||'Private')
+    : vt === 'group' ? (t('lb_group')||'Group')
+    : (t('lb_public')||'Public');
+  const seq = e.sequence_number ? `<span style="font-family:monospace;color:#666">${escHtml(e.sequence_number)}</span> · ` : '';
+  const att = (e.attachments || []).map(a => escHtml(a.filename)).join(', ');
+  return `
+    <section style="page-break-inside:avoid;margin-bottom:18px">
+      <h2 style="margin:0 0 4px 0">${escHtml(e.subject||'')}</h2>
+      <p style="color:#666;margin:0 0 8px 0">${seq}${escHtml(catLabel)} — ${escHtml(e.display_name||e.user_name||'')} — ${ts} — ${escHtml(visLabel)}</p>
+      <div style="line-height:1.6">${e.body || ''}</div>
+      ${att ? `<p style="color:#666;margin-top:6px"><em>${t('lb_attachments')||'Attachments'}: ${att}</em></p>` : ''}
+    </section>`;
+}
+
+function _lbPrintHTML(bodyHtml, title) {
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+    <style>body{font-family:Calibri,Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#222}
+    h1{color:#333;border-bottom:2px solid #333;padding-bottom:4px}
+    h2{color:#333;margin-top:0}
+    img{max-width:100%}a{color:#2563eb}
+    hr{border:0;border-top:1px solid #ccc;margin:18px 0}
+    @media print{body{margin:0;padding:10px}}</style>
+    </head><body>${bodyHtml}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 300);
+}
+
+function _lbPrintEntry(idRaw) {
+  const id = (typeof idRaw === 'number') ? idRaw : parseInt(idRaw, 10);
+  const entry = (_logBookEntries || []).find(e => e.id === id);
+  if (!entry) { showError(t('lb_not_found')||'Entry not found'); return; }
+  _lbPrintHTML(_lbEntryToHTML(entry), entry.sequence_number || entry.subject || (t('tab_log_book')||'Log Book'));
+}
+
+// Called from the print-tool radio option. Builds a printable version of
+// every log book entry visible under the current filter (so search /
+// category / visibility filters apply). If nothing is loaded yet we fetch
+// first so the print button can be used without opening the modal.
+async function _lbPrintAll() {
+  if (!_logBookEntries || _logBookEntries.length === 0) {
+    try { _logBookEntries = await apiGet('/api/log-book') || []; } catch {}
+  }
+  const filtered = _lbFilterEntries().slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  if (filtered.length === 0) {
+    showError(t('lb_empty')||'No log book entries to print.');
+    return;
+  }
+  const exName = (state.exercise && state.exercise.label) || '';
+  const title = (exName ? exName + ' — ' : '') + (t('tab_log_book')||'Log Book');
+  let html = `<h1>${escHtml(title)}</h1>`;
+  html += `<p style="color:#666">${new Date().toLocaleString()} — ${filtered.length} ${t('lb_entries')||'entries'}</p><hr>`;
+  for (const e of filtered) html += _lbEntryToHTML(e);
+  _lbPrintHTML(html, title);
 }
 
 // ── Log Book modal (accessible from Tools) ──
@@ -586,23 +847,52 @@ function openLogBookModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
-    <div class="modal" style="max-width:700px">
+    <div class="modal" style="max-width:760px">
       <div class="modal-header">
         <h3>📖 ${t('tab_log_book')||'Log Book'}</h3>
-        <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-right:8px" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
-        <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+        <div style="display:flex;gap:4px;align-items:center;margin-left:auto">
+          <button class="btn btn-sm btn-primary" data-action="_lbOpenEditor" title="${t('lb_new_entry')||'New entry'}">+ ${t('lb_new_entry')||'New Entry'}</button>
+          <button class="btn btn-sm btn-secondary" data-action="_lbPrintAll" title="${t('lb_print_all')||'Print all'}">🖨 ${t('lb_print_all')||'Print All'}</button>
+          <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+          <button class="modal-close" data-action="_closeParentModal" data-arg-el>&times;</button>
+        </div>
       </div>
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
-          <select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
-            ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
+        <!-- Search / filter row -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+          <input id="lbSearchInput" class="input" style="flex:1;min-width:150px;font-size:var(--fs-xs)" placeholder="🔍 ${t('lb_search_placeholder')||'Search log book…'}">
+          <select id="lbFilterCategory" class="input" style="font-size:var(--fs-xs)">
+            <option value="">— ${t('lb_all_categories')||'All categories'} —</option>
+            ${cats.map(c => `<option value="${c.v}">${escHtml(c.l)}</option>`).join('')}
           </select>
+          <select id="lbFilterVisibility" class="input" style="font-size:var(--fs-xs)">
+            <option value="">${t('lb_all_visibility')||'All'}</option>
+            <option value="public">🌐 ${t('lb_public')||'Public'}</option>
+            <option value="group">👥 ${t('lb_group')||'Group'}</option>
+            <option value="private">🔒 ${t('lb_private')||'Private'}</option>
+          </select>
+        </div>
+        <!-- Quick-add form (plain text body for fast entry). For richer
+             entries use the "+ New Entry" button in the header which
+             opens the full editor with rich text + colour swatches. -->
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
+            <select id="lbCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+              ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
+            </select>
+            <select id="lbVisibility" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+              <option value="public">🌐 ${t('lb_public')||'Public'}</option>
+              <option value="group">👥 ${t('lb_group')||'Group'}</option>
+              <option value="private">🔒 ${t('lb_private')||'Private'}</option>
+            </select>
+          </div>
           <input type="text" id="lbSubject" placeholder="${t('lb_subject')||'Subject'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
           <textarea id="lbBody" rows="2" placeholder="${t('lb_body')||'Details (optional)'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>
           <div style="display:flex;gap:6px;align-items:center">
             <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
               📎 <input type="file" id="lbAttachFile" style="max-width:120px;font-size:10px" multiple>
             </label>
+            <input type="hidden" id="lbColor" value="">
             <span style="flex:1"></span>
             <button class="btn btn-primary btn-sm" data-action="addLogBookEntry">${t('btn_add')||'Add'}</button>
           </div>
@@ -615,6 +905,10 @@ function openLogBookModal() {
     </div>`;
   document.body.appendChild(modal);
   _bindActions(modal);
+  // Wire the filter controls (CSP-safe — no inline oninput).
+  modal.querySelector('#lbSearchInput')?.addEventListener('input', _lbApplyFilter);
+  modal.querySelector('#lbFilterCategory')?.addEventListener('change', _lbApplyFilter);
+  modal.querySelector('#lbFilterVisibility')?.addEventListener('change', _lbApplyFilter);
   _loadLogBook();
 }
 
@@ -1450,18 +1744,37 @@ function renderSidebar() {
       el.innerHTML = logTabBar + `
         <div class="sidebar-section">
           <div class="sidebar-section-title">📖 ${t('tab_log_book')||'Log Book'}
-            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-left:auto" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+            <button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 6px;margin-left:auto" data-action="_lbOpenEditor" title="${t('lb_new_entry')||'New entry'}">+</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-left:4px" data-action="_lbPrintAll" title="${t('lb_print_all')||'Print all'}">🖨</button>
+            <button class="btn btn-sm" style="font-size:10px;padding:2px 6px;opacity:.6;margin-left:4px" data-action="openDetachedLogBook" title="${t('btn_detach')||'Detach to window'}">⧉</button>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:6px">
+            <input id="lbSearchInput" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" placeholder="🔍 ${t('lb_search_placeholder')||'Search log book…'}">
+            <select id="lbFilterVisibility" class="input" style="font-size:var(--fs-xs);padding:3px 6px">
+              <option value="">${t('lb_all_visibility')||'All'}</option>
+              <option value="public">🌐</option>
+              <option value="group">👥</option>
+              <option value="private">🔒</option>
+            </select>
           </div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">
-            <select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
-              ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
-            </select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">
+              <select id="lbCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                ${cats.map(c=>`<option value="${c.v}">${c.l}</option>`).join('')}
+              </select>
+              <select id="lbVisibility" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
+                <option value="public">🌐 ${t('lb_public')||'Public'}</option>
+                <option value="group">👥 ${t('lb_group')||'Group'}</option>
+                <option value="private">🔒 ${t('lb_private')||'Private'}</option>
+              </select>
+            </div>
             <input type="text" id="lbSubject" placeholder="${t('lb_subject')||'Subject'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">
             <textarea id="lbBody" rows="2" placeholder="${t('lb_body')||'Details (optional)'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>
             <div style="display:flex;gap:6px;align-items:center">
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim);cursor:pointer">
                 📎 <input type="file" id="lbAttachFile" style="max-width:120px;font-size:10px" multiple>
               </label>
+              <input type="hidden" id="lbColor" value="">
               <span style="flex:1"></span>
               <button class="btn btn-primary btn-sm" data-action="addLogBookEntry">${t('btn_add')||'Add'}</button>
             </div>
@@ -1470,6 +1783,8 @@ function renderSidebar() {
         </div>`;
       _bindLogSubTabs(el);
       _bindActions(el);
+      el.querySelector('#lbSearchInput')?.addEventListener('input', _lbApplyFilter);
+      el.querySelector('#lbFilterVisibility')?.addEventListener('change', _lbApplyFilter);
       _loadLogBook();
     } else if (logSub === 'checklists') {
       el.innerHTML = logTabBar + `

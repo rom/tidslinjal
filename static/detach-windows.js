@@ -145,9 +145,16 @@ function openDetachedLogBook() {
     '</style></head><body class="' + escHtml(theme) + '">' +
     '<h3>📖 ' + escHtml(t('tab_log_book')||'Log Book') + '</h3>' +
     '<div style="background:var(--bg3);border-radius:var(--radius);padding:8px;margin-bottom:8px">' +
-    '<select id="lbCategory" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px">' +
+    '<select id="lbCategory" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">' +
     cats.map(c => '<option value="' + c.v + '">' + escHtml(c.l) + '</option>').join('') +
     '</select>' +
+    '<select id="lbVisibility" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">' +
+    '<option value="public">\ud83c\udf10 ' + escHtml(t('lb_public')||'Public') + '</option>' +
+    '<option value="group">\ud83d\udc65 ' + escHtml(t('lb_group')||'Group') + '</option>' +
+    '<option value="private">\ud83d\udd12 ' + escHtml(t('lb_private')||'Private') + '</option>' +
+    '</select>' +
+    '</div>' +
     '<input type="text" id="lbSubject" placeholder="' + escHtml(t('lb_subject')||'Subject') + '" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:4px">' +
     '<textarea id="lbBody" rows="3" placeholder="' + escHtml(t('lb_body')||'Details (optional)') + '" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);resize:vertical;margin-bottom:4px"></textarea>' +
     '<div style="display:flex;gap:6px;align-items:center">' +
@@ -168,7 +175,8 @@ function openDetachedLogBook() {
       const subject = doc.getElementById('lbSubject')?.value?.trim();
       if (!subject) { alert(t('lb_subject_required')||'Subject is required'); return; }
       const body = doc.getElementById('lbBody')?.value?.trim() || '';
-      const res = await apiPost('/api/log-book', {category, subject, body});
+      const logType = doc.getElementById('lbVisibility')?.value || 'public';
+      const res = await apiPost('/api/log-book', {category, subject, body, log_type: logType});
       if (res.ok) {
         const created = await res.json().catch(() => null);
         const fileInput = doc.getElementById('lbAttachFile');
@@ -231,17 +239,26 @@ async function _refreshLogBookPopout() {
       return;
     }
     el.innerHTML = entries.slice().reverse().map(e => {
-      const ts = e.created_at ? new Date(e.created_at).toLocaleString() : '';
+      const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
       const attachments = (e.attachments||[]).map(a =>
         '<a href="/api/log-book/' + e.id + '/attachment/' + encodeURIComponent(a.stored_name) + '" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none">📎 ' + escHtml(a.filename) + '</a>'
       ).join(' ');
-      return '<div style="border-bottom:1px solid var(--border);padding:6px 0">' +
+      const vt = e.log_type || 'public';
+      const visBadge = vt === 'private'
+        ? '<span style="background:#E74C3C;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">\ud83d\udd12</span>'
+        : vt === 'group'
+        ? '<span style="background:#3498DB;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">\ud83d\udc65</span>'
+        : '<span style="background:#27AE60;color:#fff;padding:0 5px;border-radius:3px;font-size:9px;margin-left:4px">\ud83c\udf10</span>';
+      const seq = e.sequence_number ? '<span style="font-family:monospace;font-size:10px;color:var(--text-dim);margin-right:4px">' + escHtml(e.sequence_number) + '</span>' : '';
+      const bg = e.color ? 'background:' + escHtml(e.color) + ';color:#222;' : '';
+      // Body is sanitised HTML on the server — render as-is to preserve rich text formatting.
+      return '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;margin-bottom:4px;' + bg + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-weight:600;color:var(--text)">[' + escHtml(e.category||'') + '] ' + escHtml(e.subject||'') + '</span>' +
+        '<span>' + seq + '<span style="font-weight:600">[' + escHtml(e.category||'') + '] ' + escHtml(e.subject||'') + '</span>' + visBadge + '</span>' +
         '<span style="color:var(--text-dim);font-size:10px">' + escHtml(ts) + '</span></div>' +
-        (e.body ? '<div style="color:var(--text-dim);margin-top:2px;white-space:pre-line">' + escHtml(e.body) + '</div>' : '') +
+        (e.body ? '<div style="margin-top:2px;line-height:1.5">' + e.body + '</div>' : '') +
         (attachments ? '<div style="margin-top:2px">' + attachments + '</div>' : '') +
-        '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">' + escHtml(e.created_by_name||'') + '</div>' +
+        '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">' + escHtml(e.display_name||e.user_name||'') + '</div>' +
         '</div>';
     }).join('');
   } catch(e) { /* ignore */ }

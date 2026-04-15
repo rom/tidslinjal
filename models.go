@@ -1205,15 +1205,21 @@ type GradualBackupSnapshot struct {
 // EventLogEntry represents an external event received via pub/sub or webhook
 // LogBookEntry represents a single entry in the staff log book (stabsloggbok)
 type LogBookEntry struct {
-	ID          int64                `json:"id"`
-	Timestamp   time.Time            `json:"timestamp"`
-	UserID      int64                `json:"user_id"`
-	UserName    string               `json:"user_name"`
-	DisplayName string               `json:"display_name"`
-	Category    string               `json:"category"` // incoming|outgoing|incident|directive|decision|action|briefing|situation|meeting|other
-	Subject     string               `json:"subject"`
-	Body        string               `json:"body"`
-	Attachments []LogBookAttachment  `json:"attachments,omitempty"`
+	ID             int64     `json:"id"`
+	SequenceNumber string    `json:"sequence_number,omitempty"` // e.g. "AURORA-log-2026-001"
+	Timestamp      time.Time `json:"timestamp"`
+	UpdatedAt      *time.Time `json:"updated_at,omitempty"`
+	UserID         int64     `json:"user_id"`
+	UserName       string    `json:"user_name"`
+	DisplayName    string    `json:"display_name"`
+	Category       string    `json:"category"` // incoming|outgoing|incident|directive|decision|action|briefing|situation|meeting|other
+	Subject        string    `json:"subject"`
+	Body           string    `json:"body"` // HTML rich text (sanitised)
+	// Visibility: "public" (everyone), "group" (members of GroupID), "private" (author only)
+	LogType     string              `json:"log_type,omitempty"`
+	GroupID     int64               `json:"group_id,omitempty"`
+	Color       string              `json:"color,omitempty"` // background colour (CSS colour)
+	Attachments []LogBookAttachment `json:"attachments,omitempty"`
 }
 
 type LogBookAttachment struct {

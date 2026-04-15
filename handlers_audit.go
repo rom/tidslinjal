@@ -52,12 +52,111 @@ func (app *App) handleAddEventLog(w http.ResponseWriter, r *http.Request, user *
 	jsonOK(w, created)
 }
 
+// canReadLogBookEntry mirrors canReadDecisionLogEntry: admins can always
+// read, authors can always read their own, then apply the LogType
+// visibility rule (public / group / private).
+func (app *App) canReadLogBookEntry(user *User, entry LogBookEntry) bool {
+	if app.effectiveHasRole(user, RoleAdmin) {
+		return true
+	}
+	if entry.UserID == user.ID {
+		return true
+	}
+	switch entry.LogType {
+	case "public", "general", "":
+		return true
+	case "group":
+		if entry.GroupID > 0 && app.userInGroup(user.ID, entry.GroupID) {
+			return true
+		}
+	case "private":
+		// Only the author can read — already handled above
+	}
+	return false
+}
+
 func (app *App) handleGetLogBook(w http.ResponseWriter, r *http.Request, user *User) {
 	entries := app.store.GetLogBook()
 	if entries == nil {
 		entries = []LogBookEntry{}
 	}
-	jsonOK(w, entries)
+	// Apply visibility filter so private/group entries don't leak.
+	filtered := make([]LogBookEntry, 0, len(entries))
+	for _, e := range entries {
+		if app.canReadLogBookEntry(user, e) {
+			filtered = append(filtered, e)
+		}
+	}
+	jsonOK(w, filtered)
+}
+
+// normaliseLogType maps user input to a canonical visibility value. Unknown
+// or empty values fall back to "public" so existing callers keep working.
+func normaliseLogType(s string) string {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "private":
+		return "private"
+	case "group":
+		return "group"
+	default:
+		return "public"
+	}
+}
+
+// validLogBookColor returns the input if it is an acceptable CSS colour,
+// otherwise empty string. We accept short/long hex codes and a small set
+// of named CSS colours — plenty for a background tint.
+func validLogBookColor(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if len(s) > 32 {
+		return ""
+	}
+	// Hex: #fff, #ffffff, #ffffff00
+	if s[0] == '#' {
+		hex := s[1:]
+		if len(hex) == 3 || len(hex) == 4 || len(hex) == 6 || len(hex) == 8 {
+			for _, c := range hex {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+					return ""
+				}
+			}
+			return s
+		}
+		return ""
+	}
+	// Named colours — short allowlist
+	named := map[string]bool{
+		"red": true, "orange": true, "yellow": true, "green": true,
+		"blue": true, "purple": true, "pink": true, "gray": true, "grey": true,
+		"lightyellow": true, "lightgreen": true, "lightblue": true, "lightpink": true,
+		"lightgray": true, "lightgrey": true, "transparent": true,
+	}
+	if named[strings.ToLower(s)] {
+		return strings.ToLower(s)
+	}
+	return ""
+}
+
+// logBookSequenceNumber builds an exercise-scoped label of the form
+// `{exercise}-log-{year}-{number}` (or `log-{year}-{number}` if no exercise
+// label is configured).
+func (app *App) logBookSequenceNumber(id int64, ts time.Time) string {
+	prefix := "log"
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToLower(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		prefix = abbr + "-log"
+	}
+	year := ts.Year()
+	if year == 0 {
+		year = time.Now().Year()
+	}
+	return fmt.Sprintf("%s-%d-%03d", prefix, year, id)
 }
 
 func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, user *User) {
@@ -65,6 +164,9 @@ func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, us
 		Category string `json:"category"`
 		Subject  string `json:"subject"`
 		Body     string `json:"body"`
+		LogType  string `json:"log_type"`
+		GroupID  int64  `json:"group_id"`
+		Color    string `json:"color"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
@@ -77,28 +179,104 @@ func (app *App) handleAddLogBookEntry(w http.ResponseWriter, r *http.Request, us
 	if req.Category == "" {
 		req.Category = "other"
 	}
+	logType := normaliseLogType(req.LogType)
+	if logType != "group" {
+		req.GroupID = 0
+	}
 	entry := LogBookEntry{
 		UserID:      user.ID,
 		UserName:    user.Username,
 		DisplayName: user.DisplayName,
 		Category:    stripHTMLTags(req.Category),
 		Subject:     stripHTMLTags(req.Subject),
-		Body:        stripHTMLTags(req.Body),
+		// Rich text: keep a safe subset of HTML instead of stripping all tags.
+		Body:    sanitizeRichHTML(req.Body),
+		LogType: logType,
+		GroupID: req.GroupID,
+		Color:   validLogBookColor(req.Color),
 	}
 	created, err := app.store.AddLogBookEntry(entry)
 	if err != nil {
 		jsonError(w, "failed to add log book entry", http.StatusInternalServerError)
 		return
 	}
+	// Assign an exercise-scoped sequence number now that we have the ID.
+	created.SequenceNumber = app.logBookSequenceNumber(created.ID, created.Timestamp)
+	_ = app.store.UpdateLogBookEntry(created)
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "created", EntityType: "log_book", EntityID: created.ID,
-		Summary: fmt.Sprintf("Log book entry: [%s] %s", req.Category, req.Subject),
+		Summary: fmt.Sprintf("Log book entry %s: [%s] %s", created.SequenceNumber, req.Category, req.Subject),
 	})
 	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"log_book"}`})
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
+}
+
+// handleUpdateLogBookEntry lets the author (or an admin) edit an existing
+// log book entry. Rich text, category, subject, visibility and background
+// colour can all be changed; the sequence number, author and timestamps
+// are immutable.
+func (app *App) handleUpdateLogBookEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/log-book/")
+	idStr = strings.TrimSuffix(idStr, "/")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	existing := app.store.GetLogBookEntryByID(id)
+	if existing == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Category string `json:"category"`
+		Subject  string `json:"subject"`
+		Body     string `json:"body"`
+		LogType  string `json:"log_type"`
+		GroupID  int64  `json:"group_id"`
+		Color    string `json:"color"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Subject == "" {
+		jsonError(w, "subject required", http.StatusBadRequest)
+		return
+	}
+	if req.Category == "" {
+		req.Category = existing.Category
+	}
+	logType := normaliseLogType(req.LogType)
+	if logType != "group" {
+		req.GroupID = 0
+	}
+	existing.Category = stripHTMLTags(req.Category)
+	existing.Subject = stripHTMLTags(req.Subject)
+	existing.Body = sanitizeRichHTML(req.Body)
+	existing.LogType = logType
+	existing.GroupID = req.GroupID
+	existing.Color = validLogBookColor(req.Color)
+	now := time.Now()
+	existing.UpdatedAt = &now
+	if err := app.store.UpdateLogBookEntry(*existing); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "updated", EntityType: "log_book", EntityID: existing.ID,
+		Summary: fmt.Sprintf("Log book entry %s edited", existing.SequenceNumber),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "log_change", Data: `{"type":"log_book"}`})
+	jsonOK(w, existing)
 }
 
 func (app *App) handleDeleteLogBookEntry(w http.ResponseWriter, r *http.Request, user *User) {
