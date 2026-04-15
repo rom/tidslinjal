@@ -1958,6 +1958,7 @@ function _showPRCPopup(check) {
     try {
       const res = await apiPut(`/api/person-ready-check/${check.id}/respond`, { status });
       if (res.ok) {
+        if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('prc-' + check.id);
         overlay.remove();
         showNotification('success', status === 'ready' ? 'Marked as ready' : 'Marked as not ready');
       } else {
@@ -1968,8 +1969,15 @@ function _showPRCPopup(check) {
   };
   document.getElementById('prcPopupReady_' + check.id).addEventListener('click', () => respond('ready'));
   document.getElementById('prcPopupNotReady_' + check.id).addEventListener('click', () => respond('not_ready'));
-  // Play notification sound
-  _playNotifBellSound();
+  // Play an attention-grabbing repeating alarm — fires immediately and then
+  // every 60 seconds until the user responds (Ready / Not Ready) or the
+  // popup is otherwise removed. Falls back gracefully if the helper is
+  // not loaded yet.
+  if (typeof startRepeatingAlarm === 'function') {
+    startRepeatingAlarm('prc-' + check.id, 'chime', 60000);
+  } else {
+    _playNotifBellSound();
+  }
 }
 
 /* ── Poll / Multipoll ── */
@@ -2556,6 +2564,8 @@ async function _loadPolls(modal) {
         try {
           const res = await apiPut(`/api/polls/${pollId}/respond`, { answers });
           if (!res.ok) { const err = await res.json().catch(()=>({})); throw new Error(err.error || 'Failed'); }
+          // Silence the repeating poll alarm — we've submitted our response.
+          if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('poll-' + pollId);
           showNotification('success',t('poll_response_saved')||'Response saved');
           _loadPolls(modal);
         } catch (e) { showError(e.message); }
@@ -3951,6 +3961,10 @@ function dismissAlarmNotif(alarmID) {
     clearInterval(entry.counterID);
     unackedAlarms.delete(alarmID);
     if (entry.element && entry.element.parentNode) entry.element.remove();
+  }
+  // Stop the repeating alarm sound — the alarm has been dismissed/acked.
+  if (typeof stopRepeatingAlarm === 'function') {
+    stopRepeatingAlarm('alarm-' + alarmID);
   }
 }
 
