@@ -958,12 +958,14 @@ func (app *App) handleGetRFIs(w http.ResponseWriter, r *http.Request, user *User
 
 func (app *App) handleCreateRFI(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Question       string  `json:"question"`
-		RespondentIDs  []int64 `json:"respondent_ids"`
-		GroupIDs       []int64 `json:"group_ids"`
-		All            bool    `json:"all"`
-		DeadlineMins   int     `json:"deadline_mins"`
-		ScheduledAt    string  `json:"scheduled_at"`
+		Question      string              `json:"question"`
+		RespondentIDs []int64             `json:"respondent_ids"`
+		GroupIDs      []int64             `json:"group_ids"`
+		All           bool                `json:"all"`
+		DeadlineMins  int                 `json:"deadline_mins"`
+		ScheduledAt   string              `json:"scheduled_at"`
+		Color         string              `json:"color"`
+		References    []DecisionReference `json:"references"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -1013,12 +1015,14 @@ func (app *App) handleCreateRFI(w http.ResponseWriter, r *http.Request, user *Us
 	rfi := RequestForInfo{
 		CreatedBy:     user.ID,
 		CreatedByName: user.DisplayName,
-		Question:      stripHTMLTags(req.Question),
+		Question:      sanitizeRichHTML(req.Question),
 		Respondents:   respondents,
 		CreatedAt:     now,
 		DeadlineMins:  req.DeadlineMins,
 		ScheduledAt:   req.ScheduledAt,
 		Status:        "open",
+		Color:         validDecisionColor(req.Color),
+		References:    req.References,
 	}
 	if rfi.CreatedByName == "" {
 		rfi.CreatedByName = user.Username
@@ -1032,6 +1036,8 @@ func (app *App) handleCreateRFI(w http.ResponseWriter, r *http.Request, user *Us
 		jsonError(w, "failed to create RFI", http.StatusInternalServerError)
 		return
 	}
+	created.SequenceNumber = app.rfiSequenceNumber(created.ID, created.CreatedAt)
+	_ = app.store.UpdateRFI(created)
 	isScheduled := false
 	if req.ScheduledAt != "" {
 		if t, err := time.Parse(time.RFC3339, req.ScheduledAt); err == nil && t.After(now) {
@@ -1044,9 +1050,26 @@ func (app *App) handleCreateRFI(w http.ResponseWriter, r *http.Request, user *Us
 	app.store.LogAudit(AuditEntry{
 		UserID: user.ID, UserName: user.DisplayName,
 		Action: "create_rfi", EntityType: "rfi", EntityID: created.ID,
-		Summary: fmt.Sprintf("Created RFI targeting %d respondents: %s", len(created.Respondents), created.Question),
+		Summary: fmt.Sprintf("Created RFI %s targeting %d respondents: %s", created.SequenceNumber, len(created.Respondents), stripHTMLTags(created.Question)),
 	})
 	jsonOK(w, created)
+}
+
+// rfiSequenceNumber builds the label "exercisename-RFI-year-NNN" for an RFI.
+func (app *App) rfiSequenceNumber(id int64, ts time.Time) string {
+	prefix := ""
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		prefix = abbr + "-"
+	}
+	year := ts.Year()
+	if year == 0 {
+		year = time.Now().Year()
+	}
+	return fmt.Sprintf("%sRFI-%d-%03d", prefix, year, id)
 }
 
 func (app *App) fireRFI(rfi RequestForInfo) {
@@ -1093,7 +1116,7 @@ func (app *App) handleRespondRFI(w http.ResponseWriter, r *http.Request, user *U
 	for j := range found.Respondents {
 		if found.Respondents[j].UserID == user.ID {
 			found.Respondents[j].Status = "responded"
-			found.Respondents[j].Response = req.Response
+			found.Respondents[j].Response = sanitizeRichHTML(req.Response)
 			found.Respondents[j].RespondedAt = time.Now().UTC().Format(time.RFC3339)
 			updated = true
 			break
@@ -1131,13 +1154,86 @@ func (app *App) handleCloseRFI(w http.ResponseWriter, r *http.Request, user *Use
 		return
 	}
 	found.Status = "closed"
+	if found.ClosedReason == "" {
+		found.ClosedReason = "manual"
+	}
+	unanswered := markUnansweredRespondents(found)
 	if err := app.store.UpdateRFI(*found); err != nil {
 		jsonError(w, "failed to close", http.StatusInternalServerError)
 		return
 	}
+	summary := fmt.Sprintf("Closed RFI %s", nonEmpty(found.SequenceNumber, fmt.Sprintf("#%d", found.ID)))
+	if unanswered > 0 {
+		summary = fmt.Sprintf("%s — %d respondent(s) did not answer (marked unanswered)", summary, unanswered)
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "close_rfi", EntityType: "rfi", EntityID: found.ID,
+		Summary: summary,
+	})
 	jsonOK(w, found)
 	data, _ := json.Marshal(found)
 	app.broker.BroadcastAll(SSEMessage{Event: "rfi_closed", Data: string(data)})
+}
+
+// handleDeleteRFI lets the requester (or an admin) permanently delete an RFI
+// and its response history from the log. The deletion is recorded in the audit
+// trail for transparency.
+func (app *App) handleDeleteRFI(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rfis := app.store.GetRFIs()
+	var found *RequestForInfo
+	for i := range rfis {
+		if rfis[i].ID == id {
+			found = &rfis[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "RFI not found", http.StatusNotFound)
+		return
+	}
+	// Only the requester (creator) or an admin may delete.
+	if found.CreatedBy != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+		jsonError(w, "forbidden — only the requester or an admin may delete", http.StatusForbidden)
+		return
+	}
+	if err := app.store.DeleteRFI(id); err != nil {
+		jsonError(w, "failed to delete", http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "delete_rfi", EntityType: "rfi", EntityID: id,
+		Summary: fmt.Sprintf("Deleted RFI %s: %s", nonEmpty(found.SequenceNumber, fmt.Sprintf("#%d", id)), stripHTMLTags(found.Question)),
+	})
+	payload, _ := json.Marshal(map[string]any{"id": id})
+	app.broker.BroadcastAll(SSEMessage{Event: "rfi_deleted", Data: string(payload)})
+	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// markUnansweredRespondents flips any still-pending respondents to
+// "unanswered" on an RFI that is being closed. Returns the number marked.
+func markUnansweredRespondents(rfi *RequestForInfo) int {
+	n := 0
+	for j := range rfi.Respondents {
+		if rfi.Respondents[j].Status == "pending" {
+			rfi.Respondents[j].Status = "unanswered"
+			n++
+		}
+	}
+	return n
+}
+
+func nonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }
 
 func (app *App) runRFIScheduler() {
@@ -1172,7 +1268,18 @@ func (app *App) runRFIScheduler() {
 				}
 				if now.After(dlTime) {
 					rfi.Status = "closed"
+					rfi.ClosedReason = "deadline"
+					unanswered := markUnansweredRespondents(&rfi)
 					_ = app.store.UpdateRFI(rfi)
+					summary := fmt.Sprintf("RFI %s auto-closed at deadline", nonEmpty(rfi.SequenceNumber, fmt.Sprintf("#%d", rfi.ID)))
+					if unanswered > 0 {
+						summary = fmt.Sprintf("%s — %d respondent(s) did not answer (marked unanswered)", summary, unanswered)
+					}
+					app.store.LogAudit(AuditEntry{
+						UserID: rfi.CreatedBy, UserName: rfi.CreatedByName,
+						Action: "auto_close_rfi", EntityType: "rfi", EntityID: rfi.ID,
+						Summary: summary,
+					})
 					data, _ := json.Marshal(rfi)
 					app.broker.BroadcastAll(SSEMessage{Event: "rfi_closed", Data: string(data)})
 				}
