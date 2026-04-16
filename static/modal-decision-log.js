@@ -589,4 +589,78 @@ function openDetachedDecisionLog() {
   closeDecisionLogModal();
 }
 
+// ── Print helpers ──────────────────────────────────────────────────────────
+// Turn a single decision log entry into a standalone HTML block suitable
+// for the print popup.
+function _decisionEntryToHTML(e) {
+  const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '';
+  const seq = e.sequence_number ? `<span style="font-family:monospace;color:#666">${escHtml(e.sequence_number)}</span> · ` : '';
+  const vt = e.log_type || 'general';
+  const visLabel = vt === 'private' ? 'Private' : vt === 'group' ? 'Group' : 'General';
+  const statusBits = [];
+  if (e.status === 'requested') statusBits.push('⏳ Pending');
+  else if (e.status === 'approved') statusBits.push(e.approval_type === 'approved_with_condition' ? '✓⚠ Approved with condition' : e.approval_type === 'approved_with_modification' ? '✓✏ Approved with modification' : '✓ Approved');
+  else if (e.status === 'rejected') statusBits.push('✗ Denied');
+  const statusHtml = statusBits.length ? ` — <strong>${escHtml(statusBits.join(' '))}</strong>` : '';
+  const body = escHtml(e.decision || '').replace(/\n/g, '<br>');
+  const reason = e.reason ? `<p style="margin:6px 0 0 0"><em>${t('decision_reason')||'Reason'}:</em> ${escHtml(e.reason).replace(/\n/g,'<br>')}</p>` : '';
+  const exec = e.executor_label ? `<p style="margin:6px 0 0 0;color:#666"><em>${t('decision_executor')||'Executor'}:</em> ${escHtml(e.executor_label)}</p>` : '';
+  const deadline = e.deadline ? `<p style="margin:6px 0 0 0;color:#666"><em>${t('decision_deadline')||'Deadline'}:</em> ${escHtml(e.deadline)}</p>` : '';
+  return `
+    <section style="page-break-inside:avoid;margin-bottom:18px">
+      <h2 style="margin:0 0 4px 0">${escHtml(e.title || 'Decision')}</h2>
+      <p style="color:#666;margin:0 0 8px 0">${seq}${escHtml(e.display_name||e.user_name||'')} — ${ts} — ${escHtml(visLabel)}${statusHtml}</p>
+      <div style="line-height:1.6">${body}</div>
+      ${reason}${exec}${deadline}
+    </section>`;
+}
+
+function _decisionPrintHTML(bodyHtml, title) {
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+    <style>body{font-family:Calibri,Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#222}
+    h1{color:#333;border-bottom:2px solid #333;padding-bottom:4px}
+    h2{color:#333;margin-top:0}
+    a{color:#2563eb}
+    hr{border:0;border-top:1px solid #ccc;margin:18px 0}
+    @media print{body{margin:0;padding:10px}}</style>
+    </head><body>${bodyHtml}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 300);
+}
+
+// Print every decision currently loaded, honouring the decision log
+// filter if the modal is open. Used by the print-tool "Decisions log"
+// option.
+async function _decisionPrintAll() {
+  if (!_decisionLogEntries || _decisionLogEntries.length === 0) {
+    try { _decisionLogEntries = await apiGet('/api/decision-log') || []; } catch {}
+  }
+  let entries = (_decisionLogEntries || []).slice();
+  if (typeof _decisionLogFilter !== 'undefined' && _decisionLogFilter && _decisionLogFilter !== 'all') {
+    entries = entries.filter(e => {
+      switch (_decisionLogFilter) {
+        case 'pending':                return e.status === 'requested';
+        case 'decided':                return !e.status || e.status === 'approved';
+        case 'approved_condition':     return e.approval_type === 'approved_with_condition';
+        case 'approved_modification':  return e.approval_type === 'approved_with_modification';
+        case 'denied':                 return e.status === 'rejected';
+        default: return true;
+      }
+    });
+  }
+  if (entries.length === 0) {
+    showError(t('decision_log_empty')||'No decisions to print.');
+    return;
+  }
+  entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const exName = (state.exercise && state.exercise.label) || '';
+  const title = (exName ? exName + ' — ' : '') + (t('decision_log_title')||'Decision Log');
+  let html = `<h1>${escHtml(title)}</h1>`;
+  html += `<p style="color:#666">${new Date().toLocaleString()} — ${entries.length} ${t('lb_entries')||'entries'}</p><hr>`;
+  for (const e of entries) html += _decisionEntryToHTML(e);
+  _decisionPrintHTML(html, title);
+}
+
 // ── Analysis Modal ──────────────────────────────────────────────────────────

@@ -646,6 +646,18 @@ function printTimeline() {
               <input type="radio" name="printView" value="keyterrain" style="accent-color:var(--accent)">
               🏔 ${escHtml(t('print_view_keyterrain') || 'Key Terrain Board')}
             </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="decisions" style="accent-color:var(--accent)">
+              ⚖️ ${escHtml(t('print_view_decisions') || 'Decisions log')}
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="logbook" style="accent-color:var(--accent)">
+              📖 ${escHtml(t('print_view_logbook') || 'Log book')}
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="diary" style="accent-color:var(--accent)">
+              📔 ${escHtml(t('print_view_diary') || 'Diary')}
+            </label>
           </div>
           <div class="form-row" style="margin-bottom:12px">
             <div class="form-group" style="flex:1">
@@ -685,13 +697,22 @@ function printTimeline() {
   const modal = document.getElementById('printModal');
   openModal('printModal');
 
-  // Hide layer selection for views that don't use timeline layers
-  // (task-time matrix has its own filtering; the Key Terrain Board is
-  // a completely separate tool with its own column selector).
+  // Hide layer selection AND the date range for views that don't use
+  // timeline layers (task-time matrix has its own filtering; the Key
+  // Terrain Board is a separate tool; decisions/log book/diary all
+  // print their own entries and do not depend on date range / layers).
   const _updateLayerVisibility = () => {
     const view = modal.querySelector('input[name="printView"]:checked')?.value;
     const layerGroup = document.getElementById('printLayerGroup');
-    if (layerGroup) layerGroup.style.display = (view === 'ttm' || view === 'keyterrain') ? 'none' : '';
+    const noLayer = (view === 'ttm' || view === 'keyterrain' || view === 'decisions' || view === 'logbook' || view === 'diary');
+    if (layerGroup) layerGroup.style.display = noLayer ? 'none' : '';
+    // Hide date range controls for entry-based printouts — these tools
+    // have their own internal filters (search, visibility, category).
+    const dateRow = modal.querySelector('.form-row');
+    const quickRow = modal.querySelector('[data-print-range]')?.closest('.form-group');
+    const isEntryView = (view === 'decisions' || view === 'logbook' || view === 'diary');
+    if (dateRow) dateRow.style.display = isEntryView ? 'none' : '';
+    if (quickRow) quickRow.style.display = isEntryView ? 'none' : '';
   };
   modal.querySelectorAll('input[name="printView"]').forEach(r =>
     r.addEventListener('change', _updateLayerVisibility)
@@ -763,6 +784,53 @@ function printTimeline() {
         _ktPrint();
       } else {
         showError(t('print_kt_unavailable') || 'Key Terrain Board printing is not available — open the board first.');
+      }
+      return;
+    }
+    // Entry-based printouts (decisions log / log book / diary). Each
+    // tool has its own printer that renders into a popup window using
+    // a tool-specific stylesheet — we just delegate and close the
+    // print dialog. If a tool's module hasn't been loaded for some
+    // reason we fall back to an error message.
+    if (view === 'decisions') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _decisionPrintAll === 'function') {
+        _decisionPrintAll();
+      } else if (typeof openDecisionLogModal === 'function') {
+        // Open the decision log modal so the user can print from there.
+        openDecisionLogModal();
+        showNotification('info', t('print_decisions_open') || 'Open the decision log and use its print button.');
+      } else {
+        showError(t('print_decisions_unavailable') || 'Decision log printing is not available.');
+      }
+      return;
+    }
+    if (view === 'logbook') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _lbPrintAll === 'function') {
+        _lbPrintAll();
+      } else {
+        showError(t('print_logbook_unavailable') || 'Log book printing is not available.');
+      }
+      return;
+    }
+    if (view === 'diary') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _diaryPrintAll === 'function') {
+        // The diary's print-all needs the diary entries loaded into
+        // its module state. If the diary modal hasn't been opened,
+        // fetch entries once and then invoke printing.
+        try {
+          if (typeof _diaryEntries !== 'undefined' && (!_diaryEntries || _diaryEntries.length === 0)) {
+            _diaryEntries = (await apiGet('/api/diary')) || [];
+          }
+        } catch {}
+        _diaryPrintAll();
+      } else {
+        showError(t('print_diary_unavailable') || 'Diary printing is not available.');
       }
       return;
     }

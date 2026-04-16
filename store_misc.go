@@ -481,6 +481,23 @@ func (s *Store) AddLogBookEntry(entry LogBookEntry) (LogBookEntry, error) {
 	return entry, s.persist("log_book.json", snap)
 }
 
+// UpdateLogBookEntry replaces an existing entry in-place, matched by ID.
+// Used both when the author edits the entry and when the server assigns
+// a sequence number right after creation.
+func (s *Store) UpdateLogBookEntry(entry LogBookEntry) error {
+	s.mu.Lock()
+	for i := range s.logBook {
+		if s.logBook[i].ID == entry.ID {
+			s.logBook[i] = entry
+			snap := append([]LogBookEntry(nil), s.logBook...)
+			s.mu.Unlock()
+			return s.persist("log_book.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("log book entry %d not found", entry.ID)
+}
+
 func (s *Store) AddLogBookAttachment(entryID int64, att LogBookAttachment) error {
 	s.mu.Lock()
 	for i := range s.logBook {
