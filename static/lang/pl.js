@@ -2781,4 +2781,10 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     rfi_entries: 'pozycji',
     rfi_deleted: 'RFI usunięte',
     rfi_delete_confirm: 'Usunąć to RFI i wszystkie odpowiedzi?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Powiadomienia przeglądarki',
+    offline_banner: 'TRYB OFFLINE — praca z danymi z pamięci podręcznej',
+    offline_mode_enabled: 'Tryb offline włączony — używane dane z pamięci podręcznej',
+    online_mode_restored: 'Tryb online przywrócony',
   };

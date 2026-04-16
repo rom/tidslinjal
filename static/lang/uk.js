@@ -2779,4 +2779,10 @@ role_editor_label_nb: '🇳🇴 NB',
     rfi_entries: 'записів',
     rfi_deleted: 'RFI видалено',
     rfi_delete_confirm: 'Видалити цей RFI і всі відповіді?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Сповіщення браузера',
+    offline_banner: 'ОФЛАЙН-РЕЖИМ — робота з кешованими даними',
+    offline_mode_enabled: 'Офлайн-режим увімкнено — використовуються кешовані дані',
+    online_mode_restored: 'Онлайн-режим відновлено',
   };

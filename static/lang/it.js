@@ -2773,4 +2773,10 @@ admin_view: 'Vista amministratore',
     rfi_entries: 'voci',
     rfi_deleted: 'RFI eliminata',
     rfi_delete_confirm: 'Eliminare questa RFI e tutte le sue risposte?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Notifiche del browser',
+    offline_banner: 'MODALITÀ OFFLINE — lavoro con dati in cache',
+    offline_mode_enabled: 'Modalità offline attivata — uso dati in cache',
+    online_mode_restored: 'Modalità online ripristinata',
   };

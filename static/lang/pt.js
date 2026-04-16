@@ -2775,4 +2775,10 @@ manage_resource_types: 'Gerir Tipos',
     rfi_entries: 'entradas',
     rfi_deleted: 'RFI eliminada',
     rfi_delete_confirm: 'Eliminar este RFI e todas as suas respostas?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Notificações do navegador',
+    offline_banner: 'MODO OFFLINE — a trabalhar com dados em cache',
+    offline_mode_enabled: 'Modo offline ativado — a utilizar dados em cache',
+    online_mode_restored: 'Modo online restaurado',
   };

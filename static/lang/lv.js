@@ -2749,4 +2749,10 @@ admin_view: 'Administrātora skats',
     rfi_entries: 'ieraksti',
     rfi_deleted: 'RFI dzēsts',
     rfi_delete_confirm: 'Dzēst šo RFI un visas tās atbildes?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Pārlūka paziņojumi',
+    offline_banner: 'BEZSAISTES REŽĪMS — strādā ar kešatmiņas datiem',
+    offline_mode_enabled: 'Bezsaistes režīms ieslēgts — izmanto kešatmiņas datus',
+    online_mode_restored: 'Tiešsaistes režīms atjaunots',
   };

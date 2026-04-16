@@ -2749,4 +2749,10 @@ admin_view: 'Administraatori vaade',
     rfi_entries: 'kirjet',
     rfi_deleted: 'RFI kustutatud',
     rfi_delete_confirm: 'Kas kustutada see RFI ja kõik selle vastused?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Brauseri teavitused',
+    offline_banner: 'VÕRGUÜHENDUSETA REŽIIM — töötab vahemälu andmetega',
+    offline_mode_enabled: 'Võrguühenduseta režiim sisse lülitatud — kasutatakse vahemälu',
+    online_mode_restored: 'Võrguühendusega režiim taastatud',
   };

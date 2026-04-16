@@ -2747,4 +2747,10 @@ admin_view: 'Administratoriaus rodinys',
     rfi_entries: 'įrašų',
     rfi_deleted: 'RFI ištrinta',
     rfi_delete_confirm: 'Ar ištrinti šią RFI ir visus jos atsakymus?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Naršyklės pranešimai',
+    offline_banner: 'NEPRISIJUNGUS — dirbama su talpykloje esančiais duomenimis',
+    offline_mode_enabled: 'Neprisijungus režimas įjungtas — naudojami talpyklos duomenys',
+    online_mode_restored: 'Prisijungties režimas atkurtas',
   };

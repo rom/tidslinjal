@@ -120,6 +120,7 @@ async function openDecisionLogModal() {
                 <select id="dlAddRefType" class="input" style="font-size:var(--fs-xs);width:auto;padding:3px 6px">
                   <option value="log_book">${t('tab_log_book')||'Log Book'}</option>
                   <option value="diary">${t('diary_title')||'Diary'}</option>
+                  <option value="decision">${t('decisions_title')||'Decision'}</option>
                   <option value="event">${t('event')||'Event'}</option>
                 </select>
                 <input type="number" id="dlAddRefId" class="input" style="width:60px;font-size:var(--fs-xs);padding:3px 6px" placeholder="ID" min="1">
@@ -876,6 +877,7 @@ function _decisionOpenEditor(idRaw) {
             <select id="dlRefType" class="input" style="font-size:var(--fs-xs);width:auto">
               <option value="log_book">${t('tab_log_book')||'Log Book'}</option>
               <option value="diary">${t('diary_title')||'Diary'}</option>
+              <option value="decision">${t('decisions_title')||'Decision'}</option>
               <option value="event">${t('event')||'Event'}</option>
             </select>
             <input type="number" id="dlRefId" class="input" style="width:80px;font-size:var(--fs-xs)" placeholder="ID" min="1">
@@ -971,6 +973,15 @@ function _openDecisionRef(type, id) {
     if (typeof openDiaryModal === 'function') openDiaryModal();
   } else if (type === 'log_book') {
     if (typeof openLogBookModal === 'function') openLogBookModal();
+  } else if (type === 'decision') {
+    // Open the decision log and scroll the linked entry into view
+    const alreadyOpen = !!document.getElementById('decisionLogModal');
+    const reveal = () => {
+      const el = document.querySelector(`[data-decision-id="${id}"]`);
+      if (el) { el.scrollIntoView({behavior:'smooth', block:'center'}); el.style.outline = '2px solid var(--accent)'; setTimeout(() => { el.style.outline = ''; }, 2000); }
+    };
+    if (alreadyOpen) { reveal(); }
+    else if (typeof openDecisionLogModal === 'function') { openDecisionLogModal().then ? openDecisionLogModal().then(reveal) : (openDecisionLogModal(), setTimeout(reveal, 200)); }
   } else if (type === 'event') {
     const ev = (state.events || []).find(e => e.id === id);
     if (ev && typeof showEventDetail === 'function') showEventDetail(ev);

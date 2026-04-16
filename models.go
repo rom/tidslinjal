@@ -977,7 +977,7 @@ type DecisionRevision struct {
 
 // DecisionReference is a cross-link to another Tidslinjal entity.
 type DecisionReference struct {
-	Type  string `json:"type"`            // "log_book" | "diary" | "board" | "event"
+	Type  string `json:"type"`            // "log_book" | "diary" | "decision" | "board" | "event"
 	ID    int64  `json:"id"`              // entity ID
 	Label string `json:"label,omitempty"` // human-readable label
 }

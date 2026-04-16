@@ -3005,4 +3005,10 @@ TRANSLATIONS.de = {
     rfi_entries: 'Einträge',
     rfi_deleted: 'RFI gelöscht',
     rfi_delete_confirm: 'Diese RFI und alle ihre Antworten löschen?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Browser-Benachrichtigungen',
+    offline_banner: 'OFFLINE-MODUS — Arbeit mit zwischengespeicherten Daten',
+    offline_mode_enabled: 'Offline-Modus aktiviert — zwischengespeicherte Daten',
+    online_mode_restored: 'Online-Modus wiederhergestellt',
   };
