@@ -829,7 +829,19 @@ async function _lbPrintAll() {
   if (!_logBookEntries || _logBookEntries.length === 0) {
     try { _logBookEntries = await apiGet('/api/log-book') || []; } catch {}
   }
-  const filtered = _lbFilterEntries().slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  let filtered = _lbFilterEntries().slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  if (filtered.length === 0) {
+    showError(t('lb_empty')||'No log book entries to print.');
+    return;
+  }
+  // Honour the print-tool scope (All / Range) and sort (Newest / Oldest).
+  const opts = window._printEntryOptions || {};
+  if (opts.scope === 'range') {
+    const from = Math.max(1, opts.from || 1);
+    const to   = Math.max(from, opts.to || filtered.length);
+    filtered = filtered.slice(from - 1, to);
+  }
+  if (opts.sort === 'newest') filtered.reverse();
   if (filtered.length === 0) {
     showError(t('lb_empty')||'No log book entries to print.');
     return;

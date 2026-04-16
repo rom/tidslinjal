@@ -2794,4 +2794,9 @@ role_editor_label_nb: '🇳🇴 NB',
     severity_high: 'Високий',
     severity_critical: 'Критичний',
     poll_created_by: 'Автор',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Термінологія',
+    settings_offline_mode: 'Офлайн-режим',
+    settings_offline_desc: 'Якщо увімкнено або коли мережа недоступна, інструмент працює з локально кешованими даними. Інтеграції та розширені функції вимкнено.',
   };

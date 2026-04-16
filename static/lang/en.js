@@ -3259,4 +3259,9 @@ TRANSLATIONS.en = {
     severity_high: 'High',
     severity_critical: 'Critical',
     poll_created_by: 'By',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminology',
+    settings_offline_mode: 'Offline Mode',
+    settings_offline_desc: 'When enabled or when network is unavailable, the tool works with locally cached data. Integrations and advanced features are disabled.',
   };

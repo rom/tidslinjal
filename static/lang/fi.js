@@ -2812,4 +2812,9 @@ TRANSLATIONS.fi = {
     severity_high: 'Korkea',
     severity_critical: 'Kriittinen',
     poll_created_by: 'Tekijä',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologia',
+    settings_offline_mode: 'Offline-tila',
+    settings_offline_desc: 'Kun käytössä tai kun verkkoa ei ole saatavilla, työkalu toimii paikallisesti välimuistissa olevilla tiedoilla. Integraatiot ja edistyneet ominaisuudet on poistettu käytöstä.',
   };

@@ -1481,6 +1481,21 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				case "checklist_log":
 					data = app.store.GetChecklistInstances()
 					filename = "checklist_log"
+				case "diary":
+					data = app.store.GetDiary()
+					filename = "diary"
+				case "rfi":
+					data = app.store.GetRFIs()
+					filename = "rfi"
+				case "key_terrain":
+					data = app.store.GetKeyTerrainEntries()
+					filename = "key_terrain"
+				case "spreadsheets":
+					data = app.store.GetSpreadsheets()
+					filename = "spreadsheets"
+				case "boards":
+					data = app.store.GetBoards()
+					filename = "boards"
 				default:
 					http.Error(w, `{"error":"invalid log type"}`, http.StatusBadRequest)
 					return

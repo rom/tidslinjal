@@ -2796,4 +2796,9 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     severity_high: 'Wysoki',
     severity_critical: 'Krytyczny',
     poll_created_by: 'Przez',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologia',
+    settings_offline_mode: 'Tryb offline',
+    settings_offline_desc: 'Gdy włączony lub gdy sieć jest niedostępna, narzędzie działa na lokalnie zapisanych danych. Integracje i funkcje zaawansowane są wyłączone.',
   };

@@ -224,12 +224,22 @@ async function _openSpreadsheet(id) {
     columns.push({ title: _colLetter(columns.length), width: 100 });
   }
 
-  // Build UI — single toolbar row with all controls
+  // Build UI — single toolbar row with all controls.
+  // The spreadsheet name in the header is now click-to-rename (inline prompt
+  // that PUTs the updated name). An access badge next to the name surfaces
+  // the current visibility at a glance without having to open Settings.
+  const _accessBadge = (() => {
+    const v = ss.visibility || 'public';
+    if (v === 'private') return `<span title="${t('ss_access_private')||'Private (only me)'}" style="font-size:var(--fs-xs);padding:1px 6px;border-radius:3px;background:#E74C3C;color:#fff;margin-left:6px">\u{1F512} ${t('ss_access_private_short')||'Private'}</span>`;
+    if (v === 'group')   return `<span title="${t('ss_access_group')||'Group members'}" style="font-size:var(--fs-xs);padding:1px 6px;border-radius:3px;background:#3498DB;color:#fff;margin-left:6px">\u{1F465} ${t('ss_access_group_short')||'Group'}</span>`;
+    return                     `<span title="${t('ss_access_public')||'Public (everyone)'}" style="font-size:var(--fs-xs);padding:1px 6px;border-radius:3px;background:#27AE60;color:#fff;margin-left:6px">\u{1F310} ${t('ss_access_public_short')||'Public'}</span>`;
+  })();
   let html = `<div style="max-width:98vw;margin:0 auto" id="ssEditorRoot">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
       <div style="display:flex;align-items:center;gap:8px">
         <button class="btn btn-sm" id="ssBackBtn">\u2190 ${t('btn_back')||'Back'}</button>
-        <h3 style="margin:0" id="ssNameLabel">${escHtml(ss.name)}</h3>
+        <h3 style="margin:0;cursor:pointer" id="ssNameLabel" title="${t('ss_click_rename')||'Click to rename'}">${escHtml(ss.name)}</h3>
+        ${_accessBadge}
         <span style="font-size:var(--fs-xs);color:var(--text-dim)" id="ssDimLabel">${colCount}\u00d7${rowCount}</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
@@ -246,14 +256,55 @@ async function _openSpreadsheet(id) {
             <option value="COUNT">COUNT</option><option value="COUNTA">COUNTA</option>
             <option value="MEDIAN">MEDIAN</option><option value="PRODUCT">PRODUCT</option>
             <option value="STDEV">STDEV</option><option value="VAR">VAR</option>
+            <option value="ABS">ABS</option><option value="ROUND">ROUND</option>
+            <option value="FLOOR">FLOOR</option><option value="CEILING">CEILING</option>
+            <option value="MOD">MOD</option><option value="POWER">POWER</option>
+            <option value="SQRT">SQRT</option><option value="EXP">EXP</option>
+            <option value="LN">LN</option><option value="LOG">LOG</option>
+            <option value="LOG10">LOG10</option><option value="SIGN">SIGN</option>
+            <option value="INT">INT</option><option value="TRUNC">TRUNC</option>
+            <option value="GEOMEAN">GEOMEAN</option><option value="HARMEAN">HARMEAN</option>
+            <option value="STDEVP">STDEVP</option><option value="VARP">VARP</option>
+            <option value="PERCENTILE">PERCENTILE</option><option value="QUARTILE">QUARTILE</option>
+            <option value="RANK">RANK</option><option value="SUMSQ">SUMSQ</option>
+          </optgroup>
+          <optgroup label="${t('ss_func_trig')||'Trigonometry'}">
+            <option value="SIN">SIN</option><option value="COS">COS</option><option value="TAN">TAN</option>
+            <option value="ASIN">ASIN</option><option value="ACOS">ACOS</option><option value="ATAN">ATAN</option>
+            <option value="RADIANS">RADIANS</option><option value="DEGREES">DEGREES</option>
+            <option value="PI">PI</option>
           </optgroup>
           <optgroup label="${t('ss_func_cond')||'Conditional'}">
             <option value="SUMIF">SUMIF</option><option value="COUNTIF">COUNTIF</option>
             <option value="AVERAGEIF">AVERAGEIF</option>
+            <option value="SUMIFS">SUMIFS</option><option value="COUNTIFS">COUNTIFS</option>
+            <option value="AVERAGEIFS">AVERAGEIFS</option>
+            <option value="IF">IF</option><option value="IFERROR">IFERROR</option>
+            <option value="IFS">IFS</option>
           </optgroup>
           <optgroup label="${t('ss_func_text')||'Text'}">
-            <option value="CONCAT">CONCAT</option><option value="LEN">LEN</option>
+            <option value="CONCAT">CONCAT</option><option value="CONCATENATE">CONCATENATE</option>
+            <option value="LEN">LEN</option>
             <option value="UPPER">UPPER</option><option value="LOWER">LOWER</option>
+            <option value="PROPER">PROPER</option><option value="TRIM">TRIM</option>
+            <option value="LEFT">LEFT</option><option value="RIGHT">RIGHT</option>
+            <option value="MID">MID</option><option value="REPLACE">REPLACE</option>
+            <option value="SUBSTITUTE">SUBSTITUTE</option><option value="FIND">FIND</option>
+            <option value="SEARCH">SEARCH</option><option value="REPT">REPT</option>
+            <option value="TEXT">TEXT</option>
+          </optgroup>
+          <optgroup label="${t('ss_func_date')||'Date & Time'}">
+            <option value="TODAY">TODAY</option><option value="NOW">NOW</option>
+            <option value="YEAR">YEAR</option><option value="MONTH">MONTH</option>
+            <option value="DAY">DAY</option><option value="HOUR">HOUR</option>
+            <option value="MINUTE">MINUTE</option><option value="SECOND">SECOND</option>
+            <option value="WEEKDAY">WEEKDAY</option><option value="WEEKNUM">WEEKNUM</option>
+            <option value="DATE">DATE</option><option value="DATEDIF">DATEDIF</option>
+          </optgroup>
+          <optgroup label="${t('ss_func_lookup')||'Lookup'}">
+            <option value="VLOOKUP">VLOOKUP</option><option value="HLOOKUP">HLOOKUP</option>
+            <option value="INDEX">INDEX</option><option value="MATCH">MATCH</option>
+            <option value="CHOOSE">CHOOSE</option>
           </optgroup>
         </select>
         <span style="color:var(--border)">|</span>
@@ -270,6 +321,41 @@ async function _openSpreadsheet(id) {
         <button class="btn btn-sm" id="ssSettingsBtn" title="${t('ss_settings')||'Settings'}">\u2699</button>
         <button class="btn btn-sm" id="ssHelpBtn" title="${t('btn_help')||'Help'}">\u2753</button>
       </div>
+    </div>
+    <!-- Formatting toolbar — applies style to the currently-selected cells -->
+    <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
+      <span style="color:var(--text-dim);margin-right:4px">${t('ss_fmt_label')||'Format'}:</span>
+      <button class="btn btn-sm" data-ss-fmt="align-left" title="${t('ss_align_left')||'Align left'}" style="min-width:28px">\u2B05</button>
+      <button class="btn btn-sm" data-ss-fmt="align-center" title="${t('ss_align_center')||'Align center'}" style="min-width:28px">\u2194</button>
+      <button class="btn btn-sm" data-ss-fmt="align-right" title="${t('ss_align_right')||'Align right'}" style="min-width:28px">\u27A1</button>
+      <span style="color:var(--border)">|</span>
+      <button class="btn btn-sm" data-ss-fmt="bold" title="${t('ss_bold')||'Bold'}" style="min-width:28px;font-weight:700">B</button>
+      <button class="btn btn-sm" data-ss-fmt="italic" title="${t('ss_italic')||'Italic'}" style="min-width:28px;font-style:italic">I</button>
+      <button class="btn btn-sm" data-ss-fmt="underline" title="${t('ss_underline')||'Underline'}" style="min-width:28px;text-decoration:underline">U</button>
+      <button class="btn btn-sm" data-ss-fmt="strikethrough" title="${t('ss_strikethrough')||'Strikethrough'}" style="min-width:28px;text-decoration:line-through">S</button>
+      <span style="color:var(--border)">|</span>
+      <label style="color:var(--text-dim)">${t('ss_font_size')||'Size'}:
+        <select id="ssFmtFontSize" style="padding:2px 4px;font-size:var(--fs-xs);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+          <option value="">—</option>
+          <option value="10px">10</option><option value="12px">12</option>
+          <option value="14px">14</option><option value="16px">16</option>
+          <option value="18px">18</option><option value="20px">20</option>
+          <option value="24px">24</option><option value="28px">28</option>
+          <option value="32px">32</option>
+        </select>
+      </label>
+      <label style="color:var(--text-dim);display:inline-flex;align-items:center;gap:2px">${t('ss_font_color')||'Color'}:
+        <input type="color" id="ssFmtFontColor" value="#222222" style="width:22px;height:20px;padding:0;border:none;background:transparent;cursor:pointer" title="${t('ss_font_color_tip')||'Text colour for selection'}">
+        <button class="btn btn-sm" data-ss-fmt="font-color" title="${t('ss_apply')||'Apply'}" style="padding:1px 6px">\u2714</button>
+      </label>
+      <label style="color:var(--text-dim);display:inline-flex;align-items:center;gap:2px">${t('ss_bg_color')||'Fill'}:
+        <input type="color" id="ssFmtBgColor" value="#FFF4C2" style="width:22px;height:20px;padding:0;border:none;background:transparent;cursor:pointer" title="${t('ss_bg_color_tip')||'Background colour for selection'}">
+        <button class="btn btn-sm" data-ss-fmt="bg-cell" title="${t('ss_apply_cells')||'Apply to cells'}" style="padding:1px 6px">${t('ss_bg_cells')||'Cells'}</button>
+        <button class="btn btn-sm" data-ss-fmt="bg-row" title="${t('ss_apply_row')||'Apply to whole row(s)'}" style="padding:1px 6px">${t('ss_bg_row')||'Row'}</button>
+        <button class="btn btn-sm" data-ss-fmt="bg-col" title="${t('ss_apply_col')||'Apply to whole column(s)'}" style="padding:1px 6px">${t('ss_bg_col')||'Col'}</button>
+      </label>
+      <span style="color:var(--border)">|</span>
+      <button class="btn btn-sm" data-ss-fmt="clear" title="${t('ss_fmt_clear_tip')||'Clear formatting on selection'}" style="color:var(--danger,#E74C3C)">\u2716 ${t('ss_fmt_clear')||'Clear'}</button>
     </div>
     <div id="ssGrid" style="overflow:auto;max-height:70vh;border:1px solid var(--border);border-radius:var(--radius)"></div>
     <input type="file" id="ssImportFile" style="display:none" accept=".csv,.json,.xml,.xlsx,.ods">
@@ -375,10 +461,15 @@ async function _openSpreadsheet(id) {
     // Place result in the cell just below the selection (same column as end)
     const targetRow = r2 + 1;
     const targetCol = c2;
-    // Expand grid if needed
+    // Expand grid if needed. `getData()` returns a snapshot, so we must
+    // compute how many rows to add up front — otherwise the `data.length`
+    // comparison never updates and we get an infinite loop that hangs the
+    // tab (observed when a formula is picked with a selection whose end
+    // row is at the last row of the sheet).
     try {
       const data = w.getData();
-      while (data.length <= targetRow) {
+      const rowsToAdd = Math.max(0, targetRow + 1 - data.length);
+      for (let i = 0; i < rowsToAdd; i++) {
         if (typeof w.insertRow === 'function') w.insertRow();
         else break;
       }
@@ -541,6 +632,119 @@ async function _openSpreadsheet(id) {
   // Help modal
   doc.getElementById('ssSettingsBtn')?.addEventListener('click', () => _ssEditSettingsDialog(ss));
   doc.getElementById('ssHelpBtn')?.addEventListener('click', _ssShowHelp);
+
+  // Click the name label to rename in place. A tiny prompt is lighter than
+  // the full Settings dialog when all the user wants to do is fix a typo.
+  doc.getElementById('ssNameLabel')?.addEventListener('click', async () => {
+    const newName = (prompt(t('ss_rename_prompt')||'New spreadsheet name:', ss.name) || '').trim();
+    if (!newName || newName === ss.name) return;
+    const res = await apiPut('/api/spreadsheets/' + id, { ...ss, name: newName });
+    if (res.ok) {
+      ss.name = newName;
+      const lbl = doc.getElementById('ssNameLabel');
+      if (lbl) lbl.textContent = newName;
+      showNotification('success', t('ss_renamed')||'Spreadsheet renamed');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showError(err.error || 'Rename failed');
+    }
+  });
+
+  // Formatting toolbar — apply inline styles to the selected cells using
+  // jspreadsheet v5's setStyle API. For the row/col fill buttons we expand
+  // the selection to the full row or column range before applying.
+  function _ssSelectedRefs() {
+    const ws = _ws();
+    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
+    const [c1, r1, c2, r2] = ws.selectedCell;
+    const refs = [];
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+      for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+        refs.push(_colLetter(c) + (r + 1));
+      }
+    }
+    return refs;
+  }
+  function _ssRowRefs() {
+    const ws = _ws();
+    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
+    const [, r1, , r2] = ws.selectedCell;
+    const refs = [];
+    const colCount = ((ws.options && ws.options.columns) || []).length || 26;
+    for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
+      for (let c = 0; c < colCount; c++) refs.push(_colLetter(c) + (r + 1));
+    }
+    return refs;
+  }
+  function _ssColRefs() {
+    const ws = _ws();
+    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
+    const [c1, , c2] = ws.selectedCell;
+    let rowCount = 0;
+    try { rowCount = (ws.getData() || []).length; } catch {}
+    if (!rowCount) rowCount = ss.row_count || 50;
+    const refs = [];
+    for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
+      for (let r = 0; r < rowCount; r++) refs.push(_colLetter(c) + (r + 1));
+    }
+    return refs;
+  }
+  function _ssApplyStyle(refs, css) {
+    const ws = _ws();
+    if (!ws || typeof ws.setStyle !== 'function' || !refs.length) return;
+    const payload = {};
+    refs.forEach(ref => { payload[ref] = css; });
+    try { ws.setStyle(payload); } catch (e) { console.warn('setStyle failed', e); }
+  }
+  doc.querySelectorAll('[data-ss-fmt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.ssFmt;
+      const refs = _ssSelectedRefs();
+      if (kind !== 'bg-row' && kind !== 'bg-col' && !refs.length) {
+        showError(t('ss_func_no_selection')||'Select cells first');
+        return;
+      }
+      switch (kind) {
+        case 'align-left':     _ssApplyStyle(refs, 'text-align:left'); break;
+        case 'align-center':   _ssApplyStyle(refs, 'text-align:center'); break;
+        case 'align-right':    _ssApplyStyle(refs, 'text-align:right'); break;
+        case 'bold':           _ssApplyStyle(refs, 'font-weight:bold'); break;
+        case 'italic':         _ssApplyStyle(refs, 'font-style:italic'); break;
+        case 'underline':      _ssApplyStyle(refs, 'text-decoration:underline'); break;
+        case 'strikethrough':  _ssApplyStyle(refs, 'text-decoration:line-through'); break;
+        case 'font-color': {
+          const col = doc.getElementById('ssFmtFontColor')?.value || '#222';
+          _ssApplyStyle(refs, 'color:' + col);
+          break;
+        }
+        case 'bg-cell': {
+          const col = doc.getElementById('ssFmtBgColor')?.value || '#FFF4C2';
+          _ssApplyStyle(refs, 'background-color:' + col);
+          break;
+        }
+        case 'bg-row': {
+          const col = doc.getElementById('ssFmtBgColor')?.value || '#FFF4C2';
+          _ssApplyStyle(_ssRowRefs(), 'background-color:' + col);
+          break;
+        }
+        case 'bg-col': {
+          const col = doc.getElementById('ssFmtBgColor')?.value || '#FFF4C2';
+          _ssApplyStyle(_ssColRefs(), 'background-color:' + col);
+          break;
+        }
+        case 'clear':          _ssApplyStyle(refs, ''); break;
+      }
+    });
+  });
+  // Font-size dropdown applies on change (no separate "apply" button).
+  doc.getElementById('ssFmtFontSize')?.addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    const refs = _ssSelectedRefs();
+    if (!refs.length) { showError(t('ss_func_no_selection')||'Select cells first'); e.target.value = ''; return; }
+    _ssApplyStyle(refs, 'font-size:' + v);
+    e.target.value = '';
+  });
 }
 
 // ── Save current spreadsheet state back to server ────────────────────────────
@@ -719,9 +923,22 @@ function _ssShowHelp() {
       <li><b>${t('ss_help_edit')||'Edit a cell'}</b>: ${t('ss_help_edit_desc')||'Click a cell and start typing, or double-click to edit'}</li>
       <li><b>${t('ss_help_navigate')||'Navigate'}</b>: ${t('ss_help_navigate_desc')||'Arrow keys, Tab, Enter to move between cells'}</li>
       <li><b>${t('ss_help_rename_col')||'Rename column'}</b>: ${t('ss_help_rename_col_desc')||'Right-click a column header and select Rename'}</li>
+      <li><b>${t('ss_help_rename_sheet')||'Rename the spreadsheet'}</b>: ${t('ss_help_rename_sheet_desc')||'Click the spreadsheet name in the top-left corner to rename it in place.'}</li>
+      <li><b>${t('ss_help_access_badge')||'Access badge'}</b>: ${t('ss_help_access_badge_desc')||'The 🔒 / 👥 / 🌐 badge next to the name shows the current visibility (Private / Group / Public). Open Settings (⚙) to change it.'}</li>
+      <li><b>${t('ss_help_detach')||'Detached window'}</b>: ${t('ss_help_detach_desc')||'Use the ⧉ button to pop the spreadsheet out into its own browser window (useful on multi-screen setups).'}</li>
       <li><b>${t('ss_help_sort')||'Sort'}</b>: ${t('ss_help_sort_desc')||'Right-click a column header to sort ascending/descending'}</li>
       <li><b>${t('ss_help_resize')||'Resize column'}</b>: ${t('ss_help_resize_desc')||'Drag the edge of a column header'}</li>
       <li><b>+ Row / + Col</b>: ${t('ss_help_addrowcol_desc')||'Add rows or columns to expand the spreadsheet'}</li>
+    </ul>
+
+    <h4>${t('ss_help_format')||'Cell Formatting'}</h4>
+    <ul style="font-size:var(--fs-xs);line-height:1.8;margin-bottom:12px">
+      <li><b>${t('ss_help_align')||'Alignment'}</b>: ${t('ss_help_align_desc')||'Select cells and click ⬅ ↔ ➡ to align text left / centred / right.'}</li>
+      <li><b>${t('ss_help_font')||'Font styles'}</b>: ${t('ss_help_font_desc')||'Use B / I / U / S to toggle bold, italic, underline and strikethrough on the selected cells.'}</li>
+      <li><b>${t('ss_help_size')||'Font size'}</b>: ${t('ss_help_size_desc')||'Select cells, then pick a pixel size from the Size dropdown.'}</li>
+      <li><b>${t('ss_help_fgcolor')||'Text colour'}</b>: ${t('ss_help_fgcolor_desc')||'Pick a colour from the Color swatch and press ✔ to apply to the selected cells.'}</li>
+      <li><b>${t('ss_help_bgcolor')||'Background colour'}</b>: ${t('ss_help_bgcolor_desc')||'Pick a fill colour and press "Cells" (just the selection), "Row" (the full row for each selected cell) or "Col" (the full column).'}</li>
+      <li><b>${t('ss_help_clearfmt')||'Clear formatting'}</b>: ${t('ss_help_clearfmt_desc')||'The ✖ Clear button resets any inline style on the selected cells.'}</li>
     </ul>
 
     <h4>${t('ss_help_formulas')||'Formulas'}</h4>
@@ -837,6 +1054,91 @@ function _detachSingleSpreadsheet(id, name) {
   _ssDetachWindow(name || 'Spreadsheet', (w) => {
     _openSpreadsheet(id);
   });
+}
+
+// Called from the print tool. Fetches the spreadsheet list, lets the user
+// pick one, then renders its current cell data as a printable HTML table
+// in a new tab. We go through the list → pick flow because the print tool
+// is opened from the timeline view, not from inside an open spreadsheet.
+async function _printSpreadsheetPicker() {
+  let list = [];
+  try { list = await apiGet('/api/spreadsheets') || []; } catch {}
+  if (!Array.isArray(list) || list.length === 0) {
+    showError(t('ss_print_empty') || 'No spreadsheets to print.');
+    return;
+  }
+  // Build a small picker modal
+  const existing = document.getElementById('ssPrintPicker');
+  if (existing) existing.remove();
+  const opts = list.map(ss =>
+    `<option value="${ss.id}">${escHtml(ss.name || ('Spreadsheet #' + ss.id))}</option>`
+  ).join('');
+  const html = `
+    <div class="modal-overlay open" id="ssPrintPicker">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h3>🖨 ${escHtml(t('ss_print_title') || 'Print Spreadsheet')}</h3>
+          <button class="modal-close" data-close-modal="ssPrintPicker">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label style="display:block;margin-bottom:6px;font-size:var(--fs-sm);color:var(--text-dim)">${escHtml(t('ss_print_pick') || 'Choose a spreadsheet')}</label>
+          <select id="ssPrintPickerSel" class="input" style="width:100%">${opts}</select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="ssPrintPicker">${escHtml(t('btn_cancel') || 'Cancel')}</button>
+          <button class="btn btn-primary" id="ssPrintPickerGo">🖨 ${escHtml(t('btn_print') || 'Print')}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('ssPrintPickerGo')?.addEventListener('click', async () => {
+    const id = parseInt(document.getElementById('ssPrintPickerSel')?.value || '0', 10);
+    const pickerEl = document.getElementById('ssPrintPicker');
+    if (pickerEl) pickerEl.remove();
+    if (!id) return;
+    let ss;
+    try { ss = await apiGet('/api/spreadsheets/' + id); } catch { showError('Failed to load spreadsheet'); return; }
+    if (!ss) return;
+    _printSpreadsheetData(ss);
+  });
+}
+
+// Render the spreadsheet's persisted cell grid as a printable table. We
+// don't rely on the jspreadsheet DOM because the spreadsheet modal may
+// not be open — we read `ss.cells` straight from the API payload.
+function _printSpreadsheetData(ss) {
+  const cells = (ss && ss.cells) || [];
+  let maxR = 0, maxC = 0;
+  for (const c of cells) {
+    if (c.row > maxR) maxR = c.row;
+    if (c.col > maxC) maxC = c.col;
+  }
+  const grid = Array.from({length: maxR + 1}, () => Array(maxC + 1).fill(''));
+  for (const c of cells) {
+    grid[c.row][c.col] = (c.value != null ? String(c.value) : '');
+  }
+  const headerCols = [];
+  for (let c = 0; c <= maxC; c++) headerCols.push('<th>' + _colLetter(c) + '</th>');
+  const rows = grid.map((row, rIdx) => {
+    const cells = row.map(v => '<td>' + escHtml(v) + '</td>').join('');
+    return '<tr><th style="background:#eee">' + (rIdx + 1) + '</th>' + cells + '</tr>';
+  }).join('');
+  const win = window.open('', '_blank');
+  if (!win) return;
+  const title = ss.name || 'Spreadsheet';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>' +
+    '<style>body{font-family:Calibri,Arial,sans-serif;margin:16px;color:#222}' +
+    'h1{color:#333;border-bottom:2px solid #333;padding-bottom:4px}' +
+    'table{border-collapse:collapse;width:100%;font-size:12px}' +
+    'td,th{border:1px solid #ccc;padding:4px 8px}' +
+    'th{background:#f0f0f0;font-weight:600;text-align:center}' +
+    '@media print{body{margin:0;padding:10px}}</style></head><body>' +
+    '<h1>' + escHtml(title) + '</h1>' +
+    '<p style="color:#666;font-size:12px">' + new Date().toLocaleString() + '</p>' +
+    '<table><thead><tr><th></th>' + headerCols.join('') + '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</body></html>');
+  win.document.close();
+  setTimeout(() => win.print(), 300);
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────

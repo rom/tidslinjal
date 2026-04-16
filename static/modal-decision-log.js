@@ -735,7 +735,11 @@ function _decisionEntryToHTML(e) {
   else if (e.status === 'approved') statusBits.push(e.approval_type === 'approved_with_condition' ? '✓⚠ Approved with condition' : e.approval_type === 'approved_with_modification' ? '✓✏ Approved with modification' : '✓ Approved');
   else if (e.status === 'rejected') statusBits.push('✗ Denied');
   const statusHtml = statusBits.length ? ` — <strong>${escHtml(statusBits.join(' '))}</strong>` : '';
-  const body = escHtml(e.decision || '').replace(/\n/g, '<br>');
+  // Decision text is stored as server-sanitised rich HTML (via
+  // sanitizeRichHTML on the backend), so emit it verbatim so bold /
+  // italic / lists / links print correctly. The reason field is plain
+  // text — keep it escaped and turn newlines into <br>.
+  const body = e.decision || '';
   const reason = e.reason ? `<p style="margin:6px 0 0 0"><em>${t('decision_reason')||'Reason'}:</em> ${escHtml(e.reason).replace(/\n/g,'<br>')}</p>` : '';
   const exec = e.executor_label ? `<p style="margin:6px 0 0 0;color:#666"><em>${t('decision_executor')||'Executor'}:</em> ${escHtml(e.executor_label)}</p>` : '';
   const deadline = e.deadline ? `<p style="margin:6px 0 0 0;color:#666"><em>${t('decision_deadline')||'Deadline'}:</em> ${escHtml(e.deadline)}</p>` : '';
@@ -787,7 +791,21 @@ async function _decisionPrintAll() {
     showError(t('decision_log_empty')||'No decisions to print.');
     return;
   }
+  // Sort oldest→newest first so range-indexing is predictable, then
+  // honour the print-tool's All / Range and Newest / Oldest options
+  // (set by the print modal via window._printEntryOptions).
   entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const opts = window._printEntryOptions || {};
+  if (opts.scope === 'range') {
+    const from = Math.max(1, opts.from || 1);
+    const to   = Math.max(from, opts.to || entries.length);
+    entries = entries.slice(from - 1, to);
+  }
+  if (opts.sort === 'newest') entries.reverse();
+  if (entries.length === 0) {
+    showError(t('decision_log_empty')||'No decisions to print.');
+    return;
+  }
   const exName = (state.exercise && state.exercise.label) || '';
   const title = (exName ? exName + ' — ' : '') + (t('decision_log_title')||'Decision Log');
   let html = `<h1>${escHtml(title)}</h1>`;

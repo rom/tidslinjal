@@ -2788,4 +2788,9 @@ admin_view: 'Vista amministratore',
     severity_high: 'Alto',
     severity_critical: 'Critico',
     poll_created_by: 'Da',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologia',
+    settings_offline_mode: 'Modalità offline',
+    settings_offline_desc: 'Quando abilitato o quando la rete non è disponibile, lo strumento funziona con i dati in cache locale. Le integrazioni e le funzioni avanzate sono disattivate.',
   };

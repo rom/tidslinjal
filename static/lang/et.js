@@ -2764,4 +2764,9 @@ admin_view: 'Administraatori vaade',
     severity_high: 'Kõrge',
     severity_critical: 'Kriitiline',
     poll_created_by: 'Autor',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminoloogia',
+    settings_offline_mode: 'Võrguühenduseta režiim',
+    settings_offline_desc: 'Kui on sisse lülitatud või võrk pole saadaval, töötab tööriist kohalikult vahemällu salvestatud andmetega. Integratsioonid ja täiustatud funktsioonid on keelatud.',
   };

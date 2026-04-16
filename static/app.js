@@ -666,6 +666,39 @@ function printTimeline() {
               <input type="radio" name="printView" value="diary" style="accent-color:var(--accent)">
               📔 ${escHtml(t('print_view_diary') || 'Diary')}
             </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="rfi" style="accent-color:var(--accent)">
+              📋 ${escHtml(t('print_view_rfi') || 'Request For Information')}
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="boards" style="accent-color:var(--accent)">
+              📌 ${escHtml(t('print_view_boards') || 'Boards')}
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+              <input type="radio" name="printView" value="spreadsheet" style="accent-color:var(--accent)">
+              🧮 ${escHtml(t('print_view_spreadsheet') || 'Spreadsheet')}
+            </label>
+          </div>
+          <div id="printEntryOptions" class="form-group" style="margin-bottom:12px;display:none;background:var(--bg2);padding:8px;border-radius:var(--radius)">
+            <label style="font-size:var(--fs-sm);color:var(--text-dim);font-weight:600;display:block;margin-bottom:6px">${escHtml(t('print_entry_options') || 'Entry selection & sort')}</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:var(--fs-sm)">
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="radio" name="printEntryScope" value="all" checked style="accent-color:var(--accent)">
+                ${escHtml(t('print_scope_all') || 'All')}
+              </label>
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="radio" name="printEntryScope" value="range" style="accent-color:var(--accent)">
+                ${escHtml(t('print_scope_range') || 'Range')}
+              </label>
+              <input type="number" id="printEntryRangeFrom" min="1" placeholder="${escHtml(t('print_scope_from')||'From')}" style="width:70px;padding:3px 6px;font-size:var(--fs-xs)">
+              <input type="number" id="printEntryRangeTo" min="1" placeholder="${escHtml(t('print_scope_to')||'To')}" style="width:70px;padding:3px 6px;font-size:var(--fs-xs)">
+              <span style="flex:1"></span>
+              <label style="color:var(--text-dim)">${escHtml(t('print_sort') || 'Sort')}:</label>
+              <select id="printEntrySort" style="padding:3px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)">
+                <option value="newest">${escHtml(t('print_sort_newest') || 'Newest first')}</option>
+                <option value="oldest">${escHtml(t('print_sort_oldest') || 'Oldest first')}</option>
+              </select>
+            </div>
           </div>
           <div class="form-row" style="margin-bottom:12px">
             <div class="form-group" style="flex:1">
@@ -712,15 +745,21 @@ function printTimeline() {
   const _updateLayerVisibility = () => {
     const view = modal.querySelector('input[name="printView"]:checked')?.value;
     const layerGroup = document.getElementById('printLayerGroup');
-    const noLayer = (view === 'ttm' || view === 'keyterrain' || view === 'decisions' || view === 'logbook' || view === 'diary');
+    const noLayer = (view === 'ttm' || view === 'keyterrain' || view === 'decisions' || view === 'logbook' || view === 'diary' || view === 'rfi' || view === 'boards' || view === 'spreadsheet');
     if (layerGroup) layerGroup.style.display = noLayer ? 'none' : '';
     // Hide date range controls for entry-based printouts — these tools
     // have their own internal filters (search, visibility, category).
     const dateRow = modal.querySelector('.form-row');
     const quickRow = modal.querySelector('[data-print-range]')?.closest('.form-group');
-    const isEntryView = (view === 'decisions' || view === 'logbook' || view === 'diary');
+    const isEntryView = (view === 'decisions' || view === 'logbook' || view === 'diary' || view === 'rfi' || view === 'boards' || view === 'spreadsheet');
     if (dateRow) dateRow.style.display = isEntryView ? 'none' : '';
     if (quickRow) quickRow.style.display = isEntryView ? 'none' : '';
+    // Entry-list tools support All / Range + Newest/Oldest sort.
+    // Boards and Spreadsheet don't list logged entries, so the scope
+    // picker is hidden for them.
+    const entryOpts = document.getElementById('printEntryOptions');
+    const showEntryOpts = (view === 'decisions' || view === 'logbook' || view === 'diary' || view === 'rfi');
+    if (entryOpts) entryOpts.style.display = showEntryOpts ? '' : 'none';
   };
   modal.querySelectorAll('input[name="printView"]').forEach(r =>
     r.addEventListener('change', _updateLayerVisibility)
@@ -824,6 +863,14 @@ function printTimeline() {
       }
       return;
     }
+    // Read the entry selection & sort choice so the per-tool printer
+    // can honour them. We stash them on window so the existing print-all
+    // functions can pick them up without changing every signature.
+    const entryScope = modal.querySelector('input[name="printEntryScope"]:checked')?.value || 'all';
+    const rangeFrom = parseInt(document.getElementById('printEntryRangeFrom')?.value || '0', 10) || 0;
+    const rangeTo   = parseInt(document.getElementById('printEntryRangeTo')?.value || '0', 10) || 0;
+    const sortPref  = document.getElementById('printEntrySort')?.value || 'newest';
+    window._printEntryOptions = { scope: entryScope, from: rangeFrom, to: rangeTo, sort: sortPref };
     if (view === 'diary') {
       closeModal('printModal');
       modal.remove();
@@ -839,6 +886,44 @@ function printTimeline() {
         _diaryPrintAll();
       } else {
         showError(t('print_diary_unavailable') || 'Diary printing is not available.');
+      }
+      return;
+    }
+    if (view === 'rfi') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _rfiPrintAll === 'function') {
+        try {
+          if (typeof _rfiList !== 'undefined' && (!_rfiList || _rfiList.length === 0)) {
+            _rfiList = (await apiGet('/api/rfi')) || [];
+          }
+        } catch {}
+        _rfiPrintAll();
+      } else {
+        showError(t('print_rfi_unavailable') || 'RFI printing is not available.');
+      }
+      return;
+    }
+    if (view === 'boards') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _openBoardsPrintDialog === 'function') {
+        _openBoardsPrintDialog();
+      } else if (typeof openBoardsModal === 'function') {
+        openBoardsModal();
+        showNotification('info', t('print_boards_open') || 'Open the Boards list and use its print button.');
+      } else {
+        showError(t('print_boards_unavailable') || 'Boards printing is not available.');
+      }
+      return;
+    }
+    if (view === 'spreadsheet') {
+      closeModal('printModal');
+      modal.remove();
+      if (typeof _printSpreadsheetPicker === 'function') {
+        _printSpreadsheetPicker();
+      } else {
+        showError(t('print_spreadsheet_unavailable') || 'Spreadsheet printing is not available.');
       }
       return;
     }

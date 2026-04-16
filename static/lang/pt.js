@@ -2790,4 +2790,9 @@ manage_resource_types: 'Gerir Tipos',
     severity_high: 'Alto',
     severity_critical: 'Crítico',
     poll_created_by: 'Por',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologia',
+    settings_offline_mode: 'Modo offline',
+    settings_offline_desc: 'Quando ativado ou quando a rede não está disponível, a ferramenta funciona com dados em cache local. As integrações e funcionalidades avançadas estão desativadas.',
   };

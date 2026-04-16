@@ -2762,4 +2762,9 @@ admin_view: 'Administratoriaus rodinys',
     severity_high: 'Aukštas',
     severity_critical: 'Kritinis',
     poll_created_by: 'Autorius',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologija',
+    settings_offline_mode: 'Autonominis režimas',
+    settings_offline_desc: 'Kai įjungtas arba tinklas neprieinamas, įrankis veikia su lokaliai podėlyje saugomais duomenimis. Integracijos ir išplėstinės funkcijos yra išjungtos.',
   };
