@@ -3020,4 +3020,9 @@ TRANSLATIONS.nl = {
     severity_high: 'Hoog',
     severity_critical: 'Kritiek',
     poll_created_by: 'Door',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologie',
+    settings_offline_mode: 'Offlinemodus',
+    settings_offline_desc: 'Wanneer ingeschakeld of wanneer er geen netwerk beschikbaar is, werkt de tool met lokaal gecachete gegevens. Integraties en geavanceerde functies zijn uitgeschakeld.',
   };

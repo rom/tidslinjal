@@ -3024,4 +3024,9 @@ TRANSLATIONS.nb = {
     severity_high: 'Høy',
     severity_critical: 'Kritisk',
     poll_created_by: 'Av',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologi',
+    settings_offline_mode: 'Frakoblet modus',
+    settings_offline_desc: 'Når aktivert eller når nettverket er utilgjengelig, arbeider verktøyet med lokalt bufrede data. Integrasjoner og avanserte funksjoner er deaktivert.',
   };

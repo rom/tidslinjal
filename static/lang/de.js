@@ -3020,4 +3020,9 @@ TRANSLATIONS.de = {
     severity_high: 'Hoch',
     severity_critical: 'Kritisch',
     poll_created_by: 'Von',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologie',
+    settings_offline_mode: 'Offline-Modus',
+    settings_offline_desc: 'Wenn aktiviert oder wenn kein Netzwerk verfügbar ist, arbeitet das Werkzeug mit lokal zwischengespeicherten Daten. Integrationen und erweiterte Funktionen sind deaktiviert.',
   };

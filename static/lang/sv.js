@@ -2960,4 +2960,9 @@ TRANSLATIONS.sv = {
     severity_high: 'Hög',
     severity_critical: 'Kritisk',
     poll_created_by: 'Av',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologi',
+    settings_offline_mode: 'Offline-läge',
+    settings_offline_desc: 'När aktiverat eller när nätverket är otillgängligt arbetar verktyget med lokalt cachade data. Integrationer och avancerade funktioner är avstängda.',
   };

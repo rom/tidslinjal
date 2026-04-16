@@ -1433,7 +1433,7 @@ TRANSLATIONS.is = {
     settings_push_event_info:  'Receive browser notifications when other users modify events.',
 
     // Offline mode info
-    settings_force_offline_info: 'Force the application into offline mode, using locally cached data only.',
+    settings_force_offline_info: 'Þvinga forritið í ónetshamur og nota aðeins staðbundin skyndiminnisgögn.',
 
     // Artificial time info
     settings_artificial_time_info: 'Override the current time for exercise simulation purposes.',
@@ -1532,7 +1532,7 @@ TRANSLATIONS.is = {
     // Settings labels (i18n)
     settings_push_alarms:         'Alarm notifications',
     settings_push_event_changes:  'Event changes by other users',
-    settings_force_offline:       'Force offline mode',
+    settings_force_offline:       'Þvinga ónetshamur',
     artificial_time_enable:       'Enable artificial time',
 
     // Theme names and descriptions
@@ -3018,4 +3018,9 @@ TRANSLATIONS.is = {
     severity_high: 'Hátt',
     severity_critical: 'Krítískt',
     poll_created_by: 'Af',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Orðanotkun',
+    settings_offline_mode: 'Ónetshamur',
+    settings_offline_desc: 'Þegar kveikt er á eða þegar ekkert net er í boði, vinnur tólið með staðbundnum skyndiminnisgögnum. Samþættingar og ítarlegir eiginleikar eru óvirkir.',
   };

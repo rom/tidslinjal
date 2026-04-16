@@ -3043,4 +3043,9 @@ TRANSLATIONS.fr = {
     severity_high: 'Élevé',
     severity_critical: 'Critique',
     poll_created_by: 'Par',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologie',
+    settings_offline_mode: 'Mode hors ligne',
+    settings_offline_desc: 'Lorsqu\'il est activé ou si le réseau est indisponible, l\'outil fonctionne avec les données en cache local. Les intégrations et les fonctionnalités avancées sont désactivées.',
   };

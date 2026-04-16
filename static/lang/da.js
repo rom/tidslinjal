@@ -2802,4 +2802,9 @@ TRANSLATIONS.da = {
     severity_high: 'Høj',
     severity_critical: 'Kritisk',
     poll_created_by: 'Af',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminologi',
+    settings_offline_mode: 'Offlinetilstand',
+    settings_offline_desc: 'Når aktiveret eller når netværket er utilgængeligt, arbejder værktøjet med lokalt cachede data. Integrationer og avancerede funktioner er deaktiveret.',
   };

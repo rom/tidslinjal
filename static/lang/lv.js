@@ -2764,4 +2764,9 @@ admin_view: 'Administrātora skats',
     severity_high: 'Augsts',
     severity_critical: 'Kritisks',
     poll_created_by: 'Autors',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminoloģija',
+    settings_offline_mode: 'Bezsaistes režīms',
+    settings_offline_desc: 'Kad iespējots vai tīkls nav pieejams, rīks darbojas ar lokāli kešotiem datiem. Integrācijas un papildu funkcijas ir atspējotas.',
   };

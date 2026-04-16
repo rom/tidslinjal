@@ -1531,7 +1531,7 @@ TRANSLATIONS.hu = {
     settings_push_event_info:  'Receive browser notifications when other users modify events.',
 
     // Offline mode info
-    settings_force_offline_info: 'Force the application into offline mode, using locally cached data only.',
+    settings_force_offline_info: 'Az alkalmazás kényszerítése offline módba, csak helyileg gyorsítótárazott adatok használatával.',
 
     // Artificial time info
     settings_artificial_time_info: 'Override the current time for exercise simulation purposes.',
@@ -1639,7 +1639,7 @@ TRANSLATIONS.hu = {
     // Settings labels (i18n)
     settings_push_alarms:         'Alarm notifications',
     settings_push_event_changes:  'Event changes by other users',
-    settings_force_offline:       'Force offline mode',
+    settings_force_offline:       'Offline mód kényszerítése',
     artificial_time_enable:       'Enable artificial time',
 
     // Theme names and descriptions
@@ -3209,4 +3209,9 @@ TRANSLATIONS.hu = {
     severity_high: 'Magas',
     severity_critical: 'Kritikus',
     poll_created_by: 'Készítette',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: 'Terminológia',
+    settings_offline_mode: 'Offline mód',
+    settings_offline_desc: 'Ha engedélyezve van vagy nincs elérhető hálózat, az eszköz helyileg gyorsítótárazott adatokkal dolgozik. Az integrációk és a speciális funkciók le vannak tiltva.',
   };

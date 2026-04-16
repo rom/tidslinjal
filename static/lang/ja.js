@@ -1277,7 +1277,7 @@ TRANSLATIONS.ja = {
     settings_auto_busy_info: '有効にすると、予定されたアクティビティ中にステータスが「取り込み中」に変わり、終了後に以前のステータスに戻ります。',
     settings_push_alarms_info: 'Receive browser notifications when alarms trigger.',
     settings_push_event_info: 'Receive browser notifications when other users modify events.',
-    settings_force_offline_info: 'Force the application into offline mode, using locally cached data only.',
+    settings_force_offline_info: 'アプリケーションをオフラインモードに強制し、ローカルキャッシュのデータのみを使用します。',
     settings_artificial_time_info: 'Override the current time for exercise simulation purposes.',
     lang_fi: 'Suomi',
     lang_da: 'Dansk',
@@ -1377,7 +1377,7 @@ TRANSLATIONS.ja = {
     clock_no_exercise: 'No exercise active',
     settings_push_alarms: 'Alarm notifications',
     settings_push_event_changes: 'Event changes by other users',
-    settings_force_offline: 'Force offline mode',
+    settings_force_offline: 'オフラインモードを強制',
     artificial_time_enable: '人工時間を有効化',
     // Theme names and descriptions
     theme_camo: 'カモフラージュ',
@@ -2736,4 +2736,9 @@ TRANSLATIONS.ja = {
     severity_high: '高',
     severity_critical: '重大',
     poll_created_by: '作成者',
+
+    // Settings — Terminology & Offline mode
+    settings_terminology: '用語',
+    settings_offline_mode: 'オフラインモード',
+    settings_offline_desc: '有効化されているか、ネットワークが利用できない場合、ツールはローカルキャッシュのデータで動作します。統合機能と高度な機能は無効になります。',
 };
