@@ -1982,6 +1982,9 @@ function _showPRCPopup(check) {
 
 /* ── Request For Information (RFI) ── */
 let _rfiList = [];
+let _rfiFilter = 'all';   // all | open | closed | unanswered
+let _rfiSearch = '';
+const RFI_SWATCHES = ['', '#FFF4C2', '#D6F5D6', '#FFD6D6', '#D6E4FF', '#E6D6FF', '#FFE0B3'];
 
 async function openRFIModal() {
   try { _rfiList = await apiGet('/api/rfi') || []; } catch { _rfiList = []; }
@@ -1991,8 +1994,12 @@ async function openRFIModal() {
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
   modal.id = 'rfiModal';
+  const richQuestion = (typeof _diaryRichField === 'function')
+    ? _diaryRichField('rfiQuestion', '', t('rfi_question_placeholder')||'What information do you need?', '100px')
+    : `<textarea id="rfiQuestion" rows="3" placeholder="${t('rfi_question_placeholder')||'What information do you need?'}"
+         style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>`;
   modal.innerHTML = `
-    <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal" style="max-width:800px;width:95vw;max-height:85vh;display:flex;flex-direction:column">
       <div class="modal-header">
         <h3>📋 ${t('rfi_title')||'Request For Information'}</h3>
         <button class="modal-close" data-action="_closeRFIModal">&times;</button>
@@ -2001,9 +2008,8 @@ async function openRFIModal() {
         ${isCreator ? `
         <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
           <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:4px">${t('rfi_question')||'Question / Request'}</label>
-          <textarea id="rfiQuestion" rows="3" placeholder="${t('rfi_question_placeholder')||'What information do you need?'}"
-            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+          <div id="rfiQuestionWrap">${richQuestion}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
             <label style="font-size:var(--fs-xs);font-weight:600">${t('rfi_target')||'Send to'}:</label>
             <div class="toggle-btn-group" style="font-size:10px">
               <button class="toggle-btn active" id="rfiModeUser" data-rfi-mode="users">${t('poll_target_users')||'Users'}</button>
@@ -2011,7 +2017,7 @@ async function openRFIModal() {
               <button class="toggle-btn" id="rfiModeAll" data-rfi-mode="all">${t('rfi_all')||'All'}</button>
             </div>
           </div>
-          <div id="rfiTargetUsers">
+          <div id="rfiTargetUsers" style="margin-top:6px">
             <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
               ${users.map(u => `<label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                 <input type="checkbox" class="rfi-user-cb" value="${u.id}" style="margin-right:4px">
@@ -2019,7 +2025,7 @@ async function openRFIModal() {
               </label>`).join('')}
             </div>
           </div>
-          <div id="rfiTargetGroups" style="display:none">
+          <div id="rfiTargetGroups" style="display:none;margin-top:6px">
             <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
               ${groups.map(g => `<label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
                 <input type="checkbox" class="rfi-group-cb" value="${g.id}" style="margin-right:4px">
@@ -2027,10 +2033,37 @@ async function openRFIModal() {
               </label>`).join('')}
             </div>
           </div>
-          <div id="rfiTargetAll" style="display:none">
+          <div id="rfiTargetAll" style="display:none;margin-top:6px">
             <p style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px">📢 ${t('rfi_all_desc')||'The RFI will be sent to all users.'}</p>
           </div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <div style="margin-top:8px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;display:block;margin-bottom:4px">${t('lb_background_color')||'Background colour'}</label>
+            <div id="rfiAddSwatches" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+              ${RFI_SWATCHES.map(sw => {
+                const bg = sw || 'transparent';
+                const sel = sw === '' ? 'outline:2px solid var(--accent);' : '';
+                return `<button type="button" class="rfi-add-swatch" data-rfi-color="${escHtml(sw)}"
+                  style="width:20px;height:20px;border:1px solid #888;border-radius:4px;background:${bg};${sel}cursor:pointer" title="${sw||'None'}"></button>`;
+              }).join('')}
+            </div>
+            <input type="hidden" id="rfiAddColor" value="">
+          </div>
+          <div style="margin-top:4px">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;display:block;margin-bottom:4px">🔗 ${t('rfi_references')||'References'}</label>
+            <div id="rfiAddRefs" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
+            <div style="display:flex;gap:4px;align-items:center">
+              <select id="rfiAddRefType" class="input" style="font-size:var(--fs-xs);width:auto;padding:3px 6px">
+                <option value="log_book">${t('tab_log_book')||'Log Book'}</option>
+                <option value="diary">${t('diary_title')||'Diary'}</option>
+                <option value="decision">${t('decisions_title')||'Decision'}</option>
+                <option value="event">${t('event')||'Event'}</option>
+              </select>
+              <input type="number" id="rfiAddRefId" class="input" style="width:60px;font-size:var(--fs-xs);padding:3px 6px" placeholder="ID" min="1">
+              <input type="text" id="rfiAddRefLabel" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" placeholder="${t('decision_ref_label')||'Label'}">
+              <button type="button" class="btn btn-sm btn-secondary" id="rfiAddRefBtn" style="font-size:10px;padding:2px 6px">+</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
             <label style="font-size:var(--fs-xs);color:var(--text-dim)">⏱ ${t('rfi_deadline')||'Deadline (minutes)'}:
               <input type="number" id="rfiDeadlineMins" min="1" value="5" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
             </label>
@@ -2040,6 +2073,17 @@ async function openRFIModal() {
             <button class="btn btn-primary btn-sm" data-action="_rfiSend">${t('rfi_send')||'Send RFI'}</button>
           </div>
         </div>` : ''}
+        <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+          <input id="rfiSearchInput" class="input" style="flex:1;min-width:150px;font-size:var(--fs-xs)" placeholder="🔍 ${t('rfi_search_placeholder')||'Search RFIs…'}">
+          <div class="toggle-btn-group" style="font-size:10px">
+            <button class="toggle-btn${_rfiFilter==='all'?' active':''}" data-action="_setRFIFilter" data-arg="all">${t('filter_all')||'All'}</button>
+            <button class="toggle-btn${_rfiFilter==='open'?' active':''}" data-action="_setRFIFilter" data-arg="open">${t('rfi_filter_open')||'Open'}</button>
+            <button class="toggle-btn${_rfiFilter==='closed'?' active':''}" data-action="_setRFIFilter" data-arg="closed">${t('rfi_filter_closed')||'Closed'}</button>
+            <button class="toggle-btn${_rfiFilter==='unanswered'?' active':''}" data-action="_setRFIFilter" data-arg="unanswered">${t('rfi_filter_unanswered')||'Unanswered'}</button>
+          </div>
+          <button class="btn btn-sm" style="font-size:11px;padding:2px 8px" data-action="_rfiExportCSV" title="${t('btn_export_csv')||'Export CSV'}">⤓ ${t('btn_export')||'Export'}</button>
+          <button class="btn btn-sm" style="font-size:11px;padding:2px 8px" data-action="_rfiPrintAll" title="${t('btn_print')||'Print'}">🖨 ${t('btn_print')||'Print'}</button>
+        </div>
         <div id="rfiActiveList"></div>
       </div>
     </div>`;
@@ -2055,6 +2099,62 @@ async function openRFIModal() {
       document.getElementById('rfiTargetAll').style.display = btn.dataset.rfiMode === 'all' ? '' : 'none';
     });
   });
+  // Wire rich text toolbar for the question body (if diary helper is loaded)
+  if (typeof _diaryBindToolbar === 'function') {
+    _diaryBindToolbar(modal, 'rfiQuestion');
+  }
+  // Wire colour swatches
+  modal.querySelectorAll('.rfi-add-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.rfiColor || '';
+      const hidden = document.getElementById('rfiAddColor');
+      if (hidden) hidden.value = val;
+      modal.querySelectorAll('.rfi-add-swatch').forEach(b => { b.style.outline = ''; });
+      btn.style.outline = '2px solid var(--accent)';
+    });
+  });
+  // Wire reference add button
+  document.getElementById('rfiAddRefBtn')?.addEventListener('click', () => {
+    const refType = document.getElementById('rfiAddRefType')?.value;
+    const refId = document.getElementById('rfiAddRefId')?.value;
+    const refLabel = document.getElementById('rfiAddRefLabel')?.value || '';
+    if (!refType || !refId) return;
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px';
+    tag.dataset.refType = refType;
+    tag.dataset.refId = refId;
+    tag.dataset.refLabel = refLabel || `${refType} #${refId}`;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => tag.remove());
+    tag.textContent = `🔗 ${refLabel || refType + ' #' + refId} `;
+    tag.appendChild(removeBtn);
+    document.getElementById('rfiAddRefs')?.appendChild(tag);
+    document.getElementById('rfiAddRefId').value = '';
+    document.getElementById('rfiAddRefLabel').value = '';
+  });
+  // Wire search
+  const searchEl = document.getElementById('rfiSearchInput');
+  if (searchEl) {
+    searchEl.value = _rfiSearch;
+    searchEl.addEventListener('input', () => {
+      _rfiSearch = searchEl.value.trim();
+      _rfiRenderList(modal);
+    });
+  }
+  _rfiRenderList(modal);
+}
+
+function _setRFIFilter(filter) {
+  _rfiFilter = filter;
+  const modal = document.getElementById('rfiModal');
+  if (!modal) return;
+  // Update active class on filter buttons
+  modal.querySelectorAll('[data-action="_setRFIFilter"]').forEach(b => {
+    b.classList.toggle('active', b.dataset.arg === filter);
+  });
   _rfiRenderList(modal);
 }
 
@@ -2062,48 +2162,87 @@ function _closeRFIModal() {
   document.getElementById('rfiModal')?.remove();
 }
 
+function _rfiFilteredList() {
+  let list = (_rfiList || []).slice();
+  if (_rfiFilter === 'open')   list = list.filter(r => r.status === 'open');
+  else if (_rfiFilter === 'closed') list = list.filter(r => r.status === 'closed');
+  else if (_rfiFilter === 'unanswered') {
+    list = list.filter(r => (r.respondents||[]).some(x => x.status === 'unanswered'));
+  }
+  if (_rfiSearch) {
+    const q = _rfiSearch.toLowerCase();
+    list = list.filter(r => {
+      const respNames = (r.respondents||[]).map(x => `${x.user_name} ${x.response||''}`).join(' ');
+      const hay = `${r.sequence_number||''} ${r.question||''} ${r.created_by_name||''} ${respNames}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  return list;
+}
+
 function _rfiRenderList(modal) {
   const wrap = (modal || document).querySelector('#rfiActiveList');
   if (!wrap) return;
-  if (!_rfiList || _rfiList.length === 0) {
+  const filtered = _rfiFilteredList();
+  if (!filtered || filtered.length === 0) {
     wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('rfi_empty')||'No requests for information.'}</p>`;
     return;
   }
-  const isCreator = hasRole2(state.user.role, 'teamlead');
+  const isAdmin = hasRole2(state.user?.role, 'admin');
+  const isCreator = hasRole2(state.user?.role, 'teamlead');
   // Sort newest first
-  const sorted = _rfiList.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const sorted = filtered.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   wrap.innerHTML = sorted.map(rfi => {
     const isOpen = rfi.status === 'open';
     const responded = (rfi.respondents || []).filter(r => r.status === 'responded');
     const pending = (rfi.respondents || []).filter(r => r.status === 'pending');
+    const unanswered = (rfi.respondents || []).filter(r => r.status === 'unanswered');
     const total = (rfi.respondents || []).length;
     const statusColor = isOpen ? 'var(--accent)' : 'var(--text-dim)';
-    const statusText = isOpen ? (t('rfi_open')||'Open') : (t('rfi_closed')||'Closed');
+    let statusText = isOpen ? (t('rfi_open')||'Open') : (t('rfi_closed')||'Closed');
+    if (!isOpen && rfi.closed_reason === 'deadline') statusText += ' ⏱';
     const dlInfo = rfi.deadline_at ? ` · ⏱ ${new Date(rfi.deadline_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}` : '';
     let respondentsHtml = '';
     if (responded.length > 0) {
       respondentsHtml = `<div style="margin-top:6px"><strong style="color:#27AE60;font-size:var(--fs-xs)">✅ ${t('rfi_responded')||'Responded'} (${responded.length}/${total}):</strong>
         ${responded.map(r => `<div style="margin:4px 0 4px 8px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
           <strong>${escHtml(r.user_name)}</strong>${r.responded_at ? ' · ' + new Date(r.responded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}
-          <div style="margin-top:2px;white-space:pre-wrap">${escHtml(r.response||'')}</div>
+          <div style="margin-top:2px">${r.response||''}</div>
         </div>`).join('')}
       </div>`;
     }
     if (pending.length > 0 && isCreator) {
       respondentsHtml += `<div style="margin-top:4px"><span style="color:#E67E22;font-size:var(--fs-xs)">⏳ ${t('rfi_pending')||'Pending'}: ${pending.map(r => escHtml(r.user_name)).join(', ')}</span></div>`;
     }
-    return `<div style="margin-bottom:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius)">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <strong style="font-size:var(--fs-sm)">📋 ${escHtml(rfi.question)}</strong>
-          <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600;margin-left:8px">${statusText}</span>
+    if (unanswered.length > 0) {
+      respondentsHtml += `<div style="margin-top:4px"><span style="color:var(--danger,#E74C3C);font-size:var(--fs-xs);font-weight:700">❌ ${t('rfi_unanswered')||'Unanswered'} (${unanswered.length}): ${unanswered.map(r => escHtml(r.user_name)).join(', ')}</span></div>`;
+    }
+    const bgStyle = rfi.color ? `background:${escHtml(rfi.color)};color:#222;` : '';
+    const refsHtml = (rfi.references && rfi.references.length)
+      ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">🔗 ${rfi.references.map(r =>
+          `<button type="button" class="btn btn-sm" style="padding:0 4px;font-size:10px;color:var(--accent);text-decoration:none" data-action="_openRFIRef" data-args='["${escHtml(r.type)}",${r.id}]'>${escHtml(r.label || r.type + ' #' + r.id)}</button>`
+        ).join(', ')}</div>`
+      : '';
+    const seqHtml = rfi.sequence_number ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-right:4px">${escHtml(rfi.sequence_number)}</span>` : '';
+    const canDelete = (rfi.created_by === state.user?.id) || isAdmin;
+    return `<div data-rfi-id="${rfi.id}" style="margin-bottom:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);${bgStyle}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="flex:1;min-width:0">
+          ${seqHtml}<strong style="font-size:var(--fs-sm)">📋</strong>
+          <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600;margin-left:4px">${statusText}</span>
+          <div style="margin-top:4px;line-height:1.5">${rfi.question || ''}</div>
         </div>
-        ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger" style="font-size:10px" data-action="_rfiClose" data-arg="${rfi.id}">${t('rfi_close')||'Close'}</button>` : ''}
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger" style="font-size:10px" data-action="_rfiClose" data-arg="${rfi.id}" title="${t('rfi_close')||'Close'}">${t('rfi_close')||'Close'}</button>` : ''}
+          <button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_rfiPrintEntry" data-arg="${rfi.id}" title="${t('btn_print')||'Print'}">🖨</button>
+          ${canDelete ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px;color:var(--danger,#e74c3c)" data-action="_rfiDelete" data-arg="${rfi.id}" title="${t('btn_delete')||'Delete'}">🗑</button>` : ''}
+        </div>
       </div>
-      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">
         ${escHtml(rfi.created_by_name)} — ${new Date(rfi.created_at).toLocaleString()}${dlInfo}
-        — ${t('rfi_responses')||'Responses'}: ${responded.length}/${total}
+        — ${t('rfi_responses')||'Responses'}: ${responded.length}/${total}${unanswered.length ? ' · ❌ ' + unanswered.length : ''}
       </div>
+      ${refsHtml}
       ${respondentsHtml}
     </div>`;
   }).join('');
@@ -2111,8 +2250,9 @@ function _rfiRenderList(modal) {
 }
 
 async function _rfiSend() {
-  const question = document.getElementById('rfiQuestion')?.value?.trim();
-  if (!question) { showError(t('rfi_question_required')||'Question is required'); return; }
+  const qEl = document.getElementById('rfiQuestion');
+  const question = qEl ? (qEl.tagName === 'TEXTAREA' ? qEl.value.trim() : (qEl.innerHTML || '').trim()) : '';
+  if (!question || question === '<br>') { showError(t('rfi_question_required')||'Question is required'); return; }
   const mode = document.querySelector('[data-rfi-mode].active')?.dataset?.rfiMode || 'users';
   const respondentIds = mode === 'users' ? [...document.querySelectorAll('.rfi-user-cb:checked')].map(c => parseInt(c.value)) : [];
   const groupIds = mode === 'groups' ? [...document.querySelectorAll('.rfi-group-cb:checked')].map(c => parseInt(c.value)) : [];
@@ -2124,19 +2264,29 @@ async function _rfiSend() {
   const deadlineMins = parseInt(document.getElementById('rfiDeadlineMins')?.value || '0', 10);
   const scheduledAtLocal = document.getElementById('rfiScheduledAt')?.value || '';
   const scheduledAt = scheduledAtLocal ? new Date(scheduledAtLocal).toISOString() : '';
+  const color = document.getElementById('rfiAddColor')?.value || '';
+  // Collect references
+  const refEls = document.querySelectorAll('#rfiAddRefs span[data-ref-type]');
+  const references = [];
+  refEls.forEach(el => {
+    references.push({ type: el.dataset.refType, id: parseInt(el.dataset.refId, 10), label: el.dataset.refLabel || '' });
+  });
   const res = await apiPost('/api/rfi', {
     question,
     respondent_ids: respondentIds,
     group_ids: groupIds,
     all,
     deadline_mins: deadlineMins,
-    scheduled_at: scheduledAt
+    scheduled_at: scheduledAt,
+    color,
+    references
   });
   if (res.ok) {
-    document.getElementById('rfiQuestion').value = '';
+    if (qEl) { if (qEl.tagName === 'TEXTAREA') qEl.value = ''; else qEl.innerHTML = ''; }
+    const refsWrap = document.getElementById('rfiAddRefs'); if (refsWrap) refsWrap.innerHTML = '';
     showNotification('success', t('rfi_sent')||'RFI sent');
     _rfiList = await apiGet('/api/rfi') || [];
-    _rfiRenderList();
+    _rfiRenderList(document.getElementById('rfiModal'));
   } else {
     const err = await res.json().catch(() => ({}));
     showError(err.error || 'Failed to send RFI');
@@ -2148,8 +2298,134 @@ async function _rfiClose(id) {
   if (res.ok) {
     showNotification('success', t('rfi_closed_success')||'RFI closed');
     _rfiList = await apiGet('/api/rfi') || [];
-    _rfiRenderList();
+    _rfiRenderList(document.getElementById('rfiModal'));
   }
+}
+
+async function _rfiDelete(id) {
+  if (!confirm(t('rfi_delete_confirm')||'Delete this RFI and all of its responses?')) return;
+  const res = await api('DELETE', `/api/rfi/${id}`);
+  if (res.ok) {
+    showNotification('success', t('rfi_deleted')||'RFI deleted');
+    _rfiList = await apiGet('/api/rfi') || [];
+    _rfiRenderList(document.getElementById('rfiModal'));
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to delete RFI');
+  }
+}
+
+// Open a cross-referenced target from an RFI entry
+function _openRFIRef(type, id) {
+  if (type === 'diary') {
+    if (typeof openDiaryModal === 'function') openDiaryModal();
+  } else if (type === 'log_book') {
+    if (typeof openLogBookModal === 'function') openLogBookModal();
+  } else if (type === 'decision') {
+    if (typeof openDecisionLogModal === 'function') openDecisionLogModal();
+  } else if (type === 'event') {
+    const ev = (state.events || []).find(e => e.id === id);
+    if (ev && typeof showEventDetail === 'function') showEventDetail(ev);
+  }
+}
+
+function _rfiEntryToHTML(rfi) {
+  const responded = (rfi.respondents || []).filter(r => r.status === 'responded');
+  const unanswered = (rfi.respondents || []).filter(r => r.status === 'unanswered');
+  const pending = (rfi.respondents || []).filter(r => r.status === 'pending');
+  const total = (rfi.respondents || []).length;
+  const closedReason = rfi.closed_reason === 'deadline' ? ' (deadline reached)' : '';
+  let respHtml = '';
+  if (responded.length) {
+    respHtml += '<h3>Responses</h3><ul>';
+    responded.forEach(r => {
+      respHtml += `<li><b>${escHtml(r.user_name)}</b>${r.responded_at ? ' — ' + new Date(r.responded_at).toLocaleString() : ''}<br>${r.response||''}</li>`;
+    });
+    respHtml += '</ul>';
+  }
+  if (unanswered.length) {
+    respHtml += `<p><b>Unanswered:</b> ${unanswered.map(r => escHtml(r.user_name)).join(', ')}</p>`;
+  }
+  if (pending.length) {
+    respHtml += `<p><b>Pending:</b> ${pending.map(r => escHtml(r.user_name)).join(', ')}</p>`;
+  }
+  return `<section style="page-break-inside:avoid;margin-bottom:24px">
+    <h2>${escHtml(rfi.sequence_number || ('RFI #' + rfi.id))}</h2>
+    <p style="color:#666;font-size:12px">
+      ${escHtml(rfi.created_by_name||'')} — ${new Date(rfi.created_at).toLocaleString()} —
+      ${rfi.status === 'open' ? 'Open' : 'Closed' + closedReason} —
+      Responses: ${responded.length}/${total}
+    </p>
+    <div style="line-height:1.6">${rfi.question || ''}</div>
+    ${respHtml}
+  </section>`;
+}
+
+function _rfiPrintHTML(bodyHtml, title) {
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escHtml(title)}</title>
+    <style>body{font-family:Calibri,Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#222}
+    h1{color:#333;border-bottom:2px solid #333;padding-bottom:4px}
+    h2{color:#333;margin-top:0}
+    a{color:#2563eb}
+    hr{border:0;border-top:1px solid #ccc;margin:18px 0}
+    @media print{body{margin:0;padding:10px}}</style>
+    </head><body>${bodyHtml}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 300);
+}
+
+function _rfiPrintEntry(idRaw) {
+  const id = typeof idRaw === 'number' ? idRaw : parseInt(idRaw, 10);
+  const rfi = (_rfiList || []).find(r => r.id === id);
+  if (!rfi) { showError('RFI not found'); return; }
+  _rfiPrintHTML(_rfiEntryToHTML(rfi), rfi.sequence_number || ('RFI #' + rfi.id));
+}
+
+function _rfiPrintAll() {
+  const entries = _rfiFilteredList();
+  if (!entries.length) { showError(t('rfi_empty')||'No RFIs to print'); return; }
+  entries.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const exName = (state.exercise && state.exercise.label) || '';
+  const title = (exName ? exName + ' — ' : '') + (t('rfi_title')||'Request For Information');
+  let html = `<h1>${escHtml(title)}</h1>`;
+  html += `<p style="color:#666">${new Date().toLocaleString()} — ${entries.length} ${t('rfi_entries')||'entries'}</p><hr>`;
+  for (const r of entries) html += _rfiEntryToHTML(r);
+  _rfiPrintHTML(html, title);
+}
+
+// CSV export of currently filtered RFIs, one row per respondent (or one row
+// when there are no respondents). Opens a download dialog in the browser.
+function _rfiExportCSV() {
+  const entries = _rfiFilteredList();
+  if (!entries.length) { showError(t('rfi_empty')||'No RFIs to export'); return; }
+  const esc = (v) => {
+    const s = (v === null || v === undefined) ? '' : String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  };
+  const stripTags = (h) => (h || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const rows = [['sequence_number','rfi_id','status','closed_reason','created_by','created_at','deadline_at','question','respondent','respondent_status','response','responded_at']];
+  entries.forEach(r => {
+    const base = [r.sequence_number||'', r.id, r.status||'', r.closed_reason||'', r.created_by_name||'', r.created_at||'', r.deadline_at||'', stripTags(r.question||'')];
+    if (!r.respondents || r.respondents.length === 0) {
+      rows.push([...base, '', '', '', '']);
+    } else {
+      r.respondents.forEach(x => {
+        rows.push([...base, x.user_name||'', x.status||'', stripTags(x.response||''), x.responded_at||'']);
+      });
+    }
+  });
+  const csv = rows.map(row => row.map(esc).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rfi-export-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
 }
 
 // RFI popup for respondents — shown when an SSE rfi_new event arrives
@@ -2164,27 +2440,34 @@ function _showRFIPopup(rfi) {
   overlay.className = 'modal-overlay open';
   overlay.style.zIndex = '10001';
   const dlText = rfi.deadline_at ? `<p style="font-size:var(--fs-xs);color:#E67E22;margin-bottom:8px">⏱ ${t('rfi_deadline_at')||'Deadline'}: ${new Date(rfi.deadline_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</p>` : '';
+  const responseId = 'rfiResponse_' + rfi.id;
+  const responseField = (typeof _diaryRichField === 'function')
+    ? _diaryRichField(responseId, '', t('rfi_response_placeholder')||'Type your response here…', '120px')
+    : `<textarea id="${responseId}" rows="6" placeholder="${t('rfi_response_placeholder')||'Type your response here…'}"
+         style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:8px"></textarea>`;
+  const seq = rfi.sequence_number ? `<span style="font-size:var(--fs-xs);color:#cde;margin-left:8px">${escHtml(rfi.sequence_number)}</span>` : '';
   overlay.innerHTML = `
-    <div class="modal" style="max-width:500px;animation:slideIn .25s ease">
+    <div class="modal" style="max-width:560px;animation:slideIn .25s ease">
       <div class="modal-header" style="background:#3498DB;color:#fff">
-        <h3 style="color:#fff">📋 ${t('rfi_popup_title')||'Information Requested'}</h3>
+        <h3 style="color:#fff">📋 ${t('rfi_popup_title')||'Information Requested'}${seq}</h3>
       </div>
       <div class="modal-body">
         <p style="font-size:var(--fs-sm);margin-bottom:4px">
           <b>${escHtml(rfi.created_by_name || '')}</b> ${t('rfi_popup_asks')||'requests information:'}
         </p>
-        <div style="font-size:var(--fs-sm);padding:8px 10px;margin-bottom:10px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text);font-weight:600">${escHtml(rfi.question)}</div>
+        <div style="font-size:var(--fs-sm);padding:8px 10px;margin-bottom:10px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text);font-weight:600">${rfi.question || ''}</div>
         ${dlText}
-        <textarea id="rfiResponse_${rfi.id}" rows="6" placeholder="${t('rfi_response_placeholder')||'Type your response here…'}"
-          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:8px"></textarea>
-        <div style="display:flex;gap:8px;justify-content:center">
+        ${responseField}
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
           <button class="btn btn-primary" id="rfiSubmit_${rfi.id}" style="padding:8px 24px;font-size:14px">📨 ${t('rfi_submit')||'Submit Response'}</button>
         </div>
       </div>
     </div>`;
   document.body.appendChild(overlay);
+  if (typeof _diaryBindToolbar === 'function') _diaryBindToolbar(overlay, responseId);
   document.getElementById('rfiSubmit_' + rfi.id).addEventListener('click', async () => {
-    const response = document.getElementById('rfiResponse_' + rfi.id)?.value || '';
+    const respEl = document.getElementById(responseId);
+    const response = respEl ? (respEl.tagName === 'TEXTAREA' ? respEl.value : (respEl.innerHTML || '')) : '';
     try {
       const res = await api('PUT', `/api/rfi/${rfi.id}/respond`, { response });
       if (res.ok) {

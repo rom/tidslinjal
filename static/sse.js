@@ -234,7 +234,7 @@ function connectSSE() {
       // Refresh modal if open
       if (document.getElementById('rfiModal') && typeof _rfiRenderList === 'function') {
         _rfiList = []; // force refresh
-        apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(); }).catch(() => {});
+        apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(document.getElementById('rfiModal')); }).catch(() => {});
       }
     } catch {}
   });
@@ -248,7 +248,20 @@ function connectSSE() {
         popup.remove();
       }
       if (document.getElementById('rfiModal') && typeof _rfiRenderList === 'function') {
-        _rfiList = []; apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(); }).catch(() => {});
+        _rfiList = []; apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(document.getElementById('rfiModal')); }).catch(() => {});
+      }
+    } catch {}
+  });
+  es.addEventListener('rfi_deleted', e => {
+    try {
+      const data = JSON.parse(e.data);
+      const popup = document.getElementById('rfiPopup_' + data.id);
+      if (popup) {
+        if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('rfi-' + data.id);
+        popup.remove();
+      }
+      if (document.getElementById('rfiModal') && typeof _rfiRenderList === 'function') {
+        _rfiList = []; apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(document.getElementById('rfiModal')); }).catch(() => {});
       }
     } catch {}
   });

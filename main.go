@@ -1733,6 +1733,7 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 	})
 	mux.HandleFunc("PUT /api/rfi/{id}/respond", app.requireAuth(app.handleRespondRFI))
 	mux.HandleFunc("PUT /api/rfi/{id}/close", app.requireRole(RoleTeamLead, app.handleCloseRFI))
+	mux.HandleFunc("DELETE /api/rfi/{id}", app.requireAuth(app.handleDeleteRFI))
 
 	// ── Polls / Multipoll ──
 	mux.HandleFunc("/api/polls", func(w http.ResponseWriter, r *http.Request) {
