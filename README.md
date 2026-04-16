@@ -936,6 +936,26 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
+### v8.7.0 — RFI rewrite, Poll enhancements, Decision cross-refs, ZULU `:` separators
+
+A focused feature release for the RFI and Poll / Multipoll tools, plus several cross-cutting quality-of-life fixes.
+
+- **Request For Information (RFI) overhaul**
+  - Auto-close on deadline: when an RFI deadline passes, the scheduler closes it and flips every still-pending respondent's status to `unanswered`. Manual close does the same. The audit log records the unanswered count.
+  - Stable request IDs — every RFI is labelled `<exercisename>-RFI-<year>-<NNN>`. Legacy RFIs receive a label lazily when read.
+  - Rich-text question + response (shared diary editor, sanitised server-side via `sanitizeRichHTML`), background-colour swatches matching the decision log, and cross-references to Log Book / Diary / Decision / Event entries.
+  - Requester-initiated delete with audit-log entry and `rfi_deleted` SSE event.
+  - Search (question text, respondent names, sequence number), filter tabs (All / Open / Closed / Unanswered), CSV export (one row per respondent, BOM-prefixed), and per-entry + "Print All" printing.
+- **Poll / Multipoll**
+  - Two new question types: **Scale 0–10** (11-button strip, colour-graded green → yellow → orange → red) and **Low / Medium / High / Critical** severity.
+  - Each poll gets a `<exercisename>-Poll-<year>-<NNN>` sequence number; legacy polls labelled lazily.
+  - The poll header in both the sidebar log and the main modal now shows "👤 By: <name>" so the log always tells you who ran it.
+- **Decision cross-references can link to earlier decisions** — the reference picker offers **Decision** alongside Log Book / Diary / Event. Clicking a decision reference opens the decision log and briefly highlights the target entry.
+- **ZULU / UTC clocks always use `:`** — the main header clock, Clocks popup (12h and 24h), and detached clock render ZULU as `HH:MM:SSZ` (e.g. `14:23:05Z`). Local time still honours the user's `time_separator` preference.
+- **Settings properly translated for `hu`, `is`, `ja`, `ko`, `nl`** — ~200 Settings strings (color-blind palette, tooltip delay, drag-move confirm, default event type, workspace presets, log book — decisions, clock flags, day visualisation, quick response receiver, vertical spacing, hover zoom, auto-busy, country code format, startup message, links/URLs, date/time format, week start, etc.) went from hard-coded English fallback to native translations.
+- **New i18n keys in all 20 languages** — 35 `rfi_*` keys, 7 poll keys (`poll_type_scale_0_10`, `poll_type_severity`, `severity_{low,medium,high,critical}`, `poll_created_by`), and 4 offline / push-notification keys (`settings_push_notifications`, `offline_banner`, `offline_mode_enabled`, `online_mode_restored`). Every language file verified to parse under `node --check`.
+- **Bug fixes**: stored-XSS in RFI responses (`sanitizeRichHTML` now sanitises the free-text answer before broadcast), RFI question text being downgraded to plain text via `stripHTMLTags` (replaced with `sanitizeRichHTML`), `offline.js` banner and state-transition notifications hard-coded in English (now routed through `t()`).
+
 ### v8.6.0 — Key Terrain Board: Battle Rhythm, Comments column, Hungarian
 
 A large feature release focused on the Key Terrain Board. Introduces a new Battle Rhythm subsystem and adds Hungarian as the 20th supported language.
