@@ -3244,4 +3244,10 @@ TRANSLATIONS.en = {
     rfi_entries: 'entries',
     rfi_deleted: 'RFI deleted',
     rfi_delete_confirm: 'Delete this RFI and all of its responses?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Browser Notifications',
+    offline_banner: 'OFFLINE MODE — Working with cached data',
+    offline_mode_enabled: 'Offline mode enabled — using cached data',
+    online_mode_restored: 'Online mode restored',
   };

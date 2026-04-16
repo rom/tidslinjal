@@ -536,12 +536,12 @@ function tick() {
   if (isUTC) {
     h=now.getUTCHours(); m=now.getUTCMinutes(); s=now.getUTCSeconds();
     if (_hourFormat === '12') {
-      // ZULU 12h: no colons, e.g. "012233 PM Z"
+      // ZULU 12h: always ":" separated, e.g. "01:22:33 PM Z"
       const ampm = h >= 12 ? 'PM' : 'AM';
       const h12 = h % 12 || 12;
-      timeStr = pad(h12)+pad(m)+pad(s)+' '+ampm+' Z';
+      timeStr = pad(h12)+':'+pad(m)+':'+pad(s)+' '+ampm+' Z';
     } else {
-      timeStr = pad(h)+pad(m)+pad(s)+'Z';
+      timeStr = pad(h)+':'+pad(m)+':'+pad(s)+'Z';
     }
     dateStr = now.toLocaleDateString(locale,{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
     tzLabel = 'UTC/Z';

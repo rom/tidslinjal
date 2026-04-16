@@ -3009,4 +3009,10 @@ TRANSLATIONS.nb = {
     rfi_entries: 'oppføringer',
     rfi_deleted: 'RFI slettet',
     rfi_delete_confirm: 'Slette denne RFI-en og alle svarene?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Nettleservarsler',
+    offline_banner: 'FRAKOBLET — arbeider med bufrede data',
+    offline_mode_enabled: 'Frakoblet modus aktivert — bruker bufrede data',
+    online_mode_restored: 'Tilkoblet modus gjenopprettet',
   };

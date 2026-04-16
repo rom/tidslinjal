@@ -2787,4 +2787,10 @@ TRANSLATIONS.da = {
     rfi_entries: 'poster',
     rfi_deleted: 'RFI slettet',
     rfi_delete_confirm: 'Slet denne RFI og alle dens svar?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Browsernotifikationer',
+    offline_banner: 'OFFLINE-TILSTAND — arbejder med cachede data',
+    offline_mode_enabled: 'Offline-tilstand aktiveret — bruger cachede data',
+    online_mode_restored: 'Online-tilstand gendannet',
   };

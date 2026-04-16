@@ -2945,4 +2945,10 @@ TRANSLATIONS.sv = {
     rfi_entries: 'poster',
     rfi_deleted: 'RFI borttagen',
     rfi_delete_confirm: 'Radera denna RFI och alla dess svar?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Webbläsarnotiser',
+    offline_banner: 'OFFLINE-LÄGE — arbetar med cachade data',
+    offline_mode_enabled: 'Offline-läge aktiverat — använder cachade data',
+    online_mode_restored: 'Online-läge återställt',
   };

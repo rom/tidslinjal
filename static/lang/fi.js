@@ -2797,4 +2797,10 @@ TRANSLATIONS.fi = {
     rfi_entries: 'merkintää',
     rfi_deleted: 'RFI poistettu',
     rfi_delete_confirm: 'Poistetaanko tämä RFI ja kaikki sen vastaukset?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Selaimen ilmoitukset',
+    offline_banner: 'OFFLINE-TILA — välimuistitietoja käytössä',
+    offline_mode_enabled: 'Offline-tila käytössä — välimuistitietoja käytetään',
+    online_mode_restored: 'Online-tila palautettu',
   };

@@ -369,8 +369,8 @@ function updateClock() {
     if (_clockUTC) {
       h = now.getUTCHours(); m = now.getUTCMinutes(); s = now.getUTCSeconds();
       dateStr = now.toLocaleDateString(getLocale(), {weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC'});
-      // Zulu format: no colons, "Z" suffix
-      timeStr = `${pad(h)}${pad(m)}${pad(s)}Z`;
+      // Zulu format: always ":" separated, "Z" suffix
+      timeStr = `${pad(h)}:${pad(m)}:${pad(s)}Z`;
       tzLabel = 'UTC/Z';
     } else {
       h = now.getHours(); m = now.getMinutes(); s = now.getSeconds();

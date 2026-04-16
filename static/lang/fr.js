@@ -3028,4 +3028,10 @@ TRANSLATIONS.fr = {
     rfi_entries: 'entrées',
     rfi_deleted: 'RFI supprimée',
     rfi_delete_confirm: 'Supprimer cette RFI et toutes ses réponses ?',
+
+    // Browser notifications / Offline mode
+    settings_push_notifications: 'Notifications du navigateur',
+    offline_banner: 'MODE HORS LIGNE — utilisation des données en cache',
+    offline_mode_enabled: 'Mode hors ligne activé — données en cache',
+    online_mode_restored: 'Mode en ligne rétabli',
   };

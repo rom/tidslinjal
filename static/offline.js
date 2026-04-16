@@ -171,7 +171,7 @@ function _updateOfflineIndicator() {
     banner = document.createElement('div');
     banner.id = 'offlineBanner';
     banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#e05252;color:#fff;text-align:center;font-size:11px;padding:3px;letter-spacing:.05em';
-    banner.textContent = '📡 OFFLINE MODE — Working with cached data';
+    banner.textContent = '📡 ' + (t('offline_banner')||'OFFLINE MODE — Working with cached data');
     document.body.prepend(banner);
   } else if (!window._offlineMode && banner) {
     banner.remove();
@@ -185,9 +185,9 @@ function toggleOfflineMode() {
   _updateOfflineIndicator();
   renderSidebar();
   if (window._offlineModeForced) {
-    showNotification('warning', 'Offline mode enabled — using cached data');
+    showNotification('warning', t('offline_mode_enabled')||'Offline mode enabled — using cached data');
   } else if (navigator.onLine) {
-    showNotification('success', 'Online mode restored');
+    showNotification('success', t('online_mode_restored')||'Online mode restored');
     refreshAll();
   }
 }
