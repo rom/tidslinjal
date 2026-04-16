@@ -23,7 +23,26 @@ function _diaryTrapModalKeys(modalId) {
 function _diaryBindToolbar(container, editorId) {
   container.querySelectorAll('[data-diary-cmd]').forEach(btn => {
     btn.addEventListener('mousedown', e => e.preventDefault());
-    btn.addEventListener('click', () => document.execCommand(btn.dataset.diaryCmd));
+    btn.addEventListener('click', () => {
+      // Ensure the editor is focused before running the command —
+      // list commands (insertUnorderedList / insertOrderedList) fail
+      // silently when there is no active editable selection.
+      const ed = document.getElementById(editorId);
+      if (ed && document.activeElement !== ed) {
+        ed.focus();
+        // If there's no selection inside the editor, place the cursor
+        // at the end so the command has somewhere to act.
+        const sel = window.getSelection();
+        if (sel && (!sel.rangeCount || !ed.contains(sel.anchorNode))) {
+          const range = document.createRange();
+          range.selectNodeContents(ed);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      document.execCommand(btn.dataset.diaryCmd);
+    });
   });
   container.querySelectorAll('[data-diary-action]').forEach(btn => {
     btn.addEventListener('mousedown', e => e.preventDefault());
@@ -47,7 +66,7 @@ function _diaryRichField(id, value, placeholder, height) {
     <button type="button" class="btn btn-sm" data-diary-action="insertImage" title="${t("btn_insert_image")||"Insert image"}">🖼</button>
   </div>`;
   return `${toolbar}<div id="${id}" contenteditable="true" class="input"
-    style="width:100%;min-height:${height};max-height:400px;overflow-y:auto;resize:vertical;padding:8px;font-size:var(--fs-sm);white-space:pre-wrap;word-break:break-word;line-height:1.5"
+    style="width:100%;min-height:${height};max-height:400px;overflow-y:auto;resize:vertical;padding:8px;font-size:var(--fs-sm);white-space:pre-wrap;word-break:break-word;line-height:1.5;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)"
     data-placeholder="${escHtml(placeholder)}">${value||''}</div>`;
 }
 

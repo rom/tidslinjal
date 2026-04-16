@@ -413,7 +413,7 @@ function _renderDecisionLogEntries() {
       <div style="margin-top:4px;line-height:1.5">${e.decision}</div>
       ${reasonHtml}
       ${(e.references && e.references.length) ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">🔗 ${e.references.map(r =>
-        `<a href="#" style="color:var(--accent);text-decoration:none" onclick="event.preventDefault();_openDecisionRef('${escHtml(r.type)}',${r.id})">${escHtml(r.label || r.type + ' #' + r.id)}</a>`
+        `<button type="button" class="btn btn-sm" style="padding:0 4px;font-size:10px;color:var(--accent);text-decoration:none" data-action="_openDecisionRef" data-args='["${escHtml(r.type)}",${r.id}]'>${escHtml(r.label || r.type + ' #' + r.id)}</button>`
       ).join(', ')}</div>` : ''}
       ${(e.revisions && e.revisions.length) ? `<details style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)"><summary style="cursor:pointer">📝 ${e.revisions.length} ${t('decision_revision_count')||'revision(s)'}</summary>${e.revisions.map(rv =>
         `<div style="padding:4px 0;border-bottom:1px solid var(--border);margin-left:8px"><strong>${escHtml(rv.user_name||'')}</strong> — ${fmtDateTime(new Date(rv.timestamp))}${rv.prev_title ? '<br>Title: <del>' + escHtml(rv.prev_title) + '</del>' : ''}${rv.prev_decision ? '<br>Body changed' : ''}${rv.prev_log_type ? '<br>Visibility: <del>' + escHtml(rv.prev_log_type) + '</del>' : ''}${rv.prev_color ? '<br>Color changed' : ''}${rv.prev_deadline ? '<br>Deadline: <del>' + escHtml(rv.prev_deadline) + '</del>' : ''}</div>`
@@ -755,7 +755,7 @@ function _decisionOpenEditor(idRaw) {
 
   // Build references display
   const refs = entry.references || [];
-  const refsHtml = refs.map((r, i) => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px">🔗 ${escHtml(r.label || r.type + ' #' + r.id)} <button type="button" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)" onclick="this.closest('span').remove()">×</button></span>`).join('');
+  const refsHtml = refs.map((r, i) => `<span data-ref-type="${escHtml(r.type)}" data-ref-id="${r.id}" data-ref-label="${escHtml(r.label || r.type + ' #' + r.id)}" style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px">🔗 ${escHtml(r.label || r.type + ' #' + r.id)} <button type="button" class="dl-ref-remove" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)">×</button></span>`).join('');
 
   const modal = document.createElement('div');
   modal.className = 'modal-overlay open';
@@ -825,6 +825,10 @@ function _decisionOpenEditor(idRaw) {
   _bindActions(modal);
   if (typeof _diaryBindToolbar === 'function') _diaryBindToolbar(modal, 'dlEditBody');
   if (typeof _diaryTrapModalKeys === 'function') _diaryTrapModalKeys('dlEditorModal');
+  // Wire ref-chip remove buttons (CSP-safe — no inline onclick)
+  modal.querySelectorAll('.dl-ref-remove').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('span').remove());
+  });
   // Swatch clicks
   modal.querySelectorAll('.dl-swatch').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -844,7 +848,8 @@ function _decisionOpenEditor(idRaw) {
     tag.dataset.refType = refType;
     tag.dataset.refId = refId;
     tag.dataset.refLabel = refLabel || `${refType} #${refId}`;
-    tag.innerHTML = `🔗 ${escHtml(refLabel || refType + ' #' + refId)} <button type="button" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)" onclick="this.closest('span').remove()">×</button>`;
+    tag.innerHTML = `🔗 ${escHtml(refLabel || refType + ' #' + refId)} <button type="button" class="dl-ref-remove" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)">×</button>`;
+    tag.querySelector('.dl-ref-remove').addEventListener('click', () => tag.remove());
     document.getElementById('dlEditRefs')?.appendChild(tag);
     document.getElementById('dlRefId').value = '';
     document.getElementById('dlRefLabel').value = '';

@@ -566,12 +566,20 @@ async function _checkBoardDueItems() {
     if (!msg) msg = (t('board_due_items_notice')||'{n} board item(s) due or overdue').replace('{n}', dueItems.length);
     banner.innerHTML = `<span>⚠️ ${msg}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:4px 10px;cursor:pointer" onclick="if(typeof openBoardsModal==='function')openBoardsModal();this.closest('#boardDueBanner').remove()">${t('board_due_view')||'View Boards'}</button>
-        <button style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:2px 6px" onclick="this.closest('#boardDueBanner').remove()">✕</button>
+        <button class="btn btn-sm" id="boardDueViewBtn" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:4px 10px;cursor:pointer">${t('board_due_view')||'View Boards'}</button>
+        <button id="boardDueCloseBtn" style="background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:2px 6px">✕</button>
       </div>`;
     const header = document.getElementById('top-bar') || document.querySelector('header');
     if (header) header.insertAdjacentElement('afterend', banner);
     else document.body.prepend(banner);
+    // CSP-safe: attach event listeners instead of inline onclick handlers.
+    banner.querySelector('#boardDueViewBtn').addEventListener('click', () => {
+      if (typeof openBoardsModal === 'function') openBoardsModal();
+      banner.remove();
+    });
+    banner.querySelector('#boardDueCloseBtn').addEventListener('click', () => {
+      banner.remove();
+    });
   } catch { /* ignore if endpoint not available */ }
 }
 
