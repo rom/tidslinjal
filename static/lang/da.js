@@ -2793,4 +2793,13 @@ TRANSLATIONS.da = {
     offline_banner: 'OFFLINE-TILSTAND — arbejder med cachede data',
     offline_mode_enabled: 'Offline-tilstand aktiveret — bruger cachede data',
     online_mode_restored: 'Online-tilstand gendannet',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0-10',
+    poll_type_severity: 'Lav / Mellem / Høj / Kritisk',
+    severity_low: 'Lav',
+    severity_medium: 'Mellem',
+    severity_high: 'Høj',
+    severity_critical: 'Kritisk',
+    poll_created_by: 'Af',
   };

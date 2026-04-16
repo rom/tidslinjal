@@ -2727,4 +2727,13 @@ TRANSLATIONS.ko = {
     offline_banner: '오프라인 모드 — 캐시 데이터로 작업 중',
     offline_mode_enabled: '오프라인 모드 활성화 — 캐시 데이터 사용',
     online_mode_restored: '온라인 모드가 복구되었습니다',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: '0-10 척도',
+    poll_type_severity: '낮음 / 중간 / 높음 / 중대',
+    severity_low: '낮음',
+    severity_medium: '중간',
+    severity_high: '높음',
+    severity_critical: '중대',
+    poll_created_by: '작성자',
 };

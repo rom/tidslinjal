@@ -2727,4 +2727,13 @@ TRANSLATIONS.ja = {
     offline_banner: 'オフラインモード — キャッシュデータで動作中',
     offline_mode_enabled: 'オフラインモードを有効化 — キャッシュデータを使用',
     online_mode_restored: 'オンラインモードに復帰',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: '0-10段階評価',
+    poll_type_severity: '低 / 中 / 高 / 重大',
+    severity_low: '低',
+    severity_medium: '中',
+    severity_high: '高',
+    severity_critical: '重大',
+    poll_created_by: '作成者',
 };

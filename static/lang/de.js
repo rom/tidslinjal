@@ -3011,4 +3011,13 @@ TRANSLATIONS.de = {
     offline_banner: 'OFFLINE-MODUS — Arbeit mit zwischengespeicherten Daten',
     offline_mode_enabled: 'Offline-Modus aktiviert — zwischengespeicherte Daten',
     online_mode_restored: 'Online-Modus wiederhergestellt',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0-10',
+    poll_type_severity: 'Niedrig / Mittel / Hoch / Kritisch',
+    severity_low: 'Niedrig',
+    severity_medium: 'Mittel',
+    severity_high: 'Hoch',
+    severity_critical: 'Kritisch',
+    poll_created_by: 'Von',
   };

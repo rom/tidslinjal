@@ -1503,8 +1503,10 @@ type PollQuestionType string
 
 const (
 	PollQuestionScaleZeroThree PollQuestionType = "scale_0_3"
+	PollQuestionScaleZeroTen   PollQuestionType = "scale_0_10"
 	PollQuestionYesNo          PollQuestionType = "yes_no"
 	PollQuestionFreeText       PollQuestionType = "free_text"
+	PollQuestionSeverity       PollQuestionType = "severity"
 )
 
 // PollQuestion is a single question within a poll
@@ -1527,22 +1529,23 @@ type PollResponse struct {
 
 // Poll is a multipoll / personnel check that targets users, groups, or roles
 type Poll struct {
-	ID            int64          `json:"id"`
-	CreatedBy     int64          `json:"created_by"`
-	CreatedByName string         `json:"created_by_name"`
-	CreatedAt     time.Time      `json:"created_at"`
-	Title         string         `json:"title"`
-	Description   string         `json:"description,omitempty"`
-	TargetType    string         `json:"target_type"`    // user | group | role
-	TargetIDs     []string       `json:"target_ids"`     // user IDs, group IDs, or role names
-	Questions     []PollQuestion `json:"questions"`
-	Responses     []PollResponse `json:"responses"`
-	Status        string         `json:"status"`          // open | closed
-	ClosedAt      *time.Time     `json:"closed_at,omitempty"`
-	ScheduledAt   string         `json:"scheduled_at,omitempty"` // ISO 8601 time for timed polls
-	ReminderMins  int            `json:"reminder_mins,omitempty"` // auto-remind non-responders after N minutes
-	Fired         bool           `json:"fired,omitempty"`         // true once a scheduled poll has been activated
-	Tags          []string       `json:"tags,omitempty"`
+	ID             int64          `json:"id"`
+	SequenceNumber string         `json:"sequence_number,omitempty"` // "exercisename-Poll-year-NNN"
+	CreatedBy      int64          `json:"created_by"`
+	CreatedByName  string         `json:"created_by_name"`
+	CreatedAt      time.Time      `json:"created_at"`
+	Title          string         `json:"title"`
+	Description    string         `json:"description,omitempty"`
+	TargetType     string         `json:"target_type"`    // user | group | role
+	TargetIDs      []string       `json:"target_ids"`     // user IDs, group IDs, or role names
+	Questions      []PollQuestion `json:"questions"`
+	Responses      []PollResponse `json:"responses"`
+	Status         string         `json:"status"`          // open | closed
+	ClosedAt       *time.Time     `json:"closed_at,omitempty"`
+	ScheduledAt    string         `json:"scheduled_at,omitempty"` // ISO 8601 time for timed polls
+	ReminderMins   int            `json:"reminder_mins,omitempty"` // auto-remind non-responders after N minutes
+	Fired          bool           `json:"fired,omitempty"`         // true once a scheduled poll has been activated
+	Tags           []string       `json:"tags,omitempty"`
 }
 
 // DefaultPollQuestions returns the standard personnel-check questions

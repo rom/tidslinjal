@@ -3250,4 +3250,13 @@ TRANSLATIONS.en = {
     offline_banner: 'OFFLINE MODE — Working with cached data',
     offline_mode_enabled: 'Offline mode enabled — using cached data',
     online_mode_restored: 'Online mode restored',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Scale 0-10',
+    poll_type_severity: 'Low / Medium / High / Critical',
+    severity_low: 'Low',
+    severity_medium: 'Medium',
+    severity_high: 'High',
+    severity_critical: 'Critical',
+    poll_created_by: 'By',
   };

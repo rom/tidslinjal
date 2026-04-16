@@ -2779,4 +2779,13 @@ admin_view: 'Vista amministratore',
     offline_banner: 'MODALITÀ OFFLINE — lavoro con dati in cache',
     offline_mode_enabled: 'Modalità offline attivata — uso dati in cache',
     online_mode_restored: 'Modalità online ripristinata',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Scala 0-10',
+    poll_type_severity: 'Basso / Medio / Alto / Critico',
+    severity_low: 'Basso',
+    severity_medium: 'Medio',
+    severity_high: 'Alto',
+    severity_critical: 'Critico',
+    poll_created_by: 'Da',
   };

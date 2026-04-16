@@ -2677,7 +2677,7 @@ async function openPollModal(opts) {
       const questions = JSON.parse(opt.dataset.questions || '[]');
       list.innerHTML = '';
       questions.forEach(q => {
-        const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
+        const typeMap = { scale_0_3: 'scale', scale_0_10: 'scale_0_10', yes_no: 'yes_no', severity: 'severity', free_text: 'free_text' };
         _addPollQuestionRow(list, q.text, typeMap[q.type] || q.type || 'scale');
       });
     });
@@ -2830,7 +2830,9 @@ function _addPollQuestionRow(container, text, type) {
       style="flex:1;width:auto;min-width:0;padding:4px 8px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);resize:vertical;min-height:32px;height:32px;line-height:1.4">${escHtml(text)}</textarea>
     <select class="poll-q-type" style="width:auto;padding:4px 6px;font-size:var(--fs-xs);background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);flex-shrink:0">
       <option value="scale" ${type==='scale'?'selected':''}>${t('poll_type_scale')||'Scale 0-3'}</option>
+      <option value="scale_0_10" ${type==='scale_0_10'?'selected':''}>${t('poll_type_scale_0_10')||'Scale 0-10'}</option>
       <option value="yes_no" ${type==='yes_no'?'selected':''}>${t('poll_type_yes_no')||'Yes / No'}</option>
+      <option value="severity" ${type==='severity'?'selected':''}>${t('poll_type_severity')||'Low / Medium / High / Critical'}</option>
       <option value="free_text" ${type==='free_text'?'selected':''}>${t('poll_type_free_text')||'Free text'}</option>
     </select>
     <button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;flex-shrink:0" title="${t('poll_remove_question')||'Remove'}">✕</button>`;
@@ -2880,11 +2882,24 @@ async function _loadPolls(modal) {
                 <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
                   ${[0,1,2,3].map(v => `<button class="toggle-btn poll-scale-btn" data-qi="${qi}" data-val="${v}">${t('poll_scale_'+v)||['None','Low','Medium','High'][v]}</button>`).join('')}
                 </div></div>`;
+            } else if (q.type === 'scale_0_10') {
+              return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
+                <div class="toggle-btn-group" style="font-size:10px;margin-top:2px;flex-wrap:wrap">
+                  ${[0,1,2,3,4,5,6,7,8,9,10].map(v => `<button class="toggle-btn poll-scale-btn" data-qi="${qi}" data-val="${v}">${v}</button>`).join('')}
+                </div></div>`;
             } else if (q.type === 'yes_no') {
               return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
                 <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
                   <button class="toggle-btn poll-yn-btn" data-qi="${qi}" data-val="yes">${t('yes')||'Yes'}</button>
                   <button class="toggle-btn poll-yn-btn" data-qi="${qi}" data-val="no">${t('no')||'No'}</button>
+                </div></div>`;
+            } else if (q.type === 'severity') {
+              return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
+                <div class="toggle-btn-group" style="font-size:10px;margin-top:2px">
+                  <button class="toggle-btn poll-sev-btn" data-qi="${qi}" data-val="low" style="background:#27AE60;color:#fff">${t('severity_low')||'Low'}</button>
+                  <button class="toggle-btn poll-sev-btn" data-qi="${qi}" data-val="medium" style="background:#F1C40F;color:#222">${t('severity_medium')||'Medium'}</button>
+                  <button class="toggle-btn poll-sev-btn" data-qi="${qi}" data-val="high" style="background:#E67E22;color:#fff">${t('severity_high')||'High'}</button>
+                  <button class="toggle-btn poll-sev-btn" data-qi="${qi}" data-val="critical" style="background:#E74C3C;color:#fff">${t('severity_critical')||'Critical'}</button>
                 </div></div>`;
             } else {
               return `<div style="margin-bottom:6px"><label style="font-size:var(--fs-xs);color:var(--text-dim)">${escHtml(q.text)}</label>
@@ -2960,8 +2975,8 @@ async function _loadPolls(modal) {
           });
         }
 
-        // Standard question table for scale/yes_no
-        const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'yes_no');
+        // Standard question table for scale/scale_0_10/yes_no/severity
+        const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'scale_0_10' || q.type === 'yes_no' || q.type === 'severity');
         let tableHtml = '';
         if (standardQs.length > 0 && answeredUsers.length > 0) {
           const headerCells = standardQs.map(q => `<th style="padding:3px 6px;border:1px solid var(--border);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(q.text)}">${escHtml(q.text.length > 30 ? q.text.slice(0,27)+'...' : q.text)}</th>`).join('');
@@ -2978,9 +2993,19 @@ async function _loadPolls(modal) {
                 else if (v === 2) bg = 'background:#E67E2233';
                 else if (v === 3) bg = 'background:#E74C3C33';
                 val = t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v;
+              } else if (q.type === 'scale_0_10') {
+                const v = parseInt(val);
+                if (v <= 2) bg = 'background:#27AE6033';
+                else if (v <= 5) bg = 'background:#F39C1233';
+                else if (v <= 8) bg = 'background:#E67E2233';
+                else bg = 'background:#E74C3C33';
               } else if (q.type === 'yes_no') {
                 bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
                 val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
+              } else if (q.type === 'severity') {
+                const sevMap = { low: {bg:'#27AE6033', l:'severity_low', f:'Low'}, medium: {bg:'#F1C40F33', l:'severity_medium', f:'Medium'}, high: {bg:'#E67E2233', l:'severity_high', f:'High'}, critical: {bg:'#E74C3C33', l:'severity_critical', f:'Critical'} };
+                const s = sevMap[val];
+                if (s) { bg = 'background:'+s.bg; val = t(s.l)||s.f; }
               }
               return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;font-size:10px;${bg}">${val}</td>`;
             }).join('');
@@ -3018,13 +3043,15 @@ async function _loadPolls(modal) {
         </div>`;
       }
 
+      const _pollSeq = poll.sequence_number ? `<span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;margin-right:6px">${escHtml(poll.sequence_number)}</span>` : '';
+      const _pollCreatedBy = poll.created_by_name ? ` · 👤 ${t('poll_created_by')||'By'}: ${escHtml(poll.created_by_name)}` : '';
       return `<div class="sidebar-section" style="margin-bottom:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius)">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong style="font-size:var(--fs-sm)">📊 ${escHtml(poll.title)}</strong>
+          <strong style="font-size:var(--fs-sm)">${_pollSeq}📊 ${escHtml(poll.title)}</strong>
           <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600">${statusText}</span>
         </div>
         <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">
-          ${t('poll_started')||'Started'}: ${fmtDateTime(new Date(poll.created_at))}${isCreator ? ` — ${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}` : ''}
+          ${t('poll_started')||'Started'}: ${fmtDateTime(new Date(poll.created_at))}${_pollCreatedBy}${isCreator ? ` — ${t('poll_responses')||'Responses'}: ${totalResponses}/${totalTargets}` : ''}
         </div>
         ${questionsHtml}
         ${summaryHtml}
@@ -3036,8 +3063,8 @@ async function _loadPolls(modal) {
       </div>`;
     }).join('');
 
-    // Bind scale/yn toggle buttons
-    wrap.querySelectorAll('.poll-scale-btn, .poll-yn-btn').forEach(btn => {
+    // Bind scale/yn/severity toggle buttons
+    wrap.querySelectorAll('.poll-scale-btn, .poll-yn-btn, .poll-sev-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const grp = btn.parentElement;
         grp.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
@@ -3055,11 +3082,14 @@ async function _loadPolls(modal) {
         if (!poll) return;
         const answers = (poll.questions || []).map((q, qi) => {
           let answer = '';
-          if (q.type === 'scale_0_3' || q.type === 'scale') {
+          if (q.type === 'scale_0_3' || q.type === 'scale' || q.type === 'scale_0_10') {
             const active = form.querySelector(`.poll-scale-btn[data-qi="${qi}"].active`);
             answer = active ? active.dataset.val : '';
           } else if (q.type === 'yes_no') {
             const active = form.querySelector(`.poll-yn-btn[data-qi="${qi}"].active`);
+            answer = active ? active.dataset.val : '';
+          } else if (q.type === 'severity') {
+            const active = form.querySelector(`.poll-sev-btn[data-qi="${qi}"].active`);
             answer = active ? active.dataset.val : '';
           } else {
             const input = form.querySelector(`.poll-free-input[data-qi="${qi}"]`);
@@ -3935,7 +3965,7 @@ async function openQuestionnaireEditor() {
     descEl.value = tq ? (tq.description || '') : '';
     questionsEl.innerHTML = '';
     if (tq && tq.questions) {
-      const typeMap = { scale_0_3: 'scale', yes_no: 'yes_no', free_text: 'free_text' };
+      const typeMap = { scale_0_3: 'scale', scale_0_10: 'scale_0_10', yes_no: 'yes_no', severity: 'severity', free_text: 'free_text' };
       tq.questions.forEach(qu => _addPollQuestionRow(questionsEl, qu.text, typeMap[qu.type] || qu.type || 'scale'));
     }
     // All fields are always editable — built-in questionnaires can be edited (will save as copy)
@@ -4017,7 +4047,7 @@ async function openQuestionnaireEditor() {
     questionsEl.querySelectorAll('.poll-q-row').forEach(row => {
       const text = row.querySelector('.poll-q-text')?.value?.trim();
       const rawType = row.querySelector('.poll-q-type')?.value || 'scale';
-      const typeMap = { scale: 'scale_0_3', yes_no: 'yes_no', free_text: 'free_text' };
+      const typeMap = { scale: 'scale_0_3', scale_0_10: 'scale_0_10', yes_no: 'yes_no', severity: 'severity', free_text: 'free_text' };
       if (text) questions.push({ text, type: typeMap[rawType] || rawType });
     });
     if (questions.length === 0) { showError(t('questionnaire_add_question')||'Add at least one question'); return; }

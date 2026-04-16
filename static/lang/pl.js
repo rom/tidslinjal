@@ -2787,4 +2787,13 @@ event_log_empty: 'Brak odebranych zdarzeń zewnętrznych.',
     offline_banner: 'TRYB OFFLINE — praca z danymi z pamięci podręcznej',
     offline_mode_enabled: 'Tryb offline włączony — używane dane z pamięci podręcznej',
     online_mode_restored: 'Tryb online przywrócony',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0-10',
+    poll_type_severity: 'Niski / Średni / Wysoki / Krytyczny',
+    severity_low: 'Niski',
+    severity_medium: 'Średni',
+    severity_high: 'Wysoki',
+    severity_critical: 'Krytyczny',
+    poll_created_by: 'Przez',
   };
