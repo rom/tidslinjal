@@ -211,6 +211,54 @@ func (s *Store) UpdatePersonReadyCheck(check PersonReadyCheck) error {
 	return fmt.Errorf("person ready check %d not found", check.ID)
 }
 
+// ── Request For Information (RFI) ───────────────────────────────────────────
+
+func (s *Store) GetRFIs() []RequestForInfo {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]RequestForInfo, len(s.rfis))
+	copy(out, s.rfis)
+	return out
+}
+
+func (s *Store) AddRFI(rfi RequestForInfo) (RequestForInfo, error) {
+	s.mu.Lock()
+	s.nextRFIID++
+	rfi.ID = s.nextRFIID
+	s.rfis = append(s.rfis, rfi)
+	snap := append([]RequestForInfo(nil), s.rfis...)
+	s.mu.Unlock()
+	return rfi, s.persist("rfis.json", snap)
+}
+
+func (s *Store) UpdateRFI(rfi RequestForInfo) error {
+	s.mu.Lock()
+	for i, r := range s.rfis {
+		if r.ID == rfi.ID {
+			s.rfis[i] = rfi
+			snap := append([]RequestForInfo(nil), s.rfis...)
+			s.mu.Unlock()
+			return s.persist("rfis.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("RFI %d not found", rfi.ID)
+}
+
+func (s *Store) DeleteRFI(id int64) error {
+	s.mu.Lock()
+	for i, r := range s.rfis {
+		if r.ID == id {
+			s.rfis = append(s.rfis[:i], s.rfis[i+1:]...)
+			snap := append([]RequestForInfo(nil), s.rfis...)
+			s.mu.Unlock()
+			return s.persist("rfis.json", snap)
+		}
+	}
+	s.mu.Unlock()
+	return fmt.Errorf("RFI %d not found", id)
+}
+
 // ── Polls ───────────────────────────────────────────────────────────────────
 
 func (s *Store) GetPolls() []Poll {

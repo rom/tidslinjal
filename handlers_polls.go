@@ -945,3 +945,238 @@ func (app *App) handleDuplicateQuestionnaire(w http.ResponseWriter, r *http.Requ
 	})
 	jsonOK(w, saved)
 }
+
+// ── Request For Information (RFI) ─────────────────────────────────────────
+
+func (app *App) handleGetRFIs(w http.ResponseWriter, r *http.Request, user *User) {
+	rfis := app.store.GetRFIs()
+	if rfis == nil {
+		rfis = []RequestForInfo{}
+	}
+	jsonOK(w, rfis)
+}
+
+func (app *App) handleCreateRFI(w http.ResponseWriter, r *http.Request, user *User) {
+	var req struct {
+		Question       string  `json:"question"`
+		RespondentIDs  []int64 `json:"respondent_ids"`
+		GroupIDs       []int64 `json:"group_ids"`
+		All            bool    `json:"all"`
+		DeadlineMins   int     `json:"deadline_mins"`
+		ScheduledAt    string  `json:"scheduled_at"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Question == "" {
+		jsonError(w, "question text required", http.StatusBadRequest)
+		return
+	}
+	respondentMap := make(map[int64]bool)
+	for _, uid := range req.RespondentIDs {
+		respondentMap[uid] = true
+	}
+	if len(req.GroupIDs) > 0 {
+		for _, gid := range req.GroupIDs {
+			members := app.store.GetGroupMembers(gid)
+			for _, m := range members {
+				respondentMap[m.UserID] = true
+			}
+		}
+	}
+	if req.All {
+		for _, u := range app.store.GetUsers() {
+			respondentMap[u.ID] = true
+		}
+	}
+	delete(respondentMap, user.ID)
+	if len(respondentMap) == 0 {
+		jsonError(w, "at least one respondent required", http.StatusBadRequest)
+		return
+	}
+	respondents := make([]RFIRespondent, 0, len(respondentMap))
+	for uid := range respondentMap {
+		u, ok := app.store.GetUserByID(uid)
+		name := ""
+		if ok && u != nil {
+			name = u.DisplayName
+			if name == "" {
+				name = u.Username
+			}
+		}
+		respondents = append(respondents, RFIRespondent{
+			UserID: uid, UserName: name, Status: "pending",
+		})
+	}
+	now := time.Now()
+	rfi := RequestForInfo{
+		CreatedBy:     user.ID,
+		CreatedByName: user.DisplayName,
+		Question:      stripHTMLTags(req.Question),
+		Respondents:   respondents,
+		CreatedAt:     now,
+		DeadlineMins:  req.DeadlineMins,
+		ScheduledAt:   req.ScheduledAt,
+		Status:        "open",
+	}
+	if rfi.CreatedByName == "" {
+		rfi.CreatedByName = user.Username
+	}
+	if req.DeadlineMins > 0 {
+		dl := now.Add(time.Duration(req.DeadlineMins) * time.Minute)
+		rfi.DeadlineAt = dl.UTC().Format(time.RFC3339)
+	}
+	created, err := app.store.AddRFI(rfi)
+	if err != nil {
+		jsonError(w, "failed to create RFI", http.StatusInternalServerError)
+		return
+	}
+	isScheduled := false
+	if req.ScheduledAt != "" {
+		if t, err := time.Parse(time.RFC3339, req.ScheduledAt); err == nil && t.After(now) {
+			isScheduled = true
+		}
+	}
+	if !isScheduled {
+		app.fireRFI(created)
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "create_rfi", EntityType: "rfi", EntityID: created.ID,
+		Summary: fmt.Sprintf("Created RFI targeting %d respondents: %s", len(created.Respondents), created.Question),
+	})
+	jsonOK(w, created)
+}
+
+func (app *App) fireRFI(rfi RequestForInfo) {
+	data, _ := json.Marshal(rfi)
+	app.broker.BroadcastAll(SSEMessage{Event: "rfi_new", Data: string(data)})
+	for _, r := range rfi.Respondents {
+		app.notifyUser(r.UserID, "rfi",
+			"Request For Information",
+			fmt.Sprintf("%s requests information: %s", rfi.CreatedByName, rfi.Question),
+			fmt.Sprintf("%d", rfi.ID))
+	}
+}
+
+func (app *App) handleRespondRFI(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Response string `json:"response"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	rfis := app.store.GetRFIs()
+	var found *RequestForInfo
+	for i := range rfis {
+		if rfis[i].ID == id {
+			found = &rfis[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "RFI not found", http.StatusNotFound)
+		return
+	}
+	if found.Status == "closed" {
+		jsonError(w, "this RFI is closed", http.StatusBadRequest)
+		return
+	}
+	updated := false
+	for j := range found.Respondents {
+		if found.Respondents[j].UserID == user.ID {
+			found.Respondents[j].Status = "responded"
+			found.Respondents[j].Response = req.Response
+			found.Respondents[j].RespondedAt = time.Now().UTC().Format(time.RFC3339)
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		jsonError(w, "you are not a respondent in this RFI", http.StatusForbidden)
+		return
+	}
+	if err := app.store.UpdateRFI(*found); err != nil {
+		jsonError(w, "failed to update", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, found)
+	data, _ := json.Marshal(found)
+	app.broker.BroadcastAll(SSEMessage{Event: "rfi_update", Data: string(data)})
+}
+
+func (app *App) handleCloseRFI(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rfis := app.store.GetRFIs()
+	var found *RequestForInfo
+	for i := range rfis {
+		if rfis[i].ID == id {
+			found = &rfis[i]
+			break
+		}
+	}
+	if found == nil {
+		jsonError(w, "RFI not found", http.StatusNotFound)
+		return
+	}
+	found.Status = "closed"
+	if err := app.store.UpdateRFI(*found); err != nil {
+		jsonError(w, "failed to close", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, found)
+	data, _ := json.Marshal(found)
+	app.broker.BroadcastAll(SSEMessage{Event: "rfi_closed", Data: string(data)})
+}
+
+func (app *App) runRFIScheduler() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-app.stopCh:
+			return
+		case <-ticker.C:
+		}
+		now := time.Now()
+		rfis := app.store.GetRFIs()
+		for _, rfi := range rfis {
+			if rfi.ScheduledAt != "" && !rfi.Fired {
+				scheduledTime, err := time.Parse(time.RFC3339, rfi.ScheduledAt)
+				if err != nil || now.Before(scheduledTime) {
+					continue
+				}
+				rfi.Fired = true
+				if rfi.DeadlineMins > 0 && rfi.DeadlineAt == "" {
+					dl := now.Add(time.Duration(rfi.DeadlineMins) * time.Minute)
+					rfi.DeadlineAt = dl.UTC().Format(time.RFC3339)
+				}
+				_ = app.store.UpdateRFI(rfi)
+				app.fireRFI(rfi)
+			}
+			if rfi.Status == "open" && rfi.DeadlineAt != "" {
+				dlTime, err := time.Parse(time.RFC3339, rfi.DeadlineAt)
+				if err != nil {
+					continue
+				}
+				if now.After(dlTime) {
+					rfi.Status = "closed"
+					_ = app.store.UpdateRFI(rfi)
+					data, _ := json.Marshal(rfi)
+					app.broker.BroadcastAll(SSEMessage{Event: "rfi_closed", Data: string(data)})
+				}
+			}
+		}
+	}
+}

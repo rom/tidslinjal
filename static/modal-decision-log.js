@@ -101,6 +101,32 @@ async function openDecisionLogModal() {
               <select id="dlExecutorValue" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);min-width:120px">
               </select>
             </div>
+            <div style="margin-top:6px">
+              <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;display:block;margin-bottom:4px">${t('lb_background_color')||'Background colour'}</label>
+              <div id="dlAddSwatches" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                ${['', '#FFF4C2', '#D6F5D6', '#FFD6D6', '#D6E4FF', '#E6D6FF', '#FFE0B3'].map(sw => {
+                  const bg = sw || 'transparent';
+                  const sel = sw === '' ? 'outline:2px solid var(--accent);' : '';
+                  return `<button type="button" class="dl-add-swatch" data-dl-color="${escHtml(sw)}"
+                    style="width:20px;height:20px;border:1px solid #888;border-radius:4px;background:${bg};${sel}cursor:pointer" title="${sw||'None'}"></button>`;
+                }).join('')}
+              </div>
+              <input type="hidden" id="dlAddColor" value="">
+            </div>
+            <div style="margin-top:4px">
+              <label style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600;display:block;margin-bottom:4px">🔗 ${t('decision_references')||'References'}</label>
+              <div id="dlAddRefs" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
+              <div style="display:flex;gap:4px;align-items:center">
+                <select id="dlAddRefType" class="input" style="font-size:var(--fs-xs);width:auto;padding:3px 6px">
+                  <option value="log_book">${t('tab_log_book')||'Log Book'}</option>
+                  <option value="diary">${t('diary_title')||'Diary'}</option>
+                  <option value="event">${t('event')||'Event'}</option>
+                </select>
+                <input type="number" id="dlAddRefId" class="input" style="width:60px;font-size:var(--fs-xs);padding:3px 6px" placeholder="ID" min="1">
+                <input type="text" id="dlAddRefLabel" class="input" style="flex:1;font-size:var(--fs-xs);padding:3px 6px" placeholder="${t('decision_ref_label')||'Label'}">
+                <button type="button" class="btn btn-sm btn-secondary" id="dlAddRefBtn" style="font-size:10px;padding:2px 6px">+</button>
+              </div>
+            </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               ${canWrite ? `
                 <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:3px 10px;font-size:11px" data-action="addDecisionLogEntry" data-approval-type="approved" data-arg-el>✓ ${t('btn_approve')||'Approve'}</button>
@@ -210,6 +236,38 @@ async function openDecisionLogModal() {
   if (typeof _diaryBindToolbar === 'function') {
     _diaryBindToolbar(modal, 'dlNewDecision');
   }
+  // Wire color swatch clicks in the add form
+  modal.querySelectorAll('.dl-add-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.dlColor || '';
+      const hidden = document.getElementById('dlAddColor');
+      if (hidden) hidden.value = val;
+      modal.querySelectorAll('.dl-add-swatch').forEach(b => { b.style.outline = ''; });
+      btn.style.outline = '2px solid var(--accent)';
+    });
+  });
+  // Wire reference add button in the add form
+  document.getElementById('dlAddRefBtn')?.addEventListener('click', () => {
+    const refType = document.getElementById('dlAddRefType')?.value;
+    const refId = document.getElementById('dlAddRefId')?.value;
+    const refLabel = document.getElementById('dlAddRefLabel')?.value || '';
+    if (!refType || !refId) return;
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px';
+    tag.dataset.refType = refType;
+    tag.dataset.refId = refId;
+    tag.dataset.refLabel = refLabel || `${refType} #${refId}`;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => tag.remove());
+    tag.textContent = `🔗 ${refLabel || refType + ' #' + refId} `;
+    tag.appendChild(removeBtn);
+    document.getElementById('dlAddRefs')?.appendChild(tag);
+    document.getElementById('dlAddRefId').value = '';
+    document.getElementById('dlAddRefLabel').value = '';
+  });
   // Wire free-text search
   const searchEl = document.getElementById('dlSearchInput');
   if (searchEl) {
@@ -379,17 +437,23 @@ function _renderDecisionLogEntries() {
     const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
     const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
     // Background color: custom > deadline-based auto-color
+    // Status values: '' = direct decision (decided immediately),
+    // 'requested' = pending, 'approved' = reviewed+approved, 'rejected' = denied.
+    // Direct decisions (status='') are implicitly approved.
+    const isApproved = e.status === 'approved' || (!e.status && e.decided_at);
+    const isCondition = e.approval_type === 'approved_with_condition';
     let bgStyle = '';
     if (e.color) {
       bgStyle = `background:${escHtml(e.color)};color:#222;`;
     } else if (e.deadline && e.status === 'requested') {
       bgStyle = 'background:#FFF4C2;color:#222;'; // yellow: pending with deadline
-    } else if (e.status === 'approved' && e.approval_type === 'approved_with_condition') {
+    } else if (isApproved && isCondition) {
       bgStyle = 'background:#FFF4C2;color:#222;'; // yellow: conditional approval
-    } else if (e.deadline && e.status === 'approved' && e.approval_type !== 'approved_with_condition') {
+    } else if (e.deadline && isApproved && !isCondition) {
       const dlDate = new Date(e.deadline);
       const decidedAt = e.decided_at ? new Date(e.decided_at) : null;
       if (decidedAt && decidedAt <= dlDate) bgStyle = 'background:#D6F5D6;color:#222;'; // green: approved before deadline
+      else if (decidedAt) bgStyle = 'background:#FFD6D6;color:#222;'; // red: approved after deadline
     } else if (e.deadline && e.status === 'rejected') {
       bgStyle = 'background:#FFD6D6;color:#222;'; // red: denied
     }
@@ -460,11 +524,18 @@ async function addDecisionLogEntry(el) {
   const coSignTargetUser = coSignTargetId ? (state.users||[]).find(u => u.id === parseInt(coSignTargetId, 10)) : null;
   const coSignTargetName = coSignTargetUser ? (coSignTargetUser.display_name || coSignTargetUser.username) : '';
   const deadline = document.getElementById('dlDeadline')?.value || '';
+  const color = document.getElementById('dlAddColor')?.value || '';
+  // Collect references from add form
+  const addRefEls = document.querySelectorAll('#dlAddRefs span[data-ref-type]');
+  const references = [];
+  addRefEls.forEach(el => {
+    references.push({ type: el.dataset.refType, id: parseInt(el.dataset.refId, 10), label: el.dataset.refLabel || '' });
+  });
   const res = await apiPost('/api/decision-log', {title, decision: text, log_type: logType, group_id: groupId, confidential,
     status: isDeny ? 'rejected' : '',
     approval_type: isDeny ? '' : approvalType,
     executor_type: executorType, executor_value: executorValue, executor_label: executorLabel,
-    reason, co_sign_required: coSignRequired, deadline,
+    reason, co_sign_required: coSignRequired, deadline, color, references,
     co_sign_target_id: coSignTargetId ? parseInt(coSignTargetId, 10) : null,
     co_sign_target_name: coSignTargetName});
   if (res.ok) {

@@ -62,6 +62,7 @@ type Store struct {
 	rooms                []Room
 	customResourceTypes  []CustomResourceType
 	personReadyChecks    []PersonReadyCheck
+	rfis                 []RequestForInfo
 	polls                []Poll
 	notifications        []Notification
 	mapResources         []MapResource
@@ -119,6 +120,7 @@ type Store struct {
 	nextLogBookID            int64
 	nextCustomResTypeID      int64
 	nextPersonReadyCheckID   int64
+	nextRFIID                int64
 	nextPollID               int64
 	nextNotificationID       int64
 	nextMapResourceID        int64
@@ -257,6 +259,7 @@ func (s *Store) load() error {
 	s.loadFile("event_log.json", &s.eventLog)
 	s.loadFile("log_book.json", &s.logBook)
 	s.loadFile("person_ready_checks.json", &s.personReadyChecks)
+	s.loadFile("rfis.json", &s.rfis)
 	s.loadFile("polls.json", &s.polls)
 	s.loadFile("notifications.json", &s.notifications)
 	s.loadFile("map_resources.json", &s.mapResources)
@@ -453,6 +456,11 @@ func (s *Store) load() error {
 	for _, x := range s.personReadyChecks {
 		if x.ID > s.nextPersonReadyCheckID {
 			s.nextPersonReadyCheckID = x.ID
+		}
+	}
+	for _, x := range s.rfis {
+		if x.ID > s.nextRFIID {
+			s.nextRFIID = x.ID
 		}
 	}
 	for _, x := range s.polls {
