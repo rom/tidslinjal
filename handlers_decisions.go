@@ -52,24 +52,26 @@ func (app *App) handleListDecisionLog(w http.ResponseWriter, r *http.Request, us
 
 func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Title             string `json:"title"`
-		Decision          string `json:"decision"`
-		LogType           string `json:"log_type"`
-		GroupID           int64  `json:"group_id"`
-		Confidential      bool   `json:"confidential"`
-		Status            string `json:"status"`              // "" = decided, "requested" = request for decision
-		ApprovalType      string `json:"approval_type"`       // "approved" | "approved_with_condition" | "approved_with_modification"
-		RequestedOfType   string `json:"requested_of_type"`   // "role" | "group" | "person"
-		RequestedOfValue  string `json:"requested_of_value"`  // role key, group id, or user id
-		RequestedOfLabel  string `json:"requested_of_label"`  // display name
-		ExecutorType      string `json:"executor_type"`       // "role" | "group" | "person"
-		ExecutorValue     string `json:"executor_value"`
-		ExecutorLabel     string `json:"executor_label"`
-		Reason            string `json:"reason"`
-		CoSignRequired    bool   `json:"co_sign_required"`
-		CoSignTargetID    int64  `json:"co_sign_target_id"`
-		CoSignTargetName  string `json:"co_sign_target_name"`
-		Deadline          string `json:"deadline"`
+		Title             string              `json:"title"`
+		Decision          string              `json:"decision"`
+		LogType           string              `json:"log_type"`
+		GroupID           int64               `json:"group_id"`
+		Confidential      bool                `json:"confidential"`
+		Status            string              `json:"status"`              // "" = decided, "requested" = request for decision
+		ApprovalType      string              `json:"approval_type"`       // "approved" | "approved_with_condition" | "approved_with_modification"
+		RequestedOfType   string              `json:"requested_of_type"`   // "role" | "group" | "person"
+		RequestedOfValue  string              `json:"requested_of_value"`  // role key, group id, or user id
+		RequestedOfLabel  string              `json:"requested_of_label"`  // display name
+		ExecutorType      string              `json:"executor_type"`       // "role" | "group" | "person"
+		ExecutorValue     string              `json:"executor_value"`
+		ExecutorLabel     string              `json:"executor_label"`
+		Reason            string              `json:"reason"`
+		CoSignRequired    bool                `json:"co_sign_required"`
+		CoSignTargetID    int64               `json:"co_sign_target_id"`
+		CoSignTargetName  string              `json:"co_sign_target_name"`
+		Deadline          string              `json:"deadline"`
+		Color             string              `json:"color"`
+		References        []DecisionReference `json:"references"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -112,7 +114,7 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		DisplayName:       user.DisplayName,
 		Title:             stripHTMLTags(req.Title),
 		Status:            req.Status,
-		Decision:          stripHTMLTags(req.Decision),
+		Decision:          sanitizeRichHTML(req.Decision),
 		LogType:           req.LogType,
 		GroupID:            req.GroupID,
 		Confidential:      req.Confidential,
@@ -127,6 +129,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		CoSignTargetID:    req.CoSignTargetID,
 		CoSignTargetName:  req.CoSignTargetName,
 		Deadline:          req.Deadline,
+		Color:             validDecisionColor(req.Color),
+		References:        req.References,
 	}
 	if req.Status == "requested" {
 		entry.RequestedAt = &now
@@ -148,16 +152,8 @@ func (app *App) handleAddDecisionLogEntry(w http.ResponseWriter, r *http.Request
 		jsonError(w, "failed to save", http.StatusInternalServerError)
 		return
 	}
-	// Generate sequence number from exercise name + sequential ID
-	seqPrefix := "decision"
-	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
-		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
-		if len(abbr) > 20 {
-			abbr = abbr[:20]
-		}
-		seqPrefix = abbr
-	}
-	created.SequenceNumber = fmt.Sprintf("%s-%03d", seqPrefix, created.ID)
+	// Generate sequence number: exercisename-decision-year-NNN
+	created.SequenceNumber = app.decisionSequenceNumber(created.ID, created.Timestamp)
 	_ = app.store.UpdateDecisionLogEntry(created)
 	auditAction := "created"
 	var auditSummary string
@@ -574,16 +570,18 @@ func (app *App) userHasCapability(user *User, cap string) bool {
 // ── Decision Request handler (any authenticated user) ─────────────────────────
 func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, user *User) {
 	var req struct {
-		Title            string `json:"title"`
-		Decision         string `json:"decision"`
-		LogType          string `json:"log_type"`
-		GroupID          int64  `json:"group_id"`
-		Confidential     bool   `json:"confidential"`
-		Reason           string `json:"reason"`
-		RequestedOfType  string `json:"requested_of_type"`
-		RequestedOfValue string `json:"requested_of_value"`
-		RequestedOfLabel string `json:"requested_of_label"`
-		Deadline         string `json:"deadline"`
+		Title            string              `json:"title"`
+		Decision         string              `json:"decision"`
+		LogType          string              `json:"log_type"`
+		GroupID          int64               `json:"group_id"`
+		Confidential     bool                `json:"confidential"`
+		Reason           string              `json:"reason"`
+		RequestedOfType  string              `json:"requested_of_type"`
+		RequestedOfValue string              `json:"requested_of_value"`
+		RequestedOfLabel string              `json:"requested_of_label"`
+		Deadline         string              `json:"deadline"`
+		Color            string              `json:"color"`
+		References       []DecisionReference `json:"references"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -603,7 +601,7 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 		UserName:         user.Username,
 		DisplayName:      user.DisplayName,
 		Title:            req.Title,
-		Decision:         req.Decision,
+		Decision:         sanitizeRichHTML(req.Decision),
 		LogType:          req.LogType,
 		GroupID:          req.GroupID,
 		Confidential:     req.Confidential,
@@ -614,6 +612,8 @@ func (app *App) handleRequestDecision(w http.ResponseWriter, r *http.Request, us
 		RequestedOfLabel: req.RequestedOfLabel,
 		Reason:           req.Reason,
 		Deadline:         req.Deadline,
+		Color:            validDecisionColor(req.Color),
+		References:       req.References,
 	}
 	created, err := app.store.AddDecisionLogEntry(entry)
 	if err != nil {
@@ -722,4 +722,149 @@ func (app *App) handleGetDecisionLogByShareToken(w http.ResponseWriter, r *http.
 		}
 	}
 	jsonError(w, "invalid or expired share link", http.StatusNotFound)
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+// decisionSequenceNumber builds the label "exercisename-decision-year-NNN".
+func (app *App) decisionSequenceNumber(id int64, ts time.Time) string {
+	prefix := ""
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		prefix = abbr + "-"
+	}
+	year := ts.Year()
+	if year == 0 {
+		year = time.Now().Year()
+	}
+	return fmt.Sprintf("%sdecision-%d-%03d", prefix, year, id)
+}
+
+// validDecisionColor mirrors validLogBookColor in handlers_audit.go.
+func validDecisionColor(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" || len(s) > 32 {
+		return ""
+	}
+	if s[0] == '#' {
+		hex := s[1:]
+		if len(hex) == 3 || len(hex) == 4 || len(hex) == 6 || len(hex) == 8 {
+			for _, c := range hex {
+				if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+					return ""
+				}
+			}
+			return s
+		}
+		return ""
+	}
+	named := map[string]bool{
+		"red": true, "orange": true, "yellow": true, "green": true,
+		"blue": true, "purple": true, "pink": true, "gray": true, "grey": true,
+		"lightyellow": true, "lightgreen": true, "lightblue": true, "lightpink": true,
+		"lightgray": true, "lightgrey": true, "transparent": true,
+	}
+	if named[strings.ToLower(s)] {
+		return strings.ToLower(s)
+	}
+	return ""
+}
+
+// handleUpdateDecisionLogEntry lets the creator (or admin) edit an existing
+// decision. A revision snapshot of the previous state is stored so the
+// change history is transparent.
+func (app *App) handleUpdateDecisionLogEntry(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	entry := app.store.GetDecisionLogEntryByID(id)
+	if entry == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	if entry.UserID != user.ID && !app.effectiveHasRole(user, RoleAdmin) {
+		jsonError(w, "forbidden — only the creator or an admin may edit", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Title      string              `json:"title"`
+		Decision   string              `json:"decision"`
+		Reason     string              `json:"reason"`
+		LogType    string              `json:"log_type"`
+		GroupID    int64               `json:"group_id"`
+		Color      string              `json:"color"`
+		Deadline   string              `json:"deadline"`
+		References []DecisionReference `json:"references"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Decision == "" {
+		jsonError(w, "decision text required", http.StatusBadRequest)
+		return
+	}
+	// Build a revision snapshot of the fields that actually changed.
+	now := time.Now()
+	rev := DecisionRevision{
+		Timestamp: now,
+		UserID:    user.ID,
+		UserName:  user.DisplayName,
+	}
+	newTitle := stripHTMLTags(req.Title)
+	newDecision := sanitizeRichHTML(req.Decision)
+	if newTitle != entry.Title {
+		rev.PrevTitle = entry.Title
+	}
+	if newDecision != entry.Decision {
+		rev.PrevDecision = entry.Decision
+	}
+	if req.Reason != entry.Reason {
+		rev.PrevReason = entry.Reason
+	}
+	lt := req.LogType
+	if lt == "" {
+		lt = entry.LogType
+	}
+	if lt != entry.LogType {
+		rev.PrevLogType = entry.LogType
+	}
+	newColor := validDecisionColor(req.Color)
+	if newColor != entry.Color {
+		rev.PrevColor = entry.Color
+	}
+	if req.Deadline != entry.Deadline {
+		rev.PrevDeadline = entry.Deadline
+	}
+	// Only store the revision if something actually changed.
+	changed := rev.PrevTitle != "" || rev.PrevDecision != "" || rev.PrevReason != "" || rev.PrevLogType != "" || rev.PrevColor != "" || rev.PrevDeadline != ""
+	if changed {
+		entry.Revisions = append(entry.Revisions, rev)
+	}
+	entry.Title = newTitle
+	entry.Decision = newDecision
+	entry.Reason = req.Reason
+	entry.LogType = lt
+	if lt == "group" {
+		entry.GroupID = req.GroupID
+	}
+	entry.Color = newColor
+	entry.Deadline = req.Deadline
+	entry.References = req.References
+	if err := app.store.UpdateDecisionLogEntry(*entry); err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	app.store.LogAudit(AuditEntry{
+		UserID: user.ID, UserName: user.DisplayName,
+		Action: "updated", EntityType: "decision_log", EntityID: entry.ID,
+		Summary: fmt.Sprintf("Decision %s edited", entry.SequenceNumber),
+	})
+	app.broker.BroadcastAll(SSEMessage{Event: "decision_log_change", Data: `{}`})
+	jsonOK(w, entry)
 }

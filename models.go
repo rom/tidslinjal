@@ -911,13 +911,13 @@ type MapLocation struct {
 // DecisionLogEntry represents a single entry in the decision log
 type DecisionLogEntry struct {
 	ID             int64     `json:"id"`
-	SequenceNumber string    `json:"sequence_number,omitempty"` // e.g. "EX-AURORA-001"
+	SequenceNumber string    `json:"sequence_number,omitempty"` // e.g. "EX-AURORA-decision-2026-001"
 	Timestamp      time.Time `json:"timestamp"`
 	UserID         int64     `json:"user_id"`
 	UserName       string    `json:"user_name"`
 	DisplayName    string    `json:"display_name"`
 	Title          string    `json:"title,omitempty"` // short decision title
-	Decision       string    `json:"decision"`        // free text (decision body)
+	Decision       string    `json:"decision"`        // HTML rich text (sanitised)
 	LogType        string    `json:"log_type"`        // private | group | general
 	// Executor: person/role/group assigned to execute the decision
 	ExecutorType   string    `json:"executor_type,omitempty"`  // "role" | "group" | "person"
@@ -949,10 +949,37 @@ type DecisionLogEntry struct {
 	CoSignComment     string     `json:"co_sign_comment,omitempty"`
 	// Sharable link token
 	ShareToken        string               `json:"share_token,omitempty"`
-	// Deadline for decision
-	Deadline          string               `json:"deadline,omitempty"` // ISO date string YYYY-MM-DD, optional
+	// Deadline for decision (ISO datetime, e.g. "2026-04-16T14:30")
+	Deadline          string               `json:"deadline,omitempty"`
+	// Custom background colour (CSS colour, e.g. "#FFF4C2")
+	Color             string               `json:"color,omitempty"`
 	// File attachments
 	Attachments       []DecisionAttachment `json:"attachments,omitempty"`
+	// Revision history — snapshot of previous values on each edit
+	Revisions         []DecisionRevision   `json:"revisions,omitempty"`
+	// Cross-references to other Tidslinjal objects
+	References        []DecisionReference  `json:"references,omitempty"`
+}
+
+// DecisionRevision stores a snapshot of what changed during an edit.
+type DecisionRevision struct {
+	Timestamp time.Time `json:"timestamp"`
+	UserID    int64     `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	// Previous values (empty string means unchanged)
+	PrevTitle    string `json:"prev_title,omitempty"`
+	PrevDecision string `json:"prev_decision,omitempty"`
+	PrevReason   string `json:"prev_reason,omitempty"`
+	PrevLogType  string `json:"prev_log_type,omitempty"`
+	PrevColor    string `json:"prev_color,omitempty"`
+	PrevDeadline string `json:"prev_deadline,omitempty"`
+}
+
+// DecisionReference is a cross-link to another Tidslinjal entity.
+type DecisionReference struct {
+	Type  string `json:"type"`            // "log_book" | "diary" | "board" | "event"
+	ID    int64  `json:"id"`              // entity ID
+	Label string `json:"label,omitempty"` // human-readable label
 }
 
 // DecisionAttachment is a file attached to a decision log entry

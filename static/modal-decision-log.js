@@ -3,6 +3,7 @@
 let _decisionLogEntries = [];
 let _decisionLogSortNewest = true; // true = newest first (default), false = oldest first
 let _decisionLogFilter = 'all'; // 'all' | 'pending' | 'decided' | 'approved_condition' | 'approved_modification' | 'denied'
+let _decisionLogSearch = ''; // free-text search
 let _decisionLogStaffDuties = []; // cached staff duties for acting check
 
 // Live-refresh the decision log entries if the modal is currently open
@@ -55,8 +56,7 @@ async function openDecisionLogModal() {
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-sm);margin-bottom:6px">
             <input type="text" id="dlReason" placeholder="${t('decision_reason_label')||'Reason for decision'}"
               style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:var(--fs-xs);margin-bottom:6px">
-            <textarea id="dlNewDecision" rows="3" placeholder="${t('decision_log_placeholder')||'Enter decision...'}"
-              style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical"></textarea>
+            <div id="dlNewDecisionWrap">${typeof _diaryRichField === 'function' ? _diaryRichField('dlNewDecision', '', t('decision_log_placeholder')||'Enter decision...', '100px') : `<textarea id="dlNewDecision" rows="3" placeholder="${t('decision_log_placeholder')||'Enter decision...'}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical"></textarea>`}</div>
             <div style="display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap">
               <select id="dlLogType" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs)">
                 <option value="general">${t('decision_log_general')||'General (all)'}</option>
@@ -87,7 +87,7 @@ async function openDecisionLogModal() {
               </label>
               <label style="display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--text-dim)">
                 📅 ${t('decision_deadline')||'Deadline'}:
-                <input type="date" id="dlDeadline" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+                <input type="datetime-local" id="dlDeadline" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
               </label>
             </div>
             <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -124,6 +124,9 @@ async function openDecisionLogModal() {
               </div>
             </div>
           </div>` : ''}
+          <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+            <input id="dlSearchInput" class="input" style="flex:1;min-width:150px;font-size:var(--fs-xs)" placeholder="🔍 ${t('dl_search_placeholder')||'Search decisions…'}">
+          </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:8px 0;border-bottom:2px solid var(--accent);flex-wrap:wrap;gap:6px">
             <h3 style="margin:0;font-size:var(--fs-sm);text-transform:uppercase;letter-spacing:.05em;color:var(--accent)">📋 ${t('decision_log_header')||'Decision Log'}</h3>
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
@@ -203,6 +206,20 @@ async function openDecisionLogModal() {
       execValueEl.innerHTML = opts;
     };
   }
+  // Wire the rich text toolbar for the decision body (if diary helper loaded)
+  if (typeof _diaryBindToolbar === 'function') {
+    _diaryBindToolbar(modal, 'dlNewDecision');
+  }
+  // Wire free-text search
+  const searchEl = document.getElementById('dlSearchInput');
+  if (searchEl) {
+    searchEl.value = _decisionLogSearch;
+    searchEl.addEventListener('input', () => {
+      _decisionLogSearch = searchEl.value.trim();
+      const el = document.getElementById('dlEntries');
+      if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+    });
+  }
 }
 
 function closeDecisionLogModal() {
@@ -261,6 +278,14 @@ function _renderDecisionLogEntries() {
   else if (_decisionLogFilter === 'approved_condition') filtered = filtered.filter(e => e.approval_type === 'approved_with_condition');
   else if (_decisionLogFilter === 'approved_modification') filtered = filtered.filter(e => e.approval_type === 'approved_with_modification');
   else if (_decisionLogFilter === 'denied') filtered = filtered.filter(e => e.status === 'rejected');
+  // Free-text search
+  if (_decisionLogSearch) {
+    const q = _decisionLogSearch.toLowerCase();
+    filtered = filtered.filter(e => {
+      const hay = `${e.sequence_number||''} ${e.title||''} ${e.decision||''} ${e.display_name||''} ${e.reason||''} ${e.review_comment||''} ${e.executor_label||''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
   if (!filtered.length) return `<p style="color:var(--text-dim)">${t('decision_filter_empty')||'No decisions match this filter.'}</p>`;
   const sorted = _decisionLogSortNewest ? filtered.reverse() : filtered;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -297,6 +322,17 @@ function _renderDecisionLogEntries() {
       const approvalBg = e.approval_type === 'approved_with_condition' ? '#2ECC71' : e.approval_type === 'approved_with_modification' ? '#27AE60' : '#27AE60';
       statusBadge = `<span style="background:${approvalBg};color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">${approvalLabel}</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✓ ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
+      // Approved-with-condition: allow follow-up approve or deny.
+      if (e.approval_type === 'approved_with_condition' && canReview) {
+        reviewSection += `<div style="margin-top:6px">
+          <input type="text" id="dlReviewComment_${e.id}" placeholder="${t('review_followup_comment')||'Follow-up comment...'}"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:4px 8px;font-size:var(--fs-xs);margin-bottom:6px">
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn btn-sm" style="background:#27AE60;color:#fff;padding:2px 8px;font-size:10px" data-action="reviewDecision" data-arg="${e.id}" data-status="approved" data-approval-type="approved" data-arg-el>✓ ${t('btn_final_approve')||'Final Approve'}</button>
+            <button class="btn btn-sm" style="background:#E74C3C;color:#fff;padding:2px 8px;font-size:10px" data-action="reviewDecision" data-arg="${e.id}" data-status="denied" data-arg-el>✗ ${t('btn_deny')||'Deny'}</button>
+          </div>
+        </div>`;
+      }
     } else if (e.status === 'rejected') {
       statusBadge = `<span style="background:#E74C3C;color:#fff;font-size:10px;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:6px">DENIED</span>`;
       if (e.reviewed_by_name) reviewSection = `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">✗ Denied by ${escHtml(e.reviewed_by_name)}${e.reviewed_at ? ' — ' + fmtDateTime(new Date(e.reviewed_at)) : ''}${e.review_comment ? ': ' + escHtml(e.review_comment) : ''}</div>`;
@@ -342,8 +378,23 @@ function _renderDecisionLogEntries() {
     }
     const titleHtml = e.title ? `<div style="font-weight:700;font-size:var(--fs-sm);margin-top:2px">${escHtml(e.title)}</div>` : '';
     const execHtml = e.executor_label ? `<span style="font-size:var(--fs-xs);color:var(--accent);margin-left:6px">⚡ ${t('decision_executor')||'Executor'}: ${escHtml(e.executor_label)}</span>` : '';
-    const borderStyle = e.deadline && e.deadline < todayStr && e.status === 'requested' ? 'border-left:3px solid var(--danger,#E74C3C);' : '';
-    return `<div data-decision-id="${e.id}" style="padding:8px;border-bottom:1px solid var(--border);${borderStyle}">
+    // Background color: custom > deadline-based auto-color
+    let bgStyle = '';
+    if (e.color) {
+      bgStyle = `background:${escHtml(e.color)};color:#222;`;
+    } else if (e.deadline && e.status === 'requested') {
+      bgStyle = 'background:#FFF4C2;color:#222;'; // yellow: pending with deadline
+    } else if (e.status === 'approved' && e.approval_type === 'approved_with_condition') {
+      bgStyle = 'background:#FFF4C2;color:#222;'; // yellow: conditional approval
+    } else if (e.deadline && e.status === 'approved' && e.approval_type !== 'approved_with_condition') {
+      const dlDate = new Date(e.deadline);
+      const decidedAt = e.decided_at ? new Date(e.decided_at) : null;
+      if (decidedAt && decidedAt <= dlDate) bgStyle = 'background:#D6F5D6;color:#222;'; // green: approved before deadline
+    } else if (e.deadline && e.status === 'rejected') {
+      bgStyle = 'background:#FFD6D6;color:#222;'; // red: denied
+    }
+    const borderStyle = e.deadline && e.deadline.slice(0,10) < todayStr && e.status === 'requested' ? 'border-left:3px solid var(--danger,#E74C3C);' : '';
+    return `<div data-decision-id="${e.id}" style="padding:8px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--radius);${bgStyle}${borderStyle}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <span style="font-size:var(--fs-xs);color:var(--text-dim);font-weight:600">${escHtml(e.sequence_number||'')}</span>
@@ -351,14 +402,22 @@ function _renderDecisionLogEntries() {
           <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:6px">${ts}${typeBadge}${badge}</span>
           ${statusBadge}${deadlineHtml}${execHtml}
         </div>
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:2px">
+          ${e.user_id === state.user?.id || isAdmin ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_decisionOpenEditor" data-arg="${e.id}" title="${t('btn_edit')||'Edit'}">✏</button>` : ''}
+          <button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_decisionPrintEntry" data-arg="${e.id}" title="${t('btn_print')||'Print'}">🖨</button>
           ${canReview ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px" data-action="_shareDecisionLogEntry" data-arg="${e.id}" title="${t('board_share')||'Share link'}">🔗</button>` : ''}
-          ${isAdmin ? `<button class="btn btn-danger btn-sm" style="padding:1px 6px;font-size:10px" data-action="deleteDecisionLogEntry" data-arg="${e.id}">×</button>` : ''}
+          ${isAdmin ? `<button class="btn btn-sm" style="padding:1px 6px;font-size:10px;color:var(--danger,#e74c3c)" data-action="deleteDecisionLogEntry" data-arg="${e.id}" title="${t('btn_delete')||'Delete'}">🗑</button>` : ''}
         </div>
       </div>
       ${titleHtml}
-      <div style="margin-top:4px;white-space:pre-wrap">${escHtml(e.decision)}</div>
+      <div style="margin-top:4px;line-height:1.5">${e.decision}</div>
       ${reasonHtml}
+      ${(e.references && e.references.length) ? `<div style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)">🔗 ${e.references.map(r =>
+        `<a href="#" style="color:var(--accent);text-decoration:none" onclick="event.preventDefault();_openDecisionRef('${escHtml(r.type)}',${r.id})">${escHtml(r.label || r.type + ' #' + r.id)}</a>`
+      ).join(', ')}</div>` : ''}
+      ${(e.revisions && e.revisions.length) ? `<details style="margin-top:4px;font-size:var(--fs-xs);color:var(--text-dim)"><summary style="cursor:pointer">📝 ${e.revisions.length} ${t('decision_revision_count')||'revision(s)'}</summary>${e.revisions.map(rv =>
+        `<div style="padding:4px 0;border-bottom:1px solid var(--border);margin-left:8px"><strong>${escHtml(rv.user_name||'')}</strong> — ${fmtDateTime(new Date(rv.timestamp))}${rv.prev_title ? '<br>Title: <del>' + escHtml(rv.prev_title) + '</del>' : ''}${rv.prev_decision ? '<br>Body changed' : ''}${rv.prev_log_type ? '<br>Visibility: <del>' + escHtml(rv.prev_log_type) + '</del>' : ''}${rv.prev_color ? '<br>Color changed' : ''}${rv.prev_deadline ? '<br>Deadline: <del>' + escHtml(rv.prev_deadline) + '</del>' : ''}</div>`
+      ).join('')}</details>` : ''}
       ${lifecycleHtml}
       ${(e.attachments && e.attachments.length) ? `<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${e.attachments.map(a =>
         `<a href="/api/decision-log/${e.id}/attachment/${encodeURIComponent(a.stored_name)}" target="_blank" style="font-size:var(--fs-xs);color:var(--accent);text-decoration:none" title="${escHtml(a.filename)}">📎 ${escHtml(a.filename)}</a>`
@@ -372,7 +431,8 @@ function _renderDecisionLogEntries() {
 async function addDecisionLogEntry(el) {
   const approvalType = el?.dataset?.approvalType || 'approved';
   const isDeny = approvalType === 'denied';
-  const text = document.getElementById('dlNewDecision')?.value?.trim();
+  const decEl = document.getElementById('dlNewDecision');
+  const text = decEl ? (decEl.tagName === 'TEXTAREA' ? decEl.value.trim() : (decEl.innerHTML || '').trim()) : '';
   if (!text) { showError(t('decision_required')||'Decision text is required'); return; }
   const reason = document.getElementById('dlReason')?.value?.trim() || '';
   // Deny requires a reason
@@ -449,7 +509,8 @@ async function requestDecision() {
     targetPanel.style.display = '';
     return;
   }
-  const text = document.getElementById('dlNewDecision')?.value?.trim();
+  const decEl2 = document.getElementById('dlNewDecision');
+  const text = decEl2 ? (decEl2.tagName === 'TEXTAREA' ? decEl2.value.trim() : (decEl2.innerHTML || '').trim()) : '';
   if (!text) { showError(t('decision_required')||'Decision request text is required'); return; }
   const logType = document.getElementById('dlLogType')?.value || 'general';
   const groupId = logType === 'group' ? parseInt(document.getElementById('dlGroupId')?.value || '0') : 0;
@@ -661,6 +722,183 @@ async function _decisionPrintAll() {
   html += `<p style="color:#666">${new Date().toLocaleString()} — ${entries.length} ${t('lb_entries')||'entries'}</p><hr>`;
   for (const e of entries) html += _decisionEntryToHTML(e);
   _decisionPrintHTML(html, title);
+}
+
+// Print a single decision entry (called via 🖨 button)
+function _decisionPrintEntry(idRaw) {
+  const id = typeof idRaw === 'number' ? idRaw : parseInt(idRaw, 10);
+  const entry = (_decisionLogEntries || []).find(e => e.id === id);
+  if (!entry) { showError('Entry not found'); return; }
+  _decisionPrintHTML(_decisionEntryToHTML(entry), entry.sequence_number || entry.title || 'Decision');
+}
+
+// ── Decision Editor (edit existing entry with revision tracking) ──────────
+// Color swatches — matches log book palette
+const _dlColorSwatches = ['', '#FFF4C2', '#D6F5D6', '#FFD6D6', '#D6E4FF', '#E6D6FF', '#FFE0B3'];
+
+function _decisionOpenEditor(idRaw) {
+  const id = typeof idRaw === 'number' ? idRaw : parseInt(idRaw, 10);
+  const entry = (_decisionLogEntries || []).find(e => e.id === id);
+  if (!entry) { showError('Entry not found'); return; }
+
+  const groups = state.groups || [];
+  const curColor = entry.color || '';
+  const swatchesHtml = _dlColorSwatches.map(sw => {
+    const bg = sw || 'transparent';
+    const sel = (curColor === sw) ? 'outline:2px solid var(--accent);' : '';
+    return `<button type="button" class="dl-swatch" data-dl-color="${escHtml(sw)}"
+      style="width:22px;height:22px;border:1px solid #888;border-radius:4px;background:${bg};${sel}cursor:pointer" title="${sw||'None'}"></button>`;
+  }).join('');
+  const bodyField = (typeof _diaryRichField === 'function')
+    ? _diaryRichField('dlEditBody', entry.decision || '', t('decision_log_placeholder')||'Decision text…', '160px')
+    : `<textarea id="dlEditBody" rows="6" class="input" style="width:100%;font-size:var(--fs-xs)">${escHtml((entry.decision||'').replace(/<[^>]+>/g,''))}</textarea>`;
+
+  // Build references display
+  const refs = entry.references || [];
+  const refsHtml = refs.map((r, i) => `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px">🔗 ${escHtml(r.label || r.type + ' #' + r.id)} <button type="button" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)" onclick="this.closest('span').remove()">×</button></span>`).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'dlEditorModal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:680px;max-height:90vh;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <h3>✏ ${t('decision_edit')||'Edit Decision'} ${escHtml(entry.sequence_number||'')}</h3>
+        <button class="modal-close" data-action="_decisionCloseEditor">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600">${t('decision_title_placeholder')||'Title'}</label>
+          <input id="dlEditTitle" class="input" style="width:100%;font-size:var(--fs-sm)" value="${escHtml(entry.title||'')}">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600">${t('decision_reason_label')||'Reason'}</label>
+          <input id="dlEditReason" class="input" style="width:100%;font-size:var(--fs-xs)" value="${escHtml(entry.reason||'')}">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600">${t('decision_body')||'Decision'}</label>
+          ${bodyField}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:var(--fs-xs);font-weight:600">${t('lb_visibility')||'Visibility'}</label>
+            <select id="dlEditLogType" class="input" style="width:100%;font-size:var(--fs-xs)">
+              <option value="general" ${(entry.log_type||'general')==='general'?'selected':''}>${t('decision_log_general')||'General (all)'}</option>
+              <option value="group" ${entry.log_type==='group'?'selected':''}>${t('decision_log_group')||'Group'}</option>
+              <option value="private" ${entry.log_type==='private'?'selected':''}>${t('decision_log_private')||'Private'}</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:var(--fs-xs);font-weight:600">📅 ${t('decision_deadline')||'Deadline'}</label>
+            <input type="datetime-local" id="dlEditDeadline" class="input" style="width:100%;font-size:var(--fs-xs)" value="${escHtml(entry.deadline||'')}">
+          </div>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:4px">${t('lb_background_color')||'Background colour'}</label>
+          <div id="dlEditSwatches" style="display:flex;gap:6px;flex-wrap:wrap">${swatchesHtml}</div>
+          <input type="hidden" id="dlEditColor" value="${escHtml(curColor)}">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:4px">🔗 ${t('decision_references')||'References'}</label>
+          <div id="dlEditRefs" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">${refsHtml}</div>
+          <div style="display:flex;gap:4px;align-items:center">
+            <select id="dlRefType" class="input" style="font-size:var(--fs-xs);width:auto">
+              <option value="log_book">${t('tab_log_book')||'Log Book'}</option>
+              <option value="diary">${t('diary_title')||'Diary'}</option>
+              <option value="event">${t('event')||'Event'}</option>
+            </select>
+            <input type="number" id="dlRefId" class="input" style="width:80px;font-size:var(--fs-xs)" placeholder="ID" min="1">
+            <input type="text" id="dlRefLabel" class="input" style="flex:1;font-size:var(--fs-xs)" placeholder="${t('decision_ref_label')||'Label (optional)'}">
+            <button type="button" class="btn btn-sm btn-secondary" id="dlAddRefBtn" style="font-size:10px">+ Add</button>
+          </div>
+        </div>
+        ${(entry.revisions && entry.revisions.length) ? `<details style="margin-bottom:8px;font-size:var(--fs-xs);color:var(--text-dim)"><summary style="cursor:pointer;font-weight:600">📝 ${entry.revisions.length} ${t('decision_revision_count')||'revision(s)'}</summary>${entry.revisions.map(rv =>
+          `<div style="padding:4px 0;border-bottom:1px solid var(--border);margin-left:8px"><strong>${escHtml(rv.user_name||'')}</strong> — ${fmtDateTime(new Date(rv.timestamp))}${rv.prev_title ? '<br>Title: <del>' + escHtml(rv.prev_title) + '</del>' : ''}${rv.prev_decision ? '<br>Body changed' : ''}${rv.prev_log_type ? '<br>Visibility: <del>' + escHtml(rv.prev_log_type) + '</del>' : ''}</div>`
+        ).join('')}</details>` : ''}
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary btn-sm" data-action="_decisionSaveEntry" data-arg="${entry.id}">${t('btn_save')||'Save'}</button>
+          <button class="btn btn-secondary btn-sm" data-action="_decisionCloseEditor">${t('btn_cancel')||'Cancel'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  if (typeof _diaryBindToolbar === 'function') _diaryBindToolbar(modal, 'dlEditBody');
+  if (typeof _diaryTrapModalKeys === 'function') _diaryTrapModalKeys('dlEditorModal');
+  // Swatch clicks
+  modal.querySelectorAll('.dl-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('dlEditColor').value = btn.dataset.dlColor || '';
+      modal.querySelectorAll('.dl-swatch').forEach(b => { b.style.outline = ''; });
+      btn.style.outline = '2px solid var(--accent)';
+    });
+  });
+  // Add reference button
+  document.getElementById('dlAddRefBtn')?.addEventListener('click', () => {
+    const refType = document.getElementById('dlRefType')?.value;
+    const refId = document.getElementById('dlRefId')?.value;
+    const refLabel = document.getElementById('dlRefLabel')?.value || '';
+    if (!refType || !refId) return;
+    const tag = document.createElement('span');
+    tag.style.cssText = 'display:inline-flex;align-items:center;gap:2px;padding:1px 6px;margin:1px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius);font-size:10px';
+    tag.dataset.refType = refType;
+    tag.dataset.refId = refId;
+    tag.dataset.refLabel = refLabel || `${refType} #${refId}`;
+    tag.innerHTML = `🔗 ${escHtml(refLabel || refType + ' #' + refId)} <button type="button" style="border:none;background:none;cursor:pointer;font-size:10px;color:var(--danger)" onclick="this.closest('span').remove()">×</button>`;
+    document.getElementById('dlEditRefs')?.appendChild(tag);
+    document.getElementById('dlRefId').value = '';
+    document.getElementById('dlRefLabel').value = '';
+  });
+  setTimeout(() => document.getElementById('dlEditTitle')?.focus(), 50);
+}
+
+function _decisionCloseEditor() {
+  document.getElementById('dlEditorModal')?.remove();
+}
+
+async function _decisionSaveEntry(idStr) {
+  const id = parseInt(idStr, 10);
+  const title = document.getElementById('dlEditTitle')?.value?.trim() || '';
+  const reason = document.getElementById('dlEditReason')?.value?.trim() || '';
+  const bodyEl = document.getElementById('dlEditBody');
+  const decision = bodyEl ? (bodyEl.tagName === 'TEXTAREA' ? bodyEl.value : (bodyEl.innerHTML || '')) : '';
+  if (!decision.trim()) { showError(t('decision_required')||'Decision text is required'); return; }
+  const logType = document.getElementById('dlEditLogType')?.value || 'general';
+  const deadline = document.getElementById('dlEditDeadline')?.value || '';
+  const color = document.getElementById('dlEditColor')?.value || '';
+  // Collect references from the tag chips
+  const refEls = document.querySelectorAll('#dlEditRefs span[data-ref-type]');
+  const references = [];
+  refEls.forEach(el => {
+    references.push({ type: el.dataset.refType, id: parseInt(el.dataset.refId, 10), label: el.dataset.refLabel || '' });
+  });
+  try {
+    const res = await api('PUT', '/api/decision-log/' + id, { title, decision, reason, log_type: logType, deadline, color, references });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to save');
+    }
+    _decisionCloseEditor();
+    showNotification('success', t('decision_updated')||'Decision updated');
+    // Refresh entries
+    await _loadDecisionLog();
+    const el = document.getElementById('dlEntries');
+    if (el) { el.innerHTML = _renderDecisionLogEntries(); _bindActions(el); }
+  } catch (e) {
+    showError(e.message || 'Failed to save');
+  }
+}
+
+// Open a cross-reference target
+function _openDecisionRef(type, id) {
+  if (type === 'diary') {
+    if (typeof openDiaryModal === 'function') openDiaryModal();
+  } else if (type === 'log_book') {
+    if (typeof openLogBookModal === 'function') openLogBookModal();
+  } else if (type === 'event') {
+    const ev = (state.events || []).find(e => e.id === id);
+    if (ev && typeof showEventDetail === 'function') showEventDetail(ev);
+  }
 }
 
 // ── Analysis Modal ──────────────────────────────────────────────────────────
