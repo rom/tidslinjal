@@ -2384,9 +2384,17 @@ function _rfiPrintEntry(idRaw) {
 }
 
 function _rfiPrintAll() {
-  const entries = _rfiFilteredList();
+  let entries = _rfiFilteredList();
   if (!entries.length) { showError(t('rfi_empty')||'No RFIs to print'); return; }
   entries.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const opts = window._printEntryOptions || {};
+  if (opts.scope === 'range') {
+    const from = Math.max(1, opts.from || 1);
+    const to   = Math.max(from, opts.to || entries.length);
+    entries = entries.slice(from - 1, to);
+  }
+  if (opts.sort === 'newest') entries.reverse();
+  if (!entries.length) { showError(t('rfi_empty')||'No RFIs to print'); return; }
   const exName = (state.exercise && state.exercise.label) || '';
   const title = (exName ? exName + ' — ' : '') + (t('rfi_title')||'Request For Information');
   let html = `<h1>${escHtml(title)}</h1>`;

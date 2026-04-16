@@ -844,6 +844,91 @@ function _detachSingleSpreadsheet(id, name) {
   });
 }
 
+// Called from the print tool. Fetches the spreadsheet list, lets the user
+// pick one, then renders its current cell data as a printable HTML table
+// in a new tab. We go through the list → pick flow because the print tool
+// is opened from the timeline view, not from inside an open spreadsheet.
+async function _printSpreadsheetPicker() {
+  let list = [];
+  try { list = await apiGet('/api/spreadsheets') || []; } catch {}
+  if (!Array.isArray(list) || list.length === 0) {
+    showError(t('ss_print_empty') || 'No spreadsheets to print.');
+    return;
+  }
+  // Build a small picker modal
+  const existing = document.getElementById('ssPrintPicker');
+  if (existing) existing.remove();
+  const opts = list.map(ss =>
+    `<option value="${ss.id}">${escHtml(ss.name || ('Spreadsheet #' + ss.id))}</option>`
+  ).join('');
+  const html = `
+    <div class="modal-overlay open" id="ssPrintPicker">
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <h3>🖨 ${escHtml(t('ss_print_title') || 'Print Spreadsheet')}</h3>
+          <button class="modal-close" data-close-modal="ssPrintPicker">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label style="display:block;margin-bottom:6px;font-size:var(--fs-sm);color:var(--text-dim)">${escHtml(t('ss_print_pick') || 'Choose a spreadsheet')}</label>
+          <select id="ssPrintPickerSel" class="input" style="width:100%">${opts}</select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-close-modal="ssPrintPicker">${escHtml(t('btn_cancel') || 'Cancel')}</button>
+          <button class="btn btn-primary" id="ssPrintPickerGo">🖨 ${escHtml(t('btn_print') || 'Print')}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('ssPrintPickerGo')?.addEventListener('click', async () => {
+    const id = parseInt(document.getElementById('ssPrintPickerSel')?.value || '0', 10);
+    const pickerEl = document.getElementById('ssPrintPicker');
+    if (pickerEl) pickerEl.remove();
+    if (!id) return;
+    let ss;
+    try { ss = await apiGet('/api/spreadsheets/' + id); } catch { showError('Failed to load spreadsheet'); return; }
+    if (!ss) return;
+    _printSpreadsheetData(ss);
+  });
+}
+
+// Render the spreadsheet's persisted cell grid as a printable table. We
+// don't rely on the jspreadsheet DOM because the spreadsheet modal may
+// not be open — we read `ss.cells` straight from the API payload.
+function _printSpreadsheetData(ss) {
+  const cells = (ss && ss.cells) || [];
+  let maxR = 0, maxC = 0;
+  for (const c of cells) {
+    if (c.row > maxR) maxR = c.row;
+    if (c.col > maxC) maxC = c.col;
+  }
+  const grid = Array.from({length: maxR + 1}, () => Array(maxC + 1).fill(''));
+  for (const c of cells) {
+    grid[c.row][c.col] = (c.value != null ? String(c.value) : '');
+  }
+  const headerCols = [];
+  for (let c = 0; c <= maxC; c++) headerCols.push('<th>' + _colLetter(c) + '</th>');
+  const rows = grid.map((row, rIdx) => {
+    const cells = row.map(v => '<td>' + escHtml(v) + '</td>').join('');
+    return '<tr><th style="background:#eee">' + (rIdx + 1) + '</th>' + cells + '</tr>';
+  }).join('');
+  const win = window.open('', '_blank');
+  if (!win) return;
+  const title = ss.name || 'Spreadsheet';
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escHtml(title) + '</title>' +
+    '<style>body{font-family:Calibri,Arial,sans-serif;margin:16px;color:#222}' +
+    'h1{color:#333;border-bottom:2px solid #333;padding-bottom:4px}' +
+    'table{border-collapse:collapse;width:100%;font-size:12px}' +
+    'td,th{border:1px solid #ccc;padding:4px 8px}' +
+    'th{background:#f0f0f0;font-weight:600;text-align:center}' +
+    '@media print{body{margin:0;padding:10px}}</style></head><body>' +
+    '<h1>' + escHtml(title) + '</h1>' +
+    '<p style="color:#666;font-size:12px">' + new Date().toLocaleString() + '</p>' +
+    '<table><thead><tr><th></th>' + headerCols.join('') + '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '</body></html>');
+  win.document.close();
+  setTimeout(() => win.print(), 300);
+}
+
 // ── Helper ───────────────────────────────────────────────────────────────────
 
 function _colLetter(i) {

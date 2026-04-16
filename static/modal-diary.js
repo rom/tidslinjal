@@ -380,7 +380,17 @@ function _diaryPrintEntry(id) {
 }
 
 function _diaryPrintAll() {
-  const filtered = _diaryFilterEntries().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  // Sort oldest→newest so range indexing is intuitive (1 = first entry).
+  let filtered = _diaryFilterEntries().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const opts = window._printEntryOptions || {};
+  if (opts.scope === 'range') {
+    const from = Math.max(1, opts.from || 1);
+    const to   = Math.max(from, opts.to || filtered.length);
+    filtered = filtered.slice(from - 1, to);
+  }
+  // Default is newest first for diary (unchanged behaviour); explicit
+  // 'oldest' keeps chronological order.
+  if (opts.sort !== 'oldest') filtered = filtered.slice().reverse();
   let html = '';
   for (const e of filtered) {
     html += _diaryEntryToHTML(e) + '<hr style="margin:20px 0">';
