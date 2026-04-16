@@ -375,10 +375,15 @@ async function _openSpreadsheet(id) {
     // Place result in the cell just below the selection (same column as end)
     const targetRow = r2 + 1;
     const targetCol = c2;
-    // Expand grid if needed
+    // Expand grid if needed. `getData()` returns a snapshot, so we must
+    // compute how many rows to add up front — otherwise the `data.length`
+    // comparison never updates and we get an infinite loop that hangs the
+    // tab (observed when a formula is picked with a selection whose end
+    // row is at the last row of the sheet).
     try {
       const data = w.getData();
-      while (data.length <= targetRow) {
+      const rowsToAdd = Math.max(0, targetRow + 1 - data.length);
+      for (let i = 0; i < rowsToAdd; i++) {
         if (typeof w.insertRow === 'function') w.insertRow();
         else break;
       }

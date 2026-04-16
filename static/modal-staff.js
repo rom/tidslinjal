@@ -97,6 +97,10 @@ function _staffToolboxContent(users) {
 
 // ── Load data from API ──────────────────────────────────────────────────────
 
+// Cached copies of the last load so edit-forms can pre-fill from memory
+// without a second round-trip.
+let _staffDutiesCache = [];
+let _staffMembersCache = [];
 async function _loadStaffData() {
   try {
     const [duties, members, areas] = await Promise.all([
@@ -104,8 +108,10 @@ async function _loadStaffData() {
       apiGet('/api/staff/members'),
       apiGet('/api/staff/areas')
     ]);
-    _renderStaffDuties(duties || []);
-    _renderStaffMembers(members || []);
+    _staffDutiesCache = duties || [];
+    _staffMembersCache = members || [];
+    _renderStaffDuties(_staffDutiesCache);
+    _renderStaffMembers(_staffMembersCache);
     _renderStaffAreas(areas || []);
   } catch (e) {
     console.error('Staff data load error:', e);
@@ -138,6 +144,7 @@ function _renderStaffDuties(duties) {
       ${d.start_time ? `<span style="font-size:11px;color:var(--text-muted)">${escHtml(d.start_time)} \u2013 ${escHtml(d.end_time||'')}</span>` : ''}
       ${d.note ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(d.note)}">\u{1F4DD}</span>` : ''}
       ${_staffMattermostLink(d.user_id)}
+      <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditDuty" data-arg="${d.id}" title="${t('btn_edit')||'Edit'}">\u270E</button>
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteDuty" data-arg="${d.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
     </div>`).join('');
   _bindActions(el);
@@ -158,6 +165,7 @@ function _renderStaffMembers(members) {
       <span style="flex:1">${escHtml(m.user_name || '-')}</span>
       ${m.note ? `<span style="font-size:11px;color:var(--text-muted)" title="${escHtml(m.note)}">\u{1F4DD}</span>` : ''}
       ${_staffMattermostLink(m.user_id)}
+      <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditMember" data-arg="${m.id}" title="${t('btn_edit')||'Edit'}">\u270E</button>
       <button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteMember" data-arg="${m.id}" title="${t('btn_delete')||'Delete'}">\u2715</button>
     </div>`;
   }).join('');
@@ -237,6 +245,24 @@ async function staffDeleteDuty(id) {
     await apiDel('/api/staff/duties/' + id);
     _loadStaffData();
   } catch (e) { console.error(e); }
+}
+
+// Edit an existing duty by re-opening the add-form with its values
+// pre-filled. SetStaffDuty upserts by role name server-side, so saving
+// with the same role updates in place; changing the role creates a new
+// entry, so to keep "edit" meaning "edit" we lock the role field.
+function staffEditDuty(id) {
+  const idNum = parseInt(id, 10);
+  const d = (_staffDutiesCache || []).find(x => x.id === idNum);
+  if (!d) return;
+  staffCancelDutyForm();
+  staffAddDuty();
+  const roleEl = document.getElementById('staffDutyRole');
+  const userEl = document.getElementById('staffDutyUser');
+  const noteEl = document.getElementById('staffDutyNote');
+  if (roleEl) { roleEl.value = d.role || ''; roleEl.readOnly = true; roleEl.title = t('staff_edit_role_locked')||'Role is locked during edit'; }
+  if (userEl) userEl.value = String(d.user_id || '');
+  if (noteEl) noteEl.value = d.note || '';
 }
 
 // ── Add member ──────────────────────────────────────────────────────────────
@@ -328,6 +354,35 @@ async function staffDeleteMember(id) {
     await apiDel('/api/staff/members/' + id);
     _loadStaffData();
   } catch (e) { console.error(e); }
+}
+
+// Edit an existing staff member. Position is the upsert key, so we pin
+// it and let the user change the person / note.
+function staffEditMember(id) {
+  const idNum = parseInt(id, 10);
+  const m = (_staffMembersCache || []).find(x => x.id === idNum);
+  if (!m) return;
+  staffCancelMemberForm();
+  staffAddMember();
+  const selEl = document.getElementById('staffMemberPositionSelect');
+  const customEl = document.getElementById('staffMemberPositionCustom');
+  const userEl = document.getElementById('staffMemberUser');
+  const noteEl = document.getElementById('staffMemberNote');
+  const isBuiltIn = _staffPositions.some(p => p.value === m.position);
+  if (selEl) {
+    if (isBuiltIn) {
+      selEl.value = m.position;
+      if (customEl) customEl.style.display = 'none';
+    } else {
+      selEl.value = '__custom__';
+      if (customEl) { customEl.style.display = ''; customEl.value = m.position || ''; }
+    }
+    selEl.disabled = true;
+    selEl.title = t('staff_edit_position_locked')||'Position is locked during edit';
+    if (customEl) customEl.readOnly = true;
+  }
+  if (userEl) userEl.value = String(m.user_id || '');
+  if (noteEl) noteEl.value = m.note || '';
 }
 
 // ── Add / edit area ─────────────────────────────────────────────────────────
@@ -473,8 +528,12 @@ async function _loadStaffDataInto(targetDoc, rebindFn) {
       apiGet('/api/staff/members'),
       apiGet('/api/staff/areas')
     ]);
-    _renderStaffDutiesInto(targetDoc, duties || [], rebindFn);
-    _renderStaffMembersInto(targetDoc, members || [], rebindFn);
+    // Keep the in-memory cache in sync so staffEditDuty / staffEditMember
+    // work from the detached popout as well as the main modal.
+    _staffDutiesCache = duties || [];
+    _staffMembersCache = members || [];
+    _renderStaffDutiesInto(targetDoc, _staffDutiesCache, rebindFn);
+    _renderStaffMembersInto(targetDoc, _staffMembersCache, rebindFn);
     _renderStaffAreasInto(targetDoc, areas || [], rebindFn);
   } catch (e) {
     console.error('Staff data load error (detached):', e);
@@ -494,6 +553,7 @@ function _renderStaffDutiesInto(doc, duties, rebindFn) {
       '<span style="flex:1">' + escHtml(d.user_name || '-') + '</span>' +
       (d.start_time ? '<span style="font-size:11px;color:var(--text-muted)">' + escHtml(d.start_time) + ' \u2013 ' + escHtml(d.end_time||'') + '</span>' : '') +
       (d.note ? '<span style="font-size:11px;color:var(--text-muted)" title="' + escHtml(d.note) + '">\u{1F4DD}</span>' : '') +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditDuty" data-arg="' + d.id + '" title="Edit">\u270E</button>' +
       '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteDuty" data-arg="' + d.id + '" title="Delete">\u2715</button>' +
     '</div>';
   }).join('');
@@ -513,6 +573,7 @@ function _renderStaffMembersInto(doc, members, rebindFn) {
       '<strong style="min-width:140px">' + escHtml(posLabel) + '</strong>' +
       '<span style="flex:1">' + escHtml(m.user_name || '-') + '</span>' +
       (m.note ? '<span style="font-size:11px;color:var(--text-muted)" title="' + escHtml(m.note) + '">\u{1F4DD}</span>' : '') +
+      '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffEditMember" data-arg="' + m.id + '" title="Edit">\u270E</button>' +
       '<button class="btn btn-sm" style="padding:2px 6px;font-size:11px" data-action="staffDeleteMember" data-arg="' + m.id + '" title="Delete">\u2715</button>' +
     '</div>';
   }).join('');
