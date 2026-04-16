@@ -3011,4 +3011,13 @@ TRANSLATIONS.nl = {
     offline_banner: 'OFFLINEMODUS — werken met gegevens uit cache',
     offline_mode_enabled: 'Offlinemodus ingeschakeld — cachegegevens in gebruik',
     online_mode_restored: 'Onlinemodus hersteld',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Schaal 0-10',
+    poll_type_severity: 'Laag / Middel / Hoog / Kritiek',
+    severity_low: 'Laag',
+    severity_medium: 'Middel',
+    severity_high: 'Hoog',
+    severity_critical: 'Kritiek',
+    poll_created_by: 'Door',
   };

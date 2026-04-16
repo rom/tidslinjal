@@ -2781,4 +2781,13 @@ manage_resource_types: 'Gerir Tipos',
     offline_banner: 'MODO OFFLINE — a trabalhar com dados em cache',
     offline_mode_enabled: 'Modo offline ativado — a utilizar dados em cache',
     online_mode_restored: 'Modo online restaurado',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Escala 0-10',
+    poll_type_severity: 'Baixo / Médio / Alto / Crítico',
+    severity_low: 'Baixo',
+    severity_medium: 'Médio',
+    severity_high: 'Alto',
+    severity_critical: 'Crítico',
+    poll_created_by: 'Por',
   };

@@ -2803,4 +2803,13 @@ TRANSLATIONS.fi = {
     offline_banner: 'OFFLINE-TILA — välimuistitietoja käytössä',
     offline_mode_enabled: 'Offline-tila käytössä — välimuistitietoja käytetään',
     online_mode_restored: 'Online-tila palautettu',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Asteikko 0-10',
+    poll_type_severity: 'Matala / Keskitaso / Korkea / Kriittinen',
+    severity_low: 'Matala',
+    severity_medium: 'Keskitaso',
+    severity_high: 'Korkea',
+    severity_critical: 'Kriittinen',
+    poll_created_by: 'Tekijä',
   };

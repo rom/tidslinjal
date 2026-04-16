@@ -3200,4 +3200,13 @@ TRANSLATIONS.hu = {
     offline_banner: 'OFFLINE MÓD — gyorsítótárazott adatokkal dolgozik',
     offline_mode_enabled: 'Offline mód bekapcsolva — gyorsítótárazott adatok használata',
     online_mode_restored: 'Online mód helyreállítva',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: '0-10 skála',
+    poll_type_severity: 'Alacsony / Közepes / Magas / Kritikus',
+    severity_low: 'Alacsony',
+    severity_medium: 'Közepes',
+    severity_high: 'Magas',
+    severity_critical: 'Kritikus',
+    poll_created_by: 'Készítette',
   };

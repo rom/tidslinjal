@@ -3009,4 +3009,13 @@ TRANSLATIONS.is = {
     offline_banner: 'ÓNETSHAMUR — vinnur með skyndiminni',
     offline_mode_enabled: 'Ónetshamur virkur — notar skyndiminni',
     online_mode_restored: 'Netshamur endurheimtur',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Kvarði 0-10',
+    poll_type_severity: 'Lágt / Miðlungs / Hátt / Krítískt',
+    severity_low: 'Lágt',
+    severity_medium: 'Miðlungs',
+    severity_high: 'Hátt',
+    severity_critical: 'Krítískt',
+    poll_created_by: 'Af',
   };

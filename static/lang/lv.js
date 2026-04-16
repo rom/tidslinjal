@@ -2755,4 +2755,13 @@ admin_view: 'Administrātora skats',
     offline_banner: 'BEZSAISTES REŽĪMS — strādā ar kešatmiņas datiem',
     offline_mode_enabled: 'Bezsaistes režīms ieslēgts — izmanto kešatmiņas datus',
     online_mode_restored: 'Tiešsaistes režīms atjaunots',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0–10',
+    poll_type_severity: 'Zems / Vidējs / Augsts / Kritisks',
+    severity_low: 'Zems',
+    severity_medium: 'Vidējs',
+    severity_high: 'Augsts',
+    severity_critical: 'Kritisks',
+    poll_created_by: 'Autors',
   };

@@ -2755,4 +2755,13 @@ admin_view: 'Administraatori vaade',
     offline_banner: 'VÕRGUÜHENDUSETA REŽIIM — töötab vahemälu andmetega',
     offline_mode_enabled: 'Võrguühenduseta režiim sisse lülitatud — kasutatakse vahemälu',
     online_mode_restored: 'Võrguühendusega režiim taastatud',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skaala 0-10',
+    poll_type_severity: 'Madal / Keskmine / Kõrge / Kriitiline',
+    severity_low: 'Madal',
+    severity_medium: 'Keskmine',
+    severity_high: 'Kõrge',
+    severity_critical: 'Kriitiline',
+    poll_created_by: 'Autor',
   };

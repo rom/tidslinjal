@@ -2785,4 +2785,13 @@ role_editor_label_nb: '🇳🇴 NB',
     offline_banner: 'ОФЛАЙН-РЕЖИМ — робота з кешованими даними',
     offline_mode_enabled: 'Офлайн-режим увімкнено — використовуються кешовані дані',
     online_mode_restored: 'Онлайн-режим відновлено',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Шкала 0–10',
+    poll_type_severity: 'Низький / Середній / Високий / Критичний',
+    severity_low: 'Низький',
+    severity_medium: 'Середній',
+    severity_high: 'Високий',
+    severity_critical: 'Критичний',
+    poll_created_by: 'Автор',
   };

@@ -3015,4 +3015,13 @@ TRANSLATIONS.nb = {
     offline_banner: 'FRAKOBLET — arbeider med bufrede data',
     offline_mode_enabled: 'Frakoblet modus aktivert — bruker bufrede data',
     online_mode_restored: 'Tilkoblet modus gjenopprettet',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0–10',
+    poll_type_severity: 'Lav / Middels / Høy / Kritisk',
+    severity_low: 'Lav',
+    severity_medium: 'Middels',
+    severity_high: 'Høy',
+    severity_critical: 'Kritisk',
+    poll_created_by: 'Av',
   };

@@ -2951,4 +2951,13 @@ TRANSLATIONS.sv = {
     offline_banner: 'OFFLINE-LÄGE — arbetar med cachade data',
     offline_mode_enabled: 'Offline-läge aktiverat — använder cachade data',
     online_mode_restored: 'Online-läge återställt',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skala 0–10',
+    poll_type_severity: 'Låg / Medel / Hög / Kritisk',
+    severity_low: 'Låg',
+    severity_medium: 'Medel',
+    severity_high: 'Hög',
+    severity_critical: 'Kritisk',
+    poll_created_by: 'Av',
   };

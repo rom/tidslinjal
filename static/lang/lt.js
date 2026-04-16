@@ -2753,4 +2753,13 @@ admin_view: 'Administratoriaus rodinys',
     offline_banner: 'NEPRISIJUNGUS — dirbama su talpykloje esančiais duomenimis',
     offline_mode_enabled: 'Neprisijungus režimas įjungtas — naudojami talpyklos duomenys',
     online_mode_restored: 'Prisijungties režimas atkurtas',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Skalė 0–10',
+    poll_type_severity: 'Žemas / Vidutinis / Aukštas / Kritinis',
+    severity_low: 'Žemas',
+    severity_medium: 'Vidutinis',
+    severity_high: 'Aukštas',
+    severity_critical: 'Kritinis',
+    poll_created_by: 'Autorius',
   };

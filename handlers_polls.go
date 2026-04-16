@@ -352,6 +352,11 @@ func (app *App) handleGetPolls(w http.ResponseWriter, r *http.Request, user *Use
 	filtered := make([]Poll, len(polls))
 	for i, p := range polls {
 		filtered[i] = p
+		// Lazily assign a sequence number to legacy polls created before the
+		// labelling feature existed, so every poll shows up with an ID.
+		if filtered[i].SequenceNumber == "" {
+			filtered[i].SequenceNumber = app.pollSequenceNumber(p.ID, p.CreatedAt)
+		}
 		if p.CreatedBy != user.ID {
 			// Only keep the current user's own responses
 			var myResponses []PollResponse
@@ -435,6 +440,8 @@ func (app *App) handleCreatePoll(w http.ResponseWriter, r *http.Request, user *U
 		jsonError(w, "failed to create poll", http.StatusInternalServerError)
 		return
 	}
+	created.SequenceNumber = app.pollSequenceNumber(created.ID, created.CreatedAt)
+	_ = app.store.UpdatePoll(created)
 	jsonOK(w, created)
 
 	if !isScheduled {
@@ -1070,6 +1077,23 @@ func (app *App) rfiSequenceNumber(id int64, ts time.Time) string {
 		year = time.Now().Year()
 	}
 	return fmt.Sprintf("%sRFI-%d-%03d", prefix, year, id)
+}
+
+// pollSequenceNumber builds the label "exercisename-Poll-year-NNN".
+func (app *App) pollSequenceNumber(id int64, ts time.Time) string {
+	prefix := ""
+	if ex := app.store.GetExerciseSettings(); ex.Enabled && ex.Label != "" {
+		abbr := strings.ToUpper(strings.ReplaceAll(ex.Label, " ", "-"))
+		if len(abbr) > 20 {
+			abbr = abbr[:20]
+		}
+		prefix = abbr + "-"
+	}
+	year := ts.Year()
+	if year == 0 {
+		year = time.Now().Year()
+	}
+	return fmt.Sprintf("%sPoll-%d-%03d", prefix, year, id)
 }
 
 func (app *App) fireRFI(rfi RequestForInfo) {

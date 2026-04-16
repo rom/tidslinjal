@@ -3034,4 +3034,13 @@ TRANSLATIONS.fr = {
     offline_banner: 'MODE HORS LIGNE — utilisation des données en cache',
     offline_mode_enabled: 'Mode hors ligne activé — données en cache',
     online_mode_restored: 'Mode en ligne rétabli',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Échelle 0-10',
+    poll_type_severity: 'Faible / Moyen / Élevé / Critique',
+    severity_low: 'Faible',
+    severity_medium: 'Moyen',
+    severity_high: 'Élevé',
+    severity_critical: 'Critique',
+    poll_created_by: 'Par',
   };

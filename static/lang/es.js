@@ -2779,4 +2779,13 @@ admin_view: 'Vista de administrador',
     offline_banner: 'MODO SIN CONEXIÓN — trabajando con datos en caché',
     offline_mode_enabled: 'Modo sin conexión activado — usando datos en caché',
     online_mode_restored: 'Modo en línea restaurado',
+
+    // Poll — additional question types & metadata
+    poll_type_scale_0_10: 'Escala 0-10',
+    poll_type_severity: 'Bajo / Medio / Alto / Crítico',
+    severity_low: 'Bajo',
+    severity_medium: 'Medio',
+    severity_high: 'Alto',
+    severity_critical: 'Crítico',
+    poll_created_by: 'Por',
   };

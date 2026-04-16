@@ -183,7 +183,7 @@ async function _loadPollsterLog(container) {
       }
 
       // Standard question table
-      const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'yes_no');
+      const standardQs = (poll.questions || []).filter(q => q.type === 'scale' || q.type === 'scale_0_3' || q.type === 'scale_0_10' || q.type === 'yes_no' || q.type === 'severity');
       let tableHtml = '';
       if (standardQs.length > 0 && answeredUsers.length > 0) {
         const headerCells = standardQs.map(q => `<th style="padding:3px 6px;border:1px solid var(--border);font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(q.text)}">${escHtml(q.text.length > 30 ? q.text.slice(0,27)+'...' : q.text)}</th>`).join('');
@@ -200,9 +200,20 @@ async function _loadPollsterLog(container) {
               else if (v === 2) bg = 'background:#E67E2233';
               else if (v === 3) bg = 'background:#E74C3C33';
               val = t('poll_scale_'+v)||['None','Low','Medium','High'][v]||v;
+            } else if (q.type === 'scale_0_10') {
+              const v = parseInt(val);
+              // Gradient green→yellow→orange→red across 0–10
+              if (v <= 2) bg = 'background:#27AE6033';
+              else if (v <= 5) bg = 'background:#F39C1233';
+              else if (v <= 8) bg = 'background:#E67E2233';
+              else bg = 'background:#E74C3C33';
             } else if (q.type === 'yes_no') {
               bg = val === 'yes' ? 'background:#27AE6022' : 'background:#E74C3C22';
               val = val === 'yes' ? (t('yes')||'Yes') : (t('no')||'No');
+            } else if (q.type === 'severity') {
+              const sevMap = { low: {bg:'#27AE6033', l:'severity_low', f:'Low'}, medium: {bg:'#F1C40F33', l:'severity_medium', f:'Medium'}, high: {bg:'#E67E2233', l:'severity_high', f:'High'}, critical: {bg:'#E74C3C33', l:'severity_critical', f:'Critical'} };
+              const s = sevMap[val];
+              if (s) { bg = 'background:'+s.bg; val = t(s.l)||s.f; }
             }
             return `<td style="padding:3px 6px;border:1px solid var(--border);text-align:center;font-size:10px;${bg}">${val}</td>`;
           }).join('');
@@ -246,13 +257,15 @@ async function _loadPollsterLog(container) {
         if (targetLabel) receiversHtml = `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">📨 ${t('poll_receivers')||'Receivers'}: ${escHtml(targetLabel)}</div>`;
       }
 
+      const seqHtml = poll.sequence_number ? `<span style="font-size:10px;color:var(--text-dim);font-weight:600;margin-right:6px">${escHtml(poll.sequence_number)}</span>` : '';
+      const createdByHtml = poll.created_by_name ? `<span> · 👤 ${t('poll_created_by')||'By'}: ${escHtml(poll.created_by_name)}</span>` : '';
       return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <strong>📊 ${escHtml(poll.title)}</strong>
+          <strong>${seqHtml}📊 ${escHtml(poll.title)}</strong>
           <span style="font-size:10px;color:${statusColor}">${statusLabel}</span>
         </div>
         <div style="color:var(--text-dim);font-size:var(--fs-xs)">
-          📅 ${t('poll_started')||'Started'}: ${ts}
+          📅 ${t('poll_started')||'Started'}: ${ts}${createdByHtml}
           ${scheduledTs ? `<br>⏱ ${t('poll_scheduled_for')||'Scheduled for'}: ${scheduledTs}` : ''}
           ${closedTs ? `<br>🔒 ${t('poll_closed')||'Closed'}: ${closedTs}` : ''}
         </div>
