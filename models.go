@@ -1289,6 +1289,30 @@ type EventLogEntry struct {
 	UserName  string    `json:"user_name,omitempty"`
 }
 
+// RFIRespondent is a single respondent in a Request For Information
+type RFIRespondent struct {
+	UserID      int64  `json:"user_id"`
+	UserName    string `json:"user_name"`
+	Status      string `json:"status"`                // pending | responded
+	Response    string `json:"response,omitempty"`     // free-text answer
+	RespondedAt string `json:"responded_at,omitempty"` // ISO 8601 timestamp
+}
+
+// RequestForInfo tracks a per-participant information request
+type RequestForInfo struct {
+	ID            int64           `json:"id"`
+	CreatedBy     int64           `json:"created_by"`
+	CreatedByName string          `json:"created_by_name"`
+	Question      string          `json:"question"`                    // the question / request text
+	Respondents   []RFIRespondent `json:"respondents"`
+	CreatedAt     time.Time       `json:"created_at"`
+	DeadlineMins  int             `json:"deadline_mins,omitempty"`     // auto-close after N minutes (0 = no auto-close)
+	DeadlineAt    string          `json:"deadline_at,omitempty"`       // computed absolute deadline (ISO 8601)
+	ScheduledAt   string          `json:"scheduled_at,omitempty"`      // optional: fire at this time
+	Fired         bool            `json:"fired,omitempty"`             // true once a scheduled RFI has been dispatched
+	Status        string          `json:"status"`                      // open | closed
+}
+
 // Notification is a persistent personal notification for a user
 type Notification struct {
 	ID           int64     `json:"id"`

@@ -109,7 +109,14 @@ function connectSSE() {
       // For polls and poll reminders, start a repeating alarm sound that
       // fires every minute until the user submits a response. For other
       // personal notifications, the normal bell chime is enough.
-      if ((data.type === 'poll' || data.type === 'poll_reminder') && data.ref_id) {
+      if (data.type === 'rfi' && data.ref_id) {
+        // RFI notifications get a repeating alarm (chime every 60s)
+        if (typeof startRepeatingAlarm === 'function') {
+          startRepeatingAlarm('rfi-' + data.ref_id, 'chime', 60000);
+        } else {
+          _playNotifBellSound();
+        }
+      } else if ((data.type === 'poll' || data.type === 'poll_reminder') && data.ref_id) {
         if (typeof startRepeatingAlarm === 'function') {
           startRepeatingAlarm('poll-' + data.ref_id, 'chime', 60000);
         } else {
@@ -202,6 +209,46 @@ function connectSSE() {
       if (pollModal) {
         const modal = pollModal.closest('.modal-overlay');
         if (modal) _loadPolls(modal);
+      }
+    } catch {}
+  });
+  // ── RFI (Request For Information) ──
+  es.addEventListener('rfi_new', e => {
+    try {
+      const data = JSON.parse(e.data);
+      if (typeof _showRFIPopup === 'function') _showRFIPopup(data);
+    } catch {}
+  });
+  es.addEventListener('rfi_update', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // If the popup is open and the user has already responded, remove it
+      const popup = document.getElementById('rfiPopup_' + data.id);
+      if (popup) {
+        const me = (data.respondents || []).find(r => r.user_id === state.user.id);
+        if (me && me.status !== 'pending') {
+          if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('rfi-' + data.id);
+          popup.remove();
+        }
+      }
+      // Refresh modal if open
+      if (document.getElementById('rfiModal') && typeof _rfiRenderList === 'function') {
+        _rfiList = []; // force refresh
+        apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(); }).catch(() => {});
+      }
+    } catch {}
+  });
+  es.addEventListener('rfi_closed', e => {
+    try {
+      const data = JSON.parse(e.data);
+      // Remove popup if RFI was closed
+      const popup = document.getElementById('rfiPopup_' + data.id);
+      if (popup) {
+        if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('rfi-' + data.id);
+        popup.remove();
+      }
+      if (document.getElementById('rfiModal') && typeof _rfiRenderList === 'function') {
+        _rfiList = []; apiGet('/api/rfi').then(r => { _rfiList = r || []; _rfiRenderList(); }).catch(() => {});
       }
     } catch {}
   });

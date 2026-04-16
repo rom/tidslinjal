@@ -90,7 +90,19 @@ function render() {
     const attachSection = (e.attachments && e.attachments.length) ? '<div class="dl-attachments">' + e.attachments.map(a =>
       '<a href="/api/decision-log/' + e.id + '/attachment/' + encodeURIComponent(a.stored_name) + '" target="_blank" title="' + escHtml(a.filename) + '">📎 ' + escHtml(a.filename) + '</a>'
     ).join('') + '</div>' : '';
-    return '<div class="dl-entry"><div class="dl-entry-header"><div><span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text">' + escHtml(e.decision) + '</div>' + reasonSection + attachSection + coSignSection + reviewSection + '</div>';
+    // Decision body: render as HTML (sanitised on server) so rich text
+    // formatting (bold, lists, links etc.) is preserved.  Fall back to
+    // escaped plain text only if the value looks like it has never been
+    // through the rich-text editor (no HTML tags at all).
+    const bodyHtml = (e.decision && /<[a-z][\s\S]*>/i.test(e.decision)) ? e.decision : escHtml(e.decision || '');
+    // Background color: custom or deadline-auto
+    let entryBg = '';
+    if (e.color) entryBg = 'background:' + escHtml(e.color) + ';color:#222;';
+    else if (e.deadline && e.status === 'requested') entryBg = 'background:#FFF4C2;color:#222;';
+    else if ((e.status === 'approved' || (!e.status && e.decided_at)) && e.approval_type === 'approved_with_condition') entryBg = 'background:#FFF4C2;color:#222;';
+    else if (e.deadline && e.status === 'rejected') entryBg = 'background:#FFD6D6;color:#222;';
+    const seqLabel = e.sequence_number ? '<span style="font-family:monospace;font-size:10px;color:var(--text-dim);margin-right:4px">' + escHtml(e.sequence_number) + '</span>' : '';
+    return '<div class="dl-entry" style="' + entryBg + 'border-radius:6px;margin-bottom:4px;border:1px solid var(--border)"><div class="dl-entry-header"><div>' + seqLabel + '<span style="font-weight:600">' + escHtml(e.display_name || e.user_name) + '</span><span class="dl-meta">' + ts + typeBadge + confBadge + '</span>' + statusBadge + '</div>' + delBtn + '</div><div class="dl-text" style="line-height:1.5">' + bodyHtml + '</div>' + reasonSection + attachSection + coSignSection + reviewSection + '</div>';
   }).join('');
   bindEntryActions();
 }
@@ -323,14 +335,20 @@ try {
 // Auto-refresh every 30 seconds
 setInterval(loadEntries, 30000);
 
-// Periodic theme sync from opener
+// Periodic theme sync — try opener first, fall back to localStorage
+// so the popup keeps its theme even after the parent window closes.
 setInterval(function() {
   var op = getOpener();
+  var theme = '';
   if (op && op.state && op.state.preferences) {
-    var theme = op.state.preferences.theme || 'dark';
-    if (document.body.className !== 'theme-' + theme) {
-      document.body.className = 'theme-' + theme;
-    }
+    theme = op.state.preferences.theme || '';
+  }
+  if (!theme) {
+    try { var prefs = JSON.parse(localStorage.getItem('tidslinjal_prefs') || '{}'); theme = prefs.theme || ''; } catch {}
+  }
+  if (!theme) theme = 'dark';
+  if (document.body.className !== 'theme-' + theme) {
+    document.body.className = 'theme-' + theme;
   }
 }, 3000);
 

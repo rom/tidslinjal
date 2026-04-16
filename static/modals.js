@@ -1980,6 +1980,229 @@ function _showPRCPopup(check) {
   }
 }
 
+/* ── Request For Information (RFI) ── */
+let _rfiList = [];
+
+async function openRFIModal() {
+  try { _rfiList = await apiGet('/api/rfi') || []; } catch { _rfiList = []; }
+  const isCreator = hasRole2(state.user.role, 'teamlead');
+  const groups = state.groups || [];
+  const users = (state.users || []).filter(u => u.id !== state.user.id);
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'rfiModal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:750px;width:95vw;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <h3>📋 ${t('rfi_title')||'Request For Information'}</h3>
+        <button class="modal-close" data-action="_closeRFIModal">&times;</button>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto;padding:12px">
+        ${isCreator ? `
+        <div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius)">
+          <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:4px">${t('rfi_question')||'Question / Request'}</label>
+          <textarea id="rfiQuestion" rows="3" placeholder="${t('rfi_question_placeholder')||'What information do you need?'}"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:6px"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+            <label style="font-size:var(--fs-xs);font-weight:600">${t('rfi_target')||'Send to'}:</label>
+            <div class="toggle-btn-group" style="font-size:10px">
+              <button class="toggle-btn active" id="rfiModeUser" data-rfi-mode="users">${t('poll_target_users')||'Users'}</button>
+              <button class="toggle-btn" id="rfiModeGroup" data-rfi-mode="groups">${t('poll_target_groups')||'Groups'}</button>
+              <button class="toggle-btn" id="rfiModeAll" data-rfi-mode="all">${t('rfi_all')||'All'}</button>
+            </div>
+          </div>
+          <div id="rfiTargetUsers">
+            <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${users.map(u => `<label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                <input type="checkbox" class="rfi-user-cb" value="${u.id}" style="margin-right:4px">
+                ${escHtml(u.display_name||u.username)}
+              </label>`).join('')}
+            </div>
+          </div>
+          <div id="rfiTargetGroups" style="display:none">
+            <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:6px;display:flex;flex-wrap:wrap;gap:4px">
+              ${groups.map(g => `<label class="group-chip" style="cursor:pointer;font-size:var(--fs-xs)">
+                <input type="checkbox" class="rfi-group-cb" value="${g.id}" style="margin-right:4px">
+                👥 ${escHtml(g.name)}
+              </label>`).join('')}
+            </div>
+          </div>
+          <div id="rfiTargetAll" style="display:none">
+            <p style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px">📢 ${t('rfi_all_desc')||'The RFI will be sent to all users.'}</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">⏱ ${t('rfi_deadline')||'Deadline (minutes)'}:
+              <input type="number" id="rfiDeadlineMins" min="1" value="5" style="width:60px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+            </label>
+            <label style="font-size:var(--fs-xs);color:var(--text-dim)">📅 ${t('rfi_schedule')||'Schedule'}:
+              <input type="datetime-local" id="rfiScheduledAt" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 6px;font-size:var(--fs-xs)">
+            </label>
+            <button class="btn btn-primary btn-sm" data-action="_rfiSend">${t('rfi_send')||'Send RFI'}</button>
+          </div>
+        </div>` : ''}
+        <div id="rfiActiveList"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  _bindActions(modal);
+  // Mode toggle
+  modal.querySelectorAll('[data-rfi-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.querySelectorAll('[data-rfi-mode]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('rfiTargetUsers').style.display = btn.dataset.rfiMode === 'users' ? '' : 'none';
+      document.getElementById('rfiTargetGroups').style.display = btn.dataset.rfiMode === 'groups' ? '' : 'none';
+      document.getElementById('rfiTargetAll').style.display = btn.dataset.rfiMode === 'all' ? '' : 'none';
+    });
+  });
+  _rfiRenderList(modal);
+}
+
+function _closeRFIModal() {
+  document.getElementById('rfiModal')?.remove();
+}
+
+function _rfiRenderList(modal) {
+  const wrap = (modal || document).querySelector('#rfiActiveList');
+  if (!wrap) return;
+  if (!_rfiList || _rfiList.length === 0) {
+    wrap.innerHTML = `<p style="color:var(--text-dim);font-size:var(--fs-sm)">${t('rfi_empty')||'No requests for information.'}</p>`;
+    return;
+  }
+  const isCreator = hasRole2(state.user.role, 'teamlead');
+  // Sort newest first
+  const sorted = _rfiList.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  wrap.innerHTML = sorted.map(rfi => {
+    const isOpen = rfi.status === 'open';
+    const responded = (rfi.respondents || []).filter(r => r.status === 'responded');
+    const pending = (rfi.respondents || []).filter(r => r.status === 'pending');
+    const total = (rfi.respondents || []).length;
+    const statusColor = isOpen ? 'var(--accent)' : 'var(--text-dim)';
+    const statusText = isOpen ? (t('rfi_open')||'Open') : (t('rfi_closed')||'Closed');
+    const dlInfo = rfi.deadline_at ? ` · ⏱ ${new Date(rfi.deadline_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}` : '';
+    let respondentsHtml = '';
+    if (responded.length > 0) {
+      respondentsHtml = `<div style="margin-top:6px"><strong style="color:#27AE60;font-size:var(--fs-xs)">✅ ${t('rfi_responded')||'Responded'} (${responded.length}/${total}):</strong>
+        ${responded.map(r => `<div style="margin:4px 0 4px 8px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
+          <strong>${escHtml(r.user_name)}</strong>${r.responded_at ? ' · ' + new Date(r.responded_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : ''}
+          <div style="margin-top:2px;white-space:pre-wrap">${escHtml(r.response||'')}</div>
+        </div>`).join('')}
+      </div>`;
+    }
+    if (pending.length > 0 && isCreator) {
+      respondentsHtml += `<div style="margin-top:4px"><span style="color:#E67E22;font-size:var(--fs-xs)">⏳ ${t('rfi_pending')||'Pending'}: ${pending.map(r => escHtml(r.user_name)).join(', ')}</span></div>`;
+    }
+    return `<div style="margin-bottom:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong style="font-size:var(--fs-sm)">📋 ${escHtml(rfi.question)}</strong>
+          <span style="font-size:var(--fs-xs);color:${statusColor};font-weight:600;margin-left:8px">${statusText}</span>
+        </div>
+        ${isCreator && isOpen ? `<button class="btn btn-sm btn-danger" style="font-size:10px" data-action="_rfiClose" data-arg="${rfi.id}">${t('rfi_close')||'Close'}</button>` : ''}
+      </div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px">
+        ${escHtml(rfi.created_by_name)} — ${new Date(rfi.created_at).toLocaleString()}${dlInfo}
+        — ${t('rfi_responses')||'Responses'}: ${responded.length}/${total}
+      </div>
+      ${respondentsHtml}
+    </div>`;
+  }).join('');
+  _bindActions(wrap);
+}
+
+async function _rfiSend() {
+  const question = document.getElementById('rfiQuestion')?.value?.trim();
+  if (!question) { showError(t('rfi_question_required')||'Question is required'); return; }
+  const mode = document.querySelector('[data-rfi-mode].active')?.dataset?.rfiMode || 'users';
+  const respondentIds = mode === 'users' ? [...document.querySelectorAll('.rfi-user-cb:checked')].map(c => parseInt(c.value)) : [];
+  const groupIds = mode === 'groups' ? [...document.querySelectorAll('.rfi-group-cb:checked')].map(c => parseInt(c.value)) : [];
+  const all = mode === 'all';
+  if (!all && respondentIds.length === 0 && groupIds.length === 0) {
+    showError(t('rfi_target_required')||'Select at least one recipient');
+    return;
+  }
+  const deadlineMins = parseInt(document.getElementById('rfiDeadlineMins')?.value || '0', 10);
+  const scheduledAtLocal = document.getElementById('rfiScheduledAt')?.value || '';
+  const scheduledAt = scheduledAtLocal ? new Date(scheduledAtLocal).toISOString() : '';
+  const res = await apiPost('/api/rfi', {
+    question,
+    respondent_ids: respondentIds,
+    group_ids: groupIds,
+    all,
+    deadline_mins: deadlineMins,
+    scheduled_at: scheduledAt
+  });
+  if (res.ok) {
+    document.getElementById('rfiQuestion').value = '';
+    showNotification('success', t('rfi_sent')||'RFI sent');
+    _rfiList = await apiGet('/api/rfi') || [];
+    _rfiRenderList();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showError(err.error || 'Failed to send RFI');
+  }
+}
+
+async function _rfiClose(id) {
+  const res = await api('PUT', `/api/rfi/${id}/close`);
+  if (res.ok) {
+    showNotification('success', t('rfi_closed_success')||'RFI closed');
+    _rfiList = await apiGet('/api/rfi') || [];
+    _rfiRenderList();
+  }
+}
+
+// RFI popup for respondents — shown when an SSE rfi_new event arrives
+function _showRFIPopup(rfi) {
+  if (!state.user) return;
+  const me = (rfi.respondents || []).find(r => r.user_id === state.user.id);
+  if (!me || me.status !== 'pending') return;
+  // Don't show duplicate popups
+  if (document.getElementById('rfiPopup_' + rfi.id)) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'rfiPopup_' + rfi.id;
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '10001';
+  const dlText = rfi.deadline_at ? `<p style="font-size:var(--fs-xs);color:#E67E22;margin-bottom:8px">⏱ ${t('rfi_deadline_at')||'Deadline'}: ${new Date(rfi.deadline_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</p>` : '';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:500px;animation:slideIn .25s ease">
+      <div class="modal-header" style="background:#3498DB;color:#fff">
+        <h3 style="color:#fff">📋 ${t('rfi_popup_title')||'Information Requested'}</h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:var(--fs-sm);margin-bottom:4px">
+          <b>${escHtml(rfi.created_by_name || '')}</b> ${t('rfi_popup_asks')||'requests information:'}
+        </p>
+        <div style="font-size:var(--fs-sm);padding:8px 10px;margin-bottom:10px;background:var(--bg2);border-radius:var(--radius);border-left:3px solid var(--accent);color:var(--text);font-weight:600">${escHtml(rfi.question)}</div>
+        ${dlText}
+        <textarea id="rfiResponse_${rfi.id}" rows="6" placeholder="${t('rfi_response_placeholder')||'Type your response here…'}"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px;font-size:var(--fs-sm);resize:vertical;margin-bottom:8px"></textarea>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-primary" id="rfiSubmit_${rfi.id}" style="padding:8px 24px;font-size:14px">📨 ${t('rfi_submit')||'Submit Response'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('rfiSubmit_' + rfi.id).addEventListener('click', async () => {
+    const response = document.getElementById('rfiResponse_' + rfi.id)?.value || '';
+    try {
+      const res = await api('PUT', `/api/rfi/${rfi.id}/respond`, { response });
+      if (res.ok) {
+        if (typeof stopRepeatingAlarm === 'function') stopRepeatingAlarm('rfi-' + rfi.id);
+        overlay.remove();
+        showNotification('success', t('rfi_response_sent')||'Response submitted');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showError(err.error || 'Failed to submit');
+      }
+    } catch (e) { showError('Error: ' + e.message); }
+  });
+  // Play repeating alarm to get attention
+  if (typeof startRepeatingAlarm === 'function') {
+    startRepeatingAlarm('rfi-' + rfi.id, 'chime', 60000);
+  }
+}
+
 /* ── Poll / Multipoll ── */
 async function openPollModal(opts) {
   opts = opts || {};

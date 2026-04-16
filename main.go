@@ -1720,6 +1720,20 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 		}
 	})
 
+	// ── Request For Information (RFI) ──
+	mux.HandleFunc("/api/rfi", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.requireAuth(app.handleGetRFIs)(w, r)
+		case http.MethodPost:
+			app.requireRole(RoleTeamLead, app.handleCreateRFI)(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("PUT /api/rfi/{id}/respond", app.requireAuth(app.handleRespondRFI))
+	mux.HandleFunc("PUT /api/rfi/{id}/close", app.requireRole(RoleTeamLead, app.handleCloseRFI))
+
 	// ── Polls / Multipoll ──
 	mux.HandleFunc("/api/polls", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -2715,6 +2729,7 @@ func main() {
 	go app.runSessionCleaner()
 	go app.runGradualBackupScheduler()
 	go app.runPRCScheduler()
+	go app.runRFIScheduler()
 	go app.runPollScheduler()
 	app.startAutoReportScheduler()
 	app.startBattleRhythmScheduler()

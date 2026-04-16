@@ -2483,6 +2483,7 @@ Fields: file, subject, sender, type, tags</pre>
           ${toolBtn('📊', t('poll_title')||'Poll / Multipoll', 'openPollModal()')}
           ${(isTeamLead || isAdminOrOplead) ? toolBtn('📝', t('questionnaire_editor')||'Poll Questions Editor', 'openQuestionnaireEditor()') : ''}
           ${toolBtn('🙋', t('person_ready_check_title')||'Person Ready Check', 'openPersonReadyCheckPopup()')}
+          ${toolBtn('📋', t('rfi_title')||'Request For Information', 'openRFIModal()')}
           ${toolBtn('✅', t('ready_check_title')||'Ready Check', 'openReadyCheckPopup()')}
           ${(role === 'admin' || role === 'developer') ? toolBtn('🔧', t('btn_bulk_actions')||'Bulk Event Actions', 'openBulkActionsModal()') : ''}
           ${toolBtn('📊', t('dashboard_title')||'Dashboard', 'openDashboard()')}
