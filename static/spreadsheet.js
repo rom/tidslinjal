@@ -323,7 +323,7 @@ async function _openSpreadsheet(id) {
       </div>
     </div>
     <!-- Formatting toolbar — applies style to the currently-selected cells -->
-    <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
+    <div data-ss-fmtbar="1" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
       <span style="color:var(--text-dim);margin-right:4px">${t('ss_fmt_label')||'Format'}:</span>
       <button class="btn btn-sm" data-ss-fmt="align-left" title="${t('ss_align_left')||'Align left'}" style="min-width:28px">\u2B05</button>
       <button class="btn btn-sm" data-ss-fmt="align-center" title="${t('ss_align_center')||'Align center'}" style="min-width:28px">\u2194</button>
@@ -653,10 +653,52 @@ async function _openSpreadsheet(id) {
   // Formatting toolbar — apply inline styles to the selected cells using
   // jspreadsheet v5's setStyle API. For the row/col fill buttons we expand
   // the selection to the full row or column range before applying.
-  function _ssSelectedRefs() {
+  //
+  // Selection persistence: clicking any toolbar control (button, dropdown,
+  // color picker) shifts focus out of the grid and jspreadsheet clears
+  // `selectedCell`, so the handler would see an empty selection and fire
+  // "Select cells first". We capture the selection on the toolbar's
+  // `mousedown` (fires BEFORE focus moves) and read from that snapshot in
+  // the handlers.
+  let _savedFmtSelection = null;
+  const fmtBar = doc.getElementById('ssEditorRoot')?.querySelector('[data-ss-fmtbar="1"]') ||
+    (() => { // find the formatting row regardless of id (it's the bar containing any [data-ss-fmt])
+      const anyBtn = doc.querySelector('[data-ss-fmt]');
+      return anyBtn ? anyBtn.parentElement : null;
+    })();
+  const _captureSel = () => {
     const ws = _ws();
-    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
-    const [c1, r1, c2, r2] = ws.selectedCell;
+    if (ws && ws.selectedCell && ws.selectedCell.length) {
+      _savedFmtSelection = [...ws.selectedCell];
+    }
+  };
+  if (fmtBar) {
+    // Any mousedown on the toolbar row captures selection. We use capture
+    // phase so it runs before any child handler that might steal focus.
+    fmtBar.addEventListener('mousedown', _captureSel, true);
+    // Colour inputs are special — on some browsers the first interaction
+    // is on the native picker which doesn't bubble a mousedown on the
+    // input element itself. Capture when the picker is opened via focus.
+    fmtBar.querySelectorAll('input[type="color"]').forEach(inp => {
+      inp.addEventListener('mousedown', _captureSel);
+      inp.addEventListener('focus', _captureSel);
+    });
+    // Select dropdowns (font size) don't always fire mousedown before the
+    // native menu steals focus — hook focus as well.
+    fmtBar.querySelectorAll('select').forEach(sel => {
+      sel.addEventListener('mousedown', _captureSel);
+      sel.addEventListener('focus', _captureSel);
+    });
+  }
+  function _selOrSaved() {
+    const ws = _ws();
+    if (ws && ws.selectedCell && ws.selectedCell.length) return ws.selectedCell;
+    return _savedFmtSelection || [];
+  }
+  function _ssSelectedRefs() {
+    const sel = _selOrSaved();
+    if (!sel || !sel.length) return [];
+    const [c1, r1, c2, r2] = sel;
     const refs = [];
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
       for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
@@ -666,22 +708,24 @@ async function _openSpreadsheet(id) {
     return refs;
   }
   function _ssRowRefs() {
+    const sel = _selOrSaved();
+    if (!sel || !sel.length) return [];
+    const [, r1, , r2] = sel;
     const ws = _ws();
-    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
-    const [, r1, , r2] = ws.selectedCell;
     const refs = [];
-    const colCount = ((ws.options && ws.options.columns) || []).length || 26;
+    const colCount = (ws && ws.options && ws.options.columns) ? ws.options.columns.length : 26;
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r++) {
       for (let c = 0; c < colCount; c++) refs.push(_colLetter(c) + (r + 1));
     }
     return refs;
   }
   function _ssColRefs() {
+    const sel = _selOrSaved();
+    if (!sel || !sel.length) return [];
+    const [c1, , c2] = sel;
     const ws = _ws();
-    if (!ws || !ws.selectedCell || !ws.selectedCell.length) return [];
-    const [c1, , c2] = ws.selectedCell;
     let rowCount = 0;
-    try { rowCount = (ws.getData() || []).length; } catch {}
+    try { rowCount = ws && typeof ws.getData === 'function' ? (ws.getData() || []).length : 0; } catch {}
     if (!rowCount) rowCount = ss.row_count || 50;
     const refs = [];
     for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c++) {
