@@ -1910,21 +1910,53 @@ function _clearBoardItemDueDate(itemId) {
 // Accept a board item as handled. Backend records who accepted it and
 // when; the detail view re-renders showing a green "Accepted" pill
 // alongside the due date where the "✓ Accept" button used to be.
+// Any pending debounced inline-save is flushed first so a concurrent
+// PUT can't clobber the server-side state.
 async function _acceptBoardItem(itemId) {
   try {
-    await _boardApi('POST', '/board-items/' + itemId + '/accept', {});
+    await _flushInlineSave(itemId);
+    const updated = await _boardApi('POST', '/board-items/' + itemId + '/accept');
+    _applyItemUpdate(updated);
     if (typeof showNotification === 'function') showNotification('success', t('board_accepted_toast')||'Item accepted');
     _openBoardItem(itemId);
-  } catch (e) { showError('Accept failed: ' + e.message); }
+  } catch (e) {
+    console.error('[boards] accept failed:', e);
+    showError('Accept failed: ' + (e && e.message ? e.message : String(e)));
+  }
 }
 
 // Undo an accept — returns the item to "pending" state.
 async function _unacceptBoardItem(itemId) {
   try {
-    await _boardApi('POST', '/board-items/' + itemId + '/unaccept', {});
+    await _flushInlineSave(itemId);
+    const updated = await _boardApi('POST', '/board-items/' + itemId + '/unaccept');
+    _applyItemUpdate(updated);
     if (typeof showNotification === 'function') showNotification('success', t('board_unaccepted_toast')||'Accept undone');
     _openBoardItem(itemId);
-  } catch (e) { showError('Un-accept failed: ' + e.message); }
+  } catch (e) {
+    console.error('[boards] unaccept failed:', e);
+    showError('Un-accept failed: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
+// Cancel the debounced inline-save timer and run any pending save
+// synchronously so the next API call sees fresh server-side state.
+async function _flushInlineSave(itemId) {
+  if (_inlineSaveTimer) {
+    clearTimeout(_inlineSaveTimer);
+    _inlineSaveTimer = null;
+    try { await _inlineSaveBoardItemNow(itemId); } catch {}
+  }
+}
+
+// Merges an updated board item (returned from the server) into the
+// local state so the detail view re-renders with fresh fields without
+// waiting for the SSE refresh round-trip.
+function _applyItemUpdate(updated) {
+  if (!updated || typeof updated !== 'object' || !updated.id) return;
+  const list = _boardsState.items || [];
+  const idx = list.findIndex(i => i.id === updated.id);
+  if (idx >= 0) list[idx] = updated;
 }
 
 function _clearBoardItemColor(itemId) {
