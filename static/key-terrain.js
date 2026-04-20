@@ -823,6 +823,154 @@ async function _ktUploadBoardAttachment() {
   } catch (err) { alert('Error: ' + err.message); }
 }
 
+// ── Cycle History Viewer ──────────────────────────────────────────────────
+// Lists automatic battle-rhythm snapshots (written to disk by
+// runDueBattleRhythmSnapshots) and lets the operator replay the Key
+// Terrain Board state from any earlier cycle. Only JSON snapshots can
+// be replayed in-browser; CSV/XML/SVG fall back to a raw download.
+async function _ktOpenCycleHistory() {
+  let cycles = [];
+  try {
+    cycles = await _ktApi('GET', '/key-terrain/battle-rhythm/snapshots') || [];
+  } catch (e) {
+    alert('Error: ' + e.message);
+    return;
+  }
+  const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
+  const cycleMin = parseInt(cfg.cycle_minutes) || 0;
+  const startedAt = cfg.started_at ? new Date(cfg.started_at) : null;
+  const cycleIdxFor = (cycleDir) => {
+    if (!startedAt || !cycleMin) return null;
+    const parsed = _ktParseSafeTimestamp(cycleDir);
+    if (!parsed) return null;
+    const diffMin = (parsed.getTime() - startedAt.getTime()) / 60000;
+    if (diffMin < 0) return null;
+    return Math.round(diffMin / cycleMin);
+  };
+  const rows = cycles.map(c => {
+    const idx = cycleIdxFor(c.cycle_dir);
+    const when = _ktParseSafeTimestamp(c.cycle_dir);
+    const label = (idx != null ? `${t('kt_current_cycle')||'Cycle'} ${idx}` : c.cycle_dir)
+                + (when ? ' · ' + when.toLocaleString() : '');
+    const files = (c.files || []).slice().sort((a, b) => (a.offset_min||0) - (b.offset_min||0));
+    const fileLinks = files.map(f => {
+      const href = `/api/key-terrain/battle-rhythm/snapshots/${encodeURIComponent(c.cycle_dir)}/${encodeURIComponent(f.name)}`;
+      const isJson = (f.format || '').toLowerCase() === 'json';
+      const offsetTxt = 'H' + (f.offset_min >= 0 ? '+' : '') + f.offset_min;
+      const fmt = (f.format || '').toUpperCase();
+      if (isJson) {
+        return `<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" data-action="_ktShowHistoricalSnapshot" data-arg-el data-cycle="${escHtml(c.cycle_dir)}" data-name="${escHtml(f.name)}" data-label="${escHtml(label + ' · ' + offsetTxt)}">${offsetTxt} ${fmt}</button>`;
+      }
+      return `<a class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;text-decoration:none" href="${href}" target="_blank" rel="noopener" title="${t('kt_br_history_download')||'Download'}">${offsetTxt} ${fmt}</a>`;
+    }).join(' ');
+    return `<div style="padding:6px 8px;border-bottom:1px solid var(--border)">
+      <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">${escHtml(label)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${fileLinks || `<span style="color:var(--text-dim);font-size:10px">${t('kt_br_history_no_files')||'No snapshots'}</span>`}</div>
+    </div>`;
+  }).join('');
+  const empty = !cycles.length
+    ? `<p style="color:var(--text-dim);padding:12px">${t('kt_br_history_empty')||'No snapshots recorded yet. Configure snapshot offsets in the Battle Rhythm settings.'}</p>`
+    : '';
+  const html = `<div style="width:min(92vw,720px);max-width:92vw">
+    <h3 style="margin:0 0 10px">\u{1F4DC} ${t('kt_br_history_title')||'Battle-rhythm cycle history'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('kt_br_history_desc')||'Browse saved snapshots from previous cycles. Click a JSON marker to view the board as it was at that moment.'}</p>
+    <div style="max-height:45vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">${rows}${empty}</div>
+    <div id="ktHistorySnapshotView" style="margin-top:12px"></div>
+    <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px">
+      <button class="btn btn-secondary btn-sm" data-action="_ktCloseCycleHistory">${t('btn_close')||'Close'}</button>
+    </div>
+  </div>`;
+  _boardModal('ktCycleHistoryModal', html, '720px');
+  _ktTrapModalKeys('ktCycleHistoryModal');
+}
+
+function _ktCloseCycleHistory() {
+  if (typeof _closeBoardModal === 'function') _closeBoardModal('ktCycleHistoryModal');
+}
+
+// Parses the safeTimestamp() format ("2026-04-13T09-00-00Z") back into
+// a Date. safeTimestamp replaces the colons in RFC3339 with dashes, so
+// we only need to put them back in the time part.
+function _ktParseSafeTimestamp(s) {
+  if (!s || typeof s !== 'string') return null;
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})(Z|[+-]\d{2}-\d{2})?$/);
+  if (!m) return null;
+  const tz = (m[5] || '').replace('-', ':'); // the dash in the TZ offset also needs reversing
+  const iso = `${m[1]}T${m[2]}:${m[3]}:${m[4]}${tz || 'Z'}`;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function _ktShowHistoricalSnapshot(el) {
+  const cycleDir = el?.dataset?.cycle;
+  const name = el?.dataset?.name;
+  const label = el?.dataset?.label || '';
+  if (!cycleDir || !name) return;
+  const view = document.getElementById('ktHistorySnapshotView');
+  if (!view) return;
+  view.innerHTML = `<div style="padding:12px;color:var(--text-dim);font-size:var(--fs-xs)">${t('loading')||'Loading…'}</div>`;
+  try {
+    const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+    if (csrf) headers['X-CSRF-Token'] = csrf[1];
+    const res = await fetch(`/api/key-terrain/battle-rhythm/snapshots/${encodeURIComponent(cycleDir)}/${encodeURIComponent(name)}`, { headers });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || res.statusText);
+    }
+    const text = await res.text();
+    const data = JSON.parse(text);
+    view.innerHTML = _ktRenderHistoricalSnapshot(data, label);
+  } catch (err) {
+    view.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:var(--fs-xs)">Error: ${escHtml(err.message || String(err))}</div>`;
+  }
+}
+
+function _ktRenderHistoricalSnapshot(data, label) {
+  const entries = Array.isArray(data && data.entries) ? data.entries : [];
+  const taken = data && data.taken_at ? new Date(data.taken_at).toLocaleString() : '';
+  const offset = (data && Number.isFinite(data.offset_min)) ? ('H' + (data.offset_min >= 0 ? '+' : '') + data.offset_min) : '';
+  const visible = entries.filter(e => !e.archived);
+  const priorityOrder = (e) => (e.priority && e.priority > 0) ? e.priority : 9999;
+  visible.sort((a, b) => priorityOrder(a) - priorityOrder(b));
+  const head = `<div style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline">
+      <strong style="font-size:var(--fs-sm)">${escHtml(label)}</strong>
+      ${offset ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(offset)}</span>` : ''}
+      ${taken ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${t('kt_br_history_taken_at')||'Taken'}: ${escHtml(taken)}</span>` : ''}
+      <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:auto">${visible.length} ${visible.length === 1 ? (t('kt_entry_singular')||'entry') : (t('kt_entry_plural')||'entries')}</span>
+    </div>`;
+  if (!visible.length) {
+    return head + `<div style="padding:12px;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg);color:var(--text-dim);font-size:var(--fs-xs)">${t('kt_br_history_empty_entries')||'This snapshot contains no (non-archived) entries.'}</div>`;
+  }
+  const rowsHtml = visible.map(e => `
+    <tr>
+      <td style="padding:4px 6px">${e.priority || ''}</td>
+      <td style="padding:4px 6px">${escHtml(e.zone || '')}</td>
+      <td style="padding:4px 6px;font-weight:600">${escHtml(e.function || '')}</td>
+      <td style="padding:4px 6px">${escHtml(e.status || '')}</td>
+      <td style="padding:4px 6px">${escHtml(e.trend || '')}</td>
+      <td style="padding:4px 6px">${escHtml(e.threat || '').replace(/<[^>]+>/g,'')}</td>
+      <td style="padding:4px 6px">${escHtml(e.responsible_name || '')}</td>
+      <td style="padding:4px 6px">${escHtml(e.actions || '').replace(/<[^>]+>/g,'')}</td>
+      <td style="padding:4px 6px;text-align:right">${e.rounds || 0}</td>
+    </tr>`).join('');
+  return head + `<div style="max-height:45vh;overflow:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg)">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:var(--bg2);position:sticky;top:0">
+        <th style="padding:4px 6px;text-align:left">${t('kt_priority')||'Prio'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_zone')||'Zone'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_function')||'Function'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_status')||'Status'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_trend')||'Trend'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_threat')||'Threat'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_responsible')||'Responsible'}</th>
+        <th style="padding:4px 6px;text-align:left">${t('kt_actions')||'Actions'}</th>
+        <th style="padding:4px 6px;text-align:right">${t('kt_rounds')||'# Cycles'}</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>`;
+}
+
 async function _ktDeleteBoardAttachment(el) {
   const storedName = el?.dataset?.stored;
   if (!storedName) return;
@@ -2661,6 +2809,11 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
       stateColor = 'var(--text-dim)';
   }
   let controls = '';
+  // "Cycle History" is visible for every layout (incl. stopped) so
+  // operators can browse snapshots from prior exercises after a reset.
+  const historyBtn = canWrite
+    ? `<button class="btn btn-sm btn-secondary" data-action="_ktOpenCycleHistory" title="${t('kt_br_history_h')||'Browse saved snapshots from previous battle-rhythm cycles'}">\u{1F4DC} ${t('kt_br_history')||'History'}</button>`
+    : '';
   if (canWrite) {
     // Step navigation buttons — shown whenever the clock is running or
     // paused. Forward / Fast Forward skip ahead to the start of the next
@@ -2685,19 +2838,22 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
           <span style="font-weight:700">:</span>
           <input type="number" id="ktBrStartM" class="input" min="0" max="59" placeholder="MM" style="width:44px;padding:3px 4px;text-align:center;font-size:var(--fs-xs)">
         </div>
-        <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>`;
+        <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="start">\u25B6 ${t('kt_br_start')||'Start'}</button>
+        ${historyBtn}`;
     } else if (layout === 'starting') {
-      controls = `<button class="btn btn-sm btn-secondary" disabled style="opacity:.6">\u23F3 ${t('kt_br_starting')||'Starting…'}</button>`;
+      controls = `<button class="btn btn-sm btn-secondary" disabled style="opacity:.6">\u23F3 ${t('kt_br_starting')||'Starting…'}</button>${historyBtn}`;
     } else if (layout === 'scheduled') {
-      controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_cancel')||'Cancel'}</button>`;
+      controls = `<button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_cancel')||'Cancel'}</button>${historyBtn}`;
     } else if (layout === 'paused') {
       controls = `${navButtons}
         <button class="btn btn-sm btn-primary" data-action="_ktBrControl" data-arg="resume">\u25B6 ${t('kt_br_resume')||'Resume'}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
+        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
+        ${historyBtn}`;
     } else if (layout === 'running') {
       controls = `${navButtons}
         <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="pause">\u23F8 ${t('kt_br_pause')||'Pause'}</button>
-        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>`;
+        <button class="btn btn-sm btn-secondary" data-action="_ktBrControl" data-arg="reset">\u27F2 ${t('kt_br_reset')||'Reset'}</button>
+        ${historyBtn}`;
     }
   }
   // In "scheduled" mode, the big headline shows the waiting time and the
