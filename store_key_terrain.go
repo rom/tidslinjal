@@ -66,56 +66,48 @@ func (s *Store) UpdateKeyTerrainEntry(e KeyTerrainEntry) error {
 	return fmt.Errorf("key terrain entry %d not found", e.ID)
 }
 
-// AddKeyTerrainAttachment appends an attachment record to the entry and
+// GetKeyTerrainBoardAttachments returns a copy of all board-level
+// attachments (meeting protocols etc.), sorted newest first.
+func (s *Store) GetKeyTerrainBoardAttachments() []KeyTerrainAttachment {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]KeyTerrainAttachment, len(s.keyTerrainAttachments))
+	copy(out, s.keyTerrainAttachments)
+	return out
+}
+
+// AddKeyTerrainBoardAttachment appends a new board-level attachment and
 // persists. Caller is responsible for writing the file to AttachmentDir().
-func (s *Store) AddKeyTerrainAttachment(entryID int64, att KeyTerrainAttachment) error {
+func (s *Store) AddKeyTerrainBoardAttachment(att KeyTerrainAttachment) error {
 	s.mu.Lock()
+	s.keyTerrainAttachments = append(s.keyTerrainAttachments, att)
+	snap := append([]KeyTerrainAttachment(nil), s.keyTerrainAttachments...)
+	s.mu.Unlock()
+	return s.persist("key_terrain_attachments.json", snap)
+}
+
+// DeleteKeyTerrainBoardAttachment removes an attachment record by its
+// stored filename and returns the removed record. The on-disk file is
+// deleted by the handler.
+func (s *Store) DeleteKeyTerrainBoardAttachment(storedName string) (KeyTerrainAttachment, error) {
+	s.mu.Lock()
+	var removed KeyTerrainAttachment
 	found := false
-	for i := range s.keyTerrainEntries {
-		if s.keyTerrainEntries[i].ID == entryID {
-			s.keyTerrainEntries[i].Attachments = append(s.keyTerrainEntries[i].Attachments, att)
-			s.keyTerrainEntries[i].UpdatedAt = time.Now()
+	for i, a := range s.keyTerrainAttachments {
+		if a.StoredName == storedName {
+			removed = a
+			s.keyTerrainAttachments = append(s.keyTerrainAttachments[:i], s.keyTerrainAttachments[i+1:]...)
 			found = true
 			break
 		}
 	}
 	if !found {
 		s.mu.Unlock()
-		return fmt.Errorf("key terrain entry %d not found", entryID)
-	}
-	snap := append([]KeyTerrainEntry(nil), s.keyTerrainEntries...)
-	s.mu.Unlock()
-	return s.persist("key_terrain.json", snap)
-}
-
-// DeleteKeyTerrainAttachment removes an attachment record by its stored
-// filename. The on-disk file is deleted by the handler, not the store.
-func (s *Store) DeleteKeyTerrainAttachment(entryID int64, storedName string) (KeyTerrainAttachment, error) {
-	s.mu.Lock()
-	var removed KeyTerrainAttachment
-	found := false
-	for i := range s.keyTerrainEntries {
-		if s.keyTerrainEntries[i].ID != entryID {
-			continue
-		}
-		for j, a := range s.keyTerrainEntries[i].Attachments {
-			if a.StoredName == storedName {
-				removed = a
-				s.keyTerrainEntries[i].Attachments = append(s.keyTerrainEntries[i].Attachments[:j], s.keyTerrainEntries[i].Attachments[j+1:]...)
-				s.keyTerrainEntries[i].UpdatedAt = time.Now()
-				found = true
-				break
-			}
-		}
-		break
-	}
-	if !found {
-		s.mu.Unlock()
 		return removed, fmt.Errorf("attachment not found")
 	}
-	snap := append([]KeyTerrainEntry(nil), s.keyTerrainEntries...)
+	snap := append([]KeyTerrainAttachment(nil), s.keyTerrainAttachments...)
 	s.mu.Unlock()
-	return removed, s.persist("key_terrain.json", snap)
+	return removed, s.persist("key_terrain_attachments.json", snap)
 }
 
 func (s *Store) DeleteKeyTerrainEntry(id int64) error {

@@ -270,14 +270,15 @@ type KeyTerrainEntry struct {
 	Archived        bool             `json:"archived,omitempty"`          // hidden from normal view
 	FinishedAt      *time.Time       `json:"finished_at,omitempty"`       // when the entry was marked finished
 	History         []KeyTerrainHist `json:"history,omitempty"`
-	Attachments     []KeyTerrainAttachment `json:"attachments,omitempty"` // meeting protocols / files uploaded during battle-rhythm cycles
 	CreatedAt       time.Time        `json:"created_at"`
 	UpdatedAt       time.Time        `json:"updated_at"`
 }
 
-// KeyTerrainAttachment is a file attached to a Key Terrain entry — typically
-// a meeting protocol captured during a battle-rhythm cycle. Comment is
-// pre-filled client-side with the current cycle number when the file is added.
+// KeyTerrainAttachment is a file attached to the Key Terrain Board (not to
+// any individual entry) — typically a meeting protocol captured during a
+// battle-rhythm cycle. Comment is pre-filled client-side with the current
+// cycle number when the file is added so it is easy to trace a protocol
+// back to the cycle where the meeting ran.
 type KeyTerrainAttachment struct {
 	Filename     string    `json:"filename"`
 	StoredName   string    `json:"stored_name"`

@@ -80,9 +80,10 @@ type Store struct {
 	tags                 []Tag
 	boards               []Board
 	boardItems           []BoardItem
-	keyTerrainEntries    []KeyTerrainEntry
-	keyTerrainSettings   KeyTerrainSettings
-	keyTerrainSnapshots  []KeyTerrainSnapshot
+	keyTerrainEntries     []KeyTerrainEntry
+	keyTerrainSettings    KeyTerrainSettings
+	keyTerrainSnapshots   []KeyTerrainSnapshot
+	keyTerrainAttachments []KeyTerrainAttachment
 	reportArchive        []ReportArchiveEntry
 	reportIngestConfig   ReportIngestConfig
 	startupText          string
@@ -279,6 +280,7 @@ func (s *Store) load() error {
 	s.loadFile("key_terrain.json", &s.keyTerrainEntries)
 	s.loadFile("key_terrain_settings.json", &s.keyTerrainSettings)
 	s.loadFile("key_terrain_snapshots.json", &s.keyTerrainSnapshots)
+	s.loadFile("key_terrain_attachments.json", &s.keyTerrainAttachments)
 	s.loadFile("report_archive.json", &s.reportArchive)
 	s.loadFile("report_ingest_config.json", &s.reportIngestConfig)
 	s.loadFile("message_archive.json", &s.messageArchive)

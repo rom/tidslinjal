@@ -71,23 +71,27 @@ async function _ktApi(method, path, body) {
 
 async function openKeyTerrainBoard() {
   try {
-    const [entries, access, settings] = await Promise.all([
+    const [entries, access, settings, attachments] = await Promise.all([
       _ktApi('GET', '/key-terrain'),
       _ktApi('GET', '/key-terrain/access'),
       _ktApi('GET', '/key-terrain/settings').catch(() => ({})),
+      _ktApi('GET', '/key-terrain-attachments').catch(() => []),
     ]);
     _ktState.entries = entries;
     _ktState.access = access;
     _ktState.settings = settings || {};
+    _ktState.attachments = Array.isArray(attachments) ? attachments : [];
   } catch (e) {
     _ktState.entries = [];
     _ktState.access = { can_write: false };
+    _ktState.attachments = [];
   }
   _renderKeyTerrainBoard();
   _ktSubscribeSSE();
   // Start the live battle rhythm ticker if the function is defined
   // (it's defined later in this same file so it's always available here).
   if (typeof _ktBrStartTicker === 'function') _ktBrStartTicker();
+  _ktRenderBoardAttachments();
 }
 
 // ── SSE auto-refresh ──────────────────────────────────────────────────────
@@ -114,6 +118,12 @@ function _ktHandleSSE(ev) {
   const action = (ev && ev.detail && ev.detail.action) || '';
   if (action && action.indexOf('battle_rhythm_') === 0) {
     if (typeof _ktBrPoll === 'function') _ktBrPoll();
+    return;
+  }
+  // Board-level attachment add/remove: just refetch the list; the entry
+  // table and battle-rhythm widget are not affected.
+  if (action === 'attachment_added' || action === 'attachment_removed') {
+    if (typeof _ktLoadBoardAttachments === 'function') _ktLoadBoardAttachments();
     return;
   }
   // Cycle rollover: the Rounds field on every entry has been bumped on
@@ -334,7 +344,8 @@ function _renderKeyTerrainBoard() {
       </div>
     </div>
 
-    <div id="ktBattleRhythmWidget" class="kt-no-print" style="display:none;margin-bottom:12px"></div>
+    <div id="ktBattleRhythmWidget" class="kt-no-print" style="display:none;margin-bottom:8px"></div>
+    <div id="ktBoardAttachments" class="kt-no-print" style="display:none;margin-bottom:12px"></div>
 
     <h2 class="kt-print-only" style="display:none;margin-bottom:8px">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
     <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px">${t('kt_desc')||'Cyber key terrain overview \u2014 tracks critical functions, their status, threats, and response actions.'}</p>
@@ -475,6 +486,9 @@ function _renderKeyTerrainBoard() {
   }
   // Wire row hover via event delegation (CSP-safe, no inline handlers)
   _ktBindRowHover();
+  // Rehydrate the board-level attachments panel — a full board re-render
+  // wipes the host div's content but leaves the element in place.
+  if (typeof _ktRenderBoardAttachments === 'function') _ktRenderBoardAttachments();
 }
 
 // CSP-safe row hover: attach mouseover/mouseout listeners via delegation
@@ -585,8 +599,6 @@ async function _ktEditEntry(entryId) {
       <textarea id="ktComments" class="input" style="width:100%;min-height:48px;resize:vertical;font-size:var(--fs-xs)" placeholder="${t('kt_comments_ph')||'Notes, remarks, flags…'}">${escHtml(entry.comments || '')}</textarea>
     </div>
 
-    ${_ktRenderAttachmentsSection(entry, entryId)}
-
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary btn-sm" data-action="_ktSaveEntry" data-arg="${entryId || 0}">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_ktCancelEdit">${t('btn_cancel')||'Cancel'}</button>
@@ -693,7 +705,9 @@ function _ktCancelEdit() {
   if (typeof _closeBoardModal === 'function') _closeBoardModal('ktEditModal');
 }
 
-// ── Attachments (meeting protocols during battle-rhythm cycles) ────────────
+// ── Board-level Attachments (meeting protocols across battle cycles) ──────
+// Live next to the Battle Rhythm widget, not on individual entries, so
+// operators can keep a running log of per-cycle protocols on one board.
 function _ktCurrentCycle() {
   const st = typeof _ktBrLastState !== 'undefined' ? _ktBrLastState : null;
   return (st && Number.isFinite(st.cycles_completed)) ? st.cycles_completed : 0;
@@ -705,48 +719,84 @@ function _ktFmtBytes(n) {
   return (n/(1024*1024)).toFixed(1) + ' MB';
 }
 
-function _ktRenderAttachmentsSection(entry, entryId) {
-  const cycle = _ktCurrentCycle();
-  const canAttach = entryId && parseInt(entryId) > 0;
-  const list = Array.isArray(entry.attachments) ? entry.attachments : [];
-  const header = `<div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">\u{1F4CE} ${t('kt_attachments')||'Attachments'}${cycle ? ` <span style="color:var(--text-dim);font-weight:normal">(${t('kt_current_cycle')||'Cycle'} ${cycle})</span>` : ''}</div>`;
-  const existing = list.length ? `<div id="ktAttachList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">${list.map(a => _ktAttachmentRow(entryId, a)).join('')}</div>`
-                               : `<div id="ktAttachList" style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_no_attachments')||'No attachments yet.'}</div>`;
-  const uploader = canAttach ? `
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg3);padding:6px;border-radius:var(--radius)">
-      <input type="file" id="ktAttachFile" style="font-size:10px;flex:1;min-width:160px">
-      <input type="text" id="ktAttachComment" class="input" style="flex:2;min-width:200px;font-size:var(--fs-xs)"
-        placeholder="${t('kt_attach_comment_ph')||'Protocol / note'}"
-        value="${escHtml(_ktDefaultAttachComment(cycle))}">
-      <button class="btn btn-primary btn-sm" style="font-size:var(--fs-xs)" data-action="_ktUploadAttachment" data-arg="${entryId}">\u{2B06} ${t('kt_upload')||'Upload'}</button>
-    </div>
-    <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.'}</div>`
-    : `<div style="font-size:10px;color:var(--text-dim);font-style:italic">${t('kt_attach_save_first')||'Save the entry before uploading attachments.'}</div>`;
-  return `<div style="margin-bottom:10px">${header}${existing}${uploader}</div>`;
-}
-
 function _ktDefaultAttachComment(cycle) {
   const tpl = t('kt_attach_comment_default') || 'Battle cycle {n} — meeting protocol';
   return tpl.replace('{n}', String(cycle));
 }
 
-function _ktAttachmentRow(entryId, a) {
-  const href = `/api/key-terrain-attachment/${entryId}/${encodeURIComponent(a.stored_name)}`;
+function _ktAttachmentRow(a) {
+  const href = `/api/key-terrain-attachments/${encodeURIComponent(a.stored_name)}`;
   const meta = [];
   if (a.cycle != null) meta.push((t('kt_current_cycle')||'Cycle') + ' ' + a.cycle);
   if (a.size) meta.push(_ktFmtBytes(a.size));
   if (a.uploader_name) meta.push(a.uploader_name);
+  if (a.created_at) { try { meta.push(new Date(a.created_at).toLocaleString()); } catch {} }
+  const canDelete = _ktState.access && _ktState.access.can_write;
+  const delBtn = canDelete
+    ? `<button class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 6px;flex:0 0 auto" data-action="_ktDeleteBoardAttachment" data-arg-el data-stored="${escHtml(a.stored_name)}" title="${t('btn_delete')||'Delete'}">\u{1F5D1}</button>`
+    : '';
   return `<div style="display:flex;gap:6px;align-items:center;padding:4px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
     <a href="${href}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;flex:0 0 auto">\u{1F4CE} ${escHtml(a.filename||'')}</a>
-    <span style="flex:1;min-width:0;color:var(--text)">${escHtml(a.comment||'')}</span>
-    <span style="color:var(--text-dim);font-size:10px">${escHtml(meta.join(' \u00B7 '))}</span>
-    <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 6px" data-action="_ktDeleteAttachment" data-arg-el data-entry="${entryId}" data-stored="${escHtml(a.stored_name)}" title="${t('btn_delete')||'Delete'}">\u{1F5D1}</button>
+    <span style="flex:1;min-width:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(a.comment||'')}</span>
+    <span style="color:var(--text-dim);font-size:10px;flex:0 0 auto">${escHtml(meta.join(' \u00B7 '))}</span>
+    ${delBtn}
   </div>`;
 }
 
-async function _ktUploadAttachment(entryId) {
-  const fi = document.getElementById('ktAttachFile');
-  const ci = document.getElementById('ktAttachComment');
+// Renders the board-level attachments panel. Sits in #ktBoardAttachments
+// directly below the Battle Rhythm widget. Scrollable list so any number
+// of protocols fit without pushing the KT table off the page.
+function _ktRenderBoardAttachments() {
+  const host = document.getElementById('ktBoardAttachments');
+  if (!host) return;
+  const cfg = (_ktState.settings && _ktState.settings.battle_rhythm) || {};
+  if (!cfg.enabled || !cfg.show_clock) { host.style.display = 'none'; return; }
+  host.style.display = '';
+  const cycle = _ktCurrentCycle();
+  const canWrite = _ktState.access && _ktState.access.can_write;
+  const list = Array.isArray(_ktState.attachments) ? [..._ktState.attachments] : [];
+  // newest first by created_at (fallback: order in array)
+  list.sort((a, b) => {
+    const ta = a.created_at ? Date.parse(a.created_at) : 0;
+    const tb = b.created_at ? Date.parse(b.created_at) : 0;
+    return tb - ta;
+  });
+  const listHtml = list.length
+    ? `<div id="ktBoardAttachList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${list.map(_ktAttachmentRow).join('')}</div>`
+    : `<div id="ktBoardAttachList" style="font-size:10px;color:var(--text-dim);padding:8px;background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);text-align:center">${t('kt_no_attachments')||'No protocols uploaded yet.'}</div>`;
+  const uploader = canWrite ? `
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg3);padding:6px;border-radius:var(--radius);margin-top:6px">
+      <input type="file" id="ktBoardAttachFile" style="font-size:10px;flex:1;min-width:160px">
+      <input type="text" id="ktBoardAttachComment" class="input" style="flex:2;min-width:200px;font-size:var(--fs-xs)"
+        placeholder="${t('kt_attach_comment_ph')||'Protocol / note'}"
+        value="${escHtml(_ktDefaultAttachComment(cycle))}">
+      <button class="btn btn-primary btn-sm" style="font-size:var(--fs-xs)" data-action="_ktUploadBoardAttachment">\u{2B06} ${t('kt_upload')||'Upload'}</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.'}</div>` : '';
+  host.innerHTML = `
+    <div style="padding:10px 12px;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="font-weight:600;font-size:var(--fs-sm)">\u{1F4CE} ${t('kt_board_protocols')||'Battle cycle protocols'}</div>
+        <span style="font-size:10px;color:var(--text-dim)">${list.length} ${list.length === 1 ? (t('kt_file_singular')||'file') : (t('kt_file_plural')||'files')}${cycle ? ' \u00B7 ' + (t('kt_current_cycle')||'Cycle') + ' ' + cycle : ''}</span>
+      </div>
+      ${listHtml}
+      ${uploader}
+    </div>`;
+  if (typeof _bindActions === 'function') _bindActions(host);
+}
+
+async function _ktLoadBoardAttachments() {
+  try {
+    _ktState.attachments = await _ktApi('GET', '/key-terrain-attachments') || [];
+  } catch {
+    _ktState.attachments = [];
+  }
+  _ktRenderBoardAttachments();
+}
+
+async function _ktUploadBoardAttachment() {
+  const fi = document.getElementById('ktBoardAttachFile');
+  const ci = document.getElementById('ktBoardAttachComment');
   if (!fi || !fi.files || !fi.files.length) {
     alert(t('kt_attach_pick_file')||'Pick a file to upload first.');
     return;
@@ -760,56 +810,38 @@ async function _ktUploadAttachment(entryId) {
   const headers = { 'X-Requested-With': 'XMLHttpRequest' };
   if (csrf) headers['X-CSRF-Token'] = csrf[1];
   try {
-    const res = await fetch(`/api/key-terrain-attachment/${entryId}`, { method: 'POST', headers, body: fd });
+    const res = await fetch('/api/key-terrain-attachments', { method: 'POST', headers, body: fd });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
       throw new Error(e.error || res.statusText);
     }
     const att = await res.json();
-    // Update the entry in local state and re-render just the list
-    const e = _ktState.entries.find(x => x.id === parseInt(entryId));
-    if (e) { e.attachments = e.attachments || []; e.attachments.push(att); }
-    _ktRefreshAttachmentList(entryId);
-    fi.value = '';
-    if (ci) ci.value = _ktDefaultAttachComment(cycle);
+    _ktState.attachments = _ktState.attachments || [];
+    _ktState.attachments.push(att);
+    _ktRenderBoardAttachments();
     if (typeof showNotification === 'function') showNotification('success', t('kt_attach_uploaded')||'Attachment uploaded');
   } catch (err) { alert('Error: ' + err.message); }
 }
 
-async function _ktDeleteAttachment(el) {
-  const entryId = parseInt(el?.dataset?.entry || '0', 10);
+async function _ktDeleteBoardAttachment(el) {
   const storedName = el?.dataset?.stored;
-  if (!entryId || !storedName) return;
+  if (!storedName) return;
   if (!confirm(t('kt_attach_delete_confirm')||'Delete this attachment?')) return;
   const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
   const headers = { 'X-Requested-With': 'XMLHttpRequest' };
   if (csrf) headers['X-CSRF-Token'] = csrf[1];
   try {
-    const res = await fetch(`/api/key-terrain-attachment/${entryId}/${encodeURIComponent(storedName)}`, { method: 'DELETE', headers });
+    const res = await fetch(`/api/key-terrain-attachments/${encodeURIComponent(storedName)}`, { method: 'DELETE', headers });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
       throw new Error(e.error || res.statusText);
     }
-    const e = _ktState.entries.find(x => x.id === parseInt(entryId));
-    if (e && Array.isArray(e.attachments)) {
-      e.attachments = e.attachments.filter(a => a.stored_name !== storedName);
+    if (Array.isArray(_ktState.attachments)) {
+      _ktState.attachments = _ktState.attachments.filter(a => a.stored_name !== storedName);
     }
-    _ktRefreshAttachmentList(entryId);
+    _ktRenderBoardAttachments();
     if (typeof showNotification === 'function') showNotification('success', t('kt_attach_deleted')||'Attachment deleted');
   } catch (err) { alert('Error: ' + err.message); }
-}
-
-function _ktRefreshAttachmentList(entryId) {
-  const wrap = document.getElementById('ktAttachList');
-  if (!wrap) return;
-  const e = _ktState.entries.find(x => x.id === parseInt(entryId));
-  const list = (e && Array.isArray(e.attachments)) ? e.attachments : [];
-  if (!list.length) {
-    wrap.outerHTML = `<div id="ktAttachList" style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_no_attachments')||'No attachments yet.'}</div>`;
-  } else {
-    wrap.outerHTML = `<div id="ktAttachList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">${list.map(a => _ktAttachmentRow(entryId, a)).join('')}</div>`;
-  }
-  if (typeof _bindActions === 'function') _bindActions(document.getElementById('ktEditModal'));
 }
 
 async function _ktDeleteEntry(entryId) {
