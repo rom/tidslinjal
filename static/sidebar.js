@@ -3349,6 +3349,16 @@ Fields: file, subject, sender, type, tags</pre>
         </label>
       </div>
       <div class="sidebar-section">
+        <div class="sidebar-section-title">${t('settings_link_event_times')||'Link Event Start/End Times'}</div>
+        <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_link_event_times_desc')||'When editing an event, changing the start shifts the end (and vice versa) to preserve duration. Disabled by default — start and end times are edited independently.'}</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:var(--fs-sm)">
+          <input type="checkbox" ${p.link_event_times?'checked':''} data-action="setPref" data-event="change" data-pref-checked="link_event_times"
+            style="width:14px;height:14px;accent-color:var(--accent)">
+          ${t('settings_link_event_times')||'Link Event Start/End Times'}
+          <span title="${t('settings_link_event_times_info')||'When enabled, editing one time shifts the other so the event duration stays the same.'}" style="cursor:help;font-size:var(--fs-xs);color:var(--accent)">ℹ️</span>
+        </label>
+      </div>
+      <div class="sidebar-section">
         <div class="sidebar-section-title">${t('settings_default_event_type')||'Default Event Type'}</div>
         <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:6px">${t('settings_default_event_type_desc')}</p>
         <select data-action="setPrefSelect" data-event="change" data-pref-key="default_event_type"

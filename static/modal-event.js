@@ -82,8 +82,13 @@ function openEventModal(ev, defaultStart, defaultEnd) {
 
   const start = defaultStart || (ev ? new Date(ev.start_time) : new Date());
   const end   = defaultEnd   || (ev && ev.end_time ? new Date(ev.end_time) : addHours(start, 1));
-  document.getElementById('eventStart').value = fmtDateInput(start);
-  document.getElementById('eventEnd').value   = fmtDateInput(end);
+  const startEl = document.getElementById('eventStart');
+  const endEl   = document.getElementById('eventEnd');
+  startEl.value = fmtDateInput(start);
+  endEl.value   = fmtDateInput(end);
+  // Baseline for "link_event_times" delta computation
+  startEl.dataset.lastValue = startEl.value;
+  endEl.dataset.lastValue   = endEl.value;
 
   // Show browser timezone hint next to time labels
   try {
@@ -328,12 +333,44 @@ document.getElementById('eventRecurring').addEventListener('change', function() 
 
 document.getElementById('eventAllDay').addEventListener('change', updateEventModalTimeVisibility);
 
-// Auto-adjust end time to start + 1 hour whenever start changes
+// When "link_event_times" preference is enabled, changing start shifts end
+// (and vice versa) to preserve the event's duration. Default: independent.
 document.getElementById('eventStart').addEventListener('change', function() {
-  const start = new Date(this.value);
-  if (!isNaN(start.getTime())) {
-    document.getElementById('eventEnd').value = fmtDateInput(addHours(start, 1));
+  if (!state?.preferences?.link_event_times) {
+    this.dataset.lastValue = this.value;
+    return;
   }
+  const endEl = document.getElementById('eventEnd');
+  const newStart = new Date(this.value);
+  const prevStart = this.dataset.lastValue ? new Date(this.dataset.lastValue) : null;
+  const curEnd = endEl.value ? new Date(endEl.value) : null;
+  if (!isNaN(newStart.getTime())) {
+    if (prevStart && !isNaN(prevStart.getTime()) && curEnd && !isNaN(curEnd.getTime())) {
+      const deltaMs = newStart.getTime() - prevStart.getTime();
+      endEl.value = fmtDateInput(new Date(curEnd.getTime() + deltaMs));
+    } else {
+      endEl.value = fmtDateInput(addHours(newStart, 1));
+    }
+    endEl.dataset.lastValue = endEl.value;
+  }
+  this.dataset.lastValue = this.value;
+});
+
+document.getElementById('eventEnd').addEventListener('change', function() {
+  if (!state?.preferences?.link_event_times) {
+    this.dataset.lastValue = this.value;
+    return;
+  }
+  const startEl = document.getElementById('eventStart');
+  const newEnd = new Date(this.value);
+  const prevEnd = this.dataset.lastValue ? new Date(this.dataset.lastValue) : null;
+  const curStart = startEl.value ? new Date(startEl.value) : null;
+  if (!isNaN(newEnd.getTime()) && prevEnd && !isNaN(prevEnd.getTime()) && curStart && !isNaN(curStart.getTime())) {
+    const deltaMs = newEnd.getTime() - prevEnd.getTime();
+    startEl.value = fmtDateInput(new Date(curStart.getTime() + deltaMs));
+    startEl.dataset.lastValue = startEl.value;
+  }
+  this.dataset.lastValue = this.value;
 });
 
 document.getElementById('btnSaveEvent').addEventListener('click', async () => {

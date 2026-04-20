@@ -329,6 +329,7 @@ type UserPreferences struct {
 	WeekStartDay       string   `json:"week_start_day,omitempty"`       // monday | sunday (default: monday)
 	TooltipDelay       int      `json:"tooltip_delay,omitempty"`        // 0 | 200 | 500 ms hover delay
 	ConfirmDragMove    *bool    `json:"confirm_drag_move,omitempty"`    // confirm before drag-reschedule
+	LinkEventTimes     bool     `json:"link_event_times,omitempty"`     // when editing an event, changing start/end shifts the other to preserve duration (default: independent)
 	DefaultEventType   string   `json:"default_event_type,omitempty"`   // per-user default event type key
 	WorkspacePresetsEnabled *bool `json:"workspace_presets_enabled,omitempty"` // enable workspace presets feature
 	WorkspacePresets   []WorkspacePreset `json:"workspace_presets,omitempty"`  // saved workspace presets
