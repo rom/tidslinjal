@@ -2063,6 +2063,24 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 				}
 				return
 			}
+			// /api/board-items/{id}/accept
+			if len(parts) == 4 && parts[3] == "accept" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleAcceptBoardItem)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+			// /api/board-items/{id}/unaccept
+			if len(parts) == 4 && parts[3] == "unaccept" {
+				if r.Method == http.MethodPost {
+					app.requireAuth(app.handleUnacceptBoardItem)(w, r)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
 			// /api/board-items/{id}/attachments/{attId}
 			if len(parts) == 5 && parts[3] == "attachments" {
 				if r.Method == http.MethodGet {

@@ -936,6 +936,17 @@ The `training/` directory contains step-by-step training guides and reference ma
 
 ## Changelog
 
+### v8.8.0 — KTB Wayback Machine, cycle protocols, Boards accept, independent event times
+
+A quality-of-life release across the Event modal, Decision Log, Key Terrain Board, and Boards.
+
+- **⏪ Wayback Machine (Key Terrain Board)** — a new *📜 History* button in the Battle Rhythm widget opens a list of every cycle that has a saved snapshot on disk. Clicking a JSON marker loads that historical KTB straight into the main view; a yellow banner with a *Return to live* button lets the operator flip between past and present without losing context. Edit affordances and live SSE refreshes are suppressed while in wayback mode. CSV/XML/SVG markers fall back to a raw download. Reuses the existing per-minute snapshot scheduler — no new backend state.
+- **📎 Battle cycle protocols** — board-level attachments on the Key Terrain Board (no longer per-entry). Collapsed by default behind a one-line *Battle cycle protocols · N files · Cycle X* bar directly below the Battle Rhythm widget; click to expand, click to collapse. Open/closed state persists in `localStorage`. Uploading a protocol pre-fills its comment with *"Battle cycle N — meeting protocol"* using the live cycle number, and records uploader + timestamp + cycle-at-upload. New endpoints under `/api/key-terrain-attachments[/{filename}]` with a companion `key_terrain_attachments.json` store file.
+- **✓ Accept button on Boards items** — the due-date row now has a green *Accept* button alongside the existing *✖* (clear due date). Accepting records who accepted the item and when; the button turns into an *Accepted · name · date* pill that can also un-accept if pressed. New fields on `BoardItem`: `accepted_at`, `accepted_by_id`, `accepted_by_name` (all `omitempty`). New endpoints `POST /api/board-items/{id}/accept|unaccept`.
+- **Independent event start/end times** — the event modal no longer snaps *end* to *start + 1 h* when *start* is edited. A new sidebar preference (*Link Event Start/End Times*, off by default) re-enables a duration-preserving link where editing either side shifts the other by the same delta. Fixed a stale duplicate `eventStart` listener in `modals.js` that had been overriding the preference.
+- **Decision editor clears on approve/deny** — after pressing any of the four decision buttons (*✓ Approve*, *✓⚠ Approve w/ Condition*, *✓✏ Approve w/ Modification*, *✗ Deny*), every input in the editor row resets — decision body (rich-text and textarea variants both; the old code silently missed the contenteditable), title, reason, log type, group, executor, deadline, co-sign target, references, colour, and attachments. Leaves the editor ready for the next entry.
+- **In-app help updated** — both the Key Terrain Board's own `?` help modal and the global Help modal (*Key Terrain Board*, *Working with Events*, *Decision Log* sections) now document every feature above, including the collapsible protocols pane, the Wayback Machine, the new event-time default, and the decision-log editor behaviour.
+
 ### v8.7.0 — RFI rewrite, Poll enhancements, Decision cross-refs, ZULU `:` separators
 
 A focused feature release for the RFI and Poll / Multipoll tools, plus several cross-cutting quality-of-life fixes.

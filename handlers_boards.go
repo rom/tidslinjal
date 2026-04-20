@@ -1455,6 +1455,75 @@ func (app *App) handleGetBoardDueItems(w http.ResponseWriter, r *http.Request, u
 
 // ── Archive / Unarchive Board Items ─────────────────────────────────────────
 
+// handleAcceptBoardItem marks an item as handled. Records who accepted it
+// and when, and writes a history entry. URL: POST /api/board-items/{id}/accept
+func (app *App) handleAcceptBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	now := time.Now()
+	item.AcceptedAt = &now
+	item.AcceptedByID = user.ID
+	item.AcceptedByName = user.DisplayName
+	item.UpdatedAt = now
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "accept failed", http.StatusInternalServerError)
+		return
+	}
+	_ = app.store.AddBoardItemHistory(id, BoardHistory{
+		Timestamp: now, UserID: user.ID, UserName: user.DisplayName,
+		Action: "accepted", Detail: "Item marked as handled",
+	})
+	app.broadcastBoardChange("board_item_updated", item.BoardID)
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// handleUnacceptBoardItem reverses an accept so the item goes back to
+// "open" state. URL: POST /api/board-items/{id}/unaccept
+func (app *App) handleUnacceptBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
+	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
+	if err != nil {
+		jsonError(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	item := app.store.GetBoardItemByID(id)
+	if item == nil {
+		jsonError(w, "not found", http.StatusNotFound)
+		return
+	}
+	board := app.store.GetBoardByID(item.BoardID)
+	if board == nil || !app.canEditBoard(board, user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	item.AcceptedAt = nil
+	item.AcceptedByID = 0
+	item.AcceptedByName = ""
+	item.UpdatedAt = time.Now()
+	if err := app.store.UpdateBoardItem(*item); err != nil {
+		jsonError(w, "unaccept failed", http.StatusInternalServerError)
+		return
+	}
+	_ = app.store.AddBoardItemHistory(id, BoardHistory{
+		Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName,
+		Action: "unaccepted", Detail: "Accept reversed",
+	})
+	app.broadcastBoardChange("board_item_updated", item.BoardID)
+	jsonOK(w, map[string]string{"status": "ok"})
+}
+
 func (app *App) handleArchiveBoardItem(w http.ResponseWriter, r *http.Request, user *User) {
 	id, err := strconv.ParseInt(pathSegment(r, 2), 10, 64)
 	if err != nil {

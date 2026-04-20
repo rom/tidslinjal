@@ -61,6 +61,13 @@ type BoardItem struct {
 	RelatedItemIDs  []int64           `json:"related_item_ids,omitempty"` // IDs of related board items
 	Archived        bool              `json:"archived,omitempty"`      // archived items are hidden from board view
 	ShareToken      string            `json:"share_token,omitempty"`   // token for sharable link
+	// Acceptance: the due-date row carries both an "X" (clear due date) and an
+	// "✓ Accept" button. Accepting an item records who handled it and when.
+	// AcceptedAt is nil for un-accepted items; operators can toggle the flag
+	// off if they accepted by mistake.
+	AcceptedAt       *time.Time `json:"accepted_at,omitempty"`
+	AcceptedByID     int64      `json:"accepted_by_id,omitempty"`
+	AcceptedByName   string     `json:"accepted_by_name,omitempty"`
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
 }
