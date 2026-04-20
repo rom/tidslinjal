@@ -226,13 +226,8 @@ document.getElementById('eventRecurring').addEventListener('change', function() 
   document.getElementById('recurrenceEndGroup').style.display = this.checked ? '' : 'none';
 });
 
-// Auto-adjust end time to start + 1 hour whenever start changes
-document.getElementById('eventStart').addEventListener('change', function() {
-  const start = new Date(this.value);
-  if (!isNaN(start.getTime())) {
-    document.getElementById('eventEnd').value = fmtDateInput(addHours(start, 1));
-  }
-});
+// NOTE: The eventStart / eventEnd change handlers live in modal-event.js
+// (they honor the link_event_times preference — do not add a second listener here).
 
 // NOTE: The btnSaveEvent click handler lives in modal-event.js (single canonical handler).
 
