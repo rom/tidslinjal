@@ -585,6 +585,8 @@ async function _ktEditEntry(entryId) {
       <textarea id="ktComments" class="input" style="width:100%;min-height:48px;resize:vertical;font-size:var(--fs-xs)" placeholder="${t('kt_comments_ph')||'Notes, remarks, flags…'}">${escHtml(entry.comments || '')}</textarea>
     </div>
 
+    ${_ktRenderAttachmentsSection(entry, entryId)}
+
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary btn-sm" data-action="_ktSaveEntry" data-arg="${entryId || 0}">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_ktCancelEdit">${t('btn_cancel')||'Cancel'}</button>
@@ -689,6 +691,125 @@ async function _ktSaveEntry(entryId) {
 
 function _ktCancelEdit() {
   if (typeof _closeBoardModal === 'function') _closeBoardModal('ktEditModal');
+}
+
+// ── Attachments (meeting protocols during battle-rhythm cycles) ────────────
+function _ktCurrentCycle() {
+  const st = typeof _ktBrLastState !== 'undefined' ? _ktBrLastState : null;
+  return (st && Number.isFinite(st.cycles_completed)) ? st.cycles_completed : 0;
+}
+
+function _ktFmtBytes(n) {
+  if (!n || n < 1024) return (n||0) + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/(1024*1024)).toFixed(1) + ' MB';
+}
+
+function _ktRenderAttachmentsSection(entry, entryId) {
+  const cycle = _ktCurrentCycle();
+  const canAttach = entryId && parseInt(entryId) > 0;
+  const list = Array.isArray(entry.attachments) ? entry.attachments : [];
+  const header = `<div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:4px">\u{1F4CE} ${t('kt_attachments')||'Attachments'}${cycle ? ` <span style="color:var(--text-dim);font-weight:normal">(${t('kt_current_cycle')||'Cycle'} ${cycle})</span>` : ''}</div>`;
+  const existing = list.length ? `<div id="ktAttachList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">${list.map(a => _ktAttachmentRow(entryId, a)).join('')}</div>`
+                               : `<div id="ktAttachList" style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_no_attachments')||'No attachments yet.'}</div>`;
+  const uploader = canAttach ? `
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg3);padding:6px;border-radius:var(--radius)">
+      <input type="file" id="ktAttachFile" style="font-size:10px;flex:1;min-width:160px">
+      <input type="text" id="ktAttachComment" class="input" style="flex:2;min-width:200px;font-size:var(--fs-xs)"
+        placeholder="${t('kt_attach_comment_ph')||'Protocol / note'}"
+        value="${escHtml(_ktDefaultAttachComment(cycle))}">
+      <button class="btn btn-primary btn-sm" style="font-size:var(--fs-xs)" data-action="_ktUploadAttachment" data-arg="${entryId}">\u{2B06} ${t('kt_upload')||'Upload'}</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.'}</div>`
+    : `<div style="font-size:10px;color:var(--text-dim);font-style:italic">${t('kt_attach_save_first')||'Save the entry before uploading attachments.'}</div>`;
+  return `<div style="margin-bottom:10px">${header}${existing}${uploader}</div>`;
+}
+
+function _ktDefaultAttachComment(cycle) {
+  const tpl = t('kt_attach_comment_default') || 'Battle cycle {n} — meeting protocol';
+  return tpl.replace('{n}', String(cycle));
+}
+
+function _ktAttachmentRow(entryId, a) {
+  const href = `/api/key-terrain-attachment/${entryId}/${encodeURIComponent(a.stored_name)}`;
+  const meta = [];
+  if (a.cycle != null) meta.push((t('kt_current_cycle')||'Cycle') + ' ' + a.cycle);
+  if (a.size) meta.push(_ktFmtBytes(a.size));
+  if (a.uploader_name) meta.push(a.uploader_name);
+  return `<div style="display:flex;gap:6px;align-items:center;padding:4px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
+    <a href="${href}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;flex:0 0 auto">\u{1F4CE} ${escHtml(a.filename||'')}</a>
+    <span style="flex:1;min-width:0;color:var(--text)">${escHtml(a.comment||'')}</span>
+    <span style="color:var(--text-dim);font-size:10px">${escHtml(meta.join(' \u00B7 '))}</span>
+    <button class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 6px" data-action="_ktDeleteAttachment" data-arg-el data-entry="${entryId}" data-stored="${escHtml(a.stored_name)}" title="${t('btn_delete')||'Delete'}">\u{1F5D1}</button>
+  </div>`;
+}
+
+async function _ktUploadAttachment(entryId) {
+  const fi = document.getElementById('ktAttachFile');
+  const ci = document.getElementById('ktAttachComment');
+  if (!fi || !fi.files || !fi.files.length) {
+    alert(t('kt_attach_pick_file')||'Pick a file to upload first.');
+    return;
+  }
+  const cycle = _ktCurrentCycle();
+  const fd = new FormData();
+  fd.append('file', fi.files[0]);
+  fd.append('comment', ci?.value || '');
+  fd.append('cycle', String(cycle));
+  const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+  if (csrf) headers['X-CSRF-Token'] = csrf[1];
+  try {
+    const res = await fetch(`/api/key-terrain-attachment/${entryId}`, { method: 'POST', headers, body: fd });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || res.statusText);
+    }
+    const att = await res.json();
+    // Update the entry in local state and re-render just the list
+    const e = _ktState.entries.find(x => x.id === parseInt(entryId));
+    if (e) { e.attachments = e.attachments || []; e.attachments.push(att); }
+    _ktRefreshAttachmentList(entryId);
+    fi.value = '';
+    if (ci) ci.value = _ktDefaultAttachComment(cycle);
+    if (typeof showNotification === 'function') showNotification('success', t('kt_attach_uploaded')||'Attachment uploaded');
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+async function _ktDeleteAttachment(el) {
+  const entryId = parseInt(el?.dataset?.entry || '0', 10);
+  const storedName = el?.dataset?.stored;
+  if (!entryId || !storedName) return;
+  if (!confirm(t('kt_attach_delete_confirm')||'Delete this attachment?')) return;
+  const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+  if (csrf) headers['X-CSRF-Token'] = csrf[1];
+  try {
+    const res = await fetch(`/api/key-terrain-attachment/${entryId}/${encodeURIComponent(storedName)}`, { method: 'DELETE', headers });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || res.statusText);
+    }
+    const e = _ktState.entries.find(x => x.id === parseInt(entryId));
+    if (e && Array.isArray(e.attachments)) {
+      e.attachments = e.attachments.filter(a => a.stored_name !== storedName);
+    }
+    _ktRefreshAttachmentList(entryId);
+    if (typeof showNotification === 'function') showNotification('success', t('kt_attach_deleted')||'Attachment deleted');
+  } catch (err) { alert('Error: ' + err.message); }
+}
+
+function _ktRefreshAttachmentList(entryId) {
+  const wrap = document.getElementById('ktAttachList');
+  if (!wrap) return;
+  const e = _ktState.entries.find(x => x.id === parseInt(entryId));
+  const list = (e && Array.isArray(e.attachments)) ? e.attachments : [];
+  if (!list.length) {
+    wrap.outerHTML = `<div id="ktAttachList" style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_no_attachments')||'No attachments yet.'}</div>`;
+  } else {
+    wrap.outerHTML = `<div id="ktAttachList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">${list.map(a => _ktAttachmentRow(entryId, a)).join('')}</div>`;
+  }
+  if (typeof _bindActions === 'function') _bindActions(document.getElementById('ktEditModal'));
 }
 
 async function _ktDeleteEntry(entryId) {
