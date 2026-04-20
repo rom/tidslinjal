@@ -42,6 +42,7 @@ window.state = {
     week_start_day:      'monday',
     tooltip_delay:       0,
     confirm_drag_move:   false,
+    link_event_times:    false,
     default_event_type:  '',
     workspace_presets_enabled: false,
     workspace_presets:   [],
