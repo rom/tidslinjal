@@ -1,6 +1,42 @@
-# Release Notes — Tidslinjal v8.6.0
+# Release Notes — Tidslinjal v8.8.0
 
-**Release Date:** 2026-04-13
+**Release Date:** 2026-04-20
+
+v8.8.0 is a focused quality-of-life release across the **Event modal**, **Decision Log**, **Key Terrain Board**, and **Boards**. The Key Terrain Board gets the headline feature: a **Wayback Machine** that loads an earlier cycle's board straight into the main view, plus board-level **battle cycle protocols** hidden behind a collapsible bar. Boards items gain an **✓ Accept** button beside the due-date clear button so tasks can be explicitly marked as handled.
+
+Upgrading from 8.7.0 requires no data migration. The `KeyTerrainEntry` struct dropped its short-lived per-entry `Attachments` field in favour of a board-level list in `key_terrain_attachments.json`; the new file is created lazily on first upload.
+
+---
+
+## Headline features
+
+- **⏪ Wayback Machine (Key Terrain Board)** — a new *📜 History* button in the Battle Rhythm widget opens a list of every cycle that has a snapshot on disk. Clicking a JSON marker loads that historical KTB into the main view; a yellow banner and a *Return to live* button let operators step between past and present without losing their place. Edit affordances and SSE refreshes are suppressed while in wayback mode.
+- **📎 Battle cycle protocols** — board-level meeting protocols attached to the KTB as a whole (no longer per-entry). The pane sits below the Battle Rhythm widget, collapsed by default behind a one-line summary bar showing file count and current cycle. Each upload's comment is pre-populated with *"Battle cycle N — meeting protocol"*. Open/closed state persists across reloads.
+- **✓ Accept on Boards items** — the due-date row now has an *Accept* button alongside the existing *✖* (clear due date). Accepting records who accepted the item and when; the button turns into a green **Accepted** pill that can also un-accept if pressed.
+- **Independent event start/end times** — the event modal no longer snaps the end time to *start + 1 h* when the start is edited. A new sidebar preference (*Link Event Start/End Times*, off by default) restores a duration-preserving link in which editing either side shifts the other by the same delta.
+- **Decision editor clears on approve/deny** — after pressing any of the four decision buttons the editor row resets fully: decision body (rich-text and textarea variants both), title, reason, log type, group, executor, deadline, co-sign target, references, colour, and attachments.
+
+## Improvements
+
+- In-app help (KTB `?` help modal + global Help → *Key Terrain Board* / *Working with Events* / *Decision Log*) now documents every feature above.
+- New endpoints `POST /api/board-items/{id}/accept|unaccept` for the new board-item acceptance workflow.
+- New endpoints `GET|POST /api/key-terrain-attachments[/{filename}]` for board-level protocols, replacing the short-lived per-entry attachment routes.
+
+## Upgrading
+
+No schema migrations. Existing `key_terrain.json`, `boards.json`, and `user_preferences.json` load unchanged. Downgrading to 8.7.0 is safe — the new fields are simply ignored, and the new attachments file stays on disk ready to be picked up on upgrade.
+
+See **[`docs/RELEASE_NOTES_v8.8.0.md`](RELEASE_NOTES_v8.8.0.md)** for the full details including the endpoint and data-model changes.
+
+---
+
+## Previous Release: v8.7.0 (2026-04-16)
+
+See [`docs/RELEASE_NOTES_v8.7.0.md`](RELEASE_NOTES_v8.7.0.md) for the full v8.7.0 release notes covering the RFI overhaul, multipoll tool, decision cross-references, and ZULU-clock separator fix.
+
+---
+
+## Previous Release: v8.6.0 (2026-04-13)
 
 v8.6.0 is a large feature release focused on the **Key Terrain Board** tool. It introduces a new **Battle Rhythm** subsystem — a shared exercise clock with cyclic steps, per-step coloured borders, automatic snapshot scheduling, and forward / backward / fast-forward step navigation — plus a new **Comments** column, a significantly expanded zoom range, a step-level hover tooltip, terminology customization, and a fresh **Hungarian** locale (the 20th supported language).
 

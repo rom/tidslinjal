@@ -1342,10 +1342,13 @@ function _openBoardItem(itemId) {
         </select>
       </div>
 
-      <div style="display:flex;align-items:center;gap:6px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <strong>📅 ${t('board_due_date')||'Due Date'}:</strong>
         <input id="inlineItemDueDate" type="date" class="input" value="${escHtml(item.due_date||'')}" style="font-size:var(--fs-sm);padding:3px 6px;border:1px solid var(--border);background:var(--bg3);border-radius:var(--radius);cursor:pointer">
-        ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemDueDate" data-arg="${item.id}">✖</button>` : ''}
+        ${item.due_date ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 6px" data-action="_clearBoardItemDueDate" data-arg="${item.id}" title="${t('board_due_date_clear')||'Clear due date'}">✖</button>` : ''}
+        ${item.accepted_at
+          ? `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 8px;background:#27AE60;color:#fff;border-color:#27AE60" data-action="_unacceptBoardItem" data-arg="${item.id}" title="${t('board_accept_undo_h')||'Click to mark as still pending'}">✓ ${t('board_accepted')||'Accepted'}${item.accepted_by_name ? ' · '+escHtml(item.accepted_by_name) : ''}${item.accepted_at ? ' · '+escHtml(new Date(item.accepted_at).toLocaleDateString()) : ''}</button>`
+          : `<button class="btn btn-sm" style="font-size:var(--fs-xs);padding:1px 8px;border-color:#27AE60;color:#27AE60" data-action="_acceptBoardItem" data-arg="${item.id}" title="${t('board_accept_h')||'Mark this item as handled'}">✓ ${t('board_accept')||'Accept'}</button>`}
       </div>
 
       <div style="display:flex;align-items:center;gap:6px">
@@ -1902,6 +1905,26 @@ function _clearBoardItemDueDate(itemId) {
   const el = document.getElementById('inlineItemDueDate');
   if (el) el.value = '';
   _inlineSaveBoardItem(itemId);
+}
+
+// Accept a board item as handled. Backend records who accepted it and
+// when; the detail view re-renders showing a green "Accepted" pill
+// alongside the due date where the "✓ Accept" button used to be.
+async function _acceptBoardItem(itemId) {
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/accept', {});
+    if (typeof showNotification === 'function') showNotification('success', t('board_accepted_toast')||'Item accepted');
+    _openBoardItem(itemId);
+  } catch (e) { showError('Accept failed: ' + e.message); }
+}
+
+// Undo an accept — returns the item to "pending" state.
+async function _unacceptBoardItem(itemId) {
+  try {
+    await _boardApi('POST', '/board-items/' + itemId + '/unaccept', {});
+    if (typeof showNotification === 'function') showNotification('success', t('board_unaccepted_toast')||'Accept undone');
+    _openBoardItem(itemId);
+  } catch (e) { showError('Un-accept failed: ' + e.message); }
 }
 
 function _clearBoardItemColor(itemId) {
