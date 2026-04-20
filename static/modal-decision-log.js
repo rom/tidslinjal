@@ -493,6 +493,46 @@ function _renderDecisionLogEntries() {
   }).join('');
 }
 
+// Clears all input fields in the decision-log editor block after a
+// successful approve / deny. Keeps the editor ready for the next entry.
+function _resetDecisionEditor() {
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  const setChk = (id, v) => { const e = document.getElementById(id); if (e) e.checked = v; };
+  const hide   = (id)    => { const e = document.getElementById(id); if (e) e.style.display = 'none'; };
+
+  const dec = document.getElementById('dlNewDecision');
+  if (dec) {
+    if (dec.tagName === 'TEXTAREA' || dec.tagName === 'INPUT') dec.value = '';
+    else dec.innerHTML = ''; // contenteditable (_diaryRichField)
+  }
+  setVal('dlTitle', '');
+  setVal('dlReason', '');
+  setVal('dlLogType', 'general');
+  setVal('dlGroupId', '');
+  hide  ('dlGroupId');
+  setChk('dlConfidential', false);
+  setChk('dlCoSignRequired', false);
+  setVal('dlCoSignTarget', '');
+  hide  ('dlCoSignTargetGroup');
+  setVal('dlDeadline', '');
+  setVal('dlExecutorType', '');
+  setVal('dlExecutorValue', '');
+  hide  ('dlExecutorValue');
+  setVal('dlAddColor', '');
+  setVal('dlAddRefId', '');
+  setVal('dlAddRefLabel', '');
+  setVal('dlAddRefType', 'log_book');
+  const refs = document.getElementById('dlAddRefs');
+  if (refs) refs.innerHTML = '';
+  const fileInput = document.getElementById('dlAttachFile');
+  if (fileInput) fileInput.value = '';
+
+  // Reset the colour swatch outline to the "no colour" option (empty value)
+  document.querySelectorAll('#dlAddSwatches .dl-add-swatch').forEach(sw => {
+    sw.style.outline = sw.dataset.dlColor === '' ? '2px solid var(--accent)' : '';
+  });
+}
+
 async function addDecisionLogEntry(el) {
   const approvalType = el?.dataset?.approvalType || 'approved';
   const isDeny = approvalType === 'denied';
@@ -555,8 +595,7 @@ async function addDecisionLogEntry(el) {
     const el = document.getElementById('dlEntries');
     if (el) el.innerHTML = _renderDecisionLogEntries();
     _bindActions(el);
-    const inp = document.getElementById('dlNewDecision');
-    if (inp) inp.value = '';
+    _resetDecisionEditor();
     showNotification('success', isDeny ? (t('decision_denied')||'Decision denied') : (t('decision_added')||'Decision recorded'));
   } else {
     const err = await res.json().catch(() => ({}));
