@@ -563,28 +563,28 @@ func (app *App) handleGetKeyTerrainAccess(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// ── Key Terrain Attachments ───────────────────────────────────────────────
+// ── Key Terrain Board Attachments ─────────────────────────────────────────
 // Meeting protocols (and other files) captured during battle-rhythm cycles
-// are attached to individual Key Terrain entries. Each attachment carries a
+// attach to the board itself — not to any single entry — so operators can
+// keep a running log of protocols across cycles. Each attachment carries a
 // free-form comment that the UI pre-fills with the current cycle number so
 // operators can trace a protocol back to the cycle where the meeting ran.
 
-// handleKeyTerrainAttachmentUpload: POST /api/key-terrain/{id}/attachment
+// handleKeyTerrainListAttachments: GET /api/key-terrain-attachments
+func (app *App) handleKeyTerrainListAttachments(w http.ResponseWriter, r *http.Request, user *User) {
+	if !app.canReadKeyTerrain(user) {
+		jsonError(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	jsonOK(w, app.store.GetKeyTerrainBoardAttachments())
+}
+
+// handleKeyTerrainAttachmentUpload: POST /api/key-terrain-attachments
 // Expects multipart/form-data with a "file" field and optional "comment"
 // and "cycle" fields.
 func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
-	}
-	entry := app.store.GetKeyTerrainEntryByID(id)
-	if entry == nil {
-		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
 	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
@@ -605,7 +605,7 @@ func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.
 		jsonError(w, "file type not allowed", http.StatusBadRequest)
 		return
 	}
-	storedName := fmt.Sprintf("kt_%d_%d_%s", id, time.Now().UnixNano(), safeFilename)
+	storedName := fmt.Sprintf("ktb_%d_%s", time.Now().UnixNano(), safeFilename)
 	destPath := filepath.Join(app.store.AttachmentDir(), storedName)
 	dst, err := os.Create(destPath)
 	if err != nil {
@@ -637,39 +637,29 @@ func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.
 		UploaderName: user.DisplayName,
 		CreatedAt:    time.Now(),
 	}
-	if err := app.store.AddKeyTerrainAttachment(id, att); err != nil {
+	if err := app.store.AddKeyTerrainBoardAttachment(att); err != nil {
 		os.Remove(destPath)
-		jsonError(w, err.Error(), http.StatusNotFound)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	app.audit(user.ID, user.Username, "attach", "key_terrain", id,
-		fmt.Sprintf("Uploaded attachment %q (cycle %d) to entry %q", safeFilename, cycle, entry.Function))
+	app.audit(user.ID, user.Username, "attach", "key_terrain_board", 0,
+		fmt.Sprintf("Uploaded attachment %q (cycle %d) to the board", safeFilename, cycle))
 	app.broadcastKeyTerrainChange("attachment_added")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(att)
 }
 
-// handleKeyTerrainAttachmentDownload: GET /api/key-terrain/{id}/attachment/{filename}
+// handleKeyTerrainAttachmentDownload: GET /api/key-terrain-attachments/{filename}
 func (app *App) handleKeyTerrainAttachmentDownload(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canReadKeyTerrain(user) {
 		http.NotFound(w, r)
 		return
 	}
-	entryID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
 	storedName := filepath.Base(r.PathValue("filename"))
-	entry := app.store.GetKeyTerrainEntryByID(entryID)
-	if entry == nil {
-		http.NotFound(w, r)
-		return
-	}
 	found := false
 	var att KeyTerrainAttachment
-	for _, a := range entry.Attachments {
+	for _, a := range app.store.GetKeyTerrainBoardAttachments() {
 		if a.StoredName == storedName {
 			att = a
 			found = true
@@ -703,25 +693,20 @@ func (app *App) handleKeyTerrainAttachmentDownload(w http.ResponseWriter, r *htt
 	http.ServeFile(w, r, filePath)
 }
 
-// handleKeyTerrainAttachmentDelete: DELETE /api/key-terrain/{id}/attachment/{filename}
+// handleKeyTerrainAttachmentDelete: DELETE /api/key-terrain-attachments/{filename}
 func (app *App) handleKeyTerrainAttachmentDelete(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	entryID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		jsonError(w, "invalid id", http.StatusBadRequest)
-		return
-	}
 	storedName := filepath.Base(r.PathValue("filename"))
-	removed, err := app.store.DeleteKeyTerrainAttachment(entryID, storedName)
+	removed, err := app.store.DeleteKeyTerrainBoardAttachment(storedName)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	_ = os.Remove(filepath.Join(app.store.AttachmentDir(), storedName))
-	app.audit(user.ID, user.Username, "detach", "key_terrain", entryID,
+	app.audit(user.ID, user.Username, "detach", "key_terrain_board", 0,
 		fmt.Sprintf("Deleted attachment %q", removed.Filename))
 	app.broadcastKeyTerrainChange("attachment_removed")
 	jsonOK(w, map[string]string{"status": "ok"})

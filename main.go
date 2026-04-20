@@ -2163,14 +2163,15 @@ hr{border:none;border-top:1px solid #2a3f56;margin:2em 0}
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
-	// Key Terrain entry attachments (meeting protocols during battle cycles).
+	// Key Terrain Board-level attachments (meeting protocols during battle
+	// cycles). Scoped to the board rather than individual entries so
+	// operators can keep a running log of protocols across cycles.
 	// Under a separate top-level prefix to avoid conflicting with
-	// "/api/key-terrain/snapshots/" and other fixed subpaths below — both
-	// patterns would otherwise match "/api/key-terrain/<id>/attachment"
-	// when <id> happens to collide with an existing subpath name.
-	mux.HandleFunc("POST /api/key-terrain-attachment/{id}", app.requireAuth(app.handleKeyTerrainAttachmentUpload))
-	mux.HandleFunc("GET /api/key-terrain-attachment/{id}/{filename}", app.requireAuth(app.handleKeyTerrainAttachmentDownload))
-	mux.HandleFunc("DELETE /api/key-terrain-attachment/{id}/{filename}", app.requireAuth(app.handleKeyTerrainAttachmentDelete))
+	// "/api/key-terrain/snapshots/" and other fixed subpaths below.
+	mux.HandleFunc("GET /api/key-terrain-attachments", app.requireAuth(app.handleKeyTerrainListAttachments))
+	mux.HandleFunc("POST /api/key-terrain-attachments", app.requireAuth(app.handleKeyTerrainAttachmentUpload))
+	mux.HandleFunc("GET /api/key-terrain-attachments/{filename}", app.requireAuth(app.handleKeyTerrainAttachmentDownload))
+	mux.HandleFunc("DELETE /api/key-terrain-attachments/{filename}", app.requireAuth(app.handleKeyTerrainAttachmentDelete))
 	mux.HandleFunc("/api/key-terrain/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPut:
