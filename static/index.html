@@ -1985,7 +1985,7 @@
             <p>Click any active time slot to open the <b>Add Event</b> dialog.</p>
             <ul class="help-list">
               <li>Fill in title, type, times, optional layer, responsible user, and invited persons.</li>
-              <li>Changing <b>Start time</b> auto-adjusts End to Start + 1 hour.</li>
+              <li><b>Start and End times are independent by default</b>: changing one no longer touches the other. Turn on <em>Settings → Link Event Start/End Times</em> to restore the legacy linked behaviour, where editing either side shifts the other to preserve the event's duration.</li>
               <li><b>Drag</b> an event block to reschedule it.</li>
               <li>Click a block to open its <b>Detail view</b> (edit, delete, alarm, status).</li>
               <li>You can set an <b>inline alarm</b> directly while creating or editing an event.</li>
@@ -2549,6 +2549,7 @@
               <li>Decisions follow a status workflow: <b>Proposed → Approved / Rejected</b>.</li>
               <li>Attach files to decisions for supporting documentation.</li>
               <li>Team Lead+ can approve or reject decisions.</li>
+              <li>After you press <b>✓ Approve</b>, <b>✓⚠ Approve w/ Condition</b>, <b>✓✏ Approve w/ Modification</b>, or <b>✗ Deny</b>, every input in the editor row (decision text, title, reason, log type, group, executor, deadline, co-sign, references, colour, attachments) is cleared, leaving the editor ready for the next entry.</li>
               <li>The decision log can be <b>detached</b> to a standalone browser window for multi-monitor use.</li>
               <li>Full i18n support — available in English, Swedish, and French.</li>
             </ul>
@@ -2642,6 +2643,22 @@
               <li>Start / Pause / Reset are shared: one operator's action propagates to every other open Key Terrain Board within one round-trip via SSE. A success toast confirms the action.</li>
               <li>Detach the clock into its own pane via the <b>Clocks</b> popup → <em>Battle Rhythm</em> toolbar button; it shows the same H-offset and step information as a read-only card beside other clocks.</li>
               <li>The colour of the <b>border around the entire board</b> reflects the current step, giving instant visual awareness of where you are in the cycle.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">📎 Battle cycle protocols</h4>
+            <ul class="help-list">
+              <li>A collapsed <b>Battle cycle protocols</b> bar sits directly below the Battle Rhythm widget. Click it to expand a list of files (meeting protocols, situation reports, anything cycle-relevant) attached to the board as a whole — protocols are <em>not</em> tied to individual entries, so the same log is visible to every operator.</li>
+              <li>The bar's right side shows the protocol count and the current cycle number. Open / closed state is remembered across reloads.</li>
+              <li>Each protocol carries a free-form <b>comment</b> pre-filled with <em>"Battle cycle N — meeting protocol"</em> using the live cycle number; edit before uploading if you want a different label.</li>
+              <li>Read-access users can download protocols; uploading and deleting require write access. 10 MB max per file; storage lives under <code>data/attachments/</code>.</li>
+            </ul>
+            <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">⏪ Wayback Machine — replay an earlier KTB</h4>
+            <ul class="help-list">
+              <li>The <b>📜 History</b> button in the Battle Rhythm controls (write-access only) opens the <em>Wayback Machine</em>. It lists every cycle that has at least one snapshot on disk (newest first), with one button per recorded snapshot offset and format.</li>
+              <li>Click a JSON marker (e.g. <code>⏪ H+0 JSON</code>) to <b>load that historical KTB into the main view</b>. A yellow banner at the top of the board shows the cycle number, offset, and the moment the snapshot was taken.</li>
+              <li>While in wayback mode the board is fully read-only — Add, Edit, drag, ghost, archive and the Settings panel are suppressed, and live SSE refreshes are paused so the historical view doesn't move.</li>
+              <li>Click <b>⏩ Return to live</b> in the banner to restore the current state. The unfiltered live entries are stashed locally — no server round trip needed.</li>
+              <li>CSV / XML / SVG markers download the raw snapshot file instead of loading it into the view.</li>
+              <li>Wayback requires snapshot offsets and at least the JSON format to be configured under <em>⚙ Settings → Battle Rhythm</em>; otherwise the list is empty.</li>
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Access control</h4>
             <ul class="help-list">

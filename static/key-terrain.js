@@ -126,6 +126,10 @@ function _ktHandleSSE(ev) {
     if (typeof _ktLoadBoardAttachments === 'function') _ktLoadBoardAttachments();
     return;
   }
+  // While in wayback mode any live entry refresh would overwrite the
+  // historical snapshot the operator is viewing. Skip the refresh; when
+  // they exit wayback the board re-renders from the stashed live state.
+  if (_ktState._waybackInfo) return;
   // Cycle rollover: the Rounds field on every entry has been bumped on
   // the server, so we do need to refresh entries — but we can skip the
   // settings fetch because the only setting that changed is
@@ -237,7 +241,12 @@ function _ktSortByColumn(col) {
 
 function _renderKeyTerrainBoard() {
   const allEntries = _ktState.entries;
-  const canWrite = _ktState.access.can_write;
+  // Wayback mode: operators are viewing a frozen historical snapshot of
+  // the board. Every edit affordance must be suppressed so the read-only
+  // guarantee holds; the "Return to live" banner gets them back to the
+  // current state.
+  const waybackMode = !!_ktState._waybackInfo;
+  const canWrite = waybackMode ? false : _ktState.access.can_write;
   const hidden = _ktState.hiddenColumns || {};
   const ghostStyle = _ktGhostStyle();
   const f = _ktState.filter || {};
@@ -345,6 +354,7 @@ function _renderKeyTerrainBoard() {
     </div>
 
     <div id="ktBattleRhythmWidget" class="kt-no-print" style="display:none;margin-bottom:8px"></div>
+    ${_ktRenderWaybackBanner()}
     <div id="ktBoardAttachments" class="kt-no-print" style="display:none;margin-bottom:12px"></div>
 
     <h2 class="kt-print-only" style="display:none;margin-bottom:8px">\u{1F3D4}\uFE0F ${t('kt_title')||'Key Terrain Board'}</h2>
@@ -743,9 +753,24 @@ function _ktAttachmentRow(a) {
   </div>`;
 }
 
+// Tracks whether the protocols pane is expanded. Persisted to
+// localStorage so the operator's preference survives reloads. Default
+// false: the pane starts collapsed and the operator opens it on demand.
+function _ktProtocolsPaneOpen() {
+  try { return localStorage.getItem('kt_protocols_open') === '1'; } catch { return false; }
+}
+function _ktSetProtocolsPaneOpen(v) {
+  try { localStorage.setItem('kt_protocols_open', v ? '1' : '0'); } catch {}
+}
+function _ktToggleProtocolsPane() {
+  _ktSetProtocolsPaneOpen(!_ktProtocolsPaneOpen());
+  _ktRenderBoardAttachments();
+}
+
 // Renders the board-level attachments panel. Sits in #ktBoardAttachments
-// directly below the Battle Rhythm widget. Scrollable list so any number
-// of protocols fit without pushing the KT table off the page.
+// directly below the Battle Rhythm widget. Hidden by default behind a
+// summary button; clicking expands the panel with a scrollable list and
+// (for write-access users) an uploader row.
 function _ktRenderBoardAttachments() {
   const host = document.getElementById('ktBoardAttachments');
   if (!host) return;
@@ -753,15 +778,31 @@ function _ktRenderBoardAttachments() {
   if (!cfg.enabled || !cfg.show_clock) { host.style.display = 'none'; return; }
   host.style.display = '';
   const cycle = _ktCurrentCycle();
-  const canWrite = _ktState.access && _ktState.access.can_write;
+  const canWrite = _ktState.access && _ktState.access.can_write && !_ktState._waybackInfo;
   const list = Array.isArray(_ktState.attachments) ? [..._ktState.attachments] : [];
-  // newest first by created_at (fallback: order in array)
   list.sort((a, b) => {
     const ta = a.created_at ? Date.parse(a.created_at) : 0;
     const tb = b.created_at ? Date.parse(b.created_at) : 0;
     return tb - ta;
   });
-  const listHtml = list.length
+  const open = _ktProtocolsPaneOpen();
+  const count = list.length;
+  const summaryRight = `${count} ${count === 1 ? (t('kt_file_singular')||'file') : (t('kt_file_plural')||'files')}${cycle ? ' \u00B7 ' + (t('kt_current_cycle')||'Cycle') + ' ' + cycle : ''}`;
+  // Collapsed: render only a button-like summary header. Expanded: also
+  // render the list and (optional) uploader row below.
+  const summaryRow = `<button type="button" data-action="_ktToggleProtocolsPane"
+      style="width:100%;text-align:left;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font:inherit;color:var(--text)"
+      title="${t(open ? 'kt_protocols_hide' : 'kt_protocols_show')||(open?'Hide protocols':'Show protocols')}">
+      <span style="font-size:14px">${open ? '\u25BC' : '\u25B6'}</span>
+      <span style="font-weight:600;font-size:var(--fs-sm)">\u{1F4CE} ${t('kt_board_protocols')||'Battle cycle protocols'}</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text-dim)">${summaryRight}</span>
+    </button>`;
+  if (!open) {
+    host.innerHTML = summaryRow;
+    if (typeof _bindActions === 'function') _bindActions(host);
+    return;
+  }
+  const listHtml = count
     ? `<div id="ktBoardAttachList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${list.map(_ktAttachmentRow).join('')}</div>`
     : `<div id="ktBoardAttachList" style="font-size:10px;color:var(--text-dim);padding:8px;background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);text-align:center">${t('kt_no_attachments')||'No protocols uploaded yet.'}</div>`;
   const uploader = canWrite ? `
@@ -774,11 +815,8 @@ function _ktRenderBoardAttachments() {
     </div>
     <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.'}</div>` : '';
   host.innerHTML = `
-    <div style="padding:10px 12px;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <div style="font-weight:600;font-size:var(--fs-sm)">\u{1F4CE} ${t('kt_board_protocols')||'Battle cycle protocols'}</div>
-        <span style="font-size:10px;color:var(--text-dim)">${list.length} ${list.length === 1 ? (t('kt_file_singular')||'file') : (t('kt_file_plural')||'files')}${cycle ? ' \u00B7 ' + (t('kt_current_cycle')||'Cycle') + ' ' + cycle : ''}</span>
-      </div>
+    ${summaryRow}
+    <div style="padding:10px 12px;margin-top:-1px;border-radius:0 0 var(--radius) var(--radius);background:var(--bg2);border:1px solid var(--border);border-top:none">
       ${listHtml}
       ${uploader}
     </div>`;
@@ -859,7 +897,7 @@ async function _ktOpenCycleHistory() {
       const offsetTxt = 'H' + (f.offset_min >= 0 ? '+' : '') + f.offset_min;
       const fmt = (f.format || '').toUpperCase();
       if (isJson) {
-        return `<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" data-action="_ktShowHistoricalSnapshot" data-arg-el data-cycle="${escHtml(c.cycle_dir)}" data-name="${escHtml(f.name)}" data-label="${escHtml(label + ' · ' + offsetTxt)}">${offsetTxt} ${fmt}</button>`;
+        return `<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" data-action="_ktLoadHistoricalKTB" data-arg-el data-cycle="${escHtml(c.cycle_dir)}" data-name="${escHtml(f.name)}" data-label="${escHtml(label + ' · ' + offsetTxt)}" data-cycle-idx="${idx != null ? idx : ''}" data-offset="${f.offset_min}" data-taken="${escHtml(f.taken_at || '')}" title="${t('kt_br_wayback_load_h')||'Load this board state into the main view'}">\u23EA ${offsetTxt} ${fmt}</button>`;
       }
       return `<a class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;text-decoration:none" href="${href}" target="_blank" rel="noopener" title="${t('kt_br_history_download')||'Download'}">${offsetTxt} ${fmt}</a>`;
     }).join(' ');
@@ -872,10 +910,9 @@ async function _ktOpenCycleHistory() {
     ? `<p style="color:var(--text-dim);padding:12px">${t('kt_br_history_empty')||'No snapshots recorded yet. Configure snapshot offsets in the Battle Rhythm settings.'}</p>`
     : '';
   const html = `<div style="width:min(92vw,720px);max-width:92vw">
-    <h3 style="margin:0 0 10px">\u{1F4DC} ${t('kt_br_history_title')||'Battle-rhythm cycle history'}</h3>
-    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('kt_br_history_desc')||'Browse saved snapshots from previous cycles. Click a JSON marker to view the board as it was at that moment.'}</p>
-    <div style="max-height:45vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">${rows}${empty}</div>
-    <div id="ktHistorySnapshotView" style="margin-top:12px"></div>
+    <h3 style="margin:0 0 6px">\u23EA ${t('kt_br_wayback_title')||'Wayback Machine'}</h3>
+    <p style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:8px">${t('kt_br_wayback_desc')||'Load the Key Terrain Board as it stood in an earlier battle-rhythm cycle. Click a JSON marker to load that snapshot into the main view; you can return to live at any time. CSV/XML/SVG markers download the raw file.'}</p>
+    <div style="max-height:55vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">${rows}${empty}</div>
     <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px">
       <button class="btn btn-secondary btn-sm" data-action="_ktCloseCycleHistory">${t('btn_close')||'Close'}</button>
     </div>
@@ -901,14 +938,16 @@ function _ktParseSafeTimestamp(s) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-async function _ktShowHistoricalSnapshot(el) {
+// _ktLoadHistoricalKTB swaps the live entries for a snapshot from disk so
+// the main board re-renders showing the KTB as it stood at that cycle.
+// Live state is stashed in _ktState._liveEntries; the wayback banner's
+// Return-to-live action restores it. SSE / cycle-rollover refreshes are
+// suppressed while in wayback mode so the historical view stays put.
+async function _ktLoadHistoricalKTB(el) {
   const cycleDir = el?.dataset?.cycle;
   const name = el?.dataset?.name;
   const label = el?.dataset?.label || '';
   if (!cycleDir || !name) return;
-  const view = document.getElementById('ktHistorySnapshotView');
-  if (!view) return;
-  view.innerHTML = `<div style="padding:12px;color:var(--text-dim);font-size:var(--fs-xs)">${t('loading')||'Loading…'}</div>`;
   try {
     const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
     const headers = { 'X-Requested-With': 'XMLHttpRequest' };
@@ -918,57 +957,52 @@ async function _ktShowHistoricalSnapshot(el) {
       const e = await res.json().catch(() => ({}));
       throw new Error(e.error || res.statusText);
     }
-    const text = await res.text();
-    const data = JSON.parse(text);
-    view.innerHTML = _ktRenderHistoricalSnapshot(data, label);
+    const data = JSON.parse(await res.text());
+    if (!Array.isArray(data && data.entries)) throw new Error('Snapshot has no entries array');
+    if (!_ktState._liveEntries) _ktState._liveEntries = _ktState.entries;
+    _ktState.entries = data.entries;
+    _ktState._waybackInfo = {
+      label,
+      cycleDir,
+      cycleIdx: el.dataset.cycleIdx ? parseInt(el.dataset.cycleIdx, 10) : null,
+      offsetMin: Number.isFinite(parseInt(el.dataset.offset, 10)) ? parseInt(el.dataset.offset, 10) : (data.offset_min || 0),
+      takenAt: data.taken_at || el.dataset.taken || '',
+      cycleStart: data.cycle_start || '',
+    };
+    _ktCloseCycleHistory();
+    _renderKeyTerrainBoard();
   } catch (err) {
-    view.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:var(--fs-xs)">Error: ${escHtml(err.message || String(err))}</div>`;
+    alert('Error: ' + (err.message || String(err)));
   }
 }
 
-function _ktRenderHistoricalSnapshot(data, label) {
-  const entries = Array.isArray(data && data.entries) ? data.entries : [];
-  const taken = data && data.taken_at ? new Date(data.taken_at).toLocaleString() : '';
-  const offset = (data && Number.isFinite(data.offset_min)) ? ('H' + (data.offset_min >= 0 ? '+' : '') + data.offset_min) : '';
-  const visible = entries.filter(e => !e.archived);
-  const priorityOrder = (e) => (e.priority && e.priority > 0) ? e.priority : 9999;
-  visible.sort((a, b) => priorityOrder(a) - priorityOrder(b));
-  const head = `<div style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline">
-      <strong style="font-size:var(--fs-sm)">${escHtml(label)}</strong>
-      ${offset ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${escHtml(offset)}</span>` : ''}
-      ${taken ? `<span style="color:var(--text-dim);font-size:var(--fs-xs)">${t('kt_br_history_taken_at')||'Taken'}: ${escHtml(taken)}</span>` : ''}
-      <span style="color:var(--text-dim);font-size:var(--fs-xs);margin-left:auto">${visible.length} ${visible.length === 1 ? (t('kt_entry_singular')||'entry') : (t('kt_entry_plural')||'entries')}</span>
-    </div>`;
-  if (!visible.length) {
-    return head + `<div style="padding:12px;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg);color:var(--text-dim);font-size:var(--fs-xs)">${t('kt_br_history_empty_entries')||'This snapshot contains no (non-archived) entries.'}</div>`;
+// _ktExitWayback restores the live board state and re-renders.
+function _ktExitWayback() {
+  if (!_ktState._waybackInfo) return;
+  if (_ktState._liveEntries) {
+    _ktState.entries = _ktState._liveEntries;
+    delete _ktState._liveEntries;
   }
-  const rowsHtml = visible.map(e => `
-    <tr>
-      <td style="padding:4px 6px">${e.priority || ''}</td>
-      <td style="padding:4px 6px">${escHtml(e.zone || '')}</td>
-      <td style="padding:4px 6px;font-weight:600">${escHtml(e.function || '')}</td>
-      <td style="padding:4px 6px">${escHtml(e.status || '')}</td>
-      <td style="padding:4px 6px">${escHtml(e.trend || '')}</td>
-      <td style="padding:4px 6px">${escHtml(e.threat || '').replace(/<[^>]+>/g,'')}</td>
-      <td style="padding:4px 6px">${escHtml(e.responsible_name || '')}</td>
-      <td style="padding:4px 6px">${escHtml(e.actions || '').replace(/<[^>]+>/g,'')}</td>
-      <td style="padding:4px 6px;text-align:right">${e.rounds || 0}</td>
-    </tr>`).join('');
-  return head + `<div style="max-height:45vh;overflow:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg)">
-    <table style="width:100%;border-collapse:collapse;font-size:11px">
-      <thead><tr style="background:var(--bg2);position:sticky;top:0">
-        <th style="padding:4px 6px;text-align:left">${t('kt_priority')||'Prio'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_zone')||'Zone'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_function')||'Function'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_status')||'Status'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_trend')||'Trend'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_threat')||'Threat'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_responsible')||'Responsible'}</th>
-        <th style="padding:4px 6px;text-align:left">${t('kt_actions')||'Actions'}</th>
-        <th style="padding:4px 6px;text-align:right">${t('kt_rounds')||'# Cycles'}</th>
-      </tr></thead>
-      <tbody>${rowsHtml}</tbody>
-    </table></div>`;
+  delete _ktState._waybackInfo;
+  _renderKeyTerrainBoard();
+}
+
+// _ktRenderWaybackBanner returns the HTML for the prominent banner shown
+// at the top of the board while in wayback mode. Empty string if live.
+function _ktRenderWaybackBanner() {
+  const w = _ktState._waybackInfo;
+  if (!w) return '';
+  const offset = Number.isFinite(w.offsetMin) ? ('H' + (w.offsetMin >= 0 ? '+' : '') + w.offsetMin) : '';
+  const takenStr = w.takenAt ? (() => { try { return new Date(w.takenAt).toLocaleString(); } catch { return w.takenAt; } })() : '';
+  const cycleStr = w.cycleIdx != null ? (t('kt_current_cycle')||'Cycle') + ' ' + w.cycleIdx : (w.cycleDir || '');
+  return `<div class="kt-no-print" style="padding:10px 14px;margin-bottom:10px;background:#FFF4C2;color:#222;border:1px solid #E0C200;border-radius:var(--radius);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="font-size:20px">\u23EA</div>
+    <div style="flex:1;min-width:240px">
+      <div style="font-weight:700">${t('kt_br_wayback_banner')||'Wayback mode — viewing a frozen historical snapshot'}</div>
+      <div style="font-size:var(--fs-xs);opacity:.8">${escHtml(cycleStr)}${offset ? ' \u00B7 ' + escHtml(offset) : ''}${takenStr ? ' \u00B7 ' + (t('kt_br_history_taken_at')||'Taken') + ': ' + escHtml(takenStr) : ''}</div>
+    </div>
+    <button class="btn btn-sm btn-primary" data-action="_ktExitWayback" style="background:#222;color:#fff">\u23E9 ${t('kt_br_wayback_return')||'Return to live'}</button>
+  </div>`;
 }
 
 async function _ktDeleteBoardAttachment(el) {
@@ -2437,6 +2471,26 @@ function _ktShowHelp() {
       <ul style="margin:0;padding-left:18px">
         <li>Every time the clock rolls over into a new cycle, the <strong># Cycles</strong> counter on every active entry is incremented by one. The scheduler runs once per minute.</li>
         <li>Snapshot offsets (minutes from H0, comma-separated in Settings) auto-capture the full board in every selected format (<strong>CSV / JSON / XML / SVG</strong>) and write them under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code> on the server.</li>
+      </ul>
+
+      <h5 style="margin:10px 0 4px">\u{1F4CE} Battle cycle protocols</h5>
+      <p>Below the Battle Rhythm widget the board shows a collapsed <strong>Battle cycle protocols</strong> bar. Click it to expand a scrollable list of files (meeting protocols, situation reports, anything you want to attach to the cycle log). The bar's right side shows the count of protocols and the current cycle number. Click again to collapse — your open/closed preference is remembered between sessions.</p>
+      <ul style="margin:0;padding-left:18px">
+        <li>Protocols are <strong>board-level</strong> — they belong to the KTB as a whole and are visible to every operator regardless of which entry is in focus.</li>
+        <li>Each protocol has a free-form <em>comment</em> that is pre-filled with <em>"Battle cycle N — meeting protocol"</em> using the current cycle number; edit it before uploading if you want a different label.</li>
+        <li>Each row records who uploaded the file, when, the file size, and the cycle number it belonged to at upload time.</li>
+        <li>Anyone with read access can download a protocol; only write-access users can upload or delete.</li>
+        <li>Maximum 10 MB per file. Files are stored under <code>data/attachments/</code> on the server.</li>
+      </ul>
+
+      <h5 style="margin:10px 0 4px">\u23EA Wayback Machine</h5>
+      <p>The <strong>\u{1F4DC} History</strong> button in the Battle Rhythm controls opens the <em>Wayback Machine</em>. It lists every cycle that has at least one snapshot on disk (newest first), with one button per recorded snapshot offset and format.</p>
+      <ul style="margin:0;padding-left:18px">
+        <li>Click a JSON marker (e.g. <code>\u23EA H+0 JSON</code>) to <strong>load that historical KTB into the main view</strong>. A yellow banner appears at the top of the board indicating the cycle and the moment the snapshot was taken.</li>
+        <li>While in wayback mode the board is fully read-only — Add, Edit, drag, ghost, archive, and the Settings panel are suppressed; live SSE refreshes are paused so the historical view doesn't move.</li>
+        <li>Click <strong>\u23E9 Return to live</strong> in the banner to restore the current state of the board. The unfiltered live entries are stashed locally — no server round trip is needed.</li>
+        <li>CSV / XML / SVG markers download the raw snapshot file to your machine instead of loading it into the view.</li>
+        <li>Wayback requires snapshot offsets and at least the JSON format to be configured under <em>\u2699 Settings \u2192 Battle Rhythm</em>; otherwise the list will be empty.</li>
       </ul>
 
       <h5 style="margin:10px 0 4px">Detached clock window</h5>
