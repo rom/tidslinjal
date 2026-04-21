@@ -734,8 +734,20 @@ function _ktDefaultAttachComment(cycle) {
   return tpl.replace('{n}', String(cycle));
 }
 
+// Parses the host out of a URL and returns "(host)" for display next
+// to a URL-style attachment. Empty string on parse error.
+function _ktAttachmentHostHint(u) {
+  try {
+    const h = new URL(u).host;
+    if (!h) return '';
+    return ' <span style="color:var(--text-dim);font-weight:normal">(' + escHtml(h) + ')</span>';
+  } catch { return ''; }
+}
+
 function _ktAttachmentRow(a) {
-  const href = `/api/key-terrain-attachments/${encodeURIComponent(a.stored_name)}`;
+  const isURL = !!a.url;
+  const href = isURL ? a.url : `/api/key-terrain-attachments/${encodeURIComponent(a.stored_name)}`;
+  const icon = isURL ? '\u{1F517}' : '\u{1F4CE}'; // 🔗 for link, 📎 for file
   const meta = [];
   if (a.cycle != null) meta.push((t('kt_current_cycle')||'Cycle') + ' ' + a.cycle);
   if (a.size) meta.push(_ktFmtBytes(a.size));
@@ -746,7 +758,7 @@ function _ktAttachmentRow(a) {
     ? `<button class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 6px;flex:0 0 auto" data-action="_ktDeleteBoardAttachment" data-arg-el data-stored="${escHtml(a.stored_name)}" title="${t('btn_delete')||'Delete'}">\u{1F5D1}</button>`
     : '';
   return `<div style="display:flex;gap:6px;align-items:center;padding:4px 6px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);font-size:var(--fs-xs)">
-    <a href="${href}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;flex:0 0 auto">\u{1F4CE} ${escHtml(a.filename||'')}</a>
+    <a href="${escHtml(href)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;flex:0 0 auto" title="${escHtml(isURL ? a.url : (a.filename||''))}">${icon} ${escHtml(a.filename||'')}${isURL ? _ktAttachmentHostHint(a.url) : ''}</a>
     <span style="flex:1;min-width:0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(a.comment||'')}</span>
     <span style="color:var(--text-dim);font-size:10px;flex:0 0 auto">${escHtml(meta.join(' \u00B7 '))}</span>
     ${delBtn}
@@ -805,15 +817,23 @@ function _ktRenderBoardAttachments() {
   const listHtml = count
     ? `<div id="ktBoardAttachList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${list.map(_ktAttachmentRow).join('')}</div>`
     : `<div id="ktBoardAttachList" style="font-size:10px;color:var(--text-dim);padding:8px;background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);text-align:center">${t('kt_no_attachments')||'No protocols uploaded yet.'}</div>`;
+  const urlMode = _ktProtocolModeIsURL();
   const uploader = canWrite ? `
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg3);padding:6px;border-radius:var(--radius);margin-top:6px">
-      <input type="file" id="ktBoardAttachFile" style="font-size:10px;flex:1;min-width:160px">
+    <div style="display:flex;gap:4px;margin-top:8px;margin-bottom:4px">
+      <button class="btn btn-sm ${!urlMode ? 'btn-primary' : 'btn-secondary'}" style="font-size:10px;padding:3px 10px" data-action="_ktSetProtocolModeFile">\u{1F4CE} ${t('kt_attach_mode_file')||'Upload file'}</button>
+      <button class="btn btn-sm ${urlMode ? 'btn-primary' : 'btn-secondary'}" style="font-size:10px;padding:3px 10px" data-action="_ktSetProtocolModeURL">\u{1F517} ${t('kt_attach_mode_url')||'Save URL'}</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--bg3);padding:6px;border-radius:var(--radius)">
+      ${urlMode
+        ? `<input type="url" id="ktBoardAttachURL" class="input" style="flex:2;min-width:220px;font-size:var(--fs-xs)" placeholder="${t('kt_attach_url_ph')||'https://cloud.example.com/s/…'}">
+           <input type="text" id="ktBoardAttachLabel" class="input" style="flex:1;min-width:140px;font-size:var(--fs-xs)" placeholder="${t('kt_attach_label_ph')||'Label (optional)'}">`
+        : `<input type="file" id="ktBoardAttachFile" style="font-size:10px;flex:1;min-width:160px">`}
       <input type="text" id="ktBoardAttachComment" class="input" style="flex:2;min-width:200px;font-size:var(--fs-xs)"
         placeholder="${t('kt_attach_comment_ph')||'Protocol / note'}"
         value="${escHtml(_ktDefaultAttachComment(cycle))}">
-      <button class="btn btn-primary btn-sm" style="font-size:var(--fs-xs)" data-action="_ktUploadBoardAttachment">\u{2B06} ${t('kt_upload')||'Upload'}</button>
+      <button class="btn btn-primary btn-sm" style="font-size:var(--fs-xs)" data-action="_ktUploadBoardAttachment">${urlMode ? '\u{1F4CC} ' + (t('kt_save_link')||'Save link') : '\u{2B06} ' + (t('kt_upload')||'Upload')}</button>
     </div>
-    <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.'}</div>` : '';
+    <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${urlMode ? (t('kt_attach_url_hint')||'Paste an http(s) link (Nextcloud, Google Drive, SharePoint, …). Comment is pre-filled with the current battle cycle number — adjust before saving if needed.') : (t('kt_attach_hint')||'Comment is pre-filled with the current battle cycle number — adjust before uploading if needed.')}</div>` : '';
   host.innerHTML = `
     ${summaryRow}
     <div style="padding:10px 12px;margin-top:-1px;border-radius:0 0 var(--radius) var(--radius);background:var(--bg2);border:1px solid var(--border);border-top:none">
@@ -832,21 +852,65 @@ async function _ktLoadBoardAttachments() {
   _ktRenderBoardAttachments();
 }
 
+// Protocol uploader mode: 'file' (default) or 'url'. Persisted to
+// localStorage so the operator's preference survives reloads.
+function _ktProtocolModeIsURL() {
+  try { return localStorage.getItem('kt_protocol_mode') === 'url'; } catch { return false; }
+}
+function _ktSetProtocolModeFile() {
+  try { localStorage.setItem('kt_protocol_mode', 'file'); } catch {}
+  _ktRenderBoardAttachments();
+}
+function _ktSetProtocolModeURL() {
+  try { localStorage.setItem('kt_protocol_mode', 'url'); } catch {}
+  _ktRenderBoardAttachments();
+}
+
 async function _ktUploadBoardAttachment() {
-  const fi = document.getElementById('ktBoardAttachFile');
   const ci = document.getElementById('ktBoardAttachComment');
+  const cycle = _ktCurrentCycle();
+  const comment = ci?.value || '';
+  const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+  if (csrf) headers['X-CSRF-Token'] = csrf[1];
+
+  // URL mode: send a JSON body — no file. The server validates the
+  // scheme (http/https only) and stores the link alongside file-backed
+  // protocols in the same list.
+  if (_ktProtocolModeIsURL()) {
+    const urlEl = document.getElementById('ktBoardAttachURL');
+    const labelEl = document.getElementById('ktBoardAttachLabel');
+    const url = (urlEl?.value || '').trim();
+    if (!url) { alert(t('kt_attach_url_required')||'Paste a URL first.'); return; }
+    headers['Content-Type'] = 'application/json';
+    try {
+      const res = await fetch('/api/key-terrain-attachments', {
+        method: 'POST', headers,
+        body: JSON.stringify({ url, filename: (labelEl?.value || '').trim(), comment, cycle }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || res.statusText);
+      }
+      const att = await res.json();
+      _ktState.attachments = _ktState.attachments || [];
+      _ktState.attachments.push(att);
+      _ktRenderBoardAttachments();
+      if (typeof showNotification === 'function') showNotification('success', t('kt_attach_url_saved')||'Link saved');
+    } catch (err) { alert('Error: ' + err.message); }
+    return;
+  }
+
+  // File mode: multipart form with a "file" field.
+  const fi = document.getElementById('ktBoardAttachFile');
   if (!fi || !fi.files || !fi.files.length) {
     alert(t('kt_attach_pick_file')||'Pick a file to upload first.');
     return;
   }
-  const cycle = _ktCurrentCycle();
   const fd = new FormData();
   fd.append('file', fi.files[0]);
-  fd.append('comment', ci?.value || '');
+  fd.append('comment', comment);
   fd.append('cycle', String(cycle));
-  const csrf = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-  const headers = { 'X-Requested-With': 'XMLHttpRequest' };
-  if (csrf) headers['X-CSRF-Token'] = csrf[1];
   try {
     const res = await fetch('/api/key-terrain-attachments', { method: 'POST', headers, body: fd });
     if (!res.ok) {
@@ -2474,13 +2538,13 @@ function _ktShowHelp() {
       </ul>
 
       <h5 style="margin:10px 0 4px">\u{1F4CE} Battle cycle protocols</h5>
-      <p>Below the Battle Rhythm widget the board shows a collapsed <strong>Battle cycle protocols</strong> bar. Click it to expand a scrollable list of files (meeting protocols, situation reports, anything you want to attach to the cycle log). The bar's right side shows the count of protocols and the current cycle number. Click again to collapse — your open/closed preference is remembered between sessions.</p>
+      <p>Below the Battle Rhythm widget the board shows a collapsed <strong>Battle cycle protocols</strong> bar. Click it to expand a scrollable list of protocols. The bar's right side shows the count and the current cycle number. Click again to collapse — your open/closed preference is remembered between sessions.</p>
       <ul style="margin:0;padding-left:18px">
         <li>Protocols are <strong>board-level</strong> — they belong to the KTB as a whole and are visible to every operator regardless of which entry is in focus.</li>
-        <li>Each protocol has a free-form <em>comment</em> that is pre-filled with <em>"Battle cycle N — meeting protocol"</em> using the current cycle number; edit it before uploading if you want a different label.</li>
-        <li>Each row records who uploaded the file, when, the file size, and the cycle number it belonged to at upload time.</li>
-        <li>Anyone with read access can download a protocol; only write-access users can upload or delete.</li>
-        <li>Maximum 10 MB per file. Files are stored under <code>data/attachments/</code> on the server.</li>
+        <li>Two save modes: <strong>\u{1F4CE} Upload file</strong> (stored on the server, up to 10 MB) or <strong>\u{1F517} Save URL</strong> — a link to where the protocol lives in Nextcloud, Google Drive, SharePoint, or any other http/https location. The mode toggle above the uploader row remembers your last choice.</li>
+        <li>Each protocol carries a free-form <em>comment</em> pre-filled with <em>"Battle cycle N — meeting protocol"</em>; edit it before saving if you want a different label. URL records also accept an optional display label; otherwise the link's last path segment (or hostname) is used.</li>
+        <li>Each row records who added the entry, when, the file size (for uploads) or hostname (for URLs), and the cycle number it belonged to at save time.</li>
+        <li>Anyone with read access can open a protocol; only write-access users can add or delete. Only <code>http://</code> and <code>https://</code> URLs are accepted.</li>
       </ul>
 
       <h5 style="margin:10px 0 4px">\u23EA Wayback Machine</h5>

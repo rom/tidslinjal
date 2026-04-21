@@ -2646,10 +2646,11 @@
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">📎 Battle cycle protocols</h4>
             <ul class="help-list">
-              <li>A collapsed <b>Battle cycle protocols</b> bar sits directly below the Battle Rhythm widget. Click it to expand a list of files (meeting protocols, situation reports, anything cycle-relevant) attached to the board as a whole — protocols are <em>not</em> tied to individual entries, so the same log is visible to every operator.</li>
+              <li>A collapsed <b>Battle cycle protocols</b> bar sits directly below the Battle Rhythm widget. Click it to expand a list of files and links (meeting protocols, situation reports, anything cycle-relevant) attached to the board as a whole — protocols are <em>not</em> tied to individual entries, so the same log is visible to every operator.</li>
               <li>The bar's right side shows the protocol count and the current cycle number. Open / closed state is remembered across reloads.</li>
-              <li>Each protocol carries a free-form <b>comment</b> pre-filled with <em>"Battle cycle N — meeting protocol"</em> using the live cycle number; edit before uploading if you want a different label.</li>
-              <li>Read-access users can download protocols; uploading and deleting require write access. 10 MB max per file; storage lives under <code>data/attachments/</code>.</li>
+              <li>The uploader row has two modes: <b>📎 Upload file</b> (stored on the server, up to 10 MB) or <b>🔗 Save URL</b> (an external link to Nextcloud, Google Drive, SharePoint, etc.). Only <code>http://</code> and <code>https://</code> schemes are accepted. Your mode choice persists across reloads.</li>
+              <li>Each protocol carries a free-form <b>comment</b> pre-filled with <em>"Battle cycle N — meeting protocol"</em> using the live cycle number; edit before saving if you want a different label.</li>
+              <li>Read-access users can open protocols (download for files, follow the link for URLs); uploading, linking, and deleting require write access. File storage lives under <code>data/attachments/</code>; URL records just keep the link and comment.</li>
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">⏪ Wayback Machine — replay an earlier KTB</h4>
             <ul class="help-list">

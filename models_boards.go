@@ -281,16 +281,20 @@ type KeyTerrainEntry struct {
 	UpdatedAt       time.Time        `json:"updated_at"`
 }
 
-// KeyTerrainAttachment is a file attached to the Key Terrain Board (not to
-// any individual entry) — typically a meeting protocol captured during a
-// battle-rhythm cycle. Comment is pre-filled client-side with the current
-// cycle number when the file is added so it is easy to trace a protocol
-// back to the cycle where the meeting ran.
+// KeyTerrainAttachment is a protocol attached to the Key Terrain Board
+// (not to any individual entry) — typically a meeting protocol captured
+// during a battle-rhythm cycle. It is either a file stored under
+// AttachmentDir() (StoredName non-empty) or a link to an external
+// resource such as a Nextcloud / Google Drive / SharePoint document
+// (URL non-empty). Exactly one of StoredName / URL is set per record.
+// Comment is pre-filled client-side with the current cycle number so it
+// is easy to trace a protocol back to the cycle where the meeting ran.
 type KeyTerrainAttachment struct {
 	Filename     string    `json:"filename"`
-	StoredName   string    `json:"stored_name"`
-	Size         int64     `json:"size"`
-	MimeType     string    `json:"mime_type"`
+	StoredName   string    `json:"stored_name,omitempty"`
+	URL          string    `json:"url,omitempty"`
+	Size         int64     `json:"size,omitempty"`
+	MimeType     string    `json:"mime_type,omitempty"`
 	Comment      string    `json:"comment,omitempty"`
 	Cycle        int       `json:"cycle,omitempty"`
 	UploadedBy   int64     `json:"uploaded_by,omitempty"`

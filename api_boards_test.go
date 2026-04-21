@@ -283,3 +283,65 @@ func TestAPI_BoardDelete_CascadesItems(t *testing.T) {
 		}
 	}
 }
+
+func TestAPI_KeyTerrainAttachment_URL(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	// Save a URL-only protocol — Nextcloud-style link.
+	resp := apiDo(t, srv, http.MethodPost, "/api/key-terrain-attachments", map[string]any{
+		"url":     "https://cloud.example.com/s/abc123",
+		"comment": "Battle cycle 3 — notes",
+		"cycle":   3,
+	}, cookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("url attachment: expected 201, got %d", resp.StatusCode)
+	}
+	var att map[string]any
+	decodeJSON(t, resp, &att)
+	if att["url"] != "https://cloud.example.com/s/abc123" {
+		t.Errorf("expected url round-tripped, got %v", att["url"])
+	}
+	if att["stored_name"] == nil || att["stored_name"] == "" {
+		t.Error("expected synthetic stored_name for URL record")
+	}
+	if att["filename"] == "" || att["filename"] == nil {
+		t.Error("expected a derived filename label")
+	}
+
+	// List and make sure it's there.
+	resp2 := apiDo(t, srv, http.MethodGet, "/api/key-terrain-attachments", nil, cookies)
+	defer resp2.Body.Close()
+	var list []map[string]any
+	decodeJSON(t, resp2, &list)
+	if len(list) != 1 {
+		t.Fatalf("expected 1 attachment, got %d", len(list))
+	}
+
+	// Non-http schemes must be rejected.
+	bad := apiDo(t, srv, http.MethodPost, "/api/key-terrain-attachments", map[string]any{
+		"url": "file:///etc/passwd",
+	}, cookies)
+	defer bad.Body.Close()
+	if bad.StatusCode == http.StatusCreated {
+		t.Error("file:// url must be rejected, but was accepted")
+	}
+
+	// Delete via the synthetic stored-name.
+	storedName, _ := att["stored_name"].(string)
+	resp3 := apiDo(t, srv, http.MethodDelete, "/api/key-terrain-attachments/"+storedName, nil, cookies)
+	defer resp3.Body.Close()
+	if !isSuccess(resp3.StatusCode) {
+		t.Fatalf("delete url attachment: got %d", resp3.StatusCode)
+	}
+
+	// Listing should now be empty.
+	resp4 := apiDo(t, srv, http.MethodGet, "/api/key-terrain-attachments", nil, cookies)
+	defer resp4.Body.Close()
+	var list2 []map[string]any
+	decodeJSON(t, resp4, &list2)
+	if len(list2) != 0 {
+		t.Errorf("expected 0 attachments after delete, got %d", len(list2))
+	}
+}
