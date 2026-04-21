@@ -12,6 +12,7 @@ Upgrading from 8.7.0 requires no data migration. The `KeyTerrainEntry` struct dr
 
 - **⏪ Wayback Machine (Key Terrain Board)** — a new *📜 History* button in the Battle Rhythm widget opens a list of every cycle that has a snapshot on disk. Clicking a JSON marker loads that historical KTB into the main view; a yellow banner and a *Return to live* button let operators step between past and present without losing their place. Edit affordances and SSE refreshes are suppressed while in wayback mode.
 - **📎 Battle cycle protocols** — board-level meeting protocols attached to the KTB as a whole (no longer per-entry). The pane sits below the Battle Rhythm widget, collapsed by default behind a one-line summary bar showing file count and current cycle. Each upload's comment is pre-populated with *"Battle cycle N — meeting protocol"*. Open/closed state persists across reloads.
+- **🔗 URL protocols** — the protocols pane can now save a URL instead of uploading a file, for when the protocol lives in Nextcloud / Google Drive / SharePoint. Only `http://` and `https://` schemes are accepted. The mode toggle persists in `localStorage`.
 - **✓ Accept on Boards items** — the due-date row now has an *Accept* button alongside the existing *✖* (clear due date). Accepting records who accepted the item and when; the button turns into a green **Accepted** pill that can also un-accept if pressed.
 - **Independent event start/end times** — the event modal no longer snaps the end time to *start + 1 h* when the start is edited. A new sidebar preference (*Link Event Start/End Times*, off by default) restores a duration-preserving link in which editing either side shifts the other by the same delta.
 - **Decision editor clears on approve/deny** — after pressing any of the four decision buttons the editor row resets fully: decision body (rich-text and textarea variants both), title, reason, log type, group, executor, deadline, co-sign target, references, colour, and attachments.
@@ -21,6 +22,11 @@ Upgrading from 8.7.0 requires no data migration. The `KeyTerrainEntry` struct dr
 - In-app help (KTB `?` help modal + global Help → *Key Terrain Board* / *Working with Events* / *Decision Log*) now documents every feature above.
 - New endpoints `POST /api/board-items/{id}/accept|unaccept` for the new board-item acceptance workflow.
 - New endpoints `GET|POST /api/key-terrain-attachments[/{filename}]` for board-level protocols, replacing the short-lived per-entry attachment routes.
+
+## Bug fixes
+
+- **"Not found" when acking an event-invite banner** — invites, routed-event banners and @mention banners were sent over SSE as `AlarmNotification` records with `alarm_id = 0`, so the banner's *ACK* button posted to `/api/alarms/0/ack` and 404'd. These informational banners now carry `Kind: "invite"` / `"info"` and the client replaces *ACK* with a local-only *Got it*.
+- **Boards Accept — "Failed to fetch" during a debounced inline save** — flush any pending inline save before the accept/unaccept POST so the two requests can't race; server returns the refreshed `BoardItem` so local state updates in-place.
 
 ## Upgrading
 

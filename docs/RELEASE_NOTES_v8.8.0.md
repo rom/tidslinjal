@@ -40,7 +40,17 @@ Board items now carry an **Accept** button alongside the existing `✖` (clear d
 - Clicking **✓ Accept** records who accepted the item and when, and writes a history entry.
 - The button turns into a green **✓ Accepted · *name* · *date*** pill; clicking again un-accepts the item if it was accepted in error.
 - New fields on `BoardItem`: `accepted_at`, `accepted_by_id`, `accepted_by_name` (all `omitempty`).
-- New endpoints: `POST /api/board-items/{id}/accept` and `POST /api/board-items/{id}/unaccept`. Both require the caller's write access to the board.
+- New endpoints: `POST /api/board-items/{id}/accept` and `POST /api/board-items/{id}/unaccept`. Both require the caller's write access to the board. Handlers return the full refreshed `BoardItem` so the client can update local state without a follow-up round-trip.
+- Accept/unaccept flushes any pending debounced inline save first so a concurrent PUT can't race with the action, and console-logs the underlying error on failure so network issues are easier to diagnose.
+
+### 🔗 URL option for battle cycle protocols
+
+The battle-cycle protocols pane now lets operators save a link instead of uploading a file, for the common case where the protocol already lives in Nextcloud, Google Drive, SharePoint, or another shared store.
+
+- `KeyTerrainAttachment` grows a `URL` field; `StoredName` is now optional.
+- `POST /api/key-terrain-attachments` accepts either a `multipart/form-data` file upload (existing flow) or an `application/json` body with `{url, filename?, comment?, cycle?}`. URL validation: `http`/`https` only, ≤2048 chars, parseable host; other schemes rejected with 400.
+- The uploader row gains a `📎 Upload file` / `🔗 Save URL` mode toggle, persisted to `localStorage`.
+- Attachment rows show `🔗` for URL records with the hostname in parentheses (e.g. *"(cloud.example.com)"*) so the target is obvious at a glance.
 
 ---
 
@@ -75,7 +85,7 @@ Both the Key Terrain Board's own `?` help modal and the global Help modal (`#h-k
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/key-terrain-attachments` | List board-level attachments |
-| `POST` | `/api/key-terrain-attachments` | Upload a new protocol (multipart: `file`, `comment`, `cycle`) |
+| `POST` | `/api/key-terrain-attachments` | Upload a new protocol (multipart: `file` + `comment` + `cycle`, **or** JSON `{url, filename?, comment?, cycle?}` for URL-only records) |
 | `GET` | `/api/key-terrain-attachments/{filename}` | Download a protocol |
 | `DELETE` | `/api/key-terrain-attachments/{filename}` | Remove a protocol |
 | `POST` | `/api/board-items/{id}/accept` | Mark a board item as handled |
@@ -92,9 +102,18 @@ The short-lived per-entry endpoints introduced in the same branch (`/api/key-ter
 - `BoardItem` — added `accepted_at *time.Time`, `accepted_by_id int64`, `accepted_by_name string`.
 - `UserPreferences` — added `LinkEventTimes bool` (default false).
 - `KeyTerrainEntry` — removed the short-lived `Attachments` field.
+- `KeyTerrainAttachment` — gained a `URL` field; `StoredName`, `Size`, and `MimeType` are now `omitempty` so URL-only records don't carry empty file metadata.
+- `AlarmNotification` — gained a `Kind` field (`"invite"`, `"info"`, or empty for a real alarm).
 - New top-level `Store.keyTerrainAttachments []KeyTerrainAttachment`, persisted to `key_terrain_attachments.json`.
 
 All new struct fields use `omitempty`; legacy JSON files load cleanly with zero values.
+
+---
+
+## Bug fixes
+
+- **"Not found" when acking an event invite** — the *You have been invited to: X* banner is fired over SSE with `alarm_id = 0` because there's no persisted alarm record. The banner's *✓ ACK* button posted to `/api/alarms/0/ack`, which correctly 404'd. Invites (and the similarly-shaped routed-event and @mention banners) now carry `Kind: "invite"` / `"info"`; the client swaps the *ACK* button for a local-only *Got it* that dismisses the banner without touching the server. Escalation-after-60s is also suppressed for these informational banners, and the `unackedAlarms` map uses a per-banner synthetic key so concurrent invites don't evict each other under the shared `alarm_id = 0`.
+- **Board item Accept — "Failed to fetch" during a debounced inline save** — a pending `_inlineSaveTimer` PUT could race with the Accept POST. The accept/unaccept handlers now flush any pending inline save first, the server returns the refreshed `BoardItem`, and the client merges it into local state directly. The underlying error is also logged to the browser console on failure so the next time something trips this path it's easier to diagnose.
 
 ---
 
