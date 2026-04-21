@@ -565,6 +565,12 @@ type AlarmNotification struct {
 	LeadTime   int       `json:"lead_time"`
 	Sound      string    `json:"sound,omitempty"`
 	Message    string    `json:"message"`
+	// Kind distinguishes a real alarm ("alarm", the default when empty)
+	// from an informational invite ("invite") that has no persisted
+	// alarm record on the server. The client uses this to decide
+	// whether to offer an "Ack" button — invites can only be dismissed
+	// locally because there is nothing to acknowledge on the backend.
+	Kind string `json:"kind,omitempty"`
 }
 
 // AuditEntry records every significant action in the system

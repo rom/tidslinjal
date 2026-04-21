@@ -435,6 +435,9 @@ TRANSLATIONS.en = {
     notif_unlocked: 'Lock removed',
     notif_saved: 'Saved',
     notif_alarm_title: '🔔 Alarm',
+    notif_invite_title: '📨 Invitation',
+    notif_info_title: '🔔 Notification',
+    notif_info_ack: 'Got it',
     notif_done: '✓ Done',
 
     // Roles

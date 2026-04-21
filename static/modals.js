@@ -4432,12 +4432,18 @@ function playAlarmSound(sound) {
 const unackedAlarms = new Map(); // alarmID → {data, level, timerID, element}
 
 function showAlarmNotification(data, level) {
-  // Clear any existing notification for this alarm
-  const existing = unackedAlarms.get(data.alarm_id);
-  if (existing) {
-    clearTimeout(existing.timerID);
-    clearInterval(existing.counterID);
-    if (existing.element && existing.element.parentNode) existing.element.remove();
+  // Real alarms are deduped by alarm_id so an escalation for a given
+  // alarm replaces the earlier banner. Info notifications (invites,
+  // @mentions, routed events) all carry alarm_id = 0 and must NOT
+  // dedupe against each other; give them a unique key-per-banner.
+  const dedupKey = (data.alarm_id && data.kind !== 'invite' && data.kind !== 'info') ? data.alarm_id : null;
+  if (dedupKey != null) {
+    const existing = unackedAlarms.get(dedupKey);
+    if (existing) {
+      clearTimeout(existing.timerID);
+      clearInterval(existing.counterID);
+      if (existing.element && existing.element.parentNode) existing.element.remove();
+    }
   }
 
   const area = document.getElementById('notification-area');
@@ -4449,20 +4455,40 @@ function showAlarmNotification(data, level) {
   // Check if event has a meeting URL
   const meetingURL = data.meeting_url || data.contact_url || '';
   const hasMeeting = meetingURL && (meetingURL.startsWith('http://') || meetingURL.startsWith('https://') || meetingURL.startsWith('sip:') || meetingURL.startsWith('tel:'));
+  // Distinguish real alarms (backed by a persisted Alarm record) from
+  // informational notifications — invites ("You have been invited to:
+  // X"), routed events, @mentions — which carry alarm_id = 0. The
+  // "Ack" button posts to /api/alarms/{id}/ack and would 404 with id 0,
+  // so we only render it for real alarms and replace it with a local
+  // "Dismiss" for info notifications.
+  const isRealAlarm = !!data.alarm_id && data.kind !== 'invite' && data.kind !== 'info';
+  const titleText = isRealAlarm
+    ? t('notif_alarm_title')
+    : (data.kind === 'invite' ? (t('notif_invite_title')||'Invitation') : (t('notif_info_title')||'Notification'));
   el.innerHTML = `
-    <div class="notification-title">${t('notif_alarm_title')}${escHtml(warnings)}</div>
+    <div class="notification-title">${escHtml(titleText)}${escHtml(warnings)}</div>
     <div class="notification-msg">${escHtml(data.message)}</div>
     <div class="alarm-since" style="font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px">⏱ 0s ago</div>
     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
       <button class="btn btn-ghost btn-sm notification-close-btn alarm-dismiss-btn">${t('alarm_dismiss')||'Dismiss'}</button>
       <button class="btn btn-secondary btn-sm alarm-show-event-btn">📋 Show event</button>
       ${hasMeeting ? `<a href="${escHtml(meetingURL)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none">${t('alarm_enter_meeting')}</a>` : ''}
-      <button class="btn btn-primary btn-sm alarm-ack-btn">✓ ${t('alarm_ack')}</button>
+      ${isRealAlarm ? `<button class="btn btn-primary btn-sm alarm-ack-btn">✓ ${t('alarm_ack')}</button>` : `<button class="btn btn-primary btn-sm alarm-info-ack-btn">✓ ${t('notif_info_ack')||'Got it'}</button>`}
     </div>
   `;
-  el.querySelector('.alarm-dismiss-btn').addEventListener('click', () => dismissAlarmNotif(data.alarm_id));
+  // For info notifications we use a synthetic unackedAlarms key; pass
+  // the same key to dismissAlarmNotif so it can clean up the entry.
+  const bannerKey = isRealAlarm ? data.alarm_id : ('info-' + shownAt);
+  el.querySelector('.alarm-dismiss-btn').addEventListener('click', () => dismissAlarmNotif(bannerKey));
   el.querySelector('.alarm-show-event-btn').addEventListener('click', () => openAlarmEvent(data.event_id));
-  el.querySelector('.alarm-ack-btn').addEventListener('click', () => ackAlarm(data.alarm_id, el));
+  const ackBtn = el.querySelector('.alarm-ack-btn');
+  if (ackBtn) ackBtn.addEventListener('click', () => ackAlarm(data.alarm_id, el));
+  const infoAckBtn = el.querySelector('.alarm-info-ack-btn');
+  if (infoAckBtn) infoAckBtn.addEventListener('click', () => {
+    // Info notifications have no server-side record to acknowledge —
+    // the "Got it" button just dismisses the banner locally.
+    dismissAlarmNotif(bannerKey);
+  });
   area.appendChild(el);
 
   // Update "X seconds/minutes ago" counter every second
@@ -4485,12 +4511,16 @@ function showAlarmNotification(data, level) {
   }
 
   // Escalate after 60 s if not acked, as long as we're before the event time
+  // — but only for real alarms. Invites and other info notifications have
+  // no server-side record to re-fire against, so letting them escalate
+  // just spams duplicate banners with the same alarm_id = 0.
   const eventTime = new Date(data.event_time);
-  const timerID = (new Date() < eventTime)
+  const timerID = (isRealAlarm && new Date() < eventTime)
     ? setTimeout(() => showAlarmNotification(data, level + 1), 60000)
     : null;
 
-  unackedAlarms.set(data.alarm_id, {data, level, timerID, counterID, element: el});
+  // Same synthetic key we bound the Dismiss / Got-it handlers to.
+  unackedAlarms.set(bannerKey, {data, level, timerID, counterID, element: el});
 }
 
 function dismissAlarmNotif(alarmID) {

@@ -157,6 +157,7 @@ func (app *App) notifyMentions(c EventComment, authorName string, eventID int64)
 					EventID:    eventID,
 					EventTitle: evTitle,
 					Message:    fmt.Sprintf("%s mentioned you in a comment on %q", authorName, evTitle),
+					Kind:       "info",
 				})
 				_ = data
 				logDebug("mention: @%s notified (user %d) in comment on event %d", mention, u.ID, eventID)
