@@ -133,6 +133,10 @@ func (app *App) handleCreateEvent(w http.ResponseWriter, r *http.Request, user *
 		EventTitle: created.Title,
 		EventTime:  created.StartTime,
 		Message:    fmt.Sprintf("You have been invited to: %s", created.Title),
+		// No persisted alarm record backs this; the client hides the
+		// "Ack" button when Kind == "invite" so it can't POST to the
+		// /api/alarms/{id}/ack endpoint with a zero id.
+		Kind: "invite",
 	}
 	for uid := range notifyUsers {
 		if uid != user.ID {

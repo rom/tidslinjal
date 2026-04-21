@@ -1487,6 +1487,12 @@ func (app *App) handleAcceptBoardItem(w http.ResponseWriter, r *http.Request, us
 		Action: "accepted", Detail: "Item marked as handled",
 	})
 	app.broadcastBoardChange("board_item_updated", item.BoardID)
+	// Return the refreshed item so the client can update state without a
+	// follow-up GET — avoids a race with a concurrent debounced save.
+	if updated := app.store.GetBoardItemByID(id); updated != nil {
+		jsonOK(w, updated)
+		return
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
@@ -1521,6 +1527,10 @@ func (app *App) handleUnacceptBoardItem(w http.ResponseWriter, r *http.Request, 
 		Action: "unaccepted", Detail: "Accept reversed",
 	})
 	app.broadcastBoardChange("board_item_updated", item.BoardID)
+	if updated := app.store.GetBoardItemByID(id); updated != nil {
+		jsonOK(w, updated)
+		return
+	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 

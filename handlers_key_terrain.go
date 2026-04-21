@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -580,20 +581,79 @@ func (app *App) handleKeyTerrainListAttachments(w http.ResponseWriter, r *http.R
 }
 
 // handleKeyTerrainAttachmentUpload: POST /api/key-terrain-attachments
-// Expects multipart/form-data with a "file" field and optional "comment"
-// and "cycle" fields.
+// Accepts either a file upload (multipart/form-data with "file") or a
+// URL-only record (JSON body or form field "url"). Common optional
+// fields: "comment" (free-form note), "cycle" (battle-cycle number).
+// For URL-only records, "filename" can be supplied to give the link a
+// display label; otherwise the URL's last path segment is used.
 func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.Request, user *User) {
 	if !app.canWriteKeyTerrain(user) {
 		jsonError(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	ct := strings.ToLower(strings.TrimSpace(strings.Split(r.Header.Get("Content-Type"), ";")[0]))
+	// JSON path: URL-only record, no multipart parsing needed.
+	if ct == "application/json" {
+		var req struct {
+			URL      string `json:"url"`
+			Filename string `json:"filename"`
+			Comment  string `json:"comment"`
+			Cycle    int    `json:"cycle"`
+		}
+		if err := decode(r, &req); err != nil {
+			jsonError(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		att, err := app.makeKeyTerrainURLAttachment(req.URL, req.Filename, req.Comment, req.Cycle, user)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := app.store.AddKeyTerrainBoardAttachment(att); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		app.audit(user.ID, user.Username, "attach", "key_terrain_board", 0,
+			fmt.Sprintf("Linked URL %q (cycle %d) to the board", att.URL, att.Cycle))
+		app.broadcastKeyTerrainChange("attachment_added")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(att)
+		return
+	}
+	// Multipart path: file upload OR url-only via "url" form field.
 	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
 		jsonError(w, "file too large (max 10 MB)", http.StatusBadRequest)
 		return
 	}
+	comment := strings.TrimSpace(r.FormValue("comment"))
+	cycle := 0
+	if cv := strings.TrimSpace(r.FormValue("cycle")); cv != "" {
+		if n, err := strconv.Atoi(cv); err == nil && n >= 0 {
+			cycle = n
+		}
+	}
+	if urlVal := strings.TrimSpace(r.FormValue("url")); urlVal != "" {
+		att, err := app.makeKeyTerrainURLAttachment(urlVal, strings.TrimSpace(r.FormValue("filename")), comment, cycle, user)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := app.store.AddKeyTerrainBoardAttachment(att); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		app.audit(user.ID, user.Username, "attach", "key_terrain_board", 0,
+			fmt.Sprintf("Linked URL %q (cycle %d) to the board", att.URL, att.Cycle))
+		app.broadcastKeyTerrainChange("attachment_added")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(att)
+		return
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		jsonError(w, "file field missing", http.StatusBadRequest)
+		jsonError(w, "provide either a file or a url", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -619,13 +679,6 @@ func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.
 		jsonError(w, "failed to save file", http.StatusInternalServerError)
 		return
 	}
-	comment := strings.TrimSpace(r.FormValue("comment"))
-	cycle := 0
-	if cv := strings.TrimSpace(r.FormValue("cycle")); cv != "" {
-		if n, err := strconv.Atoi(cv); err == nil && n >= 0 {
-			cycle = n
-		}
-	}
 	att := KeyTerrainAttachment{
 		Filename:     safeFilename,
 		StoredName:   storedName,
@@ -648,6 +701,52 @@ func (app *App) handleKeyTerrainAttachmentUpload(w http.ResponseWriter, r *http.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(att)
+}
+
+// makeKeyTerrainURLAttachment validates a URL-only protocol record
+// (Nextcloud / Google Drive / SharePoint / etc. link) and produces a
+// KeyTerrainAttachment with the right bookkeeping fields. Only http(s)
+// URLs are allowed so we cannot turn into an open redirect or file://
+// leak.
+func (app *App) makeKeyTerrainURLAttachment(rawURL, rawFilename, comment string, cycle int, user *User) (KeyTerrainAttachment, error) {
+	u := strings.TrimSpace(rawURL)
+	if u == "" {
+		return KeyTerrainAttachment{}, fmt.Errorf("url is required")
+	}
+	if len(u) > 2048 {
+		return KeyTerrainAttachment{}, fmt.Errorf("url too long (max 2048 chars)")
+	}
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return KeyTerrainAttachment{}, fmt.Errorf("invalid url")
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return KeyTerrainAttachment{}, fmt.Errorf("url scheme must be http or https")
+	}
+	label := strings.TrimSpace(rawFilename)
+	if label == "" {
+		// Derive a reasonable display label from the URL path; fall back
+		// to the hostname so the list row is never blank.
+		base := filepath.Base(parsed.Path)
+		if base == "" || base == "." || base == "/" {
+			base = parsed.Host
+		}
+		label = base
+	}
+	return KeyTerrainAttachment{
+		Filename: label,
+		URL:      u,
+		// Synthetic stored-name so the delete path, which identifies
+		// attachments by stored-name, works uniformly for URL-only
+		// records. Never points at a real file on disk.
+		StoredName:   fmt.Sprintf("ktburl_%d", time.Now().UnixNano()),
+		Comment:      strings.TrimSpace(comment),
+		Cycle:        cycle,
+		UploadedBy:   user.ID,
+		UploaderName: user.DisplayName,
+		CreatedAt:    time.Now(),
+	}, nil
 }
 
 // handleKeyTerrainAttachmentDownload: GET /api/key-terrain-attachments/{filename}
@@ -705,7 +804,12 @@ func (app *App) handleKeyTerrainAttachmentDelete(w http.ResponseWriter, r *http.
 		jsonError(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	_ = os.Remove(filepath.Join(app.store.AttachmentDir(), storedName))
+	// URL-only records have a synthetic stored-name and no on-disk
+	// file; skip the unlink for them. File-backed records keep the
+	// existing best-effort Remove.
+	if removed.URL == "" {
+		_ = os.Remove(filepath.Join(app.store.AttachmentDir(), storedName))
+	}
 	app.audit(user.ID, user.Username, "detach", "key_terrain_board", 0,
 		fmt.Sprintf("Deleted attachment %q", removed.Filename))
 	app.broadcastKeyTerrainChange("attachment_removed")

@@ -177,6 +177,74 @@ func TestAPI_BoardItem_Archive_Unarchive(t *testing.T) {
 	}
 }
 
+func TestAPI_BoardItem_Accept_Unaccept(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	resp := apiDo(t, srv, http.MethodPost, "/api/boards", map[string]any{
+		"name": "Accept Test", "visibility": "global",
+		"columns": []map[string]any{{"id": "1", "name": "Open"}},
+	}, cookies)
+	var board map[string]any
+	decodeJSON(t, resp, &board)
+	boardID := int(board["id"].(float64))
+
+	resp2 := apiDo(t, srv, http.MethodPost, fmt.Sprintf("/api/boards/%d/items", boardID), map[string]any{
+		"subject": "Acceptable", "column_id": "1", "sort_order": 0,
+		"event_id": 9999, // point at a non-existent event — must not break accept
+		"due_date": "2020-01-01", // long past
+	}, cookies)
+	var item map[string]any
+	decodeJSON(t, resp2, &item)
+	itemID := int(item["id"].(float64))
+
+	// Accept
+	resp3 := apiDo(t, srv, http.MethodPost, fmt.Sprintf("/api/board-items/%d/accept", itemID), map[string]any{}, cookies)
+	defer resp3.Body.Close()
+	if !isSuccess(resp3.StatusCode) {
+		t.Fatalf("accept: expected 200, got %d", resp3.StatusCode)
+	}
+
+	// Verify accepted_at set
+	resp4 := apiDo(t, srv, http.MethodGet, fmt.Sprintf("/api/boards/%d/items", boardID), nil, cookies)
+	var itemsAfter []map[string]any
+	decodeJSON(t, resp4, &itemsAfter)
+	found := false
+	for _, it := range itemsAfter {
+		if int(it["id"].(float64)) == itemID {
+			found = true
+			if it["accepted_at"] == nil || it["accepted_at"] == "" {
+				t.Error("expected accepted_at to be set after accept")
+			}
+			if it["accepted_by_name"] == nil {
+				t.Error("expected accepted_by_name to be set after accept")
+			}
+		}
+	}
+	if !found {
+		t.Error("item not found after accept")
+	}
+
+	// Unaccept
+	resp5 := apiDo(t, srv, http.MethodPost, fmt.Sprintf("/api/board-items/%d/unaccept", itemID), map[string]any{}, cookies)
+	defer resp5.Body.Close()
+	if !isSuccess(resp5.StatusCode) {
+		t.Fatalf("unaccept: expected 200, got %d", resp5.StatusCode)
+	}
+
+	// Verify accepted_at cleared
+	resp6 := apiDo(t, srv, http.MethodGet, fmt.Sprintf("/api/boards/%d/items", boardID), nil, cookies)
+	var itemsAfter2 []map[string]any
+	decodeJSON(t, resp6, &itemsAfter2)
+	for _, it := range itemsAfter2 {
+		if int(it["id"].(float64)) == itemID {
+			if v, ok := it["accepted_at"]; ok && v != nil && v != "" {
+				t.Errorf("expected accepted_at cleared after unaccept, got %v", v)
+			}
+		}
+	}
+}
+
 func TestAPI_BoardDelete_CascadesItems(t *testing.T) {
 	_, srv := newTestApp(t)
 	cookies := login(t, srv, "admin", "admin")
@@ -213,5 +281,67 @@ func TestAPI_BoardDelete_CascadesItems(t *testing.T) {
 		if len(items) > 0 {
 			t.Error("expected no items after board deletion")
 		}
+	}
+}
+
+func TestAPI_KeyTerrainAttachment_URL(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	// Save a URL-only protocol — Nextcloud-style link.
+	resp := apiDo(t, srv, http.MethodPost, "/api/key-terrain-attachments", map[string]any{
+		"url":     "https://cloud.example.com/s/abc123",
+		"comment": "Battle cycle 3 — notes",
+		"cycle":   3,
+	}, cookies)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("url attachment: expected 201, got %d", resp.StatusCode)
+	}
+	var att map[string]any
+	decodeJSON(t, resp, &att)
+	if att["url"] != "https://cloud.example.com/s/abc123" {
+		t.Errorf("expected url round-tripped, got %v", att["url"])
+	}
+	if att["stored_name"] == nil || att["stored_name"] == "" {
+		t.Error("expected synthetic stored_name for URL record")
+	}
+	if att["filename"] == "" || att["filename"] == nil {
+		t.Error("expected a derived filename label")
+	}
+
+	// List and make sure it's there.
+	resp2 := apiDo(t, srv, http.MethodGet, "/api/key-terrain-attachments", nil, cookies)
+	defer resp2.Body.Close()
+	var list []map[string]any
+	decodeJSON(t, resp2, &list)
+	if len(list) != 1 {
+		t.Fatalf("expected 1 attachment, got %d", len(list))
+	}
+
+	// Non-http schemes must be rejected.
+	bad := apiDo(t, srv, http.MethodPost, "/api/key-terrain-attachments", map[string]any{
+		"url": "file:///etc/passwd",
+	}, cookies)
+	defer bad.Body.Close()
+	if bad.StatusCode == http.StatusCreated {
+		t.Error("file:// url must be rejected, but was accepted")
+	}
+
+	// Delete via the synthetic stored-name.
+	storedName, _ := att["stored_name"].(string)
+	resp3 := apiDo(t, srv, http.MethodDelete, "/api/key-terrain-attachments/"+storedName, nil, cookies)
+	defer resp3.Body.Close()
+	if !isSuccess(resp3.StatusCode) {
+		t.Fatalf("delete url attachment: got %d", resp3.StatusCode)
+	}
+
+	// Listing should now be empty.
+	resp4 := apiDo(t, srv, http.MethodGet, "/api/key-terrain-attachments", nil, cookies)
+	defer resp4.Body.Close()
+	var list2 []map[string]any
+	decodeJSON(t, resp4, &list2)
+	if len(list2) != 0 {
+		t.Errorf("expected 0 attachments after delete, got %d", len(list2))
 	}
 }

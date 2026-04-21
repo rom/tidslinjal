@@ -149,6 +149,7 @@ func (app *App) applyRoutingRule(rule RoutingRule, ev *Event) {
 				EventTitle: ev.Title,
 				EventTime:  ev.StartTime,
 				Message:    fmt.Sprintf("Routed event: %s (rule: %s)", ev.Title, rule.Name),
+				Kind:       "info",
 			})
 		}
 	}
