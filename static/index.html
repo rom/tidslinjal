@@ -2611,6 +2611,7 @@
               <li>Click any column header to sort ascending / descending / back to default.</li>
               <li>Use <b>👁 Columns</b> to hide any column you don't need, and <b>⚙ Settings → Column Labels</b> to rename any column heading (e.g. <em>Function</em> → <em>Task</em>). Renames are global and visible to every user of the board.</li>
               <li>Entries can be linked to a <b>Capability resource</b> — when the capability's status or zone changes the linked entries update automatically.</li>
+              <li><b>🌳 Root cause &amp; consequences</b> — in the entry editor, pick another entry as the <em>Root cause</em> to mark the current entry as a consequence. Consequences cluster under their root cause on the board and are indented with a ↳ marker plus a left border so the link is visible at a glance; the parent entry carries a 🌳 <em>Root cause</em> badge. The server rejects self-references and cycles. An orphan child (parent archived or filtered out of the current view) falls back to rendering as a standalone row so it never disappears.</li>
               <li>The board auto-updates in real time via SSE; when another operator edits an entry you see the change immediately.</li>
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Zoom &amp; window-fill</h4>

@@ -301,8 +301,42 @@ function _renderKeyTerrainBoard() {
     });
   }
 
-  // Sort using settings
-  const sorted = _ktSortEntries(filtered);
+  // Sort using settings, then reorder so each root-cause entry is
+  // immediately followed by its consequences (entries whose parent_id
+  // points at it). Consequences are rendered with an "indent level"
+  // marker — e.indent — attached on a non-persisted property so the
+  // row renderer knows how far to tab them in. Orphan children
+  // (parent_id references an entry not in the filtered set — archived,
+  // filtered out, or deleted) render as standalone rows at the normal
+  // indent level so they don't silently disappear.
+  const sortedFlat = _ktSortEntries(filtered);
+  const byID = new Map(sortedFlat.map(e => [e.id, e]));
+  const childrenOf = new Map();
+  for (const e of sortedFlat) {
+    const pid = e.parent_id || 0;
+    if (pid && byID.has(pid)) {
+      if (!childrenOf.has(pid)) childrenOf.set(pid, []);
+      childrenOf.get(pid).push(e);
+    }
+  }
+  const sorted = [];
+  const pushed = new Set();
+  const pushWithKids = (e, indent) => {
+    if (pushed.has(e.id)) return;
+    pushed.add(e.id);
+    sorted.push({ ...e, _indent: indent });
+    const kids = childrenOf.get(e.id) || [];
+    for (const k of kids) pushWithKids(k, indent + 1);
+  };
+  for (const e of sortedFlat) {
+    const pid = e.parent_id || 0;
+    // Start a cluster only from roots (no parent, or parent not in this view).
+    if (!pid || !byID.has(pid)) pushWithKids(e, 0);
+  }
+  // Safety net: anything still unvisited (shouldn't happen — a cycle would
+  // trigger this) is appended at the end as a standalone row.
+  for (const e of sortedFlat) if (!pushed.has(e.id)) sorted.push({ ...e, _indent: 0 });
+
   const cols = _ktState.columnOrder.filter(c => !hidden[c] && (c !== 'management' || canWrite));
   const hasHidden = Object.values(hidden).some(v => v);
   const totalCols = cols.length;
@@ -409,7 +443,20 @@ function _renderKeyTerrainBoard() {
       seq_num: `<td style="padding:8px;text-align:center;font-weight:600;font-size:11px;color:var(--text-dim)">${e.seq_num || '\u2014'}</td>`,
       zone: `<td style="padding:8px">${e.zone ? escHtml(e.zone) : '<span style="color:var(--text-dim)">\u2014</span>'}</td>`,
       priority: `<td style="padding:8px;text-align:center;font-weight:700;font-size:14px;${priColor ? 'color:' + priColor : ''}">${e.priority || '\u2014'}</td>`,
-      function: `<td style="padding:8px;font-weight:600">${escHtml(e.function)}${e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : (isInactive ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(' + (t('kt_inactive')||'inactive') + ')</span>' : '')}</td>`,
+      function: (() => {
+        // Indent + prefix for consequence rows; root-cause badge on parents
+        // so they are identifiable at a glance. The "indent" is expressed
+        // in ems so it scales with the board-zoom level (A- / A+).
+        const indent = e._indent || 0;
+        const indentStyle = indent > 0 ? `padding-left:${8 + indent * 16}px;border-left:3px solid var(--accent);` : 'padding-left:8px;';
+        const prefix = indent > 0 ? `<span style="color:var(--accent);margin-right:4px" title="${t('kt_consequence_of')||'Consequence of root cause'}">↳</span>` : '';
+        const isRoot = (childrenOf.get(e.id) || []).length > 0;
+        const rootBadge = isRoot && indent === 0
+          ? ` <span style="font-size:9px;color:var(--accent);font-weight:normal;border:1px solid var(--accent);border-radius:8px;padding:1px 5px;margin-left:4px" title="${t('kt_root_cause_badge_h')||'Root cause for one or more consequences below'}">\u{1F333} ${t('kt_root_cause_badge')||'Root cause'}</span>`
+          : '';
+        const ghostedTag = e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : (isInactive ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(' + (t('kt_inactive')||'inactive') + ')</span>' : '');
+        return `<td style="padding:8px 8px 8px 0;${indentStyle}font-weight:600">${prefix}${escHtml(e.function)}${rootBadge}${ghostedTag}</td>`;
+      })(),
       status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusLabel}">${sIcon} ${statusLabel}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
       threat: `<td style="padding:8px">${e.threat ? _ktRenderRich(e.threat) : '\u2014'}</td>`,
@@ -605,6 +652,19 @@ async function _ktEditEntry(entryId) {
     </div>
 
     <div style="margin-bottom:10px">
+      <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F333} ${t('kt_root_cause')||'Root cause (this entry is a consequence of…)'}</label>
+      <select id="ktParent" class="input" style="width:100%;font-size:var(--fs-xs)">
+        <option value="0">${t('kt_root_cause_none')||'— None (this is a root cause itself or standalone) —'}</option>
+        ${(_ktState.entries || [])
+          .filter(x => !x.archived && x.id !== (entry.id || 0))
+          .sort((a, b) => (a.function || '').localeCompare(b.function || ''))
+          .map(x => `<option value="${x.id}"${entry.parent_id === x.id ? ' selected' : ''}>${escHtml('#' + (x.seq_num || x.id) + ' ' + (x.function || ''))}</option>`)
+          .join('')}
+      </select>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:3px">${t('kt_root_cause_hint')||'Consequences are indented under their root cause on the board.'}</div>
+    </div>
+
+    <div style="margin-bottom:10px">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F4AC} ${_ktColLabel('comments', t('kt_comments')||'Comments')}</label>
       <textarea id="ktComments" class="input" style="width:100%;min-height:48px;resize:vertical;font-size:var(--fs-xs)" placeholder="${t('kt_comments_ph')||'Notes, remarks, flags…'}">${escHtml(entry.comments || '')}</textarea>
     </div>
@@ -689,6 +749,7 @@ async function _ktSaveEntry(entryId) {
     rounds: parseInt(document.getElementById('ktRounds')?.value) || 0,
     actions: _ktGetRichValue('ktActions'),
     comments: document.getElementById('ktComments')?.value || '',
+    parent_id: parseInt(document.getElementById('ktParent')?.value) || 0,
   };
 
   const respId = parseInt(document.getElementById('ktResponsibleId')?.value);
@@ -2495,6 +2556,7 @@ function _ktShowHelp() {
       <h4 style="margin:12px 0 4px">${t('kt_help_features')||'Features'}</h4>
       <ul style="margin:0;padding-left:18px">
         <li><strong>Click a row</strong> to edit the entry (write-access users).</li>
+        <li><strong>\u{1F333} Root cause &amp; consequences</strong> — in the edit modal, pick another entry as the <em>Root cause</em> to mark the current entry as a consequence. Consequences cluster right under their root cause on the board and are indented with a ↳ marker plus a left border; the parent carries a \u{1F333} <em>Root cause</em> badge. Orphans (parent archived or filtered out) fall back to rendering standalone.</li>
         <li><strong>\u25B2 \u25BC</strong> moves a row up or down.</li>
         <li><strong>Click column headers</strong> to sort (click again to reverse, again to clear).</li>
         <li><strong>\u{1F50D} Filter</strong> narrows the view by any field.</li>

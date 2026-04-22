@@ -276,6 +276,12 @@ type KeyTerrainEntry struct {
 	Ghosted         bool             `json:"ghosted,omitempty"`           // visually dimmed / inactive
 	Archived        bool             `json:"archived,omitempty"`          // hidden from normal view
 	FinishedAt      *time.Time       `json:"finished_at,omitempty"`       // when the entry was marked finished
+	// ParentID links this entry to a "root cause" entry on the same
+	// board. An entry with ParentID == 0 is standalone (or may itself
+	// be a root cause with one or more children pointing at it). Used
+	// purely for grouping / indentation in the UI — the server does
+	// no cascading semantics.
+	ParentID        int64            `json:"parent_id,omitempty"`
 	History         []KeyTerrainHist `json:"history,omitempty"`
 	CreatedAt       time.Time        `json:"created_at"`
 	UpdatedAt       time.Time        `json:"updated_at"`
