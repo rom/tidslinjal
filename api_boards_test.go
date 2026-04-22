@@ -421,3 +421,48 @@ func TestAPI_KeyTerrain_ParentID(t *testing.T) {
 		t.Errorf("clear parent_id: got %d", clear.StatusCode)
 	}
 }
+
+// TestAPI_KeyTerrain_InitialStateLogged verifies that creating an
+// entry with non-empty initial fields records one history row per
+// field, so the per-entry revision log shows WHO set WHICH value WHEN
+// right from the creation moment.
+func TestAPI_KeyTerrain_InitialStateLogged(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	r := apiDo(t, srv, http.MethodPost, "/api/key-terrain", map[string]any{
+		"function": "Power distribution",
+		"status":   "degraded",
+		"trend":    "worsening",
+		"threat":   "APT group probing SCADA",
+		"priority": 1,
+		"zone":     "North",
+		"actions":  "Rerouting via backup link",
+		"comments": "Initial observation",
+	}, cookies)
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusCreated {
+		t.Fatalf("create: got %d", r.StatusCode)
+	}
+	var created map[string]any
+	decodeJSON(t, r, &created)
+
+	hist, _ := created["history"].([]any)
+	if len(hist) < 8 {
+		t.Fatalf("expected ≥8 history rows for a fully-populated create, got %d", len(hist))
+	}
+	seen := map[string]bool{}
+	for _, h := range hist {
+		if m, ok := h.(map[string]any); ok {
+			if f, ok := m["field"].(string); ok {
+				seen[f] = true
+			}
+		}
+	}
+	// Spot-check: the specific fields we set must each have a row.
+	for _, want := range []string{"created", "status", "trend", "threat", "priority", "zone", "actions", "comments"} {
+		if !seen[want] {
+			t.Errorf("expected history row for field %q, seen=%v", want, seen)
+		}
+	}
+}

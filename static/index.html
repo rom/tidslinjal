@@ -2631,18 +2631,18 @@
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Battle Rhythm — shared exercise clock</h4>
             <p>Open <b>⚙ Settings → Battle Rhythm</b> to configure a shared clock that every operator sees in lockstep.</p>
             <ul class="help-list">
-              <li><b>Cycle length</b> (minutes) defines one battle rhythm cycle, e.g. 120 min for a two-hour cadence. The first tick of each cycle is <b>H0</b>.</li>
-              <li><b>Steps</b> are named events inside each cycle, timed relative to H0. Offsets can be negative: a step with <em>Start −15, End 0</em> fires in the last 15 minutes of the previous cycle. Leave <em>End</em> blank for an instant marker. Each step has a colour picker — the board's outer border swaps to that colour while the step is the active one.</li>
+              <li><b>Cycle length</b> (minutes) defines one battle rhythm cycle, e.g. 120 min for a two-hour cadence. The first tick of each cycle is <b>T0</b>. The headline readout on the widget is a T-offset (e.g. <code>T+5</code>, <code>T-30</code>, <code>T0</code>) so the clock reads in T-time, not H-hour.</li>
+              <li><b>Steps</b> are named events inside each cycle, timed relative to T0. Offsets can be negative: a step with <em>Start −15, End 0</em> fires in the last 15 minutes of the previous cycle. Leave <em>End</em> blank for an instant marker. Each step has a colour picker — the board's outer border swaps to that colour while the step is the active one.</li>
               <li><b>Snapshot offsets</b> are a comma-separated list of minute offsets; at each offset the scheduler auto-captures the board in every selected format (<b>CSV / JSON / XML / SVG</b>) and stores it under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code>. Teamlead+ can list and download snapshots from the Manage &amp; Export panel.</li>
               <li><b># Cycles</b> column: every time the clock rolls over to a new cycle, the <em># Cycles</em> counter on every active entry is incremented by one, so you can see how many rhythm cycles have touched each function.</li>
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">Running the battle rhythm clock</h4>
             <ul class="help-list">
               <li>The clock widget appears at the top of the board (toggle with <em>Show clock widget</em> in Settings).</li>
-              <li>Press <b>▶ Start</b> to begin immediately. Type a time in the <em>HH:MM</em> field beside Start to arm the clock for a future moment — the widget switches to a waiting state (<b>⏳ Waiting for 09:00</b> with a live countdown) until H0 fires. If the time is already past for today, H0 is scheduled for <em>tomorrow</em> at that wall-clock time so the clock actually fires.</li>
-              <li><b>⏸ Pause</b> freezes the clock; <b>▶ Resume</b> continues from where it stopped. <b>⟲ Reset</b> stops and clears H0.</li>
+              <li>Press <b>▶ Start</b> to begin immediately. Type a time in the <em>HH:MM</em> field beside Start to arm the clock for a future moment — the widget switches to a waiting state (<b>⏳ Waiting for 09:00</b> with a live countdown) until T0 fires. If the time is already past for today, T0 is scheduled for <em>tomorrow</em> at that wall-clock time so the clock actually fires.</li>
+              <li><b>⏸ Pause</b> freezes the clock; <b>▶ Resume</b> continues from where it stopped. <b>⟲ Reset</b> stops and clears T0.</li>
               <li>Start / Pause / Reset are shared: one operator's action propagates to every other open Key Terrain Board within one round-trip via SSE. A success toast confirms the action.</li>
-              <li>Detach the clock into its own pane via the <b>Clocks</b> popup → <em>Battle Rhythm</em> toolbar button; it shows the same H-offset and step information as a read-only card beside other clocks.</li>
+              <li>Detach the clock into its own pane via the <b>Clocks</b> popup → <em>Battle Rhythm</em> toolbar button; it shows the same T-offset and step information as a read-only card beside other clocks.</li>
               <li>The colour of the <b>border around the entire board</b> reflects the current step, giving instant visual awareness of where you are in the cycle.</li>
             </ul>
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">📎 Battle cycle protocols</h4>
@@ -2656,7 +2656,7 @@
             <h4 style="font-size:var(--fs-sm);margin:10px 0 4px">⏪ Wayback Machine — replay an earlier KTB</h4>
             <ul class="help-list">
               <li>The <b>📜 History</b> button in the Battle Rhythm controls (write-access only) opens the <em>Wayback Machine</em>. It lists every cycle that has at least one snapshot on disk (newest first), with one button per recorded snapshot offset and format.</li>
-              <li>Click a JSON marker (e.g. <code>⏪ H+0 JSON</code>) to <b>load that historical KTB into the main view</b>. A yellow banner at the top of the board shows the cycle number, offset, and the moment the snapshot was taken.</li>
+              <li>Click a JSON marker (e.g. <code>⏪ T+0 JSON</code>) to <b>load that historical KTB into the main view</b>. A yellow banner at the top of the board shows the cycle number, offset, and the moment the snapshot was taken.</li>
               <li>While in wayback mode the board is fully read-only — Add, Edit, drag, ghost, archive and the Settings panel are suppressed, and live SSE refreshes are paused so the historical view doesn't move.</li>
               <li>Click <b>⏩ Return to live</b> in the banner to restore the current state. The unfiltered live entries are stashed locally — no server round trip needed.</li>
               <li>CSV / XML / SVG markers download the raw snapshot file instead of loading it into the view.</li>
