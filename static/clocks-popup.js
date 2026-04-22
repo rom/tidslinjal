@@ -2471,15 +2471,15 @@ async function _brPoll() {
   } catch {}
 }
 function _brFormatHOffset(posMin, cycleMin) {
-  if (!cycleMin) return 'H+' + Math.floor(posMin || 0);
+  if (!cycleMin) return 'T+' + Math.floor(posMin || 0);
   let m = posMin;
   if (m > cycleMin / 2) m = m - cycleMin;
   const sign = m < 0 ? '-' : '+';
   const absM = Math.abs(m);
   const hh = Math.floor(absM / 60);
   const mm = Math.floor(absM % 60);
-  if (hh > 0) return 'H' + sign + hh + 'h' + String(mm).padStart(2, '0');
-  return 'H' + sign + String(Math.floor(absM)).padStart(2, '0');
+  if (hh > 0) return 'T' + sign + hh + 'h' + String(mm).padStart(2, '0');
+  return 'T' + sign + String(Math.floor(absM)).padStart(2, '0');
 }
 let _brPollCounter = 0;
 function tickBattleRhythm() {
@@ -2497,7 +2497,7 @@ function tickBattleRhythm() {
   const cycEl = document.getElementById('br-cycles');
   if (!hEl) return;
   if (!st || !st.running) {
-    hEl.textContent = 'H--';
+    hEl.textContent = 'T--';
     if (curEl) curEl.textContent = 'Stopped';
     if (nxtEl) nxtEl.textContent = '';
     if (cycEl) cycEl.textContent = 'Cycles: 0';

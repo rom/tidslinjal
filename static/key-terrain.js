@@ -1065,7 +1065,7 @@ async function _ktOpenCycleHistory() {
     const fileLinks = files.map(f => {
       const href = `/api/key-terrain/battle-rhythm/snapshots/${encodeURIComponent(c.cycle_dir)}/${encodeURIComponent(f.name)}`;
       const isJson = (f.format || '').toLowerCase() === 'json';
-      const offsetTxt = 'H' + (f.offset_min >= 0 ? '+' : '') + f.offset_min;
+      const offsetTxt = 'T' + (f.offset_min >= 0 ? '+' : '') + f.offset_min;
       const fmt = (f.format || '').toUpperCase();
       if (isJson) {
         return `<button class="btn btn-sm btn-primary" style="font-size:10px;padding:2px 8px" data-action="_ktLoadHistoricalKTB" data-arg-el data-cycle="${escHtml(c.cycle_dir)}" data-name="${escHtml(f.name)}" data-label="${escHtml(label + ' · ' + offsetTxt)}" data-cycle-idx="${idx != null ? idx : ''}" data-offset="${f.offset_min}" data-taken="${escHtml(f.taken_at || '')}" title="${t('kt_br_wayback_load_h')||'Load this board state into the main view'}">\u23EA ${offsetTxt} ${fmt}</button>`;
@@ -1163,7 +1163,7 @@ function _ktExitWayback() {
 function _ktRenderWaybackBanner() {
   const w = _ktState._waybackInfo;
   if (!w) return '';
-  const offset = Number.isFinite(w.offsetMin) ? ('H' + (w.offsetMin >= 0 ? '+' : '') + w.offsetMin) : '';
+  const offset = Number.isFinite(w.offsetMin) ? ('T' + (w.offsetMin >= 0 ? '+' : '') + w.offsetMin) : '';
   const takenStr = w.takenAt ? (() => { try { return new Date(w.takenAt).toLocaleString(); } catch { return w.takenAt; } })() : '';
   const cycleStr = w.cycleIdx != null ? (t('kt_current_cycle')||'Cycle') + ' ' + w.cycleIdx : (w.cycleDir || '');
   return `<div class="kt-no-print" style="padding:10px 14px;margin-bottom:10px;background:#FFF4C2;color:#222;border:1px solid #E0C200;border-radius:var(--radius);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -1424,7 +1424,7 @@ function _ktOpenSettings() {
 
     <div style="margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">
       <div style="font-weight:600;margin-bottom:8px;font-size:var(--fs-sm)">\u23F1\uFE0F ${t('kt_battle_rhythm')||'Battle Rhythm'}</div>
-      <p style="font-size:10px;color:var(--text-dim);margin-bottom:8px">${t('kt_battle_rhythm_desc')||'Shared exercise clock with cyclic steps. Every client sees the same H0.'}</p>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:8px">${t('kt_battle_rhythm_desc')||'Shared exercise clock with cyclic steps. Every client sees the same T0.'}</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px">
         <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
           <input type="checkbox" id="ktBrEnabled" ${br.enabled ? 'checked' : ''} style="accent-color:var(--accent)">
@@ -1440,7 +1440,7 @@ function _ktOpenSettings() {
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer">
           <input type="checkbox" id="ktBrShowSeconds" ${s.battle_rhythm_show_seconds ? 'checked' : ''} style="accent-color:var(--accent)">
-          ${t('kt_br_show_seconds')||'Show seconds in H-offset (H+00:00 instead of H+00)'}
+          ${t('kt_br_show_seconds')||'Show seconds in T-offset (T+00:00 instead of T+00)'}
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);cursor:pointer" title="${t('kt_br_step_end_sound_h')||'Play a short audio chime in the browser 60 seconds before the current step ends.'}">
           <input type="checkbox" id="ktBrStepEndSound" ${s.battle_rhythm_step_end_sound ? 'checked' : ''} style="accent-color:var(--accent)">
@@ -1452,10 +1452,10 @@ function _ktOpenSettings() {
         <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${t('kt_reset_cycles_desc')||'Zero the # Cycles column for every non-archived entry. Use this to wipe the counter between exercises without rebuilding the board.'}</div>
       </div>
       <div style="font-weight:600;font-size:var(--fs-xs);margin:8px 0 4px">${t('kt_br_steps')||'Steps in one cycle'}</div>
-      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_steps_desc')||'Offsets are in minutes from H0. Negative values schedule a step before H0. Leave End blank for an instant step.'}</p>
+      <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_steps_desc')||'Offsets are in minutes from T0. Negative values schedule a step before T0. Leave End blank for an instant step.'}</p>
       <div id="ktBrStepList" style="margin-bottom:6px"></div>
       <button type="button" class="btn btn-sm btn-secondary" data-action="_ktBrAddStep" style="font-size:10px">+ ${t('kt_br_add_step')||'Add step'}</button>
-      <div style="font-weight:600;font-size:var(--fs-xs);margin:12px 0 4px">${t('kt_br_snap_offsets')||'Snapshot offsets (minutes from H0)'}</div>
+      <div style="font-weight:600;font-size:var(--fs-xs);margin:12px 0 4px">${t('kt_br_snap_offsets')||'Snapshot offsets (minutes from T0)'}</div>
       <p style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${t('kt_br_snap_offsets_desc')||'Comma-separated list, e.g. "0, 15, 60". A board snapshot is captured in each selected format when the clock reaches each offset, every cycle.'}</p>
       <input type="text" id="ktBrSnapOffsets" class="input" value="${escHtml(brSnapOffsets.join(', '))}" placeholder="0, 15, 60" style="width:100%;font-size:var(--fs-xs);padding:4px 6px">
       <div style="font-weight:600;font-size:var(--fs-xs);margin:12px 0 4px">${t('kt_br_snap_formats')||'Snapshot formats'}</div>
@@ -1571,7 +1571,7 @@ function _ktBrRenderStepList(initial) {
     return `
     <div style="display:grid;grid-template-columns:1fr 70px 70px 34px auto;gap:4px;align-items:center;margin-bottom:4px;padding:4px;background:var(--bg2);border-radius:var(--radius);border-left:4px solid ${colorVal}">
       <input class="input ktBrStepName" data-idx="${i}" value="${escHtml(step.name||'')}" placeholder="${t('kt_br_step_name')||'Step name'}" style="font-size:var(--fs-xs);padding:3px 6px">
-      <input class="input ktBrStepStart" data-idx="${i}" type="number" value="${step.start_offset_min ?? 0}" placeholder="Start" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_start_h')||'Start offset (minutes from H0)'}">
+      <input class="input ktBrStepStart" data-idx="${i}" type="number" value="${step.start_offset_min ?? 0}" placeholder="Start" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_start_h')||'Start offset (minutes from T0)'}">
       <input class="input ktBrStepEnd" data-idx="${i}" type="number" value="${step.end_offset_min != null ? step.end_offset_min : ''}" placeholder="End" style="font-size:var(--fs-xs);padding:3px 6px" title="${t('kt_br_step_end_h')||'End offset or blank for instant'}">
       <input type="color" class="ktBrStepColor" data-idx="${i}" value="${colorVal}" title="${t('kt_br_step_color_h')||'Border colour while this step is active'}" style="width:30px;height:24px;border:none;cursor:pointer;padding:0;background:transparent">
       <button type="button" class="btn btn-sm btn-secondary" data-action="_ktBrRemoveStep" data-arg="${i}" style="font-size:10px;padding:2px 6px">\u2716</button>
@@ -2622,19 +2622,19 @@ function _ktShowHelp() {
       <p>Operations Lead, Staff Officers, and Staff Assistants have <strong>write access</strong>. Everyone else has <strong>read-only</strong> access.</p>
 
       <h4 style="margin:14px 0 4px">\u23F1\uFE0F ${t('kt_help_br')||'Battle Rhythm'}</h4>
-      <p>The <strong>battle rhythm</strong> is a shared exercise clock with cyclic steps. Every connected user sees the same <strong>H0</strong> (the start of the current cycle) and the same step progression.</p>
+      <p>The <strong>battle rhythm</strong> is a shared exercise clock with cyclic steps. Every connected user sees the same <strong>T0</strong> (the start of the current cycle) and the same step progression. The headline readout uses T-time, so the clock shows <code>T+5</code> / <code>T-30</code> / <code>T0</code> — not H-hour.</p>
       <ul style="margin:0;padding-left:18px">
-        <li>Configure under <strong>\u2699 Settings → Battle Rhythm</strong>: cycle length, named steps with start/end offsets relative to H0 (negative offsets allowed for pre-H0 steps), a colour picker per step, and an automatic snapshot schedule.</li>
-        <li>The clock widget appears at the top of the board when <em>Show clock widget</em> is enabled. It shows the current H-offset, the cycle length, the number of cycles completed so far, the current step, and the next step with a countdown.</li>
+        <li>Configure under <strong>\u2699 Settings → Battle Rhythm</strong>: cycle length, named steps with start/end offsets relative to T0 (negative offsets allowed for pre-T0 steps), a colour picker per step, and an automatic snapshot schedule.</li>
+        <li>The clock widget appears at the top of the board when <em>Show clock widget</em> is enabled. It shows the current T-offset, the cycle length, the number of cycles completed so far, the current step, and the next step with a countdown.</li>
         <li>The <strong>board's outer border</strong> changes colour while a step is active — it uses the colour you picked for that step, or an automatic palette if you left the picker at default.</li>
       </ul>
 
       <h5 style="margin:10px 0 4px">Controls</h5>
       <ul style="margin:0;padding-left:18px">
-        <li><strong>\u25B6 Start</strong> \u2014 starts the clock at wall-clock <em>now</em>. Type a time in the HH:MM field beside Start to <em>arm</em> the clock for a future moment; the widget then shows a waiting state with a live countdown until H0.</li>
+        <li><strong>\u25B6 Start</strong> \u2014 starts the clock at wall-clock <em>now</em>. Type a time in the HH:MM field beside Start to <em>arm</em> the clock for a future moment; the widget then shows a waiting state with a live countdown until T0.</li>
         <li><strong>\u23F8 Pause</strong> / <strong>\u25B6 Resume</strong> \u2014 freezes / restarts the clock. The elapsed position is preserved across the pause.</li>
-        <li><strong>\u27F2 Reset</strong> \u2014 stops the clock and clears H0. Steps and cycle length are preserved.</li>
-        <li><strong>\u23EA Backward</strong> \u2014 rewinds the apparent clock position to the start of the previous step (or to H+0, or one full cycle back if already at H+0). Wall clock unchanged.</li>
+        <li><strong>\u27F2 Reset</strong> \u2014 stops the clock and clears T0. Steps and cycle length are preserved.</li>
+        <li><strong>\u23EA Backward</strong> \u2014 rewinds the apparent clock position to the start of the previous step (or to T+0, or one full cycle back if already at T+0). Wall clock unchanged.</li>
         <li><strong>\u23ED Forward</strong> \u2014 ends the current step <em>now</em>; the next step absorbs the leftover time and runs longer. The cycle length is unchanged. The mutation persists across cycles until you reconfigure the steps.</li>
         <li><strong>\u23E9 Fast-forward</strong> \u2014 jumps the clock forward to the next step's nominal start. The current step is cut short, wall clock continues, and the cycle ends sooner than its original wall-clock end.</li>
       </ul>
@@ -2642,7 +2642,7 @@ function _ktShowHelp() {
       <h5 style="margin:10px 0 4px">Cycle rollover and snapshots</h5>
       <ul style="margin:0;padding-left:18px">
         <li>Every time the clock rolls over into a new cycle, the <strong># Cycles</strong> counter on every active entry is incremented by one. The scheduler runs once per minute.</li>
-        <li>Snapshot offsets (minutes from H0, comma-separated in Settings) auto-capture the full board in every selected format (<strong>CSV / JSON / XML / SVG</strong>) and write them under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code> on the server.</li>
+        <li>Snapshot offsets (minutes from T0, comma-separated in Settings) auto-capture the full board in every selected format (<strong>CSV / JSON / XML / SVG</strong>) and write them under <code>data/key_terrain_battle_rhythm/&lt;cycle_start&gt;/</code> on the server.</li>
       </ul>
 
       <h5 style="margin:10px 0 4px">\u{1F4CE} Battle cycle protocols</h5>
@@ -2658,7 +2658,7 @@ function _ktShowHelp() {
       <h5 style="margin:10px 0 4px">\u23EA Wayback Machine</h5>
       <p>The <strong>\u{1F4DC} History</strong> button in the Battle Rhythm controls opens the <em>Wayback Machine</em>. It lists every cycle that has at least one snapshot on disk (newest first), with one button per recorded snapshot offset and format.</p>
       <ul style="margin:0;padding-left:18px">
-        <li>Click a JSON marker (e.g. <code>\u23EA H+0 JSON</code>) to <strong>load that historical KTB into the main view</strong>. A yellow banner appears at the top of the board indicating the cycle and the moment the snapshot was taken.</li>
+        <li>Click a JSON marker (e.g. <code>\u23EA T+0 JSON</code>) to <strong>load that historical KTB into the main view</strong>. A yellow banner appears at the top of the board indicating the cycle and the moment the snapshot was taken.</li>
         <li>While in wayback mode the board is fully read-only — Add, Edit, drag, ghost, archive, and the Settings panel are suppressed; live SSE refreshes are paused so the historical view doesn't move.</li>
         <li>Click <strong>\u23E9 Return to live</strong> in the banner to restore the current state of the board. The unfiltered live entries are stashed locally — no server round trip is needed.</li>
         <li>CSV / XML / SVG markers download the raw snapshot file to your machine instead of loading it into the view.</li>
@@ -2666,7 +2666,7 @@ function _ktShowHelp() {
       </ul>
 
       <h5 style="margin:10px 0 4px">Detached clock window</h5>
-      <p>The <strong>Clocks</strong> popup (toolbar in the main app) has a <em>Battle Rhythm</em> button that adds a read-only clock card showing the same H-offset, current step, next-step countdown, and cycles-completed counter alongside the other clocks.</p>
+      <p>The <strong>Clocks</strong> popup (toolbar in the main app) has a <em>Battle Rhythm</em> button that adds a read-only clock card showing the same T-offset, current step, next-step countdown, and cycles-completed counter alongside the other clocks.</p>
     </div>
 
     <div style="margin-top:16px">
@@ -2798,11 +2798,11 @@ function _ktBrExtrapolate(st) {
 }
 
 function _ktBrFormatHOffset(posMin, cycleMin) {
-  // Prefer "H+NN" / "H-NN" where magnitude < cycle/2, so a clock at 115 min
-  // into a 120-min cycle reads as "H-5" rather than "H+115". When the
+  // Prefer "T+NN" / "T-NN" where magnitude < cycle/2, so a clock at 115 min
+  // into a 120-min cycle reads as "T-5" rather than "T+115". When the
   // "show seconds" option is on, renders the seconds component too:
   // H+15:30 instead of H+15 for positions with fractional minutes.
-  if (!cycleMin) return 'H+' + Math.floor(posMin || 0);
+  if (!cycleMin) return 'T+' + Math.floor(posMin || 0);
   let m = posMin;
   if (m > cycleMin / 2) m = m - cycleMin;
   const sign = m < 0 ? '-' : '+';
@@ -2815,14 +2815,14 @@ function _ktBrFormatHOffset(posMin, cycleMin) {
     const mRem = Math.floor((totalSec % 3600) / 60);
     const sRem = totalSec % 60;
     if (h > 0) {
-      return 'H' + sign + h + 'h' + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
+      return 'T' + sign + h + 'h' + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
     }
-    return 'H' + sign + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
+    return 'T' + sign + String(mRem).padStart(2,'0') + ':' + String(sRem).padStart(2,'0');
   }
   const hh = Math.floor(absM / 60);
   const mm = Math.floor(absM % 60);
-  if (hh > 0) return 'H' + sign + hh + 'h' + String(mm).padStart(2,'0');
-  return 'H' + sign + String(Math.floor(absM)).padStart(2,'0');
+  if (hh > 0) return 'T' + sign + hh + 'h' + String(mm).padStart(2,'0');
+  return 'T' + sign + String(Math.floor(absM)).padStart(2,'0');
 }
 
 // Reset # Cycles counter — prompts the operator, then calls the
@@ -3018,7 +3018,7 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
       bgStyle = 'background:var(--bg2);border:2px dashed #3498db';
       break;
     case 'scheduled':
-      stateLabel = (t('kt_br_waiting')||'Waiting for H0');
+      stateLabel = (t('kt_br_waiting')||'Waiting for T0');
       stateColor = '#f39c12';
       bgStyle = 'background:var(--bg2);border:2px solid #f39c12;box-shadow:0 0 0 2px rgba(243,156,18,.15)';
       break;
@@ -3083,8 +3083,8 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
     }
   }
   // In "scheduled" mode, the big headline shows the waiting time and the
-  // target wall-clock time instead of an H-offset.
-  let headline = 'H--';
+  // target wall-clock time instead of a T-offset.
+  let headline = 'T--';
   let subline = '';
   if (layout === 'scheduled' && st && st.started_at) {
     // The countdown text is updated on every tick; the target time is
@@ -3133,7 +3133,7 @@ function _ktBrBuildShell(layout, st, canWrite, cfg) {
 // ticker animation runs without destroying any focus-holding input.
 function _ktBrUpdateValues(layout, cfg, st) {
   const hEl = document.getElementById('ktBrHOffset');
-  let hoffset = 'H--';
+  let hoffset = 'T--';
   if (layout === 'scheduled' && st && st.scheduled_seconds != null) {
     // Live countdown: Tm:SS until H0.
     const secs = Math.max(0, Math.round(st.scheduled_seconds - ((Date.now() - _ktBrLastFetchAt) / 1000)));
@@ -3215,8 +3215,8 @@ function _ktBrBuildStepsTitleText(cfg, st) {
     const abs = Math.abs(n);
     const h = Math.floor(abs / 60);
     const m = abs % 60;
-    if (h > 0) return 'H' + sign + h + 'h' + String(m).padStart(2, '0');
-    return 'H' + sign + String(m).padStart(2, '0');
+    if (h > 0) return 'T' + sign + h + 'h' + String(m).padStart(2, '0');
+    return 'T' + sign + String(m).padStart(2, '0');
   };
   steps.forEach((s) => {
     const start = typeof s.start_offset_min === 'number' ? s.start_offset_min : 0;
