@@ -448,14 +448,21 @@ function _renderKeyTerrainBoard() {
         // so they are identifiable at a glance. The "indent" is expressed
         // in ems so it scales with the board-zoom level (A- / A+).
         const indent = e._indent || 0;
-        const indentStyle = indent > 0 ? `padding-left:${8 + indent * 16}px;border-left:3px solid var(--accent);` : 'padding-left:8px;';
-        const prefix = indent > 0 ? `<span style="color:var(--accent);margin-right:4px" title="${t('kt_consequence_of')||'Consequence of root cause'}">↳</span>` : '';
+        const indentStyle = indent > 0 ? `padding-left:${8 + indent * 20}px;border-left:4px solid var(--accent);` : 'padding-left:8px;';
+        // Chunky arrow: larger, bold, with a pale accent background so the
+        // "connected" relationship is obvious even at dense board zoom.
+        const prefix = indent > 0
+          ? `<span style="display:inline-block;color:var(--accent);font-weight:700;font-size:1.25em;line-height:1;margin-right:6px;padding:0 4px;border-radius:3px;background:rgba(74,144,217,0.15)" title="${t('kt_consequence_of')||'Consequence of root cause'}">↳</span>`
+          : '';
         const isRoot = (childrenOf.get(e.id) || []).length > 0;
         const rootBadge = isRoot && indent === 0
-          ? ` <span style="font-size:9px;color:var(--accent);font-weight:normal;border:1px solid var(--accent);border-radius:8px;padding:1px 5px;margin-left:4px" title="${t('kt_root_cause_badge_h')||'Root cause for one or more consequences below'}">\u{1F333} ${t('kt_root_cause_badge')||'Root cause'}</span>`
+          ? ` <span style="display:inline-block;font-size:9px;color:#fff;background:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:1px 6px;margin-left:6px;font-weight:600;vertical-align:baseline;white-space:nowrap" title="${t('kt_root_cause_badge_h')||'Root cause for one or more consequences below'}">\u{1F333} ${t('kt_root_cause_badge')||'Root cause'}</span>`
           : '';
         const ghostedTag = e.ghosted ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(ghosted)</span>' : (isInactive ? ' <span style="font-size:9px;color:var(--text-dim);font-weight:normal">(' + (t('kt_inactive')||'inactive') + ')</span>' : '');
-        return `<td style="padding:8px 8px 8px 0;${indentStyle}font-weight:600">${prefix}${escHtml(e.function)}${rootBadge}${ghostedTag}</td>`;
+        // white-space:nowrap keeps the root-cause badge on the same row
+        // as the function name — letting the column widen naturally
+        // instead of wrapping the badge below the text.
+        return `<td style="padding:8px 8px 8px 0;${indentStyle}font-weight:600;white-space:nowrap">${prefix}${escHtml(e.function)}${rootBadge}${ghostedTag}</td>`;
       })(),
       status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusLabel}">${sIcon} ${statusLabel}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
@@ -669,6 +676,8 @@ async function _ktEditEntry(entryId) {
       <textarea id="ktComments" class="input" style="width:100%;min-height:48px;resize:vertical;font-size:var(--fs-xs)" placeholder="${t('kt_comments_ph')||'Notes, remarks, flags…'}">${escHtml(entry.comments || '')}</textarea>
     </div>
 
+    ${_ktRenderEntryHistorySection(entry, isNew)}
+
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary btn-sm" data-action="_ktSaveEntry" data-arg="${entryId || 0}">✔ ${t('btn_save')||'Save'}</button>
       <button class="btn btn-secondary btn-sm" data-action="_ktCancelEdit">${t('btn_cancel')||'Cancel'}</button>
@@ -730,6 +739,43 @@ async function _ktEditEntry(entryId) {
       setTimeout(() => { respDropdown.style.display = 'none'; }, 200);
     });
   }
+}
+
+// _ktRenderEntryHistorySection shows the entry's revision history
+// inline inside the edit modal so operators don't have to close the
+// popup and hit the 📜 button to see WHO changed WHAT and WHEN. New
+// entries (no history yet) show a "no history yet" placeholder.
+function _ktRenderEntryHistorySection(entry, isNew) {
+  if (isNew) {
+    return `<div style="margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--border)">
+      <div style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim)">\u{1F4DC} ${t('kt_entry_history')||'Revision history'}</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-style:italic">${t('kt_entry_history_new')||'History is recorded from the first save onwards.'}</div>
+    </div>`;
+  }
+  const hist = Array.isArray(entry.history) ? [...entry.history].reverse() : [];
+  const rows = hist.length
+    ? hist.map(h => {
+        let ts = '';
+        try { ts = new Date(h.timestamp).toLocaleString(); } catch {}
+        const oldNew = h.old_value
+          ? `<span style="text-decoration:line-through;color:var(--text-dim)">${escHtml(h.old_value)}</span> → <span>${escHtml(h.new_value)}</span>`
+          : (h.new_value ? escHtml(h.new_value) : `<span style="color:var(--text-dim)">${t('kt_history_cleared')||'cleared'}</span>`);
+        return `<div style="padding:4px 6px;border-bottom:1px solid var(--border);font-size:11px;line-height:1.4">
+          <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:10px">
+            <span>${escHtml(h.user_name || '')}</span>
+            <span>${escHtml(ts)}</span>
+          </div>
+          <div><strong>${escHtml(h.field)}</strong>: ${oldNew}</div>
+        </div>`;
+      }).join('')
+    : `<div style="padding:8px;font-size:10px;color:var(--text-dim);font-style:italic">${t('kt_no_history')||'No history for this entry.'}</div>`;
+  return `<div style="margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--border)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="font-size:var(--fs-xs);font-weight:600">\u{1F4DC} ${t('kt_entry_history')||'Revision history'}</div>
+      <span style="font-size:10px;color:var(--text-dim)">${hist.length} ${hist.length === 1 ? (t('kt_entry_singular')||'entry') : (t('kt_entry_plural')||'entries')}</span>
+    </div>
+    <div style="max-height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${rows}</div>
+  </div>`;
 }
 
 async function _ktSaveEntry(entryId) {

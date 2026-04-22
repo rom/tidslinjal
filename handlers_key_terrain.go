@@ -151,6 +151,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	now := time.Now()
 	entry := KeyTerrainEntry{
 		SeqNum:       seqNum,
 		CapabilityID: req.CapabilityID,
@@ -164,9 +165,6 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Priority: req.Priority,
 		Actions:  req.Actions,
 		ParentID: req.ParentID,
-		History: []KeyTerrainHist{
-			{Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName, Field: "created", NewValue: req.Function},
-		},
 	}
 
 	// Resolve responsible: try @name autocomplete
@@ -184,12 +182,62 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// Build the initial history as the full captured state. One
+	// "created" row plus one row per non-empty initial field, so the
+	// per-entry history popup (and the global audit log below) show
+	// every value the operator originally entered — not just the
+	// function name.
+	initialFields := []struct {
+		field string
+		value string
+	}{
+		{"function", entry.Function},
+		{"status", entry.Status},
+		{"trend", entry.Trend},
+		{"threat", entry.Threat},
+		{"external", entry.External},
+		{"comments", entry.Comments},
+		{"zone", entry.Zone},
+		{"actions", entry.Actions},
+		{"responsible", entry.ResponsibleName},
+	}
+	entry.History = []KeyTerrainHist{{Timestamp: now, UserID: user.ID, UserName: user.DisplayName, Field: "created", NewValue: entry.Function}}
+	if entry.Priority > 0 {
+		entry.History = append(entry.History, KeyTerrainHist{Timestamp: now, UserID: user.ID, UserName: user.DisplayName, Field: "priority", NewValue: fmt.Sprintf("%d", entry.Priority)})
+	}
+	if entry.ParentID > 0 {
+		entry.History = append(entry.History, KeyTerrainHist{Timestamp: now, UserID: user.ID, UserName: user.DisplayName, Field: "parent_id", NewValue: fmt.Sprintf("%d", entry.ParentID)})
+	}
+	for _, f := range initialFields {
+		if f.value == "" {
+			continue
+		}
+		entry.History = append(entry.History, KeyTerrainHist{Timestamp: now, UserID: user.ID, UserName: user.DisplayName, Field: f.field, NewValue: f.value})
+	}
+
 	created, err := app.store.CreateKeyTerrainEntry(entry)
 	if err != nil {
 		jsonError(w, "failed to create entry", http.StatusInternalServerError)
 		return
 	}
+	// Summary audit line, plus one line per initial field set — mirrors
+	// the per-entry history so the global audit log tells the same story.
 	app.audit(user.ID, user.Username, "create", "key_terrain", created.ID, fmt.Sprintf("Created key terrain entry #%d %q", created.SeqNum, created.Function))
+	if created.Priority > 0 {
+		app.audit(user.ID, user.Username, "set_field", "key_terrain", created.ID,
+			fmt.Sprintf("KT #%d %q · priority = %d", created.SeqNum, created.Function, created.Priority))
+	}
+	if created.ParentID > 0 {
+		app.audit(user.ID, user.Username, "set_field", "key_terrain", created.ID,
+			fmt.Sprintf("KT #%d %q · parent_id = %d", created.SeqNum, created.Function, created.ParentID))
+	}
+	for _, f := range initialFields {
+		if f.value == "" || f.field == "function" {
+			continue // function is already in the Created summary
+		}
+		app.audit(user.ID, user.Username, "set_field", "key_terrain", created.ID,
+			fmt.Sprintf("KT #%d %q · %s = %q", created.SeqNum, created.Function, f.field, f.value))
+	}
 	app.broadcastKeyTerrainChange("entry_created")
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
@@ -240,6 +288,19 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 			Timestamp: now, UserID: user.ID, UserName: user.DisplayName,
 			Field: field, OldValue: oldVal, NewValue: newVal,
 		})
+		// Mirror every change into the global audit log so admins can
+		// reconstruct who changed what and when without having to open
+		// each entry's history popup. Format matches the create-time
+		// set_field lines so the audit log tells one consistent story.
+		var detail string
+		if oldVal == "" {
+			detail = fmt.Sprintf("KT #%d %q · %s = %q", entry.SeqNum, entry.Function, field, newVal)
+		} else if newVal == "" {
+			detail = fmt.Sprintf("KT #%d %q · %s cleared (was %q)", entry.SeqNum, entry.Function, field, oldVal)
+		} else {
+			detail = fmt.Sprintf("KT #%d %q · %s: %q → %q", entry.SeqNum, entry.Function, field, oldVal, newVal)
+		}
+		app.audit(user.ID, user.Username, "set_field", "key_terrain", entry.ID, detail)
 	}
 
 	if req.Function != nil && *req.Function != entry.Function {
