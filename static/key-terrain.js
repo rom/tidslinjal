@@ -410,6 +410,17 @@ function _renderKeyTerrainBoard() {
   const fmtDate = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleDateString(undefined, {year:'2-digit',month:'short',day:'numeric'}); } catch { return '\u2014'; } };
   const fmtDateTime = (d) => { if (!d) return '\u2014'; try { return new Date(d).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); } catch { return '\u2014'; } };
 
+  // Age badges: compare each entry's created_at to the current battle-
+  // rhythm cycle length. Entries younger than one cycle get a green
+  // "new" flag; entries older than one cycle get a muted "old" flag.
+  // If battle-rhythm isn't configured we skip both badges since there
+  // is no reference cycle length to compare against.
+  const _ktCycleMs = (() => {
+    const m = parseInt(_ktState.settings?.battle_rhythm?.cycle_minutes);
+    return (m > 0) ? m * 60 * 1000 : 0;
+  })();
+  const _ktNowMs = Date.now();
+
   for (const e of sorted) {
     const statusOpt = _ktStatusOptions.find(s => s.value === e.status) || _ktStatusOptions[3];
     const trendOpt = _ktTrendOptions.find(tr => tr.value === e.trend) || _ktTrendOptions[1];
@@ -454,6 +465,27 @@ function _renderKeyTerrainBoard() {
         const prefix = indent > 0
           ? `<span style="display:inline-block;color:var(--accent);font-weight:700;font-size:1.25em;line-height:1;margin-right:6px;padding:0 4px;border-radius:3px;background:rgba(74,144,217,0.15)" title="${t('kt_consequence_of')||'Consequence of root cause'}">↳</span>`
           : '';
+        // Sequence-number chip before the function name: matches the
+        // "#N" shorthand used in the audit log and stays visible even
+        // when the dedicated seq_num column is hidden.
+        const seqChip = e.seq_num
+          ? `<span style="display:inline-block;font-size:10px;color:var(--text-dim);background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:0 5px;margin-right:6px;font-weight:600;vertical-align:baseline">#${e.seq_num}</span>`
+          : '';
+        // New/old age flag: 🆕 for entries younger than one battle-rhythm
+        // cycle, 🕰 for entries older than one cycle. Skipped when
+        // battle-rhythm is not configured (no reference cycle length).
+        let ageBadge = '';
+        if (_ktCycleMs > 0 && e.created_at) {
+          const createdMs = Date.parse(e.created_at);
+          if (!isNaN(createdMs)) {
+            const age = _ktNowMs - createdMs;
+            if (age >= 0 && age < _ktCycleMs) {
+              ageBadge = ` <span style="font-size:10px;margin-right:4px;vertical-align:baseline" title="${t('kt_age_new_h')||'Added within the last battle-rhythm cycle'}">\u{1F195}</span>`;
+            } else if (age >= _ktCycleMs) {
+              ageBadge = ` <span style="font-size:10px;margin-right:4px;vertical-align:baseline;opacity:0.7" title="${t('kt_age_old_h')||'On the board for more than one battle-rhythm cycle'}">\u{1F570}️</span>`;
+            }
+          }
+        }
         const isRoot = (childrenOf.get(e.id) || []).length > 0;
         const rootBadge = isRoot && indent === 0
           ? ` <span style="display:inline-block;font-size:9px;color:#fff;background:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:1px 6px;margin-left:6px;font-weight:600;vertical-align:baseline;white-space:nowrap" title="${t('kt_root_cause_badge_h')||'Root cause for one or more consequences below'}">\u{1F333} ${t('kt_root_cause_badge')||'Root cause'}</span>`
@@ -462,7 +494,7 @@ function _renderKeyTerrainBoard() {
         // white-space:nowrap keeps the root-cause badge on the same row
         // as the function name — letting the column widen naturally
         // instead of wrapping the badge below the text.
-        return `<td style="padding:8px 8px 8px 0;${indentStyle}font-weight:600;white-space:nowrap">${prefix}${escHtml(e.function)}${rootBadge}${ghostedTag}</td>`;
+        return `<td style="padding:8px 8px 8px 0;${indentStyle}font-weight:600;white-space:nowrap">${prefix}${ageBadge}${seqChip}${escHtml(e.function)}${rootBadge}${ghostedTag}</td>`;
       })(),
       status: `<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap" title="${statusLabel}">${sIcon} ${statusLabel}</span></td>`,
       trend: `<td style="padding:8px;text-align:center"><span title="${trendOpt.label}">${trIcon} ${trendOpt.label}</span></td>`,
@@ -2616,6 +2648,8 @@ function _ktShowHelp() {
       <h4 style="margin:12px 0 4px">${t('kt_help_features')||'Features'}</h4>
       <ul style="margin:0;padding-left:18px">
         <li><strong>Click a row</strong> to edit the entry (write-access users).</li>
+        <li><strong>\u{1F195} / \u{1F570} Age badges</strong> — entries younger than one battle-rhythm cycle carry a \u{1F195} "new" badge in the function cell; entries older than one cycle carry a muted \u{1F570} "old" badge. The threshold is the configured cycle length in Settings → Battle Rhythm; if battle rhythm is not configured, no badge is shown.</li>
+        <li><strong>#N seq chip</strong> — each function cell is prefixed with the entry's sequence number (e.g. <code>#7</code>) so the canonical identifier is always visible, even when the dedicated <em>Seq</em> column is hidden.</li>
         <li><strong>\u{1F333} Root cause &amp; consequences</strong> — in the edit modal, pick another entry as the <em>Root cause</em> to mark the current entry as a consequence. Consequences cluster right under their root cause on the board and are indented with a ↳ marker plus a left border; the parent carries a \u{1F333} <em>Root cause</em> badge. Orphans (parent archived or filtered out) fall back to rendering standalone.</li>
         <li><strong>\u25B2 \u25BC</strong> moves a row up or down.</li>
         <li><strong>Click column headers</strong> to sort (click again to reverse, again to clear).</li>
