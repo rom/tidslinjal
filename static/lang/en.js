@@ -3091,6 +3091,7 @@ TRANSLATIONS.en = {
     kt_entry_history: 'Revision history',
     kt_entry_history_new: 'History is recorded from the first save onwards.',
     kt_history_cleared: 'cleared',
+    kt_revision: 'Revision',
     kt_board_protocols: 'Battle cycle protocols',
     kt_file_singular: 'file',
     kt_file_plural: 'files',

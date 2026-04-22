@@ -589,8 +589,20 @@ async function _ktEditEntry(entryId) {
 
   const isNew = !entryId;
 
+  // Revision number = how many history records the entry carries.
+  // First save creates the "created" record, so a freshly-saved entry
+  // is at revision 1; subsequent edits bump it. New (unsaved) entries
+  // show no revision badge.
+  const revisionCount = (entry.history || []).length;
+  const revBadge = (!isNew && revisionCount > 0)
+    ? ` <span style="font-size:11px;font-weight:normal;color:#fff;background:var(--accent);border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle">${t('kt_revision')||'Revision'} ${revisionCount}</span>`
+    : '';
+  const seqBadge = (!isNew && entry.seq_num)
+    ? ` <span style="font-size:11px;font-weight:normal;color:var(--text-dim);margin-left:8px;vertical-align:middle">#${entry.seq_num}</span>`
+    : '';
+
   let html = `<div style="max-width:540px">
-    <h3>${isNew ? '➕' : '✏️'} ${isNew ? (t('kt_add')||'Add Entry') : (t('kt_edit')||'Edit Entry')}</h3>
+    <h3 style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">${isNew ? '➕' : '✏️'} ${isNew ? (t('kt_add')||'Add Entry') : (t('kt_edit')||'Edit Entry')}${seqBadge}${revBadge}</h3>
 
     ${capabilities.length > 0 ? `<div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:var(--radius)">
       <label style="font-size:var(--fs-xs);font-weight:600;display:block;margin-bottom:3px">\u{1F3AF} ${t('kt_from_capability')||'Load from Function'}</label>
@@ -747,34 +759,36 @@ async function _ktEditEntry(entryId) {
 // entries (no history yet) show a "no history yet" placeholder.
 function _ktRenderEntryHistorySection(entry, isNew) {
   if (isNew) {
-    return `<div style="margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--border)">
-      <div style="font-size:var(--fs-xs);font-weight:600;color:var(--text-dim)">\u{1F4DC} ${t('kt_entry_history')||'Revision history'}</div>
+    return `<div style="margin:14px 0 6px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="font-size:var(--fs-xs);font-weight:600">\u{1F4DC} ${t('kt_entry_history')||'Revision history'}</div>
       <div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-style:italic">${t('kt_entry_history_new')||'History is recorded from the first save onwards.'}</div>
     </div>`;
   }
   const hist = Array.isArray(entry.history) ? [...entry.history].reverse() : [];
   const rows = hist.length
-    ? hist.map(h => {
+    ? hist.map((h, idx) => {
         let ts = '';
         try { ts = new Date(h.timestamp).toLocaleString(); } catch {}
         const oldNew = h.old_value
-          ? `<span style="text-decoration:line-through;color:var(--text-dim)">${escHtml(h.old_value)}</span> → <span>${escHtml(h.new_value)}</span>`
-          : (h.new_value ? escHtml(h.new_value) : `<span style="color:var(--text-dim)">${t('kt_history_cleared')||'cleared'}</span>`);
-        return `<div style="padding:4px 6px;border-bottom:1px solid var(--border);font-size:11px;line-height:1.4">
-          <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:10px">
-            <span>${escHtml(h.user_name || '')}</span>
+          ? `<span style="text-decoration:line-through;color:var(--text-dim)">${escHtml(h.old_value)}</span> → <span style="color:var(--accent)">${escHtml(h.new_value)}</span>`
+          : (h.new_value ? `<span style="color:var(--accent)">${escHtml(h.new_value)}</span>` : `<span style="color:var(--text-dim)">${t('kt_history_cleared')||'cleared'}</span>`);
+        // Revision number = position in chronological order (oldest = 1).
+        const revNum = hist.length - idx;
+        return `<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:11px;line-height:1.4">
+          <div style="display:flex;justify-content:space-between;align-items:center;color:var(--text-dim);font-size:10px">
+            <span><span style="color:var(--accent);font-weight:600">r${revNum}</span> · ${escHtml(h.user_name || '')}</span>
             <span>${escHtml(ts)}</span>
           </div>
           <div><strong>${escHtml(h.field)}</strong>: ${oldNew}</div>
         </div>`;
       }).join('')
     : `<div style="padding:8px;font-size:10px;color:var(--text-dim);font-style:italic">${t('kt_no_history')||'No history for this entry.'}</div>`;
-  return `<div style="margin:14px 0 6px;padding-top:10px;border-top:1px dashed var(--border)">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+  return `<div style="margin:14px 0 6px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <div style="font-size:var(--fs-xs);font-weight:600">\u{1F4DC} ${t('kt_entry_history')||'Revision history'}</div>
-      <span style="font-size:10px;color:var(--text-dim)">${hist.length} ${hist.length === 1 ? (t('kt_entry_singular')||'entry') : (t('kt_entry_plural')||'entries')}</span>
+      <span style="font-size:10px;color:var(--text-dim)">${t('kt_revision')||'Revision'} ${hist.length} · ${hist.length} ${hist.length === 1 ? (t('kt_entry_singular')||'entry') : (t('kt_entry_plural')||'entries')}</span>
     </div>
-    <div style="max-height:180px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${rows}</div>
+    <div style="max-height:200px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">${rows}</div>
   </div>`;
 }
 
