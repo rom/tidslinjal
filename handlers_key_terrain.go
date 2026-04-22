@@ -189,7 +189,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		jsonError(w, "failed to create entry", http.StatusInternalServerError)
 		return
 	}
-	app.audit(user.ID, user.Username, "create", "key_terrain", created.ID, fmt.Sprintf("Created key terrain entry %q", created.Function))
+	app.audit(user.ID, user.Username, "create", "key_terrain", created.ID, fmt.Sprintf("Created key terrain entry #%d %q", created.SeqNum, created.Function))
 	app.broadcastKeyTerrainChange("entry_created")
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, created)
@@ -371,7 +371,7 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
-	app.audit(user.ID, user.Username, "update", "key_terrain", entry.ID, fmt.Sprintf("Updated key terrain entry %q", entry.Function))
+	app.audit(user.ID, user.Username, "update", "key_terrain", entry.ID, fmt.Sprintf("Updated key terrain entry #%d %q", entry.SeqNum, entry.Function))
 	app.broadcastKeyTerrainChange("entry_updated")
 	jsonOK(w, entry)
 }
@@ -395,7 +395,7 @@ func (app *App) handleDeleteKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		jsonError(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
-	app.audit(user.ID, user.Username, "delete", "key_terrain", id, fmt.Sprintf("Deleted key terrain entry %q", entry.Function))
+	app.audit(user.ID, user.Username, "delete", "key_terrain", id, fmt.Sprintf("Deleted key terrain entry #%d %q", entry.SeqNum, entry.Function))
 	app.broadcastKeyTerrainChange("entry_deleted")
 	jsonOK(w, map[string]string{"status": "ok"})
 }
