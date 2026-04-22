@@ -2456,7 +2456,7 @@ function _ktShowHistory(entryId) {
 
   const hist = [...entry.history].reverse();
   let html = `<div style="max-width:500px">
-    <h3>📜 ${t('kt_history')||'History'}: ${escHtml(entry.function)}</h3>
+    <h3>📜 ${t('kt_history')||'History'}: #${entry.seq_num || entry.id} ${escHtml(entry.function)}</h3>
     <div style="max-height:400px;overflow-y:auto">`;
 
   for (const h of hist) {
