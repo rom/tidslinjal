@@ -345,3 +345,79 @@ func TestAPI_KeyTerrainAttachment_URL(t *testing.T) {
 		t.Errorf("expected 0 attachments after delete, got %d", len(list2))
 	}
 }
+
+// TestAPI_KeyTerrain_ParentID exercises the root-cause / consequence
+// link: creating with parent_id, updating to set / clear it, and the
+// server-side guards against self-reference and cycles.
+func TestAPI_KeyTerrain_ParentID(t *testing.T) {
+	_, srv := newTestApp(t)
+	cookies := login(t, srv, "admin", "admin")
+
+	mkEntry := func(fn string, parentID int64) int64 {
+		payload := map[string]any{"function": fn}
+		if parentID != 0 {
+			payload["parent_id"] = parentID
+		}
+		r := apiDo(t, srv, http.MethodPost, "/api/key-terrain", payload, cookies)
+		defer r.Body.Close()
+		if r.StatusCode != http.StatusCreated {
+			t.Fatalf("create %q: got %d", fn, r.StatusCode)
+		}
+		var got map[string]any
+		decodeJSON(t, r, &got)
+		return int64(got["id"].(float64))
+	}
+
+	root := mkEntry("Root cause A", 0)
+	child1 := mkEntry("Consequence 1", root)
+	child2 := mkEntry("Consequence 2", 0) // will be linked via PUT
+
+	// Verify creation path stored parent_id
+	list := apiDo(t, srv, http.MethodGet, "/api/key-terrain", nil, cookies)
+	defer list.Body.Close()
+	var entries []map[string]any
+	decodeJSON(t, list, &entries)
+	for _, e := range entries {
+		if int64(e["id"].(float64)) == child1 {
+			if pid, _ := e["parent_id"].(float64); int64(pid) != root {
+				t.Errorf("child1 parent_id: want %d, got %v", root, e["parent_id"])
+			}
+		}
+	}
+
+	// PUT sets parent_id after the fact
+	put := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/key-terrain/%d", child2), map[string]any{"parent_id": root}, cookies)
+	put.Body.Close()
+	if !isSuccess(put.StatusCode) {
+		t.Fatalf("set parent_id: got %d", put.StatusCode)
+	}
+
+	// Self-reference must be rejected
+	self := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/key-terrain/%d", root), map[string]any{"parent_id": root}, cookies)
+	self.Body.Close()
+	if self.StatusCode != http.StatusBadRequest {
+		t.Errorf("self-reference: expected 400, got %d", self.StatusCode)
+	}
+
+	// Cycle must be rejected: root → child1 is fine, but trying to
+	// make root a consequence of child1 would close a loop.
+	cycle := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/key-terrain/%d", root), map[string]any{"parent_id": child1}, cookies)
+	cycle.Body.Close()
+	if cycle.StatusCode != http.StatusBadRequest {
+		t.Errorf("cycle: expected 400, got %d", cycle.StatusCode)
+	}
+
+	// Missing parent must be rejected
+	missing := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/key-terrain/%d", child1), map[string]any{"parent_id": 999999}, cookies)
+	missing.Body.Close()
+	if missing.StatusCode != http.StatusBadRequest {
+		t.Errorf("missing parent: expected 400, got %d", missing.StatusCode)
+	}
+
+	// Clearing parent_id (setting it to 0) must succeed
+	clear := apiDo(t, srv, http.MethodPut, fmt.Sprintf("/api/key-terrain/%d", child1), map[string]any{"parent_id": 0}, cookies)
+	clear.Body.Close()
+	if !isSuccess(clear.StatusCode) {
+		t.Errorf("clear parent_id: got %d", clear.StatusCode)
+	}
+}

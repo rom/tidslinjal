@@ -123,6 +123,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		ResponsibleID int64  `json:"responsible_id"`
 		Responsible   string `json:"responsible"`
 		Actions       string `json:"actions"`
+		ParentID      int64  `json:"parent_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -141,6 +142,15 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// Validate ParentID on create. An entry-in-the-making has no ID
+	// yet, so we can't self-reference; just check existence when set.
+	if req.ParentID != 0 {
+		if app.store.GetKeyTerrainEntryByID(req.ParentID) == nil {
+			jsonError(w, "parent entry not found", http.StatusBadRequest)
+			return
+		}
+	}
+
 	entry := KeyTerrainEntry{
 		SeqNum:       seqNum,
 		CapabilityID: req.CapabilityID,
@@ -153,6 +163,7 @@ func (app *App) handleCreateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Comments: req.Comments,
 		Priority: req.Priority,
 		Actions:  req.Actions,
+		ParentID: req.ParentID,
 		History: []KeyTerrainHist{
 			{Timestamp: time.Now(), UserID: user.ID, UserName: user.DisplayName, Field: "created", NewValue: req.Function},
 		},
@@ -216,6 +227,7 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 		Ghosted       *bool   `json:"ghosted"`
 		Archived      *bool   `json:"archived"`
 		Finished      *bool   `json:"finished"`
+		ParentID      *int64  `json:"parent_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -269,6 +281,38 @@ func (app *App) handleUpdateKeyTerrainEntry(w http.ResponseWriter, r *http.Reque
 	if req.Rounds != nil && *req.Rounds != entry.Rounds {
 		addHist("rounds", fmt.Sprintf("%d", entry.Rounds), fmt.Sprintf("%d", *req.Rounds))
 		entry.Rounds = *req.Rounds
+	}
+	// Handle parent_id ("root cause" link). Validate: must not point
+	// at the entry itself, must reference an existing (non-archived)
+	// entry if non-zero, and must not introduce a cycle by walking
+	// the parent chain. 0 means "no parent / this is a root cause
+	// itself or standalone".
+	if req.ParentID != nil && *req.ParentID != entry.ParentID {
+		newParent := *req.ParentID
+		if newParent != 0 {
+			if newParent == entry.ID {
+				jsonError(w, "an entry cannot be its own root cause", http.StatusBadRequest)
+				return
+			}
+			parent := app.store.GetKeyTerrainEntryByID(newParent)
+			if parent == nil {
+				jsonError(w, "parent entry not found", http.StatusBadRequest)
+				return
+			}
+			// Walk the parent chain up to 32 hops to detect cycles.
+			seen := map[int64]bool{entry.ID: true}
+			cur := parent
+			for i := 0; i < 32 && cur != nil && cur.ParentID != 0; i++ {
+				if seen[cur.ParentID] {
+					jsonError(w, "setting this parent would create a cycle", http.StatusBadRequest)
+					return
+				}
+				seen[cur.ID] = true
+				cur = app.store.GetKeyTerrainEntryByID(cur.ParentID)
+			}
+		}
+		addHist("parent_id", fmt.Sprintf("%d", entry.ParentID), fmt.Sprintf("%d", newParent))
+		entry.ParentID = newParent
 	}
 
 	// Handle ghost/archive/finish
